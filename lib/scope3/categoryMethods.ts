@@ -16,12 +16,11 @@
 //                             leg and rail journey, with well-to-tank added (businessTravel.ts)
 //   Cat 7                     (since 19 Sep 2026) DEFRA/DESNZ 2026 land travel factors per group of
 //                             commuters, with well-to-tank added, and UK homeworking (commuting.ts)
+//   Cat 3                     (since 20 Sep 2026) DEFRA/DESNZ 2026 upstream energy factors, applied to the
+//                             bound GHG inventory's own fuel, electricity and heat (cat3Energy.ts,
+//                             cat3Inputs.ts, cat3Copy.ts)
 //   Cat 15                    the PCAF-aligned path in lib/pcaf
-//   the other seven           one flat spend factor, with no source, no year and no region
-// The eighth method, 'fuel_and_energy_upstream' (DEFRA/DESNZ 2026 upstream energy factors on the bound GHG
-// inventory's own fuel, electricity and heat), is DEFINED AND UNASSIGNED: Cat 3 takes it in Task 5, with
-// the panel and the basis branch. Defining it early is what makes the records below answerable one at a
-// time; assigning it early would change a customer's figure before anything could describe it.
+//   the other six             one flat spend factor, with no source, no year and no region
 //
 // CLIENT-SAFE: imports spend.ts (types and the source catalogue) and lib/emissionFactors.ts, neither
 // of which pulls in a factor file, and defraWaste.ts, which pulls in the ~30 KB waste artefact the
@@ -53,18 +52,18 @@ const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   // OUT, where there is no purchase; Cat 3 is derived from energy already in Scopes 1 and 2; Cat 12 is
   // tonnes by material; Cat 8's own guidance says spend is not appropriate. Those eight kept flat_spend
   // deliberately; see SPEND_PRICED_CATEGORIES in app/dashboard/scope3/page.tsx.
-  //   ⚠️ CAT 12 LEFT THE FLAT GROUP ON 18 SEP 2026 for end_of_life_factors, so flat_spend has SEVEN
-  // members: 3, 8, 9, 10, 11, 13 and 14. Cat 3 leaves in Task 5 of the Category 3 build, not here.
-  // Whether flat_spend survives is a later question.
+  //   ⚠️ CAT 12 LEFT ON 18 SEP 2026 for end_of_life_factors and CAT 3 ON 20 SEP 2026 for
+  // fuel_and_energy_upstream, so flat_spend has SIX members: 8, 9, 10, 11, 13 and 14. Whether it
+  // survives is a later question.
   cat2: 'exiobase_spend',
-  // ⚠️ CAT 3 IS NOT HERE YET, AND THAT IS THE WHOLE OF THE DECISION OF 20 SEP 2026. The method it will
-  // take, 'fuel_and_energy_upstream', is defined and described below; no category is assigned to it.
-  // This map is what the calculator DISPATCHES on, so assigning Cat 3 here changes the figure at the
-  // same moment it changes every description of the figure. Until the panel that reads the bound GHG
-  // inventory exists (Task 5) and the basis branch that describes it exists (Task 6), an assignment
-  // would leave a spend figure under an activity-data description, or no figure under a promise of one.
-  // Task 5 flips this line together with SCOPE3_DATA_SOURCE.cat3; categoryMethods.test.ts M1 and M11
-  // fail until both arrive.
+  // ⚠️ CAT 3 JOINED ON 20 SEP 2026 (Task 5), WITH ITS PANEL AND ITS CALCULATOR IN THE SAME CHANGE, so
+  // flat_spend has SIX members: 8, 9, 10, 11, 13 and 14. It is the first category priced from data the
+  // customer entered in ANOTHER module: the bound GHG inventory's own energy, re-priced on upstream
+  // factors. Nothing about it is spend, and a spend figure saved under its old method prices nothing.
+  //   This map is what the calculator DISPATCHES on, which is why the assignment, the panel, the
+  // calculator and SCOPE3_DATA_SOURCE.cat3 are one change: categoryMethods.test.ts M11 fails if an
+  // assignment arrives without them.
+  cat3: 'fuel_and_energy_upstream',
   cat4: 'exiobase_spend',
   cat5: 'waste_factors',
   // ⚠️ 'travel_factors' IS GONE, NOT RENAMED. It priced flight COUNTS at an assumed 800 or 5,000 km from
@@ -113,8 +112,8 @@ export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>
   employee_commuting_factors: false,
   // Category 12 takes no entered total: its figure is the customer's materials and split, priced.
   end_of_life_factors: false,
-  // Category 3 will take one when it joins this method. Its estimate is derived from another module's
-  // data rather than from anything typed on its own panel, so a customer who holds a better figure for
+  // Category 3 DOES take one. Its estimate is derived from another module's data rather than from
+  // anything typed on its own panel, so a customer who holds a better figure for
   // upstream fuel and energy has nowhere else to put it; the known-emissions field stays, as it does for
   // Cats 1, 2, 4 and 15. ~/themisiq-sources/findings/cat3-design.md, Q7.
   fuel_and_energy_upstream: true,

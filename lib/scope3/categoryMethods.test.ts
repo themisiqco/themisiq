@@ -44,25 +44,24 @@ const bannedFor = (m: Scope3Method): RegExp[] => {
 }
 
 describe('Scope 3 category methods', () => {
-  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 5/6/7/12 activity factors, Cat 15 PCAF, the other seven flat, and NOTHING on the new energy method', () => {
+  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 3 upstream energy, Cat 5/6/7/12 activity factors, Cat 15 PCAF, the other six flat', () => {
     // Cats 2 and 4 moved onto EXIOBASE on 17 Sep 2026: they are purchases, so a spend figure has something
-    // to multiply. The seven left on flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
+    // to multiply. Cat 3 joined fuel_and_energy_upstream on 20 Sep 2026, priced from the bound GHG
+    // inventory's own energy rather than from anything entered on its own panel. The six left on
+    // flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
     expect(IDS.map(id => [id, scope3MethodFor(id)])).toEqual([
-      ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'flat_spend'], ['cat4', 'exiobase_spend'],
+      ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'fuel_and_energy_upstream'], ['cat4', 'exiobase_spend'],
       ['cat5', 'waste_factors'], ['cat6', 'business_travel_factors'], ['cat7', 'employee_commuting_factors'],
       ['cat8', 'flat_spend'], ['cat9', 'flat_spend'], ['cat10', 'flat_spend'], ['cat11', 'flat_spend'],
       ['cat12', 'end_of_life_factors'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
     ])
-    // SEVEN: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14; Cats 2 and 4 left for EXIOBASE on
-    // 17 Sep 2026, and Cat 12 for the DEFRA end-of-life factors on 18 Sep 2026.
-    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toEqual(['cat3', 'cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
+    // SIX: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14; Cats 2 and 4 left for EXIOBASE on
+    // 17 Sep 2026, Cat 12 for the DEFRA end-of-life factors on 18 Sep 2026, and Cat 3 on 20 Sep 2026.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toEqual(['cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
     expect(IDS.filter(id => scope3MethodFor(id) === 'exiobase_spend')).toEqual(['cat1', 'cat2', 'cat4'])
-    // ⚠️ DEFINED AND UNASSIGNED, ON PURPOSE, AND THIS LINE IS THE RECORD OF IT. 'fuel_and_energy_upstream'
-    // exists with a description, an assistant phrase, a GWP record, a rank and a vocabulary of its own; no
-    // category dispatches to it. Task 5 of the Category 3 design changes this to ['cat3'] IN THE SAME
-    // CHANGE as the panel that reads the bound GHG inventory and the rewritten SCOPE3_DATA_SOURCE.cat3,
-    // and Task 6 adds the categoryBasis branch. M11 fails if an assignment arrives without them.
-    expect(IDS.filter(id => scope3MethodFor(id) === 'fuel_and_energy_upstream')).toEqual([])
+    // ⚠️ ONE CATEGORY, AND THE ASSIGNMENT CAME WITH ITS PANEL AND ITS CALCULATOR. M11 is what holds that
+    // together: it fails if this list grows without the surfaces that describe what was priced.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'fuel_and_energy_upstream')).toEqual(['cat3'])
   })
 
   it('M2 descriptions are derived: the flat factor and the gap come from the factor record', () => {

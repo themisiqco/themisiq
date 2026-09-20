@@ -56,6 +56,17 @@ import {
   cat6Sentences, cat6WorkingsSummary, cat6Basis, cat6RfHeader, cat6RfSentence, flightCsvRow, railCsvRow,
   flightRuleText, flightClassText, flightNotPricedReason, railNotPricedReason, AIR_CATEGORY_LABEL,
 } from '../../../lib/scope3/businessTravelCopy'
+// ── CATEGORY 3 ────────────────────────────────────────────────────────────────────────────────────
+// The adapter reads the bound GHG inventory's saved workings and locations; the pricing module turns
+// them into DEFRA-priced lines; the copy module is where every sentence about them lives. None of the
+// three imports lib/ghg/engine.ts, so the Scope 3 bundle does not gain the engine's factor tables.
+import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
+import { priceCat3 } from '../../../lib/scope3/cat3Energy'
+import {
+  cat3Sentences, cat3WorkingsSummary, cat3NoFigureText,
+  CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
+} from '../../../lib/scope3/cat3Copy'
+import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
 import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
@@ -1063,6 +1074,15 @@ export default function Scope3Dashboard() {
   // The bound GHG inventory's recorded GWP basis (ghg_inventories.gwp_version: AR4, AR5, AR6 or null).
   // Read so the Cat 5 disclosure can state whether its AR5 factors match it, rather than assume either way.
   const [ghgGwpVersion, setGhgGwpVersion] = useState<string | null>(null)
+  // ── THE BOUND INVENTORY'S ENERGY, WHICH IS CATEGORY 3'S ONLY INPUT ───────────────────────────
+  // bindToInventory already fetches the whole ghg_inventories row and threw these two columns away
+  // until 20 Sep 2026. `workings` carries the activity that actually priced, with the inventory's
+  // coverage resolutions applied; `locations_data` carries the country and the declaration answers
+  // that `workings` does not. lib/scope3/cat3Inputs.ts reads both and validates their shape itself,
+  // which is why they are held as `unknown`: an inventory saved before either column existed is a
+  // case it answers with a reason, not a crash.
+  const [boundWorkings, setBoundWorkings] = useState<unknown>(null)
+  const [boundLocations, setBoundLocations] = useState<unknown>(null)
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
   const [cameFromGhg, setCameFromGhg] = useState(false) // arrived via ?from=ghg (unsaved GHG wizard)
@@ -1394,6 +1414,8 @@ export default function Scope3Dashboard() {
     if (!row) return // no row -> stays unbound; the picker gate handles it
     setBoundInventoryId(id)
     setGhgGwpVersion(row.gwp_version ?? null)
+    setBoundWorkings(row.workings ?? null)
+    setBoundLocations(row.locations_data ?? null)
     setCompany(row.company_name)
     setReportingYear(row.reporting_year)
     setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
@@ -1830,6 +1852,31 @@ export default function Scope3Dashboard() {
     return (spend * GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit) / 1000
   }
 
+  /**
+   * Category 3, from the bound GHG inventory: the adapter's reading of it, and the priced result.
+   *
+   * ⚠️ COMPUTED ONCE PER RENDER AND SHARED BY EVERY SURFACE, exactly as cat15Result() is. The figure,
+   * the panel's workings, the confidence pill and (from Task 6) the CSV must all describe one
+   * evaluation; two calls with the same inputs would agree today and are two things to keep in step
+   * tomorrow.
+   *
+   * ⚠️ NOTHING HERE READS catData['cat3'].annual_spend. A spend figure saved under the old method is
+   * not an input to this calculation and prices nothing; Task 9 of the Category 3 design adds the
+   * export row that reports it as recorded and not used.
+   */
+  // Plain consts, not useMemo, for the same reason cat15Result() is a plain call: the page's derived
+  // values are computed per render, and the harness (lib/scope3/scope3Surfaces.test.ts) mocks React
+  // down to useState, useEffect and useRef. Both calls are pure and cheap.
+  const cat3Read = cat3InputsFrom(boundWorkings, boundLocations)
+  const cat3Priced = cat3Read.inputs ? priceCat3(cat3Read.inputs) : null
+  /** The sentence shown when Category 3 has no figure: the inventory could not be read, or a stream was
+   *  never answered. null when there is a figure, including a calculated zero. */
+  const cat3NoFigure = cat3NoFigureText(cat3Priced, cat3Read)
+
+  /** The figure in tonnes, or null where there is none. A withheld category has no figure, never a zero. */
+  const cat3Mt = (): number | null =>
+    cat3Priced && cat3Priced.status !== 'withheld' ? cat3Priced.kg_co2e / 1000 : null
+
   // Full PCAF result for cat 15. Delegates to the engine orchestrator, which chooses the
   // decomposed per-asset assessment (detailed mode) or the lumped score-5 proxy. Returns
   // the whole PortfolioResult so render can read mode/dqScore without re-plumbing.
@@ -1863,14 +1910,10 @@ export default function Scope3Dashboard() {
       case 'employee_commuting_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'pcaf': return calcCat15()
       case 'flat_spend': return calcGenericSpend(id)
-      // ⚠️ NO SPEND FALLBACK HERE, AND THAT IS THE WHOLE POINT OF THE MOVE. Category 3's method is now
-      // fuel_and_energy_upstream, so calcGenericSpend would price it by a method the map no longer
-      // claims, under copy that names DEFRA: the one thing categoryMethods.ts exists to prevent.
-      // Task 5 of the Category 3 design replaces this line with the priced result of
-      // lib/scope3/cat3Inputs.ts and lib/scope3/cat3Energy.ts, read from the bound GHG inventory. Until
-      // then the only Category 3 figure is one the customer entered as known emissions, which
-      // METHOD_TAKES_ENTERED_FIGURE says this method accepts.
-      case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || 0
+      // ⚠️ NEVER calcGenericSpend. Category 3 is priced from the bound GHG inventory's own energy; a
+      // spend figure saved under the old method prices nothing. An entered known figure still wins,
+      // as METHOD_TAKES_ENTERED_FIGURE says it does for this method, and is handled first.
+      case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || cat3Mt() || 0
     }
   }
 
@@ -1914,11 +1957,11 @@ export default function Scope3Dashboard() {
       // applies to this path.
       case 'pcaf': return cat15Result().mt !== null
       case 'flat_spend': return !!d.annual_spend
-      // An entered figure is handled above (takesEnteredFigure is true for this method). Nothing else on
-      // this panel produces a Category 3 figure until Task 5 reads the bound inventory, and a saved
-      // annual_spend must NOT make it calculated: that spend is no longer what the category is priced
-      // from, and saying "calculated" of it would put a flat-factor number under a DEFRA description.
-      case 'fuel_and_energy_upstream': return false
+      // ⚠️ A CALCULATED ZERO COUNTS, A WITHHELD CATEGORY DOES NOT, and a saved annual_spend is not
+      // consulted at all. 'zero' means every stream at every location was answered and none holds any
+      // energy, which is an answer; 'withheld' means a stream was never answered, where a zero would
+      // assert something nobody said. An entered figure is handled above.
+      case 'fuel_and_energy_upstream': return cat3Mt() !== null
     }
   }
 
@@ -1941,6 +1984,9 @@ export default function Scope3Dashboard() {
       // every sector this page can offer, so Cat 15 was ALWAYS excluded — a complete per-asset PCAF
       // assessment was computed, displayed with its data-quality score, and then dropped from the total.
       if (c.id === 'cat15') return cat15Result().mt === null
+      // Category 3 is missing from the total whenever it has no figure: the inventory could not be read,
+      // or a stream was never answered. A calculated zero is a figure and is NOT unpriced.
+      if (c.id === 'cat3') return !catData[c.id]?.emissions_override && cat3Mt() === null
       return false
     }).map(c => c.id),
   )
@@ -1967,6 +2013,11 @@ export default function Scope3Dashboard() {
       // is the customer's turn — neither is our failure. The one case that is: every holding computes on
       // its own and the portfolio assessment still throws.
       if (c.id === 'cat15') return cat15Result().reason === CAT15_ASSESSMENT_FAILED
+      // ⚠️ ONE OF CATEGORY 3'S TWO WITHHOLDINGS IS OURS AND THE OTHER IS NOT. 'nothing_priced' means the
+      // inventory holds energy at these locations and we could price none of it, which is a platform
+      // gap. An unanswered stream, an unreadable inventory or none bound is the customer's turn, and
+      // this column would report their unfinished work as our failure.
+      if (c.id === 'cat3') return cat3Priced?.withheld?.code === 'nothing_priced'
       return false
     }).map(c => c.id),
   )
@@ -2015,6 +2066,9 @@ export default function Scope3Dashboard() {
     // amber box and the export cannot describe the gap differently. It never says "no factor for this
     // sector": no factor was ever the problem here.
     if (id === 'cat15') return cat15Result().reason || NO_REASON
+    // Same rule as Cat 15's line above: the reason is the sentence that withheld the figure, verbatim,
+    // so the panel, the amber box and the export cannot describe the gap three ways.
+    if (id === 'cat3') return cat3NoFigure || NO_REASON
     return NO_REASON
   }
 
@@ -3254,6 +3308,46 @@ export default function Scope3Dashboard() {
                     )}
                   </>}
 
+                  {/* Cat 3 — fuel and energy related activities: derived from the bound GHG inventory, with
+                      no input of its own but the known-emissions override. Every sentence comes from
+                      lib/scope3/cat3Copy.ts; none is typed here (categoryMethods.test.ts M12). */}
+                  {cat.id === 'cat3' && <>
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>What this figure is</div>
+                      <p style={{ margin: '0 0 6px' }}>{CAT3_DERIVED_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT3_EXCLUDES_COMBUSTION_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT3_STAND_IN_SENTENCE}</p>
+                      <p style={{ margin: '6px 0 0', fontSize: 10 }}>
+                        {CAT3_ATTRIBUTION}{' '}
+                        <a href={DEFRA_ENERGY_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_ENERGY_META.licence}</a>
+                      </p>
+                    </div>
+
+                    {/* No figure, and the reason, in the words that withheld it. An amber box rather than a
+                        silent empty panel: this is the state a customer has to act on, in the GHG module. */}
+                    {cat3NoFigure && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
+                        {cat3NoFigure}
+                      </div>
+                    )}
+
+                    {cat3Priced && cat3Priced.status !== 'withheld' && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <SpendFactorWorkings
+                          id="cat3-energy"
+                          figureMt={cat3Mt() ?? 0}
+                          summary={cat3WorkingsSummary(cat3Priced)}
+                          sentences={cat3Sentences(cat3Priced, cat3Read)}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
+                      <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder={KNOWN_EMISSIONS_PLACEHOLDER} />
+                    </div>
+                  </>}
+
                   {cat.id === 'cat15' && <>
                     {/* ⚠️ THE PORTFOLIO VALUE AND SECTOR INPUTS ARE GONE, along with the proxy that read
                         them. A balance at a date times an intensity per year of activity is not a quantity,
@@ -3468,9 +3562,9 @@ export default function Scope3Dashboard() {
                     </>
                   })()}
 
-                  {/* Generic spend-based for the seven categories that keep the flat factor (3, 8, 9, 10, 11, 13
-                      and 14). Cat 12 left on 18 Sep 2026 for its own panel above. */}
-                  {!['cat1', 'cat2', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
+                  {/* Generic spend-based for the six categories that keep the flat factor (8, 9, 10, 11, 13
+                      and 14). Cat 12 left on 18 Sep 2026 and Cat 3 on 20 Sep 2026, each for its own panel. */}
+                  {!['cat1', 'cat2', 'cat3', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
                     <div>
                       <label style={labelStyle}>Annual spend / value ({currency})</label>
                       <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="e.g. 400,000" />
