@@ -58,6 +58,7 @@ function methodologyScope3(): Piece[] {
 const LIB_SOURCES = [
   'lib/scope3/categoryScope.ts',       // why a row is outside a category: the pickers and the CSV
   'lib/scope3/cat15.ts',
+  'lib/scope3/cat3.ts',               // Category 3's "Where to find it" text
   'lib/scope3/businessTravelCopy.ts',
   'lib/scope3/notEntered.ts',
   'lib/emissionFactors/productOptions.ts', // the EXIOBASE product-type note after a picker option
