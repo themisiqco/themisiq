@@ -17,6 +17,7 @@ import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
 import { SCOPE3_DATA_SOURCE } from '../../../lib/scope3/dataSources'
+import { KNOWN_EMISSIONS_PLACEHOLDER } from '../../../lib/scope3/formCopy'
 import {
   cat15Figure, assessHolding, cat15HoldingIncomplete, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
@@ -2090,13 +2091,18 @@ export default function Scope3Dashboard() {
     return 'low'
   }
 
-  // The pill labels. 'EXIOBASE spend' and 'Flat spend' both fit the 96px Method column at 9px — see the
-  // column-width note above the results grid, which was measured against the longest pill.
+  // The pill labels. The longest, 'EXIOBASE spend', fits the 96px Method column at 9px — see the
+  // column-width note above the results grid, which was measured against it.
+  //
+  // ⚠️ 'Flat spend' UNTIL 20 SEP 2026, AND FIVE OF THE SEVEN FLAT CATEGORIES SPEND NOTHING. Categories
+  // 9, 10, 11, 13 and 14 price what a customer, tenant or franchisee did; the label named a purchase
+  // the company never made, on the pill a verifier reads first. 'low' is the KEY and is unchanged:
+  // getConfidence returns it, and the CSV's Confidence column carries the LABEL, which nothing parses.
   const confidenceConfig = {
     high: { label: 'Primary data', color: '#0F6E56', bg: '#E1F5EE' },
     medium: { label: 'Activity data', color: '#0C447C', bg: '#E6F1FB' },
     exiobase_spend: { label: 'EXIOBASE spend', color: '#0C447C', bg: '#E6F1FB' },
-    low: { label: 'Flat spend', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+    low: { label: 'Flat factor', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   }
 
   /**
@@ -3435,7 +3441,7 @@ export default function Scope3Dashboard() {
                       </div>
                       <div style={{ gridColumn: '1 / -1' }}>
                         <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
-                        <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder="Leave blank to use the spend-based estimate" />
+                        <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder={KNOWN_EMISSIONS_PLACEHOLDER} />
                       </div>
                     </>
                   })()}
@@ -3449,7 +3455,7 @@ export default function Scope3Dashboard() {
                     </div>
                     <div>
                       <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
-                      <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder="Leave blank to use spend-based" />
+                      <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder={KNOWN_EMISSIONS_PLACEHOLDER} />
                     </div>
                   </>}
                 </div>
@@ -3500,7 +3506,7 @@ export default function Scope3Dashboard() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {highCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', fontWeight: 600 }}>{highCount} primary data</span>}
               {medCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{medCount} activity data</span>}
-              {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', fontWeight: 600 }}>{lowCount} spend-based</span>}
+              {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', fontWeight: 600 }}>{lowCount} on the flat factor</span>}
             </div>
             <div className="tq-summary-sub">{company} · {reportingYear} · GHG Protocol Scope 3 Standard</div>
           </div>

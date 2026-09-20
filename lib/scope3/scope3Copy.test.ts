@@ -5,6 +5,7 @@ import ts from 'typescript'
 import { scope3MethodDescription, type Scope3Method } from './categoryMethods'
 import { methodologyHierarchyLines } from './methodSummary'
 import { SPEND_EF_SOURCES, type SpendFactorSource } from '../emissionFactors/spend'
+import { KNOWN_EMISSIONS_PLACEHOLDER } from './formCopy'
 
 // ── SCOPE 3 CUSTOMER TEXT: NO EM-DASHES, AND NO PLACEHOLDER THAT READS AS AN ENTERED VALUE ─────────────
 //
@@ -60,6 +61,7 @@ const LIB_SOURCES = [
   'lib/scope3/categoryScope.ts',       // why a row is outside a category: the pickers and the CSV
   'lib/scope3/cat15.ts',
   'lib/scope3/dataSources.ts',       // the fifteen "Where to find it" texts
+  'lib/scope3/formCopy.ts',           // the shared labels and placeholders beside the fields
   'lib/scope3/businessTravelCopy.ts',
   'lib/scope3/notEntered.ts',
   'lib/emissionFactors/productOptions.ts', // the EXIOBASE product-type note after a picker option
@@ -94,6 +96,41 @@ describe('Scope 3 customer text', () => {
   it('SC4 ⚠️ no em-dash in the lib/ strings the Scope 3 page renders', () => {
     const found = LIB_SOURCES.flatMap(rel => { const sf = parse(rel); return dashed(textPieces(sf, sf, rel)) })
     expect(found).toEqual([])
+  })
+
+  it('SC8 \u26a0\ufe0f neither confidence label calls a flat-priced category spend', () => {
+    // ⚠️ TWO LABELS NAMED A PURCHASE THAT NEVER HAPPENED. The confidence pill read "Flat spend" and the
+    // Results summary badge "{n} spend-based", of a group that includes Categories 9, 10, 11, 13 and 14,
+    // where the spending is a customer's, a tenant's or a franchisee's. Both are read straight off the
+    // page source: confidenceConfig is a closure inside the component and the badge is JSX text.
+    const page = read('app/dashboard/scope3/page.tsx')
+    const config = page.slice(page.indexOf('const confidenceConfig = {'))
+    const block = config.slice(0, config.indexOf('\n  }'))
+    // ⚠️ THE FLAT ENTRY ONLY. 'EXIOBASE spend' is the label of Categories 1, 2 and 4, which ARE priced
+    // from spend, so a blanket ban on the word across the block would be wrong.
+    const low = block.split('\n').find(l => /^\s*low:/.test(l))
+    expect(low, 'the flat group\'s confidence pill').toBeTruthy()
+    expect(low!, 'the flat group\'s confidence pill').not.toMatch(/spend/i)
+    expect(low!).toContain("label: 'Flat factor'")
+    // The key is what getConfidence returns and the code dispatches on; it is deliberately untouched.
+    expect(low!).toMatch(/^\s*low: \{/)
+    const badge = page.split('\n').find(l => l.includes('{lowCount}'))
+    expect(badge, 'the Results badge for the flat group').toBeTruthy()
+    expect(badge!, 'the Results badge').not.toMatch(/spend/i)
+    expect(badge!).toContain('{lowCount} on the flat factor')
+  })
+
+  it('SC7 \u26a0\ufe0f the known-emissions placeholder does not call the figure spend', () => {
+    // ⚠️ IT ARGUED WITH THE PARAGRAPH ABOVE IT. The placeholder read "Leave blank to use the spend-based
+    // estimate" on the EXIOBASE panel and "Leave blank to use spend-based" on the generic one, while the
+    // "Where to find it" text for Cats 9, 10, 11, 13 and 14 now says there is no spend of the company's
+    // behind the figure at all. Two literals in two panels is also how the two spellings arose.
+    expect(KNOWN_EMISSIONS_PLACEHOLDER).not.toMatch(/spend/i)
+    expect(KNOWN_EMISSIONS_PLACEHOLDER).toBe('Leave blank to use the estimate')
+    // Both panels render the constant, so neither can drift back to a literal of its own.
+    const page = read('app/dashboard/scope3/page.tsx')
+    expect(page.match(/placeholder=\{KNOWN_EMISSIONS_PLACEHOLDER\}/g) ?? []).toHaveLength(2)
+    expect(page).not.toMatch(/Leave blank to use (the )?spend/)
   })
 
   it('SC6 ⚠️ no em-dash in the spend-source fields that customer sentences splice in', () => {
