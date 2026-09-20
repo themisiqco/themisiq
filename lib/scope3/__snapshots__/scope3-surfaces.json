@@ -140,8 +140,8 @@
    "reason": null
   },
   "basis": {
-   "basis": "No data",
-   "detail": "No activity data was entered, so nothing was calculated."
+   "basis": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, upstream energy factors per line, on the bound GHG inventory",
+   "detail": "Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0. 9 lines priced at 2 locations, 19,572.33 kg CO2e in all. 5 of 9 lines rest on a UK factor away from the UK (US), which the line says on its face. Not used, by method: the market-based electricity row at UK site is not used: the location-based row is the basis for this category."
   },
   "data_source": "Nothing to collect for this one: the figures come from the GHG inventory this Scope 3 record is bound to, location by location, and no spend figure is asked for. To change what Category 3 covers, change the energy in that inventory. Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0. If you already hold a figure for this category, enter it as known emissions and that figure is used instead of the estimate.",
   "guidance": "Upstream emissions of the fuel and electricity you use that aren't already in Scope 1 or 2: extracting, producing and transporting those fuels, plus grid transmission and distribution (T&D) losses.",
@@ -158,12 +158,138 @@
    ],
    [
     "Cat 3",
+    "Basis",
+    "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, upstream energy factors per line, on the bound GHG inventory",
+    "Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0. 9 lines priced at 2 locations, 19,572.33 kg CO2e in all. 5 of 9 lines rest on a UK factor away from the UK (US), which the line says on its face. Not used, by method: the market-based electricity row at UK site is not used: the location-based row is the basis for this category."
+   ],
+   [
+    "Cat 3",
+    "UK site, electricity, upstream of the fuels burned to generate it (well-to-tank)",
+    "100,000 kWh",
+    "100,000 kWh x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 3,682.00 kg CO2e."
+   ],
+   [
+    "Cat 3",
+    "UK site, electricity, generation of the electricity lost in transmission and distribution",
+    "100,000 kWh",
+    "100,000 kWh x 0.01299 kg CO2e per kWh (Transmission and distribution E22) = 1,299.00 kg CO2e."
+   ],
+   [
+    "Cat 3",
+    "UK site, electricity, upstream of the fuels behind that lost electricity",
+    "100,000 kWh",
+    "100,000 kWh x 0.00359 kg CO2e per kWh (WTT- UK electricity E24) = 359.00 kg CO2e."
+   ],
+   [
+    "Cat 3",
+    "UK site, natural gas, upstream of the fuel (well-to-tank)",
+    "50,000 kwh",
+    "50,000 kwh x 0.03021 kg CO2e per kWh (Gross CV) (WTT- fuels D41) = 1,510.50 kg CO2e."
+   ],
+   [
+    "Cat 3",
+    "US site, electricity, upstream of the fuels burned to generate it (well-to-tank)",
+    "200,000 kWh",
+    "200,000 kWh x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 7,364.00 kg CO2e. UK factor used as a stand-in at a location in US, whose Scope 1 and 2 figures are priced from US EPA eGRID."
+   ],
+   [
+    "Cat 3",
+    "US site, electricity, generation of the electricity lost in transmission and distribution",
+    "200,000 kWh",
+    "200,000 kWh x 0.01299 kg CO2e per kWh (Transmission and distribution E22) = 2,598.00 kg CO2e. UK factor used as a stand-in at a location in US, whose Scope 1 and 2 figures are priced from US EPA eGRID."
+   ],
+   [
+    "Cat 3",
+    "US site, electricity, upstream of the fuels behind that lost electricity",
+    "200,000 kWh",
+    "200,000 kWh x 0.00359 kg CO2e per kWh (WTT- UK electricity E24) = 718.00 kg CO2e. UK factor used as a stand-in at a location in US, whose Scope 1 and 2 figures are priced from US EPA eGRID."
+   ],
+   [
+    "Cat 3",
+    "US site, natural gas, upstream of the fuel (well-to-tank)",
+    "1,000 therms",
+    "Converted to kWh at 29.30710833487654 (Conversions!D30) = 29,307.1083 kWh. 29,307.1083 kWh x 0.03021 kg CO2e per kWh (Gross CV) (WTT- fuels D41) = 885.37 kg CO2e. UK factor used as a stand-in at a location in US, whose Scope 1 and 2 figures are priced from US EPA GHG Emission Factors Hub (2025)."
+   ],
+   [
+    "Cat 3",
+    "US site, diesel (mobile), upstream of the fuel (well-to-tank)",
+    "500 gallons",
+    "Converted to litres at 3.7854118034613733 (Conversions!C40) = 1,892.7059 litres. 1,892.7059 litres x 0.61101 kg CO2e per litres (WTT- fuels D71) = 1,156.46 kg CO2e. UK factor used as a stand-in at a location in US, whose Scope 1 and 2 figures are priced from US EPA GHG Emission Factors Hub (2025)."
+   ],
+   [
+    "Cat 3",
+    "Row not used",
+    "",
+    "The market-based electricity row at UK site is not used: the location-based row is the basis for this category."
+   ],
+   [
+    "Cat 3",
+    "GWP basis",
+    "AR5",
+    "GWP basis: AR5. Stated by the workbook's Introduction sheet (Introduction A35): the CO2e figures use IPCC AR5 100-year GWPs. The values are combined CO2e as published and are not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures."
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "Priced from UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, factor edition DEFRA 2026): the WTT- fuels, WTT- UK electricity, Transmission and distribution, WTT- heat and steam sheets, with unit conversions from its Conversions sheet.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "Contains public sector information licensed under the Open Government Licence v3.0.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "Licence: Open Government Licence v3.0 (OGL v3.0), http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "Nothing in this category is entered here. Every figure is the fuel, electricity and purchased heat or steam already recorded for each location in the GHG inventory this Scope 3 record is bound to, with the coverage resolutions of that inventory already applied. To change what this category covers, change the energy in that inventory.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "Every factor here is an upstream factor and excludes combustion, which is what this category may use: the burning of the fuel is already in your Scope 1, and the electricity you bought is already in your Scope 2. Nothing is counted twice.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "Electricity and purchased heat are reported as three separate lines each, as the workbook directs (WTT- UK electricity A16 and Heat and steam A13): the upstream emissions of generating what you used, the generation of what was lost in transmission and distribution, and the upstream emissions of that lost energy.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "These figures rest on your location-based Scope 2 total, not your market-based one. The GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose which of the two it used as the basis for this category, and this is that disclosure.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "These are UK factors, and DEFRA no longer publishes overseas electricity, transmission and distribution or well-to-tank factors (Overseas electricity A11, Transmission and distribution A13 and WTT- UK electricity A13). Every line priced from them at a location outside the UK is flagged as a stand-in, fuels included.",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "A natural gas figure in therms, million Btu or kWh is priced on the gross calorific value factor, because the workbook asks for the same basis on both sides of the entry (WTT- fuels A11, WTT- fuels A12) and the Scope 1 side of that figure is priced on the US EPA's higher heating values. That those two bases are interchangeable is not stated by either publisher, and this sentence is here instead of the assumption.",
+    ""
+   ],
+   [
+    "Cat 3",
     "Fuel & energy related",
-    "No data",
-    "No activity data was entered, so nothing was calculated."
+    "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, upstream energy factors per line, on the bound GHG inventory",
+    "Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0. 9 lines priced at 2 locations, 19,572.33 kg CO2e in all. 5 of 9 lines rest on a UK factor away from the UK (US), which the line says on its face. Not used, by method: the market-based electricity row at UK site is not used: the location-based row is the basis for this category."
    ]
   ],
-  "factor_basis_line": "Cat 3 Fuel & energy related: No data. No activity data was entered, so nothing was calculated.",
+  "factor_basis_line": "Cat 3 Fuel & energy related: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, upstream energy factors per line, on the bound GHG inventory. Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0. 9 lines priced at 2 locations, 19,572.33 kg CO2e in all. 5 of 9 lines rest on a UK factor away from the UK (US), which the line says on its face. Not used, by method: the market-based electricity row at UK site is not used: the location-based row is the basis for this category.",
   "panel": {
    "summary": "9 lines at 2 locations, priced from the DEFRA/DESNZ 2026 upstream energy factors on the bound GHG inventory",
    "sentences": [
@@ -174,10 +300,10 @@
     "Every factor here is an upstream factor and excludes combustion, which is what this category may use: the burning of the fuel is already in your Scope 1, and the electricity you bought is already in your Scope 2. Nothing is counted twice.",
     "Electricity and purchased heat are reported as three separate lines each, as the workbook directs (WTT- UK electricity A16 and Heat and steam A13): the upstream emissions of generating what you used, the generation of what was lost in transmission and distribution, and the upstream emissions of that lost energy.",
     "These figures rest on your location-based Scope 2 total, not your market-based one. The GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose which of the two it used as the basis for this category, and this is that disclosure.",
-    "The factors are on an AR5 basis: their publisher combined the gases using IPCC AR5 100 year global warming potentials (Introduction A35). Your GHG inventory may be on another basis, and this line says so rather than assuming the two agree.",
+    "GWP basis: AR5. Stated by the workbook's Introduction sheet (Introduction A35): the CO2e figures use IPCC AR5 100-year GWPs. The values are combined CO2e as published and are not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures.",
     "These are UK factors, and DEFRA no longer publishes overseas electricity, transmission and distribution or well-to-tank factors (Overseas electricity A11, Transmission and distribution A13 and WTT- UK electricity A13). Every line priced from them at a location outside the UK is flagged as a stand-in, fuels included.",
     "A natural gas figure in therms, million Btu or kWh is priced on the gross calorific value factor, because the workbook asks for the same basis on both sides of the entry (WTT- fuels A11, WTT- fuels A12) and the Scope 1 side of that figure is priced on the US EPA's higher heating values. That those two bases are interchangeable is not stated by either publisher, and this sentence is here instead of the assumption.",
-    "19,572.33 kg CO2e in all, which is 19.5723 t CO2e.",
+    "19,572.33 kg CO2e in all, which is 19.5723 mt CO2e.",
     "UK site, electricity, upstream of the fuels burned to generate it (well-to-tank): 100,000 kWh, x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 3,682.00 kg CO2e.",
     "UK site, electricity, generation of the electricity lost in transmission and distribution: 100,000 kWh, x 0.01299 kg CO2e per kWh (Transmission and distribution E22) = 1,299.00 kg CO2e.",
     "UK site, electricity, upstream of the fuels behind that lost electricity: 100,000 kWh, x 0.00359 kg CO2e per kWh (WTT- UK electricity E24) = 359.00 kg CO2e.",

@@ -17,6 +17,7 @@
 // meet two voices.
 
 import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
+import { scope3MethodDescription } from './categoryMethods'
 import type {
   Cat3Flag, Cat3LineKind, Cat3PricedLine, Cat3Reason, Cat3Result, Cat3Stream, Cat3Unpriced, Cat3Withheld,
 } from './cat3Energy'
@@ -33,9 +34,19 @@ const cite = (key: string): string => {
 }
 
 const n2 = (x: number) => x.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-/** The category total in tonnes, at four places: the figure a customer quotes, and the card above it
- *  rounds to two. Rounding both to two would make the panel's own arithmetic look wrong on a small
- *  category. */
+/**
+ * The category total in tonnes, at four places: the figure a customer quotes, and the card above it
+ * rounds to two. Rounding both to two would make the panel's own arithmetic look wrong on a small
+ * category.
+ *
+ * ⚠️ "mt CO2e", NOT "t CO2e", EVERYWHERE IN THIS MODULE. Both spellings were here: the panel's total
+ * sentence said "t CO2e" and the override sentence beside it "mt CO2e", in adjacent clauses. The
+ * product says mt: the workings card's own header (`${figureMt.toFixed(2)} mt CO₂e`), the CSV's
+ * "Total Scope 3" row, its "mt CO2e" column heading, and the entered-figure sentences of Categories
+ * 1, 2, 4, 15 and the flat six. Category 3 follows the surfaces around it rather than introducing a
+ * second unit label two lines apart; whether "mt" is the right abbreviation for a tonne at all is a
+ * platform-wide question and is not answered here.
+ */
 const n4 = (x: number) => x.toLocaleString('en', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 /** An activity figure as entered: enough places to show a small one, never scientific notation. */
 const nAct = (x: number) => x.toLocaleString('en', { maximumFractionDigits: 4 })
@@ -71,10 +82,26 @@ export const CAT3_LOCATION_BASED_SENTENCE =
   'Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose which of the two it used as the ' +
   'basis for this category, and this is that disclosure.'
 
-export const CAT3_GWP_SENTENCE =
-  `The factors are on an ${m.gwp_basis} basis: their publisher combined the gases using IPCC ` +
-  `${m.gwp_basis} 100 year global warming potentials (${cite('gwp_basis')}). Your GHG inventory may be on ` +
-  `another basis, and this line says so rather than assuming the two agree.`
+/**
+ * ⚠️ THE GWP SENTENCE IS THE SHARED ONE, NOT A CATEGORY 3 WORDING. Cats 5, 6, 7 and 12 all state their
+ * publisher's basis through publisherGwpSentence (lib/scope3/gwpSentence.ts), which READS the bound GHG
+ * inventory and says whether the two bases agree, differ, or whether the inventory records none. A
+ * static Category 3 sentence saying "your inventory may be on another basis" would be the weakest of
+ * those three statements, and this category is only ever calculated while an inventory IS bound, so the
+ * comparison is always available. The page passes it in, as it does for the other four.
+ */
+export const CAT3_GWP_PUBLISHER = {
+  gwp_basis: m.gwp_basis,
+  // ⚠️ NOT m.gwp_basis_note, AND THE REASON IS ONE WORD IN IT. The artefact's own note reads "Stated by
+  // the workbook's Introduction sheet (guidance.gwp_basis): …", where `guidance.gwp_basis` is the KEY of
+  // the quote inside the JSON: a variable name, in a sentence a customer reads on the panel and in the
+  // export. The fact is the artefact's; the citation a reader can check is the sheet and cell, which is
+  // what the design's Q5 asks this line to carry and what the waste note gives. Both are read from the
+  // record, nothing is typed. The artefact's note stays as the record's own prose.
+  gwp_basis_note:
+    `Stated by the workbook's Introduction sheet (${cite('gwp_basis')}): the CO2e figures use IPCC ` +
+    `${m.gwp_basis} 100-year GWPs. The values are combined CO2e as published and are not re-based.`,
+}
 
 export const CAT3_STAND_IN_SENTENCE =
   `These are UK factors, and DEFRA no longer publishes overseas electricity, transmission and ` +
@@ -325,7 +352,7 @@ export function cat3WorkingsSummary(r: Cat3Result): string {
  * Everything the workings card shows: the method, then every priced line, then everything that was not
  * priced and why. `gwpSentence` is the record's own publisher GWP sentence, as Cats 5, 6 and 7 pass one.
  */
-export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult): string[] {
+export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[] {
   const out: string[] = [
     CAT3_SOURCE_SENTENCE,
     CAT3_ATTRIBUTION,
@@ -334,20 +361,164 @@ export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult): string[]
     CAT3_EXCLUDES_COMBUSTION_SENTENCE,
     CAT3_SEPARATE_LINES_SENTENCE,
     CAT3_LOCATION_BASED_SENTENCE,
-    CAT3_GWP_SENTENCE,
+    gwpSentence,
     CAT3_STAND_IN_SENTENCE,
   ]
   // Only where a gross CV factor actually priced something: a sentence about a conversion nobody's
   // figures went through is noise, and noise is what stops the rest being read.
   if (r.lines.some(l => l.factor?.key === 'natural_gas_kwh_gross_cv')) out.push(CAT3_CV_BASIS_SENTENCE)
+  return out
+}
+
+/** The workings card: the method, then the figure, then every line and everything not priced. */
+export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult, gwpSentence: string): string[] {
+  const out: string[] = cat3MethodSentences(r, gwpSentence)
   if (r.status === 'priced') {
-    out.push(`${n2(r.kg_co2e)} kg CO2e in all, which is ${n4(r.kg_co2e / 1000)} t CO2e.`)
+    out.push(`${n2(r.kg_co2e)} kg CO2e in all, which is ${n4(r.kg_co2e / 1000)} mt CO2e.`)
     for (const l of r.lines) out.push(cat3LineText(l))
   }
   if (r.status === 'zero') out.push(cat3ZeroText())
   if (r.withheld) out.push(cat3WithheldText(r.withheld, inputs.undeclared_detail))
   for (const u of r.unpriced) out.push(cat3UnpricedText(u))
   for (const s of inputs.skipped) out.push(`${cat3SkippedText(s).charAt(0).toUpperCase()}${cat3SkippedText(s).slice(1)}.`)
+  return out
+}
+
+// ── THE BASIS: THE CSV'S METHOD CELL, AND THE SAVED factor_basis COLUMN ──────────────────────────
+
+/** How many lines rest on a UK factor away from the UK, and where. Empty when none do. */
+function standInSummary(r: Cat3Result): string {
+  const standIns = r.lines.filter(l => l.flags.some(f => f.code === 'uk_stand_in'))
+  if (standIns.length === 0) return ''
+  const countries = [...new Set(standIns.map(l => {
+    const f = l.flags.find(x => x.code === 'uk_stand_in') as Extract<Cat3Flag, { code: 'uk_stand_in' }>
+    return f.country ?? 'a location whose country is not recorded'
+  }))]
+  return ` ${standIns.length} of ${r.lines.length} ${standIns.length === 1 ? 'line rests' : 'lines rest'} ` +
+    `on a UK factor away from the UK (${list(countries)}), which the line says on its face.`
+}
+
+/** The New Zealand lines the GHG inventory priced itself, named because they are not DEFRA figures. */
+function nzSummary(r: Cat3Result): string {
+  const nz = r.lines.filter(l => l.flags.some(f => f.code === 'nz_mfe_3c'))
+  return nz.length === 0 ? ''
+    : ` ${nz.length} transmission and distribution ${nz.length === 1 ? 'line is' : 'lines are'} the GHG ` +
+      `inventory's own New Zealand ${nz.length === 1 ? 'figure' : 'figures'} rather than a DEFRA one.`
+}
+
+/**
+ * Everything read and not priced, so the basis states its own gaps.
+ *
+ * ⚠️ TWO CLAUSES, BECAUSE THEY ARE TWO DIFFERENT STATEMENTS. A market-based electricity row and a
+ * refrigerant row are set aside BY THE METHOD, and reading "Not priced: the market-based row is not
+ * used" invites the reader to count them as missing emissions. A stream with no factor, a location the
+ * GHG inventory excluded or a fuel row that names no fuel IS a gap in the figure, and belongs under a
+ * heading that says so.
+ */
+const DELIBERATE: readonly Cat3Skipped['code'][] = ['market_based_row_not_used', 'refrigerants_not_in_category']
+function notPricedSummary(r: Cat3Result, inputs: Cat3InputsResult): string {
+  const gaps = [
+    ...r.unpriced.map(u => `${u.location}, ${CAT3_STREAM_LABEL[u.stream]}, ${cat3ReasonText(u.reason)}`),
+    ...inputs.skipped.filter(s => !DELIBERATE.includes(s.code)).map(cat3SkippedText),
+  ]
+  const byDesign = inputs.skipped.filter(s => DELIBERATE.includes(s.code)).map(cat3SkippedText)
+  return `${gaps.length ? ` Not priced: ${gaps.join('; ')}.` : ''}` +
+    `${byDesign.length ? ` Not used, by method: ${byDesign.join('; ')}.` : ''}`
+}
+
+/**
+ * The METHODOLOGY NOTE's basis and detail for Category 3, which is also the saved factor_basis line.
+ *
+ * ⚠️ IT DESCRIBES WHAT PRICED THIS RECORD'S FIGURE, NOT WHAT THE METHOD CAN DO. Five states, and each
+ * says a different thing: an entered figure (no factor was applied, and the derived figure it replaced
+ * is named); a priced figure (the source, how many lines, the stand-ins and the gaps); a calculated
+ * zero (an answer, not an absence); a withheld one (the reason that withheld it, verbatim); and an
+ * inventory that could not be read at all.
+ *
+ * ⚠️ THE OVERRIDE BRANCH NAMES THE FIGURE IT SUPERSEDES, as Category 15's does for its holdings: a
+ * verifier comparing the export with the panel would otherwise see a number the panel can also compute
+ * and no statement of which one is in the total.
+ */
+export function cat3Basis(
+  r: Cat3Result | null, inputs: Cat3InputsResult, override: number | null | undefined,
+): { basis: string; detail: string } {
+  if (override) {
+    const derived = r && r.status !== 'withheld'
+      ? ` The energy in the bound GHG inventory gives ${n4(r.kg_co2e / 1000)} mt CO2e; the entered figure is used instead.`
+      : ''
+    return {
+      basis: 'Entered figure',
+      detail: `${n2(override)} mt CO2e entered directly; no emission factor was applied.${derived}`,
+    }
+  }
+  const noFigure = cat3NoFigureText(r, inputs)
+  if (!r || noFigure) return { basis: 'Not priced', detail: noFigure ?? 'It was not priced, and no reason was recorded.' }
+  if (r.status === 'zero') {
+    return {
+      basis: `${m.source}, upstream energy factors, on the bound GHG inventory`,
+      detail: `${cat3ZeroText()}${notPricedSummary(r, inputs)}`,
+    }
+  }
+  const locations = new Set(r.lines.map(l => l.location)).size
+  return {
+    basis: `${m.source}, upstream energy factors per line, on the bound GHG inventory`,
+    detail:
+      `${scope3MethodDescription('fuel_and_energy_upstream')} ${r.lines.length} ` +
+      `${r.lines.length === 1 ? 'line' : 'lines'} priced at ${locations} ` +
+      `${locations === 1 ? 'location' : 'locations'}, ${n2(r.kg_co2e)} kg CO2e in all.` +
+      `${standInSummary(r)}${nzSummary(r)}${notPricedSummary(r, inputs)}`,
+  }
+}
+
+// ── THE EXPORT ───────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Category 3's rows for the CSV, without the leading "Cat 3" cell, which the page adds: the same
+ * [label, input as entered, note] triple Cats 5, 6, 7, 12 and 15 write.
+ *
+ * ⚠️ ONE ROW PER PRICED LINE, because that is the unit a verifier checks: an activity figure, a
+ * published factor, the cell it came from and the product of the two. A category total with no lines
+ * under it cannot be re-derived from the file, which is what the design's Q4 asks for.
+ */
+export function cat3CsvRows(
+  r: Cat3Result | null, inputs: Cat3InputsResult, override: number | null | undefined, gwpSentence: string,
+): [string, string, string][] {
+  const out: [string, string, string][] = []
+  const basis = cat3Basis(r, inputs, override)
+  out.push(['Basis', basis.basis, basis.detail])
+  if (!r) return out
+
+  for (const l of r.lines) {
+    // ⚠️ THE 3c LINE NAMES ITS OWN SOURCE. A New Zealand transmission line is the GHG engine's own
+    // figure on the New Zealand factor, not a DEFRA product, and the label must not let it read as one.
+    const nz = l.flags.find(f => f.code === 'nz_mfe_3c') as Extract<Cat3Flag, { code: 'nz_mfe_3c' }> | undefined
+    const label = `${l.location}, ${CAT3_STREAM_LABEL[l.stream]}, ${CAT3_LINE_LABEL[l.line]}`
+    const entered = `${nAct(l.activity_as_entered)} ${l.unit_as_entered}`
+    const arithmetic = nz
+      ? `${n2(l.kg_co2e)} kg CO2e, taken from the GHG inventory's own New Zealand transmission and ` +
+        `distribution figure (${nz.source}). No DEFRA factor was applied to this line.`
+      : `${l.conversion ? `Converted to ${l.conversion.to} at ${nFac(l.conversion.factor)} ` +
+          `(${l.conversion.source === 'defra' ? l.conversion.cite : `an exact identity, ${l.conversion.cite}`})` +
+          ` = ${nAct(l.activity_priced)} ${l.unit_priced}. ` : ''}` +
+        `${nAct(l.activity_priced)} ${l.unit_priced} x ${nFac(l.factor!.kg_co2e)} kg CO2e per ` +
+        `${l.factor!.unit} (${l.factor!.sheet} ${l.factor!.cell}) = ${n2(l.kg_co2e)} kg CO2e.`
+    const flags = cat3FlagStatements(l.flags.filter(f => f.code !== 'nz_mfe_3c'))
+    out.push([label, entered,
+      `${arithmetic}${flags.length ? ` ${flags.map(t => `${t.charAt(0).toUpperCase()}${t.slice(1)}`).join('. ')}.` : ''}`])
+  }
+  if (r.status === 'priced' && r.lines.length === 0) out.push(['Lines', '', 'None priced.'])
+  for (const u of r.unpriced) {
+    out.push([`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}`, 'Not priced', `${cat3ReasonText(u.reason).charAt(0).toUpperCase()}${cat3ReasonText(u.reason).slice(1)}.`])
+  }
+  for (const s of inputs.skipped) {
+    const t = cat3SkippedText(s)
+    out.push(['Row not used', '', `${t.charAt(0).toUpperCase()}${t.slice(1)}.`])
+  }
+  out.push(['GWP basis', m.gwp_basis, gwpSentence])
+  // ⚠️ THE GWP SENTENCE HAS ITS OWN ROW ABOVE, so it comes out of the disclosure list here: printed
+  // twice in one export it reads as two different statements that happen to match, and a verifier
+  // checking whether the bases agree should find one answer, not two copies of one.
+  for (const d of cat3MethodSentences(r, gwpSentence)) if (d !== gwpSentence) out.push(['Disclosure', d, ''])
   return out
 }
 

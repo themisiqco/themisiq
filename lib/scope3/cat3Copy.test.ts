@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cat3InputsFrom } from './cat3Inputs'
+import { scope3MethodDescription } from './categoryMethods'
 import { priceCat3 } from './cat3Energy'
 import type { Cat3Flag, Cat3Reason, Cat3Result, Cat3Withheld } from './cat3Energy'
 import type { Cat3Skipped, Cat3InputsReason } from './cat3Inputs'
@@ -10,8 +11,10 @@ import {
   cat3SkippedText, cat3InputsReasonText, cat3WithheldText, cat3ZeroText, cat3NoFigureText,
   CAT3_STREAM_LABEL, CAT3_LINE_LABEL, CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE,
   CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_LOCATION_BASED_SENTENCE,
-  CAT3_GWP_SENTENCE, CAT3_SEPARATE_LINES_SENTENCE, CAT3_CV_BASIS_SENTENCE, CAT3_ATTRIBUTION,
+  CAT3_GWP_PUBLISHER, CAT3_SEPARATE_LINES_SENTENCE, CAT3_CV_BASIS_SENTENCE, CAT3_ATTRIBUTION,
+  cat3Basis, cat3CsvRows, cat3MethodSentences,
 } from './cat3Copy'
+import { publisherGwpSentence } from './gwpSentence'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 
 // ── CATEGORY 3'S CUSTOMER TEXT ───────────────────────────────────────────────────────────────────
@@ -21,6 +24,8 @@ import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 // reads it from here rather than typing it again.
 
 const PAGE = join(__dirname, '../../app/dashboard/scope3/page.tsx')
+/** As the page builds it: this record is always bound, and the fixture inventory records AR6. */
+const GWP = publisherGwpSentence(CAT3_GWP_PUBLISHER, true, 'AR6')
 const page = () => readFileSync(PAGE, 'utf8')
 
 /** The worked example, through exactly the path the page takes. */
@@ -38,7 +43,7 @@ describe('Category 3 copy', () => {
     expect(priced.kg_co2e).toBeCloseTo(19_572.329976, 6)
     expect((priced.kg_co2e / 1000).toFixed(4)).toBe('19.5723')
 
-    const sentences = cat3Sentences(priced, read)
+    const sentences = cat3Sentences(priced, read, GWP)
     // One sentence per priced line, and each carries the arithmetic a verifier reproduces from.
     for (const l of priced.lines) expect(sentences).toContain(cat3LineText(l))
     const gas = priced.lines.find(l => l.location === 'US site' && l.stream === 'natural_gas')!
@@ -57,11 +62,11 @@ describe('Category 3 copy', () => {
     // The card's summary counts what it priced, and the total is stated in both units.
     expect(cat3WorkingsSummary(priced)).toBe(
       '9 lines at 2 locations, priced from the DEFRA/DESNZ 2026 upstream energy factors on the bound GHG inventory')
-    expect(sentences).toContain('19,572.33 kg CO2e in all, which is 19.5723 t CO2e.')
+    expect(sentences).toContain('19,572.33 kg CO2e in all, which is 19.5723 mt CO2e.')
     // The method sentences are all present, the gross CV one because a therms figure was priced.
     for (const s of [CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE,
-      CAT3_SEPARATE_LINES_SENTENCE, CAT3_LOCATION_BASED_SENTENCE, CAT3_GWP_SENTENCE,
-      CAT3_STAND_IN_SENTENCE, CAT3_CV_BASIS_SENTENCE, CAT3_ATTRIBUTION]) expect(sentences).toContain(s)
+      CAT3_SEPARATE_LINES_SENTENCE, CAT3_LOCATION_BASED_SENTENCE,
+      CAT3_STAND_IN_SENTENCE, CAT3_CV_BASIS_SENTENCE, CAT3_ATTRIBUTION, GWP]) expect(sentences).toContain(s)
     // The market-based row was read and set aside, and the panel says so rather than dropping it.
     expect(sentences.some(s => /market-based electricity row at UK site is not used/.test(s))).toBe(true)
   })
@@ -158,7 +163,7 @@ describe('Category 3 copy', () => {
       .filter(t => !/[#{}<>/]|\d(px|rem|%)|^[\w-]+\s*:/.test(t))
     expect(typed, 'these look like sentences typed into the panel; move them to lib/scope3/cat3Copy.ts').toEqual([])
     // No sentence from the copy module was pasted into the page as a literal.
-    for (const s of [CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE, CAT3_GWP_SENTENCE, CAT3_STAND_IN_SENTENCE]) {
+    for (const s of [CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE, CAT3_LOCATION_BASED_SENTENCE, CAT3_STAND_IN_SENTENCE]) {
       expect(src.includes(s), 'a cat3Copy sentence is duplicated in the page').toBe(false)
     }
   })
@@ -200,7 +205,7 @@ describe('Category 3 copy', () => {
     const zero = priceCat3(zeroRead.inputs!)
     expect(zero.status).toBe('zero')
     expect(zero.kg_co2e).toBe(0)
-    expect(cat3Sentences(zero, zeroRead)).toContain(cat3ZeroText())
+    expect(cat3Sentences(zero, zeroRead, GWP)).toContain(cat3ZeroText())
     expect(cat3ZeroText()).toContain('calculated zero, not a blank')
     expect(cat3NoFigureText(zero, zeroRead), 'a zero is a figure, so no notice').toBeNull()
 
@@ -224,7 +229,7 @@ describe('Category 3 copy', () => {
       { location: 'Depot', stream: 'mobile', state: 'declared_unquantified' },
     ])).toContain('Office: propane; Depot: vehicle or mobile equipment fuel.')
     // The panel shows the same sentence the figure was withheld by, not a second wording.
-    expect(cat3Sentences(open, openRead)).toContain(notice)
+    expect(cat3Sentences(open, openRead, GWP)).toContain(notice)
   })
 
   it('C3C-6 an unreadable inventory says which of the three it is, and never reads as zero energy', () => {
@@ -244,6 +249,102 @@ describe('Category 3 copy', () => {
     expect(cat3InputsReasonText({ code: 'workings_shape_unreadable', rows: 12 })).toContain('12 rows)')
   })
 
+  it('C3C-8 the basis says what priced THIS record, in each of its five states', () => {
+    const { read, priced } = worked()
+    // 1. Priced: the source, the count, the stand-ins and the gaps, with the method description embedded.
+    const b = cat3Basis(priced, read, null)
+    expect(b.basis).toBe('UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, upstream energy factors per line, on the bound GHG inventory')
+    expect(b.detail).toContain(scope3MethodDescription('fuel_and_energy_upstream'))
+    expect(b.detail).toContain('9 lines priced at 2 locations, 19,572.33 kg CO2e in all.')
+    // 2. The stand-in lines are counted and their countries named, in the basis itself.
+    expect(b.detail).toContain('5 of 9 lines rest on a UK factor away from the UK (US)')
+    // 3. Withheld: the reason that withheld it, verbatim, and the same sentence the panel shows.
+    const openRead = cat3InputsFrom(SCOPE3_FIXTURE_GHG.workings,
+      SCOPE3_FIXTURE_GHG.locations.map(l => ({ ...l, stream_attestations: [] })))
+    const open = priceCat3(openRead.inputs!)
+    expect(open.status).toBe('withheld')
+    expect(cat3Basis(open, openRead, null)).toEqual({ basis: 'Not priced', detail: cat3NoFigureText(open, openRead) })
+    // 4. A calculated zero: an answer, and it says so.
+    const answered = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual',
+      'mobile', 'refrigerants', 'electricity', 'purchased_steam']
+    const zeroRead = cat3InputsFrom(
+      answered.map(stream => ({ location: 'Office', stream, source: 'Declaration', scope: 1, activity_data: 0,
+        activity_unit: '—', declaration: 'attested_absent', gwp_basis: 'declaration', result_tco2e: null })),
+      [{ id: 'o', name: 'Office', country: 'GB', stream_attestations: answered.map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })) }],
+    )
+    const zero = priceCat3(zeroRead.inputs!)
+    const zb = cat3Basis(zero, zeroRead, null)
+    expect(zb.basis).toContain('upstream energy factors, on the bound GHG inventory')
+    expect(zb.detail).toContain('calculated zero, not a blank')
+    // 5. An entered figure: no factor was applied, and the figure it supersedes is named.
+    const ob = cat3Basis(priced, read, 25)
+    expect(ob.basis).toBe('Entered figure')
+    expect(ob.detail).toBe('25.00 mt CO2e entered directly; no emission factor was applied. The energy in ' +
+      'the bound GHG inventory gives 19.5723 mt CO2e; the entered figure is used instead.')
+    // ⚠️ ONE UNIT LABEL IN THIS CATEGORY'S PROSE. Two spellings two clauses apart is how a reader starts
+    // wondering whether they mean different things. Kilograms are spelled out per line; tonnes are "mt",
+    // as the card header, the CSV total and every other category's entered-figure sentence have them.
+    const prose = [ob.detail, b.detail, zb.detail, ...cat3Sentences(priced, read, GWP)].join(' ')
+    // A space then "t CO2e" is the spelling this bans; " mt CO2e" does not match it.
+    expect(/\st CO2e/.test('19.5723 t CO2e'), 'the guard must catch the banned spelling').toBe(true)
+    expect(/\st CO2e/.test('19.5723 mt CO2e'), 'and must not catch the chosen one').toBe(false)
+    expect(prose).not.toMatch(/\st CO2e/)
+    expect(prose).toMatch(/19\.5723 mt CO2e/)
+    // An unreadable inventory has no figure to supersede, and the sentence does not invent one.
+    const none = cat3InputsFrom(null, [])
+    expect(cat3Basis(null, none, 25).detail).toBe('25.00 mt CO2e entered directly; no emission factor was applied.')
+    expect(cat3Basis(null, none, null)).toEqual({ basis: 'Not priced', detail: cat3NoFigureText(null, none) })
+  })
+
+  it('C3C-9 the export carries one row per priced line, and each can be re-derived from it', () => {
+    const { read, priced } = worked()
+    const rows = cat3CsvRows(priced, read, null, GWP)
+    expect(rows[0][0]).toBe('Basis')
+    // One row per line, labelled by location, stream and which of the three lines it is.
+    const lineRows = rows.filter(r => r[0].startsWith('UK site') || r[0].startsWith('US site'))
+    expect(lineRows).toHaveLength(9)
+    expect(lineRows[0]).toEqual(['UK site, electricity, upstream of the fuels burned to generate it (well-to-tank)',
+      '100,000 kWh',
+      '100,000 kWh x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 3,682.00 kg CO2e.'])
+    // A converted line shows the conversion, then the priced figure, then the factor and the product.
+    const therms = lineRows.find(r => r[1] === '1,000 therms')!
+    expect(therms[2]).toBe('Converted to kWh at 29.30710833487654 (Conversions!D30) = 29,307.1083 kWh. ' +
+      '29,307.1083 kWh x 0.03021 kg CO2e per kWh (Gross CV) (WTT- fuels D41) = 885.37 kg CO2e. ' +
+      'UK factor used as a stand-in at a location in US, whose Scope 1 and 2 figures are priced from US EPA GHG Emission Factors Hub (2025).')
+    // The GWP basis and the disclosures, once each.
+    expect(rows.filter(r => r[0] === 'GWP basis')).toEqual([['GWP basis', 'AR5', GWP]])
+    // The GWP sentence has its own row, so it is not repeated as a disclosure.
+    expect(rows.filter(r => r[0] === 'Disclosure').map(r => r[1]))
+      .toEqual(cat3MethodSentences(priced, GWP).filter(d => d !== GWP))
+    expect(rows.filter(r => r[2] === GWP || r[1] === GWP), 'the GWP sentence appears exactly once').toHaveLength(1)
+    // A row the adapter set aside is reported rather than dropped.
+    expect(rows.some(r => r[0] === 'Row not used' && /market-based electricity row at UK site/.test(r[2]))).toBe(true)
+  })
+
+  it('C3C-10 a New Zealand transmission line names its own source in the export, and no DEFRA factor', () => {
+    // ⚠️ THE 3c LINE IS NOT A DEFRA PRODUCT AT AN NZ LOCATION. The GHG engine prices it on the New Zealand
+    // factor, and the export must not let it read as one of the DEFRA lines beside it.
+    const attest = ['propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
+      'refrigerants', 'purchased_steam', 'natural_gas'].map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' }))
+    const read = cat3InputsFrom(
+      [{ location: 'Auckland', stream: 'electricity', source: 'Electricity (S2 location-based)', scope: 2,
+         activity_data: 50_000, activity_unit: 'kWh', scope2_method: 'location-based',
+         ef_source: 'NZ MfE (2025)', result_tco2e: 5, entry_method: 'manual' },
+       { location: 'Auckland', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3',
+         scope: 3, activity_data: 50_000, activity_unit: 'kWh', gwp_basis: 'scope3-cat3',
+         ef_source: 'NZ MfE (2025) · T&D losses (Scope 3 Cat 3)', result_tco2e: 0.745, entry_method: 'manual' }],
+      [{ id: 'nz', name: 'Auckland', country: 'NZ', electricity_kwh: 50_000, nz_td_losses: true, stream_attestations: attest }],
+    )
+    const priced = priceCat3(read.inputs!)
+    const rows = cat3CsvRows(priced, read, null, GWP)
+    const td = rows.find(r => r[0].includes('generation of the electricity lost'))!
+    expect(td[2]).toBe("745.00 kg CO2e, taken from the GHG inventory's own New Zealand transmission and " +
+      'distribution figure (lib/ghg/engine.ts s3_td (MfE)). No DEFRA factor was applied to this line.')
+    expect(td[2]).not.toMatch(/WTT|Transmission and distribution E22|0\.01299/)
+    // The basis says the same thing, so the Method cell and the line agree.
+    expect(cat3Basis(priced, read, null).detail).toContain("the GHG inventory's own New Zealand figure")
+  })
+
   it('C3C-7 the unpriced rows are named with their reason, and are not in the figure', () => {
     // A unit no sheet publishes: the row is named and the rest of the location still prices.
     const read = cat3InputsFrom(
@@ -260,7 +361,7 @@ describe('Category 3 copy', () => {
     expect(priced.unpriced).toHaveLength(1)
     const text = cat3UnpricedText(priced.unpriced[0])
     expect(text).toBe('UK site, propane: not priced, the workbook publishes no upstream factor for propane measured in barrels.')
-    expect(cat3Sentences(priced, read)).toContain(text)
+    expect(cat3Sentences(priced, read, GWP)).toContain(text)
     expect(priced.kg_co2e).toBeCloseTo(19_572.329976, 6)
   })
 })

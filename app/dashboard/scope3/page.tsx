@@ -63,7 +63,7 @@ import {
 import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
-  cat3Sentences, cat3WorkingsSummary, cat3NoFigureText,
+  cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
   CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
 } from '../../../lib/scope3/cat3Copy'
 import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
@@ -1867,6 +1867,9 @@ export default function Scope3Dashboard() {
   // Plain consts, not useMemo, for the same reason cat15Result() is a plain call: the page's derived
   // values are computed per render, and the harness (lib/scope3/scope3Surfaces.test.ts) mocks React
   // down to useState, useEffect and useRef. Both calls are pure and cheap.
+  // The same sentence Cats 5, 6, 7 and 12 carry, with Category 3's own publisher record: it names the
+  // factors' AR5 basis and what the bound GHG inventory records, without claiming the two agree.
+  const cat3GwpSentence: string = publisherGwpSentence(CAT3_GWP_PUBLISHER, !!boundInventoryId, ghgGwpVersion)
   const cat3Read = cat3InputsFrom(boundWorkings, boundLocations)
   const cat3Priced = cat3Read.inputs ? priceCat3(cat3Read.inputs) : null
   /** The sentence shown when Category 3 has no figure: the inventory could not be read, or a stream was
@@ -2292,6 +2295,10 @@ export default function Scope3Dashboard() {
       }
     }
 
+    // ⚠️ THE BASIS IS BUILT IN lib/scope3/cat3Copy.ts, LIKE CATS 6, 7 AND 15's. This cell is the CSV's
+    // Method column and the saved factor_basis line, and until 20 Sep 2026 Category 3 fell through to
+    // "No data. No activity data was entered", which would have been recorded beside a real figure.
+    if (method === 'fuel_and_energy_upstream') return cat3Basis(cat3Priced, cat3Read, d?.emissions_override)
     if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d), countryLabel)
     if (method === 'employee_commuting_factors') return cat7Basis(evaluateCommuting(d))
 
@@ -2432,6 +2439,16 @@ export default function Scope3Dashboard() {
     // ⚠️ THE BATCH COUNTS BELONG TO THE INVENTORY, NOT TO A CATEGORY. They count lines across one request,
     // which now carries several categories, so they are written once here rather than on any card.
     for (const sentence of spendBatchSummary()) out.push(['Spend estimates', 'Batch', sentence, ''])
+
+    // ⚠️ ONE ROW PER PRICED LINE: the activity as entered, the conversion where one applied, the
+    // published factor with the sheet and cell it came from, and the product. Then the rows that were
+    // read and not priced, the GWP basis and the disclosures. Category 3's figures come from the bound
+    // GHG inventory rather than from this panel, so these rows are the only place the export can show
+    // what they were.
+    const c3 = catData['cat3']
+    if (c3 && isReportable('cat3')) {
+      for (const row of cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence)) out.push(['Cat 3', ...row])
+    }
 
     const c5 = catData['cat5']
     if (c5 && isReportable('cat5')) {
@@ -3337,7 +3354,7 @@ export default function Scope3Dashboard() {
                           id="cat3-energy"
                           figureMt={cat3Mt() ?? 0}
                           summary={cat3WorkingsSummary(cat3Priced)}
-                          sentences={cat3Sentences(cat3Priced, cat3Read)}
+                          sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence)}
                         />
                       </div>
                     )}

@@ -51,7 +51,16 @@ const SEEDS: [string, string][] = [
   ['const [boundWorkings, setBoundWorkings] = useState<unknown>(null)', 'const [boundWorkings] = useState<unknown>((globalThis as any).__SCOPE3_GHG__.workings)'],
   ['const [boundLocations, setBoundLocations] = useState<unknown>(null)', 'const [boundLocations] = useState<unknown>((globalThis as any).__SCOPE3_GHG__.locations)'],
 ]
-/** Where the capture is attached: the last statement before the component's own return. */
+/**
+ * Where the capture is attached: the last statement before the component's own return.
+ *
+ * ⚠️ THIS IS A STRING, SO tsc NEVER SEES IT. On 20 Sep 2026 cat3Sentences gained a third argument and
+ * this call was left with two: the missing gwpSentence became `undefined`, went into the sentence list,
+ * and was written into the snapshot as `null` at index 7. Nothing failed at the type level and the
+ * update flag recorded it happily; what caught it was the compare run, where `undefined` from a fresh
+ * capture does not equal `null` from the file. S2 now asserts every captured sentence is a string, so
+ * the next arity change fails with its own message rather than as a puzzling inequality.
+ */
 const CAPTURE_ANCHOR = '  const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]'
 const CAPTURE = `${CAPTURE_ANCHOR}
   ;(globalThis as any).__SCOPE3_CAPTURE__ = {
@@ -67,7 +76,7 @@ const CAPTURE = `${CAPTURE_ANCHOR}
     // sentences, and the amber notice when there is no figure. Captured because this is the surface
     // Task 5 adds, and a snapshot of a figure would not show a word of it.
     cat3Workings: () => (cat3Priced && cat3Priced.status !== 'withheld'
-      ? { summary: cat3WorkingsSummary(cat3Priced), sentences: cat3Sentences(cat3Priced, cat3Read) }
+      ? { summary: cat3WorkingsSummary(cat3Priced), sentences: cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence) }
       : null),
     cat3NoFigure: () => cat3NoFigure,
     generateExport,
@@ -255,6 +264,20 @@ describe('Scope 3 surfaces', () => {
     // Category 3, and the strings that cover several categories at once.
     compare('cat3', now.cat3 as Record<string, unknown>, snap.cat3, DELIBERATE)
     compare('shared', now.shared as Record<string, unknown>, snap.shared, DELIBERATE)
+  })
+
+  it('S2 every captured sentence is a string: the capture is a string of code, and tsc cannot check it', () => {
+    const snap = JSON.parse(readFileSync(SNAPSHOT, 'utf8'))
+    const panel = snap.cat3?.panel
+    expect(panel, 'Category 3 captures its panel').toBeTruthy()
+    expect(typeof panel.summary).toBe('string')
+    for (const [i, s] of (panel.sentences as unknown[]).entries()) {
+      expect(typeof s, `panel sentence ${i} is ${JSON.stringify(s)}: an argument is missing from the ` +
+        'capture in this file, which tsc does not type-check').toBe('string')
+    }
+    for (const row of snap.cat3.csv_rows as unknown[][]) {
+      for (const [i, cell] of row.entries()) expect(typeof cell, `csv cell ${i} of ${JSON.stringify(row[0])}`).toBe('string')
+    }
   })
 
   it('S1 no instrumented copy is left anywhere in the repository', () => {
