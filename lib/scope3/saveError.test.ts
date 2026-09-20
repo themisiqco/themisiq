@@ -118,7 +118,11 @@ describe('Scope 3 save errors', () => {
     const page = read(PAGE)
     expect(page).toContain('sector: sector || null,')
     expect(page).not.toMatch(/^\s*sector,\s*$/m)
-    expect(page).toContain('cat_data: catDataForSave(catData),')
+    // ⚠️ THE CALL, NOT THE EXACT LINE. Task 7 added the Category 3 fingerprint to the object being
+    // saved, so the argument is now a spread; what this guard is for is that whatever goes into
+    // cat_data goes through catDataForSave first, and that the raw state never does.
+    expect(page).toContain('cat_data: catDataForSave({')
+    expect(page).not.toMatch(/cat_data: catData\b/)
 
     // The jsonb paths the sector trigger validates: blank drops out, a real code stays, and a category
     // that never had the field is untouched.

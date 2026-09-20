@@ -79,6 +79,10 @@ const CAPTURE = `${CAPTURE_ANCHOR}
       ? { summary: cat3WorkingsSummary(cat3Priced), sentences: cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence) }
       : null),
     cat3NoFigure: () => cat3NoFigure,
+    // ⚠️ null HERE IS THE POINT, NOT AN OMISSION. The fixture record carries no stored fingerprint, which
+    // is a record saved before Task 7; the notice must stay silent rather than claim a change nobody can
+    // see. Captured so that silence is in the snapshot and not only in a unit test.
+    cat3Stale: () => (cat3Stale && cat3Change ? cat3StaleNotice(cat3Change) : null),
     generateExport,
     saveScope3,
   }`
@@ -131,6 +135,7 @@ type Capture = {
   total: number
   cat3Workings: () => { summary: string; sentences: string[] } | null
   cat3NoFigure: () => string | null
+  cat3Stale: () => string | null
   generateExport: () => void
   saveScope3: () => Promise<void>
 }
@@ -193,7 +198,8 @@ async function capture(): Promise<Record<string, unknown>> {
       },
       // Category 3 carries its panel as well as its figures: the workings card's summary and sentences,
       // and the notice shown when there is none. Added with the panel itself (Task 5).
-      cat3: { ...perCategory('cat3'), panel: cap.cat3Workings(), panel_no_figure: cap.cat3NoFigure() },
+      cat3: { ...perCategory('cat3'), panel: cap.cat3Workings(), panel_no_figure: cap.cat3NoFigure(),
+              panel_stale: cap.cat3Stale() },
       others: Object.fromEntries(IDS.filter(id => id !== 'cat3').map(id => [id, perCategory(id)])),
     }
   } finally {

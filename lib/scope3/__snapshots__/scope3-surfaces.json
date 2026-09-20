@@ -323,7 +323,8 @@
     "The market-based electricity row at UK site is not used: the location-based row is the basis for this category."
    ]
   },
-  "panel_no_figure": null
+  "panel_no_figure": null,
+  "panel_stale": null
  },
  "others": {
   "cat1": {

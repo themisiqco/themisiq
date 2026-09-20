@@ -36,6 +36,7 @@ import { rowPricedResult } from '../../../lib/scope3/rowPriced'
 import { notEnteredReason } from '../../../lib/scope3/notEntered'
 import { saveErrorText } from '../../../lib/scope3/saveError'
 import { catDataForSave } from '../../../lib/scope3/savePayload'
+import { cat3Fingerprint, cat3FingerprintChange, cat3FingerprintMoved } from '../../../lib/scope3/cat3Fingerprint'
 import {
   evaluateCommuting, hasLegacyCommuting, COMMUTE_MODES, COMMUTE_RAIL_TYPES,
   type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
@@ -66,7 +67,7 @@ import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
-  CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
+  cat3StaleNotice, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
 } from '../../../lib/scope3/cat3Copy'
 import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
 import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
@@ -988,6 +989,16 @@ interface CategoryData {
   /** ⚠️ RETIRED. Read once on restore to derive `relevant` (relevanceFromStored), then never again. A
    *  saved record keeps it, because saves spread the stored object; nothing else reads it. */
   included?: boolean
+  /**
+   * Cat 3: which activity rows in the bound GHG inventory produced the figure saved with this record.
+   *
+   * ⚠️ WRITTEN AT SAVE, READ ON LOAD, AND NEVER HELD IN THE PAGE'S OWN catData. It is a property of the
+   * SAVED record, not of what is on screen: the page recalculates Category 3 from the bound inventory
+   * on every render, so only the stored figure can go stale. lib/scope3/cat3Fingerprint.ts builds and
+   * compares it; `unknown` here because a record saved by an older version may carry any shape, and the
+   * reader validates rather than assumes.
+   */
+  source_fingerprint?: unknown
   // Cat 1
   total_spend?: number
   supplier_sector?: string
@@ -1074,6 +1085,12 @@ export default function Scope3Dashboard() {
   const [dataConfirmed, setDataConfirmed] = useState(false)
   // Why the last save was refused, in words, from lib/scope3/saveError.ts. null when none was.
   const [saveError, setSaveError] = useState<string | null>(null)
+  // ⚠️ THE FINGERPRINT SAVED WITH THE RECORD, HELD BESIDE savedTotal AND FOR THE SAME REASON. Category 3
+  // is the only category whose inputs live in another module, so the SAVED figure can go stale while the
+  // screen stays current. null means no comparison is possible: a record saved before this field
+  // existed, or none bound yet. It is never written into catData, because that would re-arm the Save
+  // button on every restore.
+  const [savedCat3Fingerprint, setSavedCat3Fingerprint] = useState<unknown>(null)
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
   // The bound GHG inventory's recorded GWP basis (ghg_inventories.gwp_version: AR4, AR5, AR6 or null).
   // Read so the Cat 5 disclosure can state whether its AR5 factors match it, rather than assume either way.
@@ -1451,6 +1468,9 @@ export default function Scope3Dashboard() {
       setSaved(true) // it IS saved
       // null when the row predates total_scope3_tco2e being written; then there is nothing to match.
       setSavedTotal(s3.total_scope3_tco2e == null ? null : Number(s3.total_scope3_tco2e))
+      // The fingerprint saved with the Category 3 figure, if this record carries one. A record saved
+      // before Task 7 has none, and the notice stays silent rather than guessing.
+      setSavedCat3Fingerprint((s3.cat_data as Record<string, CategoryData> | null)?.cat3?.source_fingerprint ?? null)
       setStep(3)     // land on Results, not Setup
     }
   }
@@ -1879,6 +1899,18 @@ export default function Scope3Dashboard() {
   /** The sentence shown when Category 3 has no figure: the inventory could not be read, or a stream was
    *  never answered. null when there is a figure, including a calculated zero. */
   const cat3NoFigure = cat3NoFigureText(cat3Priced, cat3Read)
+
+  /**
+   * The bound inventory's activity, fingerprinted, and what it says about the saved record.
+   *
+   * ⚠️ NOT COMPUTED WHEN THE INVENTORY CANNOT BE READ. cat3Read.reason is set when there are no
+   * workings, an older shape or no locations: the current fingerprint would then be an empty list and
+   * every row would report as removed, which is a claim about the customer's inventory made out of our
+   * own inability to read it. The panel already says what it could not read.
+   */
+  const cat3Change = cat3Read.reason ? null
+    : cat3FingerprintChange(savedCat3Fingerprint, cat3Fingerprint(cat3Read.inputs))
+  const cat3Stale = cat3FingerprintMoved(cat3Change)
 
   /** The figure in tonnes, or null where there is none. A withheld category has no figure, never a zero. */
   const cat3Mt = (): number | null =>
@@ -2318,6 +2350,8 @@ export default function Scope3Dashboard() {
     // store a total the page is on the point of contradicting. The button is disabled in this state
     // too; this guard is for any other caller.
     if (anySpendPending) return
+    // Computed once, so the value written and the value remembered are the same object.
+    const cat3FingerprintNow = cat3Fingerprint(cat3Read.inputs)
     setSaving(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -2340,7 +2374,14 @@ export default function Scope3Dashboard() {
         // The same rule inside the jsonb: a blank sector select writes '', and the sector trigger
         // (assert_sector_codes_exist, SQLSTATE PT422) tests `is not null`, so '' reaches its membership
         // check and refuses the save. lib/scope3/savePayload.ts drops the key instead.
-        cat_data: catDataForSave(catData),
+        // ⚠️ THE FINGERPRINT IS WRITTEN WITH THE FIGURE, NOT HELD IN STATE. It describes the activity
+        // rows this save was computed from, so it belongs to the record; putting it in catData would
+        // re-arm the Save button the moment it changed. cat_data.cat3.source_fingerprint, per Q6 of the
+        // design: no migration, and it round-trips with the record the page already writes whole.
+        cat_data: catDataForSave({
+          ...catData,
+          cat3: { ...(catData.cat3 ?? {}), source_fingerprint: cat3FingerprintNow },
+        }),
         total_scope3_tco2e: totalScope3,
         // ⚠️ WHAT THAT TOTAL COVERS, SAVED WITH IT. The number alone cannot say whether it is two
         // categories or fifteen, and it is read as a Scope 3 BASELINE by the SBTi dashboard, where a
@@ -2372,6 +2413,7 @@ export default function Scope3Dashboard() {
       setSaveError(null)
       setSaved(true)
       setSavedTotal(totalScope3) // exactly the value written above, from the same render
+      setSavedCat3Fingerprint(cat3FingerprintNow) // ditto: the notice must clear on a save that worked
     } finally { setSaving(false) }
   }
 
@@ -3361,6 +3403,14 @@ export default function Scope3Dashboard() {
                     {cat3NoFigure && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
                         {cat3NoFigure}
+                      </div>
+                    )}
+
+                    {/* The saved record is older than the inventory it was computed from. Amber, like
+                        the other "you need to act on this" states, and above the figure it describes. */}
+                    {cat3Stale && cat3Change && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
+                        {cat3StaleNotice(cat3Change)}
                       </div>
                     )}
 

@@ -22,6 +22,7 @@ import type {
   Cat3Flag, Cat3LineKind, Cat3PricedLine, Cat3Reason, Cat3Result, Cat3Stream, Cat3Unpriced, Cat3Withheld,
 } from './cat3Energy'
 import type { Cat3InputsReason, Cat3InputsResult, Cat3Skipped } from './cat3Inputs'
+import type { Cat3FingerprintChange } from './cat3Fingerprint'
 
 const m = DEFRA_ENERGY_META
 const g = m.guidance
@@ -431,6 +432,45 @@ export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult, gwpSenten
     out.push(endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`))
   }
   return out
+}
+
+// ── THE SAVED FIGURE AGAINST THE INVENTORY AS IT STANDS ─────────────────────────────────────────
+
+/**
+ * What the staleness notice can say, and what it must not.
+ *
+ * ⚠️ IT NAMES THE ROWS AND NOT THE FIGURES. lib/scope3/cat3Fingerprint.ts stores a hash per (location,
+ * stream), so a comparison knows WHICH rows changed, appeared or went; it stores no activity value, so
+ * it cannot say what a figure was before or what it is now. The sentence says exactly that much.
+ *
+ * ⚠️ AND IT IS SHOWN ONLY WHEN A COMPARISON HAPPENED. A record with no stored fingerprint, or one whose
+ * stored shape this version cannot read, produces no notice at all: "we cannot tell" is not "it changed",
+ * and a notice that appears on every old record teaches people to close it without reading.
+ */
+export function cat3StaleNotice(change: Cat3FingerprintChange): string {
+  const name = (r: { location: string; stream: string }) =>
+    `${r.location} (${CAT3_STREAM_LABEL[r.stream as Cat3Stream] ?? r.stream})`
+  const parts = [
+    change.changed.length > 0 && `changed at ${list(change.changed.map(name))}`,
+    change.added.length > 0 && `now also holds ${list(change.added.map(name))}`,
+    change.removed.length > 0 && `no longer holds ${list(change.removed.map(name))}`,
+  ].filter((x): x is string => typeof x === 'string')
+  // ⚠️ A RENAME LOOKS EXACTLY LIKE A MOVE, AND THIS SENTENCE IS WHY IT IS NOT OVERCLAIMED. A row is
+  // identified by its location NAME (the GHG module's workings rows carry no location id), so renaming
+  // a site with the same meters on it reads here as one row leaving and another arriving. That shape
+  // is indistinguishable from an actual move, so the notice names the possibility rather than asserting
+  // the data went anywhere. It is added only when both lists are non-empty, which is the only shape a
+  // rename can produce.
+  const rename = change.added.length > 0 && change.removed.length > 0
+    ? ' A location renamed in the GHG module reads the same way, as one row leaving and another ' +
+      'arriving, because a row is identified here by its location name.'
+    : ''
+  return (
+    `The GHG inventory this record is bound to has changed since this Category 3 figure was saved: it ` +
+    `${list(parts)}. The figure on this page is calculated from the inventory as it stands now; the one ` +
+    `stored in your saved record is the older one. Save again to store the current figure. What changed ` +
+    `in each row is not recorded here, only that it did.${rename}`
+  )
 }
 
 // ── THE BASIS: THE CSV'S METHOD CELL, AND THE SAVED factor_basis COLUMN ──────────────────────────
