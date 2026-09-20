@@ -8,6 +8,7 @@ import {
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
   cat15MethodDescription, cat15MethodologyPassage, cat15DecomposedBasisDetail, cat15Figure,
   CAT15_GWP_SENTENCE, CAT15_GWP_TAIL, cat15GwpSentence, CAT15_NOT_ENTERED, cat15HasPortfolioFields,
+  CAT15_HOLDINGS_SUPERSEDED, CAT15_HOLDING_NOT_USED, CAT15_HOLDING_FIELDS, cat15HoldingIncomplete,
 } from './cat15'
 import { notEnteredReason } from './notEntered'
 
@@ -62,7 +63,9 @@ const SUPERSEDED: readonly { was: string; re: RegExp }[] = [
   { was: '"multiply into a quantity"', re: /multiply into a quantity/i },
   { was: '"not a quantity"', re: /\bnot a quantity\b/i },
   { was: '"prices a year of purchasing"', re: /prices a year of purchasing/i },
-  { was: 'the old withholding list naming the outstanding amount', re: /missing its emissions, outstanding amount or attribution value/i },
+  // 19 Sep 2026: a blank outstanding amount withholds the figure. From 18 to 19 Sep the withholding sentences
+  // said it was "read as zero", which was then true; the three-field list is the current wording again.
+  { was: '"left blank is read as zero" (a blank outstanding amount now withholds)', re: /left blank is read as zero/i },
   { was: 'the old known-total phrasing', re: /known financed emissions where entered, otherwise/i },
   // 18 Sep 2026: the investee GWP basis is not recorded. lib/pcaf stamped 'AR6' and the CSV said the figures
   // were "on the AR6 basis the investee figures are reported on"; nothing had asked anyone which basis.
@@ -111,6 +114,17 @@ describe('Category 15 copy: one source, and the superseded wordings nowhere', ()
     expect(page, 'the Cat 15 panel box').toContain('{CAT15_PANEL_METHOD}')
     expect(page, 'the Cat 15 panel box').toContain('{CAT15_PANEL_NO_PROXY}')
     expect(page, 'the CSV recorded-and-not-used row').toContain('CAT15_RECORDED_NOT_USED])')
+    expect(page, 'the superseded note above the holdings').toContain('{CAT15_HOLDINGS_SUPERSEDED}')
+    expect(page, 'each holding\'s figure while a known total is entered').toContain('{CAT15_HOLDING_NOT_USED}')
+    expect(page, 'the per-holding incomplete line').toContain('{cat15HoldingIncomplete(row)}')
+    expect(page).not.toMatch(/Complete this holding to compute: it needs/)
+    expect(CAT15_HOLDINGS_SUPERSEDED.startsWith(CAT15_SENTENCES.knownTotalShort)).toBe(true)
+    // The per-holding line names its fields in the words the withholding sentences use.
+    for (const f of ['emissions', 'outstanding amount', 'attribution value']) {
+      expect(CAT15_SENTENCES.withholdsShort).toContain(f)
+      expect(CAT15_SENTENCES.withholdsLong).toContain(f)
+      expect(Object.values(CAT15_HOLDING_FIELDS).some(v => v.endsWith(f))).toBe(true)
+    }
     // And each of those constants carries the shared sentence it stands for.
     expect(CAT15_GUIDANCE).toContain(CAT15_FIGURE_SOURCE)
     expect(CAT15_GUIDANCE).toContain(CAT15_SENTENCES.noPortfolioProxyShort)
@@ -155,6 +169,9 @@ describe('Category 15 copy: one source, and the superseded wordings nowhere', ()
       'cat15GwpSentence(unbound)': cat15GwpSentence(false, null),
       'cat15GwpSentence(bound, AR6)': cat15GwpSentence(true, 'AR6'),
       'cat15GwpSentence(bound, none)': cat15GwpSentence(true, null),
+      CAT15_HOLDINGS_SUPERSEDED, CAT15_HOLDING_NOT_USED,
+      'cat15HoldingIncomplete(all missing)': cat15HoldingIncomplete({ id: 'x', assetClass: 'mortgages', denominator: 0, emissions: {} }),
+      'cat15HoldingIncomplete(negative)': cat15HoldingIncomplete({ id: 'x', assetClass: 'mortgages', outstandingAmount: -1, denominator: 10, emissions: { reportedEmissions: 1 } }),
       'incomplete-holdings reason': cat15Figure({ pcafAssets: [{ id: 'x', assetClass: 'mortgages', outstandingAmount: 1, denominator: 0, emissions: {} }] }).reason,
     }
     const dashed = Object.entries(produced).filter(([, v]) => /[—–]/.test(v)).map(([k]) => k)

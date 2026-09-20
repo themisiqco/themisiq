@@ -8,17 +8,18 @@ import { GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, provenanceGap, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
 import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
-// ⚠️ assessAsset ONLY. resolvePcafResult is no longer imported: it existed to choose between the
-// decomposed assessment and the lumped spend proxy, and it answered with the proxy whenever any holding
-// was incomplete. lib/scope3/cat15.ts makes that choice explicitly, and there is no proxy to choose.
-import { assessAsset } from '../../../lib/pcaf/engine'
+// ⚠️ NOTHING FROM lib/pcaf/engine. resolvePcafResult, imported here until 17 Sep 2026, chose between the
+// decomposed assessment and the lumped spend proxy and answered with the proxy whenever any holding was
+// incomplete; it was removed from lib/pcaf on 19 Sep 2026. lib/scope3/cat15.ts makes that choice explicitly,
+// there is no proxy to choose, and the per-holding line asks cat15.ts's assessHolding.
 import { INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
 import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors/productOptions'
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
 import {
-  cat15Figure, holdingComputes, assessableEmissions, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
+  cat15Figure, assessHolding, cat15HoldingIncomplete, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
+  CAT15_HOLDINGS_SUPERSEDED, CAT15_HOLDING_NOT_USED, cat15OverrideEntered, type StoredHolding,
   cat15DecomposedBasisDetail, cat15GwpSentence,
 } from '../../../lib/scope3/cat15'
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
@@ -53,7 +54,7 @@ import {
   cat6Sentences, cat6WorkingsSummary, cat6Basis, cat6RfHeader, cat6RfSentence, flightCsvRow, railCsvRow,
   flightRuleText, flightClassText, flightNotPricedReason, railNotPricedReason, AIR_CATEGORY_LABEL,
 } from '../../../lib/scope3/businessTravelCopy'
-import type { PcafPortfolioAsset, PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
+import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
@@ -1027,7 +1028,7 @@ interface CategoryData {
   portfolio_sector?: string
   // Cat 15 — detailed (per-asset PCAF) mode; dormant until the input UI (next step)
   pcafMode?: 'proxy' | 'detailed'
-  pcafAssets?: PcafPortfolioAsset[]
+  pcafAssets?: StoredHolding[] // outstandingAmount may be absent: blank is missing, not 0
   // Generic spend
   annual_spend?: number
   // Generic activity
@@ -1544,20 +1545,20 @@ export default function Scope3Dashboard() {
   // clearing. Both are function patches, so they too read the row as it is when the edit applies.
 
   // Cat 15 detailed (per-asset PCAF) holdings, in catData['cat15'].pcafAssets.
-  const newPcafAsset = (): PcafPortfolioAsset => ({
+  // No outstandingAmount: a new holding's amount is blank, and blank withholds the figure (StoredHolding).
+  const newPcafAsset = (): StoredHolding => ({
     id: Math.random().toString(36).slice(2),
     assetClass: 'listed_equity_corp_bonds',
-    outstandingAmount: 0,
     denominator: 0,
     emissions: {}, // EmissionInputs — empty until the user fills a path
   })
   /** For rendering only. */
   const cat15Assets = () => catData['cat15']?.pcafAssets ?? []
-  const editCat15Assets = (edit: RowEdit<PcafPortfolioAsset>) =>
+  const editCat15Assets = (edit: RowEdit<StoredHolding>) =>
     setCatData(prev => ({ ...prev, cat15: { ...prev.cat15, pcafAssets: editRows(prev.cat15?.pcafAssets, edit) } }))
   const addPcafAsset = () => editCat15Assets({ kind: 'add', row: newPcafAsset() })
   const removePcafAsset = (id: string) => editCat15Assets({ kind: 'remove', id })
-  const updatePcafAsset = (id: string, patch: Partial<PcafPortfolioAsset> | ((row: PcafPortfolioAsset) => Partial<PcafPortfolioAsset>)) =>
+  const updatePcafAsset = (id: string, patch: Partial<StoredHolding> | ((row: StoredHolding) => Partial<StoredHolding>)) =>
     editCat15Assets({ kind: 'update', id, patch })
   // Row-specific: merges into the nested emissions object as it is when the edit applies.
   const updatePcafEmissions = (id: string, patch: Partial<EmissionInputs>) =>
@@ -3256,6 +3257,13 @@ export default function Scope3Dashboard() {
                         `pcafMode` stays in CategoryData for records that stored it. */}
                     <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <label style={labelStyle}>Holdings</label>
+                      {/* ⚠️ WHILE A KNOWN TOTAL IS ENTERED THE HOLDINGS ARE NOT IN THE FIGURE, AND THE PANEL SAYS SO.
+                          cat15OverrideEntered is the question cat15Figure asks, so the note and the figure agree. */}
+                      {cat15OverrideEntered(catData['cat15']) && cat15Assets().length > 0 && (
+                        <div role="status" style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.5 }}>
+                          {CAT15_HOLDINGS_SUPERSEDED}
+                        </div>
+                      )}
                       {cat15Assets().length === 0 && (
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', background: '#f8f7f5', borderRadius: 8, padding: '0.75rem', lineHeight: 1.5 }}>
                           No holdings yet. Add one per investment or loan, or enter a known figure above. Until one or the other is there, Category 15 is reported as not calculated, and is not counted as zero.
@@ -3277,7 +3285,9 @@ export default function Scope3Dashboard() {
                             </div>
                             <div>
                               <label style={labelStyle}>Outstanding amount ({currency})</label>
-                              <input style={inputStyle} type="number" value={row.outstandingAmount || ''} onChange={e => updatePcafAsset(row.id, { outstandingAmount: Number(e.target.value) })} placeholder="e.g. 5,000,000" />
+                              {/* ⚠️ BLANK IS undefined, NOT 0, and an entered 0 shows as 0. This wrote Number('') = 0 and showed 0 as
+                                  blank, so an unfinished holding computed to zero and looked untouched. */}
+                              <input style={inputStyle} type="number" value={row.outstandingAmount ?? ''} onChange={e => updatePcafAsset(row.id, { outstandingAmount: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. 5,000,000" />
                             </div>
                             <div>
                               {/* Correctness-critical: denominator label tracks the selected asset class */}
@@ -3307,18 +3317,19 @@ export default function Scope3Dashboard() {
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                               {(() => {
-                                // ⚠️ ASKED OF THE SAME FUNCTION THE TOTAL USES. holdingComputes runs the
+                                // ⚠️ ASKED OF THE SAME FUNCTION THE TOTAL USES. assessHolding runs the
                                 // library's own assessAsset on the STRIPPED row, so a row that shows a
                                 // figure here is a row the portfolio total contains, and one that says
-                                // "complete this row" is one that withholds the whole figure.
-                                if (!holdingComputes(row)) {
-                                  // ⚠️ ONLY WHAT WITHHOLDS THE FIGURE. This said the holding "needs an outstanding
-                                  // amount", which it does not: a blank outstanding amount is read as zero and the
-                                  // holding computes (see the cat15-blank-outstanding-is-zero note). When that is
-                                  // fixed, the outstanding amount goes back into this sentence.
-                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Complete this holding to compute: it needs the investee&apos;s emissions and the attribution value.</div>
+                                // "complete this holding" is one that withholds the whole figure.
+                                const a = assessHolding(row)
+                                if (!a) {
+                                  // Names only what THIS holding lacks, from cat15.ts (holdingMissing).
+                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{cat15HoldingIncomplete(row)}</div>
                                 }
-                                const a = assessAsset({ ...row, emissions: assessableEmissions(row.emissions) })
+                                // While a known total is entered this figure is not in the total: muted, and said.
+                                if (cat15OverrideEntered(catData['cat15'])) {
+                                  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · {(a.attributionFactor * 100).toFixed(1)}% of the investee · PCAF DQ {a.dqScore} · {CAT15_HOLDING_NOT_USED}</div>
+                                }
                                 return <div style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>Financed: {a.financedEmissions.toFixed(1)} tCO₂e · {(a.attributionFactor * 100).toFixed(1)}% of the investee · PCAF DQ {a.dqScore}</div>
                               })()}
                             </div>

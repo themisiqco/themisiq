@@ -36,19 +36,22 @@ const PCAF_GWP_BASIS = null;
 
 // Compute the attribution factor for one asset.
 //
-//   denominator <= 0 → throw loud (invalid input; there is no defensible factor).
+//   outstanding not finite, or < 0 → throw loud (missing or invalid exposure).
+//   denominator not finite, or <= 0 → throw loud (invalid input; there is no defensible factor).
 //   raw factor > 1   → cap at 1, capped:true (exposure should never exceed the
 //                      asset's total value; emitting >1 would over-count emissions).
 //   raw factor 0..1  → capped:false.
 export function attributionFactor(asset: PcafAsset): AttributionResult {
-  if (asset.outstandingAmount < 0) {
+  // ⚠️ NOT FINITE THROWS TOO, SINCE 19 SEP 2026. This tested `< 0` only, so an absent amount (undefined)
+  // slipped past and produced NaN rather than a loud failure. A blank amount is missing, not zero.
+  if (!Number.isFinite(asset.outstandingAmount) || asset.outstandingAmount < 0) {
     throw new Error(
       `PCAF attribution: outstandingAmount must be >= 0 (asset ${asset.id}, ` +
       `assetClass ${asset.assetClass}, got ${asset.outstandingAmount})`,
     );
   }
 
-  if (asset.denominator <= 0) {
+  if (!Number.isFinite(asset.denominator) || asset.denominator <= 0) {
     throw new Error(
       `PCAF attribution: denominator must be > 0 (asset ${asset.id}, assetClass ${asset.assetClass}, got ${asset.denominator})`,
     );

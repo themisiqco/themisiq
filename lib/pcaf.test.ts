@@ -3,9 +3,9 @@
 // Exact-number assertions: factor = outstanding/denominator, financed = factor × investee tCO2e.
 import { describe, it, expect } from 'vitest';
 import { attributionFactor, financedEmissions } from './pcaf/attribution';
-import { estimateInvesteeEmissions, portfolioProxyEstimate } from './pcaf/estimate';
-import { assessAsset, assessPortfolio, portfolioFromProxy, resolvePcafResult } from './pcaf/engine';
-import type { PcafAsset, PcafPortfolioAsset } from './pcaf/types';
+import { estimateInvesteeEmissions } from './pcaf/estimate';
+import { assessAsset, assessPortfolio } from './pcaf/engine';
+import type { PcafAsset, PcafPortfolioAsset, EmissionInputs } from './pcaf/types';
 
 const asset = (over: Partial<PcafAsset>): PcafAsset => ({
   id: 'a1',
@@ -83,6 +83,14 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
     expect(() => attributionFactor(asset({ outstandingAmount: -100, denominator: 100 }))).toThrow();
   });
 
+  // 19 Sep 2026: a blank outstanding amount is MISSING, not zero. `< 0` alone let undefined through as NaN.
+  it('absent or non-finite outstandingAmount / denominator throws, never NaN', () => {
+    for (const bad of [undefined, NaN, Infinity]) {
+      expect(() => attributionFactor(asset({ outstandingAmount: bad as unknown as number, denominator: 100 }))).toThrow();
+      expect(() => attributionFactor(asset({ outstandingAmount: 1, denominator: bad as unknown as number }))).toThrow();
+    }
+  });
+
   it('zero outstandingAmount is valid → factor 0, financed 0 (closed position)', () => {
     const a = asset({ outstandingAmount: 0, denominator: 100, investeeEmissions: 5_000 });
     expect(attributionFactor(a)).toEqual({ factor: 0, capped: false });
@@ -94,7 +102,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
 
   // ⚠️ REWRITTEN 18 SEP 2026, NOT PRESERVED. This asserted 'AR6' on every result: a basis the library stamped
   // and nobody had collected. The contract now is that the basis is NOT RECORDED (null) on every result,
-  // decomposed, per asset and proxy alike, until a holding carries one the customer supplied.
+  // decomposed and per asset alike, until a holding carries one the customer supplied.
   it('gwpBasis is not recorded (null) on every result', () => {
     const classes: PcafAsset['assetClass'][] = [
       'listed_equity_corp_bonds',
@@ -112,7 +120,7 @@ describe('PCAF attribution — attributionFactor + financedEmissions', () => {
   });
 });
 
-describe('PCAF estimation — estimateInvesteeEmissions (scores 1–4)', () => {
+describe('PCAF estimation — estimateInvesteeEmissions (scores 1–3)', () => {
   it('reported + verified → score 1', () => {
     const r = estimateInvesteeEmissions({ reportedEmissions: 12_345, verified: true });
     expect(r.dqScore).toBe(1);
@@ -140,82 +148,20 @@ describe('PCAF estimation — estimateInvesteeEmissions (scores 1–4)', () => {
     expect(r.basis).toBe('physical activity-based');
   });
 
-  it('revenue 100M + sector → score 4, emissions 12_000 (× 0.12 / 1000)', () => {
-    const r = estimateInvesteeEmissions({ revenue: 100_000_000, sector: 'Financial Services' });
-    expect(r.dqScore).toBe(4);
-    expect(r.emissions).toBe(12_000);
-    expect(r.basis).toContain('proxy');
-  });
-
   it('reported -1 → throws', () => {
     expect(() => estimateInvesteeEmissions({ reportedEmissions: -1 })).toThrow();
   });
 
-  it('revenue -1 (+ sector) → throws', () => {
-    expect(() => estimateInvesteeEmissions({ revenue: -1, sector: 'Financial Services' })).toThrow();
+  // ⚠️ REWRITTEN 19 SEP 2026, NOT PRESERVED. This block asserted the tier-4 estimate (revenue 100M in
+  // 'Financial Services' → 12,000 tCO2e at score 4, from the 0.12 fallback). Tier 4 is removed; revenue and
+  // sector alone are now insufficient, which is what a row saved with them must produce.
+  it('revenue and sector alone → throws (no tier 4)', () => {
+    const legacy = { revenue: 100_000_000, sector: 'Financial Services' } as unknown as EmissionInputs;
+    expect(() => estimateInvesteeEmissions(legacy)).toThrow();
   });
 
   it('no usable inputs → throws', () => {
     expect(() => estimateInvesteeEmissions({})).toThrow();
-  });
-});
-
-describe('PCAF estimation — portfolioProxyEstimate (score 5, legacy calcCat15)', () => {
-  it('portfolio 100M, Financial Services → score 5, 12_000', () => {
-    const r = portfolioProxyEstimate({ portfolioValue: 100_000_000, sector: 'Financial Services' });
-    expect(r.dqScore).toBe(5);
-    expect(r.emissions).toBe(12_000);
-    expect(r.basis).toBe('economic/spend proxy on portfolio value (legacy)');
-  });
-
-  it('portfolio 50M, Mining & Metals → score 5, 210_000', () => {
-    const r = portfolioProxyEstimate({ portfolioValue: 50_000_000, sector: 'Mining & Metals' });
-    expect(r.dqScore).toBe(5);
-    expect(r.emissions).toBe(210_000);
-  });
-
-  it('portfolio 10M, sector undefined → 1_200 (Financial Services default → 0.12)', () => {
-    const r = portfolioProxyEstimate({ portfolioValue: 10_000_000 });
-    expect(r.dqScore).toBe(5);
-    expect(r.emissions).toBe(1_200);
-  });
-
-  it('portfolio 10M, nonexistent sector → 1_200 (?? 0.12 fallback, NOT 0.5)', () => {
-    const r = portfolioProxyEstimate({ portfolioValue: 10_000_000, sector: 'Nonexistent' });
-    expect(r.dqScore).toBe(5);
-    expect(r.emissions).toBe(1_200); // 0.5 would give 5_000 — proves the 0.12 fallback
-  });
-
-  it('emissionsOverride 8_500 → score 2, emissions 8_500', () => {
-    const r = portfolioProxyEstimate({ emissionsOverride: 8_500 });
-    expect(r.dqScore).toBe(2);
-    expect(r.emissions).toBe(8_500);
-    expect(r.basis).toBe('manual entry (tCO2e, unverified)');
-  });
-
-  // ⚠️ REWRITTEN 17 SEP 2026, NOT PRESERVED. This asserted that an entered 0 was FALSY and therefore fell
-  // through to the proxy at score 5 (1_200 for the inputs below). That was the behaviour, and the behaviour
-  // was wrong: a customer with no portfolio could not say so, and the proxy answered a question they had
-  // already answered. The check is now Number.isFinite.
-  it('emissionsOverride 0 → score 2, emissions 0 — an entered zero is an answer, not an absence', () => {
-    const r = portfolioProxyEstimate({ emissionsOverride: 0, portfolioValue: 10_000_000, sector: 'Financial Services' });
-    expect(r.dqScore).toBe(2);
-    expect(r.emissions).toBe(0);
-    expect(r.basis).toBe('manual entry (tCO2e, unverified)');
-  });
-
-  it('emissionsOverride undefined → the proxy still answers (nothing was entered)', () => {
-    const r = portfolioProxyEstimate({ portfolioValue: 10_000_000, sector: 'Financial Services' });
-    expect(r.dqScore).toBe(5);
-    expect(r.emissions).toBe(1_200);
-  });
-
-  it('emissionsOverride -1 → throws', () => {
-    expect(() => portfolioProxyEstimate({ emissionsOverride: -1 })).toThrow();
-  });
-
-  it('negative portfolioValue → throws', () => {
-    expect(() => portfolioProxyEstimate({ portfolioValue: -100 })).toThrow();
   });
 });
 
@@ -232,7 +178,8 @@ describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
     assetClass: 'listed_equity_corp_bonds',
     outstandingAmount: 50_000_000,
     denominator: 500_000_000,
-    emissions: { revenue: 100_000_000, sector: 'Financial Services' },
+    // Tier 3 (was tier 4 until 19 Sep 2026): 24,000 units × 0.5 = 12,000 tCO2e investee, as before.
+    emissions: { physicalActivity: 24_000, physicalEmissionFactor: 0.5 },
   };
 
   it('assessAsset composes estimate → attribution', () => {
@@ -243,7 +190,7 @@ describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
     expect(a.gwpBasis).toBeNull();
     const b = assessAsset(B);
     expect(b.financedEmissions).toBe(1_200); // 0.10 × 12_000 (investee)
-    expect(b.dqScore).toBe(4);
+    expect(b.dqScore).toBe(3);
   });
 
   it('two-asset portfolio → total, weighted DQ, breakdown, coverage', () => {
@@ -251,11 +198,11 @@ describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
     expect(r.mode).toBe('decomposed');
     expect(r.assetCount).toBe(2);
     expect(r.totalFinancedEmissions).toBe(6_200); // 5_000 + 1_200
-    // (1×5_000 + 4×1_200) / 6_200 = 9_800/6_200 ≈ 1.5806
-    expect(r.weightedDataQualityScore).toBeCloseTo(1.5806, 3);
+    // (1×5_000 + 3×1_200) / 6_200 = 8_600/6_200 ≈ 1.3871
+    expect(r.weightedDataQualityScore).toBeCloseTo(1.3871, 3);
     expect(r.byAssetClass.business_loans_unlisted_equity).toBe(5_000);
     expect(r.byAssetClass.listed_equity_corp_bonds).toBe(1_200);
-    expect(r.coverageByScore).toEqual({ 1: 1, 2: 0, 3: 0, 4: 1, 5: 0 });
+    expect(r.coverageByScore).toEqual({ 1: 1, 2: 0, 3: 1, 4: 0, 5: 0 });
     expect(r.gwpBasis).toBeNull();
   });
 
@@ -294,90 +241,5 @@ describe('PCAF engine — assessAsset / assessPortfolio (decomposed)', () => {
       emissions: {}, // no usable inputs
     };
     expect(() => assessPortfolio([bad])).toThrow();
-  });
-});
-
-describe('PCAF engine — portfolioFromProxy (score-5 regime, same shape)', () => {
-  it('portfolio value proxy → mode portfolio_proxy, score 5', () => {
-    const r = portfolioFromProxy({ portfolioValue: 100_000_000, sector: 'Financial Services' });
-    expect(r.mode).toBe('portfolio_proxy');
-    expect(r.totalFinancedEmissions).toBe(12_000);
-    expect(r.weightedDataQualityScore).toBe(5);
-    expect(r.assetCount).toBe(1);
-    expect(r.perAsset).toEqual([]);
-    expect(r.coverageByScore).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 });
-    expect(r.gwpBasis).toBeNull();
-  });
-
-  it('manual override proxy → score 2', () => {
-    const r = portfolioFromProxy({ emissionsOverride: 8_500 });
-    expect(r.totalFinancedEmissions).toBe(8_500);
-    expect(r.weightedDataQualityScore).toBe(2);
-    expect(r.coverageByScore).toEqual({ 1: 0, 2: 1, 3: 0, 4: 0, 5: 0 });
-  });
-});
-
-describe('PCAF engine — resolvePcafResult (proxy vs detailed switch)', () => {
-  const A: PcafPortfolioAsset = {
-    id: 'A',
-    assetClass: 'business_loans_unlisted_equity',
-    outstandingAmount: 10_000_000,
-    denominator: 100_000_000,
-    emissions: { reportedEmissions: 50_000, verified: true },
-  };
-  const B: PcafPortfolioAsset = {
-    id: 'B',
-    assetClass: 'listed_equity_corp_bonds',
-    outstandingAmount: 50_000_000,
-    denominator: 500_000_000,
-    emissions: { revenue: 100_000_000, sector: 'Financial Services' },
-  };
-
-  it('no mode, no assets → proxy', () => {
-    const r = resolvePcafResult({ portfolioValue: 100_000_000, sector: 'Financial Services' });
-    expect(r.mode).toBe('portfolio_proxy');
-    expect(r.totalFinancedEmissions).toBe(12_000);
-    expect(r.weightedDataQualityScore).toBe(5);
-  });
-
-  it("mode 'detailed' + undefined assets → proxy fallback", () => {
-    const r = resolvePcafResult({ mode: 'detailed', portfolioValue: 100_000_000, sector: 'Financial Services' });
-    expect(r.mode).toBe('portfolio_proxy');
-    expect(r.totalFinancedEmissions).toBe(12_000);
-  });
-
-  it("mode 'detailed' + empty assets → proxy fallback", () => {
-    const r = resolvePcafResult({ mode: 'detailed', assets: [], portfolioValue: 100_000_000, sector: 'Financial Services' });
-    expect(r.mode).toBe('portfolio_proxy');
-    expect(r.totalFinancedEmissions).toBe(12_000);
-  });
-
-  it('assets present but mode omitted → still proxy (explicit detailed required)', () => {
-    const r = resolvePcafResult({ assets: [A, B], portfolioValue: 100_000_000, sector: 'Financial Services' });
-    expect(r.mode).toBe('portfolio_proxy');
-    expect(r.totalFinancedEmissions).toBe(12_000);
-  });
-
-  it("mode 'detailed' + two valid assets → decomposed", () => {
-    const r = resolvePcafResult({ mode: 'detailed', assets: [A, B] });
-    expect(r.mode).toBe('decomposed');
-    expect(r.totalFinancedEmissions).toBe(6_200);
-    expect(r.weightedDataQualityScore).toBeCloseTo(1.5806, 3);
-  });
-
-  it("mode 'detailed' + invalid asset (denominator 0) → does not throw, falls back to proxy", () => {
-    const bad: PcafPortfolioAsset = {
-      id: 'bad',
-      assetClass: 'mortgages',
-      outstandingAmount: 100,
-      denominator: 0, // assessPortfolio → assessAsset → attributionFactor throws
-      emissions: { reportedEmissions: 10 },
-    };
-    let r: ReturnType<typeof resolvePcafResult>;
-    expect(() => {
-      r = resolvePcafResult({ mode: 'detailed', assets: [bad], portfolioValue: 100_000_000, sector: 'Financial Services' });
-    }).not.toThrow();
-    expect(r!.mode).toBe('portfolio_proxy');
-    expect(r!.totalFinancedEmissions).toBe(12_000);
   });
 });

@@ -66,8 +66,8 @@ export interface EmissionInputs {
   verified?: boolean; // true → score 1; else score 2
   physicalActivity?: number; // activity amount
   physicalEmissionFactor?: number; // tCO2e per activity unit
-  revenue?: number; // investee revenue, USD (score 4)
-  sector?: string; // key into EMISSION_FACTORS.spend
+  // No revenue or sector: the tier-4 revenue × sector-factor path was removed on 19 Sep 2026 (estimate.ts).
+  // Rows saved with them still load; lib/scope3/cat15.ts picks only the fields above before assessing.
 }
 
 // One emissions estimate with its data-quality score and human-readable provenance.
@@ -77,7 +77,7 @@ export interface EmissionEstimate {
   basis: string; // human-readable provenance
 }
 
-// High-level asset: attribution inputs + raw estimator inputs (scores 1–4 path).
+// High-level asset: attribution inputs + raw estimator inputs (scores 1–3 path).
 // Distinct from PcafAsset (which carries a pre-computed investeeEmissions number).
 export interface PcafPortfolioAsset {
   id: string;
@@ -100,15 +100,15 @@ export interface AssetAssessment {
   gwpBasis: GwpVersion | null;
 }
 
-// Portfolio-level result — one honest shape for both the decomposed and the
-// lumped-proxy regimes (mode tags which one produced it).
+// Portfolio-level result of a decomposed assessment. `mode` had a second value,
+// 'portfolio_proxy', for the lumped proxy removed on 19 Sep 2026 (estimate.ts).
 export interface PortfolioResult {
-  mode: 'decomposed' | 'portfolio_proxy';
+  mode: 'decomposed';
   totalFinancedEmissions: number; // tCO2e
   weightedDataQualityScore: number; // the verifier headline
   assetCount: number;
-  perAsset: AssetAssessment[]; // decomposed: one per asset; proxy: []
-  byAssetClass: Partial<Record<PcafAssetClass, number>>; // decomposed only
+  perAsset: AssetAssessment[]; // one per asset
+  byAssetClass: Partial<Record<PcafAssetClass, number>>;
   coverageByScore: Record<DataQualityScore, number>; // count at each tier
   /** Not recorded (null): the holdings' investee figures keep whatever basis each investee used. */
   gwpBasis: GwpVersion | null;
