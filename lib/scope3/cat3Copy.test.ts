@@ -172,7 +172,10 @@ describe('Category 3 copy', () => {
   it('C3C-4 an entered known figure still wins, and a saved annual_spend prices nothing', () => {
     const src = page()
     // The dispatch: the entered figure first, then the bound inventory. Never calcGenericSpend.
-    expect(src).toContain("case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || cat3Mt() || 0")
+    // ⚠️ THE ORDER, NOT THE EXACT LINE. Task 8 added the activity D branch between the entered figure
+    // and the derived one, so the dispatch spans two lines; what this guards is that an entered figure
+    // is read FIRST and that the derived figure is the only other source.
+    expect(src).toContain('return catData[id]?.emissions_override || (cat3ExcludedFor3d ? 0 : cat3Mt() || 0)')
     expect(src).not.toMatch(/case 'fuel_and_energy_upstream': return calcGenericSpend/)
     // The calculation's only inputs are the two bound columns; no spend field reaches it.
     expect(src).toContain('const cat3Read = cat3InputsFrom(boundWorkings, boundLocations)')

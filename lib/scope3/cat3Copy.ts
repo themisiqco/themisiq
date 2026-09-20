@@ -434,6 +434,110 @@ export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult, gwpSenten
   return out
 }
 
+// ── ACTIVITY D: ENERGY BOUGHT AND SOLD ON ──────────────────────────────────────────────────────────
+//
+// Category 3 is four activities, not one. This build prices A (upstream of fuels), B (upstream of
+// purchased electricity and heat) and C (transmission and distribution losses). The fourth, D, is
+// energy the company BUYS AND SELLS ON, and it is the one activity whose inputs are not in a GHG
+// inventory at all: the Technical Guidance asks for "Quantities and specific source (e.g., generation
+// unit) of electricity purchased and re-sold" (p. 47), which is a sales record, not a meter reading.
+//
+// ⚠️ SO THE PLATFORM ASKS INSTEAD OF ASSUMING. Every quote below is from
+// ~/themisiq-sources/ghg-protocol/Scope3_Calculation_Guidance_0[1].pdf, read with pdftotext -layout;
+// the page numbers are the printed ones in each page's own footer.
+
+/** Table 3.1, p. 39, activity D, its description column, verbatim. */
+export const CAT3_3D_DESCRIPTION =
+  'Generation (upstream activities and combustion) of electricity, steam, heating, and cooling that is ' +
+  'purchased by the reporting company and sold to end users'
+/** Table 3.1, p. 39, activity D, its applicability column, verbatim. */
+export const CAT3_3D_APPLICABILITY = 'Applicable to utility companies and energy retailers'
+/** p. 47, the activity data this build would need and does not hold, verbatim. */
+export const CAT3_3D_ACTIVITY_DATA =
+  'Quantities and specific source (e.g., generation unit) of electricity purchased and re-sold'
+
+/**
+ * The screening question, worded to the activity's own words and no wider.
+ *
+ * ⚠️ "BUY AND SELL ON", NOT "SELL ENERGY". The activity is energy PURCHASED by the reporting company
+ * and sold to end users. A company that generates and sells its own power is not doing activity D with
+ * that power, and a question that asked "do you sell energy" would collect yeses from companies whose
+ * Category 3 is complete without it, and withhold a correct figure from them.
+ */
+export const CAT3_3D_QUESTION =
+  'Does your company buy electricity, steam, heating or cooling and sell it on to end users?'
+
+/** Under the question: what it is for, in the Guidance's words, with its pages. */
+export const CAT3_3D_HELP =
+  `The GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions calls this activity D of ` +
+  `Category 3: "${CAT3_3D_DESCRIPTION}" (table 3.1, p. 39), "${CAT3_3D_APPLICABILITY}". Answer yes only ` +
+  `if you resell energy you bought. ThemisIQ cannot calculate it: the Guidance prices it from "` +
+  `${CAT3_3D_ACTIVITY_DATA}" (p. 47) through formula 3.4 (p. 48), and a GHG inventory records the ` +
+  `energy you consumed, not what you bought for resale.`
+
+/**
+ * ⚠️ THE FOOTNOTE IS NOT IN THE QUESTION, AND HERE IS WHY IT IS NAMED ANYWAY. Table 3.1's applicability
+ * column carries "* Energy retailers include any company selling excess power to the grid" (p. 39),
+ * which widens WHO counts as a retailer. The ACTIVITY is unchanged: energy purchased and sold on. A
+ * company exporting its own generation has no purchased-for-resale quantity for formula 3.4 to
+ * multiply, and an export meter is not the activity data p. 47 asks for. Widening the question to
+ * "do you export power" would withhold the whole category from every site with solar panels, on an
+ * activity this build could not price for them either. So the question stays at the operative text and
+ * the customer is told, plainly, what is not being screened.
+ */
+/**
+ * ⚠️ COOLING IS IN THE QUESTION AND IN NOTHING ELSE THIS PLATFORM DOES, so the asymmetry is named.
+ * The question quotes the Guidance's own list (electricity, steam, heating and cooling) because it
+ * SCREENS rather than prices: honouring a yes needs no cooling factor. But a customer who reads
+ * "cooling" here and then looks for somewhere to enter purchased cooling will not find one, and the
+ * nearest thing they will find is the GHG module's refrigerants question, which is a different
+ * emission entirely. Saying so is cheaper than letting them put district cooling in the refrigerants
+ * box.
+ *
+ * ⚠️ THE QUOTE IS FROM THE WORKBOOK, NOT FROM THE ARTEFACT. DEFRA_ENERGY_META.guidance carries nine
+ * quotes and this is not one of them, so cat3Resale.test.ts reads Heat and steam A28 and A29 out of
+ * data/reference/defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx and checks this sentence
+ * against them. A regenerated artefact cannot silently orphan it, because the test does not read the
+ * artefact at all.
+ */
+export const CAT3_3D_COOLING_NOTE =
+  'Cooling is in the question because the Guidance lists it. ThemisIQ collects no purchased cooling ' +
+  'anywhere: the workbook publishes no cooling factor and says to work the emissions out from the ' +
+  'energy the cooling machines consume (Heat and steam A28 and A29). Where those machines are yours, ' +
+  'that energy is already in your electricity or fuel figures; where you buy cooling from a district ' +
+  'system, it is the supplier\'s energy, and this platform does not collect it. The refrigerants ' +
+  'question in the GHG module is a different thing: gas that leaks from equipment you own.'
+
+export const CAT3_3D_EXPORT_NOTE =
+  'A footnote to that table adds that energy retailers "include any company selling excess power to ' +
+  'the grid" (p. 39). This question does not ask about exporting your own generation, and ThemisIQ ' +
+  'does not screen for it: the activity is energy you bought and sold on, and an export meter is not ' +
+  'the record the calculation needs. If you export power, check whether activity D applies to you.'
+
+/**
+ * Why the category is not calculated once the answer is yes, shown on the panel, in the export and in
+ * the coverage entry, in one wording.
+ *
+ * ⚠️ IT SAYS WHAT IS LOST, BECAUSE SOMETHING IS. The A, B and C figures ThemisIQ computed are correct
+ * and they stay on screen; what they are not is a Category 3 total for a company that resells energy.
+ * Table 3.2 of the same Guidance (p. 40) works the example: the utility's resold electricity is 94.5 t
+ * CO2e against 0.5 t for the power it consumed itself. A category figure missing that is not a
+ * conservative estimate, it is the wrong order of magnitude.
+ */
+export const CAT3_3D_WITHHELD =
+  'This category is not calculated, because you have told us you buy energy and sell it on to end ' +
+  'users. That is activity D of Category 3 in the GHG Protocol\'s Technical Guidance (table 3.1, ' +
+  'p. 39), and it is priced from the quantities and source of the power you bought for resale (p. 47, ' +
+  'formula 3.4 on p. 48), which is not in the GHG inventory this record reads. The upstream figures ' +
+  'for the energy you consumed are shown below and are NOT in your Scope 3 total: a Category 3 figure ' +
+  'that left resale out would understate the category, for a reseller usually by most of it. Enter ' +
+  'your own Category 3 figure as known emissions if you have calculated one.'
+
+/** On the workings card while the answer is yes: the lines are real, and they are not the category. */
+export const CAT3_3D_LINES_NOT_IN_TOTAL =
+  'These lines are the upstream emissions of the energy this company consumed. They are recorded here ' +
+  'and are not in the Scope 3 total, because activity D of this category is not calculated.'
+
 // ── THE SAVED FIGURE AGAINST THE INVENTORY AS IT STANDS ─────────────────────────────────────────
 
 /**
@@ -530,6 +634,7 @@ function notPricedSummary(r: Cat3Result, inputs: Cat3InputsResult): string {
  */
 export function cat3Basis(
   r: Cat3Result | null, inputs: Cat3InputsResult, override: number | null | undefined,
+  sellsEnergyOn?: boolean,
 ): { basis: string; detail: string } {
   if (override) {
     const derived = r && r.status !== 'withheld'
@@ -540,6 +645,10 @@ export function cat3Basis(
       detail: `${n2(override)} mt CO2e entered directly; no emission factor was applied.${derived}`,
     }
   }
+  // ⚠️ AFTER THE ENTERED FIGURE, BEFORE EVERYTHING ELSE. A customer who resells energy and has
+  // calculated their own Category 3 total keeps it: the override is their figure, and it may well
+  // include activity D. Without one, the answer decides the category whatever the lines say.
+  if (sellsEnergyOn) return { basis: 'Not priced', detail: CAT3_3D_WITHHELD }
   const noFigure = cat3NoFigureText(r, inputs)
   if (!r || noFigure) return { basis: 'Not priced', detail: noFigure ?? 'It was not priced, and no reason was recorded.' }
   if (r.status === 'zero') {
@@ -571,10 +680,20 @@ export function cat3Basis(
  */
 export function cat3CsvRows(
   r: Cat3Result | null, inputs: Cat3InputsResult, override: number | null | undefined, gwpSentence: string,
+  sellsEnergyOn?: boolean,
 ): [string, string, string][] {
   const out: [string, string, string][] = []
-  const basis = cat3Basis(r, inputs, override)
+  const basis = cat3Basis(r, inputs, override, sellsEnergyOn)
   out.push(['Basis', basis.basis, basis.detail])
+  // ⚠️ THE ANSWER IS IN THE FILE WHATEVER IT IS. A verifier reading a Category 3 figure needs to know
+  // the reseller question was asked and what was said, not only when the answer withheld the figure:
+  // an unanswered screening question is a different record from one answered no.
+  out.push(['Energy bought and sold on (activity D)',
+    sellsEnergyOn === undefined ? 'Not answered' : sellsEnergyOn ? 'Yes' : 'No',
+    sellsEnergyOn === undefined ? `${CAT3_3D_QUESTION} ${CAT3_3D_HELP}`
+      : sellsEnergyOn ? CAT3_3D_WITHHELD
+      : `${CAT3_3D_QUESTION} Answered no, so this category covers activities A, B and C only, which is complete for a company that does not resell energy.`])
+  if (sellsEnergyOn && r) out.push(['Lines below', 'Recorded, not in the total', CAT3_3D_LINES_NOT_IN_TOTAL])
   if (!r) return out
 
   for (const l of r.lines) {

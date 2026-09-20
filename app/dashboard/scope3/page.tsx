@@ -67,7 +67,8 @@ import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
-  cat3StaleNotice, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
+  cat3StaleNotice, CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_COOLING_NOTE, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD,
+  CAT3_3D_LINES_NOT_IN_TOTAL, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
 } from '../../../lib/scope3/cat3Copy'
 import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
 import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
@@ -999,6 +1000,16 @@ interface CategoryData {
    * reader validates rather than assumes.
    */
   source_fingerprint?: unknown
+  /**
+   * Cat 3, activity D: does the company buy energy and sell it on to end users?
+   *
+   * ⚠️ THREE STATES, AND undefined IS ONE OF THEM. true withholds the category, false prices it, and
+   * undefined is a record that has not been asked — every record saved before 20 Sep 2026, and every
+   * new one until the screening step is answered. An unanswered question must NOT withhold: absence of
+   * an answer is not a yes, and treating it as one would empty the Category 3 figure out of every
+   * record already saved.
+   */
+  sells_energy_on?: boolean
   // Cat 1
   total_spend?: number
   supplier_sector?: string
@@ -1912,6 +1923,16 @@ export default function Scope3Dashboard() {
     : cat3FingerprintChange(savedCat3Fingerprint, cat3Fingerprint(cat3Read.inputs))
   const cat3Stale = cat3FingerprintMoved(cat3Change)
 
+  /**
+   * Activity D: the screening answer, and whether it withholds the category.
+   *
+   * ⚠️ AN ENTERED FIGURE STILL WINS. A reseller who has calculated their own Category 3 total keeps it:
+   * METHOD_TAKES_ENTERED_FIGURE is true for this method, and their figure may well include activity D.
+   * The withholding is of OUR estimate, which covers activities A, B and C and cannot cover D.
+   */
+  const cat3SellsEnergyOn: boolean | undefined = catData['cat3']?.sells_energy_on
+  const cat3ExcludedFor3d = cat3SellsEnergyOn === true && !catData['cat3']?.emissions_override
+
   /** The figure in tonnes, or null where there is none. A withheld category has no figure, never a zero. */
   const cat3Mt = (): number | null =>
     cat3Priced && cat3Priced.status !== 'withheld' ? cat3Priced.kg_co2e / 1000 : null
@@ -1952,7 +1973,10 @@ export default function Scope3Dashboard() {
       // ⚠️ NEVER calcGenericSpend. Category 3 is priced from the bound GHG inventory's own energy; a
       // spend figure saved under the old method prices nothing. An entered known figure still wins,
       // as METHOD_TAKES_ENTERED_FIGURE says it does for this method, and is handled first.
-      case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || cat3Mt() || 0
+      // ⚠️ ZERO HERE IS NOT A CLAIM OF NO EMISSIONS: a category in unpricedCatIds is left OUT of
+      // totalScope3 (see its filter), never summed in. cat3ExcludedFor3d is what puts it there.
+      case 'fuel_and_energy_upstream':
+        return catData[id]?.emissions_override || (cat3ExcludedFor3d ? 0 : cat3Mt() || 0)
     }
   }
 
@@ -2000,7 +2024,7 @@ export default function Scope3Dashboard() {
       // consulted at all. 'zero' means every stream at every location was answered and none holds any
       // energy, which is an answer; 'withheld' means a stream was never answered, where a zero would
       // assert something nobody said. An entered figure is handled above.
-      case 'fuel_and_energy_upstream': return cat3Mt() !== null
+      case 'fuel_and_energy_upstream': return !cat3ExcludedFor3d && cat3Mt() !== null
     }
   }
 
@@ -2025,7 +2049,7 @@ export default function Scope3Dashboard() {
       if (c.id === 'cat15') return cat15Result().mt === null
       // Category 3 is missing from the total whenever it has no figure: the inventory could not be read,
       // or a stream was never answered. A calculated zero is a figure and is NOT unpriced.
-      if (c.id === 'cat3') return !catData[c.id]?.emissions_override && cat3Mt() === null
+      if (c.id === 'cat3') return cat3ExcludedFor3d || (!catData[c.id]?.emissions_override && cat3Mt() === null)
       return false
     }).map(c => c.id),
   )
@@ -2056,7 +2080,12 @@ export default function Scope3Dashboard() {
       // inventory holds energy at these locations and we could price none of it, which is a platform
       // gap. An unanswered stream, an unreadable inventory or none bound is the customer's turn, and
       // this column would report their unfinished work as our failure.
-      if (c.id === 'cat3') return cat3Priced?.withheld?.code === 'nothing_priced'
+      // ⚠️ ACTIVITY D IS A PLATFORM BOUNDARY, AND IT BELONGS IN THIS COLUMN. The column means "the
+      // platform produced no figure for a category the customer completed", and that is exactly what
+      // this is: they answered the screening question, and ThemisIQ cannot price the activity it
+      // names. It is also the only route by which a reason reaches the saved coverage entry, and a
+      // baseline consumer reading "relevant, not calculated" with no reason learns nothing.
+      if (c.id === 'cat3') return cat3ExcludedFor3d || cat3Priced?.withheld?.code === 'nothing_priced'
       return false
     }).map(c => c.id),
   )
@@ -2107,7 +2136,7 @@ export default function Scope3Dashboard() {
     if (id === 'cat15') return cat15Result().reason || NO_REASON
     // Same rule as Cat 15's line above: the reason is the sentence that withheld the figure, verbatim,
     // so the panel, the amber box and the export cannot describe the gap three ways.
-    if (id === 'cat3') return cat3NoFigure || NO_REASON
+    if (id === 'cat3') return cat3ExcludedFor3d ? CAT3_3D_WITHHELD : (cat3NoFigure || NO_REASON)
     return NO_REASON
   }
 
@@ -2334,7 +2363,7 @@ export default function Scope3Dashboard() {
     // ⚠️ THE BASIS IS BUILT IN lib/scope3/cat3Copy.ts, LIKE CATS 6, 7 AND 15's. This cell is the CSV's
     // Method column and the saved factor_basis line, and until 20 Sep 2026 Category 3 fell through to
     // "No data. No activity data was entered", which would have been recorded beside a real figure.
-    if (method === 'fuel_and_energy_upstream') return cat3Basis(cat3Priced, cat3Read, d?.emissions_override)
+    if (method === 'fuel_and_energy_upstream') return cat3Basis(cat3Priced, cat3Read, d?.emissions_override, cat3ExcludedFor3d)
     if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d), countryLabel)
     if (method === 'employee_commuting_factors') return cat7Basis(evaluateCommuting(d))
 
@@ -2505,7 +2534,7 @@ export default function Scope3Dashboard() {
     // what they were.
     const c3 = catData['cat3']
     if (c3 && isReportable('cat3')) {
-      for (const row of cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence)) out.push(['Cat 3', ...row])
+      for (const row of cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn)) out.push(['Cat 3', ...row])
     }
 
     const c5 = catData['cat5']
@@ -2993,6 +3022,39 @@ export default function Scope3Dashboard() {
                             exclude" was true of the GHG Protocol and false of this form, which had nowhere to
                             write it. It does NOT gate this step: the justification belongs in the report, so
                             the export is where its absence is named. */}
+                        {/* ⚠️ CATEGORY 3 IS FOUR ACTIVITIES, AND ONE OF THEM IS NOT IN A GHG INVENTORY.
+                            Activity D is energy bought and sold on, priced from resale quantities this
+                            platform does not hold, so it is screened for here rather than assumed
+                            absent. Every sentence is from lib/scope3/cat3Copy.ts, quoting the
+                            Technical Guidance with its pages. Shown while the category is relevant:
+                            an excluded category has nothing to withhold. */}
+                        {cat.id === 'cat3' && included && (
+                          <div style={{ marginTop: 10, maxWidth: 560, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '0.7rem 0.8rem' }}>
+                            <div role="group" aria-label={CAT3_3D_QUESTION} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.5, flex: 1, minWidth: 260 }}>{CAT3_3D_QUESTION}</span>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {([[true, 'Yes'], [false, 'No']] as [boolean, string][]).map(([value, text]) => {
+                                  const on = catData['cat3']?.sells_energy_on === value
+                                  return (
+                                    <button
+                                      key={text}
+                                      type="button"
+                                      aria-pressed={on}
+                                      onClick={() => updateCat('cat3', 'sells_energy_on', on ? undefined : value)}
+                                      style={{ fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--color-brand)' : '#e8e7e4'}`, background: on ? 'var(--color-brand)' : '#fff', color: on ? 'var(--color-on-dark)' : '#555553' }}
+                                    >{text}</button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 8, lineHeight: 1.6 }}>{CAT3_3D_HELP}</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_COOLING_NOTE}</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_EXPORT_NOTE}</div>
+                            {catData['cat3']?.sells_energy_on === true && (
+                              <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.55rem 0.65rem', marginTop: 8, lineHeight: 1.6 }}>{CAT3_3D_WITHHELD}</div>
+                            )}
+                          </div>
+                        )}
                         {excluded && (
                           <div style={{ marginTop: 8, maxWidth: 520 }}>
                             <label htmlFor={`excl-${cat.id}`} style={{ ...labelStyle, marginBottom: 4 }}>Why is this category not relevant?</label>
@@ -3411,6 +3473,20 @@ export default function Scope3Dashboard() {
                     {cat3Stale && cat3Change && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
                         {cat3StaleNotice(cat3Change)}
+                      </div>
+                    )}
+
+                    {/* Activity D answered yes: the same sentence the screening step showed, the export
+                        carries and the coverage entry stores. The workings stay below it, because the
+                        lines are real and the customer keeps them. */}
+                    {cat3ExcludedFor3d && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
+                        {CAT3_3D_WITHHELD}
+                      </div>
+                    )}
+                    {cat3ExcludedFor3d && cat3Priced && cat3Priced.status !== 'withheld' && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
+                        {CAT3_3D_LINES_NOT_IN_TOTAL}
                       </div>
                     )}
 

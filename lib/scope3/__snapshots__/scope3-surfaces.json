@@ -164,6 +164,12 @@
    ],
    [
     "Cat 3",
+    "Energy bought and sold on (activity D)",
+    "Not answered",
+    "Does your company buy electricity, steam, heating or cooling and sell it on to end users? The GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions calls this activity D of Category 3: \"Generation (upstream activities and combustion) of electricity, steam, heating, and cooling that is purchased by the reporting company and sold to end users\" (table 3.1, p. 39), \"Applicable to utility companies and energy retailers\". Answer yes only if you resell energy you bought. ThemisIQ cannot calculate it: the Guidance prices it from \"Quantities and specific source (e.g., generation unit) of electricity purchased and re-sold\" (p. 47) through formula 3.4 (p. 48), and a GHG inventory records the energy you consumed, not what you bought for resale."
+   ],
+   [
+    "Cat 3",
     "UK site, electricity, upstream of the fuels burned to generate it (well-to-tank)",
     "100,000 kWh",
     "100,000 kWh x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 3,682.00 kg CO2e."

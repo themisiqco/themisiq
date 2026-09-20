@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { CAT3_3D_COOLING_NOTE } from '../scope3/cat3Copy'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
@@ -339,6 +340,25 @@ describe('DEFRA/DESNZ 2026 upstream energy artefact', () => {
     expect(DEFRA_ENERGY_META.attribution_required).toBe(waste.metadata.attribution_required)
     expect(DEFRA_ENERGY_META.licence).toBe(waste.metadata.licence)
     expect(DEFRA_ENERGY_META.source).toBe(waste.metadata.source)
+  })
+
+  it('E9 the cooling FAQ the Category 3 screening quotes says what that sentence says', () => {
+    // ⚠️ NOT AN ARTEFACT RECORD, AND THAT IS WHY IT IS HERE. The workbook's cooling answer is not one
+    // of the nine guidance quotes the generator copies, so lib/scope3/cat3Copy.ts cites the sheet and
+    // cell directly (CAT3_3D_COOLING_NOTE, the Category 3 activity D screening question). This file
+    // already reads the workbook by A1 reference, so this is where that citation can be checked.
+    // .trim(): the workbook's own cells carry trailing newlines, as A8 and Introduction A35 do.
+    expect(cellText('Heat and steam', 'A28').trim()).toBe('How do I calculate emissions from cooling?')
+    const a29 = cellText('Heat and steam', 'A29').trim()
+    expect(a29).toBe('There are no specific emissions factors for air conditioning or other cooling ' +
+      'technologies. To calculate emissions from purchased cooling, use data on the energy consumption ' +
+      '(e.g. electricity or natural gas consumption) of the machines performing the cooling.')
+    // The sentence says the two things those cells say, and cites where they are.
+    expect(CAT3_3D_COOLING_NOTE).toContain('Heat and steam A28 and A29')
+    expect(CAT3_3D_COOLING_NOTE).toContain('publishes no cooling factor')
+    expect(a29).toContain('no specific emissions factors for air conditioning or other cooling technologies')
+    expect(CAT3_3D_COOLING_NOTE).toContain('the energy the cooling machines consume')
+    expect(a29).toContain('use data on the energy consumption')
   })
 })
 
