@@ -141,7 +141,8 @@ describe('Category 3 activity D screening', () => {
     expect(src).toContain('{CAT3_3D_LINES_NOT_IN_TOTAL}')
     // CSV and factor_basis, through categoryBasis.
     expect(src).toContain('cat3Basis(cat3Priced, cat3Read, d?.emissions_override, cat3ExcludedFor3d)')
-    expect(src).toContain('cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn)')
+    // Task 9 appended the retired spend, so the call is pinned by its first five arguments.
+    expect(src).toContain('cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn')
     // Coverage entry: the reason reaches it only through couldNotPriceCatIds, and it does.
     expect(src).toContain("if (c.id === 'cat3') return cat3ExcludedFor3d || cat3Priced?.withheld?.code === 'nothing_priced'")
     expect(src).toContain("if (id === 'cat3') return cat3ExcludedFor3d ? CAT3_3D_WITHHELD : (cat3NoFigure || NO_REASON)")

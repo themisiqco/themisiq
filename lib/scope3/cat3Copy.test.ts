@@ -12,7 +12,7 @@ import {
   CAT3_STREAM_LABEL, CAT3_LINE_LABEL, CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE,
   CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_LOCATION_BASED_SENTENCE,
   CAT3_GWP_PUBLISHER, CAT3_SEPARATE_LINES_SENTENCE, CAT3_GROSS_CV_SENTENCE, CAT3_EPA_HHV_SENTENCE, CAT3_ATTRIBUTION,
-  cat3Basis, cat3CsvRows, cat3MethodSentences,
+  cat3Basis, cat3CsvRows, cat3MethodSentences, CAT3_RECORDED_NOT_USED, cat3RetiredSpendText,
 } from './cat3Copy'
 import { publisherGwpSentence } from './gwpSentence'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
@@ -366,6 +366,67 @@ describe('Category 3 copy', () => {
     const gal = priced.lines.find(l => l.unit_as_entered === 'gallons')!
     expect(String(gal.conversion!.factor)).toBe('3.7854118034613733')
     expect(gal.conversion!.cite).toBe('Conversions!C40')
+  })
+
+  it('C3C-14 a spend left by the old method is reported as recorded and not used, and prices nothing', () => {
+    // ⚠️ PRECAUTIONARY. The SQL of 20 Sep 2026 found one saved Scope 3 record, Category 3 not relevant,
+    // holding only `included` and `relevant`: no live record carries a Category 3 spend. This is for
+    // the ones that do not exist yet, and for the pattern, which is Category 15's
+    // (CAT15_RECORDED_NOT_USED): keep the number, report it, never price it and never drop it quietly.
+    const { read, priced } = worked()
+    const withSpend = cat3CsvRows(priced, read, null, GWP, undefined, '400,000 USD')
+    expect(withSpend).toContainEqual(['Spend recorded on this record', '400,000 USD', CAT3_RECORDED_NOT_USED])
+    expect(CAT3_RECORDED_NOT_USED).toMatch(/^Recorded, and NOT used to produce any figure\./)
+    expect(CAT3_RECORDED_NOT_USED).toContain('asks for no spend figure')
+    expect(cat3RetiredSpendText('400,000 USD')).toContain('A spend figure of 400,000 USD is stored on this record')
+
+    // The figure is untouched by it: the same rows, the same total, with and without.
+    const without = cat3CsvRows(priced, read, null, GWP, undefined, null)
+    expect(withSpend.filter(r => r[0] !== 'Spend recorded on this record')).toEqual(without)
+    expect(without.some(r => r[0] === 'Spend recorded on this record'), 'no row when none is stored').toBe(false)
+    expect(cat3Basis(priced, read, null).detail).not.toMatch(/spend/i)
+    expect(priced.kg_co2e).toBeCloseTo(19_572.329976, 6)
+
+    // And it still appears when the category is withheld for activity D or prices zero: those states
+    // change the figure, not what is on the record.
+    expect(cat3CsvRows(priced, read, null, GWP, true, '400,000 USD'))
+      .toContainEqual(['Spend recorded on this record', '400,000 USD', CAT3_RECORDED_NOT_USED])
+    const answered = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual',
+      'mobile', 'refrigerants', 'electricity', 'purchased_steam']
+    const zeroRead = cat3InputsFrom(
+      answered.map(stream => ({ location: 'Office', stream, source: 'Declaration', scope: 1, activity_data: 0,
+        activity_unit: '—', declaration: 'attested_absent', gwp_basis: 'declaration', result_tco2e: null })),
+      [{ id: 'o', name: 'Office', country: 'GB', stream_attestations: answered.map(x => ({ stream: x, attested_at: 'x' })) }])
+    const zero = priceCat3(zeroRead.inputs!)
+    expect(zero.kg_co2e).toBe(0)
+    expect(cat3CsvRows(zero, zeroRead, null, GWP, undefined, '400,000 USD'))
+      .toContainEqual(['Spend recorded on this record', '400,000 USD', CAT3_RECORDED_NOT_USED])
+  })
+
+  it('C3C-15 nothing in the Category 3 path reads a stored spend, and the page carries it through unread', () => {
+    // The two calculation modules never mention it (SE5 asserts the same for the save payload).
+    for (const file of ['cat3Inputs.ts', 'cat3Energy.ts', 'cat3Fingerprint.ts']) {
+      expect(readFileSync(join(__dirname, file), 'utf8'), file).not.toMatch(/annual_spend|total_spend/)
+    }
+    const src = page()
+    // The page formats it once, into a string, and hands that to the copy module. A string cannot be
+    // priced by accident.
+    expect(src).toContain("const cat3RetiredSpend: string | null = catData['cat3']?.annual_spend")
+    expect(src).toContain('cat3GwpSentence, cat3SellsEnergyOn, cat3RetiredSpend)')
+    // calcGenericSpend, the only thing that turns a spend into a figure, is reachable from the
+    // flat_spend case alone.
+    // getCatEmissions declares before the unpriced sets; the slice is its own body, by its two ends.
+    const dispatch = src.slice(src.indexOf('const getCatEmissions'), src.indexOf('// ── CATEGORIES THAT CANNOT BE PRICED'))
+    // One CALL, on the flat_spend case. (The method's own arm names calcGenericSpend in a comment, to
+    // say it must not be used; a match on the bare name would count that too.)
+    expect([...dispatch.matchAll(/return calcGenericSpend\(/g)]).toHaveLength(1)
+    expect(dispatch).toContain("case 'flat_spend': return calcGenericSpend(id)")
+    // ⚠️ AND THE CONFIDENCE PILL CANNOT MOVE ON IT EITHER. getConfidence ends with a spend test and a
+    // fall-through that return the SAME value, so a stored spend cannot change the label of a category
+    // that is not priced from spend. If the fall-through ever returns something else, this fails and
+    // Category 3 needs its own branch there.
+    const conf = src.slice(src.indexOf('const getConfidence ='))
+    expect(conf).toMatch(/if \(d\.annual_spend \|\| d\.total_spend\) return 'low'\n\s*return 'low'/)
   })
 
   it('C3C-8 the basis says what priced THIS record, in each of its five states', () => {

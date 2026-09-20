@@ -170,6 +170,12 @@
    ],
    [
     "Cat 3",
+    "Spend recorded on this record",
+    "400,000 USD",
+    "Recorded, and NOT used to produce any figure. This category is derived from the energy in the bound GHG inventory and asks for no spend figure; the amount is kept because you entered it, and it is reported here so a reader of this record can see it was not priced."
+   ],
+   [
+    "Cat 3",
     "UK site, electricity, upstream of the fuels burned to generate it (well-to-tank)",
     "100,000 kWh",
     "100,000 kWh x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 3,682.00 kg CO2e."

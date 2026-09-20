@@ -434,6 +434,33 @@ export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult, gwpSenten
   return out
 }
 
+// ── THE SPEND FIGURE THIS CATEGORY NO LONGER TAKES ──────────────────────────────────────────────
+//
+// Until 20 Sep 2026 Category 3 was priced from an annual spend figure times one flat 0.5 kg CO2e per
+// unit of currency. The panel's Annual spend box is gone and nothing reads the stored value, so a
+// record saved under the old method carries a number that produces nothing.
+//
+// ⚠️ THE SAME PATTERN AS CATEGORY 15's RETIRED PORTFOLIO FIELDS (CAT15_RECORDED_NOT_USED, lib/scope3/
+// cat15.ts): the value is KEPT and REPORTED as not used, never silently dropped and never quietly
+// priced. A number a customer typed is theirs; deleting it on their behalf, unannounced, is the one
+// thing worse than showing it with an explanation.
+//
+// ⚠️ PRECAUTIONARY, AND SAID SO. The SQL run on 20 Sep 2026 found ONE saved Scope 3 record, with
+// Category 3 marked not relevant and holding only `included` and `relevant`. No live record carries a
+// Category 3 spend. This exists for the records that do not exist yet: a browser tab open since before
+// the rebuild, or a restore from a backup taken before it.
+
+/** The Category 15 wording, for the same situation: recorded, and not used to produce any figure. */
+export const CAT3_RECORDED_NOT_USED =
+  'Recorded, and NOT used to produce any figure. This category is derived from the energy in the bound ' +
+  'GHG inventory and asks for no spend figure; the amount is kept because you entered it, and it is ' +
+  'reported here so a reader of this record can see it was not priced.'
+
+/** The panel line and the export note, with the amount as the page formats it. */
+export const cat3RetiredSpendText = (amountWithCurrency: string): string =>
+  `A spend figure of ${amountWithCurrency} is stored on this record from before Category 3 was derived ` +
+  `from the GHG inventory. ${CAT3_RECORDED_NOT_USED}`
+
 // ── ACTIVITY D: ENERGY BOUGHT AND SOLD ON ──────────────────────────────────────────────────────────
 //
 // Category 3 is four activities, not one. This build prices A (upstream of fuels), B (upstream of
@@ -680,7 +707,7 @@ export function cat3Basis(
  */
 export function cat3CsvRows(
   r: Cat3Result | null, inputs: Cat3InputsResult, override: number | null | undefined, gwpSentence: string,
-  sellsEnergyOn?: boolean,
+  sellsEnergyOn?: boolean, retiredSpend?: string | null,
 ): [string, string, string][] {
   const out: [string, string, string][] = []
   const basis = cat3Basis(r, inputs, override, sellsEnergyOn)
@@ -694,6 +721,11 @@ export function cat3CsvRows(
       : sellsEnergyOn ? CAT3_3D_WITHHELD
       : `${CAT3_3D_QUESTION} Answered no, so this category covers activities A, B and C only, which is complete for a company that does not resell energy.`])
   if (sellsEnergyOn && r) out.push(['Lines below', 'Recorded, not in the total', CAT3_3D_LINES_NOT_IN_TOTAL])
+  // ⚠️ WHATEVER ELSE IS TRUE OF THE RECORD. A spend stored under the old method is reported before the
+  // lines, the withholding or anything else, because a reader who sees that number nowhere else would
+  // otherwise assume it was priced. Nothing here reads it as an input: it arrives already formatted,
+  // for printing only.
+  if (retiredSpend) out.push(['Spend recorded on this record', retiredSpend, CAT3_RECORDED_NOT_USED])
   if (!r) return out
 
   for (const l of r.lines) {

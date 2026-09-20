@@ -68,7 +68,7 @@ import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
   cat3StaleNotice, CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_COOLING_NOTE, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD,
-  CAT3_3D_LINES_NOT_IN_TOTAL, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
+  CAT3_3D_LINES_NOT_IN_TOTAL, cat3RetiredSpendText, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
 } from '../../../lib/scope3/cat3Copy'
 import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
 import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
@@ -1931,6 +1931,16 @@ export default function Scope3Dashboard() {
    * The withholding is of OUR estimate, which covers activities A, B and C and cannot cover D.
    */
   const cat3SellsEnergyOn: boolean | undefined = catData['cat3']?.sells_energy_on
+  /**
+   * A spend figure left on the record by the method Category 3 used before 20 Sep 2026.
+   *
+   * ⚠️ FORMATTED HERE AND READ NOWHERE ELSE. It is a string from the moment it leaves catData, so no
+   * later reader can mistake it for a number to price: lib/scope3/cat3Copy.ts takes it already
+   * rendered. Null when there is none, so the row and the panel line simply do not appear.
+   */
+  const cat3RetiredSpend: string | null = catData['cat3']?.annual_spend
+    ? `${amountText(catData['cat3'].annual_spend as number)} ${currency}`
+    : null
   const cat3ExcludedFor3d = cat3SellsEnergyOn === true && !catData['cat3']?.emissions_override
 
   /** The figure in tonnes, or null where there is none. A withheld category has no figure, never a zero. */
@@ -2534,7 +2544,7 @@ export default function Scope3Dashboard() {
     // what they were.
     const c3 = catData['cat3']
     if (c3 && isReportable('cat3')) {
-      for (const row of cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn)) out.push(['Cat 3', ...row])
+      for (const row of cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn, cat3RetiredSpend)) out.push(['Cat 3', ...row])
     }
 
     const c5 = catData['cat5']
@@ -3465,6 +3475,14 @@ export default function Scope3Dashboard() {
                     {cat3NoFigure && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
                         {cat3NoFigure}
+                      </div>
+                    )}
+
+                    {/* A spend left by the old method: said out loud, in the same words the export
+                        carries, so a customer who remembers typing it can see where it went. */}
+                    {cat3RetiredSpend && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
+                        {cat3RetiredSpendText(cat3RetiredSpend)}
                       </div>
                     )}
 
