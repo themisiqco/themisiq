@@ -34,6 +34,8 @@ import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type Evaluat
 import { evaluateEolMaterials, eolMaterialNotPricedReason, formatShare, type EolMaterial, type EvaluatedEolMaterial } from '../../../lib/scope3/endOfLife'
 import { rowPricedResult } from '../../../lib/scope3/rowPriced'
 import { notEnteredReason } from '../../../lib/scope3/notEntered'
+import { saveErrorText } from '../../../lib/scope3/saveError'
+import { catDataForSave } from '../../../lib/scope3/savePayload'
 import {
   evaluateCommuting, hasLegacyCommuting, COMMUTE_MODES, COMMUTE_RAIL_TYPES,
   type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
@@ -1070,6 +1072,8 @@ export default function Scope3Dashboard() {
   const [catData, setCatData] = useState<Record<string, CategoryData>>({})
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  // Why the last save was refused, in words, from lib/scope3/saveError.ts. null when none was.
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
   // The bound GHG inventory's recorded GWP basis (ghg_inventories.gwp_version: AR4, AR5, AR6 or null).
   // Read so the Cat 5 disclosure can state whether its AR5 factors match it, rather than assume either way.
@@ -2322,13 +2326,21 @@ export default function Scope3Dashboard() {
       const { error } = await supabase.from('scope3_inventories').upsert({
         user_id: uid,
         inventory_id: boundInventoryId,
-        sector,
+        // ⚠️ NULL, NOT ''. scope3_inventories_sector_is_industry reads `sector is null or sector like
+        // 'i%'`, so the blank option's '' fails it and the WHOLE upsert is refused: the customer saw
+        // the constraint's own name in an alert on 20 Sep 2026. The column is nullable by design and
+        // this sector prices nothing, so "not chosen" is NULL. Same rule, same reason, as the
+        // country_iso2 line four below.
+        sector: sector || null,
         currency,
         // NULL, not ''. scope3_inventories_country_iso2_format rejects anything that is not two
         // uppercase letters or NULL, so an empty string would fail the whole upsert.
         country_iso2: countryIso2 || null,
         revenue_millions: (revenue || 0) / 1_000_000, // raw -> millions
-        cat_data: catData,
+        // The same rule inside the jsonb: a blank sector select writes '', and the sector trigger
+        // (assert_sector_codes_exist, SQLSTATE PT422) tests `is not null`, so '' reaches its membership
+        // check and refuses the save. lib/scope3/savePayload.ts drops the key instead.
+        cat_data: catDataForSave(catData),
         total_scope3_tco2e: totalScope3,
         // ⚠️ WHAT THAT TOTAL COVERS, SAVED WITH IT. The number alone cannot say whether it is two
         // categories or fifteen, and it is read as a Scope 3 BASELINE by the SBTi dashboard, where a
@@ -2353,7 +2365,11 @@ export default function Scope3Dashboard() {
         status: 'confirmed',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'inventory_id' })
-      if (error) { console.error('Scope 3 save failed:', error); alert('Save failed: ' + error.message); return }
+      // ⚠️ THE RAW MESSAGE GOES TO THE CONSOLE, NEVER TO THE CUSTOMER. It named a constraint and a
+      // relation in an alert until 20 Sep 2026. saveErrorText says what was refused and what to do,
+      // and says that nothing was saved and nothing on screen was lost.
+      if (error) { console.error('Scope 3 save failed:', error); setSaveError(saveErrorText(error)); return }
+      setSaveError(null)
       setSaved(true)
       setSavedTotal(totalScope3) // exactly the value written above, from the same render
     } finally { setSaving(false) }
@@ -3854,6 +3870,16 @@ export default function Scope3Dashboard() {
           <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download Scope 3 Inventory (CSV)
           </button>
+          {/* ⚠️ INLINE, NOT A BROWSER DIALOG. A dialog cannot be copied into a message to us, is gone
+              the moment it is dismissed, and reads as an error the page had no words for. This stays
+              on screen until the next save, in the same amber the wizard already uses for "you need
+              to act on this". The guard in lib/scope3/saveError.test.ts SE4 bans the dialog call by
+              name, so this comment does not spell it. */}
+          {saveError && (
+            <div role="alert" style={{ fontSize: 12, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.7rem 0.8rem', marginTop: 12, lineHeight: 1.6, maxWidth: '72ch' }}>
+              {saveError}
+            </div>
+          )}
         </div>
       ) : (
         <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
