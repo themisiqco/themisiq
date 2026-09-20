@@ -7,7 +7,8 @@
     "build": "vitest run && tsc --noEmit && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "harness:scope3": "node scripts/scope3-surfaces.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
