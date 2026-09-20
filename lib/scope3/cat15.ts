@@ -28,8 +28,8 @@
 // ══════════════════════════════════════════════════════════════════════════════════════════════
 // ⚠️ THE REVENUE TIER IS CLOSED HERE, IN THE CALCULATION
 // ══════════════════════════════════════════════════════════════════════════════════════════════
-// PCAF score 4 estimates an investee from `revenue × a sector factor`, and lib/pcaf will do it for any
-// sector string. The page used to offer revenue and a sector on each holding and then HIDE the resulting
+// PCAF score 4 estimates an investee from `revenue × a sector factor`, and lib/pcaf did it for any sector
+// string until that path was removed on 19 Sep 2026 (lib/pcaf/estimate.ts). The page used to offer revenue and a sector on each holding and then HIDE the resulting
 // figure when the sector was not in the spend table — which is every sector it offered. The hiding was
 // display-only: assessPortfolio still estimated the row at the 0.12 fallback and the portfolio total still
 // contained it, so the panel's total disagreed with the row above it by a number the row refused to show.
@@ -37,15 +37,29 @@
 //
 // So `assessableEmissions` DROPS revenue and sector before anything is assessed. A holding that carries
 // only those is INCOMPLETE — which is true, and says so — rather than silently estimated. This also
-// covers rows already saved with revenue on them.
+// covers rows already saved with revenue on them. It stays after the library's tier 4 was removed: it is
+// the explicit list of what may price an investee, and it keeps a saved row's fields out of the library.
 
 import { assessAsset, assessPortfolio } from '../pcaf/engine'
-import type { PcafPortfolioAsset, PortfolioResult, EmissionInputs } from '../pcaf/types'
+import type { PcafPortfolioAsset, PortfolioResult, EmissionInputs, AssetAssessment } from '../pcaf/types'
 import { notEnteredReason } from './notEntered'
+
+/**
+ * One holding AS STORED. The only difference from the library's PcafPortfolioAsset is that the outstanding
+ * amount may be absent.
+ *
+ * ⚠️ A BLANK OUTSTANDING AMOUNT IS MISSING, NOT ZERO, SINCE 19 SEP 2026. The input wrote Number('') = 0 for a
+ * cleared field and the library accepted 0, so a holding the customer never finished computed to zero
+ * financed emissions and the category figure went out without it. The input now writes undefined for an
+ * empty field, as the investee-emissions input already did, and such a holding withholds the figure and
+ * names the field. An entered 0 is still an answer (a closed position). Holdings saved before this hold 0
+ * for "blank" and cannot be told apart from a real 0, so they read as 0, as they always have.
+ */
+export type StoredHolding = Omit<PcafPortfolioAsset, 'outstandingAmount'> & { outstandingAmount?: number }
 
 export interface Cat15Data {
   emissions_override?: number
-  pcafAssets?: PcafPortfolioAsset[]
+  pcafAssets?: StoredHolding[]
   /** Read only to report it as recorded-and-unused; see the proxy note above. */
   portfolio_value?: number
   portfolio_sector?: string
@@ -115,13 +129,11 @@ export const CAT15_GWP_SENTENCE = `Investee emissions are used ${CAT15_GWP_TAIL}
 
 export const CAT15_SENTENCES = {
   /** What withholds the figure. SHORT: the hierarchy line and CSV cell. */
-  withholdsShort:
-    'A holding missing its emissions or its attribution value withholds the category figure; an outstanding ' +
-    'amount left blank is read as zero.',
+  withholdsShort: 'A holding missing its emissions, outstanding amount or attribution value withholds the category figure.',
   /** LONG: the methodology passage, where the status the category is then reported with is named. */
   withholdsLong:
-    'If any holding is missing its emissions or its attribution value, the category produces no figure and ' +
-    'is reported as not yet calculated; an outstanding amount left blank is read as zero.',
+    'If any holding is missing its emissions, outstanding amount or attribution value, the category produces ' +
+    'no figure and is reported as not yet calculated.',
   /** What a known total does. SHORT. */
   knownTotalShort: 'A known total, where entered, replaces the holding-level figures.',
   /** LONG: adds the PCAF score it carries, which the passage's data-quality sentence sets up. */
@@ -196,6 +208,18 @@ export const CAT15_PANEL_METHOD =
   `Financed emissions are worked out holding by holding: ${CAT15_HOLDING_FIGURE}. That is PCAF's method.`
 export const CAT15_PANEL_NO_PROXY = CAT15_SENTENCES.noPortfolioProxyShort
 
+/**
+ * Above the holdings while a known total is entered: they are not in the figure. Opens with the shared
+ * known-total sentence, so the panel says what the method description and the export say.
+ * ⚠️ UNTIL 19 SEP 2026 THE PANEL SAID NOTHING. Each holding kept its own "Financed: X tCO2e" line under an
+ * entered total that had replaced them, and a figure shown beside a total reads as part of it.
+ */
+export const CAT15_HOLDINGS_SUPERSEDED =
+  `${CAT15_SENTENCES.knownTotalShort} While it is entered, the holdings below are not in the Category 15 ` +
+  'figure. Clear the known total to use them.'
+/** Appended to each holding's figure while a known total is entered. */
+export const CAT15_HOLDING_NOT_USED = 'not used: the known total above replaces it'
+
 /** The CSV note on a record that still carries a portfolio value or sector from before 17 Sep 2026. */
 export const CAT15_RECORDED_NOT_USED = `Recorded, and NOT used to produce any figure. ${CAT15_SENTENCES.noPortfolioProxyShort}`
 
@@ -249,21 +273,92 @@ export function assessableEmissions(e: EmissionInputs | undefined): EmissionInpu
   }
 }
 
-/** The holdings as they will be ASSESSED, which is not always as they were stored. */
-export function assessableAssets(d: Cat15Data | undefined): PcafPortfolioAsset[] {
-  return (d?.pcafAssets ?? []).map(a => ({ ...a, emissions: assessableEmissions(a.emissions) }))
+/** One holding as it will be ASSESSED, which is not always as it was stored: revenue and sector dropped. */
+function assessable(h: StoredHolding): PcafPortfolioAsset {
+  // The cast is sound because the library checks it: attributionFactor throws on a non-finite amount.
+  return { ...h, outstandingAmount: h.outstandingAmount as number, emissions: assessableEmissions(h.emissions) }
 }
 
-/** Whether one holding computes, asked of the library rather than re-derived: assessAsset throws by
- *  contract on a denominator of 0, a negative amount or emissions inputs it cannot use. */
-export function holdingComputes(asset: PcafPortfolioAsset): boolean {
+/** The holdings as they will be ASSESSED. */
+export function assessableAssets(d: Cat15Data | undefined): PcafPortfolioAsset[] {
+  return (d?.pcafAssets ?? []).map(assessable)
+}
+
+/**
+ * One holding's assessment, or null when it cannot compute: asked of the library rather than re-derived.
+ * assessAsset throws by contract on a missing or negative amount, a denominator of 0 or emissions inputs it
+ * cannot use. The panel's per-holding line reads THIS, so a row that shows a figure is a row the total uses.
+ */
+export function assessHolding(h: StoredHolding): AssetAssessment | null {
   try {
-    assessAsset({ ...asset, emissions: assessableEmissions(asset.emissions) })
-    return true
+    return assessAsset(assessable(h))
   } catch {
-    return false
+    return null
   }
 }
+
+export const holdingComputes = (h: StoredHolding): boolean => assessHolding(h) !== null
+
+/** The three things a holding needs, named as the withholding sentences name them. */
+export const CAT15_HOLDING_FIELDS = {
+  emissions: "the investee's emissions",
+  outstanding: 'the outstanding amount',
+  attribution: 'the attribution value',
+} as const
+
+/**
+ * What a holding that cannot compute has no value for, for the panel's per-holding line. Each test mirrors
+ * the library's own check (estimateInvesteeEmissions for the emissions, attributionFactor for the two
+ * amounts); cat15.test.ts asserts over a grid that holdingMissing and holdingUnusable are empty together
+ * exactly when holdingComputes is true, so the line cannot name a field the calculation does not need, or
+ * miss one it does.
+ */
+export function holdingMissing(h: StoredHolding): string[] {
+  const out: string[] = []
+  const e = assessableEmissions(h.emissions)
+  const anyEmissions = Number.isFinite(e.reportedEmissions) ||
+    (Number.isFinite(e.physicalActivity) && Number.isFinite(e.physicalEmissionFactor))
+  if (!anyEmissions) out.push(CAT15_HOLDING_FIELDS.emissions)
+  if (!Number.isFinite(h.outstandingAmount)) out.push(CAT15_HOLDING_FIELDS.outstanding)
+  // A denominator of 0 is the blank field: the input still writes Number('') = 0 for it.
+  if (!(Number.isFinite(h.denominator) && h.denominator !== 0)) out.push(CAT15_HOLDING_FIELDS.attribution)
+  return out
+}
+
+/**
+ * What a holding HAS but the calculation cannot use, as a clause naming the field.
+ * ⚠️ A NEGATIVE IS NOT A BLANK, AND SAYING "IT NEEDS" OF ONE IS WRONG: the field is filled in, and the
+ * customer would read a request for something already on screen. Each clause names the field and what is
+ * wrong with it, as the negative known-total message does ("A negative figure ... cannot be used").
+ */
+export function holdingUnusable(h: StoredHolding): string[] {
+  const out: string[] = []
+  const e = assessableEmissions(h.emissions)
+  const negative = Number.isFinite(e.reportedEmissions)
+    ? (e.reportedEmissions as number) < 0
+    : (e.physicalActivity as number) < 0 || (e.physicalEmissionFactor as number) < 0
+  if (negative) out.push(`${CAT15_HOLDING_FIELDS.emissions} cannot be negative`)
+  if (Number.isFinite(h.outstandingAmount) && (h.outstandingAmount as number) < 0) {
+    out.push(`${CAT15_HOLDING_FIELDS.outstanding} cannot be negative`)
+  }
+  if (Number.isFinite(h.denominator) && h.denominator < 0) out.push(`${CAT15_HOLDING_FIELDS.attribution} cannot be negative`)
+  return out
+}
+
+const listFields = (fs: string[]): string =>
+  fs.length === 1 ? fs[0] : `${fs.slice(0, -1).join(', ')} and ${fs[fs.length - 1]}`
+
+/** The panel's line under a holding that cannot compute: what it lacks, what it cannot use, or both. */
+export function cat15HoldingIncomplete(h: StoredHolding): string {
+  const missing = holdingMissing(h)
+  const unusable = holdingUnusable(h)
+  if (unusable.length === 0) return `Complete this holding to compute: it needs ${listFields(missing)}.`
+  const cannot = `This holding cannot be computed: ${listFields(unusable)}.`
+  return missing.length === 0 ? cannot : `${cannot} It also needs ${listFields(missing)}.`
+}
+
+/** Whether a known total is entered. The figure and the panel's superseded note ask this one question. */
+export const cat15OverrideEntered = (d: Cat15Data | undefined): boolean => Number.isFinite(d?.emissions_override)
 
 const listHoldings = (ns: number[]): string =>
   ns.length === 1 ? `Holding ${ns[0]}` : `Holdings ${ns.slice(0, -1).join(', ')} and ${ns[ns.length - 1]}`
@@ -272,12 +367,11 @@ const listHoldings = (ns: number[]): string =>
  * Category 15's figure, and where there is none, why.
  *
  * ⚠️ AN ENTERED FIGURE WINS, INCLUDING ZERO. `Number.isFinite`, not truthiness: a customer with no
- * portfolio must be able to say so, and 0 is an answer while blank is not. lib/pcaf/estimate.ts made the
- * same correction, and its test now asserts the corrected behaviour.
+ * portfolio must be able to say so, and 0 is an answer while blank is not.
  *
  * ⚠️ AND NO PARTIAL PORTFOLIO. One holding that cannot compute means no figure at all, with the holding
- * named — not a total of the rows that happened to work. resolvePcafResult would quietly substitute the
- * lumped proxy for the whole portfolio in that case, which is how a decomposed assessment became a 0.12
+ * named — not a total of the rows that happened to work. resolvePcafResult (removed from lib/pcaf on
+ * 19 Sep 2026) quietly substituted the lumped proxy for the whole portfolio in that case, which is how a decomposed assessment became a 0.12
  * lump without anything on screen changing but one small line.
  */
 export function cat15Figure(d: Cat15Data | undefined): Cat15Figure {
@@ -285,7 +379,7 @@ export function cat15Figure(d: Cat15Data | undefined): Cat15Figure {
     ({ mt: null, dqScore: null, basis: null, assessment: null, incomplete, reason })
 
   const override = d?.emissions_override
-  if (Number.isFinite(override)) {
+  if (cat15OverrideEntered(d)) {
     if ((override as number) < 0) {
       return none('A negative figure for financed emissions cannot be used. Enter 0 if this portfolio finances no emissions.')
     }
@@ -296,13 +390,13 @@ export function cat15Figure(d: Cat15Data | undefined): Cat15Figure {
   const assets = assessableAssets(d)
   if (assets.length === 0) return none(cat15HasPortfolioFields(d) ? CAT15_NO_BASIS : CAT15_NOT_ENTERED)
 
-  const incomplete = assets.map((a, i) => (holdingComputes(a) ? 0 : i + 1)).filter(n => n > 0)
+  const incomplete = (d?.pcafAssets ?? []).map((a, i) => (holdingComputes(a) ? 0 : i + 1)).filter(n => n > 0)
   if (incomplete.length > 0) {
     return none(
       // ⚠️ THE SHARED WITHHOLDING SENTENCE, NOT A LOCAL ONE. This ended "Each holding needs an outstanding
-      // amount, the value the attribution divides by, and the investee's reported emissions", which was wrong
-      // twice: a blank outstanding amount is read as zero and does not withhold anything, and the investee
-      // figure is whatever the customer entered, not a report.
+      // amount, the value the attribution divides by, and the investee's reported emissions": the investee
+      // figure is whatever the customer entered, not a report. (From 18 to 19 Sep 2026 the shared sentence
+      // said a blank outstanding amount was read as zero, which was then true; it now withholds.)
       `${listHoldings(incomplete)} cannot be computed yet, so no figure is shown rather than a total of the ` +
       `rest. ${CAT15_SENTENCES.withholdsShort}`,
       incomplete,
