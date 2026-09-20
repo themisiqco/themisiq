@@ -15,7 +15,7 @@
 //
 // CLIENT-SAFE: imports categoryMethods.ts and the two factor records it already reads.
 
-import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method } from './categoryMethods'
+import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method, FLAT_FACTOR_SAMENESS } from './categoryMethods'
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
@@ -157,8 +157,11 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
   business_travel_factors: () => CAT6_ASSISTANT_PHRASE,
   employee_commuting_factors: () => CAT7_ASSISTANT_PHRASE,
   pcaf: () => 'assessed through a PCAF-aligned path',
+  // ⚠️ THE CLAUSE IS SHARED, NOT RESTATED (FLAT_FACTOR_SAMENESS). The full description cannot be embedded
+  // here: this phrase is a lowercase predicate fragment that assistantScope3Basis joins with semicolons,
+  // and scope3MethodDescription('flat_spend') is two sentences beginning with a capital.
   flat_spend: () =>
-    `priced from ONE flat factor of ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's currency, the same whatever was bought, with no source, year or region recorded`,
+    `priced from ONE flat factor of ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's currency, ${FLAT_FACTOR_SAMENESS}, with no source, year or region recorded`,
 }
 
 const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen']

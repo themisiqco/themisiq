@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import ts from 'typescript'
 import { scope3MethodDescription, type Scope3Method } from './categoryMethods'
 import { methodologyHierarchyLines } from './methodSummary'
+import { SPEND_EF_SOURCES, type SpendFactorSource } from '../emissionFactors/spend'
 
 // ── SCOPE 3 CUSTOMER TEXT: NO EM-DASHES, AND NO PLACEHOLDER THAT READS AS AN ENTERED VALUE ─────────────
 //
@@ -58,7 +59,7 @@ function methodologyScope3(): Piece[] {
 const LIB_SOURCES = [
   'lib/scope3/categoryScope.ts',       // why a row is outside a category: the pickers and the CSV
   'lib/scope3/cat15.ts',
-  'lib/scope3/cat3.ts',               // Category 3's "Where to find it" text
+  'lib/scope3/dataSources.ts',       // the fifteen "Where to find it" texts
   'lib/scope3/businessTravelCopy.ts',
   'lib/scope3/notEntered.ts',
   'lib/emissionFactors/productOptions.ts', // the EXIOBASE product-type note after a picker option
@@ -93,6 +94,30 @@ describe('Scope 3 customer text', () => {
   it('SC4 ⚠️ no em-dash in the lib/ strings the Scope 3 page renders', () => {
     const found = LIB_SOURCES.flatMap(rel => { const sf = parse(rel); return dashed(textPieces(sf, sf, rel)) })
     expect(found).toEqual([])
+  })
+
+  it('SC6 ⚠️ no em-dash in the spend-source fields that customer sentences splice in', () => {
+    // ⚠️ A RECORD CAN CARRY AN EM-DASH ONTO THE PAGE WITHOUT ONE APPEARING IN A PAGE LITERAL. dataset,
+    // version, publisher, licence, classification and unit_conversion are read into
+    // scope3MethodDescription('exiobase_spend') (lib/scope3/categoryMethods.ts), the spend panel's
+    // workings summary and the spend route's disclosure sentences, so SC1 and SC4 never see them.
+    // SPEND_EF_SOURCES.useeio_us.dataset read "USEEIO — US Environmentally-Extended Input-Output model"
+    // until 20 Sep 2026; only exiobase_38 has a live consumer, so nothing had rendered it yet.
+    //
+    // ⚠️ THE FIELDS, NOT THE FILE. `note` is a provenance note for maintainers with no consumer anywhere,
+    // and two of them contain an em-dash; scanning lib/emissionFactors/spend.ts whole would fail on text
+    // no customer can reach and would push the next author to reword an internal record to satisfy a
+    // customer-copy guard.
+    const RENDERED: (keyof SpendFactorSource)[] =
+      ['publisher', 'dataset', 'version', 'licence', 'classification', 'unit_conversion']
+    const dashed: string[] = []
+    for (const [id, src] of Object.entries(SPEND_EF_SOURCES)) {
+      for (const field of RENDERED) {
+        const v = src[field]
+        if (typeof v === 'string' && v.includes('\u2014')) dashed.push(`SPEND_EF_SOURCES.${id}.${field}: ${v}`)
+      }
+    }
+    expect(dashed).toEqual([])
   })
 
   it('SC5 ⚠️ no numeric input on the Scope 3 page has a placeholder that could be read as an entered value', () => {

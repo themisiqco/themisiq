@@ -174,7 +174,7 @@ export interface SpendFactorSource {
 export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
   useeio_us: {
     publisher: 'US Environmental Protection Agency',
-    dataset: 'USEEIO — US Environmentally-Extended Input-Output model',
+    dataset: 'USEEIO, the US Environmentally-Extended Input-Output model',
     version: null,
     published: null,
     url: EPA_USEEIO_URL,

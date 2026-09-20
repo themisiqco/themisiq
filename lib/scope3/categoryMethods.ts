@@ -119,6 +119,23 @@ export function provenanceGap(p: { source: string | null; year: number | null; r
   return missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`
 }
 
+/**
+ * What the flat factor is indifferent to, in one clause, because three surfaces say it and they said it
+ * three ways.
+ *
+ * ⚠️ IT SAID "THE SAME WHATEVER WAS BOUGHT" UNTIL 20 SEP 2026, AND FIVE OF THE SEVEN FLAT CATEGORIES BUY
+ * NOTHING. Categories 9, 10, 11, 13 and 14 price what a customer, tenant or franchisee did: the company
+ * is not the buyer, there is no purchase behind the figure, and the old wording told the customer there
+ * was. The claim that is actually true of the factor is that it does not vary: not by category, and not
+ * by what the number in the box is meant to represent.
+ *
+ * Shared rather than repeated because the description below, the assistant prompt's clause
+ * (lib/scope3/methodSummary.ts) and the panel's basis detail (app/dashboard/scope3/page.tsx) all carry
+ * it, and the first two embed THIS constant. categoryMethods.test.ts fails if any of them stops.
+ */
+export const FLAT_FACTOR_SAMENESS =
+  'the same for every category priced this way, whatever the figure represents'
+
 const gapSentence = (p: Parameters<typeof provenanceGap>[0], subject: string): string => {
   const gap = provenanceGap(p)
   return gap ? ` ${subject} recorded with ${gap}.` : ''
@@ -146,8 +163,8 @@ export function scope3MethodDescription(method: Scope3Method): string {
     }
     case 'flat_spend':
       return (
-        `Spend-based, at a flat ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the ` +
-        `inventory's currency, the same whatever was bought.` +
+        `A flat ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's ` +
+        `currency entered, ${FLAT_FACTOR_SAMENESS}.` +
         gapSentence(GENERIC_SPEND_FACTOR, 'This factor is')
       )
     case 'waste_factors': {
