@@ -7,6 +7,7 @@ import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { defraCitation } from '../ghg/engine'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { methodologyHierarchyLines } from './methodSummary'
+import { CAT3_DATA_SOURCE } from './cat3'
 
 const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
 const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'end_of_life_factors']
@@ -133,5 +134,48 @@ describe('Scope 3 category methods', () => {
     for (const n of not) expect(METHOD_TAKES_ENTERED_FIGURE[scope3MethodFor(`cat${n}`)], `cat${n}`).toBe(false)
     expect(not).toContain(5)
     expect(text).not.toMatch(/Where a figure is entered directly, it is used instead of any estimate/)
+  })
+
+  it('M9 ⚠️ a flat-spend category\'s "Where to find it" text names no method the map does not assign to it', () => {
+    // ⚠️ THE TEXT DESCRIBED A CALCULATION THAT DOES NOT EXIST. Category 3's dataSource told the customer
+    // to bring Scope 1 and 2 consumption in kWh and fuel volumes and said well-to-tank and T&D-loss
+    // factors were applied; the category is priced from one flat spend factor, and the form has no field
+    // for any of it. The words a customer reads under "Where to find it" are a claim about method, so
+    // they are guarded like one.
+    //
+    // KEYED TO THE METHOD MAP, not to a list of ids: a category that joins the flat group comes under
+    // this guard on the same day, and a category that leaves it drops out.
+    //
+    // ⚠️ SIX EXEMPTIONS, AND THEY ARE A BACKLOG, NOT A RULE. Cats 8, 9, 10, 11, 13 and 14 still hold
+    // their dataSource as a literal in app/dashboard/scope3/page.tsx, and five of them say
+    // "Activity-based; spend-based is not appropriate here" of a category priced from spend alone;
+    // Cat 9 names modelled tonne-km nothing collects. Cat 4 carries the same defect (tonne-km,
+    // mode/distance) but is exiobase_spend, so it never enters this loop. All are corrected in the next
+    // task, and each exemption is removed as its text moves into lib/scope3.
+    const EXEMPT_PENDING_MOVE = ['cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14']
+    /** The dataSource strings that live in lib/scope3 and can therefore be read here. */
+    const DATA_SOURCE: Record<string, string> = { cat3: CAT3_DATA_SOURCE }
+    // Each names a method, factor or data source that no flat-spend category uses.
+    const BANNED: RegExp[] = [
+      /well-to-tank/i, /\bWTT\b/i, /T&D/i, /transmission and distribution/i,
+      /\bscope 1\b/i, /\bscope 2\b/i, /\bkWh\b/i, /fuel volume/i,
+      /EXIOBASE/i, /DEFRA/i, /DESNZ/i, /PCAF/i, /tonne-km/i, /activity-based/i, /life ?cycle/i,
+    ]
+    const flat = IDS.filter(id => scope3MethodFor(id) === 'flat_spend')
+    expect(flat, 'the flat group, from the map').toContain('cat3')
+    for (const id of flat) {
+      if (EXEMPT_PENDING_MOVE.includes(id)) continue
+      const text = DATA_SOURCE[id]
+      expect(text, `${id}: its dataSource must live in lib/scope3 to be guarded`).toBeTruthy()
+      for (const re of BANNED) expect(text, `${id} names ${re}`).not.toMatch(re)
+    }
+    // Category 3 says what the form asks for, and carries the flat claim by embedding the shared
+    // sentence rather than restating it, so the 0.5 and the provenance gap cannot drift from the
+    // methodology page and the CSV.
+    expect(CAT3_DATA_SOURCE).toContain(scope3MethodDescription('flat_spend'))
+    expect(CAT3_DATA_SOURCE).toMatch(/annual spend/i)
+    // And the page renders that value rather than a literal of its own.
+    const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
+    expect(page).toContain('dataSource: CAT3_DATA_SOURCE')
   })
 })
