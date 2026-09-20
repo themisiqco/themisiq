@@ -1,0 +1,466 @@
+{
+  "metadata": {
+    "source": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting",
+    "title_as_published": "UK Government GHG Conversion Factors for Company Reporting",
+    "edition": "DEFRA 2026",
+    "factor_set": "Full set",
+    "file_version": "1",
+    "year": 2026,
+    "sheets": [
+      "WTT- fuels",
+      "WTT- UK electricity",
+      "Transmission and distribution",
+      "WTT- heat and steam",
+      "Conversions"
+    ],
+    "scope": "Scope 3",
+    "scope_cells": {
+      "WTT- fuels": {
+        "cell": "B6",
+        "text": "Scope 3"
+      },
+      "WTT- UK electricity": {
+        "cell": "B6",
+        "text": "Scope 3"
+      },
+      "Transmission and distribution": {
+        "cell": "B6",
+        "text": "Scope 3"
+      },
+      "WTT- heat and steam": {
+        "cell": "B6",
+        "text": "Scope 3"
+      }
+    },
+    "sheet_descriptions": {
+      "WTT- fuels": {
+        "sheet": "WTT- fuels",
+        "cell": "A8",
+        "text": "Well-to-tank (WTT) fuels conversion factors should be used to account for the upstream Scope 3 emissions associated with extraction, refining and transportation of the raw fuel sources to an organisation’s site (or asset), prior to combustion."
+      },
+      "WTT- UK electricity": {
+        "sheet": "WTT- UK electricity",
+        "cell": "A8",
+        "text": "Well-to-tank (WTT) conversion factors for UK electricity should be used to report the Scope 3 emissions of extraction, refining and transportation of primary fuels before their use in the generation of electricity. It should be noted that electricity generation, transmission and distribution losses have separate WTT emissions assigned to them."
+      },
+      "Transmission and distribution": {
+        "sheet": "Transmission and distribution",
+        "cell": "A8",
+        "text": "Transmission and distribution (T&D) factors should be used to report the Scope 3 emissions associated with grid losses (the energy loss that occurs in getting the electricity from the power plant to the organisations that purchase it)."
+      },
+      "WTT- heat and steam": {
+        "sheet": "WTT- heat and steam",
+        "cell": "A8",
+        "text": "Well-to-tank (WTT) heat and steam conversion factors should be used to report emissions from the extraction, refinement and transportation of primary fuels that generate the heat and steam organisations purchase."
+      }
+    },
+    "gwp_basis": "AR5",
+    "gwp_basis_note": "Stated by the workbook's Introduction sheet (guidance.gwp_basis): the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. Category 3 discloses this on its line, because the inventory it is derived from may be on another basis.",
+    "upstream_only_note": "Every row here is a well-to-tank or transmission-and-distribution row, excluding combustion, which is what Category 3 requires: the Scope 3 Standard, p. 70, says life cycle factors used for this category must exclude combustion because combustion is already in Scope 1 or Scope 2. sheet_descriptions holds each sheet's own statement of that, with its cell.",
+    "cv_basis_note": "The natural gas row taken here is kWh (Gross CV), not Net CV, because the Scope 1 side of a therms or mmBtu figure is priced from the EPA's higher heating value factors, and the sheet asks for the same basis on both sides (guidance.cv_basis_match_scope1, guidance.cv_gross_typical). That EPA HHV and DEFRA Gross CV are interchangeable is NOT STATED by either publisher; the conversion is disclosed on the Category 3 row rather than assumed away.",
+    "overseas_note": "DEFRA publishes no overseas electricity, overseas T&D or overseas WTT factor and points to the IEA (guidance.overseas_td_withdrawn, overseas_factors_withdrawn, overseas_td_at_iea, overseas_wtt_withdrawn). A non-UK row priced from this artefact is a UK stand-in and says so.",
+    "separate_lines_note": "Generation WTT, the T&D loss and the WTT of that loss are three separate reported items, as the sheet directs (guidance.electricity_separate_lines); the same for district heat and steam (guidance.heat_distribution_to_scope3).",
+    "natural_gas_mass_note": "A FINDING, RECORDED AND NOT CORRECTED. The 'WTT- fuels' natural gas per-tonne row does not reconcile with its own volume and energy rows through the workbook's Fuel properties sheet: tonnes over cubic metres implies 1,257.17 m3/tonne against Fuel properties G31's 1,237.54, +1.59%; tonnes over kWh (Gross CV) implies 50.43 GJ/tonne against E31's 49.521, +1.83%. The rows this artefact holds agree with each other (cubic metres over kWh Gross CV is 11.142 kWh/m3 against 11.116 from Fuel properties, +0.24%), and the per-tonne row is not taken. Nothing here is adjusted to close the gap: the figures are as published.",
+    "gas_split_rounding": {
+      "electricity_td_loss": {
+        "published_total": 0.01299,
+        "split_sum": 0.013,
+        "difference": 1e-05,
+        "difference_pct": 0.077,
+        "cells": {
+          "total": "E22",
+          "split": "F22:H22"
+        },
+        "sheet": "Transmission and distribution"
+      },
+      "district_heat_steam_distribution_loss": {
+        "published_total": 0.00945,
+        "split_sum": 0.00946,
+        "difference": 1e-05,
+        "difference_pct": 0.1058,
+        "cells": {
+          "total": "E27",
+          "split": "F27:H27"
+        },
+        "sheet": "Transmission and distribution"
+      }
+    },
+    "gas_split_rounding_note": "A FINDING, RECORDED AND NOT CORRECTED. On both rows that carry one, DEFRA's published CO2, CH4 and N2O columns sum to slightly more than the kg CO2e column beside them: T&D- UK electricity 0.01300 against 0.01299 (+0.0770%), and Distribution - district heat & steam 0.00946 against 0.00945 (+0.1058%). Each column is published rounded to five decimal places, and rounded parts need not add to a rounded whole. THE PUBLISHED TOTAL IS THE FIGURE TO PRICE WITH; the split is carried for disclosure only. lib/emissionFactors/defraEnergy.test.ts asserts that the reader exposes the total and derives nothing from the split.",
+    "empty_cell_note": "An empty value cell aborts the generator. Every row named here is expected to carry a value, and an empty one is an absence, never a zero.",
+    "licence": "Open Government Licence v3.0 (OGL v3.0)",
+    "licence_url": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
+    "attribution_required": "Contains public sector information licensed under the Open Government Licence v3.0.",
+    "guidance": {
+      "gwp_basis": {
+        "sheet": "Introduction",
+        "cell": "A35",
+        "text": "The GWPs used in the calculation of CO2e are based on the Intergovernmental Panel on Climate Change (IPCC) Fifth Assessment Report (AR5) over a 100-year period so that the Conversion Factors are consistent with current national and international reporting requirements."
+      },
+      "cv_basis_match_scope1": {
+        "sheet": "WTT- fuels",
+        "cell": "A11",
+        "text": "●  Organisations should select the same type of conversion factors to report their upstream WTT fuels emissions (that is, based on mass/volume/energy (gross or net calorific value (CV)) as they used to report their Scope 1 fuel emissions."
+      },
+      "cv_gross_typical": {
+        "sheet": "WTT- fuels",
+        "cell": "A12",
+        "text": "●  Gross CV /net CV basis - typically organisations should use gross CV for each kWh of energy consumed (most energy billing is provided on a gross CV basis)."
+      },
+      "overseas_td_withdrawn": {
+        "sheet": "Transmission and distribution",
+        "cell": "A13",
+        "text": "● Transmission and distribution losses are no longer published for overseas electricity, since these are now calculated and published by the IEA."
+      },
+      "overseas_factors_withdrawn": {
+        "sheet": "Overseas electricity",
+        "cell": "A11",
+        "text": "● We no longer provide overseas CO2 emission factors. They are available for sale from the International Energy Agency (IEA) website."
+      },
+      "overseas_td_at_iea": {
+        "sheet": "Overseas electricity",
+        "cell": "A17",
+        "text": "● Further, the IEA now also publishes data for transmission and distribution losses, also available from International Energy Agency (IEA) website. These are also no longer provided as part of these conversion factors."
+      },
+      "overseas_wtt_withdrawn": {
+        "sheet": "WTT- UK electricity",
+        "cell": "A13",
+        "text": "●  We no longer provide WTT data for overseas electricity use or emissions factors for the Scope 2. They are available for sale from the CO2 Emissions from Fuel Combustion online data service at the International Energy Agency (IEA) website (see also ‘Overseas electricity’ tab)."
+      },
+      "electricity_separate_lines": {
+        "sheet": "WTT- UK electricity",
+        "cell": "A16",
+        "text": "The kWh energy is multiplied by the WTT factor for ‘WTT- UK electricity (generation)’ and separately by the ‘WTT- UK electricity (T&D)’ factor. These are reported as separate items in Scope 3 to demonstrate the WTT impact of the electricity generation and the losses experienced in the grid."
+      },
+      "heat_distribution_to_scope3": {
+        "sheet": "Heat and steam",
+        "cell": "A13",
+        "text": "●  It should be noted that to calculate the distribution impact of district heat and steam figures, users should refer to the 'Transmission and distribution' tab and add these emissions to their Scope 3 accounting."
+      }
+    },
+    "counts": {
+      "fuels": 8,
+      "electricity": 3,
+      "heat_and_steam": 3,
+      "conversions": 4
+    },
+    "generated_on": "2026-09-20",
+    "generated_from": "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx",
+    "generated_from_sha256": "b5c4f2f86cdc74707337b2fb013b44ded189a1b528f5e29ea99856ba65ae0205",
+    "generated_by": "scripts/generate-defra-energy.py",
+    "energy_fingerprint_sha256": "0c411b54324308567dc6a456cb497529716290efc21f9dcda1f5db5e61379e9b"
+  },
+  "fuels": [
+    {
+      "key": "natural_gas_kwh_gross_cv",
+      "activity": "Gaseous fuels",
+      "fuel": "Natural gas",
+      "unit": "kWh (Gross CV)",
+      "kg_co2e": 0.03021,
+      "sheet": "WTT- fuels",
+      "row": 41,
+      "cells": {
+        "activity": "A22",
+        "fuel": "B38",
+        "unit": "C41",
+        "kg_co2e": "D41"
+      },
+      "gases": null
+    },
+    {
+      "key": "natural_gas_cubic_metres",
+      "activity": "Gaseous fuels",
+      "fuel": "Natural gas",
+      "unit": "cubic metres",
+      "kg_co2e": 0.3366,
+      "sheet": "WTT- fuels",
+      "row": 39,
+      "cells": {
+        "activity": "A22",
+        "fuel": "B38",
+        "unit": "C39",
+        "kg_co2e": "D39"
+      },
+      "gases": null
+    },
+    {
+      "key": "propane_tonnes",
+      "activity": "Gaseous fuels",
+      "fuel": "Propane",
+      "unit": "tonnes",
+      "kg_co2e": 352.67018,
+      "sheet": "WTT- fuels",
+      "row": 50,
+      "cells": {
+        "activity": "A22",
+        "fuel": "B50",
+        "unit": "C50",
+        "kg_co2e": "D50"
+      },
+      "gases": null
+    },
+    {
+      "key": "propane_litres",
+      "activity": "Gaseous fuels",
+      "fuel": "Propane",
+      "unit": "litres",
+      "kg_co2e": 0.1817,
+      "sheet": "WTT- fuels",
+      "row": 51,
+      "cells": {
+        "activity": "A22",
+        "fuel": "B51",
+        "unit": "C51",
+        "kg_co2e": "D51"
+      },
+      "gases": null
+    },
+    {
+      "key": "diesel_average_biofuel_blend_litres",
+      "activity": "Liquid fuels",
+      "fuel": "Diesel (average biofuel blend)",
+      "unit": "litres",
+      "kg_co2e": 0.61101,
+      "sheet": "WTT- fuels",
+      "row": 71,
+      "cells": {
+        "activity": "A58",
+        "fuel": "B70",
+        "unit": "C71",
+        "kg_co2e": "D71"
+      },
+      "gases": null
+    },
+    {
+      "key": "petrol_average_biofuel_blend_litres",
+      "activity": "Liquid fuels",
+      "fuel": "Petrol (average biofuel blend)",
+      "unit": "litres",
+      "kg_co2e": 0.58094,
+      "sheet": "WTT- fuels",
+      "row": 95,
+      "cells": {
+        "activity": "A58",
+        "fuel": "B94",
+        "unit": "C95",
+        "kg_co2e": "D95"
+      },
+      "gases": null
+    },
+    {
+      "key": "fuel_oil_distillate_litres",
+      "activity": "Liquid fuels",
+      "fuel": "Processed fuel oils - distillate oil",
+      "unit": "litres",
+      "kg_co2e": 0.9465,
+      "sheet": "WTT- fuels",
+      "row": 107,
+      "cells": {
+        "activity": "A58",
+        "fuel": "B106",
+        "unit": "C107",
+        "kg_co2e": "D107"
+      },
+      "gases": null
+    },
+    {
+      "key": "fuel_oil_residual_litres",
+      "activity": "Liquid fuels",
+      "fuel": "Processed fuel oils - residual oil",
+      "unit": "litres",
+      "kg_co2e": 1.10125,
+      "sheet": "WTT- fuels",
+      "row": 103,
+      "cells": {
+        "activity": "A58",
+        "fuel": "B102",
+        "unit": "C103",
+        "kg_co2e": "D103"
+      },
+      "gases": null
+    }
+  ],
+  "electricity": [
+    {
+      "key": "electricity_generation_wtt",
+      "activity": "WTT- UK electricity (generation)",
+      "country": "Electricity: UK",
+      "unit": "kWh",
+      "year": 2026,
+      "kg_co2e": 0.03682,
+      "sheet": "WTT- UK electricity",
+      "row": 19,
+      "cells": {
+        "activity": "A19",
+        "country": "B19",
+        "unit": "C19",
+        "year": "D19",
+        "kg_co2e": "E19"
+      },
+      "gases": null
+    },
+    {
+      "key": "electricity_td_loss",
+      "activity": "T&D- UK electricity",
+      "type": "Electricity: UK",
+      "unit": "kWh",
+      "year": 2026,
+      "kg_co2e": 0.01299,
+      "sheet": "Transmission and distribution",
+      "row": 22,
+      "cells": {
+        "activity": "A22",
+        "type": "B22",
+        "unit": "C22",
+        "year": "D22",
+        "kg_co2e": "E22",
+        "gases_co2": "F22",
+        "gases_ch4": "G22",
+        "gases_n2o": "H22"
+      },
+      "gases": {
+        "co2": 0.01284,
+        "ch4": 7e-05,
+        "n2o": 9e-05
+      }
+    },
+    {
+      "key": "electricity_td_wtt",
+      "activity": "WTT- UK electricity (T&D)",
+      "country": "Electricity: UK",
+      "unit": "kWh",
+      "year": 2026,
+      "kg_co2e": 0.00359,
+      "sheet": "WTT- UK electricity",
+      "row": 24,
+      "cells": {
+        "activity": "A24",
+        "country": "B24",
+        "unit": "C24",
+        "year": "D24",
+        "kg_co2e": "E24"
+      },
+      "gases": null
+    }
+  ],
+  "heat_and_steam": [
+    {
+      "key": "district_heat_steam_wtt",
+      "activity": "WTT- heat and steam",
+      "type": "District heat and steam",
+      "unit": "kWh",
+      "year": 2026,
+      "kg_co2e": 0.03341,
+      "sheet": "WTT- heat and steam",
+      "row": 20,
+      "cells": {
+        "activity": "A19",
+        "type": "B20",
+        "unit": "C20",
+        "year": "D20",
+        "kg_co2e": "E20"
+      },
+      "gases": null
+    },
+    {
+      "key": "district_heat_steam_distribution_loss",
+      "activity": "Distribution - district heat & steam",
+      "type": "5% loss",
+      "unit": "kWh",
+      "year": 2026,
+      "kg_co2e": 0.00945,
+      "sheet": "Transmission and distribution",
+      "row": 27,
+      "cells": {
+        "activity": "A27",
+        "type": "B27",
+        "unit": "C27",
+        "year": "D27",
+        "kg_co2e": "E27",
+        "gases_co2": "F27",
+        "gases_ch4": "G27",
+        "gases_n2o": "H27"
+      },
+      "gases": {
+        "co2": 0.00936,
+        "ch4": 7e-05,
+        "n2o": 3e-05
+      }
+    },
+    {
+      "key": "district_heat_steam_distribution_wtt",
+      "activity": "WTT- district heat & steam distribution",
+      "type": "5% loss",
+      "unit": "kWh",
+      "year": 2026,
+      "kg_co2e": 0.00176,
+      "sheet": "WTT- heat and steam",
+      "row": 25,
+      "cells": {
+        "activity": "A25",
+        "type": "B25",
+        "unit": "C25",
+        "year": "D25",
+        "kg_co2e": "E25"
+      },
+      "gases": null
+    }
+  ],
+  "conversions": [
+    {
+      "key": "therm_to_kwh",
+      "description": "1 therm in kWh",
+      "from": "Therm",
+      "to": "kWh",
+      "factor": 29.30710833487654,
+      "sheet": "Conversions",
+      "row": 30,
+      "cells": {
+        "from": "B30",
+        "to": "D27",
+        "factor": "D30"
+      }
+    },
+    {
+      "key": "cubic_foot_to_cubic_metre",
+      "description": "1 cubic foot in cubic metres",
+      "from": "Cubic feet, cu ft",
+      "to": "m3",
+      "factor": 0.028316846368677356,
+      "sheet": "Conversions",
+      "row": 38,
+      "cells": {
+        "from": "B38",
+        "to": "D35",
+        "factor": "D38"
+      }
+    },
+    {
+      "key": "us_gallon_to_litre",
+      "description": "1 US gallon in litres",
+      "from": "US gallon",
+      "to": "L",
+      "factor": 3.7854118034613733,
+      "sheet": "Conversions",
+      "row": 40,
+      "cells": {
+        "from": "B40",
+        "to": "C35",
+        "factor": "C40"
+      }
+    },
+    {
+      "key": "kilogram_to_tonne",
+      "description": "1 kilogram in tonnes",
+      "from": "Kilogram, kg",
+      "to": "tonne",
+      "factor": 0.001,
+      "sheet": "Conversions",
+      "row": 45,
+      "cells": {
+        "from": "B45",
+        "to": "D44",
+        "factor": "D45"
+      }
+    }
+  ]
+}
