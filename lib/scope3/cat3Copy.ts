@@ -33,6 +33,22 @@ const cite = (key: string): string => {
   return `${q.sheet} ${q.cell}`
 }
 
+/**
+ * One full stop at the end, whatever the text already ends with.
+ *
+ * ⚠️ A SPLICED NAME CAN END IN A STOP, AND ONE DID. A Buffalo electricity line read "… priced from US
+ * EPA eGRID2023 · Grid factor for 2023 applied to 2025 inventory (latest vintage held).." — the note's
+ * own stop, then the one this module appends. The note is gone (see cat3Inputs.publisherOf), but the
+ * shape recurs for any publisher name ending in a stop, a bracket or a quote, and none of those is
+ * ours to control: they come from EF_SOURCES and from whatever a future factor table cites. So the
+ * punctuation is applied here, once, and cat3Copy.test.ts SC-style guards forbid a double stop in any
+ * rendered sentence.
+ */
+const endSentence = (text: string): string => {
+  const t = text.trimEnd()
+  return /[.!?]$/.test(t) ? t : `${t}.`
+}
+
 const n2 = (x: number) => x.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 /**
  * The category total in tonnes, at four places: the figure a customer quotes, and the card above it
@@ -109,12 +125,29 @@ export const CAT3_STAND_IN_SENTENCE =
   `${cite('overseas_td_withdrawn')} and ${cite('overseas_wtt_withdrawn')}). Every line priced from them ` +
   `at a location outside the UK is flagged as a stand-in, fuels included.`
 
-export const CAT3_CV_BASIS_SENTENCE =
-  `A natural gas figure in therms, million Btu or kWh is priced on the gross calorific value factor, ` +
-  `because the workbook asks for the same basis on both sides of the entry (${cite('cv_basis_match_scope1')}, ` +
-  `${cite('cv_gross_typical')}) and the Scope 1 side of that figure is priced on the US EPA's higher ` +
-  `heating values. That those two bases are interchangeable is not stated by either publisher, and this ` +
-  `sentence is here instead of the assumption.`
+/**
+ * ⚠️ SPLIT IN TWO ON 20 SEP 2026, BECAUSE ONE OF THEM WAS FALSE OF SOME INVENTORIES. The single sentence
+ * said the Scope 1 side of the gas figure "is priced on the US EPA's higher heating values" and was
+ * shown whenever ANY line used the gross CV factor. On an inventory whose only gas is at a UK location
+ * that is simply untrue: UK gas is entered in kWh (engine.ts ngUnitOptions offers kWh alone for GB/UK)
+ * and its Scope 1 side is priced by DEFRA, not the EPA. The disclosure exists to flag an assumption the
+ * customer's own figures rest on; printed where no such assumption was made it is a false claim about
+ * their inventory, and it teaches them to skip the next one.
+ *
+ * The first sentence is true of every gross CV line. The second is true exactly where a figure was
+ * entered in therms or million Btu, which engine.ts offers only on the US path, and whose Scope 1 side
+ * combustionSource therefore prices from the EPA.
+ */
+export const CAT3_GROSS_CV_SENTENCE =
+  `Natural gas is priced on the workbook's gross calorific value factor: it asks for the same basis on ` +
+  `both sides of an entry (${cite('cv_basis_match_scope1')}), and says organisations should typically ` +
+  `use gross calorific values for each kWh of energy consumed (${cite('cv_gross_typical')}).`
+
+export const CAT3_EPA_HHV_SENTENCE =
+  `A gas figure entered in therms or million Btu is a US entry, and the Scope 1 side of it is priced on ` +
+  `the US EPA's higher heating values. That an EPA higher heating value and a DEFRA gross calorific ` +
+  `value are interchangeable is not stated by either publisher, so this line says where the two meet ` +
+  `rather than assuming it away.`
 
 /** The licence the factors are published under, and the acknowledgement it requires. */
 export const CAT3_ATTRIBUTION = m.attribution_required
@@ -326,14 +359,14 @@ export function cat3LineText(l: Cat3PricedLine): string {
   // about it, and "X and the inventory does not say which country this is" reads as one broken one.
   const statements = cat3FlagStatements(l.flags)
   const flags = statements.length > 0
-    ? ` ${statements.map(t => `${t.charAt(0).toUpperCase()}${t.slice(1)}`).join('. ')}.`
+    ? ` ${statements.map(t => endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`)).join(' ')}`
     : ''
   return `${head}: ${entered}${priced} = ${n2(l.kg_co2e)} kg CO2e.${flags}`
 }
 
 /** One row that was not priced, in the same voice. */
 export function cat3UnpricedText(u: Cat3Unpriced): string {
-  return `${u.location}, ${CAT3_STREAM_LABEL[u.stream]}: not priced, ${cat3ReasonText(u.reason)}.`
+  return endSentence(`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}: not priced, ${cat3ReasonText(u.reason)}`)
 }
 
 // ── THE WORKINGS CARD ────────────────────────────────────────────────────────────────────────────
@@ -352,6 +385,15 @@ export function cat3WorkingsSummary(r: Cat3Result): string {
  * Everything the workings card shows: the method, then every priced line, then everything that was not
  * priced and why. `gwpSentence` is the record's own publisher GWP sentence, as Cats 5, 6 and 7 pass one.
  */
+/** A line priced on the workbook's gross calorific value natural gas row. */
+const isGrossCv = (l: Cat3PricedLine): boolean => l.factor?.key === 'natural_gas_kwh_gross_cv'
+/**
+ * The two units whose Scope 1 side is EPA-priced. engine.ts ngUnitOptions offers therms and MMBtu on
+ * the US path alone (CA gets mcf and m3, GB/UK and NZ kWh, AU and the EU m3), and combustionSource
+ * prices a US location from the EPA, so the unit as entered is what decides this.
+ */
+const EPA_HHV_UNITS = ['therms', 'mmbtu']
+
 export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[] {
   const out: string[] = [
     CAT3_SOURCE_SENTENCE,
@@ -366,7 +408,11 @@ export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[
   ]
   // Only where a gross CV factor actually priced something: a sentence about a conversion nobody's
   // figures went through is noise, and noise is what stops the rest being read.
-  if (r.lines.some(l => l.factor?.key === 'natural_gas_kwh_gross_cv')) out.push(CAT3_CV_BASIS_SENTENCE)
+  if (r.lines.some(isGrossCv)) out.push(CAT3_GROSS_CV_SENTENCE)
+  // And the EPA half only where a US entry made the two bases meet. See the note above the sentences.
+  if (r.lines.some(l => isGrossCv(l) && EPA_HHV_UNITS.includes(l.unit_as_entered.trim().toLowerCase()))) {
+    out.push(CAT3_EPA_HHV_SENTENCE)
+  }
   return out
 }
 
@@ -380,7 +426,10 @@ export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult, gwpSenten
   if (r.status === 'zero') out.push(cat3ZeroText())
   if (r.withheld) out.push(cat3WithheldText(r.withheld, inputs.undeclared_detail))
   for (const u of r.unpriced) out.push(cat3UnpricedText(u))
-  for (const s of inputs.skipped) out.push(`${cat3SkippedText(s).charAt(0).toUpperCase()}${cat3SkippedText(s).slice(1)}.`)
+  for (const s of inputs.skipped) {
+    const t = cat3SkippedText(s)
+    out.push(endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`))
+  }
   return out
 }
 
@@ -504,15 +553,16 @@ export function cat3CsvRows(
         `${l.factor!.unit} (${l.factor!.sheet} ${l.factor!.cell}) = ${n2(l.kg_co2e)} kg CO2e.`
     const flags = cat3FlagStatements(l.flags.filter(f => f.code !== 'nz_mfe_3c'))
     out.push([label, entered,
-      `${arithmetic}${flags.length ? ` ${flags.map(t => `${t.charAt(0).toUpperCase()}${t.slice(1)}`).join('. ')}.` : ''}`])
+      `${arithmetic}${flags.length ? ` ${flags.map(t => endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`)).join(' ')}` : ''}`])
   }
   if (r.status === 'priced' && r.lines.length === 0) out.push(['Lines', '', 'None priced.'])
   for (const u of r.unpriced) {
-    out.push([`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}`, 'Not priced', `${cat3ReasonText(u.reason).charAt(0).toUpperCase()}${cat3ReasonText(u.reason).slice(1)}.`])
+    const why = cat3ReasonText(u.reason)
+    out.push([`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}`, 'Not priced', endSentence(`${why.charAt(0).toUpperCase()}${why.slice(1)}`)])
   }
   for (const s of inputs.skipped) {
     const t = cat3SkippedText(s)
-    out.push(['Row not used', '', `${t.charAt(0).toUpperCase()}${t.slice(1)}.`])
+    out.push(['Row not used', '', endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`)])
   }
   out.push(['GWP basis', m.gwp_basis, gwpSentence])
   // ⚠️ THE GWP SENTENCE HAS ITS OWN ROW ABOVE, so it comes out of the disclosure list here: printed

@@ -11,7 +11,7 @@ import {
   cat3SkippedText, cat3InputsReasonText, cat3WithheldText, cat3ZeroText, cat3NoFigureText,
   CAT3_STREAM_LABEL, CAT3_LINE_LABEL, CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE,
   CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_LOCATION_BASED_SENTENCE,
-  CAT3_GWP_PUBLISHER, CAT3_SEPARATE_LINES_SENTENCE, CAT3_CV_BASIS_SENTENCE, CAT3_ATTRIBUTION,
+  CAT3_GWP_PUBLISHER, CAT3_SEPARATE_LINES_SENTENCE, CAT3_GROSS_CV_SENTENCE, CAT3_EPA_HHV_SENTENCE, CAT3_ATTRIBUTION,
   cat3Basis, cat3CsvRows, cat3MethodSentences,
 } from './cat3Copy'
 import { publisherGwpSentence } from './gwpSentence'
@@ -66,7 +66,8 @@ describe('Category 3 copy', () => {
     // The method sentences are all present, the gross CV one because a therms figure was priced.
     for (const s of [CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE,
       CAT3_SEPARATE_LINES_SENTENCE, CAT3_LOCATION_BASED_SENTENCE,
-      CAT3_STAND_IN_SENTENCE, CAT3_CV_BASIS_SENTENCE, CAT3_ATTRIBUTION, GWP]) expect(sentences).toContain(s)
+      CAT3_STAND_IN_SENTENCE, CAT3_GROSS_CV_SENTENCE, CAT3_EPA_HHV_SENTENCE, CAT3_ATTRIBUTION, GWP])
+      expect(sentences).toContain(s)
     // The market-based row was read and set aside, and the panel says so rather than dropping it.
     expect(sentences.some(s => /market-based electricity row at UK site is not used/.test(s))).toBe(true)
   })
@@ -247,6 +248,121 @@ describe('Category 3 copy', () => {
     // The older-shape sentence counts the rows it could not read, so the customer can see it found some.
     expect(cat3InputsReasonText({ code: 'workings_shape_unreadable', rows: 1 })).toContain('1 row)')
     expect(cat3InputsReasonText({ code: 'workings_shape_unreadable', rows: 12 })).toContain('12 rows)')
+  })
+
+  it('C3C-11 the EPA higher-heating-value sentence appears only where a US gas entry made it true', () => {
+    // ⚠️ THE DEFECT: one sentence claimed "the Scope 1 side of that figure is priced on the US EPA's
+    // higher heating values" and was shown whenever any line used the gross CV factor. A UK location
+    // enters gas in kWh (engine.ts ngUnitOptions gives GB/UK kWh alone) and its Scope 1 side is DEFRA's,
+    // so on a UK-only inventory the sentence was false about that customer's own figures.
+    const attest = (used: readonly string[]) =>
+      ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
+       'refrigerants', 'electricity', 'purchased_steam'].filter(x => !used.includes(x))
+        .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' }))
+    const gasOnly = (country: string, unit: string, amount: number) => cat3InputsFrom(
+      [{ location: 'Site', stream: 'natural_gas', source: 'Natural gas', scope: 1, activity_data: amount,
+         activity_unit: unit, ef_source: country === 'GB' ? 'UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting' : 'US EPA GHG Emission Factors Hub (2025)',
+         result_tco2e: 1, entry_method: 'manual' }],
+      [{ id: 's', name: 'Site', country, has_natural_gas: true, natural_gas_amount: amount,
+         natural_gas_unit: unit, stream_attestations: attest(['natural_gas']) }],
+    )
+    // UK, kWh: the gross CV sentence is true and stays; the EPA one is not and goes.
+    const uk = gasOnly('GB', 'kwh', 50_000)
+    const ukPriced = priceCat3(uk.inputs!)
+    expect(ukPriced.lines[0].factor!.key).toBe('natural_gas_kwh_gross_cv')
+    const ukSentences = cat3Sentences(ukPriced, uk, GWP)
+    expect(ukSentences).toContain(CAT3_GROSS_CV_SENTENCE)
+    expect(ukSentences).not.toContain(CAT3_EPA_HHV_SENTENCE)
+    expect(ukSentences.join(' '), 'no EPA claim on an inventory the EPA priced nothing in').not.toMatch(/EPA/)
+
+    // US, therms and MMBtu: both sentences, because that entry is where the two bases meet.
+    for (const unit of ['therms', 'mmbtu']) {
+      const us = gasOnly('US', unit, 1_000)
+      const usSentences = cat3Sentences(priceCat3(us.inputs!), us, GWP)
+      expect(usSentences, unit).toContain(CAT3_GROSS_CV_SENTENCE)
+      expect(usSentences, unit).toContain(CAT3_EPA_HHV_SENTENCE)
+    }
+    // A US mcf entry prices from the cubic metres row, not the gross CV one, so neither sentence applies.
+    const mcf = gasOnly('US', 'mcf', 100)
+    const mcfSentences = cat3Sentences(priceCat3(mcf.inputs!), mcf, GWP)
+    expect(mcfSentences).not.toContain(CAT3_GROSS_CV_SENTENCE)
+    expect(mcfSentences).not.toContain(CAT3_EPA_HHV_SENTENCE)
+    // Neither sentence asserts what priced THIS inventory's Scope 1 beyond the unit that was entered.
+    expect(CAT3_GROSS_CV_SENTENCE).not.toMatch(/EPA/)
+    expect(CAT3_EPA_HHV_SENTENCE).toMatch(/entered in therms or million Btu/)
+  })
+
+  it('C3C-12 a spliced publisher name never brings a note with it, and never a second full stop', () => {
+    // ⚠️ BOTH DEFECTS CAME FROM ONE STRING. ghg_inventories.workings.ef_source is a composite:
+    // "US EPA eGRID2023 · Grid factor for 2023 applied to 2025 inventory (latest vintage held)."
+    // (engine.ts:2864-2865 joins the citation to getGridFactor's note, which ends in a full stop).
+    // Category 3 spliced the whole thing into its stand-in sentence and then added a stop of its own.
+    const attest = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual',
+      'mobile', 'refrigerants', 'purchased_steam'].map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' }))
+    const read = cat3InputsFrom(
+      [{ location: 'Buffalo', stream: 'electricity', source: 'Electricity (US_NY)', scope: 2,
+         activity_data: 10_000, activity_unit: 'kWh', scope2_method: 'location-based',
+         ef_source: 'US EPA eGRID2023 \u00b7 Grid factor for 2023 applied to 2025 inventory (latest vintage held).',
+         result_tco2e: 2, entry_method: 'manual' }],
+      [{ id: 'b', name: 'Buffalo', country: 'US', electricity_kwh: 10_000, stream_attestations: attest }],
+    )
+    const priced = priceCat3(read.inputs!)
+    // The publisher reaches the flag alone.
+    const flag = priced.lines[0].flags.find(f => f.code === 'uk_stand_in') as { scope1_publisher: string }
+    expect(flag.scope1_publisher).toBe('US EPA eGRID2023')
+    // And every rendered surface carries neither the note nor a double stop.
+    const rendered = [
+      ...cat3Sentences(priced, read, GWP),
+      ...cat3CsvRows(priced, read, null, GWP).flat(),
+      cat3Basis(priced, read, null).basis, cat3Basis(priced, read, null).detail,
+    ]
+    for (const text of rendered) {
+      expect(text, 'a GHG-side note reached a Category 3 sentence').not.toContain('latest vintage held')
+      expect(text, "the GHG module's own separator reached a Category 3 sentence").not.toContain(' \u00b7 ')
+      expect(text, 'two full stops').not.toMatch(/\.\./)
+    }
+    expect(cat3LineText(priced.lines[0]))
+      .toContain('whose Scope 1 and 2 figures are priced from US EPA eGRID2023.')
+
+    // ⚠️ AND IT CANNOT RECUR FOR A NAME THAT ENDS IN A STOP OR A BRACKET, whoever publishes it: those
+    // come from EF_SOURCES and from factor tables not yet written. The punctuation is applied once.
+    for (const publisher of ['Someone Ltd.', 'A publisher (2026)', 'Ends in a quote"', 'Plain name']) {
+      const text = cat3LineText({ ...priced.lines[0],
+        flags: [{ code: 'uk_stand_in', country: 'US', scope1_publisher: publisher }] })
+      expect(text, publisher).not.toMatch(/\.\./)
+      expect(text.endsWith('.'), `${publisher}: one full stop at the end`).toBe(true)
+    }
+  })
+
+  it('C3C-13 the panel and the export print a published constant identically, and print the stored value', () => {
+    // ⚠️ ONE PRINTER, AND IT ROUND-TRIPS. A factor or a conversion printed two ways is two claims about
+    // one number: 3.7854118034613733 and 3.7854118034613737 are DIFFERENT doubles, one ULP apart, and a
+    // reader comparing an export against the workbook cannot tell a formatting slip from a wrong value.
+    const { read, priced } = worked()
+    const rows = cat3CsvRows(priced, read, null, GWP)
+    for (const l of priced.lines) {
+      const line = cat3LineText(l)
+      // The exact label: two fuel lines at one location share a line label, so a partial match finds
+      // the wrong row and would have compared a figure against another line's arithmetic.
+      const label = `${l.location}, ${CAT3_STREAM_LABEL[l.stream]}, ${CAT3_LINE_LABEL[l.line]}`
+      const row = rows.find(r => r[0] === label)!
+      expect(row, label).toBeTruthy()
+      if (l.conversion) {
+        const printed = String(l.conversion.factor)
+        expect(line, 'the panel prints the conversion').toContain(printed)
+        expect(row[2], 'the export prints the same characters').toContain(printed)
+        // The characters printed parse back to exactly the number that was used.
+        expect(Number(printed)).toBe(l.conversion.factor)
+      }
+      const factor = String(l.factor!.kg_co2e)
+      expect(line).toContain(factor)
+      expect(row[2]).toContain(factor)
+      expect(Number(factor)).toBe(l.factor!.kg_co2e)
+    }
+    // The gallon conversion, named: the artefact's own cell value, printed as stored.
+    const gal = priced.lines.find(l => l.unit_as_entered === 'gallons')!
+    expect(String(gal.conversion!.factor)).toBe('3.7854118034613733')
+    expect(gal.conversion!.cite).toBe('Conversions!C40')
   })
 
   it('C3C-8 the basis says what priced THIS record, in each of its five states', () => {

@@ -178,6 +178,18 @@ function countryByName(locations: Record<string, unknown>[]): Map<string, string
 // ── THE WORKINGS ROWS CATEGORY 3 READS ────────────────────────────────────────────────────────────
 
 /**
+ * The publisher out of a workings row's `ef_source`, dropping any note the GHG module appended.
+ *
+ * The separator is ' · ' (space, middle dot, space), which engine.ts uses to join a citation to a
+ * note; no citation in EF_SOURCES contains one. null for an empty field, because an absence is not a
+ * name, and the stand-in sentence already reads without one.
+ */
+function publisherOf(efSource: string): string | null {
+  const name = efSource.split(' · ')[0].trim()
+  return name || null
+}
+
+/**
  * Mobile carries two fuels in one stream, so the fuel has to be read from the row's source line —
  * `stream` says only 'mobile'. The engine writes the line as a LITERAL and pushFuel (:2766-2789)
  * passes `source` through to the row untouched, so there are exactly two strings to match:
@@ -331,7 +343,14 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
         : {}),
       // The publisher that priced the Scope 1 or Scope 2 figure this row derives from, for the
       // stand-in disclosure. The workings row states it; this module never maps a country to one.
-      scope1_publisher: str(r.ef_source) || null,
+      //
+      // ⚠️ THE PUBLISHER ALONE, NOT THE WHOLE ef_source. That field is the GHG module's own composite,
+      // `<citation> · <note>` (engine.ts:2864-2865), where the note explains what the GHG side did
+      // about a factor vintage: "Grid factor for 2023 applied to 2025 inventory (latest vintage held)."
+      // Spliced into a Category 3 sentence it read as a claim about THIS line, in the middle of "whose
+      // Scope 1 and 2 figures are priced from ...", and its trailing full stop met the one this module
+      // adds. The note belongs on the GHG side, where it describes the row it was written for.
+      scope1_publisher: publisherOf(str(r.ef_source)),
     })
   }
 

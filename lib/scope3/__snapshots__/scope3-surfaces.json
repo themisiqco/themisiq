@@ -279,7 +279,13 @@
    [
     "Cat 3",
     "Disclosure",
-    "A natural gas figure in therms, million Btu or kWh is priced on the gross calorific value factor, because the workbook asks for the same basis on both sides of the entry (WTT- fuels A11, WTT- fuels A12) and the Scope 1 side of that figure is priced on the US EPA's higher heating values. That those two bases are interchangeable is not stated by either publisher, and this sentence is here instead of the assumption.",
+    "Natural gas is priced on the workbook's gross calorific value factor: it asks for the same basis on both sides of an entry (WTT- fuels A11), and says organisations should typically use gross calorific values for each kWh of energy consumed (WTT- fuels A12).",
+    ""
+   ],
+   [
+    "Cat 3",
+    "Disclosure",
+    "A gas figure entered in therms or million Btu is a US entry, and the Scope 1 side of it is priced on the US EPA's higher heating values. That an EPA higher heating value and a DEFRA gross calorific value are interchangeable is not stated by either publisher, so this line says where the two meet rather than assuming it away.",
     ""
    ],
    [
@@ -302,7 +308,8 @@
     "These figures rest on your location-based Scope 2 total, not your market-based one. The GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose which of the two it used as the basis for this category, and this is that disclosure.",
     "GWP basis: AR5. Stated by the workbook's Introduction sheet (Introduction A35): the CO2e figures use IPCC AR5 100-year GWPs. The values are combined CO2e as published and are not re-based. The linked GHG inventory records AR6. These factors are not re-based to it, so the inventory combines AR6 and AR5 figures.",
     "These are UK factors, and DEFRA no longer publishes overseas electricity, transmission and distribution or well-to-tank factors (Overseas electricity A11, Transmission and distribution A13 and WTT- UK electricity A13). Every line priced from them at a location outside the UK is flagged as a stand-in, fuels included.",
-    "A natural gas figure in therms, million Btu or kWh is priced on the gross calorific value factor, because the workbook asks for the same basis on both sides of the entry (WTT- fuels A11, WTT- fuels A12) and the Scope 1 side of that figure is priced on the US EPA's higher heating values. That those two bases are interchangeable is not stated by either publisher, and this sentence is here instead of the assumption.",
+    "Natural gas is priced on the workbook's gross calorific value factor: it asks for the same basis on both sides of an entry (WTT- fuels A11), and says organisations should typically use gross calorific values for each kWh of energy consumed (WTT- fuels A12).",
+    "A gas figure entered in therms or million Btu is a US entry, and the Scope 1 side of it is priced on the US EPA's higher heating values. That an EPA higher heating value and a DEFRA gross calorific value are interchangeable is not stated by either publisher, so this line says where the two meet rather than assuming it away.",
     "19,572.33 kg CO2e in all, which is 19.5723 mt CO2e.",
     "UK site, electricity, upstream of the fuels burned to generate it (well-to-tank): 100,000 kWh, x 0.03682 kg CO2e per kWh (WTT- UK electricity E19) = 3,682.00 kg CO2e.",
     "UK site, electricity, generation of the electricity lost in transmission and distribution: 100,000 kWh, x 0.01299 kg CO2e per kWh (Transmission and distribution E22) = 1,299.00 kg CO2e.",
