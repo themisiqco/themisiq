@@ -18,6 +18,7 @@ import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { ghgStepIndex, scope3LinkState, inventoryNotOpenedGhg } from '../../../lib/moduleLinks'
 
 import {
   EF_SOURCES,
@@ -426,6 +427,17 @@ function LockedDocUpload({ label }: { label: string }) {
 }
 function GHGPage() {
   const [step, setStep] = useState(0)
+  /** Why an ?id= in the URL did not open, or null. Set by the load effect, shown above the page. */
+  const [loadError, setLoadError] = useState<string | null>(null)
+  /**
+   * Whether an inventory has a Scope 3 record, KEYED BY THE ID IT ANSWERS FOR.
+   *
+   * ⚠️ NOT A BARE BOOLEAN. Loading a second inventory would otherwise show the first one's answer until
+   * the new read came back. An answer for another id reads as "not known yet", and the control then
+   * says "Start", which goes to the same URL as "Open": the Scope 3 page loads whatever record that
+   * inventory has. The label settles when the read lands; the destination never changes.
+   */
+  const [scope3RecordFor, setScope3RecordFor] = useState<{ id: string; has: boolean } | null>(null)
 const searchParams = useSearchParams()
   const router = useRouter()
   const pack = searchParams.get('pack')
@@ -629,6 +641,22 @@ const searchParams = useSearchParams()
     return () => { cancelled = true }
   }, [inventory.company_id, inventory.reporting_year])
 
+  /**
+   * Does this inventory already have a Scope 3 record?
+   *
+   * ⚠️ ONE READ, SCOPED BY RLS, AND IT WRITES NOTHING. scope3_inventories carries `unique
+   * (inventory_id)`, so this is a yes or a no, not a count. It decides only what the control on the
+   * Review step says; the link itself names this inventory either way.
+   */
+  useEffect(() => {
+    if (!inventoryId) return
+    let cancelled = false
+    const id = inventoryId
+    supabase.from('scope3_inventories').select('id').eq('inventory_id', id).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setScope3RecordFor({ id, has: !!data }) })
+    return () => { cancelled = true }
+  }, [inventoryId])
+
   useEffect(() => {
     if (skipSavedReset.current) { skipSavedReset.current = false; return }
     setSaved(false)
@@ -651,6 +679,20 @@ const searchParams = useSearchParams()
         .eq('id', loadId)
         .maybeSingle()
       if (error) { console.error('Load failed:', error); return }
+      if (!data) {
+        // ⚠️ IT USED TO OPEN A BLANK WIZARD WITH THE DEAD ID STILL IN THE URL, and the next Save draft
+        // would then create a NEW inventory: the id in the address bar is not what the save reads, so
+        // nothing tied the two together and nothing said the link had failed. The id comes out of the
+        // URL, the page says what was observed, and the mode effect re-runs to show whatever this
+        // account actually has.
+        const { data: list } = await supabase
+          .from('ghg_inventories')
+          .select('id')
+          .limit(1)
+        setLoadError(inventoryNotOpenedGhg(!!list && list.length > 0))
+        router.replace(list && list.length > 0 ? '/dashboard/ghg?view=list' : '/dashboard/ghg')
+        return
+      }
       if (data) {
        skipSavedReset.current = true 
         setInventoryId(data.id)
@@ -680,6 +722,11 @@ const searchParams = useSearchParams()
           // empty map over a real one: the payload is built key by key from `inventory`.
           factor_editions: data.factor_editions ?? {},
         }))
+        // ⚠️ AFTER THE LOAD, NEVER BEFORE IT. A step shown against a blank wizard is a step the
+        // customer did not ask for, on data that is not theirs yet. An unknown name opens at the first
+        // step rather than at a guess: lib/moduleLinks.ts returns null for anything it does not know.
+        const wanted = ghgStepIndex(searchParams.get('step'))
+        if (wanted !== null) setStep(wanted)
         // ── Re-hydrate the comparability answer, or clear it ────────────────────────────────────
         //
         // The capture belongs to an inventory, so it is REPLACED on every load, never left behind:
@@ -716,7 +763,8 @@ const searchParams = useSearchParams()
         setDirty(false)
       }
     })
-  }, [searchParams])
+    // router is in the deps because a dead ?id= is cleared from the URL above; it is stable across renders.
+  }, [searchParams, router])
 
   const updateLocation = (idx: number, field: keyof Location, value: any) => {
     setInventory(inv => {
@@ -2111,13 +2159,46 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     )
   }
 
-    const renderStep4 = () => {
+    /**
+   * "Scope 3 for this inventory": open the record attached to it, or start one bound to it.
+   *
+   * ⚠️ EVERY WORD AND THE URL COME FROM lib/moduleLinks.ts, so the Review step, the Export banners and
+   * any future caller say the same thing. ⚠️ AND IT IS AN <a>, NOT next/link: the Scope 3 page's
+   * unsaved-changes prompt is a beforeunload handler, which a client-side route change does not fire.
+   */
+  const Scope3Control = ({ compact = false }: { compact?: boolean }) => {
+    const state = scope3LinkState(
+      inventoryId,
+      scope3RecordFor !== null && scope3RecordFor.id === inventoryId && scope3RecordFor.has,
+    )
+    if (compact) {
+      return state.href
+        ? <a href={state.href} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{state.label} →</a>
+        : <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', maxWidth: 320, lineHeight: 1.5 }}>{state.note}</span>
+    }
+    return (
+      <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const }}>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, flex: 1, minWidth: 260 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Scope 3 for this inventory</div>
+          {state.note}
+        </div>
+        {state.href
+          ? <a href={state.href} style={{ fontSize: 12, fontWeight: 600, padding: '9px 18px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{state.label} →</a>
+          : <span style={{ fontSize: 12, fontWeight: 600, padding: '9px 18px', borderRadius: 8, background: '#f8f7f5', color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' as const }}>{state.label}</span>}
+      </div>
+    )
+  }
+
+  const renderStep4 = () => {
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     return (
       <div>
         <h2 style={sectionHead}>Review, results & calculation workings</h2>
         <p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required — complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
+        {/* Scope 3 is calculated from THIS inventory's energy, so the way to it belongs where the
+            customer is reading those figures. One control, one rule: lib/moduleLinks.ts. */}
+        <Scope3Control />
         <div style={{ position: 'relative' }}>
           {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
@@ -2387,7 +2468,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#B91C1C', marginBottom: 4 }}>⚠ Scope 3 required for your selected frameworks</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>CSRD ESRS E1-6 and GRI 305-3 require Scope 3 disclosure. Complete your Scope 3 inventory before finalising your report.</div>
               </div>
-              <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#B91C1C', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Complete Scope 3 →</a>
+              <Scope3Control compact />
             </div>
           )
 
@@ -2397,7 +2478,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>SB 253 — Scope 3 not required for your first reporting year</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 is expected from {SB253_SCOPE3_FROM}, under a separate CARB rulemaking that is still in workshops — the final regulation is expected by the end of 2026, so the requirement is not settled. Starting now puts the data in place either way.</div>
               </div>
-              <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0C447C', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Start Scope 3 inventory →</a>
+              <Scope3Control compact />
             </div>
           )
 
@@ -2407,7 +2488,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>Scope 3 will improve your CDP/EcoVadis score</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>CDP and EcoVadis score Scope 3 disclosure. Cat.1 (purchased goods) and Cat.6 (business travel) are the highest-impact categories to start with.</div>
               </div>
-              <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: 'var(--color-module-climate)', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Calculate Scope 3 →</a>
+              <Scope3Control compact />
             </div>
           )
 
@@ -2417,7 +2498,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Ready to calculate your Scope 3 emissions?</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories — GHG Protocol aligned.</div>
               </div>
-              <a href={inventoryId ? `/dashboard/scope3?inventoryId=${inventoryId}` : '/dashboard/scope3?from=ghg'} style={{ fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 8, background: '#0F6E56', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>Calculate Scope 3 →</a>
+              <Scope3Control compact />
             </div>
           )
         })()}
@@ -2685,6 +2766,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               <button onClick={startNewInventory} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 20px' }}>+ New inventory</button>
             </div>
           </div>
+          {/* An ?id= that did not open. The sentence ends by naming what is on this page: the list. */}
+          {loadError && (
+            <div role="alert" style={{ background: '#FEF3C7', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+              {loadError}
+            </div>
+          )}
           {inventoryList.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-ink-muted)', fontSize: 14 }}>No inventories yet. Click &ldquo;New inventory&rdquo; to begin.</div>
           ) : (
@@ -2772,6 +2859,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             {ghgAccess !== 'unknown' && (
               <a href="/pricing?modules=ghg" style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
             )}
+          </div>
+        )}
+        {/* An ?id= that did not open, on an account with no saved inventory to list: the redirect
+            lands here, in a blank wizard, and the sentence says so rather than leaving a customer to
+            wonder why their link opened a new inventory. */}
+        {loadError && (
+          <div role="alert" style={{ background: '#FEF3C7', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+            {loadError}
           </div>
         )}
         {step === 0 && renderStep0()}

@@ -162,6 +162,9 @@ describe('Category 3 copy', () => {
       .filter(t => !ALLOWED.includes(t))
       .filter(t => t.split(/\s+/).length >= 4)
       .filter(t => !/[#{}<>/]|\d(px|rem|%)|^[\w-]+\s*:/.test(t))
+      // ⚠️ AND NOT CODE CAUGHT BETWEEN TWO TAGS. A JSX condition such as `.length > 0 && boundInventoryId
+      // && (` sits between a '>' and a '<' like text does; prose in this panel contains none of these.
+      .filter(t => !/&&|=>|\?\.|\$|`/.test(t))
     expect(typed, 'these look like sentences typed into the panel; move them to lib/scope3/cat3Copy.ts').toEqual([])
     // No sentence from the copy module was pasted into the page as a literal.
     for (const s of [CAT3_SOURCE_SENTENCE, CAT3_DERIVED_SENTENCE, CAT3_LOCATION_BASED_SENTENCE, CAT3_STAND_IN_SENTENCE]) {

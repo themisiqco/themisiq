@@ -78,7 +78,7 @@ const CAPTURE = `${CAPTURE_ANCHOR}
     cat3Workings: () => (cat3Priced && cat3Priced.status !== 'withheld'
       ? { summary: cat3WorkingsSummary(cat3Priced), sentences: cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence) }
       : null),
-    cat3NoFigure: () => cat3NoFigure,
+    cat3NoFigure: () => cat3NoticeText,
     // ⚠️ null HERE IS THE POINT, NOT AN OMISSION. The fixture record carries no stored fingerprint, which
     // is a record saved before Task 7; the notice must stay silent rather than claim a change nobody can
     // see. Captured so that silence is in the snapshot and not only in a unit test.
@@ -280,6 +280,14 @@ describe('Scope 3 surfaces', () => {
     for (const [i, s] of (panel.sentences as unknown[]).entries()) {
       expect(typeof s, `panel sentence ${i} is ${JSON.stringify(s)}: an argument is missing from the ` +
         'capture in this file, which tsc does not type-check').toBe('string')
+    }
+    // ⚠️ AND THE TWO NOTICES. This caught a renamed page local on 21 Sep 2026: the capture still read
+    // `cat3NoFigure`, which by then was the IMPORTED FUNCTION rather than the page's computed string,
+    // so the snapshot would have recorded a function. Anything that is not a string or null here means
+    // the capture is reading something other than what the page renders.
+    for (const field of ['panel_no_figure', 'panel_stale']) {
+      const v = snap.cat3[field]
+      expect(v === null || typeof v === 'string', `${field} is ${typeof v}: the capture is reading the wrong thing`).toBe(true)
     }
     for (const row of snap.cat3.csv_rows as unknown[][]) {
       for (const [i, cell] of row.entries()) expect(typeof cell, `csv cell ${i} of ${JSON.stringify(row[0])}`).toBe('string')
