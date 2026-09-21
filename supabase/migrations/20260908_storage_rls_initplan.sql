@@ -1,17 +1,48 @@
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
--- ⚠️  NOT RUN.  THIS MIGRATION HAS NEVER BEEN EXECUTED AGAINST ANY DATABASE.
+-- ⚠️  RUN ON 21 SEP 2026, IN FULL, AGAINST PRODUCTION.  BATCH 5b OF 6.
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
 --
--- Six files match 20260908_*_rls_initplan.sql. NONE of the six has been run — not against
--- production, not against a branch, not against a local copy. They were written on 8 Sep 2026 and
--- committed unrun.
+-- All six files matching 20260908_*_rls_initplan.sql were run against production on 21 Sep 2026,
+-- in order (1, 2, 3, 4, 5a, 5b). Each reported "Success. No rows returned". They were written on
+-- 8 Sep 2026 and sat unrun until that day.
 --
--- Do not infer otherwise from their neighbours. TWO other migrations dated 20260908 WERE run
--- against production that day:
---     20260908_grant_audit_log_select.sql    — RUN
---     20260908_drop_audit_insert_policy.sql  — RUN
--- Same date, same commit, opposite status. The date prefix says nothing about whether a file has
--- been applied.
+-- Everything below this block was written BEFORE the run and is kept exactly as written, including
+-- the section headed "WHY THEY WERE NOT RUN". Read those sections in the past tense. They record
+-- the state of the repo on 8 Sep 2026 and the reasoning that governed the run, not the state now.
+--
+-- Two other migrations dated 20260908 were run on 8 Sep 2026, the day these six were committed
+-- unrun:
+--     20260908_grant_audit_log_select.sql    RUN
+--     20260908_drop_audit_insert_policy.sql  RUN
+-- Same date prefix, two different histories, thirteen days apart. The prefix says nothing about
+-- whether a file has been applied. Only a status line, written by a person after the fact, does.
+--
+-- ── WHAT THIS ONE DID ──────────────────────────────────────────────────────────────────────────
+-- The 6 policies on storage.objects were dropped and recreated with (select auth.uid()), read from
+-- pg_policies at run time. storage ends with 0 policies carrying a bare auth.uid(); public ends
+-- with 1, audit_log.audit_select_own, left that way by design.
+--
+-- ── RUNNING IT AGAIN ────────────────────────────────────────────────────────────────────────────
+-- It aborts before dropping anything. Its capture strips the wrapped form before matching, so the
+-- scope is now empty, and an empty scope raises "nothing in scope for batch 5b of 5".
+--
+-- ── VERIFIED ACROSS ALL SIX, 21 SEP 2026, FROM OUTSIDE THE DATABASE ─────────────────────────────
+-- Recorded here once, in the last batch, because it is the only one that could be written after the
+-- sweep was complete. It covers all six.
+--
+-- pg_policies was exported before batch 1 and again after batch 5b, both times with the same query
+-- over schemaname in ('public', 'storage'), giving 124 policies on each side
+-- (themisiq-sources/findings/rls-before.csv and rls-after.csv). scripts/rls-verify.mjs compared
+-- them and reported every difference to be the wrap and nothing else:
+--     84 policies swept, 135 occurrences of auth.uid() substituted
+--      4 already wrapped before the sweep, untouched
+--     35 with no auth.uid() in either clause
+--      1 left un-wrapped by design (public.audit_log.audit_select_own)
+--      0 still bare that should not be, 0 dropped and not recreated
+--    124 total, against 124 in the before snapshot
+-- with per-table policy counts identical across all 83 tables, and roles, cmd and permissive
+-- identical on all 124. A policy dropped and not recreated is the failure that looks like success,
+-- which is why the counts are checked and not merely the shape of what survived.
 --
 -- ── WHY THEY WERE NOT RUN: THE REPO AND THE DATABASE HAVE DIVERGED ────────────────────────────
 -- pg_policies reports 110 policies. Reconstructing policy state from supabase/migrations yields

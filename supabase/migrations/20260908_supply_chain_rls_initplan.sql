@@ -1,17 +1,37 @@
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
--- ⚠️  NOT RUN.  THIS MIGRATION HAS NEVER BEEN EXECUTED AGAINST ANY DATABASE.
+-- ⚠️  RUN ON 21 SEP 2026, IN FULL, AGAINST PRODUCTION.  BATCH 4 OF 6.
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
 --
--- Six files match 20260908_*_rls_initplan.sql. NONE of the six has been run — not against
--- production, not against a branch, not against a local copy. They were written on 8 Sep 2026 and
--- committed unrun.
+-- All six files matching 20260908_*_rls_initplan.sql were run against production on 21 Sep 2026,
+-- in order (1, 2, 3, 4, 5a, 5b). Each reported "Success. No rows returned". They were written on
+-- 8 Sep 2026 and sat unrun until that day.
 --
--- Do not infer otherwise from their neighbours. TWO other migrations dated 20260908 WERE run
--- against production that day:
---     20260908_grant_audit_log_select.sql    — RUN
---     20260908_drop_audit_insert_policy.sql  — RUN
--- Same date, same commit, opposite status. The date prefix says nothing about whether a file has
--- been applied.
+-- Everything below this block was written BEFORE the run and is kept exactly as written, including
+-- the section headed "WHY THEY WERE NOT RUN". Read those sections in the past tense. They record
+-- the state of the repo on 8 Sep 2026 and the reasoning that governed the run, not the state now.
+--
+-- Two other migrations dated 20260908 were run on 8 Sep 2026, the day these six were committed
+-- unrun:
+--     20260908_grant_audit_log_select.sql    RUN
+--     20260908_drop_audit_insert_policy.sql  RUN
+-- Same date prefix, two different histories, thirteen days apart. The prefix says nothing about
+-- whether a file has been applied. Only a status line, written by a person after the fact, does.
+--
+-- ── WHAT THIS ONE DID ──────────────────────────────────────────────────────────────────────────
+-- 10 policies across supplier_campaigns, campaign_suppliers and supplier_responses were dropped and
+-- recreated with (select auth.uid()), read from pg_policies at run time. Policies still carrying a
+-- bare auth.uid() immediately afterwards: 34 in public, 6 in storage.
+--
+-- ⚠️ supplier_documents IS IN THE SCOPE LIST BELOW AND NO LONGER EXISTS.
+-- 20260913_drop_supplier_documents.sql dropped it, and select to_regclass('public.
+-- supplier_documents') returned null on 16 Sep 2026. It therefore contributed no rows to this run:
+-- the capture reads pg_policies, where an absent table is simply absent, so it was skipped in
+-- silence and could not have raised. The name is kept in the list so this file still reads as the
+-- batch that ran. Do not remove it. It is the record of what the scope was.
+--
+-- ── RUNNING IT AGAIN ────────────────────────────────────────────────────────────────────────────
+-- It aborts before dropping anything. Its capture strips the wrapped form before matching, so the
+-- scope is now empty, and an empty scope raises "nothing in scope for batch 4 of 5".
 --
 -- ── WHY THEY WERE NOT RUN: THE REPO AND THE DATABASE HAVE DIVERGED ────────────────────────────
 -- pg_policies reports 110 policies. Reconstructing policy state from supabase/migrations yields

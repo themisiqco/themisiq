@@ -1,17 +1,41 @@
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
--- ⚠️  NOT RUN.  THIS MIGRATION HAS NEVER BEEN EXECUTED AGAINST ANY DATABASE.
+-- ⚠️  RUN ON 21 SEP 2026, IN FULL, AGAINST PRODUCTION.  BATCH 1 OF 6.
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
 --
--- Six files match 20260908_*_rls_initplan.sql. NONE of the six has been run — not against
--- production, not against a branch, not against a local copy. They were written on 8 Sep 2026 and
--- committed unrun.
+-- All six files matching 20260908_*_rls_initplan.sql were run against production on 21 Sep 2026,
+-- in order (1, 2, 3, 4, 5a, 5b). Each reported "Success. No rows returned". They were written on
+-- 8 Sep 2026 and sat unrun until that day.
 --
--- Do not infer otherwise from their neighbours. TWO other migrations dated 20260908 WERE run
--- against production that day:
---     20260908_grant_audit_log_select.sql    — RUN
---     20260908_drop_audit_insert_policy.sql  — RUN
--- Same date, same commit, opposite status. The date prefix says nothing about whether a file has
--- been applied.
+-- Everything below this block was written BEFORE the run and is kept exactly as written, including
+-- the section headed "WHY THEY WERE NOT RUN". Read those sections in the past tense. They record
+-- the state of the repo on 8 Sep 2026 and the reasoning that governed the run, not the state now.
+--
+-- Two other migrations dated 20260908 were run on 8 Sep 2026, the day these six were committed
+-- unrun:
+--     20260908_grant_audit_log_select.sql    RUN
+--     20260908_drop_audit_insert_policy.sql  RUN
+-- Same date prefix, two different histories, thirteen days apart. The prefix says nothing about
+-- whether a file has been applied. Only a status line, written by a person after the fact, does.
+--
+-- ── WHAT THIS ONE DID ──────────────────────────────────────────────────────────────────────────
+-- The 11 named CBAM policies were dropped and recreated with (select auth.uid()). Policies still
+-- carrying a bare auth.uid() immediately afterwards: 68 in public, 6 in storage.
+--
+-- ⚠️ IT WAS RUN AS IT STOOD, WITHOUT THE REGENERATION THE ⛔ BANNER BELOW DEMANDS.
+-- The banner stays. It was right about the risk: this is the one file of the six that transcribes
+-- predicates from supabase/migrations instead of reading pg_policies, so a CBAM policy edited
+-- through the dashboard since its migration would have been silently reverted to the repo's text,
+-- and the run would have reported success either way.
+-- That did not happen, and it is known from evidence rather than from inspection. pg_policies was
+-- captured before batch 1 and again after batch 5b, and scripts/rls-verify.mjs compared the two:
+-- all 11 CBAM predicates are character for character identical once the wrap is reversed, with
+-- roles, cmd and permissive unchanged on every one. A reverted policy would have appeared there as
+-- a predicate differing by more than the wrap, which is the one thing that check exists to find.
+-- The next file written this way will not have that comparison attached to it. Regenerate first.
+--
+-- ── RUNNING IT AGAIN ────────────────────────────────────────────────────────────────────────────
+-- It aborts before dropping anything. Its pre-flight requires each of the 11 to exist AND still
+-- carry an un-wrapped auth.uid(); they are wrapped now, so the second check raises.
 --
 -- ── WHY THEY WERE NOT RUN: THE REPO AND THE DATABASE HAVE DIVERGED ────────────────────────────
 -- pg_policies reports 110 policies. Reconstructing policy state from supabase/migrations yields

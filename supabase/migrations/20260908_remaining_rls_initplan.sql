@@ -1,17 +1,45 @@
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
--- ⚠️  NOT RUN.  THIS MIGRATION HAS NEVER BEEN EXECUTED AGAINST ANY DATABASE.
+-- ⚠️  RUN ON 21 SEP 2026, IN FULL, AGAINST PRODUCTION.  BATCH 5a OF 6.
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
 --
--- Six files match 20260908_*_rls_initplan.sql. NONE of the six has been run — not against
--- production, not against a branch, not against a local copy. They were written on 8 Sep 2026 and
--- committed unrun.
+-- All six files matching 20260908_*_rls_initplan.sql were run against production on 21 Sep 2026,
+-- in order (1, 2, 3, 4, 5a, 5b). Each reported "Success. No rows returned". They were written on
+-- 8 Sep 2026 and sat unrun until that day.
 --
--- Do not infer otherwise from their neighbours. TWO other migrations dated 20260908 WERE run
--- against production that day:
---     20260908_grant_audit_log_select.sql    — RUN
---     20260908_drop_audit_insert_policy.sql  — RUN
--- Same date, same commit, opposite status. The date prefix says nothing about whether a file has
--- been applied.
+-- Everything below this block was written BEFORE the run and is kept exactly as written, including
+-- the section headed "WHY THEY WERE NOT RUN". Read those sections in the past tense. They record
+-- the state of the repo on 8 Sep 2026 and the reasoning that governed the run, not the state now.
+--
+-- Two other migrations dated 20260908 were run on 8 Sep 2026, the day these six were committed
+-- unrun:
+--     20260908_grant_audit_log_select.sql    RUN
+--     20260908_drop_audit_insert_policy.sql  RUN
+-- Same date prefix, two different histories, thirteen days apart. The prefix says nothing about
+-- whether a file has been applied. Only a status line, written by a person after the fact, does.
+--
+-- ── WHAT THIS ONE DID ──────────────────────────────────────────────────────────────────────────
+-- 33 policies were dropped and recreated with (select auth.uid()), read from pg_policies at run
+-- time. Policies still carrying a bare auth.uid() immediately afterwards: 1 in public, 6 in storage.
+--
+-- THE 33 IS NOT A FIXED SCOPE. This file takes everything in public except audit_log that still
+-- carries a bare auth.uid(), so it is a superset of batches 1 to 4 and its size depends entirely on
+-- what ran before it. Run first it would have taken 78. Run fifth it took 78 less the 11 + 16 + 8 +
+-- 10 the earlier batches had already done, which is 33. That is also why the order matters.
+--
+-- audit_log is excluded by this file's own scope, so public ends with exactly one policy carrying a
+-- bare auth.uid(): audit_log.audit_select_own, left that way by design.
+--
+-- ⚠️ CLAUDE.md COUNTS 37 UNDER `remaining` AND BOTH NUMBERS ARE RIGHT. That 37 was produced by the
+-- query recorded there, which uses LIKE and is therefore CASE-SENSITIVE, while the catalog spells
+-- the wrap ( SELECT auth.uid() AS uid) in upper case. Three already-wrapped policies
+-- (concierge_jobs, concierge_job_documents, concierge_proposals) do not match its lower-case
+-- '%select auth.uid()%' and are counted as un-wrapped. 37 = 33 rewritten here + 1 audit_log +
+-- those 3. The same effect puts supply_chain at 11 there against the 10 this sweep rewrote, the
+-- fourth already-wrapped policy being supply_chain_registers_owner.
+--
+-- ── RUNNING IT AGAIN ────────────────────────────────────────────────────────────────────────────
+-- It aborts before dropping anything. Its capture strips the wrapped form before matching, so the
+-- scope is now empty, and an empty scope raises "nothing in scope for batch 5a of 5".
 --
 -- ── WHY THEY WERE NOT RUN: THE REPO AND THE DATABASE HAVE DIVERGED ────────────────────────────
 -- pg_policies reports 110 policies. Reconstructing policy state from supabase/migrations yields
