@@ -126,10 +126,16 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
   **The result set is identical either way** — STABLE means the value cannot change within a
   statement — so this is a planning fix, not a semantic one. Which is exactly why it is easy to
   reintroduce without noticing.
-  ⚠️ **Five tables currently have RLS ENABLED WITH NO POLICY** — `ghg_entries`,
+  ⚠️ **Six tables currently have RLS ENABLED WITH NO POLICY** — `ghg_entries`,
   `materiality_survey_closing_comments`, `materiality_survey_responses`, `organizations`,
-  `rate_limits`. That is fail-closed today, but it means the first policy written for any of them
-  is a NEW policy on an old table, which is precisely where this rule gets forgotten.
+  `rate_limits`, `erasure_log`. That is fail-closed today, but it means the first policy written
+  for any of them is a NEW policy on an old table, which is precisely where this rule gets
+  forgotten.
+  `erasure_log` is policy-free BY DESIGN and differently from the other five: it is reachable only
+  by `service_role`, which RLS does not apply to. `20260910_erasure_log.sql` revokes from `public`,
+  `anon` and `authenticated`, grants to `service_role` alone, and enables RLS as belt to those
+  braces. It was created two days after `20260908_ghg_rls_initplan.sql`, whose post-flight names
+  the other five, so it appears in neither that list nor this one until now.
 
 - **`ghg_conversation_starters` is deliberately world-readable. Do not re-triage it.**
   It holds twelve seeded prompt suggestions for the GHG assistant — no user data, no writes, no
