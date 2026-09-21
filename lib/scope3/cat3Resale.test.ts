@@ -5,12 +5,15 @@ import { cat3InputsFrom } from './cat3Inputs'
 import { priceCat3 } from './cat3Energy'
 import {
   cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
-  CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD, CAT3_3D_LINES_NOT_IN_TOTAL,
+  CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, CAT3_3D_LINES_NOT_IN_TOTAL,
+  cat3ThreeDWithheld, CAT3_3D_WITHHELD_CORE, CAT3_3D_WITHHELD_SHORT, CAT3_3D_NOT_IN_TOTAL_TAG,
+  cat3Sentences, cat3WorkingsSummary,
   CAT3_3D_DESCRIPTION, CAT3_3D_APPLICABILITY, CAT3_3D_ACTIVITY_DATA, CAT3_3D_COOLING_NOTE,
 } from './cat3Copy'
 import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
 import { publisherGwpSentence } from './gwpSentence'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
+import { RESULTS_TABLE_EMPTY, resultsTableAllUnpriced } from './formCopy'
 
 // ── TASK 8: THE ACTIVITY D SCREENING QUESTION ────────────────────────────────────────────────────
 //
@@ -50,7 +53,7 @@ describe('Category 3 activity D screening', () => {
     expect(CAT3_3D_EXPORT_NOTE).toContain('does not screen for it')
     expect(CAT3_3D_QUESTION.toLowerCase()).not.toContain('export')
     expect(CAT3_3D_QUESTION.toLowerCase()).not.toContain('excess')
-    for (const t of [CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD]) {
+    for (const t of [CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, cat3ThreeDWithheld('panel')]) {
       expect(t, 'no em-dash in customer text').not.toContain('—')
     }
   })
@@ -79,21 +82,89 @@ describe('Category 3 activity D screening', () => {
     expect(CAT3_3D_COOLING_NOTE).toContain('the energy the cooling machines consume')
   })
 
-  it('RS2 a yes withholds the category with the reason, and the lines stay as recorded and not in the total', () => {
+  it('RS2 a yes withholds with the reason, and the lines stay as recorded and not in the total', () => {
     const { read, priced } = worked()
-    // The basis, which is the CSV's Method cell and the saved factor_basis line.
-    const basis = cat3Basis(priced, read, null, true)
-    expect(basis).toEqual({ basis: 'Not priced', detail: CAT3_3D_WITHHELD })
-    // The export: the answer in its own row, the lines' status said out loud, and the lines still there.
+    // The basis, which is the export's methodology note and the saved factor_basis line: the SHORT form,
+    // because the full reason is already in the file twice.
+    expect(cat3Basis(priced, read, null, true)).toEqual({ basis: 'Not priced', detail: CAT3_3D_WITHHELD_SHORT })
+    // The export: the full reason on the Basis row, the question on the activity D row, the lines' own
+    // status said out loud, and the lines still there.
     const rows = cat3CsvRows(priced, read, null, GWP, true)
-    expect(rows[0]).toEqual(['Basis', 'Not priced', CAT3_3D_WITHHELD])
-    expect(rows).toContainEqual(['Energy bought and sold on (activity D)', 'Yes', CAT3_3D_WITHHELD])
+    expect(rows[0]).toEqual(['Basis', 'Not priced', cat3ThreeDWithheld('export')])
+    const answer = rows.find(r => r[0] === 'Energy bought and sold on (activity D)')!
+    expect(answer[1]).toBe('Yes')
+    expect(answer[2]).toBe(`${CAT3_3D_QUESTION} Answered yes, so this category is not calculated: see its Basis row above.`)
     expect(rows).toContainEqual(['Lines below', 'Recorded, not in the total', CAT3_3D_LINES_NOT_IN_TOTAL])
     expect(rows.filter(r => r[0].startsWith('UK site') || r[0].startsWith('US site'))).toHaveLength(9)
     // The reason names what it costs the customer, rather than only refusing.
-    expect(CAT3_3D_WITHHELD).toContain('are NOT in your Scope 3 total')
-    expect(CAT3_3D_WITHHELD).toContain('would understate the category')
-    expect(CAT3_3D_WITHHELD).toContain('Enter your own Category 3 figure as known emissions')
+    expect(CAT3_3D_WITHHELD_CORE).toContain('activity D of Category 3')
+    expect(cat3ThreeDWithheld('panel')).toContain('would understate the category')
+    expect(cat3ThreeDWithheld('panel')).toContain('Enter your own Category 3 figure as known emissions')
+  })
+
+  it('RS2b each surface says where the figures are, and says it truly', () => {
+    // ⚠️ "shown below" WAS TRUE ON ONE SURFACE OF THREE. The panel shows the lines under the notice; the
+    // Results step does not; the export's methodology note is the last section of the file.
+    expect(cat3ThreeDWithheld('panel')).toContain('are shown below')
+    for (const where of ['results', 'export', 'record'] as const) {
+      expect(cat3ThreeDWithheld(where), where).not.toContain('below')
+    }
+    expect(cat3ThreeDWithheld('results')).toContain('on the Category 3 panel in the Calculate step')
+    expect(cat3ThreeDWithheld('export')).toContain("in this file's Cat 3 rows")
+    expect(cat3ThreeDWithheld('record')).toContain('recorded on this record')
+    // The stored record is not addressed as "you": it is read by another system.
+    expect(cat3ThreeDWithheld('record')).toContain('its Scope 3 total')
+    // Every version carries the same reason, so only the pointer differs.
+    for (const where of ['panel', 'results', 'export', 'record'] as const) {
+      expect(cat3ThreeDWithheld(where), where).toContain(CAT3_3D_WITHHELD_CORE)
+    }
+    // ⚠️ AND NONE OF THEM SHOUTS. "are NOT in your Scope 3 total" was the old wording; the amber box
+    // carries the emphasis. (CAT3_RECORDED_NOT_USED keeps its capital, with Category 15's.)
+    for (const where of ['panel', 'results', 'export', 'record'] as const) {
+      expect(cat3ThreeDWithheld(where), where).not.toContain(' NOT ')
+    }
+    expect(CAT3_3D_LINES_NOT_IN_TOTAL).not.toContain(' NOT ')
+    // The page prints each on its own surface.
+    const src = page()
+    expect(src).toContain("cat3ThreeDWithheld('panel')")
+    expect(src).toContain("unpricedReason(c.id, 'results')")
+    expect(src).toContain("unpricedReason(c.id, 'export')")
+    expect(src).toContain("unpricedReason(c.id, 'record')")
+  })
+
+  it('RS2c the card never shows the figure without its status, and the export repeats the reason no more than twice', () => {
+    const { read, priced } = worked()
+    // ⚠️ THE CARD. Its header is the bold figure, then the summary; a screenshot of it alone used to read
+    // as a confident Category 3 total. Both the header's summary and the "in all" sentence now carry the
+    // status, and the page passes the same tag to the card's own status chip.
+    // ⚠️ ONCE IN THE HEADER, NOT TWICE. The chip carries the status against the figure; the summary is
+    // the count and the source, unchanged. Both carried it for one draft and the header read the tag
+    // twice in one line.
+    expect(cat3WorkingsSummary(priced)).not.toContain(CAT3_3D_NOT_IN_TOTAL_TAG)
+    expect(cat3WorkingsSummary(priced)).toBe(
+      '9 lines at 2 locations, priced from the DEFRA/DESNZ 2026 upstream energy factors on the bound GHG inventory')
+    const withheldSentences = cat3Sentences(priced, read, GWP, true)
+    expect(withheldSentences).toContain(`19,572.33 kg CO2e in all, which is 19.5723 mt CO2e, ${CAT3_3D_NOT_IN_TOTAL_TAG}.`)
+    // Every sentence naming the total figure carries the tag: none of them states it bare.
+    for (const line of withheldSentences.filter(x => /in all/.test(x))) {
+      expect(line, line).toContain(CAT3_3D_NOT_IN_TOTAL_TAG)
+    }
+    expect(cat3Sentences(priced, read, GWP)).toContain('19,572.33 kg CO2e in all, which is 19.5723 mt CO2e.')
+    const src = page()
+    expect(src).toContain('status={cat3ExcludedFor3d ? CAT3_3D_NOT_IN_TOTAL_TAG : undefined}')
+    expect(src).toContain('summary={cat3WorkingsSummary(cat3Priced)}')
+    expect(src).toContain('sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence, cat3ExcludedFor3d)}')
+
+    // ⚠️ TWICE IN THE FILE, NOT FOUR TIMES: the header's excluded line and this category's Basis row.
+    // The rows this builder produces carry it once; the excluded line is written by the page.
+    const rows = cat3CsvRows(priced, read, null, GWP, true)
+    const full = rows.filter(r => r.some(cell => cell.includes(CAT3_3D_WITHHELD_CORE)))
+    expect(full, 'one full copy among the Category 3 rows').toHaveLength(1)
+    expect(full[0][0]).toBe('Basis')
+    // The methodology note and factor_basis carry the short form, which is not the full reason.
+    expect(CAT3_3D_WITHHELD_SHORT).not.toContain(CAT3_3D_WITHHELD_CORE)
+    expect(CAT3_3D_WITHHELD_SHORT.length).toBeLessThan(CAT3_3D_WITHHELD_CORE.length)
+    expect(cat3Basis(priced, read, null, true).detail).toBe(CAT3_3D_WITHHELD_SHORT)
   })
 
   it('RS3 a no prices exactly as before, and the file records that it was asked', () => {
@@ -130,14 +201,14 @@ describe('Category 3 activity D screening', () => {
     const withFigure = cat3Basis(priced, read, 40, true)
     expect(withFigure.basis).toBe('Entered figure')
     expect(withFigure.detail).toContain('40.00 mt CO2e entered directly')
-    expect(withFigure.detail).not.toContain(CAT3_3D_WITHHELD)
+    expect(withFigure.detail).not.toContain(CAT3_3D_WITHHELD_CORE)
     expect(page(), 'the page holds the same rule').toContain('!catData[\'cat3\']?.emissions_override')
   })
 
   it('RS6 the three surfaces carry the reason, and the category is left out of the total rather than zeroed', () => {
     const src = page()
-    // Panel.
-    expect(src).toContain('{CAT3_3D_WITHHELD}')
+    // Panel, on its own surface's wording.
+    expect(src).toContain("{cat3ThreeDWithheld('panel')}")
     expect(src).toContain('{CAT3_3D_LINES_NOT_IN_TOTAL}')
     // CSV and factor_basis, through categoryBasis.
     expect(src).toContain('cat3Basis(cat3Priced, cat3Read, d?.emissions_override, cat3ExcludedFor3d)')
@@ -145,18 +216,53 @@ describe('Category 3 activity D screening', () => {
     expect(src).toContain('cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn')
     // Coverage entry: the reason reaches it only through couldNotPriceCatIds, and it does.
     expect(src).toContain("if (c.id === 'cat3') return cat3ExcludedFor3d || cat3Priced?.withheld?.code === 'nothing_priced'")
-    expect(src).toContain("if (id === 'cat3') return cat3ExcludedFor3d ? CAT3_3D_WITHHELD : (cat3NoFigure || NO_REASON)")
+    expect(src).toContain("if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoFigure || NO_REASON)")
     // ⚠️ EXCLUDED, NOT COUNTED AS ZERO. totalScope3 filters unpricedCatIds out of the sum; it does not
     // add a zero for them. This is the line that makes that true, unchanged since before this task.
     expect(src).toContain("const totalScope3 = CATEGORIES.filter(c => statusOf(c.id).inTotal && !unpricedCatIds.has(c.id))")
     expect(src).toContain("if (c.id === 'cat3') return cat3ExcludedFor3d || (!catData[c.id]?.emissions_override && cat3Mt() === null)")
   })
 
+  it('RS8 the Results table tells an empty inventory from one whose categories are all left out', () => {
+    // ⚠️ "No data entered yet. Go back to Step 3 to enter your data." WAS UNTRUE OF A WHOLE STATE. With
+    // Category 3 the only relevant category and activity D answered yes, the table is empty because the
+    // figure is deliberately excluded: the data is there, priced, and listed with its reason in the
+    // amber box directly above the table.
+    expect(RESULTS_TABLE_EMPTY).toBe('No data entered yet. Go back to Step 3 to enter your data.')
+    expect(resultsTableAllUnpriced(1)).toBe(
+      'The one category you marked relevant is left out of the total, for the reason given above.')
+    expect(resultsTableAllUnpriced(3)).toBe(
+      'All 3 categories you marked relevant are left out of the total, for the reasons given above.')
+    // It must not send them back to Step 3, which is the thing the old message got wrong.
+    expect(resultsTableAllUnpriced(1)).not.toMatch(/Go back/)
+    // ⚠️ AND IT MAKES NO CLAIM ABOUT COMPLETENESS. It is shown for every unpriced state, and several of
+    // them ARE missing something: Category 3 withheld for unanswered streams is missing answers, an
+    // unreadable bound inventory is missing readable workings, a Category 1 spend that did not price may
+    // be incomplete. The per-category reasons above the table say which; this line must not summarise.
+    for (const n of [1, 2, 9]) {
+      const text = resultsTableAllUnpriced(n)
+      for (const claim of ['nothing is missing', 'the data is there', 'complete', 'all your data',
+        'everything is entered', 'no data is missing']) {
+        expect(text.toLowerCase(), `claims completeness: ${claim}`).not.toContain(claim)
+      }
+      // If it ever names the step, it names it as the rest of the page does.
+      if (/step \d/i.test(text)) expect(text).toMatch(/Step \d/)
+    }
+    // ⚠️ NOT A CATEGORY 3 MESSAGE. It is keyed on there being unpriced categories at all, so a Cat 1
+    // spend the factor route could not price, a Cat 15 assessment that failed, or a Cat 3 inventory that
+    // cannot be read reach the same true sentence rather than the same false one.
+    const src = page()
+    expect(src).toContain('{unpricedCats.length > 0 ? resultsTableAllUnpriced(unpricedCats.length) : RESULTS_TABLE_EMPTY}')
+    expect(src).not.toContain('>No data entered yet. Go back to Step 3 to enter your data.<')
+    expect(resultsTableAllUnpriced(2)).not.toMatch(/Category 3|activity D/)
+  })
+
   it('RS7 the question and its sentences are read from cat3Copy.ts, not typed into the page', () => {
     const src = page()
-    for (const name of ['CAT3_3D_QUESTION', 'CAT3_3D_HELP', 'CAT3_3D_EXPORT_NOTE', 'CAT3_3D_WITHHELD'])
+    for (const name of ['CAT3_3D_QUESTION', 'CAT3_3D_HELP', 'CAT3_3D_EXPORT_NOTE'])
       expect(src, name).toContain(`{${name}}`)
-    for (const sentence of [CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD])
+    for (const sentence of [CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD_CORE,
+      CAT3_3D_WITHHELD_SHORT, CAT3_3D_NOT_IN_TOTAL_TAG, CAT3_3D_LINES_NOT_IN_TOTAL])
       expect(src.includes(sentence), 'a cat3Copy sentence is duplicated in the page').toBe(false)
     // Stored in cat_data.cat3, as the design's Q6 decided for the fingerprint: no migration.
     expect(src).toContain("updateCat('cat3', 'sells_energy_on', on ? undefined : value)")

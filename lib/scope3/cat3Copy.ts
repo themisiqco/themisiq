@@ -373,6 +373,13 @@ export function cat3UnpricedText(u: Cat3Unpriced): string {
 // ── THE WORKINGS CARD ────────────────────────────────────────────────────────────────────────────
 
 /** The one line beside the figure: how many lines were priced, at how many locations, from what. */
+/**
+ * ⚠️ THE SUMMARY DOES NOT CARRY THE STATUS, THE HEADER'S OWN CHIP DOES. Both said it for one draft, and
+ * the header then read "19.57 mt CO2e · recorded, not in the Scope 3 total (activity D) · recorded, not
+ * in the Scope 3 total (activity D): 9 lines at 2 locations". One line, one statement: the chip sits
+ * against the figure (SpendFactorWorkings `status`), and the total sentence inside the card repeats it
+ * where the figure appears again.
+ */
 export function cat3WorkingsSummary(r: Cat3Result): string {
   const locations = new Set(r.lines.map(l => l.location)).size
   return (
@@ -418,10 +425,17 @@ export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[
 }
 
 /** The workings card: the method, then the figure, then every line and everything not priced. */
-export function cat3Sentences(r: Cat3Result, inputs: Cat3InputsResult, gwpSentence: string): string[] {
+export function cat3Sentences(
+  r: Cat3Result, inputs: Cat3InputsResult, gwpSentence: string, notInTotal = false,
+): string[] {
   const out: string[] = cat3MethodSentences(r, gwpSentence)
   if (r.status === 'priced') {
-    out.push(`${n2(r.kg_co2e)} kg CO2e in all, which is ${n4(r.kg_co2e / 1000)} mt CO2e.`)
+    // ⚠️ THE FIGURE NEVER APPEARS WITHOUT ITS STATUS. On the preview the card read "12.58 mt CO2e" in
+    // bold and "12,582.28 kg CO2e in all, which is 12.5823 mt CO2e" in its workings, under one line
+    // saying the lines were not in the total: a screenshot of the card alone showed a confident
+    // Category 3 figure, which is the thing the withholding exists to prevent.
+    out.push(`${n2(r.kg_co2e)} kg CO2e in all, which is ${n4(r.kg_co2e / 1000)} mt CO2e` +
+      `${notInTotal ? `, ${CAT3_3D_NOT_IN_TOTAL_TAG}.` : '.'}`)
     for (const l of r.lines) out.push(cat3LineText(l))
   }
   if (r.status === 'zero') out.push(cat3ZeroText())
@@ -551,14 +565,62 @@ export const CAT3_3D_EXPORT_NOTE =
  * CO2e against 0.5 t for the power it consumed itself. A category figure missing that is not a
  * conservative estimate, it is the wrong order of magnitude.
  */
-export const CAT3_3D_WITHHELD =
+/**
+ * ⚠️ ONE REASON, AND A POINTER THAT IS TRUE WHERE IT IS PRINTED. The single sentence ended "are shown
+ * below", which was true on the panel, false on the Results step (nothing below shows them) and false
+ * in the export's methodology note at the end of the file. A shared sentence that is true on one
+ * surface and false on two is worse than three sentences: it is trusted because it is shared.
+ *
+ * The core carries the reason and no locator. Each surface adds its own.
+ */
+export const CAT3_3D_WITHHELD_CORE =
   'This category is not calculated, because you have told us you buy energy and sell it on to end ' +
   'users. That is activity D of Category 3 in the GHG Protocol\'s Technical Guidance (table 3.1, ' +
   'p. 39), and it is priced from the quantities and source of the power you bought for resale (p. 47, ' +
-  'formula 3.4 on p. 48), which is not in the GHG inventory this record reads. The upstream figures ' +
-  'for the energy you consumed are shown below and are NOT in your Scope 3 total: a Category 3 figure ' +
-  'that left resale out would understate the category, for a reseller usually by most of it. Enter ' +
-  'your own Category 3 figure as known emissions if you have calculated one.'
+  'formula 3.4 on p. 48), which is not in the GHG inventory this record reads.'
+
+/** What follows the core, per surface. Only the panel may say "below", because only there is anything. */
+const WHERE_THE_FIGURES_ARE: Readonly<Record<Cat3Surface, string>> = {
+  panel: 'The upstream figures for the energy you consumed are shown below',
+  results: 'The upstream figures for the energy you consumed are on the Category 3 panel in the Calculate step',
+  export: "The upstream figures for the energy you consumed are in this file's Cat 3 rows",
+  record: 'The upstream figures for the energy this company consumed are recorded on this record',
+}
+
+/** Where a sentence is being printed. Not a style: it decides which pointer is true. */
+export type Cat3Surface = 'panel' | 'results' | 'export' | 'record'
+
+/**
+ * The withheld reason as one surface prints it.
+ *
+ * ⚠️ "not", NOT "NOT". The shouted word was doing the work a plain sentence should do, and it appears
+ * in an amber box that already carries the emphasis. (CAT3_RECORDED_NOT_USED keeps its capital: it is
+ * Category 15's wording, and the two are reviewed together.)
+ */
+export function cat3ThreeDWithheld(where: Cat3Surface): string {
+  const total = where === 'record' ? 'its Scope 3 total' : 'your Scope 3 total'
+  return (
+    `${CAT3_3D_WITHHELD_CORE} ${WHERE_THE_FIGURES_ARE[where]} and are not in ${total}: a Category 3 ` +
+    `figure that left resale out would understate the category, for a reseller usually by most of it. ` +
+    `Enter your own Category 3 figure as known emissions if you have calculated one.`
+  )
+}
+
+/**
+ * The short form, for the export's methodology note and the saved factor_basis column.
+ *
+ * ⚠️ SHORT BECAUSE THE FULL REASON IS ALREADY IN THE FILE TWICE. The export printed it four times: the
+ * header's excluded line, this category's Basis row, the activity D row and the methodology note. A
+ * reader who meets the same five sentences four times stops reading them, which is the opposite of what
+ * repeating them was for. It stays in the two places a reader needs it and is summarised here.
+ */
+export const CAT3_3D_WITHHELD_SHORT =
+  'This company buys energy and sells it on to end users, which is activity D of Category 3 (table 3.1, ' +
+  'p. 39). ThemisIQ does not calculate it: it is priced from resale quantities this platform does not ' +
+  'hold. The upstream figures for the energy consumed are recorded and are not in the total.'
+
+/** Beside a figure that is real and is not the category: the card header, and the total sentence. */
+export const CAT3_3D_NOT_IN_TOTAL_TAG = 'recorded, not in the Scope 3 total (activity D)'
 
 /** On the workings card while the answer is yes: the lines are real, and they are not the category. */
 export const CAT3_3D_LINES_NOT_IN_TOTAL =
@@ -675,7 +737,10 @@ export function cat3Basis(
   // ⚠️ AFTER THE ENTERED FIGURE, BEFORE EVERYTHING ELSE. A customer who resells energy and has
   // calculated their own Category 3 total keeps it: the override is their figure, and it may well
   // include activity D. Without one, the answer decides the category whatever the lines say.
-  if (sellsEnergyOn) return { basis: 'Not priced', detail: CAT3_3D_WITHHELD }
+  // ⚠️ THE SHORT FORM HERE. This is the export's methodology note and the saved factor_basis column;
+  // the full reason is printed by the excluded line and by this category's own Basis row, and a reader
+  // who meets it four times in one file stops reading it. cat3CsvRows prints the full one.
+  if (sellsEnergyOn) return { basis: 'Not priced', detail: CAT3_3D_WITHHELD_SHORT }
   const noFigure = cat3NoFigureText(r, inputs)
   if (!r || noFigure) return { basis: 'Not priced', detail: noFigure ?? 'It was not priced, and no reason was recorded.' }
   if (r.status === 'zero') {
@@ -711,14 +776,20 @@ export function cat3CsvRows(
 ): [string, string, string][] {
   const out: [string, string, string][] = []
   const basis = cat3Basis(r, inputs, override, sellsEnergyOn)
-  out.push(['Basis', basis.basis, basis.detail])
+  // ⚠️ THE FULL REASON GOES HERE, not the short one the methodology note carries: this is the row a
+  // reader lands on when they ask why Category 3 has no figure, and it is one of the two places the
+  // whole reason belongs (the other is the header's excluded line).
+  out.push(['Basis', basis.basis, sellsEnergyOn && !override ? cat3ThreeDWithheld('export') : basis.detail])
   // ⚠️ THE ANSWER IS IN THE FILE WHATEVER IT IS. A verifier reading a Category 3 figure needs to know
   // the reseller question was asked and what was said, not only when the answer withheld the figure:
   // an unanswered screening question is a different record from one answered no.
   out.push(['Energy bought and sold on (activity D)',
     sellsEnergyOn === undefined ? 'Not answered' : sellsEnergyOn ? 'Yes' : 'No',
+    // ⚠️ THE QUESTION, WHATEVER THE ANSWER. A yes used to repeat the whole withheld reason here, which
+    // is the third of four copies in one file; what this row is for is the question and what was said
+    // to it. The reason is on the Basis row above and on the header's excluded line.
     sellsEnergyOn === undefined ? `${CAT3_3D_QUESTION} ${CAT3_3D_HELP}`
-      : sellsEnergyOn ? CAT3_3D_WITHHELD
+      : sellsEnergyOn ? `${CAT3_3D_QUESTION} Answered yes, so this category is not calculated: see its Basis row above.`
       : `${CAT3_3D_QUESTION} Answered no, so this category covers activities A, B and C only, which is complete for a company that does not resell energy.`])
   if (sellsEnergyOn && r) out.push(['Lines below', 'Recorded, not in the total', CAT3_3D_LINES_NOT_IN_TOTAL])
   // ⚠️ WHATEVER ELSE IS TRUE OF THE RECORD. A spend stored under the old method is reported before the

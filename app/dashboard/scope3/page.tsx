@@ -17,7 +17,7 @@ import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
 import { SCOPE3_DATA_SOURCE } from '../../../lib/scope3/dataSources'
-import { KNOWN_EMISSIONS_PLACEHOLDER } from '../../../lib/scope3/formCopy'
+import { KNOWN_EMISSIONS_PLACEHOLDER, RESULTS_TABLE_EMPTY, resultsTableAllUnpriced } from '../../../lib/scope3/formCopy'
 import {
   cat15Figure, assessHolding, cat15HoldingIncomplete, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
@@ -37,6 +37,7 @@ import { notEnteredReason } from '../../../lib/scope3/notEntered'
 import { saveErrorText } from '../../../lib/scope3/saveError'
 import { catDataForSave } from '../../../lib/scope3/savePayload'
 import { cat3Fingerprint, cat3FingerprintChange, cat3FingerprintMoved } from '../../../lib/scope3/cat3Fingerprint'
+import type { Cat3Surface } from '../../../lib/scope3/cat3Copy'
 import {
   evaluateCommuting, hasLegacyCommuting, COMMUTE_MODES, COMMUTE_RAIL_TYPES,
   type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
@@ -67,8 +68,8 @@ import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
-  cat3StaleNotice, CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_COOLING_NOTE, CAT3_3D_EXPORT_NOTE, CAT3_3D_WITHHELD,
-  CAT3_3D_LINES_NOT_IN_TOTAL, cat3RetiredSpendText, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
+  cat3StaleNotice, CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_COOLING_NOTE, CAT3_3D_EXPORT_NOTE,
+  cat3ThreeDWithheld, CAT3_3D_NOT_IN_TOTAL_TAG, CAT3_3D_LINES_NOT_IN_TOTAL, cat3RetiredSpendText, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
 } from '../../../lib/scope3/cat3Copy'
 import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
 import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
@@ -245,11 +246,18 @@ const SPEND_DEBOUNCE_MS = 400
  * `summary` is the one place this card composes text from fields, and it names only the figure and
  * the method; every qualification of the figure stays in the sentences below it.
  */
-function SpendFactorWorkings({ id, figureMt, summary, sentences }: {
+function SpendFactorWorkings({ id, figureMt, summary, sentences, status }: {
   id: string
   figureMt: number
   summary: string
   sentences: string[]
+  /**
+   * ⚠️ A FIGURE THAT IS NOT IN THE TOTAL SAYS SO ON ITS OWN CARD. Optional, and only Category 3 passes
+   * it today: when its activity D question is answered yes, the lines are real and the category is
+   * withheld, so the header's bold figure would otherwise read as a Category 3 total in a screenshot
+   * or a skim. Rendered in the header, beside the figure, not below the fold.
+   */
+  status?: string
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = `${id}-workings`
@@ -264,6 +272,9 @@ function SpendFactorWorkings({ id, figureMt, summary, sentences }: {
       >
         <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.5 }}>
           <strong style={{ fontWeight: 600 }}>{figureMt.toFixed(2)} mt CO₂e</strong>
+          {status && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#92400E', background: '#FEF3C7', borderRadius: 99, padding: '2px 8px', marginLeft: 8, whiteSpace: 'nowrap' }}>{status}</span>
+          )}
           <span style={{ color: 'var(--color-ink-muted)' }}> · {summary}</span>
         </span>
         <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' }}>{open ? '▲ Hide' : '▼ Show workings'}</span>
@@ -1580,7 +1591,7 @@ export default function Scope3Dashboard() {
         mt: unpricedCatIds.has(c.id) ? null : Number(getCatEmissions(c.id).toFixed(4)),
         unpriced,
         // The wizard's own sentence for this category, verbatim — the same one the amber notice shows.
-        reason: unpriced ? unpricedReason(c.id) : null,
+        reason: unpriced ? unpricedReason(c.id, 'record') : null,
         // ⚠️ THE METHOD'S OWN SCORE, NOT OURS, and only for a method that defines one. PCAF's 1-to-5 for
         // Cat 15: a submission quotes PCAF's number rather than ThemisIQ's confidence pill. coverageEntry
         // drops it wherever there is no figure to describe.
@@ -2126,7 +2137,14 @@ export default function Scope3Dashboard() {
    * request in flight is checked; a route answer is quoted verbatim. Where none of those applies the
    * sentence says no reason was recorded — it does not reach for the likeliest one.
    */
-  const unpricedReason = (id: string): string => {
+  /**
+   * Why a claimed category is missing from the total, in the words of whatever withheld it.
+   *
+   * ⚠️ `where` DECIDES A POINTER, NOT A TONE. Category 3's activity D reason ends by saying where the
+   * figures it is not counting can be found, and "shown below" is true on the panel, false on the
+   * Results step and false at the end of the export. Every other reason ignores the argument.
+   */
+  const unpricedReason = (id: string, where: Cat3Surface = 'record'): string => {
     const NO_REASON = 'It was not priced, and no reason was recorded.'
     if (SPEND_PRICED_IDS.includes(id)) {
       const missing = spendMissingInputs(id)
@@ -2146,7 +2164,7 @@ export default function Scope3Dashboard() {
     if (id === 'cat15') return cat15Result().reason || NO_REASON
     // Same rule as Cat 15's line above: the reason is the sentence that withheld the figure, verbatim,
     // so the panel, the amber box and the export cannot describe the gap three ways.
-    if (id === 'cat3') return cat3ExcludedFor3d ? CAT3_3D_WITHHELD : (cat3NoFigure || NO_REASON)
+    if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoFigure || NO_REASON)
     return NO_REASON
   }
 
@@ -2682,7 +2700,7 @@ export default function Scope3Dashboard() {
       ['Reporting year', reportingYear],
       ['Total Scope 3', `${totalScope3.toFixed(2)} mt CO2e`],
       ...(unpricedCats.length > 0
-        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id)}`).join(' ')} Left out of the total rather than counted as zero.`]]
+        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id, 'export')}`).join(' ')} Left out of the total rather than counted as zero.`]]
         : []),
       // ⚠️ IN THE HEADER, BECAUSE THE PER-CATEGORY COLUMN ONLY READS AS A GAP IF SOMEONE GETS THERE. The
       // Exclusion justification column says "No justification recorded" against the row it belongs to; this
@@ -3061,7 +3079,7 @@ export default function Scope3Dashboard() {
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_COOLING_NOTE}</div>
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_EXPORT_NOTE}</div>
                             {catData['cat3']?.sells_energy_on === true && (
-                              <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.55rem 0.65rem', marginTop: 8, lineHeight: 1.6 }}>{CAT3_3D_WITHHELD}</div>
+                              <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.55rem 0.65rem', marginTop: 8, lineHeight: 1.6 }}>{cat3ThreeDWithheld('panel')}</div>
                             )}
                           </div>
                         )}
@@ -3499,7 +3517,7 @@ export default function Scope3Dashboard() {
                         lines are real and the customer keeps them. */}
                     {cat3ExcludedFor3d && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
-                        {CAT3_3D_WITHHELD}
+                        {cat3ThreeDWithheld('panel')}
                       </div>
                     )}
                     {cat3ExcludedFor3d && cat3Priced && cat3Priced.status !== 'withheld' && (
@@ -3513,8 +3531,9 @@ export default function Scope3Dashboard() {
                         <SpendFactorWorkings
                           id="cat3-energy"
                           figureMt={cat3Mt() ?? 0}
+                          status={cat3ExcludedFor3d ? CAT3_3D_NOT_IN_TOTAL_TAG : undefined}
                           summary={cat3WorkingsSummary(cat3Priced)}
-                          sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence)}
+                          sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence, cat3ExcludedFor3d)}
                         />
                       </div>
                     )}
@@ -3820,7 +3839,7 @@ export default function Scope3Dashboard() {
               {/* One line per category, each with its OWN observed reason. See unpricedReason. */}
               {unpricedCats.map(c => (
                 <div key={c.id} style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 2 }}>
-                  <strong style={{ fontWeight: 600 }}>Cat {c.num} {c.name}:</strong> {unpricedReason(c.id)}
+                  <strong style={{ fontWeight: 600 }}>Cat {c.num} {c.name}:</strong> {unpricedReason(c.id, 'results')}
                 </div>
               ))}
               <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
@@ -3888,7 +3907,11 @@ export default function Scope3Dashboard() {
             )
           })}
           {activeCats.length === 0 && (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No data entered yet. Go back to Step 3 to enter your data.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
+              {/* Two states, two messages: nothing entered, or everything entered and left out of the
+                  total for reasons the amber box above this table already gives. */}
+              {unpricedCats.length > 0 ? resultsTableAllUnpriced(unpricedCats.length) : RESULTS_TABLE_EMPTY}
+            </div>
           )}
         </div>
 
