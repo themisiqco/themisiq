@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import { scope3MethodDescription, scope3MethodFor, type Scope3Method } from './categoryMethods'
 import { methodologyHierarchyLines, assistantScope3Basis, assistantScope3GwpClause, enteredFigureSentence } from './methodSummary'
 import { KNOWN_EMISSIONS_PLACEHOLDER } from './formCopy'
-import { SCOPE3_FIXTURE_CAT_DATA, SCOPE3_FIXTURE_META } from './scope3SurfacesFixture'
+import { SCOPE3_FIXTURE_CAT_DATA, SCOPE3_FIXTURE_META, SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 
 // ── THE SCOPE 3 SURFACE SNAPSHOT ─────────────────────────────────────────────────────────────────
 //
@@ -47,8 +47,20 @@ const SEEDS: [string, string][] = [
   ['const [catData, setCatData] = useState<Record<string, CategoryData>>({})', 'const [catData, setCatData] = useState<Record<string, CategoryData>>((globalThis as any).__SCOPE3_FIXTURE__)'],
   ['const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)', `const [boundInventoryId] = useState<string | null>(${JSON.stringify(SCOPE3_FIXTURE_META.boundInventoryId)})`],
   ['const [ghgGwpVersion, setGhgGwpVersion] = useState<string | null>(null)', `const [ghgGwpVersion] = useState<string | null>(${JSON.stringify(SCOPE3_FIXTURE_META.ghgGwpVersion)})`],
+  // Category 3's only inputs, as bindToInventory would have set them from the bound ghg_inventories row.
+  ['const [boundWorkings, setBoundWorkings] = useState<unknown>(null)', 'const [boundWorkings] = useState<unknown>((globalThis as any).__SCOPE3_GHG__.workings)'],
+  ['const [boundLocations, setBoundLocations] = useState<unknown>(null)', 'const [boundLocations] = useState<unknown>((globalThis as any).__SCOPE3_GHG__.locations)'],
 ]
-/** Where the capture is attached: the last statement before the component's own return. */
+/**
+ * Where the capture is attached: the last statement before the component's own return.
+ *
+ * ⚠️ THIS IS A STRING, SO tsc NEVER SEES IT. On 20 Sep 2026 cat3Sentences gained a third argument and
+ * this call was left with two: the missing gwpSentence became `undefined`, went into the sentence list,
+ * and was written into the snapshot as `null` at index 7. Nothing failed at the type level and the
+ * update flag recorded it happily; what caught it was the compare run, where `undefined` from a fresh
+ * capture does not equal `null` from the file. S2 now asserts every captured sentence is a string, so
+ * the next arity change fails with its own message rather than as a puzzling inequality.
+ */
 const CAPTURE_ANCHOR = '  const steps = [renderStep0, renderStep1, renderStep2, renderStep3, renderStep4]'
 const CAPTURE = `${CAPTURE_ANCHOR}
   ;(globalThis as any).__SCOPE3_CAPTURE__ = {
@@ -60,6 +72,17 @@ const CAPTURE = `${CAPTURE_ANCHOR}
     basis: (id: string) => categoryBasis(id),
     meta: (id: string) => { const c = CATEGORIES.find(x => x.id === id)!; return { num: c.num, name: c.name, dataSource: (c as any).dataSource, guidance: (c as any).guidance } },
     total: totalScope3,
+    // Category 3's panel, which is text rather than a figure: the workings card's summary and its
+    // sentences, and the amber notice when there is no figure. Captured because this is the surface
+    // Task 5 adds, and a snapshot of a figure would not show a word of it.
+    cat3Workings: () => (cat3Priced && cat3Priced.status !== 'withheld'
+      ? { summary: cat3WorkingsSummary(cat3Priced), sentences: cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence) }
+      : null),
+    cat3NoFigure: () => cat3NoFigure,
+    // ⚠️ null HERE IS THE POINT, NOT AN OMISSION. The fixture record carries no stored fingerprint, which
+    // is a record saved before Task 7; the notice must stay silent rather than claim a change nobody can
+    // see. Captured so that silence is in the snapshot and not only in a unit test.
+    cat3Stale: () => (cat3Stale && cat3Change ? cat3StaleNotice(cat3Change) : null),
     generateExport,
     saveScope3,
   }`
@@ -110,6 +133,9 @@ type Capture = {
   basis: (id: string) => { basis: string; detail: string }
   meta: (id: string) => { num: number; name: string; dataSource: string; guidance: string }
   total: number
+  cat3Workings: () => { summary: string; sentences: string[] } | null
+  cat3NoFigure: () => string | null
+  cat3Stale: () => string | null
   generateExport: () => void
   saveScope3: () => Promise<void>
 }
@@ -118,6 +144,7 @@ async function capture(): Promise<Record<string, unknown>> {
   const file = instrumentedCopy()
   try {
     ;(globalThis as Record<string, unknown>).__SCOPE3_FIXTURE__ = SCOPE3_FIXTURE_CAT_DATA
+    ;(globalThis as Record<string, unknown>).__SCOPE3_GHG__ = SCOPE3_FIXTURE_GHG
     let csv = ''
     // ⚠️ createObjectURL IS ADDED TO THE REAL URL, NOT SUBSTITUTED FOR IT. Replacing globalThis.URL
     // breaks Vite's own `new URL(...)` calls mid-run.
@@ -169,7 +196,10 @@ async function capture(): Promise<Record<string, unknown>> {
           exclusions_unjustified: saved.payload?.scope3_exclusions_unjustified ?? null,
         },
       },
-      cat3: perCategory('cat3'),
+      // Category 3 carries its panel as well as its figures: the workings card's summary and sentences,
+      // and the notice shown when there is none. Added with the panel itself (Task 5).
+      cat3: { ...perCategory('cat3'), panel: cap.cat3Workings(), panel_no_figure: cap.cat3NoFigure(),
+              panel_stale: cap.cat3Stale() },
       others: Object.fromEntries(IDS.filter(id => id !== 'cat3').map(id => [id, perCategory(id)])),
     }
   } finally {
@@ -202,7 +232,7 @@ function parseCsvLine(line: string): string[] {
 }
 
 const fixtureHash = createHash('sha256')
-  .update(JSON.stringify({ meta: SCOPE3_FIXTURE_META, cat_data: SCOPE3_FIXTURE_CAT_DATA }))
+  .update(JSON.stringify({ meta: SCOPE3_FIXTURE_META, cat_data: SCOPE3_FIXTURE_CAT_DATA, ghg: SCOPE3_FIXTURE_GHG }))
   .digest('hex')
 
 describe('Scope 3 surfaces', () => {
@@ -240,6 +270,20 @@ describe('Scope 3 surfaces', () => {
     // Category 3, and the strings that cover several categories at once.
     compare('cat3', now.cat3 as Record<string, unknown>, snap.cat3, DELIBERATE)
     compare('shared', now.shared as Record<string, unknown>, snap.shared, DELIBERATE)
+  })
+
+  it('S2 every captured sentence is a string: the capture is a string of code, and tsc cannot check it', () => {
+    const snap = JSON.parse(readFileSync(SNAPSHOT, 'utf8'))
+    const panel = snap.cat3?.panel
+    expect(panel, 'Category 3 captures its panel').toBeTruthy()
+    expect(typeof panel.summary).toBe('string')
+    for (const [i, s] of (panel.sentences as unknown[]).entries()) {
+      expect(typeof s, `panel sentence ${i} is ${JSON.stringify(s)}: an argument is missing from the ` +
+        'capture in this file, which tsc does not type-check').toBe('string')
+    }
+    for (const row of snap.cat3.csv_rows as unknown[][]) {
+      for (const [i, cell] of row.entries()) expect(typeof cell, `csv cell ${i} of ${JSON.stringify(row[0])}`).toBe('string')
+    }
   })
 
   it('S1 no instrumented copy is left anywhere in the repository', () => {

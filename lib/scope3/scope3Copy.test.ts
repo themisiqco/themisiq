@@ -63,6 +63,8 @@ const LIB_SOURCES = [
   'lib/scope3/dataSources.ts',       // the fifteen "Where to find it" texts
   'lib/scope3/formCopy.ts',           // the shared labels and placeholders beside the fields
   'lib/scope3/businessTravelCopy.ts',
+  'lib/scope3/commutingCopy.ts',      // ⚠️ RENDERED SINCE 19 SEP 2026 AND NEVER LISTED HERE until 20 Sep
+  'lib/scope3/cat3Copy.ts',           // every Category 3 sentence
   'lib/scope3/notEntered.ts',
   'lib/emissionFactors/productOptions.ts', // the EXIOBASE product-type note after a picker option
   'lib/emissionFactors/spendResolver.server.ts', // the secondary-material explanation the route returns
@@ -87,7 +89,7 @@ describe('Scope 3 customer text', () => {
   })
 
   it('SC3 ⚠️ no em-dash in any Scope 3 method description or hierarchy line', () => {
-    const methods: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf']
+    const methods: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'fuel_and_energy_upstream']
     for (const m of methods) expect(scope3MethodDescription(m), m).not.toContain('—')
     for (const line of methodologyHierarchyLines()) expect(line.slice(0, 60)).toBe(line.slice(0, 60)) // readable failure below
     expect(methodologyHierarchyLines().filter(l => l.includes('—'))).toEqual([])
@@ -127,9 +129,10 @@ describe('Scope 3 customer text', () => {
     // behind the figure at all. Two literals in two panels is also how the two spellings arose.
     expect(KNOWN_EMISSIONS_PLACEHOLDER).not.toMatch(/spend/i)
     expect(KNOWN_EMISSIONS_PLACEHOLDER).toBe('Leave blank to use the estimate')
-    // Both panels render the constant, so neither can drift back to a literal of its own.
+    // All three panels that offer an override render the constant, so none can drift back to a literal
+    // of its own: the EXIOBASE one, the generic flat one, and Category 3's since 20 Sep 2026.
     const page = read('app/dashboard/scope3/page.tsx')
-    expect(page.match(/placeholder=\{KNOWN_EMISSIONS_PLACEHOLDER\}/g) ?? []).toHaveLength(2)
+    expect(page.match(/placeholder=\{KNOWN_EMISSIONS_PLACEHOLDER\}/g) ?? []).toHaveLength(3)
     expect(page).not.toMatch(/Leave blank to use (the )?spend/)
   })
 
@@ -182,7 +185,10 @@ describe('Scope 3 customer text', () => {
       ts.forEachChild(n, visit)
     }
     visit(sf)
-    expect(numeric.length).toBe(26)
+    // 27 since 20 Sep 2026: Category 3's known-emissions override. Its Annual spend field went at the
+    // same time, but that input is ONE element in the source rendered for each flat category, so the
+    // count moved by one and not by two.
+    expect(numeric.length).toBe(27)
     const bare = numeric.filter(x => x.placeholder !== null && /^\s*[\d.,\s]+\s*$/.test(x.placeholder))
     expect(bare).toEqual([])
   })

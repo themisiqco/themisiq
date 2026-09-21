@@ -16,8 +16,11 @@
 //                             leg and rail journey, with well-to-tank added (businessTravel.ts)
 //   Cat 7                     (since 19 Sep 2026) DEFRA/DESNZ 2026 land travel factors per group of
 //                             commuters, with well-to-tank added, and UK homeworking (commuting.ts)
+//   Cat 3                     (since 20 Sep 2026) DEFRA/DESNZ 2026 upstream energy factors, applied to the
+//                             bound GHG inventory's own fuel, electricity and heat (cat3Energy.ts,
+//                             cat3Inputs.ts, cat3Copy.ts)
 //   Cat 15                    the PCAF-aligned path in lib/pcaf
-//   the other seven           one flat spend factor, with no source, no year and no region
+//   the other six             one flat spend factor, with no source, no year and no region
 //
 // CLIENT-SAFE: imports spend.ts (types and the source catalogue) and lib/emissionFactors.ts, neither
 // of which pulls in a factor file, and defraWaste.ts, which pulls in the ~30 KB waste artefact the
@@ -25,6 +28,7 @@
 
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
+import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { cat15MethodDescription } from './cat15'
 import { cat6MethodDescription } from './businessTravelCopy'
@@ -38,6 +42,7 @@ export type Scope3Method =
   | 'employee_commuting_factors'
   | 'pcaf'
   | 'end_of_life_factors'
+  | 'fuel_and_energy_upstream'
 
 const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   cat1: 'exiobase_spend',
@@ -47,9 +52,18 @@ const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   // OUT, where there is no purchase; Cat 3 is derived from energy already in Scopes 1 and 2; Cat 12 is
   // tonnes by material; Cat 8's own guidance says spend is not appropriate. Those eight kept flat_spend
   // deliberately; see SPEND_PRICED_CATEGORIES in app/dashboard/scope3/page.tsx.
-  //   ⚠️ CAT 12 LEFT THE FLAT GROUP ON 18 SEP 2026 for end_of_life_factors, so flat_spend has SEVEN
-  // members: 3, 8, 9, 10, 11, 13 and 14. Whether it survives is a later question.
+  //   ⚠️ CAT 12 LEFT ON 18 SEP 2026 for end_of_life_factors and CAT 3 ON 20 SEP 2026 for
+  // fuel_and_energy_upstream, so flat_spend has SIX members: 8, 9, 10, 11, 13 and 14. Whether it
+  // survives is a later question.
   cat2: 'exiobase_spend',
+  // ⚠️ CAT 3 JOINED ON 20 SEP 2026 (Task 5), WITH ITS PANEL AND ITS CALCULATOR IN THE SAME CHANGE, so
+  // flat_spend has SIX members: 8, 9, 10, 11, 13 and 14. It is the first category priced from data the
+  // customer entered in ANOTHER module: the bound GHG inventory's own energy, re-priced on upstream
+  // factors. Nothing about it is spend, and a spend figure saved under its old method prices nothing.
+  //   This map is what the calculator DISPATCHES on, which is why the assignment, the panel, the
+  // calculator and SCOPE3_DATA_SOURCE.cat3 are one change: categoryMethods.test.ts M11 fails if an
+  // assignment arrives without them.
+  cat3: 'fuel_and_energy_upstream',
   cat4: 'exiobase_spend',
   cat5: 'waste_factors',
   // ⚠️ 'travel_factors' IS GONE, NOT RENAMED. It priced flight COUNTS at an assumed 800 or 5,000 km from
@@ -98,6 +112,11 @@ export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>
   employee_commuting_factors: false,
   // Category 12 takes no entered total: its figure is the customer's materials and split, priced.
   end_of_life_factors: false,
+  // Category 3 DOES take one. Its estimate is derived from another module's data rather than from
+  // anything typed on its own panel, so a customer who holds a better figure for
+  // upstream fuel and energy has nowhere else to put it; the known-emissions field stays, as it does for
+  // Cats 1, 2, 4 and 15. ~/themisiq-sources/findings/cat3-design.md, Q7.
+  fuel_and_energy_upstream: true,
 }
 
 /** Does this category's calculator use a figure entered in place of its estimate? Read by the page's
@@ -135,6 +154,10 @@ export function provenanceGap(p: { source: string | null; year: number | null; r
  */
 export const FLAT_FACTOR_SAMENESS =
   'the same for every category priced this way, whatever the figure represents'
+
+/** The artefact's own sheet names, in one clause: "A, B and C". Read from the record, never typed. */
+const listSheets = (sheets: readonly string[]): string =>
+  sheets.length <= 1 ? (sheets[0] ?? '') : `${sheets.slice(0, -1).join(', ')} and ${sheets[sheets.length - 1]}`
 
 const gapSentence = (p: Parameters<typeof provenanceGap>[0], subject: string): string => {
   const gap = provenanceGap(p)
@@ -193,6 +216,36 @@ export function scope3MethodDescription(method: Scope3Method): string {
         `customer's assumption. The figure is the expected end-of-life emissions of all products sold in the ` +
         `reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are ` +
         `sold. Re-use is not a treatment route and has no factor. ${w.attribution_required}`
+      )
+    }
+    case 'fuel_and_energy_upstream': {
+      // ⚠️ READ FROM THE ARTEFACT'S METADATA, LIKE THE WASTE LINE ABOVE, and no em-dashes. Every claim
+      // here is one lib/scope3/cat3Energy.ts can be checked against: the three separate electricity and
+      // heat lines are what priceCat3 emits (Cat3LineKind), the stand-in disclosure is the uk_stand_in
+      // flag it attaches to every row at a non-UK location, and the location-based basis is what
+      // lib/scope3/cat3Inputs.ts reads (it skips the market-based row).
+      //   NOT CALLED A LIFE CYCLE FACTOR, although the sheets are life cycle work: these rows EXCLUDE
+      // combustion (DEFRA_ENERGY_META.upstream_only_note), which is the whole reason Category 3 may use
+      // them, and "life cycle" would invite the reading that combustion is in here twice.
+      const e = DEFRA_ENERGY_META
+      return (
+        `Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or ` +
+        `steam already recorded for each location in the bound GHG inventory, re-priced on the upstream ` +
+        `factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the ` +
+        `unit entered. Electricity and heat take three separate published rows, the WTT of generation, ` +
+        `the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets ` +
+        `direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. ` +
+        // ⚠️ THE SHEETS THAT DECLARE SCOPE 3, NOT metadata.sheets, WHICH INCLUDES Conversions. That fifth
+        // sheet publishes unit conversions and no emission factor, so naming it here would say a factor
+        // came from a sheet that has none. scope_cells holds the four that state "Scope 3" at B6.
+        `Factors are ${e.source} (${e.factor_set.toLowerCase()} v${e.file_version}, the ` +
+        `${listSheets(Object.keys(e.scope_cells))} sheets, ${e.gwp_basis} GWPs), published for the ` +
+        `United Kingdom: a ` +
+        `location in another country is priced from them as a stand-in and its line says so. Electricity ` +
+        `is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance ` +
+        `(section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a ` +
+        `location's transmission and distribution loss on its own national factor, that figure is used ` +
+        `and its source is named on the line. ${e.attribution_required}`
       )
     }
     case 'business_travel_factors':

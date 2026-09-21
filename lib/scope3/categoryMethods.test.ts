@@ -10,22 +10,58 @@ import { methodologyHierarchyLines } from './methodSummary'
 import { SCOPE3_DATA_SOURCE } from './dataSources'
 
 const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
-const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'end_of_life_factors']
+const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'end_of_life_factors', 'fuel_and_energy_upstream']
+
+const VOCABULARY: Record<Scope3Method, RegExp[]> = {
+  exiobase_spend:             [/EXIOBASE/i, /supplier-specific/i],
+  flat_spend:                 [/\bflat\b/i],
+  waste_factors:              [/DEFRA/i, /DESNZ/i, /\btonnes?\b/i, /treatment route/i, /activity data/i],
+  end_of_life_factors:        [/DEFRA/i, /DESNZ/i, /\btonnes?\b/i, /treatment route/i],
+  business_travel_factors:    [/DEFRA/i, /DESNZ/i, /distance/i, /\bflight/i, /\brail\b/i],
+  employee_commuting_factors: [/DEFRA/i, /DESNZ/i, /distance/i, /\bflight/i, /\brail\b/i, /commut/i],
+  pcaf:                       [/PCAF/i, /EVIC/i],
+  // ⚠️ EIGHT TERMS MOVED OUT OF NEVER INTO THIS METHOD ON 20 SEP 2026, AND NOTHING ELSE CHANGED.
+  // They were banned outright because the only category that used them (Cat 3) described a
+  // calculation that did not exist. Category 3 now HAS that calculation, so the words are its
+  // vocabulary rather than a forbidden claim. Because bannedFor() bans every OTHER method's
+  // vocabulary, each of the eight is still barred everywhere else, flat_spend included: the guard
+  // on the six flat categories is byte-for-byte the list it was, which M9b asserts directly.
+  //   'activity-based' is the ninth, and it is NOT in the design's list. It has to move because
+  // this method's description opens with the word and Cat 3's text embeds that description. The
+  // alternative was to word the description around its own opening, which would be writing copy to
+  // suit a guard.
+  fuel_and_energy_upstream:   [/DEFRA/i, /DESNZ/i, /\bWTT\b/i, /well-to-tank/i, /T&D/i,
+                               /transmission and distribution/i, /\bkWh\b/i, /life ?cycle/i,
+                               /activity-based/i],
+}
+// Terms no Scope 3 method uses: an activity basis no category on these methods has.
+const NEVER = [/tonne-km/i, /fuel volume/i]
+const bannedFor = (m: Scope3Method): RegExp[] => {
+  const own = new Set(VOCABULARY[m].map(String))
+  const others = (Object.keys(VOCABULARY) as Scope3Method[])
+    .filter(k => k !== m).flatMap(k => VOCABULARY[k]).filter(re => !own.has(String(re)))
+  return [...new Map(others.map(re => [String(re), re])).values(), ...NEVER]
+}
 
 describe('Scope 3 category methods', () => {
-  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 5/6/7/12 activity factors, Cat 15 PCAF, the other seven flat', () => {
+  it('M1 the split is exactly: Cats 1/2/4 EXIOBASE, Cat 3 upstream energy, Cat 5/6/7/12 activity factors, Cat 15 PCAF, the other six flat', () => {
     // Cats 2 and 4 moved onto EXIOBASE on 17 Sep 2026: they are purchases, so a spend figure has something
-    // to multiply. The seven left on flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
+    // to multiply. Cat 3 joined fuel_and_energy_upstream on 20 Sep 2026, priced from the bound GHG
+    // inventory's own energy rather than from anything entered on its own panel. The six left on
+    // flat_spend are a decision, not a backlog — see METHOD_BY_CATEGORY.
     expect(IDS.map(id => [id, scope3MethodFor(id)])).toEqual([
-      ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'flat_spend'], ['cat4', 'exiobase_spend'],
+      ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'fuel_and_energy_upstream'], ['cat4', 'exiobase_spend'],
       ['cat5', 'waste_factors'], ['cat6', 'business_travel_factors'], ['cat7', 'employee_commuting_factors'],
       ['cat8', 'flat_spend'], ['cat9', 'flat_spend'], ['cat10', 'flat_spend'], ['cat11', 'flat_spend'],
       ['cat12', 'end_of_life_factors'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
     ])
-    // SEVEN: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14; Cats 2 and 4 left for EXIOBASE on
-    // 17 Sep 2026, and Cat 12 for the DEFRA end-of-life factors on 18 Sep 2026.
-    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toEqual(['cat3', 'cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
+    // SIX: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14; Cats 2 and 4 left for EXIOBASE on
+    // 17 Sep 2026, Cat 12 for the DEFRA end-of-life factors on 18 Sep 2026, and Cat 3 on 20 Sep 2026.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toEqual(['cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
     expect(IDS.filter(id => scope3MethodFor(id) === 'exiobase_spend')).toEqual(['cat1', 'cat2', 'cat4'])
+    // ⚠️ ONE CATEGORY, AND THE ASSIGNMENT CAME WITH ITS PANEL AND ITS CALCULATOR. M11 is what holds that
+    // together: it fails if this list grows without the surfaces that describe what was priced.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'fuel_and_energy_upstream')).toEqual(['cat3'])
   })
 
   it('M2 descriptions are derived: the flat factor and the gap come from the factor record', () => {
@@ -46,11 +82,15 @@ describe('Scope 3 category methods', () => {
     expect(provenanceGap({ source: 'X', year: 2024, region: 'GB' })).toBeNull()
   })
 
-  it('M4 only the two waste descriptions and business travel name DEFRA, each by the engine\'s citation', () => {
+  it('M4 every description that names DEFRA does so by the engine\'s own citation, and no other does', () => {
     // Cat 5 prices from DEFRA/DESNZ factors since 17 Sep 2026, Cat 12 from the same sheet since 18 Sep
-    // 2026, and Cat 6 from the business travel sheets since 19 Sep 2026. Every other method still has none.
-    // Cat 7 from the land travel and homeworking sheets since 19 Sep 2026.
-    const defra: Scope3Method[] = ['waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors']
+    // 2026, Cat 6 from the business travel sheets and Cat 7 from the land travel and homeworking sheets
+    // since 19 Sep 2026, and Cat 3 from the upstream energy sheets since 20 Sep 2026. Every other method
+    // still has none.
+    //   Category 3's citation comes from its artefact's metadata (DEFRA_ENERGY_META.source), which the
+    // generator copied from the workbook; this is what holds it to the same string as the other four,
+    // since a second wording of one publication is the defect defraCitation exists to prevent.
+    const defra: Scope3Method[] = ['waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'fuel_and_energy_upstream']
     for (const m of METHODS.filter(x => !defra.includes(x))) expect(scope3MethodDescription(m), m).not.toMatch(/DEFRA/i)
     for (const m of defra) expect(scope3MethodDescription(m), m).toContain(defraCitation(2026))
   })
@@ -147,26 +187,6 @@ describe('Scope 3 category methods', () => {
     // vocabulary it is entitled to, and a category may not use any term belonging to another method, or
     // any term in NEVER, which no method uses at all. A category that changes method changes ban list on
     // the same day.
-    const VOCABULARY: Record<Scope3Method, RegExp[]> = {
-      exiobase_spend:             [/EXIOBASE/i, /supplier-specific/i],
-      flat_spend:                 [/\bflat\b/i],
-      waste_factors:              [/DEFRA/i, /DESNZ/i, /\btonnes?\b/i, /treatment route/i, /activity data/i],
-      end_of_life_factors:        [/DEFRA/i, /DESNZ/i, /\btonnes?\b/i, /treatment route/i],
-      business_travel_factors:    [/DEFRA/i, /DESNZ/i, /distance/i, /\bflight/i, /\brail\b/i],
-      employee_commuting_factors: [/DEFRA/i, /DESNZ/i, /distance/i, /\bflight/i, /\brail\b/i, /commut/i],
-      pcaf:                       [/PCAF/i, /EVIC/i],
-    }
-    // Terms no Scope 3 method uses: they named the Cat 3 calculation that never existed, or an activity
-    // basis no category on these methods has.
-    const NEVER = [/well-to-tank/i, /\bWTT\b/i, /T&D/i, /transmission and distribution/i, /tonne-km/i,
-                   /\bkWh\b/i, /fuel volume/i, /life ?cycle/i, /activity-based/i]
-    const bannedFor = (m: Scope3Method): RegExp[] => {
-      const own = new Set(VOCABULARY[m].map(String))
-      const others = (Object.keys(VOCABULARY) as Scope3Method[])
-        .filter(k => k !== m).flatMap(k => VOCABULARY[k]).filter(re => !own.has(String(re)))
-      return [...new Map(others.map(re => [String(re), re])).values(), ...NEVER]
-    }
-
     const EMBEDS_ITS_METHOD = ['cat3', 'cat4', 'cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14']
     for (const id of IDS) {
       const method = scope3MethodFor(id)
@@ -187,6 +207,12 @@ describe('Scope 3 category methods', () => {
 
     // ⚠️ THE EIGHT SUPERSEDED TEXTS, KEPT SO THE GUARD IS TESTED AND THE DEFECT IS ON THE RECORD. Each
     // must still trip at least one banned term for the method its category is priced by.
+    //
+    // ⚠️ WATCH CATEGORY 3'S ROW WHEN TASK 5 ASSIGNS IT. Today Cat 3 is priced by flat_spend, so its
+    // superseded text trips on kWh, well-to-tank, T&D and fuel volume together. Once the category moves
+    // to fuel_and_energy_upstream, the first three become its own vocabulary and only 'fuel volume' still
+    // trips: the words were never the defect, the missing calculation was. The second assertion below —
+    // the text must be GONE — is what carries this row from then on.
     const SUPERSEDED: [string, string][] = [
       ['cat3', 'Your Scope 1 & 2 energy consumption data (kWh, fuel volumes), with well-to-tank and T&D-loss factors applied. Source the consumption from utility bills / the GHG module.'],
       ['cat4', 'Logistics/freight invoices, shipment records (tonne-km or mode/distance). Spend-based estimation is permitted for this category.'],
@@ -206,6 +232,101 @@ describe('Scope 3 category methods', () => {
     // And the page renders the map rather than literals of its own.
     const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
     for (const id of IDS) expect(page, id).toContain(`dataSource: SCOPE3_DATA_SOURCE.${id}`)
+  })
+
+  it('M9b ⚠️ moving eight terms out of NEVER did not loosen the guard on any other method', () => {
+    // The change on 20 Sep 2026 was a MOVE, not a removal: DEFRA, DESNZ, WTT, well-to-tank, T&D,
+    // transmission and distribution, kWh, life cycle and activity-based left NEVER and became
+    // fuel_and_energy_upstream's vocabulary. Because bannedFor() bans every other method's vocabulary,
+    // the ban list every other method faces is unchanged as a set. This asserts that rather than trusting
+    // it, because the failure mode is silent: a term that stops being banned anywhere bans nothing, and
+    // the text that would then slip through is the one this guard exists for.
+    const MOVED = ['/DEFRA/i', '/DESNZ/i', '/\\bWTT\\b/i', '/well-to-tank/i', '/T&D/i',
+                   '/transmission and distribution/i', '/\\bkWh\\b/i', '/life ?cycle/i', '/activity-based/i']
+    const sources = (m: Scope3Method) => new Set(bannedFor(m).map(String))
+
+    // The six flat categories, which is where a spend text could most easily borrow a DEFRA word.
+    const flat = sources('flat_spend')
+    for (const re of MOVED) expect(flat.has(re), `flat_spend must still bar ${re}`).toBe(true)
+    // Every pattern that was banned for flat_spend before the move is still banned for it. This is the
+    // list as it stood on 19 Sep 2026, typed out, so the comparison does not read the same table twice.
+    const FLAT_BANNED_BEFORE = [
+      '/EXIOBASE/i', '/supplier-specific/i', '/DEFRA/i', '/DESNZ/i', '/\\btonnes?\\b/i', '/treatment route/i',
+      '/activity data/i', '/distance/i', '/\\bflight/i', '/\\brail\\b/i', '/commut/i', '/PCAF/i', '/EVIC/i',
+      '/well-to-tank/i', '/\\bWTT\\b/i', '/T&D/i', '/transmission and distribution/i', '/tonne-km/i',
+      '/\\bkWh\\b/i', '/fuel volume/i', '/life ?cycle/i', '/activity-based/i',
+    ]
+    expect([...flat].sort()).toEqual([...new Set(FLAT_BANNED_BEFORE)].sort())
+
+    // And no OTHER method lost a term either: each of the nine is still barred everywhere it is not
+    // this method's own vocabulary.
+    for (const m of METHODS) {
+      if (m === 'fuel_and_energy_upstream') continue
+      const banned = sources(m)
+      for (const re of MOVED) {
+        if (VOCABULARY[m].map(String).includes(re)) continue // its own word, e.g. DEFRA for waste
+        expect(banned.has(re), `${m} must still bar ${re}`).toBe(true)
+      }
+    }
+    // The new method may use all nine, and may not use any other method's vocabulary.
+    const own = sources('fuel_and_energy_upstream')
+    for (const re of MOVED) expect(own.has(re), `fuel_and_energy_upstream may use ${re}`).toBe(false)
+    expect(own.has('/EXIOBASE/i')).toBe(true)
+    expect(own.has('/\\btonnes?\\b/i')).toBe(true)
+  })
+
+  it('M11 ⚠️ the energy method cannot be assigned to a category without its calculator, its panel and its basis', () => {
+    // ⚠️ THIS IS THE GUARD THAT MAKES "DEFINED AND UNASSIGNED" SAFE. The method map is what the
+    // calculator dispatches on AND what every description of a figure reads, so the moment a category is
+    // assigned, four things have to be true at once or the product states a method it does not run. Three
+    // of them are in page.tsx, which is why they are read from its source, as M7's override checks are.
+    const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
+    const assigned = IDS.filter(id => scope3MethodFor(id) === 'fuel_and_energy_upstream')
+
+    // (1) THE CONFIDENCE BRANCH, which must exist before any figure does. Without it a DEFRA-priced
+    // Category 3 falls through getConfidence's final `return 'low'` and is labelled "Flat factor" on the
+    // pill and in the CSV: Q8 of ~/themisiq-sources/findings/cat3-design.md.
+    const branch = "if (scope3MethodFor(id) === 'fuel_and_energy_upstream' && isCalculated(id)) return 'medium'"
+    expect(page).toContain(branch)
+    const conf = page.slice(page.indexOf('const getConfidence ='))
+    expect(conf.indexOf(branch), 'the branch must precede the final return').toBeLessThan(conf.indexOf("return 'low'\n  }"))
+
+    // (2) THE FIGURE IS NEVER SPEND. A category on this method priced by calcGenericSpend would put a
+    // flat-factor number under an activity-data description: the disagreement between calculation and
+    // claim that this file opens by naming.
+    expect(page).not.toMatch(/case 'fuel_and_energy_upstream': return calcGenericSpend/)
+
+    if (assigned.length === 0) {
+      // The state this task ships in. The two dispatch arms say, in code, that nothing prices yet: an
+      // entered figure only, and never calculated from a saved annual_spend.
+      expect(page).toContain("case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || 0")
+      expect(page).toContain("case 'fuel_and_energy_upstream': return false")
+      return
+    }
+
+    // From here down: a category HAS been assigned, so the interim arms must be gone and the surfaces
+    // that describe the figure must exist. Each expectation names what to build, because this test is
+    // the thing a future session will read first.
+    expect(page, 'assigned: getCatEmissions must price from the bound inventory, not return only an entered figure (Task 5)')
+      .not.toContain("case 'fuel_and_energy_upstream': return catData[id]?.emissions_override || 0")
+    expect(page, 'assigned: isCalculated must test the priced result, not return false (Task 5)')
+      .not.toContain("case 'fuel_and_energy_upstream': return false")
+    // (3) THE BASIS BRANCH (Task 6). categoryBasis has an if-chain per method and falls through to
+    // "No data. No activity data was entered", which would be the CSV's Method cell and the saved
+    // factor_basis column for a priced category.
+    expect(page, 'assigned: categoryBasis needs a branch for this method (Task 6)')
+      .toContain("if (method === 'fuel_and_energy_upstream')")
+    // (4) THE PANEL (Task 5). The generic spend panel renders for every id NOT in one exclusion list, so
+    // an assigned category left out of that list still shows an Annual spend field that nothing reads.
+    const list = page.match(/!\[([^\]]*)\]\.includes\(cat\.id\)/)
+    expect(list, 'the generic spend panel\'s exclusion list must still be readable here').toBeTruthy()
+    for (const id of assigned) {
+      expect(list![1], `assigned: ${id} must leave the generic spend panel for its own (Task 5)`).toContain(`'${id}'`)
+      // And its "Where to find it" text must describe THIS method, which M9 enforces through the method
+      // map; named here too because the rewrite and the assignment are one change, not two.
+      expect(SCOPE3_DATA_SOURCE[id], `assigned: ${id}'s dataSource must be rewritten for this method (Task 5)`)
+        .toContain(scope3MethodDescription('fuel_and_energy_upstream'))
+    }
   })
 
   it('M10 ⚠️ the three surfaces that state the flat factor say one thing, not three', () => {

@@ -18,6 +18,7 @@
 import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method, FLAT_FACTOR_SAMENESS } from './categoryMethods'
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
+import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
 import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { CAT15_GWP_TAIL } from './cat15'
 import { CAT6_ASSISTANT_PHRASE } from './businessTravelCopy'
@@ -60,12 +61,17 @@ export const SCOPE3_CATEGORY_NUMBERS: readonly number[] = Array.from({ length: 1
  */
 const METHOD_RANK: Readonly<Record<Scope3Method, number>> = {
   exiobase_spend: 1,
-  waste_factors: 2,
-  end_of_life_factors: 3,
-  business_travel_factors: 4,
-  employee_commuting_factors: 5,
-  pcaf: 6,
-  flat_spend: 7,
+  // Placed among the published-factor activity methods rather than at the head of the list: its inputs
+  // are metered consumption from another module, which is the strongest data the platform holds, but the
+  // order here is a reading order for the methodology page and Category 3's line belongs beside the
+  // other DEFRA/DESNZ ones. The ranks below moved by one; no method changed its relative position.
+  fuel_and_energy_upstream: 2,
+  waste_factors: 3,
+  end_of_life_factors: 4,
+  business_travel_factors: 5,
+  employee_commuting_factors: 6,
+  pcaf: 7,
+  flat_spend: 8,
 }
 
 export interface Scope3MethodGroup {
@@ -154,6 +160,12 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
     `priced from the UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route`,
   end_of_life_factors: () =>
     `priced from the same UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes`,
+  // Lowercase predicate fragment, like the rest: assistantScope3Basis joins these with semicolons. The
+  // year is READ from the record, as the waste and travel phrases read theirs.
+  fuel_and_energy_upstream: () =>
+    `derived from the energy already recorded in the bound GHG inventory and priced on the UK DEFRA/DESNZ ` +
+    `${DEFRA_ENERGY_META.year} upstream factors, well-to-tank for fuels and generation, transmission and ` +
+    `distribution for electricity and heat, excluding the combustion already counted in Scope 1 and Scope 2`,
   business_travel_factors: () => CAT6_ASSISTANT_PHRASE,
   employee_commuting_factors: () => CAT7_ASSISTANT_PHRASE,
   pcaf: () => 'assessed through a PCAF-aligned path',
@@ -239,6 +251,14 @@ const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
     publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} land travel and homeworking factors`,
   },
   flat_spend: { kind: 'not_recorded' },
+  // The energy artefact states its basis in its own metadata (DEFRA_ENERGY_META.gwp_basis, 'AR5'), the
+  // way the waste and travel records do. Named for the sheets Category 3 reads, so it keeps its own
+  // clause rather than merging into the waste one.
+  fuel_and_energy_upstream: {
+    kind: 'publisher',
+    basis: DEFRA_ENERGY_META.gwp_basis,
+    publisher: `UK DEFRA/DESNZ ${DEFRA_ENERGY_META.year} upstream energy factors`,
+  },
   pcaf: { kind: 'investee' },
 }
 

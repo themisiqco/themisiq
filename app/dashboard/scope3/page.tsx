@@ -17,7 +17,7 @@ import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
 import { SCOPE3_DATA_SOURCE } from '../../../lib/scope3/dataSources'
-import { KNOWN_EMISSIONS_PLACEHOLDER } from '../../../lib/scope3/formCopy'
+import { KNOWN_EMISSIONS_PLACEHOLDER, RESULTS_TABLE_EMPTY, resultsTableAllUnpriced } from '../../../lib/scope3/formCopy'
 import {
   cat15Figure, assessHolding, cat15HoldingIncomplete, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
@@ -34,6 +34,10 @@ import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type Evaluat
 import { evaluateEolMaterials, eolMaterialNotPricedReason, formatShare, type EolMaterial, type EvaluatedEolMaterial } from '../../../lib/scope3/endOfLife'
 import { rowPricedResult } from '../../../lib/scope3/rowPriced'
 import { notEnteredReason } from '../../../lib/scope3/notEntered'
+import { saveErrorText } from '../../../lib/scope3/saveError'
+import { catDataForSave } from '../../../lib/scope3/savePayload'
+import { cat3Fingerprint, cat3FingerprintChange, cat3FingerprintMoved } from '../../../lib/scope3/cat3Fingerprint'
+import type { Cat3Surface } from '../../../lib/scope3/cat3Copy'
 import {
   evaluateCommuting, hasLegacyCommuting, COMMUTE_MODES, COMMUTE_RAIL_TYPES,
   type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
@@ -56,6 +60,18 @@ import {
   cat6Sentences, cat6WorkingsSummary, cat6Basis, cat6RfHeader, cat6RfSentence, flightCsvRow, railCsvRow,
   flightRuleText, flightClassText, flightNotPricedReason, railNotPricedReason, AIR_CATEGORY_LABEL,
 } from '../../../lib/scope3/businessTravelCopy'
+// ── CATEGORY 3 ────────────────────────────────────────────────────────────────────────────────────
+// The adapter reads the bound GHG inventory's saved workings and locations; the pricing module turns
+// them into DEFRA-priced lines; the copy module is where every sentence about them lives. None of the
+// three imports lib/ghg/engine.ts, so the Scope 3 bundle does not gain the engine's factor tables.
+import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
+import { priceCat3 } from '../../../lib/scope3/cat3Energy'
+import {
+  cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
+  cat3StaleNotice, CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_COOLING_NOTE, CAT3_3D_EXPORT_NOTE,
+  cat3ThreeDWithheld, CAT3_3D_NOT_IN_TOTAL_TAG, CAT3_3D_LINES_NOT_IN_TOTAL, cat3RetiredSpendText, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
+} from '../../../lib/scope3/cat3Copy'
+import { DEFRA_ENERGY_META } from '../../../lib/emissionFactors/defraEnergy'
 import type { PcafAssetClass, EmissionInputs } from '../../../lib/pcaf/types'
 import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
@@ -230,11 +246,18 @@ const SPEND_DEBOUNCE_MS = 400
  * `summary` is the one place this card composes text from fields, and it names only the figure and
  * the method; every qualification of the figure stays in the sentences below it.
  */
-function SpendFactorWorkings({ id, figureMt, summary, sentences }: {
+function SpendFactorWorkings({ id, figureMt, summary, sentences, status }: {
   id: string
   figureMt: number
   summary: string
   sentences: string[]
+  /**
+   * ⚠️ A FIGURE THAT IS NOT IN THE TOTAL SAYS SO ON ITS OWN CARD. Optional, and only Category 3 passes
+   * it today: when its activity D question is answered yes, the lines are real and the category is
+   * withheld, so the header's bold figure would otherwise read as a Category 3 total in a screenshot
+   * or a skim. Rendered in the header, beside the figure, not below the fold.
+   */
+  status?: string
 }) {
   const [open, setOpen] = useState(false)
   const bodyId = `${id}-workings`
@@ -249,6 +272,9 @@ function SpendFactorWorkings({ id, figureMt, summary, sentences }: {
       >
         <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.5 }}>
           <strong style={{ fontWeight: 600 }}>{figureMt.toFixed(2)} mt CO₂e</strong>
+          {status && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#92400E', background: '#FEF3C7', borderRadius: 99, padding: '2px 8px', marginLeft: 8, whiteSpace: 'nowrap' }}>{status}</span>
+          )}
           <span style={{ color: 'var(--color-ink-muted)' }}> · {summary}</span>
         </span>
         <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' }}>{open ? '▲ Hide' : '▼ Show workings'}</span>
@@ -975,6 +1001,26 @@ interface CategoryData {
   /** ⚠️ RETIRED. Read once on restore to derive `relevant` (relevanceFromStored), then never again. A
    *  saved record keeps it, because saves spread the stored object; nothing else reads it. */
   included?: boolean
+  /**
+   * Cat 3: which activity rows in the bound GHG inventory produced the figure saved with this record.
+   *
+   * ⚠️ WRITTEN AT SAVE, READ ON LOAD, AND NEVER HELD IN THE PAGE'S OWN catData. It is a property of the
+   * SAVED record, not of what is on screen: the page recalculates Category 3 from the bound inventory
+   * on every render, so only the stored figure can go stale. lib/scope3/cat3Fingerprint.ts builds and
+   * compares it; `unknown` here because a record saved by an older version may carry any shape, and the
+   * reader validates rather than assumes.
+   */
+  source_fingerprint?: unknown
+  /**
+   * Cat 3, activity D: does the company buy energy and sell it on to end users?
+   *
+   * ⚠️ THREE STATES, AND undefined IS ONE OF THEM. true withholds the category, false prices it, and
+   * undefined is a record that has not been asked — every record saved before 20 Sep 2026, and every
+   * new one until the screening step is answered. An unanswered question must NOT withhold: absence of
+   * an answer is not a yes, and treating it as one would empty the Category 3 figure out of every
+   * record already saved.
+   */
+  sells_energy_on?: boolean
   // Cat 1
   total_spend?: number
   supplier_sector?: string
@@ -1059,10 +1105,27 @@ export default function Scope3Dashboard() {
   const [catData, setCatData] = useState<Record<string, CategoryData>>({})
   const [openInfo, setOpenInfo] = useState<Record<string, boolean>>({})
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  // Why the last save was refused, in words, from lib/scope3/saveError.ts. null when none was.
+  const [saveError, setSaveError] = useState<string | null>(null)
+  // ⚠️ THE FINGERPRINT SAVED WITH THE RECORD, HELD BESIDE savedTotal AND FOR THE SAME REASON. Category 3
+  // is the only category whose inputs live in another module, so the SAVED figure can go stale while the
+  // screen stays current. null means no comparison is possible: a record saved before this field
+  // existed, or none bound yet. It is never written into catData, because that would re-arm the Save
+  // button on every restore.
+  const [savedCat3Fingerprint, setSavedCat3Fingerprint] = useState<unknown>(null)
   const [boundInventoryId, setBoundInventoryId] = useState<string | null>(null)
   // The bound GHG inventory's recorded GWP basis (ghg_inventories.gwp_version: AR4, AR5, AR6 or null).
   // Read so the Cat 5 disclosure can state whether its AR5 factors match it, rather than assume either way.
   const [ghgGwpVersion, setGhgGwpVersion] = useState<string | null>(null)
+  // ── THE BOUND INVENTORY'S ENERGY, WHICH IS CATEGORY 3'S ONLY INPUT ───────────────────────────
+  // bindToInventory already fetches the whole ghg_inventories row and threw these two columns away
+  // until 20 Sep 2026. `workings` carries the activity that actually priced, with the inventory's
+  // coverage resolutions applied; `locations_data` carries the country and the declaration answers
+  // that `workings` does not. lib/scope3/cat3Inputs.ts reads both and validates their shape itself,
+  // which is why they are held as `unknown`: an inventory saved before either column existed is a
+  // case it answers with a reason, not a crash.
+  const [boundWorkings, setBoundWorkings] = useState<unknown>(null)
+  const [boundLocations, setBoundLocations] = useState<unknown>(null)
   const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
   const [cameFromGhg, setCameFromGhg] = useState(false) // arrived via ?from=ghg (unsaved GHG wizard)
@@ -1394,6 +1457,8 @@ export default function Scope3Dashboard() {
     if (!row) return // no row -> stays unbound; the picker gate handles it
     setBoundInventoryId(id)
     setGhgGwpVersion(row.gwp_version ?? null)
+    setBoundWorkings(row.workings ?? null)
+    setBoundLocations(row.locations_data ?? null)
     setCompany(row.company_name)
     setReportingYear(row.reporting_year)
     setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
@@ -1425,6 +1490,9 @@ export default function Scope3Dashboard() {
       setSaved(true) // it IS saved
       // null when the row predates total_scope3_tco2e being written; then there is nothing to match.
       setSavedTotal(s3.total_scope3_tco2e == null ? null : Number(s3.total_scope3_tco2e))
+      // The fingerprint saved with the Category 3 figure, if this record carries one. A record saved
+      // before Task 7 has none, and the notice stays silent rather than guessing.
+      setSavedCat3Fingerprint((s3.cat_data as Record<string, CategoryData> | null)?.cat3?.source_fingerprint ?? null)
       setStep(3)     // land on Results, not Setup
     }
   }
@@ -1523,7 +1591,7 @@ export default function Scope3Dashboard() {
         mt: unpricedCatIds.has(c.id) ? null : Number(getCatEmissions(c.id).toFixed(4)),
         unpriced,
         // The wizard's own sentence for this category, verbatim — the same one the amber notice shows.
-        reason: unpriced ? unpricedReason(c.id) : null,
+        reason: unpriced ? unpricedReason(c.id, 'record') : null,
         // ⚠️ THE METHOD'S OWN SCORE, NOT OURS, and only for a method that defines one. PCAF's 1-to-5 for
         // Cat 15: a submission quotes PCAF's number rather than ThemisIQ's confidence pill. coverageEntry
         // drops it wherever there is no figure to describe.
@@ -1830,6 +1898,66 @@ export default function Scope3Dashboard() {
     return (spend * GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit) / 1000
   }
 
+  /**
+   * Category 3, from the bound GHG inventory: the adapter's reading of it, and the priced result.
+   *
+   * ⚠️ COMPUTED ONCE PER RENDER AND SHARED BY EVERY SURFACE, exactly as cat15Result() is. The figure,
+   * the panel's workings, the confidence pill and (from Task 6) the CSV must all describe one
+   * evaluation; two calls with the same inputs would agree today and are two things to keep in step
+   * tomorrow.
+   *
+   * ⚠️ NOTHING HERE READS catData['cat3'].annual_spend. A spend figure saved under the old method is
+   * not an input to this calculation and prices nothing; Task 9 of the Category 3 design adds the
+   * export row that reports it as recorded and not used.
+   */
+  // Plain consts, not useMemo, for the same reason cat15Result() is a plain call: the page's derived
+  // values are computed per render, and the harness (lib/scope3/scope3Surfaces.test.ts) mocks React
+  // down to useState, useEffect and useRef. Both calls are pure and cheap.
+  // The same sentence Cats 5, 6, 7 and 12 carry, with Category 3's own publisher record: it names the
+  // factors' AR5 basis and what the bound GHG inventory records, without claiming the two agree.
+  const cat3GwpSentence: string = publisherGwpSentence(CAT3_GWP_PUBLISHER, !!boundInventoryId, ghgGwpVersion)
+  const cat3Read = cat3InputsFrom(boundWorkings, boundLocations)
+  const cat3Priced = cat3Read.inputs ? priceCat3(cat3Read.inputs) : null
+  /** The sentence shown when Category 3 has no figure: the inventory could not be read, or a stream was
+   *  never answered. null when there is a figure, including a calculated zero. */
+  const cat3NoFigure = cat3NoFigureText(cat3Priced, cat3Read)
+
+  /**
+   * The bound inventory's activity, fingerprinted, and what it says about the saved record.
+   *
+   * ⚠️ NOT COMPUTED WHEN THE INVENTORY CANNOT BE READ. cat3Read.reason is set when there are no
+   * workings, an older shape or no locations: the current fingerprint would then be an empty list and
+   * every row would report as removed, which is a claim about the customer's inventory made out of our
+   * own inability to read it. The panel already says what it could not read.
+   */
+  const cat3Change = cat3Read.reason ? null
+    : cat3FingerprintChange(savedCat3Fingerprint, cat3Fingerprint(cat3Read.inputs))
+  const cat3Stale = cat3FingerprintMoved(cat3Change)
+
+  /**
+   * Activity D: the screening answer, and whether it withholds the category.
+   *
+   * ⚠️ AN ENTERED FIGURE STILL WINS. A reseller who has calculated their own Category 3 total keeps it:
+   * METHOD_TAKES_ENTERED_FIGURE is true for this method, and their figure may well include activity D.
+   * The withholding is of OUR estimate, which covers activities A, B and C and cannot cover D.
+   */
+  const cat3SellsEnergyOn: boolean | undefined = catData['cat3']?.sells_energy_on
+  /**
+   * A spend figure left on the record by the method Category 3 used before 20 Sep 2026.
+   *
+   * ⚠️ FORMATTED HERE AND READ NOWHERE ELSE. It is a string from the moment it leaves catData, so no
+   * later reader can mistake it for a number to price: lib/scope3/cat3Copy.ts takes it already
+   * rendered. Null when there is none, so the row and the panel line simply do not appear.
+   */
+  const cat3RetiredSpend: string | null = catData['cat3']?.annual_spend
+    ? `${amountText(catData['cat3'].annual_spend as number)} ${currency}`
+    : null
+  const cat3ExcludedFor3d = cat3SellsEnergyOn === true && !catData['cat3']?.emissions_override
+
+  /** The figure in tonnes, or null where there is none. A withheld category has no figure, never a zero. */
+  const cat3Mt = (): number | null =>
+    cat3Priced && cat3Priced.status !== 'withheld' ? cat3Priced.kg_co2e / 1000 : null
+
   // Full PCAF result for cat 15. Delegates to the engine orchestrator, which chooses the
   // decomposed per-asset assessment (detailed mode) or the lumped score-5 proxy. Returns
   // the whole PortfolioResult so render can read mode/dqScore without re-plumbing.
@@ -1863,6 +1991,13 @@ export default function Scope3Dashboard() {
       case 'employee_commuting_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'pcaf': return calcCat15()
       case 'flat_spend': return calcGenericSpend(id)
+      // ⚠️ NEVER calcGenericSpend. Category 3 is priced from the bound GHG inventory's own energy; a
+      // spend figure saved under the old method prices nothing. An entered known figure still wins,
+      // as METHOD_TAKES_ENTERED_FIGURE says it does for this method, and is handled first.
+      // ⚠️ ZERO HERE IS NOT A CLAIM OF NO EMISSIONS: a category in unpricedCatIds is left OUT of
+      // totalScope3 (see its filter), never summed in. cat3ExcludedFor3d is what puts it there.
+      case 'fuel_and_energy_upstream':
+        return catData[id]?.emissions_override || (cat3ExcludedFor3d ? 0 : cat3Mt() || 0)
     }
   }
 
@@ -1906,6 +2041,11 @@ export default function Scope3Dashboard() {
       // applies to this path.
       case 'pcaf': return cat15Result().mt !== null
       case 'flat_spend': return !!d.annual_spend
+      // ⚠️ A CALCULATED ZERO COUNTS, A WITHHELD CATEGORY DOES NOT, and a saved annual_spend is not
+      // consulted at all. 'zero' means every stream at every location was answered and none holds any
+      // energy, which is an answer; 'withheld' means a stream was never answered, where a zero would
+      // assert something nobody said. An entered figure is handled above.
+      case 'fuel_and_energy_upstream': return !cat3ExcludedFor3d && cat3Mt() !== null
     }
   }
 
@@ -1928,6 +2068,9 @@ export default function Scope3Dashboard() {
       // every sector this page can offer, so Cat 15 was ALWAYS excluded — a complete per-asset PCAF
       // assessment was computed, displayed with its data-quality score, and then dropped from the total.
       if (c.id === 'cat15') return cat15Result().mt === null
+      // Category 3 is missing from the total whenever it has no figure: the inventory could not be read,
+      // or a stream was never answered. A calculated zero is a figure and is NOT unpriced.
+      if (c.id === 'cat3') return cat3ExcludedFor3d || (!catData[c.id]?.emissions_override && cat3Mt() === null)
       return false
     }).map(c => c.id),
   )
@@ -1954,6 +2097,16 @@ export default function Scope3Dashboard() {
       // is the customer's turn — neither is our failure. The one case that is: every holding computes on
       // its own and the portfolio assessment still throws.
       if (c.id === 'cat15') return cat15Result().reason === CAT15_ASSESSMENT_FAILED
+      // ⚠️ ONE OF CATEGORY 3'S TWO WITHHOLDINGS IS OURS AND THE OTHER IS NOT. 'nothing_priced' means the
+      // inventory holds energy at these locations and we could price none of it, which is a platform
+      // gap. An unanswered stream, an unreadable inventory or none bound is the customer's turn, and
+      // this column would report their unfinished work as our failure.
+      // ⚠️ ACTIVITY D IS A PLATFORM BOUNDARY, AND IT BELONGS IN THIS COLUMN. The column means "the
+      // platform produced no figure for a category the customer completed", and that is exactly what
+      // this is: they answered the screening question, and ThemisIQ cannot price the activity it
+      // names. It is also the only route by which a reason reaches the saved coverage entry, and a
+      // baseline consumer reading "relevant, not calculated" with no reason learns nothing.
+      if (c.id === 'cat3') return cat3ExcludedFor3d || cat3Priced?.withheld?.code === 'nothing_priced'
       return false
     }).map(c => c.id),
   )
@@ -1984,7 +2137,14 @@ export default function Scope3Dashboard() {
    * request in flight is checked; a route answer is quoted verbatim. Where none of those applies the
    * sentence says no reason was recorded — it does not reach for the likeliest one.
    */
-  const unpricedReason = (id: string): string => {
+  /**
+   * Why a claimed category is missing from the total, in the words of whatever withheld it.
+   *
+   * ⚠️ `where` DECIDES A POINTER, NOT A TONE. Category 3's activity D reason ends by saying where the
+   * figures it is not counting can be found, and "shown below" is true on the panel, false on the
+   * Results step and false at the end of the export. Every other reason ignores the argument.
+   */
+  const unpricedReason = (id: string, where: Cat3Surface = 'record'): string => {
     const NO_REASON = 'It was not priced, and no reason was recorded.'
     if (SPEND_PRICED_IDS.includes(id)) {
       const missing = spendMissingInputs(id)
@@ -2002,6 +2162,9 @@ export default function Scope3Dashboard() {
     // amber box and the export cannot describe the gap differently. It never says "no factor for this
     // sector": no factor was ever the problem here.
     if (id === 'cat15') return cat15Result().reason || NO_REASON
+    // Same rule as Cat 15's line above: the reason is the sentence that withheld the figure, verbatim,
+    // so the panel, the amber box and the export cannot describe the gap three ways.
+    if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoFigure || NO_REASON)
     return NO_REASON
   }
 
@@ -2076,6 +2239,15 @@ export default function Scope3Dashboard() {
     // ⚠️ A PRICED GROUP, NOT A HEADCOUNT. This returned 'medium' whenever employee_count was set, so a figure
     // built on the 15 km and petrol-car defaults was labelled activity data.
     if (scope3MethodFor(id) === 'employee_commuting_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
+    // ⚠️ 'medium' (Activity data), THE SAME LABEL CATS 5, 6, 7 AND 12 CARRY WHEN THEY PRICE, because
+    // Category 3's figure is activity data of the same kind: metered consumption from the bound GHG
+    // inventory times a published factor. Without this branch a DEFRA-priced Category 3 would fall
+    // through to 'low' and be labelled "Flat factor" on the pill and in the CSV, which is Q8 of the
+    // Category 3 design.
+    //   ⚠️ IT CANNOT FIRE YET, DELIBERATELY. isCalculated is false for this method until Task 5 wires
+    // the calculator, and an entered figure returns 'high' above. The branch is placed now so the
+    // figure cannot arrive without its label.
+    if (scope3MethodFor(id) === 'fuel_and_energy_upstream' && isCalculated(id)) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
     if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
     // ⚠️ A PER-ASSET PCAF ASSESSMENT IS NOT A SPEND ESTIMATE, and it used to fall through to 'Flat spend'
@@ -2216,6 +2388,10 @@ export default function Scope3Dashboard() {
       }
     }
 
+    // ⚠️ THE BASIS IS BUILT IN lib/scope3/cat3Copy.ts, LIKE CATS 6, 7 AND 15's. This cell is the CSV's
+    // Method column and the saved factor_basis line, and until 20 Sep 2026 Category 3 fell through to
+    // "No data. No activity data was entered", which would have been recorded beside a real figure.
+    if (method === 'fuel_and_energy_upstream') return cat3Basis(cat3Priced, cat3Read, d?.emissions_override, cat3ExcludedFor3d)
     if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d), countryLabel)
     if (method === 'employee_commuting_factors') return cat7Basis(evaluateCommuting(d))
 
@@ -2231,6 +2407,8 @@ export default function Scope3Dashboard() {
     // store a total the page is on the point of contradicting. The button is disabled in this state
     // too; this guard is for any other caller.
     if (anySpendPending) return
+    // Computed once, so the value written and the value remembered are the same object.
+    const cat3FingerprintNow = cat3Fingerprint(cat3Read.inputs)
     setSaving(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -2239,13 +2417,28 @@ export default function Scope3Dashboard() {
       const { error } = await supabase.from('scope3_inventories').upsert({
         user_id: uid,
         inventory_id: boundInventoryId,
-        sector,
+        // ⚠️ NULL, NOT ''. scope3_inventories_sector_is_industry reads `sector is null or sector like
+        // 'i%'`, so the blank option's '' fails it and the WHOLE upsert is refused: the customer saw
+        // the constraint's own name in an alert on 20 Sep 2026. The column is nullable by design and
+        // this sector prices nothing, so "not chosen" is NULL. Same rule, same reason, as the
+        // country_iso2 line four below.
+        sector: sector || null,
         currency,
         // NULL, not ''. scope3_inventories_country_iso2_format rejects anything that is not two
         // uppercase letters or NULL, so an empty string would fail the whole upsert.
         country_iso2: countryIso2 || null,
         revenue_millions: (revenue || 0) / 1_000_000, // raw -> millions
-        cat_data: catData,
+        // The same rule inside the jsonb: a blank sector select writes '', and the sector trigger
+        // (assert_sector_codes_exist, SQLSTATE PT422) tests `is not null`, so '' reaches its membership
+        // check and refuses the save. lib/scope3/savePayload.ts drops the key instead.
+        // ⚠️ THE FINGERPRINT IS WRITTEN WITH THE FIGURE, NOT HELD IN STATE. It describes the activity
+        // rows this save was computed from, so it belongs to the record; putting it in catData would
+        // re-arm the Save button the moment it changed. cat_data.cat3.source_fingerprint, per Q6 of the
+        // design: no migration, and it round-trips with the record the page already writes whole.
+        cat_data: catDataForSave({
+          ...catData,
+          cat3: { ...(catData.cat3 ?? {}), source_fingerprint: cat3FingerprintNow },
+        }),
         total_scope3_tco2e: totalScope3,
         // ⚠️ WHAT THAT TOTAL COVERS, SAVED WITH IT. The number alone cannot say whether it is two
         // categories or fifteen, and it is read as a Scope 3 BASELINE by the SBTi dashboard, where a
@@ -2270,9 +2463,14 @@ export default function Scope3Dashboard() {
         status: 'confirmed',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'inventory_id' })
-      if (error) { console.error('Scope 3 save failed:', error); alert('Save failed: ' + error.message); return }
+      // ⚠️ THE RAW MESSAGE GOES TO THE CONSOLE, NEVER TO THE CUSTOMER. It named a constraint and a
+      // relation in an alert until 20 Sep 2026. saveErrorText says what was refused and what to do,
+      // and says that nothing was saved and nothing on screen was lost.
+      if (error) { console.error('Scope 3 save failed:', error); setSaveError(saveErrorText(error)); return }
+      setSaveError(null)
       setSaved(true)
       setSavedTotal(totalScope3) // exactly the value written above, from the same render
+      setSavedCat3Fingerprint(cat3FingerprintNow) // ditto: the notice must clear on a save that worked
     } finally { setSaving(false) }
   }
 
@@ -2356,6 +2554,16 @@ export default function Scope3Dashboard() {
     // ⚠️ THE BATCH COUNTS BELONG TO THE INVENTORY, NOT TO A CATEGORY. They count lines across one request,
     // which now carries several categories, so they are written once here rather than on any card.
     for (const sentence of spendBatchSummary()) out.push(['Spend estimates', 'Batch', sentence, ''])
+
+    // ⚠️ ONE ROW PER PRICED LINE: the activity as entered, the conversion where one applied, the
+    // published factor with the sheet and cell it came from, and the product. Then the rows that were
+    // read and not priced, the GWP basis and the disclosures. Category 3's figures come from the bound
+    // GHG inventory rather than from this panel, so these rows are the only place the export can show
+    // what they were.
+    const c3 = catData['cat3']
+    if (c3 && isReportable('cat3')) {
+      for (const row of cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn, cat3RetiredSpend)) out.push(['Cat 3', ...row])
+    }
 
     const c5 = catData['cat5']
     if (c5 && isReportable('cat5')) {
@@ -2492,7 +2700,7 @@ export default function Scope3Dashboard() {
       ['Reporting year', reportingYear],
       ['Total Scope 3', `${totalScope3.toFixed(2)} mt CO2e`],
       ...(unpricedCats.length > 0
-        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id)}`).join(' ')} Left out of the total rather than counted as zero.`]]
+        ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id, 'export')}`).join(' ')} Left out of the total rather than counted as zero.`]]
         : []),
       // ⚠️ IN THE HEADER, BECAUSE THE PER-CATEGORY COLUMN ONLY READS AS A GAP IF SOMEONE GETS THERE. The
       // Exclusion justification column says "No justification recorded" against the row it belongs to; this
@@ -2842,6 +3050,42 @@ export default function Scope3Dashboard() {
                             exclude" was true of the GHG Protocol and false of this form, which had nowhere to
                             write it. It does NOT gate this step: the justification belongs in the report, so
                             the export is where its absence is named. */}
+                        {/* ⚠️ CATEGORY 3 IS FOUR ACTIVITIES, AND ONE OF THEM IS NOT IN A GHG INVENTORY.
+                            Activity D is energy bought and sold on, priced from resale quantities this
+                            platform does not hold, so it is screened for here rather than assumed
+                            absent. Every sentence is from lib/scope3/cat3Copy.ts, quoting the
+                            Technical Guidance with its pages. Shown while the category is relevant:
+                            an excluded category has nothing to withhold. */}
+                        {cat.id === 'cat3' && included && (
+                          <div style={{ marginTop: 10, maxWidth: 560, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '0.7rem 0.8rem' }}>
+                            <div role="group" aria-label={CAT3_3D_QUESTION} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.5, flex: 1, minWidth: 260 }}>{CAT3_3D_QUESTION}</span>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                {([[true, 'Yes'], [false, 'No']] as [boolean, string][]).map(([value, text]) => {
+                                  const on = catData['cat3']?.sells_energy_on === value
+                                  return (
+                                    <button
+                                      key={text}
+                                      type="button"
+                                      aria-pressed={on}
+                                      onClick={() => updateCat('cat3', 'sells_energy_on', on ? undefined : value)}
+                                      style={{ fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--color-brand)' : '#e8e7e4'}`, background: on ? 'var(--color-brand)' : '#fff', color: on ? 'var(--color-on-dark)' : '#555553' }}
+                                    >{text}</button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 8, lineHeight: 1.6 }}>{CAT3_3D_HELP}</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_COOLING_NOTE}</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_EXPORT_NOTE}</div>
+                            {/* ⚠️ 'relevance', NOT 'panel'. This is the Relevance step: the figures it
+                                names are two steps away, and the panel's wording said "shown below"
+                                with nothing below it. */}
+                            {catData['cat3']?.sells_energy_on === true && (
+                              <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.55rem 0.65rem', marginTop: 8, lineHeight: 1.6 }}>{cat3ThreeDWithheld('relevance')}</div>
+                            )}
+                          </div>
+                        )}
                         {excluded && (
                           <div style={{ marginTop: 8, maxWidth: 520 }}>
                             <label htmlFor={`excl-${cat.id}`} style={{ ...labelStyle, marginBottom: 4 }}>Why is this category not relevant?</label>
@@ -3232,6 +3476,77 @@ export default function Scope3Dashboard() {
                     )}
                   </>}
 
+                  {/* Cat 3 — fuel and energy related activities: derived from the bound GHG inventory, with
+                      no input of its own but the known-emissions override. Every sentence comes from
+                      lib/scope3/cat3Copy.ts; none is typed here (categoryMethods.test.ts M12). */}
+                  {cat.id === 'cat3' && <>
+                    <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>What this figure is</div>
+                      <p style={{ margin: '0 0 6px' }}>{CAT3_DERIVED_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT3_EXCLUDES_COMBUSTION_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{CAT3_STAND_IN_SENTENCE}</p>
+                      <p style={{ margin: '6px 0 0', fontSize: 10 }}>
+                        {CAT3_ATTRIBUTION}{' '}
+                        <a href={DEFRA_ENERGY_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_ENERGY_META.licence}</a>
+                      </p>
+                    </div>
+
+                    {/* No figure, and the reason, in the words that withheld it. An amber box rather than a
+                        silent empty panel: this is the state a customer has to act on, in the GHG module. */}
+                    {cat3NoFigure && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
+                        {cat3NoFigure}
+                      </div>
+                    )}
+
+                    {/* A spend left by the old method: said out loud, in the same words the export
+                        carries, so a customer who remembers typing it can see where it went. */}
+                    {cat3RetiredSpend && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
+                        {cat3RetiredSpendText(cat3RetiredSpend)}
+                      </div>
+                    )}
+
+                    {/* The saved record is older than the inventory it was computed from. Amber, like
+                        the other "you need to act on this" states, and above the figure it describes. */}
+                    {cat3Stale && cat3Change && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
+                        {cat3StaleNotice(cat3Change)}
+                      </div>
+                    )}
+
+                    {/* Activity D answered yes: the same sentence the screening step showed, the export
+                        carries and the coverage entry stores. The workings stay below it, because the
+                        lines are real and the customer keeps them. */}
+                    {cat3ExcludedFor3d && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
+                        {cat3ThreeDWithheld('panel')}
+                      </div>
+                    )}
+                    {cat3ExcludedFor3d && cat3Priced && cat3Priced.status !== 'withheld' && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
+                        {CAT3_3D_LINES_NOT_IN_TOTAL}
+                      </div>
+                    )}
+
+                    {cat3Priced && cat3Priced.status !== 'withheld' && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <SpendFactorWorkings
+                          id="cat3-energy"
+                          figureMt={cat3Mt() ?? 0}
+                          status={cat3ExcludedFor3d ? CAT3_3D_NOT_IN_TOTAL_TAG : undefined}
+                          summary={cat3WorkingsSummary(cat3Priced)}
+                          sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence, cat3ExcludedFor3d)}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
+                      <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder={KNOWN_EMISSIONS_PLACEHOLDER} />
+                    </div>
+                  </>}
+
                   {cat.id === 'cat15' && <>
                     {/* ⚠️ THE PORTFOLIO VALUE AND SECTOR INPUTS ARE GONE, along with the proxy that read
                         them. A balance at a date times an intensity per year of activity is not a quantity,
@@ -3446,9 +3761,9 @@ export default function Scope3Dashboard() {
                     </>
                   })()}
 
-                  {/* Generic spend-based for the seven categories that keep the flat factor (3, 8, 9, 10, 11, 13
-                      and 14). Cat 12 left on 18 Sep 2026 for its own panel above. */}
-                  {!['cat1', 'cat2', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
+                  {/* Generic spend-based for the six categories that keep the flat factor (8, 9, 10, 11, 13
+                      and 14). Cat 12 left on 18 Sep 2026 and Cat 3 on 20 Sep 2026, each for its own panel. */}
+                  {!['cat1', 'cat2', 'cat3', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
                     <div>
                       <label style={labelStyle}>Annual spend / value ({currency})</label>
                       <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="e.g. 400,000" />
@@ -3527,7 +3842,7 @@ export default function Scope3Dashboard() {
               {/* One line per category, each with its OWN observed reason. See unpricedReason. */}
               {unpricedCats.map(c => (
                 <div key={c.id} style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 2 }}>
-                  <strong style={{ fontWeight: 600 }}>Cat {c.num} {c.name}:</strong> {unpricedReason(c.id)}
+                  <strong style={{ fontWeight: 600 }}>Cat {c.num} {c.name}:</strong> {unpricedReason(c.id, 'results')}
                 </div>
               ))}
               <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>
@@ -3595,7 +3910,11 @@ export default function Scope3Dashboard() {
             )
           })}
           {activeCats.length === 0 && (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No data entered yet. Go back to Step 3 to enter your data.</div>
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
+              {/* Two states, two messages: nothing entered, or everything entered and left out of the
+                  total for reasons the amber box above this table already gives. */}
+              {unpricedCats.length > 0 ? resultsTableAllUnpriced(unpricedCats.length) : RESULTS_TABLE_EMPTY}
+            </div>
           )}
         </div>
 
@@ -3721,6 +4040,16 @@ export default function Scope3Dashboard() {
           <button onClick={() => dataConfirmed && generateExport()} style={{ ...(dataConfirmed ? btnStepPrimary : btnStepPrimaryDisabled) }}>
             ⬇ Download Scope 3 Inventory (CSV)
           </button>
+          {/* ⚠️ INLINE, NOT A BROWSER DIALOG. A dialog cannot be copied into a message to us, is gone
+              the moment it is dismissed, and reads as an error the page had no words for. This stays
+              on screen until the next save, in the same amber the wizard already uses for "you need
+              to act on this". The guard in lib/scope3/saveError.test.ts SE4 bans the dialog call by
+              name, so this comment does not spell it. */}
+          {saveError && (
+            <div role="alert" style={{ fontSize: 12, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.7rem 0.8rem', marginTop: 12, lineHeight: 1.6, maxWidth: '72ch' }}>
+              {saveError}
+            </div>
+          )}
         </div>
       ) : (
         <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>

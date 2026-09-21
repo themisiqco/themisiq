@@ -39,10 +39,22 @@ const ONE_FIELD = 'The estimate uses one field: Annual spend / value, in the inv
 /** For the categories where the spending is someone else's: Cats 9, 10, 11, 13 and 14. */
 const NO_INVOICE_OF_YOURS = 'so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent.'
 
-export const CAT3_DATA_SOURCE =
-  "Accounts payable or your utility invoices: the annual spend on fuel and energy you purchased in the " +
-  "reporting year, in the inventory's currency. Leave out any spend already entered under Category 1, " +
-  `or it will be counted twice. ${scope3MethodDescription('flat_spend')} ${KNOWN_FIGURE}`
+/**
+ * ⚠️ NOTHING TO COLLECT, WHICH IS THE POINT OF THE SENTENCE. Every other category's text names a
+ * document to go and find. Category 3's inputs are already in the platform: the bound GHG inventory's
+ * own fuel, electricity and heat. So this says where the figures come FROM rather than what to fetch,
+ * and it says plainly that no spend figure is asked for, because until 20 Sep 2026 one was.
+ *
+ * ⚠️ THE CATEGORY 1 DOUBLE-COUNT SENTENCE IS GONE, AND ITS ABSENCE IS DELIBERATE. It read "Leave out
+ * any spend already entered under Category 1, or it will be counted twice", which was a true warning
+ * about a spend figure this category no longer takes. The underlying hazard it named still exists for
+ * the categories that DO take spend (totalScope3 sums with no deduplication), which is why the sentence
+ * survives on theirs; here it would warn about an input the panel does not have.
+ */
+const CAT3_DATA_SOURCE =
+  'Nothing to collect for this one: the figures come from the GHG inventory this Scope 3 record is ' +
+  'bound to, location by location, and no spend figure is asked for. To change what Category 3 covers, ' +
+  `change the energy in that inventory. ${scope3MethodDescription('fuel_and_energy_upstream')} ${KNOWN_FIGURE}`
 
 const CAT4_DATA_SOURCE =
   'Freight and logistics invoices: the annual spend on inbound transport, distribution and warehousing ' +

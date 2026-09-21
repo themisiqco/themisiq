@@ -273,6 +273,30 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     expect(fr.inputs?.rows ?? []).toHaveLength(0)
   })
 
+  it('C3I-15 the publisher is taken without the GHG module\'s own vintage note', () => {
+    // ⚠️ ef_source IS A COMPOSITE, and only its first part is a publisher. engine.ts:2864-2865 joins
+    // the citation to getGridFactor's note with ' \u00b7 ', and that note is about what the GHG side did,
+    // not about the Category 3 line: "Grid factor for 2023 applied to 2025 inventory (latest vintage
+    // held)." It reached a customer inside a Category 3 sentence, with its full stop.
+    const attest = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate',
+      'fuel_oil_residual', 'mobile', 'refrigerants', 'purchased_steam']
+      .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' }))
+    const row = (ef: string) => cat3InputsFrom(
+      [{ location: 'Buffalo', stream: 'electricity', source: 'Electricity (US_NY)', scope: 2,
+         activity_data: 10_000, activity_unit: 'kWh', scope2_method: 'location-based',
+         ef_source: ef, result_tco2e: 2, entry_method: 'manual' }],
+      [{ id: 'b', name: 'Buffalo', country: 'US', electricity_kwh: 10_000, stream_attestations: attest }],
+    ).inputs!.rows[0].scope1_publisher
+    expect(row('US EPA eGRID2023 \u00b7 Grid factor for 2023 applied to 2025 inventory (latest vintage held).'))
+      .toBe('US EPA eGRID2023')
+    // A citation with no note is unchanged, and an empty field is an absence rather than an empty name.
+    expect(row('US EPA eGRID2023')).toBe('US EPA eGRID2023')
+    expect(row('  US EPA eGRID2023  ')).toBe('US EPA eGRID2023')
+    expect(row('')).toBeNull()
+    // Two notes joined the same way: still only the publisher.
+    expect(row('AIB 2024 \u00b7 residual mix \u00b7 latest vintage held.')).toBe('AIB 2024')
+  })
+
   it('C3I-12 neither Category 3 module imports the GHG engine', () => {
     // ⚠️ THE IMPORT SPECIFIERS, NOT EVERY STRING IN THE FILE. cat3Energy.ts names 'lib/ghg/engine.ts'
     // inside the New Zealand flag's `source` field, which is a citation for a verifier and not an
