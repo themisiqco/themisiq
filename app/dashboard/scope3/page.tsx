@@ -3078,8 +3078,11 @@ export default function Scope3Dashboard() {
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 8, lineHeight: 1.6 }}>{CAT3_3D_HELP}</div>
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_COOLING_NOTE}</div>
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>{CAT3_3D_EXPORT_NOTE}</div>
+                            {/* ⚠️ 'relevance', NOT 'panel'. This is the Relevance step: the figures it
+                                names are two steps away, and the panel's wording said "shown below"
+                                with nothing below it. */}
                             {catData['cat3']?.sells_energy_on === true && (
-                              <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.55rem 0.65rem', marginTop: 8, lineHeight: 1.6 }}>{cat3ThreeDWithheld('panel')}</div>
+                              <div style={{ fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.55rem 0.65rem', marginTop: 8, lineHeight: 1.6 }}>{cat3ThreeDWithheld('relevance')}</div>
                             )}
                           </div>
                         )}

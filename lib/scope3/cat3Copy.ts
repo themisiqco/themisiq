@@ -320,7 +320,14 @@ export function cat3WithheldText(w: Cat3Withheld, detail: Cat3InputsResult['unde
       )
     }
     case 'nothing_priced':
-      return 'This category is not calculated: the GHG inventory holds energy at these locations, and none of it could be priced. The rows below say why, one by one.'
+      // ⚠️ IT SAID "The rows below say why, one by one" AND POINTED AT NOTHING. This sentence renders in
+      // the panel's amber box, on the Results step and in the export's excluded line; on the first two
+      // there are no rows below it, because the workings card is hidden while the category is withheld
+      // (page.tsx renders it only when status !== 'withheld'). The export is the one surface that does
+      // list them, so that is what it names.
+      return 'This category is not calculated: the GHG inventory holds energy at these locations, and ' +
+        'none of it could be priced. The reason for each row is recorded with the Category 3 rows in ' +
+        'your export.'
   }
 }
 
@@ -579,16 +586,26 @@ export const CAT3_3D_WITHHELD_CORE =
   'p. 39), and it is priced from the quantities and source of the power you bought for resale (p. 47, ' +
   'formula 3.4 on p. 48), which is not in the GHG inventory this record reads.'
 
+/**
+ * ⚠️ TWO SURFACES POINT AT THE CALCULATE PANEL, AND THEY SHARE ONE SENTENCE. The Relevance step shows
+ * this notice under the activity D question, where nothing below it shows the figures; it used the
+ * panel's own "shown below" until 21 Sep 2026. It is listed as its own surface rather than borrowed
+ * from 'results' so that the next reader sees which surfaces exist and what each one says.
+ */
+const ON_THE_CALCULATE_PANEL =
+  'The upstream figures for the energy you consumed are on the Category 3 panel in the Calculate step'
+
 /** What follows the core, per surface. Only the panel may say "below", because only there is anything. */
 const WHERE_THE_FIGURES_ARE: Readonly<Record<Cat3Surface, string>> = {
   panel: 'The upstream figures for the energy you consumed are shown below',
-  results: 'The upstream figures for the energy you consumed are on the Category 3 panel in the Calculate step',
+  relevance: ON_THE_CALCULATE_PANEL,
+  results: ON_THE_CALCULATE_PANEL,
   export: "The upstream figures for the energy you consumed are in this file's Cat 3 rows",
   record: 'The upstream figures for the energy this company consumed are recorded on this record',
 }
 
 /** Where a sentence is being printed. Not a style: it decides which pointer is true. */
-export type Cat3Surface = 'panel' | 'results' | 'export' | 'record'
+export type Cat3Surface = 'panel' | 'relevance' | 'results' | 'export' | 'record'
 
 /**
  * The withheld reason as one surface prints it.

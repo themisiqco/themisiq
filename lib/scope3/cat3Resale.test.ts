@@ -7,7 +7,7 @@ import {
   cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
   CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_EXPORT_NOTE, CAT3_3D_LINES_NOT_IN_TOTAL,
   cat3ThreeDWithheld, CAT3_3D_WITHHELD_CORE, CAT3_3D_WITHHELD_SHORT, CAT3_3D_NOT_IN_TOTAL_TAG,
-  cat3Sentences, cat3WorkingsSummary,
+  cat3Sentences, cat3WorkingsSummary, cat3WithheldText, type Cat3Surface,
   CAT3_3D_DESCRIPTION, CAT3_3D_APPLICABILITY, CAT3_3D_ACTIVITY_DATA, CAT3_3D_COOLING_NOTE,
 } from './cat3Copy'
 import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
@@ -102,34 +102,78 @@ describe('Category 3 activity D screening', () => {
     expect(cat3ThreeDWithheld('panel')).toContain('Enter your own Category 3 figure as known emissions')
   })
 
-  it('RS2b each surface says where the figures are, and says it truly', () => {
-    // ⚠️ "shown below" WAS TRUE ON ONE SURFACE OF THREE. The panel shows the lines under the notice; the
-    // Results step does not; the export's methodology note is the last section of the file.
-    expect(cat3ThreeDWithheld('panel')).toContain('are shown below')
-    for (const where of ['results', 'export', 'record'] as const) {
-      expect(cat3ThreeDWithheld(where), where).not.toContain('below')
+  it('RS2b every surface that renders the reason is listed here with the variant it uses', () => {
+    // ⚠️ "shown below" WAS TRUE ON ONE SURFACE OF FOUR. The panel shows the lines under the notice; the
+    // Relevance step does not (the question is two steps earlier); the Results step does not; the
+    // export's methodology note is the last section of the file. A shared sentence that is true in one
+    // place and false in three is worse than four sentences, because it is trusted for being shared.
+    //
+    // THE TABLE IS THE TEST. Every place the page renders cat3ThreeDWithheld, with the variant it
+    // passes: a new surface has to be added here, and only the Calculate panel may say "below".
+    const SURFACES: [Cat3Surface, string, string][] = [
+      ['panel', "{cat3ThreeDWithheld('panel')}", 'the Category 3 panel on the Calculate step, above its workings card'],
+      ['relevance', "{cat3ThreeDWithheld('relevance')}", 'the Relevance step, under the activity D question'],
+      ['results', "unpricedReason(c.id, 'results')", "the Results step's amber excluded box"],
+      ['export', "unpricedReason(c.id, 'export')", "the export's Excluded from total line"],
+      ['record', "unpricedReason(c.id, 'record')", 'the saved coverage entry, read by another system'],
+    ]
+    const src = page()
+    for (const [where, rendered, place] of SURFACES) {
+      expect(src, `${where} is rendered at ${place}`).toContain(rendered)
+      expect(cat3ThreeDWithheld(where), `${where} carries the one reason`).toContain(CAT3_3D_WITHHELD_CORE)
+      if (where !== 'panel') {
+        expect(cat3ThreeDWithheld(where), `${where} points at ${place} and cannot say "below"`).not.toContain('below')
+      }
     }
+    // The type has no surface this table does not list.
+    const listed: Cat3Surface[] = SURFACES.map(([w]) => w)
+    const all: Cat3Surface[] = ['panel', 'relevance', 'results', 'export', 'record']
+    expect(listed.sort()).toEqual([...all].sort())
+    // Each pointer names something a reader can go to.
+    expect(cat3ThreeDWithheld('panel')).toContain('are shown below')
+    expect(cat3ThreeDWithheld('relevance')).toContain('on the Category 3 panel in the Calculate step')
     expect(cat3ThreeDWithheld('results')).toContain('on the Category 3 panel in the Calculate step')
     expect(cat3ThreeDWithheld('export')).toContain("in this file's Cat 3 rows")
     expect(cat3ThreeDWithheld('record')).toContain('recorded on this record')
     // The stored record is not addressed as "you": it is read by another system.
     expect(cat3ThreeDWithheld('record')).toContain('its Scope 3 total')
-    // Every version carries the same reason, so only the pointer differs.
-    for (const where of ['panel', 'results', 'export', 'record'] as const) {
-      expect(cat3ThreeDWithheld(where), where).toContain(CAT3_3D_WITHHELD_CORE)
-    }
     // ⚠️ AND NONE OF THEM SHOUTS. "are NOT in your Scope 3 total" was the old wording; the amber box
     // carries the emphasis. (CAT3_RECORDED_NOT_USED keeps its capital, with Category 15's.)
-    for (const where of ['panel', 'results', 'export', 'record'] as const) {
-      expect(cat3ThreeDWithheld(where), where).not.toContain(' NOT ')
-    }
+    for (const where of all) expect(cat3ThreeDWithheld(where), where).not.toContain(' NOT ')
     expect(CAT3_3D_LINES_NOT_IN_TOTAL).not.toContain(' NOT ')
-    // The page prints each on its own surface.
-    const src = page()
-    expect(src).toContain("cat3ThreeDWithheld('panel')")
-    expect(src).toContain("unpricedReason(c.id, 'results')")
-    expect(src).toContain("unpricedReason(c.id, 'export')")
-    expect(src).toContain("unpricedReason(c.id, 'record')")
+  })
+
+  it('RS2b2 no Category 3 sentence points at something that is not there when it renders', () => {
+    // ⚠️ THE SAME DEFECT, FOUND BY LOOKING FOR IT. 'nothing_priced' ended "The rows below say why, one
+    // by one" and rendered in the panel's amber box, on the Results step and in the export's excluded
+    // line. On the first two there are no rows below: the workings card is hidden while the category is
+    // withheld, which is exactly when that sentence shows.
+    const nothingPriced = cat3WithheldText({ code: 'nothing_priced' })
+    expect(nothingPriced).not.toContain('below')
+    expect(nothingPriced).toContain('recorded with the Category 3 rows in your export')
+    expect(page(), 'the card is hidden while the category is withheld, which is why')
+      .toContain("{cat3Priced && cat3Priced.status !== 'withheld' && (")
+
+    // The rest of the Category 3 copy that points anywhere, each checked where it renders:
+    //   CAT3_3D_LINES_NOT_IN_TOTAL   "recorded here"      the panel, under the card; and the export's
+    //                                                     'Lines below' row, above the line rows
+    //   the activity D row, answer yes  "see its Basis row above"   the Basis row is row 0 of the block
+    //   the 'Lines below' CSV label                        the priced line rows follow it
+    //   cat3StaleNotice              "on this page"       the panel only
+    // Asserted where a position is claimed:
+    const { read, priced } = worked()
+    const rows = cat3CsvRows(priced, read, null, GWP, true)
+    const basisAt = rows.findIndex(r => r[0] === 'Basis')
+    const answerAt = rows.findIndex(r => r[0] === 'Energy bought and sold on (activity D)')
+    expect(rows[answerAt][2], 'the answer row points up at the Basis row').toContain('see its Basis row above')
+    expect(basisAt).toBeLessThan(answerAt)
+    const linesLabelAt = rows.findIndex(r => r[0] === 'Lines below')
+    const firstLineAt = rows.findIndex(r => r[0].startsWith('UK site'))
+    expect(linesLabelAt, 'the lines really are below their label').toBeLessThan(firstLineAt)
+    // And nothing in the module points at a step by number, which would rot the moment a step moves.
+    const copy = readFileSync(join(__dirname, 'cat3Copy.ts'), 'utf8')
+    const strings = [...copy.matchAll(/'([^'\n]{25,})'/g)].map(m => m[1])
+    for (const text of strings) expect(text, text).not.toMatch(/\bstep [1-5]\b/i)
   })
 
   it('RS2c the card never shows the figure without its status, and the export repeats the reason no more than twice', () => {
