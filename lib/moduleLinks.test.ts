@@ -160,6 +160,46 @@ describe('the GHG and Scope 3 modules, linked', () => {
     expect(cat3GhgFixes(priceCat3(us.inputs!), us)).not.toContain('country')
   })
 
+  it('ML5d every link to the GHG module is an action on its own line, in the platform\'s own style', () => {
+    // ⚠️ THE PREVIEW READ THEM AS EMPHASIS. Bold inside these notice boxes is a heading, so a bold link
+    // at the end of a paragraph looked like the sentence insisting on itself rather than something to
+    // click. Each one is now a block-level action in btnStep, the secondary button this page already
+    // uses for its own Back control.
+    const s3 = read(SCOPE3)
+    expect(s3).toContain("const cat3ActionStyle = { ...btnStep, display: 'inline-block', textDecoration: 'none', marginTop: 8 }")
+    expect(s3).toContain("import { btnPrimary, btnStep,")
+    // btnStep is the shared object, not a copy of its values.
+    const styles = read('app/components/buttonStyles.ts')
+    expect(styles).toContain('export const btnStep: CSSProperties = {')
+
+    // Every link that goes into the GHG module uses it, and none of them is styled inline any more.
+    const anchors = [...s3.matchAll(/<a href=\{ghgHref\([^)]*\)\} style=\{([^}]*)\}/g)].map(m => m[1].trim())
+    expect(anchors.length, 'the two places a Cat 3 link is rendered').toBe(2)
+    for (const style of anchors) expect(style, style).toBe('cat3ActionStyle')
+    expect(s3, 'no Cat 3 link keeps the old inline bold').not.toMatch(/ghgHref\([^)]*\)\} style=\{\{ color: 'inherit', fontWeight: 600 \}\}/)
+
+    // ⚠️ ON ITS OWN LINE: each anchor sits in its own <div>, not inside the sentence's paragraph.
+    for (const m of s3.matchAll(/<a href=\{ghgHref\([\s\S]{0,400}?<\/a>/g)) {
+      const before = s3.slice(Math.max(0, s3.indexOf(m[0]) - 120), s3.indexOf(m[0]))
+      expect(before, 'the action is wrapped in a block').toMatch(/<div[^>]*>\s*$/)
+    }
+    // And the save-first hint stays with the link, inside that block.
+    expect(s3).toMatch(/<a href=\{ghgHref[\s\S]{0,420}\{CAT3_SAVE_FIRST_HINT\}/)
+  })
+
+  it('ML5e the workings card keeps a figure and its unit in one unbreakable token', () => {
+    // ⚠️ IT SPLIT "12.73 mt" FROM "CO₂e" AT NARROW WIDTHS, with the status chip between the halves of
+    // one number. The card is shared with Categories 5, 6, 7 and 12, so this changes their header too:
+    // their figure can no longer split either, and nothing else about them moves.
+    const s3 = read(SCOPE3)
+    expect(s3).toContain("<strong style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{figureMt.toFixed(2)} mt CO₂e</strong>")
+    // One header, one figure element: the card is declared once and every category renders through it.
+    expect([...s3.matchAll(/\{figureMt\.toFixed\(2\)\} mt CO₂e/g)]).toHaveLength(1)
+    expect([...s3.matchAll(/function SpendFactorWorkings/g)]).toHaveLength(1)
+    // The summary beside it still wraps: nowrap is on the figure alone.
+    expect(s3).toContain("<span style={{ color: 'var(--color-ink-muted)' }}> · {summary}</span>")
+  })
+
   it('ML6 every new link is a plain <a>, because beforeunload does not fire for a client-side route change', () => {
     // ⚠️ THE SAFEGUARD AND THE LINKS ARE ONE DECISION. next/link would navigate without unmounting the
     // document, so the unsaved-changes prompt would never run: the one protection this page has would

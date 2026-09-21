@@ -275,7 +275,12 @@ function SpendFactorWorkings({ id, figureMt, summary, sentences, status }: {
         style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '0.9rem 1.25rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
       >
         <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.5 }}>
-          <strong style={{ fontWeight: 600 }}>{figureMt.toFixed(2)} mt CO₂e</strong>
+          {/* ⚠️ ONE UNBREAKABLE TOKEN. At narrow widths the header wrapped between "12.73 mt" and
+              "CO₂e", with the status chip landing between the two halves of one figure. nowrap keeps
+              the number and its unit together; the summary after it still wraps as before, so the
+              other categories' headers (this card is shared with Cats 5, 6, 7 and 12) are unchanged
+              except that their figure can no longer split either. */}
+          <strong style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{figureMt.toFixed(2)} mt CO₂e</strong>
           {status && (
             <span style={{ fontSize: 11, fontWeight: 600, color: '#92400E', background: '#FEF3C7', borderRadius: 99, padding: '2px 8px', marginLeft: 8, whiteSpace: 'nowrap' }}>{status}</span>
           )}
@@ -2493,20 +2498,35 @@ export default function Scope3Dashboard() {
    * the beforeunload prompt above fires for a document navigation and not for a client-side route
    * change, so an in-app link would step around the one safeguard this page has.
    */
+  /**
+   * ⚠️ A LINK AT THE END OF A PARAGRAPH IN BOLD IS NOT A BUTTON, AND THE PREVIEW READ IT AS EMPHASIS.
+   * Bold inside these boxes is a heading ("What this figure is"), so "Change the energy in that
+   * inventory →" looked like the sentence insisting on itself. It is now an action on its own line,
+   * in btnStep: the platform's secondary button, defined in app/components/buttonStyles.ts and already
+   * used by this page's own Back control and by the eight other module wizards.
+   *
+   * ⚠️ textDecoration: 'none' IS ADDED HERE, NOT TO THE SHARED OBJECT. Every existing btnStep call site
+   * is a <button>, which has no underline to suppress; this is an <a>, which does.
+   */
+  const cat3ActionStyle = { ...btnStep, display: 'inline-block', textDecoration: 'none', marginTop: 8 }
+
   const Cat3GhgLink = ({ sentence, link }: { sentence: string; link: Cat3GhgLinkKey }) => {
     const l = CAT3_GHG_LINKS[link]
     return (
       <>
-        {sentence}{' '}
+        {sentence}
         {boundInventoryId && (
-          <a href={ghgHref(boundInventoryId, l.step as GhgStep)} style={{ color: 'inherit', fontWeight: 600 }}>
-            {l.label} →
-          </a>
-        )}
-        {boundInventoryId && !showSaved && (
-          <span style={{ display: 'block', marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)' }}>
-            {CAT3_SAVE_FIRST_HINT}
-          </span>
+          <div>
+            <a href={ghgHref(boundInventoryId, l.step as GhgStep)} style={cat3ActionStyle}>
+              {l.label} →
+            </a>
+            {/* Directly under the link it warns about, not under the paragraph. */}
+            {!showSaved && (
+              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.5 }}>
+                {CAT3_SAVE_FIRST_HINT}
+              </div>
+            )}
+          </div>
         )}
       </>
     )
@@ -3609,19 +3629,18 @@ export default function Scope3Dashboard() {
                         the way to fix it, once per kind. */}
                     {cat3Priced && cat3GhgFixes(cat3Priced, cat3Read).length > 0 && boundInventoryId && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
-                        {CAT3_FIX_IN_GHG_HEADING}{' '}
-                        {cat3GhgFixes(cat3Priced, cat3Read).map((key, i) => (
-                          <span key={key}>
-                            {i > 0 && ' · '}
-                            <a href={ghgHref(boundInventoryId, CAT3_GHG_LINKS[key].step as GhgStep)} style={{ color: 'inherit', fontWeight: 600 }}>
+                        {CAT3_FIX_IN_GHG_HEADING}
+                        {cat3GhgFixes(cat3Priced, cat3Read).map(key => (
+                          <div key={key}>
+                            <a href={ghgHref(boundInventoryId, CAT3_GHG_LINKS[key].step as GhgStep)} style={cat3ActionStyle}>
                               {CAT3_GHG_LINKS[key].label} →
                             </a>
-                          </span>
+                          </div>
                         ))}
                         {!showSaved && (
-                          <span style={{ display: 'block', marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)' }}>
+                          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.5 }}>
                             {CAT3_SAVE_FIRST_HINT}
-                          </span>
+                          </div>
                         )}
                       </div>
                     )}
