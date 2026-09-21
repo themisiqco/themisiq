@@ -260,7 +260,7 @@ describe('Category 3 activity D screening', () => {
     expect(src).toContain('cat3CsvRows(cat3Priced, cat3Read, c3.emissions_override, cat3GwpSentence, cat3SellsEnergyOn')
     // Coverage entry: the reason reaches it only through couldNotPriceCatIds, and it does.
     expect(src).toContain("if (c.id === 'cat3') return cat3ExcludedFor3d || cat3Priced?.withheld?.code === 'nothing_priced'")
-    expect(src).toContain("if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoFigure || NO_REASON)")
+    expect(src).toContain("if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoticeText || NO_REASON)")
     // ⚠️ EXCLUDED, NOT COUNTED AS ZERO. totalScope3 filters unpricedCatIds out of the sum; it does not
     // add a zero for them. This is the line that makes that true, unchanged since before this task.
     expect(src).toContain("const totalScope3 = CATEGORIES.filter(c => statusOf(c.id).inTotal && !unpricedCatIds.has(c.id))")

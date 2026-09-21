@@ -23,6 +23,7 @@ import type {
 } from './cat3Energy'
 import type { Cat3InputsReason, Cat3InputsResult, Cat3Skipped } from './cat3Inputs'
 import type { Cat3FingerprintChange } from './cat3Fingerprint'
+import type { GhgStep } from '../moduleLinks'
 
 const m = DEFRA_ENERGY_META
 const g = m.guidance
@@ -856,8 +857,113 @@ export function cat3CsvRows(
  * read, or the reason a figure was withheld. null when there IS a figure (including a calculated zero).
  */
 export function cat3NoFigureText(r: Cat3Result | null, inputs: Cat3InputsResult): string | null {
-  if (inputs.reason) return cat3InputsReasonText(inputs.reason)
+  return cat3NoFigure(r, inputs)?.text ?? null
+}
+
+// ── LINKS INTO THE GHG MODULE ────────────────────────────────────────────────────────────────────
+//
+// ⚠️ THE SENTENCES SAY GO THERE; UNTIL 21 SEP 2026 THERE WAS NO WAY TO GO. "Answer them in the GHG
+// module", "change the energy in that inventory", "Open that inventory and save it": each names a
+// thing to do in another module, and a customer reading it had to find their way back through the
+// dashboard, pick the right inventory out of a list, and guess the step.
+//
+// ⚠️ A LABEL AND A TARGET, NEVER A SENTENCE WITH A URL IN IT. The copy stays here; the page renders
+// the sentence and this label as a link, and lib/moduleLinks.ts builds the href. Nothing about a route
+// or an inventory id is written in this file, and no label is typed in the page.
+//
+// ⚠️ AND NO STEP NUMBERS. Each target is a NAME from lib/moduleLinks.ts, which carries the wizard's own
+// labels; a number in copy rots the moment a step is inserted.
+
+export interface Cat3GhgLink {
+  /** The link text. An instruction, so it reads as a thing to do rather than as a place. */
+  label: string
+  /** Which step of the GHG wizard fixes the thing the sentence describes. */
+  step: GhgStep
+}
+
+export const CAT3_GHG_LINKS = {
+  /** CAT3_DERIVED_SENTENCE: "change the energy in that inventory". */
+  derived: { label: 'Change the energy in that inventory', step: 'energy' },
+  /** The undeclared-streams withholding: "Answer them in the GHG module". */
+  undeclared: { label: 'Answer these streams in that inventory', step: 'energy' },
+  /**
+   * The staleness notice: the inventory moved under a saved figure.
+   *
+   * ⚠️ IT DOES NOT PROMISE A COMPARISON. The label read "See what changed in that inventory", and the
+   * Review step shows the inventory as it stands, not a before and after; the notice itself only says
+   * THAT something changed, because the fingerprint stores hashes and not values. A label must not
+   * offer what neither the page nor the record can show.
+   */
+  stale: { label: "Open that inventory's workings", step: 'review' },
+  /** No saved workings, or a shape this category cannot read: both are fixed by saving it again. */
+  saveInventory: { label: 'Open and save that inventory', step: 'review' },
+  /** No locations at all: they are entered with the company. */
+  noLocations: { label: 'Add locations to that inventory', step: 'setup' },
+  /** A line whose location has no country recorded: every such line is priced as a UK stand-in. */
+  country: { label: "Set this location's country", step: 'setup' },
+  /** Purchased heat or steam the GHG side could not price in its jurisdiction. */
+  steamFactor: { label: 'Enter a supplier factor for this heat', step: 'energy' },
+} as const satisfies Record<string, Cat3GhgLink>
+
+export type Cat3GhgLinkKey = keyof typeof CAT3_GHG_LINKS
+
+/**
+ * ⚠️ SAVE BEFORE YOU FOLLOW ONE. Every link out of this page is a full navigation, and the Scope 3
+ * record is not saved as you type. The browser's own "leave site?" prompt is the backstop
+ * (app/dashboard/scope3/page.tsx); this is the part that tells the customer WHY before they click.
+ */
+export const CAT3_SAVE_FIRST_HINT =
+  'This record has unsaved changes. Save it before following this link, or anything not yet saved is ' +
+  'lost.'
+
+/**
+ * ⚠️ THE ROW-LEVEL LINKS SIT UNDER THE CARD, NOT ON THE ROW, AND THAT IS A LIMITATION NOT A CHOICE OF
+ * WORDING. The workings card renders a list of STRINGS (SpendFactorWorkings, shared with Categories 5,
+ * 6, 7 and 12), so a link cannot be attached to one line without changing that contract for four other
+ * categories. The line still says what is wrong; the way to fix it is gathered here, once per kind,
+ * directly beneath.
+ */
+export const CAT3_FIX_IN_GHG_HEADING = 'Fix in the GHG module:'
+
+/**
+ * Which row-level fixes this result calls for, in a stable order and without repeats.
+ *
+ * ⚠️ NOT EVERY FLAG IS A FIX. A UK stand-in at a location whose country IS recorded is a method
+ * limitation, not something a customer can put right; only an UNRESOLVED country is. The New Zealand
+ * 3c line, the market-based row and refrigerants are all working as intended.
+ */
+export function cat3GhgFixes(r: Cat3Result | null, inputs: Cat3InputsResult): Cat3GhgLinkKey[] {
+  const out: Cat3GhgLinkKey[] = []
+  if (r?.lines.some(l => l.flags.some(f => f.code === 'country_unresolved'))) out.push('country')
+  if (inputs.skipped.some(s => s.code === 'scope2_not_priced')) out.push('steamFactor')
+  return out
+}
+
+/**
+ * Why Category 3 has no figure, as one answer: the sentence, and which link fixes it.
+ *
+ * ⚠️ ONE SWITCH, NOT TWO. The text and the link were going to be two functions branching over the same
+ * reasons, which is two things to keep in step; this returns both, and cat3NoFigureText reads the text
+ * out of it. A reason with no link (the activity D question is answered on this page, not in the GHG
+ * module) says so with null rather than by being absent.
+ */
+export function cat3NoFigure(
+  r: Cat3Result | null, inputs: Cat3InputsResult,
+): { text: string; link: Cat3GhgLinkKey | null } | null {
+  if (inputs.reason) {
+    return {
+      text: cat3InputsReasonText(inputs.reason),
+      link: inputs.reason.code === 'no_locations_data' ? 'noLocations' : 'saveInventory',
+    }
+  }
   if (!r) return null
-  if (r.withheld) return cat3WithheldText(r.withheld, inputs.undeclared_detail)
+  if (r.withheld) {
+    return {
+      text: cat3WithheldText(r.withheld, inputs.undeclared_detail),
+      // 'nothing_priced' is a platform gap, not something a customer fixes in the GHG module: the rows
+      // are there and none could be priced. It points at the export instead, and carries no link.
+      link: r.withheld.code === 'undeclared_streams' ? 'undeclared' : null,
+    }
+  }
   return null
 }

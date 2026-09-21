@@ -39,6 +39,9 @@ import { catDataForSave } from '../../../lib/scope3/savePayload'
 import { cat3Fingerprint, cat3FingerprintChange, cat3FingerprintMoved } from '../../../lib/scope3/cat3Fingerprint'
 import type { Cat3Surface } from '../../../lib/scope3/cat3Copy'
 import {
+  ghgHref, INVENTORY_NOT_OPENED_SCOPE3, type GhgStep,
+} from '../../../lib/moduleLinks'
+import {
   evaluateCommuting, hasLegacyCommuting, COMMUTE_MODES, COMMUTE_RAIL_TYPES,
   type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
 } from '../../../lib/scope3/commuting'
@@ -67,7 +70,8 @@ import {
 import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
-  cat3Sentences, cat3WorkingsSummary, cat3NoFigureText, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
+  cat3Sentences, cat3WorkingsSummary, cat3NoFigure, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
+  CAT3_GHG_LINKS, CAT3_SAVE_FIRST_HINT, CAT3_FIX_IN_GHG_HEADING, cat3GhgFixes, type Cat3GhgLinkKey,
   cat3StaleNotice, CAT3_3D_QUESTION, CAT3_3D_HELP, CAT3_3D_COOLING_NOTE, CAT3_3D_EXPORT_NOTE,
   cat3ThreeDWithheld, CAT3_3D_NOT_IN_TOTAL_TAG, CAT3_3D_LINES_NOT_IN_TOTAL, cat3RetiredSpendText, CAT3_DERIVED_SENTENCE, CAT3_EXCLUDES_COMBUSTION_SENTENCE, CAT3_STAND_IN_SENTENCE, CAT3_ATTRIBUTION,
 } from '../../../lib/scope3/cat3Copy'
@@ -271,7 +275,12 @@ function SpendFactorWorkings({ id, figureMt, summary, sentences, status }: {
         style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '0.9rem 1.25rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
       >
         <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.5 }}>
-          <strong style={{ fontWeight: 600 }}>{figureMt.toFixed(2)} mt CO₂e</strong>
+          {/* ⚠️ ONE UNBREAKABLE TOKEN. At narrow widths the header wrapped between "12.73 mt" and
+              "CO₂e", with the status chip landing between the two halves of one figure. nowrap keeps
+              the number and its unit together; the summary after it still wraps as before, so the
+              other categories' headers (this card is shared with Cats 5, 6, 7 and 12) are unchanged
+              except that their figure can no longer split either. */}
+          <strong style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{figureMt.toFixed(2)} mt CO₂e</strong>
           {status && (
             <span style={{ fontSize: 11, fontWeight: 600, color: '#92400E', background: '#FEF3C7', borderRadius: 99, padding: '2px 8px', marginLeft: 8, whiteSpace: 'nowrap' }}>{status}</span>
           )}
@@ -1107,6 +1116,8 @@ export default function Scope3Dashboard() {
   const [dataConfirmed, setDataConfirmed] = useState(false)
   // Why the last save was refused, in words, from lib/scope3/saveError.ts. null when none was.
   const [saveError, setSaveError] = useState<string | null>(null)
+  /** Why an id in the URL did not open, or null. Shown in the picker gate. */
+  const [bindError, setBindError] = useState<string | null>(null)
   // ⚠️ THE FINGERPRINT SAVED WITH THE RECORD, HELD BESIDE savedTotal AND FOR THE SAME REASON. Category 3
   // is the only category whose inputs live in another module, so the SAVED figure can go stale while the
   // screen stays current. null means no comparison is possible: a record saved before this field
@@ -1454,7 +1465,11 @@ export default function Scope3Dashboard() {
       .select('*')
       .eq('id', id)
       .maybeSingle()
-    if (!row) return // no row -> stays unbound; the picker gate handles it
+    // ⚠️ A FAILED BIND USED TO BE SILENT. RLS returns no row for an id that is not this account's, one
+    // that never existed and one that was deleted alike, so a customer following a link landed on the
+    // picker with no explanation of why it had not worked. The sentence states what was observed.
+    if (!row) { setBindError(INVENTORY_NOT_OPENED_SCOPE3); return }
+    setBindError(null)
     setBoundInventoryId(id)
     setGhgGwpVersion(row.gwp_version ?? null)
     setBoundWorkings(row.workings ?? null)
@@ -1920,7 +1935,8 @@ export default function Scope3Dashboard() {
   const cat3Priced = cat3Read.inputs ? priceCat3(cat3Read.inputs) : null
   /** The sentence shown when Category 3 has no figure: the inventory could not be read, or a stream was
    *  never answered. null when there is a figure, including a calculated zero. */
-  const cat3NoFigure = cat3NoFigureText(cat3Priced, cat3Read)
+  const cat3NoFigureAnswer = cat3NoFigure(cat3Priced, cat3Read)
+  const cat3NoticeText = cat3NoFigureAnswer?.text ?? null
 
   /**
    * The bound inventory's activity, fingerprinted, and what it says about the saved record.
@@ -2164,7 +2180,7 @@ export default function Scope3Dashboard() {
     if (id === 'cat15') return cat15Result().reason || NO_REASON
     // Same rule as Cat 15's line above: the reason is the sentence that withheld the figure, verbatim,
     // so the panel, the amber box and the export cannot describe the gap three ways.
-    if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoFigure || NO_REASON)
+    if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoticeText || NO_REASON)
     return NO_REASON
   }
 
@@ -2473,6 +2489,70 @@ export default function Scope3Dashboard() {
       setSavedCat3Fingerprint(cat3FingerprintNow) // ditto: the notice must clear on a save that worked
     } finally { setSaving(false) }
   }
+
+  /**
+   * A sentence from lib/scope3/cat3Copy.ts, with the link that fixes what it describes.
+   *
+   * ⚠️ ONE RENDERER, AND NO COPY IN IT. The sentence and the link label are both constants; this only
+   * decides where they sit and builds the href from the bound inventory. `<a href>`, never next/link:
+   * the beforeunload prompt above fires for a document navigation and not for a client-side route
+   * change, so an in-app link would step around the one safeguard this page has.
+   */
+  /**
+   * ⚠️ A LINK AT THE END OF A PARAGRAPH IN BOLD IS NOT A BUTTON, AND THE PREVIEW READ IT AS EMPHASIS.
+   * Bold inside these boxes is a heading ("What this figure is"), so "Change the energy in that
+   * inventory →" looked like the sentence insisting on itself. It is now an action on its own line,
+   * in btnStep: the platform's secondary button, defined in app/components/buttonStyles.ts and already
+   * used by this page's own Back control and by the eight other module wizards.
+   *
+   * ⚠️ textDecoration: 'none' IS ADDED HERE, NOT TO THE SHARED OBJECT. Every existing btnStep call site
+   * is a <button>, which has no underline to suppress; this is an <a>, which does.
+   */
+  const cat3ActionStyle = { ...btnStep, display: 'inline-block', textDecoration: 'none', marginTop: 8 }
+
+  const Cat3GhgLink = ({ sentence, link }: { sentence: string; link: Cat3GhgLinkKey }) => {
+    const l = CAT3_GHG_LINKS[link]
+    return (
+      <>
+        {sentence}
+        {boundInventoryId && (
+          <div>
+            <a href={ghgHref(boundInventoryId, l.step as GhgStep)} style={cat3ActionStyle}>
+              {l.label} →
+            </a>
+            {/* Directly under the link it warns about, not under the paragraph. */}
+            {!showSaved && (
+              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.5 }}>
+                {CAT3_SAVE_FIRST_HINT}
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    )
+  }
+
+  /**
+   * ⚠️ THE BROWSER'S OWN PROMPT, BECAUSE THIS PAGE NOW LINKS OUT OF ITSELF. Category 3's sentences send
+   * the customer to the GHG module, and every one of those links is a full navigation: without this,
+   * following one mid-edit loses everything typed since the last save, silently. The GHG wizard has
+   * had the same handler since before this page existed (app/dashboard/ghg/page.tsx).
+   *
+   * ⚠️ IT DOES NOT COVER IN-APP NAVIGATION, and that is why every link added for this is a plain <a>
+   * rather than next/link: beforeunload fires for a document navigation and not for a client-side
+   * route change. A real route guard is a larger change, scoped as its own task in
+   * ~/themisiq-sources/findings/.
+   *
+   * Keyed on showSaved, the same derived state the Save button reads, so "saved and unchanged" is the
+   * only quiet state. A bound record that has never been saved warns, which is the case with the most
+   * to lose.
+   */
+  useEffect(() => {
+    if (!boundInventoryId || showSaved) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [boundInventoryId, showSaved])
 
   // Re-arm the Save button whenever saved inputs change after a save. Centralised
   // here rather than scattered across every catData/sector/currency/revenue setter.
@@ -3482,7 +3562,7 @@ export default function Scope3Dashboard() {
                   {cat.id === 'cat3' && <>
                     <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>What this figure is</div>
-                      <p style={{ margin: '0 0 6px' }}>{CAT3_DERIVED_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}><Cat3GhgLink sentence={CAT3_DERIVED_SENTENCE} link="derived" /></p>
                       <p style={{ margin: '0 0 6px' }}>{CAT3_EXCLUDES_COMBUSTION_SENTENCE}</p>
                       <p style={{ margin: '0 0 6px' }}>{CAT3_STAND_IN_SENTENCE}</p>
                       <p style={{ margin: '6px 0 0', fontSize: 10 }}>
@@ -3493,9 +3573,11 @@ export default function Scope3Dashboard() {
 
                     {/* No figure, and the reason, in the words that withheld it. An amber box rather than a
                         silent empty panel: this is the state a customer has to act on, in the GHG module. */}
-                    {cat3NoFigure && (
+                    {cat3NoFigureAnswer && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
-                        {cat3NoFigure}
+                        {cat3NoFigureAnswer.link
+                          ? <Cat3GhgLink sentence={cat3NoFigureAnswer.text} link={cat3NoFigureAnswer.link} />
+                          : cat3NoFigureAnswer.text}
                       </div>
                     )}
 
@@ -3511,7 +3593,7 @@ export default function Scope3Dashboard() {
                         the other "you need to act on this" states, and above the figure it describes. */}
                     {cat3Stale && cat3Change && (
                       <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 8, padding: '0.6rem 0.7rem', lineHeight: 1.6 }}>
-                        {cat3StaleNotice(cat3Change)}
+                        <Cat3GhgLink sentence={cat3StaleNotice(cat3Change)} link="stale" />
                       </div>
                     )}
 
@@ -3538,6 +3620,28 @@ export default function Scope3Dashboard() {
                           summary={cat3WorkingsSummary(cat3Priced)}
                           sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence, cat3ExcludedFor3d)}
                         />
+                      </div>
+                    )}
+
+                    {/* ⚠️ UNDER THE CARD, NOT ON THE ROW. The workings card renders strings (it is shared
+                        with Cats 5, 6, 7 and 12), so a row cannot carry a link without changing that
+                        contract for four other categories. The row still says what is wrong; this is
+                        the way to fix it, once per kind. */}
+                    {cat3Priced && cat3GhgFixes(cat3Priced, cat3Read).length > 0 && boundInventoryId && (
+                      <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
+                        {CAT3_FIX_IN_GHG_HEADING}
+                        {cat3GhgFixes(cat3Priced, cat3Read).map(key => (
+                          <div key={key}>
+                            <a href={ghgHref(boundInventoryId, CAT3_GHG_LINKS[key].step as GhgStep)} style={cat3ActionStyle}>
+                              {CAT3_GHG_LINKS[key].label} →
+                            </a>
+                          </div>
+                        ))}
+                        {!showSaved && (
+                          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.5 }}>
+                            {CAT3_SAVE_FIRST_HINT}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -4077,6 +4181,13 @@ export default function Scope3Dashboard() {
         ) : (
           <>
             <h2 style={sectionHead}>Which inventory is this Scope 3 for?</h2>
+            {/* An id in the URL that did not open. One sentence, from lib/moduleLinks.ts, ending the
+                way this page can honour: the picker is right below it. */}
+            {bindError && (
+              <div role="alert" style={{ background: '#FEF3C7', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+                {bindError}
+              </div>
+            )}
             {inventoryList.length > 0 ? (
               <>
                 {cameFromGhg && (
