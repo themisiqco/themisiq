@@ -23,7 +23,7 @@ import { ghgStepIndex, scope3LinkState, inventoryNotOpenedGhg } from '../../../l
 import {
   EF_SOURCES,
   US_STATES, CA_PROVINCES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
-  GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
+  GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS, canonicalCountryCode,
   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
@@ -769,6 +769,12 @@ const searchParams = useSearchParams()
   const updateLocation = (idx: number, field: keyof Location, value: any) => {
     setInventory(inv => {
       const locs = [...inv.locations]
+      // ⚠️ THE COUNTRY IS CANONICALISED ON THE WAY IN, SO SAVED DATA CARRIES ONE SPELLING PER
+      // COUNTRY. Greece is why: ISO calls it GR, every factor key here is spelled EL, and a
+      // location stored as GR would lose its grid factor outright (gridRegionForCountry returns
+      // '' for it, which is unresolved, so the electricity rows are omitted and export blocks).
+      // The engine canonicalises again on read, for values that arrive from anywhere but here.
+      if (field === 'country') value = canonicalCountryCode(value)
       locs[idx] = { ...locs[idx], [field]: value }
      if (field === 'state') locs[idx].grid_region = detectGridRegion(value, locs[idx].country) // US states → US_<ST>; AU states → AU_<region>
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly

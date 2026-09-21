@@ -21,6 +21,9 @@ import {
   MissingEmissionFactorError, findUnpriceableLocations,
   streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
   efJurisdiction, steamFactorFor, findSteamFactorGaps, snapUnitsForCountry, steamToBasis,
+  canonicalCountryCode, efRouting, countryRefusal,
+  gridRegionForCountry, gridSource, ngUnitOptions, liquidUnitOptions, GRID_EF,
+  EU_COUNTRIES, combustionSource,
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
@@ -2376,6 +2379,123 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     // pickEF's behaviour is unchanged by the refactor: a GB diesel litre is still DEFRA's, a JP one the US fallback.
     expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).co2).toBe(2.58354);
     expect(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any).co2).toBe(10.20648);
+  });
+});
+
+// ── T15. ONE SPELLING PER COUNTRY, AND ONE ROUTER ────────────────────────────────────────────────
+//
+// Greece is the case these exist for. ISO 3166-1 assigns GR; every factor key in this engine is
+// spelled EL. Before canonicalCountryCode, a location stored as 'GR' was wrong in SEVEN separate
+// places at once, and the worst of them was silent: gridRegionForCountry returned '' for it, which
+// isResolvedGridRegion rejects, so the electricity rows were omitted from the workings and every
+// export blocked. Fixing only the factor router would have routed Greek FUELS to the EU tables
+// while its electricity stayed unresolved and its units stayed American, which is harder to spot
+// than the original defect because the fuel rows would have looked right.
+describe('T15 country canonicalisation', () => {
+  it('maps the two codes whose ISO spelling is not the engine spelling, and nothing else', () => {
+    expect(canonicalCountryCode('GR')).toBe('EL');
+    expect(canonicalCountryCode('UK')).toBe('GB');
+    // Case and whitespace are handled on the way in, as they always were.
+    expect(canonicalCountryCode(' gr ')).toBe('EL');
+    expect(canonicalCountryCode('uk')).toBe('GB');
+    // Everything else is returned unchanged, upper-cased and trimmed.
+    for (const c of ['US', 'CA', 'GB', 'EL', 'AU', 'NZ', 'FR', 'JP', 'OTHER', 'ZZ']) {
+      expect(canonicalCountryCode(c), c).toBe(c);
+    }
+    expect(canonicalCountryCode('')).toBe('');
+    expect(canonicalCountryCode(undefined)).toBe('');
+    // NOT a name alias table. Names are detectGridRegion's business and are left alone.
+    expect(canonicalCountryCode('GREECE')).toBe('GREECE');
+  });
+
+  it('GR and EL are indistinguishable to every country-keyed function in the engine', () => {
+    const gr = loc({ country: 'GR' }), el = loc({ country: 'EL' });
+    // 1. the factor router
+    expect(efJurisdiction(gr)).toBe(efJurisdiction(el));
+    expect(efJurisdiction(gr)).toBe('EU');
+    // 2. the grid region, and it must be a REAL GRID_EF key, not merely equal
+    expect(gridRegionForCountry('GR')).toBe(gridRegionForCountry('EL'));
+    expect(gridRegionForCountry('GR')).toBe('EU_EL');
+    expect(GRID_EF['EU_EL'], 'EU_EL must exist or the grid factor is lost').toBeDefined();
+    // 3. + 4. the two citation routers
+    expect(gridSource(gr)).toBe(gridSource(el));
+    expect(gridSource(gr)).toBe(EF_SOURCES.electricity_eu);
+    expect(combustionSource(gr)).toBe(combustionSource(el));
+    expect(combustionSource(gr)).toBe(EF_SOURCES.combustion_eu);
+    // 5. + 6. the unit option lists: metric, not American
+    expect(ngUnitOptions('GR')).toEqual(ngUnitOptions('EL'));
+    expect(ngUnitOptions('GR').map(([v]) => v)).toEqual(['m3']);
+    expect(liquidUnitOptions('GR')).toEqual(liquidUnitOptions('EL'));
+    expect(liquidUnitOptions('GR').map(([v]) => v)).toEqual(['litres']);
+    // 7. and the grid region resolves, so the electricity rows are not dropped
+    expect(isResolvedGridRegion(gridRegionForCountry('GR'))).toBe(true);
+  });
+
+  it('UK and GB are likewise indistinguishable', () => {
+    expect(efJurisdiction({ country: 'UK' })).toBe(efJurisdiction({ country: 'GB' }));
+    expect(gridRegionForCountry('UK')).toBe(gridRegionForCountry('GB'));
+    expect(gridRegionForCountry('UK')).toBe('UK');
+    expect(gridSource(loc({ country: 'UK' }))).toBe(gridSource(loc({ country: 'GB' }))); 
+    expect(combustionSource(loc({ country: 'UK' }))).toBe(combustionSource(loc({ country: 'GB' })));
+    expect(ngUnitOptions('UK')).toEqual(ngUnitOptions('GB'));
+  });
+});
+
+// ── T16. THE ROUTER'S THREE REFUSALS ─────────────────────────────────────────────────────────────
+//
+// A PROBE WITH NO CONSUMER IN THIS COMMIT. efJurisdiction still answers 'US' for an unsupported
+// country, exactly as it always has, so nothing this describes changes a figure yet. The states and
+// their tests land before the behaviour, on the same footing as reconcile().
+describe('T16 country refusals', () => {
+  it('every supported country routes, and US routes only from US', () => {
+    const supported: [string, string][] = [
+      ['US', 'US'], ['CA', 'CA'], ['GB', 'UK'], ['UK', 'UK'], ['AU', 'AU'], ['NZ', 'NZ'],
+      ['EL', 'EU'], ['GR', 'EU'], ['DE', 'EU'], ['FR', 'EU'],
+    ];
+    for (const [country, jurisdiction] of supported) {
+      const r = efRouting({ country });
+      expect(r.supported, country).toBe(true);
+      expect(r.supported && r.jurisdiction, country).toBe(jurisdiction);
+      expect(countryRefusal({ country }), country).toBeNull();
+    }
+    // Every EU member, not just the two spot checks, and each with a real grid key.
+    for (const c of EU_COUNTRIES) {
+      const r = efRouting({ country: c });
+      expect(r.supported && r.jurisdiction, c).toBe('EU');
+      expect(GRID_EF[gridRegionForCountry(c)], c).toBeDefined();
+    }
+  });
+
+  it('the three refusals are distinct and carry what their sentences need', () => {
+    // Never answered.
+    expect(countryRefusal({ country: '' })).toEqual({ state: 'country_not_set' });
+    expect(countryRefusal({})).toEqual({ state: 'country_not_set' });
+    // Answered with something that names no country. The value is carried VERBATIM so a surface
+    // can quote what was stored rather than paraphrasing it.
+    expect(countryRefusal({ country: 'OTHER' })).toEqual({ state: 'country_not_listed', value: 'OTHER' });
+    expect(countryRefusal({ country: 'ZZ' })).toEqual({ state: 'country_not_listed', value: 'ZZ' });
+    // A real country the platform can NAME but holds no factors for.
+    expect(countryRefusal({ country: 'JP' })).toEqual({ state: 'country_not_supported', iso2: 'JP' });
+    expect(countryRefusal({ country: 'PH' })).toEqual({ state: 'country_not_supported', iso2: 'PH' });
+  });
+
+  it('a code the country list cannot name is not_listed, not not_supported', () => {
+    // ⚠️ THIS IS THE LINE THE COPY FORCES. country_not_supported reads "we do not hold emission
+    // factors for this location's country (Philippines)", which cannot be written without a name.
+    // The concordance holds 212 of the 249 assigned alpha-2 codes, so Jersey, Guernsey, the Isle of
+    // Man, Gibraltar and Guam have no name here. Quoting the stored value is the honest answer for
+    // them; claiming we know which country it is would not be.
+    for (const c of ['JE', 'GG', 'IM', 'GI', 'GU']) {
+      expect(countryRefusal({ country: c }), c).toEqual({ state: 'country_not_listed', value: c });
+    }
+  });
+
+  it('efJurisdiction is UNCHANGED by this commit, including its US fallback', () => {
+    // ⚠️ DELETED BY TASK 2, AND HERE ON PURPOSE UNTIL THEN. This commit adds a router and three
+    // refusal states and wires NOTHING to them, so it must be provable that no figure moved.
+    expect(efJurisdiction({ country: 'JP' })).toBe('US');
+    expect(efJurisdiction({ country: '' })).toBe('US');
+    expect(efJurisdiction({ country: 'OTHER' })).toBe('US');
   });
 });
 

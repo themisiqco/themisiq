@@ -26,6 +26,14 @@ import type { ComparabilityRecord } from './comparability'
 // Type only, for the same reason and with the same effect: erased at compile, so the fact that
 // factorEditions.ts imports VALUES back out of this file is not a runtime cycle.
 import type { FactorEditions } from './factorEditions'
+// ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
+// WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
+// country control is built from, so "a country this platform can express" has ONE definition and
+// the picker and the router cannot disagree about it. Client-safe by construction: it imports
+// countryRegions.json (29 KB) and no factor file, which is the whole reason that split exists.
+//   It carries NO display name into the engine, deliberately. A name shown to a customer is copy,
+// is locale-sensitive, and belongs in the copy module where it can be pinned to ['en'] once.
+import { countryByIso2 } from '../emissionFactors/countryOptions'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -1265,14 +1273,110 @@ const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL
 // their answers are citations rather than table identities. Flagged, not fixed.
 export type EfJurisdiction = 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ'
 
+// ── ONE SPELLING PER COUNTRY, BEFORE ANY ROUTER LOOKS AT IT ──────────────────────────────────────
+//
+// Two codes name a country this engine supports under a spelling none of its tables use:
+//   GR -> EL   ISO 3166-1 assigns GR to Greece. EVERY factor key here is spelled EL, the
+//              EEA/Eurostat convention: GRID_EF.EU_EL, RESIDUAL_EU.EU_EL, EU_COUNTRIES.
+//   UK -> GB   ISO assigns GB; UK is exceptionally reserved and is what people type.
+//
+// ⚠️ THIS EXISTS BECAUSE GREECE WAS WRONG IN SEVEN PLACES, NOT ONE, AND FIXING THE ROUTER ALONE
+// WOULD HAVE HALF-FIXED IT. For a location stored as 'GR', efJurisdiction fell to US, AND
+// gridRegionForCountry returned '' (unresolved, so the electricity rows vanish and export blocks),
+// AND gridSource cited US EPA, AND combustionSource cited US EPA, AND ngUnitOptions offered Mcf,
+// AND liquidUnitOptions offered gallons, AND no EU_GR key exists in either grid table. Routing the
+// FUELS to the EU tables while electricity stayed unresolved and the units stayed American would
+// have been harder to spot than the original defect, because the fuel rows would have looked right.
+//
+// ⚠️ APPLIED AT BOTH ENDS, DELIBERATELY. The country control stores the canonical code, so saved
+// data keeps one spelling; the engine canonicalises again on read, so a 'GR' arriving from an
+// import, a hand-edited jsonb or a surface written later still resolves. Doing only the first
+// leaves the engine silently wrong for a value the rest of the product considers valid, which is
+// the shape of the defect this whole change removes.
+//
+// NOT AN ALIAS TABLE FOR NAMES. 'GREECE' and 'UNITED KINGDOM' are not handled here; see the alias
+// note on detectGridRegion.
+const COUNTRY_CANONICAL: Readonly<Record<string, string>> = { GR: 'EL', UK: 'GB' }
+
+/** The engine's stored spelling for a country code: upper-cased, trimmed, aliases resolved. */
+export function canonicalCountryCode(country?: string): string {
+  const ctry = (country || '').toUpperCase().trim()
+  return COUNTRY_CANONICAL[ctry] ?? ctry
+}
+
+// ── WHY A COUNTRY IS NOT PRICEABLE, IN THREE DISTINCT STATES ─────────────────────────────────────
+//
+// ⚠️ THESE ARE NOT INTERCHANGEABLE AND MUST NEVER BE FOLDED INTO ONE. They need opposite remedies:
+// a blank country is an unanswered question, a value that names no country is an answered question
+// the list could not express, and a real ISO code is a coverage limit of this platform. One state
+// would give all three the same sentence, and two of them would then be wrong.
+//
+// PROBE ONLY IN THIS CHANGE. Nothing consumes it yet: efJurisdiction still returns 'US' for an
+// unsupported country, exactly as before. Exported and tested ahead of its consumer on the same
+// footing as reconcile(), so the decision and its tests land before the behaviour does.
+export type CountryRefusal =
+  /** Never answered. Stored as ''. */
+  | { state: 'country_not_set' }
+  /** A stored value that names no country: the 'OTHER' the control stores for "Not listed",
+   *  or any legacy token. `value` is carried VERBATIM so a surface can quote what was stored. */
+  | { state: 'country_not_listed'; value: string }
+  /**
+   * A country code the platform can NAME but holds no factor set for.
+   *
+   * ⚠️ "CAN NAME", NOT "IS AN ISO CODE", AND THE DIFFERENCE IS FORCED BY THE COPY. This state's
+   * sentence is "we do not hold emission factors for this location's country (Philippines)", which
+   * cannot be written without a name. The concordance holds 212 of the 249 assigned alpha-2 codes,
+   * so JE, GG, IM, GI, GU and the rest of the territory list have no name here and fall to
+   * country_not_listed, which quotes the stored value instead. That is the honest split: we say
+   * which country we cannot price only when we can say which country it is.
+   */
+  | { state: 'country_not_supported'; iso2: string }
+
+export type EfRouting =
+  | { supported: true; jurisdiction: EfJurisdiction }
+  | { supported: false; refusal: CountryRefusal }
+
+/**
+ * THE ONE COUNTRY ROUTER. Which factor table a location resolves to, or why it resolves to none.
+ *
+ * ⚠️ US IS RETURNED FOR 'US' AND FOR NOTHING ELSE. The old `return 'US'` at the end of
+ * efJurisdiction caught every unrecognised country, so a Japanese site was priced from EPA tables,
+ * its steam from EPA Table 7 (a US natural-gas boiler at 80% efficiency), and factor_editions
+ * recorded 'US EPA 2024' against it. That is the fallback this function exists to replace.
+ */
+export function efRouting(loc: { country?: string }): EfRouting {
+  const ctry = canonicalCountryCode(loc.country)
+  const ok = (jurisdiction: EfJurisdiction): EfRouting => ({ supported: true, jurisdiction })
+  if (ctry === 'GB') return ok('UK')
+  if (EU_COUNTRIES.includes(ctry)) return ok('EU')
+  if (ctry === 'AU') return ok('AU')
+  if (ctry === 'NZ') return ok('NZ')
+  if (ctry === 'CA') return ok('CA')
+  if (ctry === 'US') return ok('US')
+  if (ctry === '') return { supported: false, refusal: { state: 'country_not_set' } }
+  // A code the country list can express is a coverage limit; anything else names no country.
+  // ⚠️ 'OTHER' TAKES NO SPECIAL CASE, AND THAT IS THE POINT. It is one member of the open set
+  // "a stored string that is not a country code", which also holds typos, truncations and whatever
+  // a future import produces. Naming it here would handle the one value we know about and drop the
+  // rest somewhere else.
+  return countryByIso2(ctry) !== undefined
+    ? { supported: false, refusal: { state: 'country_not_supported', iso2: ctry } }
+    : { supported: false, refusal: { state: 'country_not_listed', value: (loc.country || '').trim() } }
+}
+
+/** The refusal for a location, or null when its country is supported. */
+export function countryRefusal(loc: { country?: string }): CountryRefusal | null {
+  const r = efRouting(loc)
+  return r.supported ? null : r.refusal
+}
+
 export function efJurisdiction(loc: { country?: string }): EfJurisdiction {
-  const ctry = (loc.country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') return 'UK'
-  if (EU_COUNTRIES.includes(ctry)) return 'EU'
-  if (ctry === 'AU') return 'AU'
-  if (ctry === 'NZ') return 'NZ'
-  if (ctry === 'CA') return 'CA'
-  return 'US'
+  const r = efRouting(loc)
+  // ⚠️ THE LEGACY FALLBACK, KEPT ON PURPOSE FOR THIS COMMIT ONLY, AND DELETED BY THE NEXT ONE.
+  // Task 2 changes this return type to `EfJurisdiction | null` and makes every caller handle the
+  // refusal. Until then this function answers exactly as it always has, so this commit moves no
+  // figure: the router and the refusal states are in place and tested, and nothing reads them yet.
+  return r.supported ? r.jurisdiction : 'US'
 }
 // EU-27 dropdown options: [ISO, label with flag], alphabetical by country name.
 const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
@@ -1286,7 +1390,11 @@ const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
 ]
 function detectGridRegion(code: string, country?: string): string {
   const c = (code || '').toUpperCase().trim()
-  const ctry = (country || '').toUpperCase().trim()
+  // ⚠️ canonicalCountryCode HANDLES CODES, THE NAME COMPARISONS BELOW ARE LEFT EXACTLY AS THEY WERE.
+  // This function accepts 'AUSTRALIA' and 'CANADA' as well as AU and CA, which efRouting does not;
+  // the three country routers have three different alias policies and unifying them is a separate
+  // change. Canonicalising here fixes the CODE path without widening or narrowing the name path.
+  const ctry = canonicalCountryCode(country)
   // Australia first — its NT/WA codes collide with a CA province / US state, so gate on country.
   // ACT shares the NSW grid; WA→AU_WA (SWIS main); NT→AU_NT (DKIS main); else AU_<state>.
   if (ctry === 'AU' || ctry === 'AUSTRALIA') {
@@ -1308,8 +1416,9 @@ function detectGridRegion(code: string, country?: string): string {
 // Country-level grid region for countries whose grid factor is national (UK, EU members).
 // Returns the GRID_EF key, or '' if the country isn't one we map at country level.
 function gridRegionForCountry(country: string): string {
-  const ctry = (country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') return 'UK'
+  // canonicalCountryCode FIRST: 'GR' must reach EU_EL, which is the only spelling GRID_EF carries.
+  const ctry = canonicalCountryCode(country)
+  if (ctry === 'GB') return 'UK'
   if (ctry === 'NZ' || ctry === 'NEW ZEALAND') return 'NZ'
   if (EU_COUNTRIES.includes(ctry)) return 'EU_' + ctry
   return ''
@@ -1755,7 +1864,7 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
 // factor for therms/mmbtu). UK uses kWh only (DEFRA's billing basis — how UK gas bills read).
 // US keeps all three. Returned as [value, label] pairs.
 function ngUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(country)
   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
   if (ctry === 'NZ') return [['kwh', 'kWh']]
@@ -1771,7 +1880,7 @@ function normalizeNgUnit(country: string, unit: string): string {
 // Liquid-fuel units offered per country. Metric countries (CA, UK, EU) get litres only —
 // gallons is never offered, so a verifier can't find US units on a metric inventory.
 function liquidUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(country)
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
 }
@@ -1810,7 +1919,7 @@ function steamUnitOptions(country: string): Array<[string, string]> {
 }
 
 function propaneUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(country)
   if (ctry === 'NZ') return [['kg', 'kg']]
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
@@ -2179,7 +2288,7 @@ function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asser
 }
 
 function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): CombustionEF {
-  const ctry = (loc.country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(loc.country)
   // Switches on the shared router rather than re-branching on country. Behaviour is unchanged: the
   // arms below are the same six, in the same order of precedence, with the same US fallbacks.
   // ⚠️ STEAM DOES NOT COME THROUGH HERE, precisely because of those `?? (EF as any)[key]` fallbacks.
@@ -2222,7 +2331,7 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
 // It exists because the workings printed EF_SOURCES.electricity, the whole six-jurisdiction catalogue,
 // on every grid row: a verifier could not tell which source had priced the line in front of them.
 export function gridSource(loc: Location): string {
-  const ctry = (loc.country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(loc.country)
   if (ctry === 'CA') return EF_SOURCES.electricity_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.electricity_uk
   if (ctry === 'AU') return EF_SOURCES.electricity_au
@@ -2240,9 +2349,13 @@ export function gridSourcesFor(locations: readonly { country?: string }[]): stri
   return [...new Set(locations.map(l => gridSource(l as Location)))]
 }
 
+// ⚠️ CANONICALISED LIKE EVERY OTHER COUNTRY BRANCH. This function and gridSource each normalise
+// country privately (the engine's own note calls them "still separate"), so canonicalising only the
+// factor router left Greece citing US EPA on rows the EU tables had priced. A test asserting that
+// GR and EL are indistinguishable to all seven country-keyed functions is what found it.
 // Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, IPCC for EU, EPA otherwise).
 function combustionSource(loc: Location): string {
-  const ctry = (loc.country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(loc.country)
   if (ctry === 'CA') return EF_SOURCES.combustion_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.combustion_uk
   if (ctry === 'AU') return EF_SOURCES.combustion_au
