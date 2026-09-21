@@ -22,8 +22,13 @@ const COUNTRIES = [
   // EU_COUNTRIES in full — an option list that special-cases the bloc must do so for all of them.
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'EL', 'HU', 'IE', 'IT',
   'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
-  // Not a country the lists know — must still resolve to something offerable, never undefined.
-  'ZZ',
+  // ⚠️ THE THREE VALUES THE ROUTER REFUSES, AND THE LIST DID NOT HOLD ALL OF THEM.
+  // 'ZZ' was here from the start as "not a country the lists know". 'OTHER' was not, although it is
+  // the value the country control has always stored for "Not listed" and therefore the commonest
+  // refused value in real data; 'JP' was not either, and it is the third state (a real ISO code with
+  // no factor set). A list whose comment says "every country the wizard can hold" has to hold them.
+  // Every one must still resolve to something offerable, never undefined.
+  'ZZ', 'OTHER', 'JP',
 ]
 
 // Every unit value that exists anywhere across all fuels, so each field is tested against units it

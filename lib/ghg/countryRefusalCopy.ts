@@ -24,7 +24,7 @@
 //   That step also carries a SECOND label: its in-page heading reads "Company & inventory setup"
 // (page.tsx:1423). This copy follows the TAB BAR, because that is the thing a customer clicks.
 
-import type { CountryRefusal } from './engine'
+import { refusalIsFixable, type CountryRefusal } from './engine'
 import { countryByIso2 } from '../emissionFactors/countryOptions'
 
 /** The step and field a customer must go to, named exactly as the wizard labels them. */
@@ -67,6 +67,13 @@ export type RefusalSurface = 'review' | 'verifier'
  */
 const isNotListedChoice = (value: string): boolean => value.trim().toUpperCase() === 'OTHER'
 
+// ⚠️ THE REMEDY CLAUSE READS refusalIsFixable, THE SAME PREDICATE THE EXPORT GATE READS. Added with
+// Task 2a, which split the gate by whether the customer can act. This file cannot now offer a remedy
+// for a state the gate waves through, nor stay silent about one the gate blocks on, because both
+// answers come from one function. A gate that blocks with no remedy strands the customer; a remedy
+// offered where nothing is blocked nags about nothing.
+const offersRemedy = refusalIsFixable
+
 /**
  * The sentence for a refusal.
  *
@@ -86,20 +93,20 @@ export function countryRefusalText(
   switch (refusal.state) {
     case 'country_not_set':
       return surface === 'review'
-        ? review('This location has no country set, so its energy is not priced and is left out of every total.', true)
+        ? review('This location has no country set, so its energy is not priced and is left out of every total.', offersRemedy(refusal))
         : 'No country recorded for this location. Nothing from this location is included in any total on this report.'
 
     case 'country_not_listed':
       if (isNotListedChoice(refusal.value)) {
         return surface === 'review'
-          ? review('This location’s country is set to Not listed, so its energy is not priced and is left out of every total.', false)
+          ? review('This location’s country is set to Not listed, so its energy is not priced and is left out of every total.', offersRemedy(refusal))
           : 'The country for this location was recorded as not listed. No emission factor set is held for it, and nothing from this location is included in any total on this report.'
       }
       // The stored value is QUOTED, never paraphrased. A customer who sees it can match it to what
       // they picked, and a verifier can check it against the record. "An unrecognised value" leaves
       // both of them nothing to act on.
       return surface === 'review'
-        ? review(`This location’s country is recorded as "${refusal.value}", which does not name a country, so its energy is not priced and is left out of every total.`, true)
+        ? review(`This location’s country is recorded as "${refusal.value}", which does not name a country, so its energy is not priced and is left out of every total.`, offersRemedy(refusal))
         : `The country recorded for this location, "${refusal.value}", does not name a country. Nothing from this location is included in any total on this report.`
 
     case 'country_not_supported': {
@@ -110,7 +117,7 @@ export function countryRefusalText(
       // for every name in the list and needs no exception table.
       const name = countryNameEn(refusal.iso2)
       return surface === 'review'
-        ? review(`We do not hold emission factors for this location’s country (${name}), so its energy is not priced and is left out of every total.`, false)
+        ? review(`We do not hold emission factors for this location’s country (${name}), so its energy is not priced and is left out of every total.`, offersRemedy(refusal))
         : `No emission factor set is held for this location’s country (${name}). Nothing from this location is included in any total on this report.`
     }
   }

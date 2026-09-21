@@ -29,6 +29,7 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+  countryRefusal, refusalIsFixable,
   findSteamFactorGaps, steamFactorFor,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry,
@@ -1118,7 +1119,16 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // Grid-region gate: locations whose grid_region isn't a real GRID_EF key (us_average default, '',
   // or an unmapped country) — these silently fall back to US_AVG in getGridFactor. Consumed by the
   // step-2 advance + export gates and the UI prompt (sub-steps D/E). Pure derivation, no behaviour here.
+  //
+  // ⚠️ A REFUSED LOCATION IS NEVER ASKED FOR A GRID REGION, AND WITHOUT THIS IT COULD NOT ANSWER.
+  // gridRegionForCountry returns '' for every country this platform does not support, and the only
+  // controls that set grid_region are the US state, the Canadian province and the country itself.
+  // A location set to "Not listed" therefore had an unresolvable grid gate: the step 2 Continue
+  // button stayed disabled with no control anywhere that could clear it. Nothing about a grid region
+  // matters for a location excluded from every total, so the country refusal is the only reason
+  // shown for it, and it is shown once.
   const unresolvedGridLocations = inventory.locations
+    .filter(l => !countryRefusal(l))
     .map((l, i) => ({ i, name: l.name || `Location ${i + 1}`, region: l.grid_region }))
     .filter(l => !isResolvedGridRegion(l.region))
   const gridReady = unresolvedGridLocations.length === 0
@@ -1146,16 +1156,36 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // time. Running the probe per basis would triple a pure-arithmetic sweep to reach that same
   // answer, and — worse — would invite a future reader to believe the sets could differ.
   const unpriceableLocations = findUnpriceableLocations(inventory.locations, 'AR6', inventory.reporting_year)
-  const pricingReady = unpriceableLocations.length === 0
+  const refusedLocations = unpriceableLocations.filter(u => u.kind === 'country')
+  const factorGapLocations = unpriceableLocations.filter(u => u.kind === 'factor')
+  // ⚠️ THE EXPORT GATE BLOCKS ONLY ON WHAT THE CUSTOMER CAN FIX, AND THAT IS NOT A RELAXATION.
+  // A blocked export is an instruction: go and do something. For a location whose country is set to
+  // "Not listed", or whose country this platform holds no factors for, there is nothing to go and
+  // do. Blocking there does not protect the verifier, it withholds the report permanently from a
+  // customer whose other locations are complete and correct.
+  //   What protects the verifier is that the exclusion is STATED, on every surface the figures reach:
+  // the note on each total, the CSV, the workings, the verifier page and Category 3. That is
+  // stronger than a gate, because a gate that can never be cleared eventually gets removed.
+  //   refusalIsFixable is the same predicate that decides whether the sentence offers a remedy, so
+  // the two cannot disagree: we block exactly where we tell the customer what to do.
+  const blockingRefusals = refusedLocations.filter(u => u.kind === 'country' && refusalIsFixable(u.refusal))
+  const statedRefusals = refusedLocations.filter(u => u.kind === 'country' && !refusalIsFixable(u.refusal))
+  // Blocks on factor gaps (always fixable: change the unit or the country) and on fixable refusals.
+  // A stated refusal is excluded from the totals and named everywhere, and does not block.
+  const pricingReady = factorGapLocations.length === 0 && blockingRefusals.length === 0
   const unpriceableById = new Map(unpriceableLocations.map(u => [u.locId, u]))
   // One phrasing of "this total leaves something out", used at every site that shows a total.
   // ⚠️ "we can't work out YET" IS TRUE OF A UNIT MISMATCH AND FALSE OF A COUNTRY WE HOLD NO FACTORS
   // FOR. "Yet" promises the customer that something they do will fix it; for country_not_supported,
   // and for the chosen "Not listed", there is nothing they can do, and a promise that quietly never
   // comes true is worse than a plain statement. Two clauses, joined only when both apply.
-  const refusedLocations = unpriceableLocations.filter(u => u.kind === 'country')
-  const factorGapLocations = unpriceableLocations.filter(u => u.kind === 'factor')
-  const exclusionNote = pricingReady ? null : [
+  //
+  // ⚠️ KEYED ON WHAT IS EXCLUDED, NOT ON WHETHER THE EXPORT IS BLOCKED, AND TASK 2a IS WHY.
+  // This read `pricingReady ? null : …` when the two meant the same thing. They no longer do: a
+  // stated refusal leaves pricingReady TRUE and still excludes a location from every total, so
+  // keying on the gate would have silenced the note on exactly the reports that go out with a
+  // location missing. The note is the thing that makes not blocking safe.
+  const exclusionNote = unpriceableLocations.length === 0 ? null : [
     factorGapLocations.length > 0
       ? `Excludes ${factorGapLocations.length} location${factorGapLocations.length > 1 ? 's' : ''} we can't work out yet (${factorGapLocations.map(u => u.locName).join(', ')}).`
       : null,

@@ -21,15 +21,16 @@ import {
   MissingEmissionFactorError, findUnpriceableLocations,
   streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
   efJurisdiction, steamFactorFor, findSteamFactorGaps, snapUnitsForCountry, steamToBasis,
-  canonicalCountryCode, efRouting, countryRefusal, type EfJurisdiction,
+  canonicalCountryCode, efRouting, countryRefusal, refusalIsFixable, type EfJurisdiction, type CountryRefusal,
   combustionSourcesFor, gridSourcesFor,
   gridRegionForCountry, gridSource, ngUnitOptions, liquidUnitOptions, GRID_EF,
-  EU_COUNTRIES, combustionSource,
+  EU_COUNTRIES, combustionSource, propaneUnitOptions, steamUnitOptions,
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+import { countryRefusalText } from './countryRefusalCopy';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -2593,6 +2594,89 @@ describe('T16 country refusals', () => {
     const gb = loc({ id: 'gb', country: 'GB', grid_region: 'UK' });
     expect(combustionSourcesFor([gb, refused])).toEqual([EF_SOURCES.combustion_uk]);
     expect(gridSourcesFor([gb, refused])).toEqual([EF_SOURCES.electricity_uk]);
+  });
+
+  it('a refused location is offered metric units first, and never defaults to a US one', () => {
+    // A site that is not in the United States must not be handed a US billing unit as its default.
+    for (const country of ['OTHER', 'JP', '', 'ZZ']) {
+      expect(liquidUnitOptions(country)[0][0], country).toBe('litres');
+      expect(propaneUnitOptions(country)[0][0], country).toBe('litres');
+      expect(ngUnitOptions(country)[0][0], country).toBe('m3');
+      expect(steamUnitOptions(country).map(([v]) => v), country).toEqual(['gj']);
+      // A NEW location, holding nothing, takes opts[0].
+      const fresh = snapUnitsForCountry(country, {});
+      expect(fresh.diesel_stationary_unit, country).toBe('litres');
+      expect(fresh.natural_gas_unit, country).toBe('m3');
+      expect(fresh.propane_unit, country).toBe('litres');
+    }
+    // The United States itself is untouched.
+    expect(liquidUnitOptions('US')[0][0]).toBe('gallons');
+    expect(ngUnitOptions('US')[0][0]).toBe('mcf');
+  });
+
+  it('a refused location KEEPS a US unit it already holds, with the number untouched', () => {
+    // ⚠️ THIS IS THE WHOLE REASON THE US UNITS STAY IN THE LIST. snapUnitsForCountry keeps a held
+    // unit only while the list still offers it, and otherwise takes opts[0] WITHOUT CONVERTING. A
+    // metric-only list here would turn 1,000 gallons into 1,000 litres, a 3.79-fold error, silently.
+    const held = { diesel_stationary_unit: 'gallons', natural_gas_unit: 'mcf', propane_unit: 'gallons' };
+    for (const country of ['OTHER', 'JP', '', 'ZZ']) {
+      const after = snapUnitsForCountry(country, held as never);
+      expect(after.diesel_stationary_unit, country).toBe('gallons');
+      expect(after.natural_gas_unit, country).toBe('mcf');
+      expect(after.propane_unit, country).toBe('gallons');
+    }
+    // And the figure beside it is not touched by the snap at all: it returns units, nothing else.
+    const l = loc({ country: 'US', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'gallons' });
+    const moved = { ...l, country: 'OTHER', ...snapUnitsForCountry('OTHER', l as never) };
+    expect(moved.diesel_stationary_amount, 'the number is unchanged').toBe(1000);
+    expect(moved.diesel_stationary_unit, 'and so is its unit').toBe('gallons');
+  });
+
+  it('1,000 litres entered under Not listed survives the switch to France', () => {
+    // The walkthrough's exact case: FR offers litres only, the held unit is litres, so it is kept.
+    const b = loc({ country: 'OTHER', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' });
+    const after = { ...b, country: 'FR', ...snapUnitsForCountry('FR', b as never) };
+    expect(after.diesel_stationary_unit).toBe('litres');
+    expect(after.diesel_stationary_amount).toBe(1000);
+  });
+
+  it('a refusal blocks the export if and only if its sentence offers a remedy', () => {
+    // ⚠️ THE ONE INVARIANT TASK 2a RESTS ON. A gate that blocks with no remedy is a report the
+    // customer can never produce: nothing in the wizard turns "Not listed" or an unsupported
+    // country into a supported one. A remedy offered where nothing is blocked nags about nothing.
+    // Both answers come from refusalIsFixable, so they cannot drift.
+    const where = 'Choose the country in "List your locations" on the Company setup step.';
+    const cases: CountryRefusal[] = [
+      { state: 'country_not_set' },
+      { state: 'country_not_listed', value: 'OTHER' },
+      { state: 'country_not_listed', value: 'Japn' },
+      { state: 'country_not_supported', iso2: 'JP' },
+    ];
+    for (const r of cases) {
+      const fixable = refusalIsFixable(r);
+      const offersRemedy = countryRefusalText(r, 'review', false).includes(where);
+      expect(offersRemedy, `${r.state}: gate and sentence must agree`).toBe(fixable);
+    }
+    // And the split itself, spelled out so a change to the predicate has to change this line too.
+    expect(refusalIsFixable({ state: 'country_not_set' })).toBe(true);
+    expect(refusalIsFixable({ state: 'country_not_listed', value: 'Japn' })).toBe(true);
+    expect(refusalIsFixable({ state: 'country_not_listed', value: 'OTHER' })).toBe(false);
+    expect(refusalIsFixable({ state: 'country_not_listed', value: ' other ' }), 'case and space').toBe(false);
+    expect(refusalIsFixable({ state: 'country_not_supported', iso2: 'JP' })).toBe(false);
+  });
+
+  it('a non-blocking refusal is still excluded from every total and still stated', () => {
+    // Not blocking is not the same as not counting. The location contributes nothing, carries its
+    // own workings row, and that row is what every export surface renders.
+    const ok = loc({ id: 'ok', name: 'Priced', country: 'GB', grid_region: 'UK', electricity_kwh: 5000 });
+    const out = loc({ id: 'out', name: 'Elsewhere', country: 'JP', electricity_kwh: 9000 });
+    const totals = calcInventory([ok, out], 'AR6', 2025);
+    const alone = calcInventory([ok], 'AR6', 2025);
+    expect(totals.s2_location, 'the refused location adds nothing').toBe(alone.s2_location);
+    const rows = buildWorkings([ok, out], 'AR6', 2025);
+    expect(rows.filter(r => r.declaration === 'country_not_supported').length).toBe(1);
+    expect(rows.some(r => r.location === 'Elsewhere' && r.result_tco2e !== null),
+      'and contributes no priced row').toBe(false);
   });
 
   it('the workings row carries the state as its own declaration literal', () => {

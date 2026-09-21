@@ -1349,6 +1349,29 @@ export type CountryRefusal =
    */
   | { state: 'country_not_supported'; iso2: string }
 
+/**
+ * Can the customer clear this refusal by doing something?
+ *
+ * ⚠️ THIS IS ONE PREDICATE FOR TWO DECISIONS THAT MUST NOT DISAGREE: whether the Review sentence
+ * offers a remedy, and whether the export gate blocks. A gate that blocks with no remedy strands the
+ * customer: there is no control anywhere in the wizard that turns "Not listed" or an unsupported
+ * country into a supported one, so blocking on those means the report can never be produced. A
+ * remedy offered where the gate does not block is the opposite error, nagging about something that
+ * is not stopping anything.
+ *   So the rule is: THE GATE BLOCKS IF AND ONLY IF THE SENTENCE OFFERS A REMEDY, and both read this.
+ */
+export function refusalIsFixable(refusal: CountryRefusal): boolean {
+  switch (refusal.state) {
+    // Nobody answered. Answering it is the fix.
+    case 'country_not_set': return true
+    // A stored value that names no country can be replaced with one. "Not listed" cannot: the
+    // customer answered honestly and the list still has nothing for them.
+    case 'country_not_listed': return refusal.value.trim().toUpperCase() !== 'OTHER'
+    // A limit of this platform, not of the record. Nothing the customer does changes it.
+    case 'country_not_supported': return false
+  }
+}
+
 export type EfRouting =
   | { supported: true; jurisdiction: EfJurisdiction }
   | { supported: false; refusal: CountryRefusal }
@@ -1889,8 +1912,26 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
 // Natural gas units offered per country. CA uses mcf/m3 only (ECCC has no energy-basis
 // factor for therms/mmbtu). UK uses kWh only (DEFRA's billing basis — how UK gas bills read).
 // US keeps all three. Returned as [value, label] pairs.
+// ── ORDER IS THE DEFAULT, AND RETENTION IS WHAT KEEPS A STORED FIGURE HONEST ─────────────────────
+//
+// snapUnitsForCountry keeps a held unit when the list still offers it, and otherwise takes opts[0].
+// The three refused states (no country set, "Not listed", a country with no factor set) therefore
+// get METRIC FIRST and the US units RETAINED after them:
+//   - metric first => a NEW refused location, and any location switched INTO a refused state while
+//     holding nothing, defaults to litres or m3. The customer is not offered a US billing unit for
+//     a site that is not in the United States.
+//   - US units RETAINED => a location already holding 'gallons' or 'mcf' KEEPS it. Dropping them
+//     would re-snap those rows and SILENTLY REINTERPRET the stored number: 1,000 gallons would
+//     start reading as 1,000 litres, a 3.79-fold error, with no conversion and no flag. That is the
+//     live "unit switch relabels without converting" defect, and narrowing a list must never
+//     trigger it.
+// Exactly the reasoning steamUnitOptions already carries for GB kWh and GJ. Metric-ONLY lists for
+// these states are the right end state and are recorded as a follow-up, to be done AFTER the unit
+// conversion work, never before it.
 function ngUnitOptions(country: string): Array<[string, string]> {
   const ctry = canonicalCountryCode(country)
+  // Refused: m3 first, the US trio retained behind it. US itself is unchanged, below.
+  if (efJurisdiction({ country: ctry }) === null) return [['m3', 'm³'], ['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
   if (ctry === 'NZ') return [['kwh', 'kWh']]
@@ -1907,6 +1948,8 @@ function normalizeNgUnit(country: string, unit: string): string {
 // gallons is never offered, so a verifier can't find US units on a metric inventory.
 function liquidUnitOptions(country: string): Array<[string, string]> {
   const ctry = canonicalCountryCode(country)
+  // Refused: litres first, gallons retained. See the note above ngUnitOptions.
+  if (efJurisdiction({ country: ctry }) === null) return [['litres', 'Litres'], ['gallons', 'US gallons']]
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
 }
@@ -1946,6 +1989,8 @@ function steamUnitOptions(country: string): Array<[string, string]> {
 
 function propaneUnitOptions(country: string): Array<[string, string]> {
   const ctry = canonicalCountryCode(country)
+  // Refused: litres first, gallons retained. See the note above ngUnitOptions.
+  if (efJurisdiction({ country: ctry }) === null) return [['litres', 'Litres'], ['gallons', 'US gallons']]
   if (ctry === 'NZ') return [['kg', 'kg']]
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
