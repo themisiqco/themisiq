@@ -170,20 +170,28 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
       expect(efJurisdiction({ country: spelling }), `${spelling}: the engine agrees`).toBe('UK')
     }
     for (const other of ['US', 'FR', 'NZ', 'ZZ', 'OTHER', '']) expect(isUnitedKingdom(other), other).toBe(false)
-    // ⚠️ AN UNRECOGNISED COUNTRY IS NOT-UK, NOT AMERICAN. The engine's efJurisdiction ends `return 'US'`
-    // for anything it does not know, which is right for picking a factor table and wrong here.
-    expect(efJurisdiction({ country: 'ZZ' })).toBe('US')          // the engine's fallback
-    const odd = answered({ name: 'Elsewhere', country: 'ZZ', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'therms' }, ['natural_gas'])
-    const r = cat3InputsFrom(workingsOf([odd]), [odd])
-    expect(r.inputs!.rows[0].country).toBe('ZZ')                   // carried as stored, not mapped
-    expect(r.inputs!.rows[0].country_resolved).toBe(true)
-    expect(priceCat3(r.inputs!).lines[0].flags.map(f => f.code)).toEqual(['uk_stand_in'])
-    // 'OTHER' and '' name no country: unresolved rather than reported as a place.
-    for (const blank of ['OTHER', '']) {
-      const x = answered({ name: 'X', country: blank, has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'therms' }, ['natural_gas'])
-      const b = cat3InputsFrom(workingsOf([x]), [x])
-      expect(b.inputs!.rows[0].country, blank).toBeNull()
-      expect(b.inputs!.rows[0].country_resolved, blank).toBe(false)
+    // ⚠️ AN UNRECOGNISED COUNTRY IS NOT-UK, AND SINCE 21 SEP 2026 IT IS NOT AMERICAN ANYWHERE.
+    // This line used to read `.toBe('US')` and carried a note that the engine's fallback was right
+    // for picking a factor table and wrong here. The fallback is gone: efJurisdiction answers null,
+    // and Category 3's own answer for the same country is unchanged, which is the point of keeping
+    // the assertion rather than deleting it.
+    expect(efJurisdiction({ country: 'ZZ' })).toBeNull()
+
+    // ⚠️ AND THE CONSEQUENCE FOR CATEGORY 3 IS STRONGER THAN IT WAS, WHICH IS WHY THE BODY OF THIS
+    // TEST CHANGED RATHER THAN ITS TITLE. Until 21 Sep 2026 a 'ZZ' location was PRICED by the GHG
+    // engine from US tables, so its rows arrived here as ordinary priced rows and Category 3 did
+    // the honest thing one level down: it carried 'ZZ' as stored, refused to call it the UK, and
+    // flagged uk_stand_in on the figure. That was the right answer to the wrong question. The
+    // location is now excluded by the engine itself, so no priced row reaches this module at all
+    // and the only thing to assert is that the exclusion arrives intact.
+    //   Nothing about Category 3's own logic changed. The rows it used to receive are simply no
+    // longer produced, which is the outcome the uk_stand_in flag was standing in for.
+    for (const country of ['ZZ', 'OTHER', '', 'JP']) {
+      const odd = answered({ name: 'Elsewhere', country, has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'therms' }, ['natural_gas'])
+      const r = cat3InputsFrom(workingsOf([odd]), [odd])
+      expect(r.skipped, `${JSON.stringify(country)} arrives as an exclusion`)
+        .toContainEqual({ code: 'location_excluded', location: 'Elsewhere' })
+      expect(r.inputs!.rows, `${JSON.stringify(country)} contributes no priced row`).toEqual([])
     }
   })
 

@@ -28,7 +28,7 @@
  * flag, never compute with a guessed factor).
  */
 
-import { parseLocalDate, exclusiveEnd } from "./engine";
+import { parseLocalDate, exclusiveEnd, countryRefusal } from "./engine";
 import type { CoverageResolution } from "./engine";
 
 export type GwpVersion = "AR4" | "AR5" | "AR6";
@@ -173,6 +173,22 @@ export function buildMonthlyEmissions(
   const skipped: SkippedBill[] = [];
 
   for (const loc of locations) {
+    // ⚠️ A LOCATION REFUSED FOR ITS COUNTRY CONTRIBUTES NO MONTHLY ROW AT ALL, AND THE FUEL GUARD
+    // BELOW IS NOT ENOUGH ON ITS OWN. Its fuel bills would already land in `skipped`, because
+    // pickEF returns a miss and calcGas throws inside the try. Its ELECTRICITY would not: that
+    // branch asks only whether the grid region resolves, and a refused location can carry a
+    // resolved one (a saved region, or a country edited somewhere that did not clear it). The
+    // monthly rows would then hold Scope 2 for a site the annual totals exclude entirely.
+    //   That is not the deliberate monthly/annual divergence this module exists to preserve.
+    // Monthly is evidenced-only and annual adds estimates; both agree on WHICH locations are in
+    // the inventory. A refused location is in neither.
+    // `?? undefined` because this module's Location allows null where the engine's allows only
+    // undefined, and a null country is the country_not_set case either way.
+    const refusal = countryRefusal({ country: loc.country ?? undefined });
+    if (refusal) {
+      skipped.push({ fuelType: "all", document_type: "all", reason: `location excluded: ${refusal.state}` });
+      continue;
+    }
     for (const doc of loc.source_docs ?? []) {
       for (const p of doc.extracted ?? []) {
         if (p.status !== "confirmed") continue;            // only confirmed bills persist

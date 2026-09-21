@@ -5,6 +5,8 @@ import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
+import type { CountryRefusal } from '../../../lib/ghg/engine'
+import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
@@ -80,10 +82,42 @@ interface WorkingRow {
   // gap than a stream nobody was asked about — and it was rendering with no badge and no amber.
   // A value the engine can emit and this union does not name renders as an ordinary row. Any future
   // declaration state must be added here in the same change that adds it to the engine.
-  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable' | 'declared_unquantified' | 'no_published_factor'
+  // ⚠️ THE WHOLE UNION STAYS ON ONE LINE. declarationStates.test.ts collects union members from
+  // lines that contain `declaration?:`, so a member on a continuation line is invisible to it: the
+  // three country states were added on a second line first, and the guard reported the union as
+  // incomplete while the page rendered them perfectly. Wrapping this list breaks the guard, not the
+  // page, which is the harder failure to notice.
+  //   The three are NOT interchangeable. A verifier reading an excluded site needs to know which it
+  // is: nobody answered the country, the operator said their country is not listed, or this
+  // platform holds no factors for the country they named. The third is a limit of the product; the
+  // first two are properties of the record.
+  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable' | 'declared_unquantified' | 'no_published_factor' | 'country_not_set' | 'country_not_listed' | 'country_not_supported'
   // Present only on 'unpriceable' rows: what could not be priced. The engine's own tokens.
   unpriceable?: { fuel?: string; unit?: string; country?: string }
+  // Present only on the three country_* rows. The engine's own state, carried so this page can
+  // render the same sentence the wizard and the exports do, from countryRefusalCopy.
+  country_refusal?: CountryRefusal
 }
+// The badge and evidence sentence for a location excluded because of its country. One component,
+// three call sites, so the three states cannot drift apart in wording or in styling.
+//
+// ⚠️ A SEPARATE BADGE FROM 'unpriceable', AND SEPARATE ON PURPOSE. Both drop a whole location from
+// every total, so the CONSEQUENCE is identical, but the cause is not and a verifier is judging the
+// cause. 'unpriceable' means the figures are in a unit no table for that country carries, which the
+// operator can fix. These three mean the country itself resolves to no factor set, and for two of
+// them there is nothing to fix. Sharing a badge would tell a verifier the operator had left
+// something undone when they had not.
+function CountryRefusalCell({ refusal }: { refusal: CountryRefusal }) {
+  return (
+    <>
+      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>{countryRefusalLabel(refusal)}</span>
+      <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
+        {countryRefusalText(refusal, 'verifier', false)} This is not a figure of zero.
+      </div>
+    </>
+  )
+}
+
 // ⚠️ THIS INTERFACE IS A SHAPE, NOT A FILTER. The RPC decides what a verifier receives; declaring a
 // field here does not request it, and omitting one does not withhold it. Fields are listed only when
 // the page renders them — revenue_millions, scope1_intensity and scope2_intensity were declared here
@@ -839,7 +873,8 @@ export default function VerifierPage() {
                     // no figure, the third says the totals on this page are short by a known site.
                     // Equal weight is deliberate — the badge and the sentence separate them, not the
                     // colour. Grey means resolved, amber means stop; a fourth shade would blur that.
-                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' || w.declaration === 'declared_unquantified' || w.declaration === 'no_published_factor' ? '#FEF3E2'
+                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' || w.declaration === 'declared_unquantified' || w.declaration === 'no_published_factor'
+                      || w.declaration === 'country_not_set' || w.declaration === 'country_not_listed' || w.declaration === 'country_not_supported' ? '#FEF3E2'
                       : w.declaration === 'attested_absent' ? '#f4f4f2'
                       : i % 2 === 0 ? '#fff' : '#f8f7f5',
                     borderBottom: '0.5px solid #e8e7e4',
@@ -929,6 +964,22 @@ export default function VerifierPage() {
                           </div>
                         </>
                       )}
+                      {/* ⚠️ A SEPARATE BADGE FROM 'unpriceable', AND SEPARATE ON PURPOSE. Both drop a
+                          whole location from every total, so the CONSEQUENCE is identical, but the
+                          cause is not and a verifier is judging the cause. 'unpriceable' means the
+                          figures are in a unit no table for that country carries, which the operator
+                          can fix. These three mean the country itself resolves to no factor set, and
+                          for two of them there is nothing to fix. Sharing a badge would tell a
+                          verifier the operator had left something undone when they had not. */}
+                      {/* ⚠️ THREE BRANCHES, ONE CELL, AND THE REPETITION IS DELIBERATE.
+                          declarationStates.test.ts requires each state to be NAMED beside a render
+                          branch on this page, and it matches `declaration === 'x' &&`. A single
+                          branch reading `w.country_refusal &&`, or one condition chaining the three
+                          with `||`, renders identically and satisfies nothing: the first version of
+                          this block did that, and the guard reported all three as unrenderable. */}
+                      {w.declaration === 'country_not_set' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
+                      {w.declaration === 'country_not_listed' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
+                      {w.declaration === 'country_not_supported' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
                       {w.declaration === 'unpriceable' && (
                         <>
                           <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>

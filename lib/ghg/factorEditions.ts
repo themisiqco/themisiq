@@ -298,7 +298,10 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     //     UK location does NOT get filed under EPA/DEFRA — the row was not priced by that table.
     if (streamState(loc, 'purchased_steam') === 'quantified'
         && !(typeof loc.purchased_steam_supplier_ef === 'number' && loc.purchased_steam_supplier_ef > 0)
-        && steamFactorFor(loc).kind === 'published') {
+        //   - the country resolves to NO jurisdiction: steamFactorFor returns null and there is no
+        //     table, let alone an edition. The location is excluded whole, so nothing it carries is
+        //     in a total and nothing should be filed under a publisher's name.
+        && steamFactorFor(loc)?.kind === 'published') {
       const j = factorJurisdiction(loc, 'steam')
       const edition = j ? STEAM_EDITION[j] : undefined
       if (j && edition) (out[j] ??= {}).steam = { source: CITATIONS[j].steam!, edition }
