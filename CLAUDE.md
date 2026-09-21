@@ -89,35 +89,57 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
   predicate Postgres may re-evaluate it once per row; `(select auth.uid())` has no outer reference,
   so the planner hoists it to an InitPlan and evaluates it once per query. Supabase's linter reports
   the bare form as `auth_rls_initplan`.
-  ⚠️ **THE SEPTEMBER 2026 SWEEP IS PENDING, NOT DONE, AND THIS LINE USED TO SAY OTHERWISE.** It read
-  "63 policies carried it before the September 2026 sweep", which is past tense about work that has
-  not happened. The six files exist — `supabase/migrations/20260908_*_rls_initplan.sql`, batched by
-  module — and **none of them has been run**: each opens with `NOT RUN. THIS MIGRATION HAS NEVER
-  BEEN EXECUTED AGAINST ANY DATABASE`, and all six say so identically. The prose contradicted six
-  files that were right, and the prose is what every session reads.
-  **The 63 is also stale. A live count on 16 Sep 2026 returned 83**, so policies carrying the bare
-  form have been added since the figure was written — which is the rule being reintroduced exactly
-  as the paragraph below predicts. Recount rather than citing a number; test BOTH columns on both
-  sides, which the first version of this query did not:
+  ⚠️ **THE SEPTEMBER 2026 SWEEP RAN ON 21 SEP 2026, AND THIS LINE HAS BEEN WRONG IN BOTH
+  DIRECTIONS.** It once said "63 policies carried it before the September 2026 sweep", past tense
+  about work that had not happened; then it said the sweep was pending. The six files,
+  `supabase/migrations/20260908_*_rls_initplan.sql`, batched by module, were run in order
+  (1, 2, 3, 4, 5a, 5b) and each now opens with a RUN header recording what it did. The rule above
+  is unchanged and is the reason the sweep existed: a NEW policy written today with a bare
+  `auth.uid()` puts the count straight back up.
+  **The 63 is also stale, and so is the 83 that replaced it. Recount; never cite a number.**
+  The query below is the one run on 21 Sep 2026. It groups by schema, it covers every schema rather
+  than only `public`, and it is CASE-INSENSITIVE, which the version before it was not:
   ```sql
-  select count(*) from pg_policies
-  where schemaname = 'public'
-    and (coalesce(qual,'') || ' ' || coalesce(with_check,'')) like '%auth.uid()%'
-    and (coalesce(qual,'') || ' ' || coalesce(with_check,'')) not like '%select auth.uid()%';
+  select schemaname, count(*) as unwrapped_auth_uid
+  from pg_policies
+  where regexp_replace(
+    coalesce(qual, '') || ' ' || coalesce(with_check, ''),
+    '\(\s*SELECT auth\.uid\(\) AS uid\)', '', 'gi'
+  ) ~ 'auth\.uid\(\)'
+  group by schemaname
+  order by schemaname;
   ```
+  **What it returned, 21 Sep 2026.** Before the six files were run: `public 79`, `storage 6`. After
+  them: `public 1`, and NO STORAGE ROW. The one left in `public` is `audit_log.audit_select_own`,
+  bare by design and outside every batch's scope.
+  ⚠️ **A SCHEMA WITH NOTHING LEFT VANISHES FROM THE RESULT. IT DOES NOT RETURN ZERO.** `group by`
+  emits no row for a group with no members, so `storage` being absent is the success case, and it
+  looks exactly like `storage` never having been in scope. Read a missing row as zero only when you
+  already know the schema was searched. The query carries no schema filter for this reason: a row
+  for a schema nobody was thinking about is the thing worth seeing.
   ⚠️ **AN EARLIER VERSION OF THIS QUERY UNDERCOUNTED AND RETURNED 71.** It matched on `qual` OR
   `with_check` but filtered the wrapped form on `qual` ALONE, so a policy with a null `qual` and an
   unwrapped `with_check` fell through. A WITH CHECK-only policy is the ordinary shape for an INSERT
   policy, so the miss was not hypothetical: concatenating both columns on both sides found twelve
-  more. Use the form above.
-  **The 83 by module, 16 Sep 2026** — cbam 11, ghg 8, materiality 16, supply_chain 11,
-  **remaining 37**.
-  ⚠️ **`remaining` AT 37 IS THE LARGEST BUCKET AND MAY SIT OUTSIDE WHAT THE SIX FILES ADDRESS.**
-  Each of the six names its own table list explicitly; nothing guarantees those lists cover every
-  table in `public`. So **a non-zero count after the sweep runs is not necessarily a failed sweep** —
-  it may be policies no file was written for. Check the count PER MODULE against each file's own
-  table list before concluding anything went wrong, and note that `storage` is a separate schema
-  the `public` query above does not see at all.
+  more. The query above concatenates both on both sides. Keep it that way.
+  ⚠️ **AND THE VERSION AFTER THAT OVER-COUNTED AND RETURNED 83.** It filtered with
+  `not like '%select auth.uid()%'`. `LIKE` is case-sensitive, and the catalog spells the wrap
+  `( SELECT auth.uid() AS uid)` in upper case, so four policies that were already wrapped failed the
+  lower-case test and were counted as bare: `concierge_jobs`, `concierge_job_documents`,
+  `concierge_proposals` and `supply_chain_registers_owner`. 83 = 79 bare plus those 4. The `gi` flag
+  above is what fixes it, and it is why this file no longer quotes 83.
+  **The split by module, before snapshot, 21 Sep 2026:** cbam 11, ghg 8, materiality 16,
+  supply_chain 10, **remaining 34**, totalling 79. The split published here until now read
+  supply_chain 11 and remaining 37 for 83, and was the same over-count. Of the corrected
+  `remaining 34`, batch 5a rewrote 33 and the last one is `audit_log.audit_select_own`. NEITHER
+  query produces this split: it needs a grouping by table, so add `, tablename` to the `group by`
+  and bucket the names yourself.
+  ⚠️ **CHECK A NON-ZERO COUNT PER MODULE BEFORE CALLING IT A FAILED SWEEP.** Each of the six files
+  names its own table list, and nothing guarantees those lists cover every table in `public`, so a
+  policy no file was written for would survive and read as a miss. Batch 5a is the catch-all: its
+  scope is everything in `public` except `audit_log` that still carries a bare `auth.uid()`, which
+  is why exactly one policy remains, and why the order the six are run in decides how many each
+  of them touches.
   ⚠️ **RUNNING THE SIX FILES CHANGES THE SECURITY BOUNDARY, so count before and after and compare.**
   Each drops and recreates policies; a policy dropped and not recreated leaves its table either
   fail-closed or wide open, and neither shows up as an error. The check is that the policy count per
@@ -322,7 +344,7 @@ the input to Lisa's next decision, and a wrong one sends her diagnosing a
 problem that does not exist.
 
 ⚠️ **THIS FILE MUST NEVER ASSERT WHETHER A MIGRATION HAS RUN.** CLAUDE.md
-describes intended end states — what the schema is for, which invariants hold,
+describes intended end states: what the schema is for, which invariants hold,
 what must not be broken. The MIGRATION HEADER is the record of execution, and
 it is the only one. Write "the bucket is captured in
 `20260804_..._hardening.sql`" here; never "the bucket was hardened on 4 Aug",
@@ -333,16 +355,25 @@ WHY, WITH THE DATE ON IT. On 16 Sep 2026 both halves were wrong at once, in
 opposite directions. FOURTEEN migration headers said NOT RUN or NOT YET APPLIED
 when the objects they create were live, and three more carried no status line at
 all. Meanwhile THIS FILE said 63 policies carried a bare `auth.uid()` "before the
-September 2026 sweep" — past tense about six migrations that have never been
-executed, and a figure a live count put at 83.
+September 2026 sweep", which was past tense about six migrations that had not
+then been executed, beside a figure a live count put at 83. (That 83 was itself
+an over-count; see the RLS policy rules above. The true figure was 79.)
 The headers lagged reality; the prose ran ahead of it. Neither error was
 detectable from the other document: only the database settled it, one
 `to_regclass`, `to_regprocedure` or `pg_get_functiondef` query at a time.
 
-AFTER THAT PASS: 47 of the 152 migrations carry a status line — 41 RUN or
-APPLIED, 6 NOT RUN, and those six are the `20260908_*_rls_initplan.sql` sweep.
-The other 105 make no claim and none was verified; absence of a status line is
-not evidence of anything.
+COUNTED AGAIN ON 21 SEP 2026, from `supabase/migrations/` and not from the
+figures above: 158 files, of which 33 carry a status line. Those 33 say RUN (26)
+or APPLIED (7). NONE now says NOT RUN: the six `20260908_*_rls_initplan.sql`
+files were the last to, and they ran on 21 Sep 2026. The other 125 make no claim
+and none was verified; absence of a status line is not evidence of anything.
+
+⚠️ DO NOT COUNT `RUN AFTER` OR `RUN WITH` AS A STATUS LINE. Thirteen files open
+with an ordering or how-to instruction ("RUN AFTER 20260839", "RUN WITH -v
+ON_ERROR_STOP=1"), which asserts nothing about whether the file has executed.
+They are in the 125, not the 33. The previous count recorded here, 47 of 152,
+is superseded; it is larger than a recount supports, and those thirteen are the
+first thing to check before concluding the number has moved.
 
 ⚠️ AND A KEYWORD SURVEY IS NOT A SUBSTITUTE FOR READING THE HEADER. Two of the
 fourteen were mis-read by grep on that same day: "NOT RUN" matched inside "DO
@@ -351,6 +382,6 @@ NOT RUN ones. Any audit of these headers has to read the leading status
 sentence, not match a substring.
 
 SO THE DIVISION IS: this file for intent, the header for execution, the
-DATABASE for truth. When the two documents disagree, neither wins by default —
-query the database. A migration is not self-recording; nothing marks a file as
+DATABASE for truth. When the two documents disagree, neither wins by default.
+Query the database. A migration is not self-recording; nothing marks a file as
 run except a person writing it down, which is exactly why both drift.
