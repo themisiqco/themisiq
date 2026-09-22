@@ -16,7 +16,16 @@ import {
   emptyLocation, unitsForCountryChange, snapUnitsForCountry, buildWorkings, countryRefusal,
   gridRegionForCountry, isResolvedGridRegion, type Location,
 } from './engine'
-import { refusalBannerHeading, refusalBannerTrailer, countryRefusalText } from './countryRefusalCopy'
+import { refusalBannerHeading, refusalBannerTrailer, countryRefusalText, countryRefusalLabel, type RefusalSurface } from './countryRefusalCopy'
+import type { CountryRefusal } from './engine'
+
+const ALL_REFUSALS: CountryRefusal[] = [
+  { state: 'country_not_set' },
+  { state: 'country_not_listed', value: 'OTHER' },
+  { state: 'country_not_listed', value: 'Japn' },
+  { state: 'country_not_supported', iso2: 'PH' },
+]
+const SURFACES: RefusalSurface[] = ['review', 'verifier']
 import { cat3InputsFrom } from '../scope3/cat3Inputs'
 import { priceCat3 } from '../scope3/cat3Energy'
 import { cat3WorkingsSummary, cat3SkippedText } from '../scope3/cat3Copy'
@@ -89,10 +98,31 @@ describe('the banner heading matches whether the problem can be fixed', () => {
     expect(refusalBannerHeading({ state: 'country_not_supported', iso2: 'JP' })).toBe("We don't calculate emissions for this location")
   })
 
-  it('the trailer no longer repeats what the sentence just said', () => {
-    const t = refusalBannerTrailer({ state: 'country_not_supported', iso2: 'JP' })
-    expect(t).toBe("It isn't counted as zero, and nothing you've entered here is lost.")
-    expect(t, 'the sentence above it already says this').not.toContain('left out')
+  it('the trailer says only what the sentence above it has not', () => {
+    const r: CountryRefusal = { state: 'country_not_supported', iso2: 'JP' }
+    // With figures, the sentence ends "Its figures are kept as entered", so the trailer drops that
+    // clause too and is left with the one thing neither has said.
+    expect(countryRefusalText(r, 'review', true)).toContain('Its figures are kept as entered.')
+    expect(refusalBannerTrailer(r, true)).toBe("It isn't counted as zero.")
+    // With nothing entered the sentence makes no such promise, so the clause is worth keeping.
+    expect(countryRefusalText(r, 'review', false)).not.toContain('kept as entered')
+    expect(refusalBannerTrailer(r, false)).toBe("It isn't counted as zero, and nothing you've entered here is lost.")
+    // Neither form repeats the exclusion, which every sentence already states.
+    for (const f of [true, false]) expect(refusalBannerTrailer(r, f), String(f)).not.toContain('left out')
+  })
+
+  it('every sentence uses the straight apostrophe the rest of the product uses', () => {
+    // ⚠️ ONE CONVENTION, CHECKED RATHER THAN ASSUMED. The refusal sentences used the curly U+2019
+    // while the page's own strings beside them use straight quotes ("don't", "isn't"), so one
+    // amber box rendered both. A count across the GHG page, the verifier page, cat3Copy, series and
+    // the assurance PDF found straight apostrophes outnumbering curly ones by about fourteen to one.
+    const all = [
+      ...ALL_REFUSALS.flatMap(r => SURFACES.flatMap(s => [countryRefusalText(r, s, true), countryRefusalText(r, s, false)])),
+      ...ALL_REFUSALS.map(r => countryRefusalLabel(r)),
+      ...ALL_REFUSALS.map(r => refusalBannerHeading(r)),
+      ...ALL_REFUSALS.flatMap(r => [refusalBannerTrailer(r, true), refusalBannerTrailer(r, false)]),
+    ]
+    for (const t of all) expect(t, t).not.toContain('\u2019')
   })
 })
 
@@ -165,11 +195,21 @@ describe('the GHG page surfaces', () => {
     expect(PAGE).toContain("Select your {loc.country === 'CA' ? 'province' : 'state'}/region")
   })
 
-  it('Review labels the intensity as the export does, and states the exclusion beside it', () => {
+  it('Review labels the intensity as the export does', () => {
     expect(PAGE, 'one figure must not have two names across two documents').toContain('S1 intensity: {')
     expect(PAGE, 'the old label is gone').not.toContain('>Intensity: {')
-    expect(PAGE, 'an intensity from incomplete totals is itself incomplete')
-      .toContain('{rev > 0 && exclusionNote &&')
+  })
+
+  it('the exclusion note appears ONCE per card, not once per figure', () => {
+    // ⚠️ A NOTE ADDED UNDER THE INTENSITY RENDERED TWICE, DIRECTLY ABOVE THE CARD'S OWN NOTE, and
+    // the comment beside that one already said the note belongs to the card rather than to a line.
+    // Every figure on the card comes from the same excluded set, so one note covers all of them.
+    // An intensity needs its own only where it appears WITHOUT the totals: the CSV RESULTS block
+    // and the assurance package's summary table, which each carry one.
+    expect(PAGE).not.toContain('{rev > 0 && exclusionNote &&')
+    const card = PAGE.slice(PAGE.indexOf('S1 intensity: {'), PAGE.indexOf('S1 intensity: {') + 2500)
+    const notes = card.split('exclusionNote && (').length - 1
+    expect(notes, 'exactly one exclusion note between the intensity and the end of the card').toBe(1)
   })
 
   it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch', () => {

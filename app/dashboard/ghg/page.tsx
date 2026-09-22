@@ -447,9 +447,9 @@ function exclusionBannerHeading(u: UnpriceableLocation): string {
     ? refusalBannerHeading(u.refusal)
     : "We can't work out this location's emissions yet"
 }
-function exclusionBannerTrailer(u: UnpriceableLocation): string {
+function exclusionBannerTrailer(u: UnpriceableLocation, hasFigures: boolean): string {
   return u.kind === 'country'
-    ? refusalBannerTrailer(u.refusal)
+    ? refusalBannerTrailer(u.refusal, hasFigures)
     : "Until then this location is left out of your totals \u2014 it isn't counted as zero, and nothing else you've entered here is lost."
 }
 
@@ -1840,7 +1840,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ {exclusionBannerHeading(unpriceableById.get(loc.id)!)}</div>
             <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceableMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!)}</div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
@@ -2365,12 +2365,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {/* ⚠️ "S1 intensity", THE EXPORT'S OWN WORDING. This read "Intensity:", and the CSV
                         row for the identical figure reads "S1 intensity (tCO2e/$M revenue)", so one
                         number had two names across two documents a verifier reads side by side.
-                        ⚠️ AND IT CARRIES THE EXCLUSION NOTE, because it is derived from totals that
-                        exclude a location. An intensity is a ratio of an incomplete numerator; it
-                        is no more complete than the Scope 1 figure above it, and it had been the
-                        one figure on this card with nothing saying so. */}
+                        ⚠️ NO EXCLUSION NOTE OF ITS OWN, AND ONE WAS ADDED HERE BY MISTAKE. The card's
+                        note sits a few lines below and already covers every figure on the card,
+                        intensity included, exactly as the comment beside it says. The two rendered
+                        as two identical lines one under the other. An intensity needs its own note
+                        only where it appears WITHOUT the totals, which is the CSV RESULTS block and
+                        the assurance package's summary table; both carry one. */}
                     {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>S1 intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
-                    {rev > 0 && exclusionNote && <div style={{ fontSize: 10, color: 'var(--color-module-climate)', marginTop: 2, lineHeight: 1.5 }}>{exclusionNote}</div>}
                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
                     {/* Every figure in this card — both scopes, biogenic, the intensities — is built
                         from the same excluded set, so the note belongs to the card, not to one line. */}

@@ -99,14 +99,14 @@ export function countryRefusalText(
     case 'country_not_listed':
       if (isNotListedChoice(refusal.value)) {
         return surface === 'review'
-          ? review('This location’s country is set to Not listed, so its energy is not priced and is left out of every total.', offersRemedy(refusal))
+          ? review("This location's country is set to Not listed, so its energy is not priced and is left out of every total.", offersRemedy(refusal))
           : 'The country for this location was recorded as not listed. No emission factor set is held for it, and nothing from this location is included in any total on this report.'
       }
       // The stored value is QUOTED, never paraphrased. A customer who sees it can match it to what
       // they picked, and a verifier can check it against the record. "An unrecognised value" leaves
       // both of them nothing to act on.
       return surface === 'review'
-        ? review(`This location’s country is recorded as "${refusal.value}", which does not name a country, so its energy is not priced and is left out of every total.`, offersRemedy(refusal))
+        ? review(`This location's country is recorded as "${refusal.value}", which does not name a country, so its energy is not priced and is left out of every total.`, offersRemedy(refusal))
         : `The country recorded for this location, "${refusal.value}", does not name a country. Nothing from this location is included in any total on this report.`
 
     case 'country_not_supported': {
@@ -117,8 +117,8 @@ export function countryRefusalText(
       // for every name in the list and needs no exception table.
       const name = countryNameEn(refusal.iso2)
       return surface === 'review'
-        ? review(`We do not hold emission factors for this location’s country (${name}), so its energy is not priced and is left out of every total.`, offersRemedy(refusal))
-        : `No emission factor set is held for this location’s country (${name}). Nothing from this location is included in any total on this report.`
+        ? review(`We do not hold emission factors for this location's country (${name}), so its energy is not priced and is left out of every total.`, offersRemedy(refusal))
+        : `No emission factor set is held for this location's country (${name}). Nothing from this location is included in any total on this report.`
     }
   }
 }
@@ -152,11 +152,16 @@ export function refusalBannerHeading(refusal: CountryRefusal): string {
 /**
  * The line under a refusal sentence.
  *
- * ⚠️ IT NO LONGER REPEATS "left out of your totals". Every refusal sentence ends by saying the
- * location is left out of every total, so the old trailer said it twice in two wordings, one line
- * apart. What is worth adding is the part the sentence does NOT cover: that an absence is not a
- * zero, and that nothing entered has been discarded.
+ * ⚠️ IT SAYS ONLY WHAT THE SENTENCE ABOVE IT HAS NOT ALREADY SAID, AND THAT IS WHY IT TAKES
+ * `hasFigures`. Every refusal sentence ends by saying the location is left out of every total, so
+ * the trailer no longer repeats that. When figures were entered the sentence ALSO ends "Its figures
+ * are kept as entered", so the trailer drops its second clause too and is left with the one thing
+ * neither has said: an absence is not a zero.
+ *   Two lines that overlap are worse than one longer line. A reader who meets the same fact twice
+ * in two wordings starts looking for the difference between them.
  */
-export function refusalBannerTrailer(_refusal: CountryRefusal): string {
-  return "It isn't counted as zero, and nothing you've entered here is lost."
+export function refusalBannerTrailer(_refusal: CountryRefusal, hasFigures: boolean): string {
+  return hasFigures
+    ? "It isn't counted as zero."
+    : "It isn't counted as zero, and nothing you've entered here is lost."
 }
