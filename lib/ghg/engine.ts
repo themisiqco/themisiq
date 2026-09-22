@@ -26,6 +26,18 @@ import type { ComparabilityRecord } from './comparability'
 // Type only, for the same reason and with the same effect: erased at compile, so the fact that
 // factorEditions.ts imports VALUES back out of this file is not a runtime cycle.
 import type { FactorEditions } from './factorEditions'
+// The engine composes the refusal note it stores in the workings row, so the sentence a verifier
+// reads in an export and the sentence the customer reads on screen come from ONE module and cannot
+// drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
+import { countryRefusalText } from './countryRefusalCopy'
+// ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
+// WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
+// country control is built from, so "a country this platform can express" has ONE definition and
+// the picker and the router cannot disagree about it. Client-safe by construction: it imports
+// countryRegions.json (29 KB) and no factor file, which is the whole reason that split exists.
+//   It carries NO display name into the engine, deliberately. A name shown to a customer is copy,
+// is locale-sensitive, and belongs in the copy module where it can be pinned to ['en'] once.
+import { countryByIso2 } from '../emissionFactors/countryOptions'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -826,6 +838,19 @@ const EF_SOURCES = {
 // closes it, asserting every whitespace-separated token of each label appears in the citation it
 // claims to summarise. Refreshing a factor table without updating its label fails there, loudly,
 // naming both strings.
+// Emits `factor_vintage` only when the location HAS a jurisdiction. An absent key is how a
+// workings row says "no published edition", which is already the shape STEAM_EDITION uses for the
+// four jurisdictions with no steam factor: the column renders a dash, rather than a publication's
+// name attached to a figure that publication did not produce.
+function vintageOf(
+  editions: Record<EfJurisdiction, string> | Partial<Record<EfJurisdiction, string>>,
+  loc: { country?: string },
+): { factor_vintage?: string } {
+  const j = efJurisdiction(loc)
+  const v = j === null ? undefined : editions[j]
+  return v ? { factor_vintage: v } : {}
+}
+
 const COMBUSTION_EDITION: Record<EfJurisdiction, string> = {
   US: 'US EPA 2024',      // ⚠️ EF_SOURCES.combustion's year is itself UNVERIFIED — see the EF header.
   CA: 'ECCC 2025 v3.0',
@@ -1265,14 +1290,142 @@ const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL
 // their answers are citations rather than table identities. Flagged, not fixed.
 export type EfJurisdiction = 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ'
 
-export function efJurisdiction(loc: { country?: string }): EfJurisdiction {
-  const ctry = (loc.country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') return 'UK'
-  if (EU_COUNTRIES.includes(ctry)) return 'EU'
-  if (ctry === 'AU') return 'AU'
-  if (ctry === 'NZ') return 'NZ'
-  if (ctry === 'CA') return 'CA'
-  return 'US'
+// ── ONE SPELLING PER COUNTRY, BEFORE ANY ROUTER LOOKS AT IT ──────────────────────────────────────
+//
+// Two codes name a country this engine supports under a spelling none of its tables use:
+//   GR -> EL   ISO 3166-1 assigns GR to Greece. EVERY factor key here is spelled EL, the
+//              EEA/Eurostat convention: GRID_EF.EU_EL, RESIDUAL_EU.EU_EL, EU_COUNTRIES.
+//   UK -> GB   ISO assigns GB; UK is exceptionally reserved and is what people type.
+//
+// ⚠️ THIS EXISTS BECAUSE GREECE WAS WRONG IN SEVEN PLACES, NOT ONE, AND FIXING THE ROUTER ALONE
+// WOULD HAVE HALF-FIXED IT. For a location stored as 'GR', efJurisdiction fell to US, AND
+// gridRegionForCountry returned '' (unresolved, so the electricity rows vanish and export blocks),
+// AND gridSource cited US EPA, AND combustionSource cited US EPA, AND ngUnitOptions offered Mcf,
+// AND liquidUnitOptions offered gallons, AND no EU_GR key exists in either grid table. Routing the
+// FUELS to the EU tables while electricity stayed unresolved and the units stayed American would
+// have been harder to spot than the original defect, because the fuel rows would have looked right.
+//
+// ⚠️ APPLIED AT BOTH ENDS, DELIBERATELY. The country control stores the canonical code, so saved
+// data keeps one spelling; the engine canonicalises again on read, so a 'GR' arriving from an
+// import, a hand-edited jsonb or a surface written later still resolves. Doing only the first
+// leaves the engine silently wrong for a value the rest of the product considers valid, which is
+// the shape of the defect this whole change removes.
+//
+// NOT AN ALIAS TABLE FOR NAMES. 'GREECE' and 'UNITED KINGDOM' are not handled here; see the alias
+// note on detectGridRegion.
+const COUNTRY_CANONICAL: Readonly<Record<string, string>> = { GR: 'EL', UK: 'GB' }
+
+/** The engine's stored spelling for a country code: upper-cased, trimmed, aliases resolved. */
+export function canonicalCountryCode(country?: string): string {
+  const ctry = (country || '').toUpperCase().trim()
+  return COUNTRY_CANONICAL[ctry] ?? ctry
+}
+
+// ── WHY A COUNTRY IS NOT PRICEABLE, IN THREE DISTINCT STATES ─────────────────────────────────────
+//
+// ⚠️ THESE ARE NOT INTERCHANGEABLE AND MUST NEVER BE FOLDED INTO ONE. They need opposite remedies:
+// a blank country is an unanswered question, a value that names no country is an answered question
+// the list could not express, and a real ISO code is a coverage limit of this platform. One state
+// would give all three the same sentence, and two of them would then be wrong.
+//
+// PROBE ONLY IN THIS CHANGE. Nothing consumes it yet: efJurisdiction still returns 'US' for an
+// unsupported country, exactly as before. Exported and tested ahead of its consumer on the same
+// footing as reconcile(), so the decision and its tests land before the behaviour does.
+export type CountryRefusal =
+  /** Never answered. Stored as ''. */
+  | { state: 'country_not_set' }
+  /** A stored value that names no country: the 'OTHER' the control stores for "Not listed",
+   *  or any legacy token. `value` is carried VERBATIM so a surface can quote what was stored. */
+  | { state: 'country_not_listed'; value: string }
+  /**
+   * A country code the platform can NAME but holds no factor set for.
+   *
+   * ⚠️ "CAN NAME", NOT "IS AN ISO CODE", AND THE DIFFERENCE IS FORCED BY THE COPY. This state's
+   * sentence is "we do not hold emission factors for this location's country (Philippines)", which
+   * cannot be written without a name. The concordance holds 212 of the 249 assigned alpha-2 codes,
+   * so JE, GG, IM, GI, GU and the rest of the territory list have no name here and fall to
+   * country_not_listed, which quotes the stored value instead. That is the honest split: we say
+   * which country we cannot price only when we can say which country it is.
+   */
+  | { state: 'country_not_supported'; iso2: string }
+
+/**
+ * Can the customer clear this refusal by doing something?
+ *
+ * ⚠️ THIS IS ONE PREDICATE FOR TWO DECISIONS THAT MUST NOT DISAGREE: whether the Review sentence
+ * offers a remedy, and whether the export gate blocks. A gate that blocks with no remedy strands the
+ * customer: there is no control anywhere in the wizard that turns "Not listed" or an unsupported
+ * country into a supported one, so blocking on those means the report can never be produced. A
+ * remedy offered where the gate does not block is the opposite error, nagging about something that
+ * is not stopping anything.
+ *   So the rule is: THE GATE BLOCKS IF AND ONLY IF THE SENTENCE OFFERS A REMEDY, and both read this.
+ */
+export function refusalIsFixable(refusal: CountryRefusal): boolean {
+  switch (refusal.state) {
+    // Nobody answered. Answering it is the fix.
+    case 'country_not_set': return true
+    // A stored value that names no country can be replaced with one. "Not listed" cannot: the
+    // customer answered honestly and the list still has nothing for them.
+    case 'country_not_listed': return refusal.value.trim().toUpperCase() !== 'OTHER'
+    // A limit of this platform, not of the record. Nothing the customer does changes it.
+    case 'country_not_supported': return false
+  }
+}
+
+export type EfRouting =
+  | { supported: true; jurisdiction: EfJurisdiction }
+  | { supported: false; refusal: CountryRefusal }
+
+/**
+ * THE ONE COUNTRY ROUTER. Which factor table a location resolves to, or why it resolves to none.
+ *
+ * ⚠️ US IS RETURNED FOR 'US' AND FOR NOTHING ELSE. The old `return 'US'` at the end of
+ * efJurisdiction caught every unrecognised country, so a Japanese site was priced from EPA tables,
+ * its steam from EPA Table 7 (a US natural-gas boiler at 80% efficiency), and factor_editions
+ * recorded 'US EPA 2024' against it. That is the fallback this function exists to replace.
+ */
+export function efRouting(loc: { country?: string }): EfRouting {
+  const ctry = canonicalCountryCode(loc.country)
+  const ok = (jurisdiction: EfJurisdiction): EfRouting => ({ supported: true, jurisdiction })
+  if (ctry === 'GB') return ok('UK')
+  if (EU_COUNTRIES.includes(ctry)) return ok('EU')
+  if (ctry === 'AU') return ok('AU')
+  if (ctry === 'NZ') return ok('NZ')
+  if (ctry === 'CA') return ok('CA')
+  if (ctry === 'US') return ok('US')
+  if (ctry === '') return { supported: false, refusal: { state: 'country_not_set' } }
+  // A code the country list can express is a coverage limit; anything else names no country.
+  // ⚠️ 'OTHER' TAKES NO SPECIAL CASE, AND THAT IS THE POINT. It is one member of the open set
+  // "a stored string that is not a country code", which also holds typos, truncations and whatever
+  // a future import produces. Naming it here would handle the one value we know about and drop the
+  // rest somewhere else.
+  return countryByIso2(ctry) !== undefined
+    ? { supported: false, refusal: { state: 'country_not_supported', iso2: ctry } }
+    : { supported: false, refusal: { state: 'country_not_listed', value: (loc.country || '').trim() } }
+}
+
+/** The refusal for a location, or null when its country is supported. */
+export function countryRefusal(loc: { country?: string }): CountryRefusal | null {
+  const r = efRouting(loc)
+  return r.supported ? null : r.refusal
+}
+
+/**
+ * The factor table a location resolves to, or null when it resolves to none.
+ *
+ * ⚠️ null, NOT A SEVENTH MEMBER OF EfJurisdiction. Every factor table here is keyed
+ * Record<EfJurisdiction, ...> (STEAM_EF, COMBUSTION_EDITION, CITATIONS in factorEditions), and a
+ * seventh member would oblige each of them to carry an entry for a jurisdiction that by definition
+ * has no factors. The only entries that could be written are placeholders, which is how a US
+ * fallback gets reintroduced. null makes the compiler name every call site instead.
+ *
+ * ⚠️ AND US IS RETURNED FOR 'US' ALONE. Until 21 Sep 2026 this function ended `return 'US'`, so a
+ * Japanese site was priced from EPA tables, its steam from EPA Table 7 (a US natural gas boiler at
+ * 80% efficiency), and factor_editions recorded 'US EPA 2024' against it. Nothing on screen said so.
+ */
+export function efJurisdiction(loc: { country?: string }): EfJurisdiction | null {
+  const r = efRouting(loc)
+  return r.supported ? r.jurisdiction : null
 }
 // EU-27 dropdown options: [ISO, label with flag], alphabetical by country name.
 const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
@@ -1286,7 +1439,11 @@ const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
 ]
 function detectGridRegion(code: string, country?: string): string {
   const c = (code || '').toUpperCase().trim()
-  const ctry = (country || '').toUpperCase().trim()
+  // ⚠️ canonicalCountryCode HANDLES CODES, THE NAME COMPARISONS BELOW ARE LEFT EXACTLY AS THEY WERE.
+  // This function accepts 'AUSTRALIA' and 'CANADA' as well as AU and CA, which efRouting does not;
+  // the three country routers have three different alias policies and unifying them is a separate
+  // change. Canonicalising here fixes the CODE path without widening or narrowing the name path.
+  const ctry = canonicalCountryCode(country)
   // Australia first — its NT/WA codes collide with a CA province / US state, so gate on country.
   // ACT shares the NSW grid; WA→AU_WA (SWIS main); NT→AU_NT (DKIS main); else AU_<state>.
   if (ctry === 'AU' || ctry === 'AUSTRALIA') {
@@ -1308,8 +1465,9 @@ function detectGridRegion(code: string, country?: string): string {
 // Country-level grid region for countries whose grid factor is national (UK, EU members).
 // Returns the GRID_EF key, or '' if the country isn't one we map at country level.
 function gridRegionForCountry(country: string): string {
-  const ctry = (country || '').toUpperCase().trim()
-  if (ctry === 'GB' || ctry === 'UK') return 'UK'
+  // canonicalCountryCode FIRST: 'GR' must reach EU_EL, which is the only spelling GRID_EF carries.
+  const ctry = canonicalCountryCode(country)
+  if (ctry === 'GB') return 'UK'
   if (ctry === 'NZ' || ctry === 'NEW ZEALAND') return 'NZ'
   if (EU_COUNTRIES.includes(ctry)) return 'EU_' + ctry
   return ''
@@ -1754,8 +1912,26 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
 // Natural gas units offered per country. CA uses mcf/m3 only (ECCC has no energy-basis
 // factor for therms/mmbtu). UK uses kWh only (DEFRA's billing basis — how UK gas bills read).
 // US keeps all three. Returned as [value, label] pairs.
+// ── ORDER IS THE DEFAULT, AND RETENTION IS WHAT KEEPS A STORED FIGURE HONEST ─────────────────────
+//
+// snapUnitsForCountry keeps a held unit when the list still offers it, and otherwise takes opts[0].
+// The three refused states (no country set, "Not listed", a country with no factor set) therefore
+// get METRIC FIRST and the US units RETAINED after them:
+//   - metric first => a NEW refused location, and any location switched INTO a refused state while
+//     holding nothing, defaults to litres or m3. The customer is not offered a US billing unit for
+//     a site that is not in the United States.
+//   - US units RETAINED => a location already holding 'gallons' or 'mcf' KEEPS it. Dropping them
+//     would re-snap those rows and SILENTLY REINTERPRET the stored number: 1,000 gallons would
+//     start reading as 1,000 litres, a 3.79-fold error, with no conversion and no flag. That is the
+//     live "unit switch relabels without converting" defect, and narrowing a list must never
+//     trigger it.
+// Exactly the reasoning steamUnitOptions already carries for GB kWh and GJ. Metric-ONLY lists for
+// these states are the right end state and are recorded as a follow-up, to be done AFTER the unit
+// conversion work, never before it.
 function ngUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(country)
+  // Refused: m3 first, the US trio retained behind it. US itself is unchanged, below.
+  if (efJurisdiction({ country: ctry }) === null) return [['m3', 'm³'], ['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
   if (ctry === 'NZ') return [['kwh', 'kWh']]
@@ -1771,7 +1947,9 @@ function normalizeNgUnit(country: string, unit: string): string {
 // Liquid-fuel units offered per country. Metric countries (CA, UK, EU) get litres only —
 // gallons is never offered, so a verifier can't find US units on a metric inventory.
 function liquidUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(country)
+  // Refused: litres first, gallons retained. See the note above ngUnitOptions.
+  if (efJurisdiction({ country: ctry }) === null) return [['litres', 'Litres'], ['gallons', 'US gallons']]
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
 }
@@ -1810,7 +1988,9 @@ function steamUnitOptions(country: string): Array<[string, string]> {
 }
 
 function propaneUnitOptions(country: string): Array<[string, string]> {
-  const ctry = (country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(country)
+  // Refused: litres first, gallons retained. See the note above ngUnitOptions.
+  if (efJurisdiction({ country: ctry }) === null) return [['litres', 'Litres'], ['gallons', 'US gallons']]
   if (ctry === 'NZ') return [['kg', 'kg']]
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
@@ -1825,15 +2005,18 @@ function propaneUnitOptions(country: string): Array<[string, string]> {
 //
 // Replaces a hand-written `metric ? 'litres' : …` block in the wizard's country-change handler,
 // which listed the fuels a second time and silently omitted whichever was added last.
+// `amount` is the figure the unit governs. It is here so unitsForCountryChange can tell a unit the
+// customer CHOSE from one the template happened to seed, which is the only thing standing between a
+// new location and a US default it never asked for.
 export const UNIT_FIELDS = [
-  { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions' },
-  { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions' },
-  { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions' },
+  { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions',      amount: 'natural_gas_amount' },
+  { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions', amount: 'propane_amount' },
+  { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_stationary_amount' },
+  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'fuel_oil_distillate_amount' },
+  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'fuel_oil_residual_amount' },
+  { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'gasoline_amount' },
+  { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_mobile_amount' },
+  { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions',   amount: 'purchased_steam_mmbtu' },
 ] as const
 
 export type UnitFieldName = typeof UNIT_FIELDS[number]['field']
@@ -1853,6 +2036,42 @@ export function snapUnitsForCountry(
     const opts = f.options(country).map(([v]) => v)
     const held = current[f.field]
     out[f.field] = held && opts.includes(held) ? held : opts[0]
+  }
+  return out
+}
+
+/**
+ * The units to store when a location's COUNTRY changes.
+ *
+ * ⚠️ snapUnitsForCountry CANNOT ANSWER THIS, AND THE DIFFERENCE IS A UNIT NOBODY CHOSE.
+ * That function keeps any unit the new country still offers, which is right for a stream carrying a
+ * figure: the customer picked gallons, gallons are still offered, gallons stand. But emptyLocation
+ * seeds every unit US-first (mcf, gallons, mmbtu) before a country is picked at all, so a BRAND NEW
+ * location arrives already "holding" gallons. Picking a country whose list still offers gallons then
+ * kept them, and a site set to "Not listed" defaulted to a United States billing unit it had never
+ * been offered. GB, FR and AU escaped it only because their lists drop gallons entirely, so the snap
+ * fell through to opts[0]; the states that RETAIN US units for safety were the ones it bit.
+ *
+ * ⚠️ THE TEST IS `amount > 0`, AND IT IS THE SMALLEST THING THE DATA CAN ACTUALLY DISTINGUISH.
+ * Nothing records whether a customer opened a unit selector, so "chose gallons and entered nothing"
+ * and "never touched it" are the same row today. A figure is the one honest evidence of a choice:
+ * if a stream carries one, its unit is treated as chosen and is preserved exactly as before, which
+ * is what keeps this from relabelling anything. If it carries none, there is no figure to relabel
+ * and the country's own default is the better answer.
+ *   The remaining gap is a customer who picks a unit, enters nothing, and changes country: their
+ * pick is discarded. Recording an explicit choice would close it and is not worth a schema column.
+ */
+export function unitsForCountryChange(
+  country: string,
+  loc: Partial<Record<string, unknown>>,
+): Record<UnitFieldName, string> {
+  const out = {} as Record<UnitFieldName, string>
+  for (const f of UNIT_FIELDS) {
+    const opts = f.options(country).map(([v]) => v)
+    const amount = loc[f.amount]
+    const entered = typeof amount === 'number' && amount > 0
+    const held = loc[f.field]
+    out[f.field] = entered && typeof held === 'string' && opts.includes(held) ? held : opts[0]
   }
   return out
 }
@@ -2079,8 +2298,12 @@ const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
 export const SUPPLIER_SPECIFIC_ENTRY_METHOD = 'supplier-specific'
 
 /** The steam factor (or the reasoned absence) for a location. The ONLY steam lookup — no fallback. */
-export function steamFactorFor(loc: { country?: string }): SteamEntry {
-  return STEAM_EF[efJurisdiction(loc)]
+export function steamFactorFor(loc: { country?: string }): SteamEntry | null {
+  // null when the country resolves to no jurisdiction at all. A refused location never reaches a
+  // steam lookup in practice, because it is excluded whole before anything prices, but this
+  // function is exported and its type must not promise an entry it cannot produce.
+  const j = efJurisdiction(loc)
+  return j === null ? null : STEAM_EF[j]
 }
 
 /**
@@ -2107,7 +2330,9 @@ export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBas
     }
   }
   const entry = steamFactorFor(loc)
-  return entry.kind === 'published'
+  // null entry = the country resolves to no jurisdiction, so there is no table to ask. Same answer
+  // as an unpublished one: not priced. The location is excluded whole before this is reached.
+  return entry?.kind === 'published'
     ? { ef: entry.ef, basis: entry.basis, source: entry.source, supplier: false }
     : null
 }
@@ -2179,12 +2404,17 @@ function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asser
 }
 
 function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): CombustionEF {
-  const ctry = (loc.country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(loc.country)
   // Switches on the shared router rather than re-branching on country. Behaviour is unchanged: the
   // arms below are the same six, in the same order of precedence, with the same US fallbacks.
   // ⚠️ STEAM DOES NOT COME THROUGH HERE, precisely because of those `?? (EF as any)[key]` fallbacks.
   // See STEAM_EF.
   const j = efJurisdiction(loc)
+  // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS, NOT A US LOOKUP, AND THAT IS THE WHOLE CHANGE.
+  // efMiss is the same uniform marker a missing table row produces, so calcGas's assertPriceable
+  // refuses it by the path that already exists, and unpriceableReason turns that refusal into a
+  // whole location exclusion. Nothing new throws; the set of things that throw is larger by one.
+  if (j === null) return efMiss(String(key), loc.country || '')
   if (j === 'UK') {
     return efOr((EF_UK as any)[key] ?? (EF as any)[key], String(key), ctry)
   }
@@ -2222,7 +2452,7 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
 // It exists because the workings printed EF_SOURCES.electricity, the whole six-jurisdiction catalogue,
 // on every grid row: a verifier could not tell which source had priced the line in front of them.
 export function gridSource(loc: Location): string {
-  const ctry = (loc.country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(loc.country)
   if (ctry === 'CA') return EF_SOURCES.electricity_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.electricity_uk
   if (ctry === 'AU') return EF_SOURCES.electricity_au
@@ -2231,18 +2461,78 @@ export function gridSource(loc: Location): string {
   return EF_SOURCES.electricity_us
 }
 
+// Short publisher labels for the grid tables, one per jurisdiction. The LONG citation lives in
+// EF_SOURCES and is what a workings row and an export print; this is the compact form a live panel
+// has room for. Both are needed and they must not be derived from each other by string surgery.
+const GRID_PUBLISHER: Record<EfJurisdiction, string> = {
+  US: 'eGRID', CA: 'ECCC', UK: 'DEFRA', EU: 'EEA', AU: 'DCCEEW', NZ: 'MfE',
+}
+
+const COMBUSTION_STREAMS = new Set([
+  'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
+])
+
+/**
+ * The publishers that ACTUALLY PRICED this location, as short labels, in first-appearance order.
+ *
+ * ⚠️ IT READS THE PRICED ROWS, NOT THE COUNTRY, AND THAT IS THE WHOLE POINT. The live results panel
+ * carried a hard-coded line reading "EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · IPCC AR6 GWP
+ * · eGRID 2023" under EVERY location. A UK site cited the EPA and eGRID, which priced nothing there;
+ * a refused site cited five publishers when nothing had priced it at all. A catalogue is correct as
+ * a catalogue and wrong as an attribution, which is the same defect 06b6125 removed from the
+ * workings table and a later change removed from the assurance PDF's methodology page.
+ *
+ * ⚠️ DERIVED FROM buildWorkings, SO IT CANNOT DISAGREE WITH THE ROWS A VERIFIER READS. A row with a
+ * null result priced nothing, so a refused location and a location with no figures both yield an
+ * empty list by construction rather than by a special case.
+ *
+ * MARKET-BASED ROWS ARE EXCLUDED because the panel shows location-based Scope 2 only. Citing the AIB
+ * residual mix beside figures that do not include it would name a publisher for a number not shown.
+ *
+ * This is the beginning of the structured publisher-per-activity record that lib/publisherClaims
+ * .test.ts closes by saying does not exist yet. It is per location, not per page, so it does not
+ * close that gap on its own.
+ */
+export function publishersForLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024): string[] {
+  const j = efJurisdiction(loc)
+  if (j === null) return []
+  const out: string[] = []
+  const add = (label: string | undefined) => { if (label && !out.includes(label)) out.push(label) }
+  let usedOurGwp = false
+  for (const r of buildWorkings([loc], gwpVersion, year)) {
+    if (r.result_tco2e == null) continue
+    if (r.scope2_method === 'market-based') continue
+    const stream = String(r.stream ?? '')
+    if (COMBUSTION_STREAMS.has(stream)) add(COMBUSTION_EDITION[j])
+    else if (stream === 'electricity') add(`${GRID_PUBLISHER[j]} ${getGridFactor(loc.grid_region, year).usedYear}`)
+    else if (stream === 'purchased_steam') add(STEAM_EDITION[j])
+    if (r.gwp_basis === gwpVersion) usedOurGwp = true
+  }
+  // ⚠️ THE GWP SET IS NAMED ONLY WHEN A ROW APPLIED IT. Most grid and steam factors arrive already
+  // combined by their publisher and are stamped as-published, so an inventory can price every row
+  // without this platform's AR set touching any of them. Printing "IPCC AR6 GWP" there would claim
+  // a basis for figures nobody re-based. Same rule as R5 in lib/publisherClaims.test.ts.
+  if (usedOurGwp) add(`IPCC ${gwpVersion} GWP`)
+  return out
+}
+
 // Every DISTINCT electricity citation an inventory resolves to. Mirror of combustionSourcesFor, and
 // it exists for the same reason one level along: the assurance PDF printed EF_SOURCES.electricity —
 // the six-jurisdiction CATALOGUE — on its methodology page. That string is correct as a catalogue and
 // wrong as an attribution: it names six publishers where one priced the rows. 06b6125 removed the
 // same catalogue from the workings table; the methodology page kept it.
 export function gridSourcesFor(locations: readonly { country?: string }[]): string[] {
-  return [...new Set(locations.map(l => gridSource(l as Location)))]
+  // Same filter, same reason: gridSource ends `return EF_SOURCES.electricity_us`.
+  return [...new Set(locations.filter(l => !countryRefusal(l)).map(l => gridSource(l as Location)))]
 }
 
+// ⚠️ CANONICALISED LIKE EVERY OTHER COUNTRY BRANCH. This function and gridSource each normalise
+// country privately (the engine's own note calls them "still separate"), so canonicalising only the
+// factor router left Greece citing US EPA on rows the EU tables had priced. A test asserting that
+// GR and EL are indistinguishable to all seven country-keyed functions is what found it.
 // Source citation for a combustion row, country-aware (ECCC for CA, DEFRA for GB/UK, IPCC for EU, EPA otherwise).
 function combustionSource(loc: Location): string {
-  const ctry = (loc.country || '').toUpperCase().trim()
+  const ctry = canonicalCountryCode(loc.country)
   if (ctry === 'CA') return EF_SOURCES.combustion_ca
   if (ctry === 'GB' || ctry === 'UK') return EF_SOURCES.combustion_uk
   if (ctry === 'AU') return EF_SOURCES.combustion_au
@@ -2262,7 +2552,15 @@ function combustionSource(loc: Location): string {
 // be right for most customers and silently wrong for the multi-country ones — the reading that looks
 // fine until the case that matters.
 export function combustionSourcesFor(locations: readonly { country?: string }[]): string[] {
-  return [...new Set(locations.map(l => combustionSource(l as Location)))]
+  // ⚠️ REFUSED LOCATIONS ARE DROPPED BEFORE THE CITATION IS TAKEN, AND THIS IS THE LAST PLACE A US
+  // EPA CLAIM COULD HAVE SURVIVED. combustionSource falls through to EF_SOURCES.combustion for any
+  // country it does not recognise, so a Japanese site would put "US EPA" on the methodology page of
+  // the assurance PDF and in the export's source list, naming a publisher for a location nothing
+  // priced. factor_editions was fixed by returning null; this list has no null to return, so it
+  // filters instead.
+  //   A gate is not a guard: pricingReady already blocks both surfaces while a refused location
+  // exists. That is a reason to expect this never to render, not a reason for it to be wrong.
+  return [...new Set(locations.filter(l => !countryRefusal(l)).map(l => combustionSource(l as Location)))]
 }
 
 type GwpVersion = 'AR4' | 'AR5' | 'AR6'
@@ -2375,18 +2673,63 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
 //
 // Only MissingEmissionFactorError is absorbed. Any other error still propagates — a bug in the
 // arithmetic must not be silently converted into "this location is excluded".
-function unpriceableReason(loc: Location, gwpVersion: GwpVersion, year: number): MissingEmissionFactorError | null {
-  try { calcLocation(loc, gwpVersion, year); return null }
-  catch (e) { if (e instanceof MissingEmissionFactorError) return e; throw e }
+// ⚠️ GATES ONE CLAUSE OF ONE SENTENCE, AND IT EARNS ITS PLACE. "Its figures are kept as entered."
+// is a claim, and on a location where nothing has been entered it is a false one. Small, but it is
+// the kind of small falsehood that makes a customer doubt the larger sentence beside it.
+//   Reads the amounts, never the has_* flags: a stream flagged present with no figure has nothing
+// to keep.
+function locationHasFigures(loc: Location): boolean {
+  return loc.electricity_kwh > 0 || loc.natural_gas_amount > 0 || loc.propane_amount > 0
+    || loc.diesel_stationary_amount > 0 || loc.fuel_oil_distillate_amount > 0
+    || loc.fuel_oil_residual_amount > 0 || loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0
+    || loc.refrigerant_purchased_kg > 0 || loc.purchased_steam_mmbtu > 0
+    || loc.renewable_electricity_kwh > 0
 }
 
-export interface UnpriceableLocation {
-  locId: string
-  locName: string
-  fuel: string      // engine token, e.g. 'natural_gas' — the wording is the component's job
-  unit: string      // e.g. 'm3'
-  country: string   // e.g. 'US', or '(unset)' when the location has no country
+/** Why a location contributes nothing: its country, or a unit no table for that country carries. */
+export type LocationBlock =
+  | { kind: 'country'; refusal: CountryRefusal }
+  | { kind: 'factor'; error: MissingEmissionFactorError }
+
+// ⚠️ THE COUNTRY IS CHECKED BEFORE calcLocation, AND THE ORDER IS LOAD BEARING.
+// calcLocation only asks for a factor when a stream HAS a figure, so a location in Japan with
+// electricity alone, or with nothing entered yet, would never reach pickEF and would pass as
+// priceable. A country governs every stream at a site, so it is a property of the LOCATION and is
+// answered on the location, not as a consequence of pricing one of its streams.
+//   The country answer also wins when both apply. A site in Japan holding gas in m3 has two
+// problems, and "change the unit" is the wrong instruction for it: fixing the unit would not make
+// the figure priceable.
+function unpriceableReason(loc: Location, gwpVersion: GwpVersion, year: number): LocationBlock | null {
+  const refusal = countryRefusal(loc)
+  if (refusal) return { kind: 'country', refusal }
+  try { calcLocation(loc, gwpVersion, year); return null }
+  catch (e) { if (e instanceof MissingEmissionFactorError) return { kind: 'factor', error: e }; throw e }
 }
+
+/**
+ * A location excluded from every total, and why.
+ *
+ * ⚠️ A DISCRIMINATED UNION, NOT AN OPTIONAL FIELD, SO NO SURFACE CAN RENDER THE TWO ALIKE. The two
+ * blocks need opposite instructions: a factor gap says "check the country on this location, or the
+ * unit on the bill", which is actionable; a country refusal has no unit to check and, for two of
+ * its three states, no remedy at all. An optional `refusal?` would let a surface read fuel and unit
+ * off a country refusal, find empty strings, and print a sentence with holes in it.
+ */
+export type UnpriceableLocation =
+  | {
+      kind: 'factor'
+      locId: string
+      locName: string
+      fuel: string      // engine token, e.g. 'natural_gas' — the wording is the component's job
+      unit: string      // e.g. 'm3'
+      country: string   // e.g. 'US', or '(unset)' when the location has no country
+    }
+  | {
+      kind: 'country'
+      locId: string
+      locName: string
+      refusal: CountryRefusal
+    }
 
 // Pure probe, same shape as findUnresolvedCoverage / findUndeclaredStreams: a list of what is
 // wrong, which the component turns into a per-location state, a note on every affected total,
@@ -2395,7 +2738,11 @@ export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpV
   const out: UnpriceableLocation[] = []
   for (const loc of locations) {
     const why = unpriceableReason(loc, gwpVersion, year)
-    if (why) out.push({ locId: loc.id, locName: loc.name || 'Location', fuel: why.fuel, unit: why.unit, country: why.country })
+    if (!why) continue
+    const locName = loc.name || 'Location'
+    out.push(why.kind === 'country'
+      ? { kind: 'country', locId: loc.id, locName, refusal: why.refusal }
+      : { kind: 'factor', locId: loc.id, locName, fuel: why.error.fuel, unit: why.error.unit, country: why.error.country })
   }
   return out
 }
@@ -2785,7 +3132,12 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // publications for one figure, which is precisely the disagreement factor_editions exists to end.
     rows.push({ location: loc.name || 'Location', stream, source, scope, activity_data: entered, activity_unit: enteredUnit,
       ...factorCells(efShown, enteredUnit),
-      ef_source: combustionSource(loc), factor_vintage: COMBUSTION_EDITION[efJurisdiction(loc)],
+      // ⚠️ THE `?? undefined` IS A STATEMENT, NOT A GUARD. A row can only be pushed here for a
+      // location that priced, and a location whose country resolves to no jurisdiction cannot
+      // price, so the null arm is unreachable. It is spelled out rather than asserted because a
+      // factor_vintage of 'US EPA 2024' on a site that is not American is exactly the false claim
+      // this change removes, and `!` would let a future edit reintroduce it silently.
+      ef_source: combustionSource(loc), ...vintageOf(COMBUSTION_EDITION, loc),
       result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
   for (const loc of locations) {
@@ -2795,11 +3147,38 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // result_tco2e null, following the 'undeclared' row below: an absence never renders as 0.
     const blocked = unpriceableReason(loc, gwpVersion, year)
     if (blocked) {
-      rows.push({ location: loc.name || 'Location', source: 'All streams at this location', scope: 0,
+      const base = { location: loc.name || 'Location', source: 'All streams at this location', scope: 0,
         activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—',
-        ef_source: '—', gwp_basis: 'excluded', result_tco2e: null, declaration: 'unpriceable',
-        entry_method: 'excluded', unpriceable: { fuel: blocked.fuel, unit: blocked.unit, country: blocked.country },
-        note: `EXCLUDED FROM TOTALS — ${blocked.message} No figure for this location is included in any total on this report.` })
+        ef_source: '—', gwp_basis: 'excluded', result_tco2e: null, entry_method: 'excluded' } as const
+      if (blocked.kind === 'country') {
+        // ⚠️ THE DECLARATION IS THE STATE'S OWN LITERAL, NOT 'unpriceable' WITH A PAYLOAD.
+        // lib/ghg/declarationStates.test.ts reads this file and the two pages from disk and fails
+        // unless every literal the engine can emit is NAMED by a branch on every surface. Three
+        // literals force three named branches; one literal plus a field would let a surface render
+        // all three identically and still pass, which is how 'unpriceable' and
+        // 'declared_unquantified' each shipped rendering as ordinary rows.
+        //
+        // ⚠️ AND THEY ARE WRITTEN OUT, NOT INTERPOLATED, WHICH IS WHY THIS IS A SWITCH AND NOT ONE
+        // PUSH. The guard greps for `declaration: '<literal>'`; `declaration: refusal.state` is
+        // correct TypeScript and invisible to it, so all three states would have shipped with no
+        // surface obliged to name them. The first draft of this block did exactly that and the
+        // guard caught it. The repetition is the point: it is what makes the states greppable.
+        const cells = { ...base, country_refusal: blocked.refusal,
+          // ⚠️ NO PREFIX. The sentence already ends "Nothing from this location is included in any
+          // total on this report", and gwp_basis on this same row reads 'excluded'. That was three
+          // statements of one fact in one row. The unit-mismatch row below KEEPS its prefix,
+          // because its message does not say it.
+          note: countryRefusalText(blocked.refusal, 'verifier', locationHasFigures(loc)) }
+        switch (blocked.refusal.state) {
+          case 'country_not_set':       rows.push({ ...cells, declaration: 'country_not_set' }); break
+          case 'country_not_listed':    rows.push({ ...cells, declaration: 'country_not_listed' }); break
+          case 'country_not_supported': rows.push({ ...cells, declaration: 'country_not_supported' }); break
+        }
+      } else {
+        rows.push({ ...base, declaration: 'unpriceable',
+          unpriceable: { fuel: blocked.error.fuel, unit: blocked.error.unit, country: blocked.error.country },
+          note: `EXCLUDED FROM TOTALS — ${blocked.error.message} No figure for this location is included in any total on this report.` })
+      }
       continue
     }
     // First row index for THIS location. The declaration loop at the end of the iteration reads back
@@ -2906,7 +3285,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
         // told us 500 GJ and we could not price it" is a different, more useful statement to a
         // verifier than "no figure".
         const entry = steamFactorFor(loc)
-        const absent = entry.kind === 'published' ? null : entry
+        const absent = entry === null || entry.kind === 'published' ? null : entry
         rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2,
           activity_data: loc.purchased_steam_mmbtu, activity_unit: loc.purchased_steam_unit ?? 'mmbtu',
           emission_factor: '—', emission_factor_display: '—', ef_source: '—', scope2_method: '—',
@@ -2938,7 +3317,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // 'US EPA 2025 Table 7' because the site happens to be American would put a publication's name
       // on a private number. The column renders '—' there, which is what "no published edition" looks
       // like, and ef_source already names the supplier route. Same gate buildFactorEditions applies.
-      const steamVintage = priced.supplier ? undefined : STEAM_EDITION[efJurisdiction(loc)]
+      const steamVintage = priced.supplier ? undefined : vintageOf(STEAM_EDITION, loc).factor_vintage
       rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(st.note ? { note: st.note } : {}) })
       }
     }
@@ -3211,8 +3590,17 @@ export function findSteamFactorGaps(
     if (!loc.has_purchased_steam || loc.purchased_steam_mmbtu <= 0) return []
     if (steamPricing(loc)) return []
     const entry = steamFactorFor(loc)
+    // ⚠️ A REFUSED COUNTRY IS SKIPPED HERE, DELIBERATELY, AND IT IS NOT AN OVERSIGHT.
+    // This gate asks the customer for a supplier-specific factor so the steam row can price. A
+    // location whose country resolves to no jurisdiction is excluded WHOLE, so no figure it carries
+    // will be priced whatever they enter: asking would be busy-work that cannot clear the block,
+    // and it would put two different remedies on one location at once. The country refusal states
+    // the reason on its own, and pricingReady already blocks the export.
+    if (entry === null) return []
     if (entry.kind === 'published') return []   // unreachable; steamPricing would have returned it
-    return [{ locId: loc.id, locName: loc.name || 'Location', jurisdiction: efJurisdiction(loc), kind: entry.kind, guidance: entry.guidance }]
+    const j = efJurisdiction(loc)
+    if (j === null) return []                   // unreachable: a null entry above implies a null j
+    return [{ locId: loc.id, locName: loc.name || 'Location', jurisdiction: j, kind: entry.kind, guidance: entry.guidance }]
   })
 }
 

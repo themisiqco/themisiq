@@ -1,3 +1,5 @@
+import type { CountryRefusal } from './engine'
+import { countryRefusalLabel } from './countryRefusalCopy'
 import { factorEditionState } from "./factorEditions";
 import type { FactorEditions, FactorEditionState } from "./factorEditions";
 import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
@@ -72,12 +74,17 @@ export type YearDataStatus = 'ok' | 'excluded' | 'unverifiable'
 export type Scope3Basis = 'measured' | 'covers_nothing' | 'not_recorded' | 'absent'
 
 /** One location the saved inventory recorded as left out, in the engine's own tokens. */
-export interface YearExclusion {
-  locationName: string
-  fuel: string
-  unit: string
-  country: string
-}
+/**
+ * A location the stored year excluded, and why.
+ *
+ * ⚠️ A UNION, BECAUSE THE TWO KINDS HAVE NOTHING TO SAY IN COMMON BEYOND THE NAME. A factor gap
+ * names a fuel, a unit and a country; a country refusal has no fuel and no unit, and flattening it
+ * into the old four-field shape produced a sentence with holes in it ("its  figure is in , which we
+ * can't work out for "). The discriminant makes describeYearStatus branch instead.
+ */
+export type YearExclusion =
+  | { kind: 'factor'; locationName: string; fuel: string; unit: string; country: string }
+  | { kind: 'country'; locationName: string; refusal: CountryRefusal }
 
 /** Subset of a saved ghg_inventories row needed for the series. */
 export interface InventoryRow {
@@ -323,6 +330,11 @@ export function describeYearStatus(y: SeriesYear): string | null {
     const ex = y.exclusions ?? [];
     const detail = ex
       .map((e) => {
+        if (e.kind === "country") {
+          // The shared sentence, trimmed of its trailing "Nothing from this location is included
+          // in any total on this report." clause: this list already says that once, for all of them.
+          return `${e.locationName} — ${countryRefusalLabel(e.refusal).toLowerCase()}`;
+        }
         const country = COUNTRY_WORDS[e.country] ?? (e.country === "(unset)" ? "no country" : e.country);
         const unit = UNIT_WORDS[e.unit] ?? e.unit;
         const fuel = FUEL_WORDS[e.fuel] ?? e.fuel.replace(/_/g, " ");

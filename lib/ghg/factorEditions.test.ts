@@ -158,11 +158,31 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
     expect(getGridFactor('EU_DE', 2026).ef).not.toBe(getGridFactor('EU_FR', 2026).ef)
   })
 
-  it('F8 an unlisted country records US, because US EPA factors are what actually priced it', () => {
-    // pickEF falls back to EF for Japan. Recording 'JP' would name a table that does not exist.
+  it('F8 an unlisted country records NOTHING, because nothing priced it', () => {
+    // ⚠️ INVERTED 21 SEP 2026, AND THE OLD TITLE IS WORTH READING: "an unlisted country records US,
+    // because US EPA factors are what actually priced it". That was an accurate description of the
+    // behaviour and it is the behaviour that was wrong. A Japanese site was priced from EPA tables
+    // and this record then named US EPA as the publisher of its figures, on the verifier page.
+    //   Now the location is excluded whole, nothing prices it, and the honest record is an EMPTY
+    // one. An entry naming any jurisdiction here would be a publication claim about a figure no
+    // publication produced.
     const ed = buildFactorEditions([loc({ country: 'JP', grid_region: 'US_FL' })], 2026)
-    expect(Object.keys(ed)).toEqual(['US'])
-    expect(ed.US!.combustion!.source).toBe(EF_SOURCES.combustion)
+    expect(ed).toEqual({})
+  })
+
+  it('F8b a refused location contributes no entry even beside a priceable one', () => {
+    // The dangerous shape: one supported location and one refused, in a single inventory. The
+    // supported one must record its own jurisdiction and the refused one must add nothing, rather
+    // than quietly borrowing the entry its neighbour created.
+    const ed = buildFactorEditions([uk({ id: 'a' }), loc({ id: 'b', country: 'JP', grid_region: 'US_FL' })], 2026)
+    expect(Object.keys(ed)).toEqual(['UK'])
+  })
+
+  it('F8c every refusal state records nothing, not just the named-country one', () => {
+    for (const country of ['', 'OTHER', 'JP', 'ZZ']) {
+      const ed = buildFactorEditions([loc({ country, grid_region: 'US_FL' })], 2026)
+      expect(ed, `country ${JSON.stringify(country)}`).toEqual({})
+    }
   })
 
   it('F9 two locations in one jurisdiction record ONE entry, not two', () => {

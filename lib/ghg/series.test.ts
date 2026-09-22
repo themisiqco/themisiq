@@ -26,7 +26,7 @@ const row = (year: number, o: Partial<InventoryRow> = {}): InventoryRow => ({
 });
 
 const blockedSite: YearExclusion = {
-  locationName: 'Blocked Site', fuel: 'natural_gas', unit: 'm3', country: 'US',
+  kind: 'factor', locationName: 'Blocked Site', fuel: 'natural_gas', unit: 'm3', country: 'US',
 };
 
 const excluded = (year: number, exclusions: YearExclusion[] = [blockedSite]): InventoryRow =>
@@ -190,7 +190,7 @@ describe('GROUP B — the two unplottable states stay distinct', () => {
   it('B5 excluded copy counts the locations and agrees in number', () => {
     const two: YearExclusion[] = [
       blockedSite,
-      { locationName: 'Second Site', fuel: 'natural_gas', unit: 'kwh', country: 'CA' },
+      { kind: "factor" as const, locationName: 'Second Site', fuel: 'natural_gas', unit: 'kwh', country: 'CA' },
     ];
     const one = describeYearStatus(buildCompanySeries([excluded(2022)])[0].years[0])!;
     const many = describeYearStatus(buildCompanySeries([excluded(2022, two)])[0].years[0])!;
@@ -249,7 +249,7 @@ describe('GROUP C — no internal vocabulary reaches the customer', () => {
     // readable sentence. A hole in the middle of the copy is worse than an unfamiliar word: the
     // customer can at least search for the word.
     const odd: YearExclusion = {
-      locationName: 'Odd Site', fuel: 'hydrogen', unit: 'nm3', country: 'ZZ',
+      kind: 'factor', locationName: 'Odd Site', fuel: 'hydrogen', unit: 'nm3', country: 'ZZ',
     };
     const copy = describeYearStatus(buildCompanySeries([excluded(2022, [odd])])[0].years[0])!;
     expect(copy).toContain('hydrogen');
@@ -260,7 +260,7 @@ describe('GROUP C — no internal vocabulary reaches the customer', () => {
 
   it('C5 a location with no country reads as a missing country, not as a place', () => {
     const noCountry: YearExclusion = {
-      locationName: 'Unset Site', fuel: 'natural_gas', unit: 'm3', country: '(unset)',
+      kind: 'factor', locationName: 'Unset Site', fuel: 'natural_gas', unit: 'm3', country: '(unset)',
     };
     const copy = describeYearStatus(buildCompanySeries([excluded(2022, [noCountry])])[0].years[0])!;
     expect(copy).toContain('no country');

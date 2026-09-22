@@ -271,7 +271,16 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
     // customer answered ('declared_unquantified' | 'attested_absent' | 'undeclared',
     // engine.ts:2974-2982); and one per coverage resolution (scope 0, engine.ts:2991-3004).
     const declaration = str(r.declaration)
-    if (declaration === 'unpriceable') {
+    // ⚠️ FOUR MARKERS, ONE SKIP CODE, AND THAT IS THE RIGHT SHAPE HERE. The engine excludes a
+    // whole location for two different reasons now: a unit no factor table carries ('unpriceable'),
+    // and a country that resolves to no factor set at all (the three country_* states, added
+    // 21 Sep 2026). Category 3 does not care WHICH: either way the GHG side put nothing from that
+    // location into any total, so there is nothing for this module to price. The comment at the top
+    // of Cat3Skipped anticipated this marker set widening; this is that.
+    if (declaration === 'unpriceable'
+        || declaration === 'country_not_set'
+        || declaration === 'country_not_listed'
+        || declaration === 'country_not_supported') {
       skipped.push({ code: 'location_excluded', location })
       continue
     }

@@ -1,3 +1,4 @@
+import type { CountryRefusal } from "./engine";
 /**
  * GHG multi-year series — data load
  * --------------------------------------------------------------------------
@@ -74,6 +75,7 @@ interface WorkingsRow {
   location?: string;
   declaration?: string;
   unpriceable?: { fuel?: string; unit?: string; country?: string };
+  country_refusal?: CountryRefusal;
 }
 
 export interface Completeness {
@@ -94,16 +96,26 @@ export interface Completeness {
 export function assessCompleteness(workings: unknown, locationsData: unknown): Completeness {
   // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
   if (Array.isArray(workings)) {
-    const marked = (workings as WorkingsRow[]).filter((w) => w?.declaration === "unpriceable");
+    // ⚠️ MATCHES ALL FOUR EXCLUSION MARKERS. Filtering on "unpriceable" alone would let a year
+    // whose locations were excluded for their COUNTRY fall through to step 2, which recomputes and
+    // then reports "this year was saved before we started recording that" — a sentence about record
+    // keeping, for a year where the record is perfectly good. Wrong, and wrong in the direction
+    // that makes a real exclusion look like a missing marker.
+    const marked = (workings as WorkingsRow[]).filter((w) =>
+      w?.declaration === "unpriceable" || w?.declaration === "country_not_set"
+      || w?.declaration === "country_not_listed" || w?.declaration === "country_not_supported");
     if (marked.length > 0) {
       return {
         dataStatus: "excluded",
-        exclusions: marked.map((w) => ({
-          locationName: w.location ?? "Location",
-          fuel: w.unpriceable?.fuel ?? "",
-          unit: w.unpriceable?.unit ?? "",
-          country: w.unpriceable?.country ?? "",
-        })),
+        exclusions: marked.map((w) => w.country_refusal
+          ? { kind: "country" as const, locationName: w.location ?? "Location", refusal: w.country_refusal }
+          : {
+              kind: "factor" as const,
+              locationName: w.location ?? "Location",
+              fuel: w.unpriceable?.fuel ?? "",
+              unit: w.unpriceable?.unit ?? "",
+              country: w.unpriceable?.country ?? "",
+            }),
         unverifiableReason: null,
       };
     }

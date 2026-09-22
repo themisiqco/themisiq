@@ -21,11 +21,16 @@ import {
   MissingEmissionFactorError, findUnpriceableLocations,
   streamState, DECLARABLE_STREAMS, STREAM_META, nzTdLoss, NZ_TD_LOSS, EF_SOURCES,
   efJurisdiction, steamFactorFor, findSteamFactorGaps, snapUnitsForCountry, steamToBasis,
+  canonicalCountryCode, efRouting, countryRefusal, refusalIsFixable, type EfJurisdiction, type CountryRefusal,
+  combustionSourcesFor, gridSourcesFor,
+  gridRegionForCountry, gridSource, ngUnitOptions, liquidUnitOptions, GRID_EF,
+  EU_COUNTRIES, combustionSource, propaneUnitOptions, steamUnitOptions,
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+import { countryRefusalText } from './countryRefusalCopy';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -576,12 +581,19 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
       // dashboard down. Excluded, not zeroed: see GROUP L for what that distinction buys.
       expect(() => calcInventory([l], 'AR6', 2024)).not.toThrow();
       expect(findUnpriceableLocations([l], 'AR6', 2024)).toEqual([
-        { locId: l.id, locName: l.name, fuel: 'natural_gas', unit, country },
+        // `kind` added 21 Sep 2026: the type is a union now, because a location can also be
+        // excluded for its COUNTRY, and that arm carries a refusal instead of a fuel and a unit.
+        { kind: 'factor', locId: l.id, locName: l.name, fuel: 'natural_gas', unit, country },
       ]);
     });
   }
 
   it('K blank country is still named, not reported as undefined', () => {
+    // ⚠️ STILL A FACTOR-LOOKUP TEST, NOT A COUNTRY-REFUSAL ONE, AND THE DISTINCTION SURVIVED THE
+    // 21 Sep 2026 change. calcLocation prices a stream and throws the factor error; the COUNTRY
+    // refusal is decided a level up, in unpriceableReason, before calcLocation is called at all.
+    // So this assertion is unchanged: a blank country reaching pickEF still names itself '(unset)'
+    // rather than printing 'undefined'. T16 covers the refusal path for the same blank country.
     const l = loc({ country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
     expect(() => calcLocation(l, 'AR6', 2024)).toThrow(/\(unset\)/);
   });
@@ -2368,14 +2380,313 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
   it('T14 efJurisdiction is the ONE router, and pickEF agrees with it', () => {
     // The steam registry keys on efJurisdiction; pickEF switches on it. If they ever disagreed, steam
     // would be looked up under a different table from the fuels at the same location.
-    const cases: [string, string][] = [['US', 'US'], ['us', 'US'], ['', 'US'], ['JP', 'US'],
+    // ⚠️ CHANGED 21 SEP 2026. This list used to read ['', 'US'] and ['JP', 'US'], and the line below
+    // used to assert that a Japanese diesel gallon took the US EPA factor. Both were accurate
+    // records of the fallback, and the fallback is what was removed: a country this platform holds
+    // no factors for now resolves to NO jurisdiction, and its location is excluded from every total
+    // rather than priced from somebody else's table.
+    const cases: [string, EfJurisdiction | null][] = [['US', 'US'], ['us', 'US'], ['', null], ['JP', null],
       ['GB', 'UK'], ['UK', 'UK'], ['CA', 'CA'], ['DE', 'EU'], ['FR', 'EU'], ['AU', 'AU'], ['NZ', 'NZ']];
     for (const [country, expected] of cases) {
       expect(efJurisdiction({ country }), country).toBe(expected);
     }
-    // pickEF's behaviour is unchanged by the refactor: a GB diesel litre is still DEFRA's, a JP one the US fallback.
+    // A supported jurisdiction is untouched: a GB diesel litre is still DEFRA's.
     expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).co2).toBe(2.58354);
-    expect(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any).co2).toBe(10.20648);
+    // ⚠️ AND THE JAPANESE ONE IS NOW A REFUSAL, NOT A NUMBER. pickEF returns the same uniform miss
+    // marker a missing table row produces, so calcGas declines to price it by the path that already
+    // existed. The figure it used to return, 10.20648, was the US EPA diesel factor.
+    expect(() => calcGas(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any), 100, 'AR6')).toThrow(MissingEmissionFactorError);
+  });
+});
+
+// ── T15. ONE SPELLING PER COUNTRY, AND ONE ROUTER ────────────────────────────────────────────────
+//
+// Greece is the case these exist for. ISO 3166-1 assigns GR; every factor key in this engine is
+// spelled EL. Before canonicalCountryCode, a location stored as 'GR' was wrong in SEVEN separate
+// places at once, and the worst of them was silent: gridRegionForCountry returned '' for it, which
+// isResolvedGridRegion rejects, so the electricity rows were omitted from the workings and every
+// export blocked. Fixing only the factor router would have routed Greek FUELS to the EU tables
+// while its electricity stayed unresolved and its units stayed American, which is harder to spot
+// than the original defect because the fuel rows would have looked right.
+describe('T15 country canonicalisation', () => {
+  it('maps the two codes whose ISO spelling is not the engine spelling, and nothing else', () => {
+    expect(canonicalCountryCode('GR')).toBe('EL');
+    expect(canonicalCountryCode('UK')).toBe('GB');
+    // Case and whitespace are handled on the way in, as they always were.
+    expect(canonicalCountryCode(' gr ')).toBe('EL');
+    expect(canonicalCountryCode('uk')).toBe('GB');
+    // Everything else is returned unchanged, upper-cased and trimmed.
+    for (const c of ['US', 'CA', 'GB', 'EL', 'AU', 'NZ', 'FR', 'JP', 'OTHER', 'ZZ']) {
+      expect(canonicalCountryCode(c), c).toBe(c);
+    }
+    expect(canonicalCountryCode('')).toBe('');
+    expect(canonicalCountryCode(undefined)).toBe('');
+    // NOT a name alias table. Names are detectGridRegion's business and are left alone.
+    expect(canonicalCountryCode('GREECE')).toBe('GREECE');
+  });
+
+  it('GR and EL are indistinguishable to every country-keyed function in the engine', () => {
+    const gr = loc({ country: 'GR' }), el = loc({ country: 'EL' });
+    // 1. the factor router
+    expect(efJurisdiction(gr)).toBe(efJurisdiction(el));
+    expect(efJurisdiction(gr)).toBe('EU');
+    // 2. the grid region, and it must be a REAL GRID_EF key, not merely equal
+    expect(gridRegionForCountry('GR')).toBe(gridRegionForCountry('EL'));
+    expect(gridRegionForCountry('GR')).toBe('EU_EL');
+    expect(GRID_EF['EU_EL'], 'EU_EL must exist or the grid factor is lost').toBeDefined();
+    // 3. + 4. the two citation routers
+    expect(gridSource(gr)).toBe(gridSource(el));
+    expect(gridSource(gr)).toBe(EF_SOURCES.electricity_eu);
+    expect(combustionSource(gr)).toBe(combustionSource(el));
+    expect(combustionSource(gr)).toBe(EF_SOURCES.combustion_eu);
+    // 5. + 6. the unit option lists: metric, not American
+    expect(ngUnitOptions('GR')).toEqual(ngUnitOptions('EL'));
+    expect(ngUnitOptions('GR').map(([v]) => v)).toEqual(['m3']);
+    expect(liquidUnitOptions('GR')).toEqual(liquidUnitOptions('EL'));
+    expect(liquidUnitOptions('GR').map(([v]) => v)).toEqual(['litres']);
+    // 7. and the grid region resolves, so the electricity rows are not dropped
+    expect(isResolvedGridRegion(gridRegionForCountry('GR'))).toBe(true);
+  });
+
+  it('UK and GB are likewise indistinguishable', () => {
+    expect(efJurisdiction({ country: 'UK' })).toBe(efJurisdiction({ country: 'GB' }));
+    expect(gridRegionForCountry('UK')).toBe(gridRegionForCountry('GB'));
+    expect(gridRegionForCountry('UK')).toBe('UK');
+    expect(gridSource(loc({ country: 'UK' }))).toBe(gridSource(loc({ country: 'GB' }))); 
+    expect(combustionSource(loc({ country: 'UK' }))).toBe(combustionSource(loc({ country: 'GB' })));
+    expect(ngUnitOptions('UK')).toEqual(ngUnitOptions('GB'));
+  });
+});
+
+// ── T16. THE ROUTER'S THREE REFUSALS ─────────────────────────────────────────────────────────────
+//
+// A PROBE WITH NO CONSUMER IN THIS COMMIT. efJurisdiction still answers 'US' for an unsupported
+// country, exactly as it always has, so nothing this describes changes a figure yet. The states and
+// their tests land before the behaviour, on the same footing as reconcile().
+describe('T16 country refusals', () => {
+  it('every supported country routes, and US routes only from US', () => {
+    const supported: [string, string][] = [
+      ['US', 'US'], ['CA', 'CA'], ['GB', 'UK'], ['UK', 'UK'], ['AU', 'AU'], ['NZ', 'NZ'],
+      ['EL', 'EU'], ['GR', 'EU'], ['DE', 'EU'], ['FR', 'EU'],
+    ];
+    for (const [country, jurisdiction] of supported) {
+      const r = efRouting({ country });
+      expect(r.supported, country).toBe(true);
+      expect(r.supported && r.jurisdiction, country).toBe(jurisdiction);
+      expect(countryRefusal({ country }), country).toBeNull();
+    }
+    // Every EU member, not just the two spot checks, and each with a real grid key.
+    for (const c of EU_COUNTRIES) {
+      const r = efRouting({ country: c });
+      expect(r.supported && r.jurisdiction, c).toBe('EU');
+      expect(GRID_EF[gridRegionForCountry(c)], c).toBeDefined();
+    }
+  });
+
+  it('the three refusals are distinct and carry what their sentences need', () => {
+    // Never answered.
+    expect(countryRefusal({ country: '' })).toEqual({ state: 'country_not_set' });
+    expect(countryRefusal({})).toEqual({ state: 'country_not_set' });
+    // Answered with something that names no country. The value is carried VERBATIM so a surface
+    // can quote what was stored rather than paraphrasing it.
+    expect(countryRefusal({ country: 'OTHER' })).toEqual({ state: 'country_not_listed', value: 'OTHER' });
+    expect(countryRefusal({ country: 'ZZ' })).toEqual({ state: 'country_not_listed', value: 'ZZ' });
+    // A real country the platform can NAME but holds no factors for.
+    expect(countryRefusal({ country: 'JP' })).toEqual({ state: 'country_not_supported', iso2: 'JP' });
+    expect(countryRefusal({ country: 'PH' })).toEqual({ state: 'country_not_supported', iso2: 'PH' });
+  });
+
+  it('a code the country list cannot name is not_listed, not not_supported', () => {
+    // ⚠️ THIS IS THE LINE THE COPY FORCES. country_not_supported reads "we do not hold emission
+    // factors for this location's country (Philippines)", which cannot be written without a name.
+    // The concordance holds 212 of the 249 assigned alpha-2 codes, so Jersey, Guernsey, the Isle of
+    // Man, Gibraltar and Guam have no name here. Quoting the stored value is the honest answer for
+    // them; claiming we know which country it is would not be.
+    for (const c of ['JE', 'GG', 'IM', 'GI', 'GU']) {
+      expect(countryRefusal({ country: c }), c).toEqual({ state: 'country_not_listed', value: c });
+    }
+  });
+
+  it('a refused country resolves to NO jurisdiction, and US comes only from US', () => {
+    // ⚠️ THIS TEST IS THE INVERSE OF WHAT IT SAID ON 21 SEP 2026 AT TASK 1, WHEN IT ASSERTED THE US
+    // FALLBACK WAS STILL IN PLACE. That was true and deliberate for one commit: the router and the
+    // three refusal states landed with nothing reading them, so it had to be provable that no
+    // figure had moved. This is the commit that moves them.
+    expect(efJurisdiction({ country: 'JP' })).toBeNull();
+    expect(efJurisdiction({ country: '' })).toBeNull();
+    expect(efJurisdiction({ country: 'OTHER' })).toBeNull();
+    expect(efJurisdiction({ country: 'US' })).toBe('US');
+  });
+
+  it('a location is refused for its COUNTRY even when it has no fuel at all', () => {
+    // ⚠️ THE ORDER INSIDE unpriceableReason IS WHAT THIS PINS. calcLocation only asks for a factor
+    // when a stream HAS a figure, so a site with electricity alone, or with nothing entered, never
+    // reaches pickEF. Checking the country as a consequence of pricing a stream would let exactly
+    // those locations through, priced or not, and they are the commonest shape of a new location.
+    const elecOnly = loc({ country: 'JP', electricity_kwh: 50_000, grid_region: 'US_FL' });
+    const empty = loc({ country: 'JP' });
+    for (const l of [elecOnly, empty]) {
+      const found = findUnpriceableLocations([l], 'AR6', 2025);
+      expect(found.length, l.id).toBe(1);
+      expect(found[0].kind).toBe('country');
+      expect(found[0].kind === 'country' && found[0].refusal).toEqual({ state: 'country_not_supported', iso2: 'JP' });
+    }
+    // And it contributes nothing, rather than contributing its electricity.
+    expect(calcInventory([elecOnly], 'AR6', 2025).s2_location).toBe(0);
+  });
+
+  it('the country answer wins when a location has both problems', () => {
+    // A site in Japan holding gas in m3 fails on both counts. "Check the unit on the bill" is the
+    // wrong instruction for it: fixing the unit would not make the figure priceable.
+    const both = loc({ country: 'JP', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' });
+    const found = findUnpriceableLocations([both], 'AR6', 2025);
+    expect(found[0].kind).toBe('country');
+  });
+
+  it('the monthly write survives a refused location, and leaves it out of the rows', () => {
+    // ⚠️ THIS IS THE SAVE PATH, AND A THROW HERE WOULD BE A SILENT SAVE FAILURE. handleSave calls
+    // buildMonthlyEmissions after the annual row is already committed, inside a try whose comment
+    // says a monthly failure must not escape. Two locations, one refused and one priced, is the
+    // shape that matters: the priced one must still produce its rows.
+    const priced = loc({
+      id: 'ok', name: 'Priced Site', country: 'US', grid_region: 'US_FL',
+      has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [prop({
+        fuelType: 'natural_gas', value: 1200, unit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-12-31',
+      })])],
+    });
+    // The refused one carries BOTH a fuel bill and an electricity bill, and a RESOLVED grid region.
+    // The electricity branch is the one that would otherwise slip through: it asks only whether the
+    // region resolves, never whose country it is.
+    const refused = loc({
+      id: 'jp', name: 'Refused Site', country: 'JP', grid_region: 'US_FL',
+      electricity_kwh: 50_000,
+      has_natural_gas: true, natural_gas_amount: 500, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [prop({
+        fuelType: 'natural_gas', value: 500, unit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-12-31',
+      })]), doc('utility_bill_electric', [prop({
+        fuelType: 'electricity', value: 50_000, unit: 'kwh', periodStart: '2025-01-01', periodEnd: '2025-12-31',
+      })])],
+    });
+
+    // The same four deps handleSave passes at app/dashboard/ghg/page.tsx:1391.
+    const monthlyDeps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+    let out!: ReturnType<typeof buildMonthlyEmissions>;
+    expect(() => { out = buildMonthlyEmissions([priced, refused], 2025, monthlyDeps, 'AR6'); }).not.toThrow();
+
+    expect(out.slices.length, 'the priced location still produces its rows').toBeGreaterThan(0);
+    expect(out.slices.every(s => s.location_name === 'Priced Site'),
+      'no slice carries the refused location, electricity included').toBe(true);
+    expect(out.slices.some(s => s.scope === 2), 'and the priced site keeps nothing it should not').toBe(false);
+    expect(out.skipped.some(k => k.reason.includes('country_not_supported')),
+      'the refusal is REPORTED, not silently dropped').toBe(true);
+  });
+
+  it('no citation names a publisher for a refused location', () => {
+    // ⚠️ THE LAST PLACE A US EPA CLAIM COULD HAVE SURVIVED. combustionSource and gridSource each end
+    // with the US citation for any country they do not recognise, and the assurance PDF's
+    // methodology page plus the export's source list are both built from these two lists. A
+    // Japanese site would have named US EPA as the publisher of figures nothing priced.
+    const refused = loc({ id: 'jp', country: 'JP', grid_region: 'US_FL' });
+    expect(combustionSourcesFor([refused])).toEqual([]);
+    expect(gridSourcesFor([refused])).toEqual([]);
+    // Beside a real one, only the real one is cited.
+    const gb = loc({ id: 'gb', country: 'GB', grid_region: 'UK' });
+    expect(combustionSourcesFor([gb, refused])).toEqual([EF_SOURCES.combustion_uk]);
+    expect(gridSourcesFor([gb, refused])).toEqual([EF_SOURCES.electricity_uk]);
+  });
+
+  it('a refused location is offered metric units first, and never defaults to a US one', () => {
+    // A site that is not in the United States must not be handed a US billing unit as its default.
+    for (const country of ['OTHER', 'JP', '', 'ZZ']) {
+      expect(liquidUnitOptions(country)[0][0], country).toBe('litres');
+      expect(propaneUnitOptions(country)[0][0], country).toBe('litres');
+      expect(ngUnitOptions(country)[0][0], country).toBe('m3');
+      expect(steamUnitOptions(country).map(([v]) => v), country).toEqual(['gj']);
+      // A NEW location, holding nothing, takes opts[0].
+      const fresh = snapUnitsForCountry(country, {});
+      expect(fresh.diesel_stationary_unit, country).toBe('litres');
+      expect(fresh.natural_gas_unit, country).toBe('m3');
+      expect(fresh.propane_unit, country).toBe('litres');
+    }
+    // The United States itself is untouched.
+    expect(liquidUnitOptions('US')[0][0]).toBe('gallons');
+    expect(ngUnitOptions('US')[0][0]).toBe('mcf');
+  });
+
+  it('a refused location KEEPS a US unit it already holds, with the number untouched', () => {
+    // ⚠️ THIS IS THE WHOLE REASON THE US UNITS STAY IN THE LIST. snapUnitsForCountry keeps a held
+    // unit only while the list still offers it, and otherwise takes opts[0] WITHOUT CONVERTING. A
+    // metric-only list here would turn 1,000 gallons into 1,000 litres, a 3.79-fold error, silently.
+    const held = { diesel_stationary_unit: 'gallons', natural_gas_unit: 'mcf', propane_unit: 'gallons' };
+    for (const country of ['OTHER', 'JP', '', 'ZZ']) {
+      const after = snapUnitsForCountry(country, held as never);
+      expect(after.diesel_stationary_unit, country).toBe('gallons');
+      expect(after.natural_gas_unit, country).toBe('mcf');
+      expect(after.propane_unit, country).toBe('gallons');
+    }
+    // And the figure beside it is not touched by the snap at all: it returns units, nothing else.
+    const l = loc({ country: 'US', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'gallons' });
+    const moved = { ...l, country: 'OTHER', ...snapUnitsForCountry('OTHER', l as never) };
+    expect(moved.diesel_stationary_amount, 'the number is unchanged').toBe(1000);
+    expect(moved.diesel_stationary_unit, 'and so is its unit').toBe('gallons');
+  });
+
+  it('1,000 litres entered under Not listed survives the switch to France', () => {
+    // The walkthrough's exact case: FR offers litres only, the held unit is litres, so it is kept.
+    const b = loc({ country: 'OTHER', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' });
+    const after = { ...b, country: 'FR', ...snapUnitsForCountry('FR', b as never) };
+    expect(after.diesel_stationary_unit).toBe('litres');
+    expect(after.diesel_stationary_amount).toBe(1000);
+  });
+
+  it('a refusal blocks the export if and only if its sentence offers a remedy', () => {
+    // ⚠️ THE ONE INVARIANT TASK 2a RESTS ON. A gate that blocks with no remedy is a report the
+    // customer can never produce: nothing in the wizard turns "Not listed" or an unsupported
+    // country into a supported one. A remedy offered where nothing is blocked nags about nothing.
+    // Both answers come from refusalIsFixable, so they cannot drift.
+    const where = 'Choose the country in "List your locations" on the Company setup step.';
+    const cases: CountryRefusal[] = [
+      { state: 'country_not_set' },
+      { state: 'country_not_listed', value: 'OTHER' },
+      { state: 'country_not_listed', value: 'Japn' },
+      { state: 'country_not_supported', iso2: 'JP' },
+    ];
+    for (const r of cases) {
+      const fixable = refusalIsFixable(r);
+      const offersRemedy = countryRefusalText(r, 'review', false).includes(where);
+      expect(offersRemedy, `${r.state}: gate and sentence must agree`).toBe(fixable);
+    }
+    // And the split itself, spelled out so a change to the predicate has to change this line too.
+    expect(refusalIsFixable({ state: 'country_not_set' })).toBe(true);
+    expect(refusalIsFixable({ state: 'country_not_listed', value: 'Japn' })).toBe(true);
+    expect(refusalIsFixable({ state: 'country_not_listed', value: 'OTHER' })).toBe(false);
+    expect(refusalIsFixable({ state: 'country_not_listed', value: ' other ' }), 'case and space').toBe(false);
+    expect(refusalIsFixable({ state: 'country_not_supported', iso2: 'JP' })).toBe(false);
+  });
+
+  it('a non-blocking refusal is still excluded from every total and still stated', () => {
+    // Not blocking is not the same as not counting. The location contributes nothing, carries its
+    // own workings row, and that row is what every export surface renders.
+    const ok = loc({ id: 'ok', name: 'Priced', country: 'GB', grid_region: 'UK', electricity_kwh: 5000 });
+    const out = loc({ id: 'out', name: 'Elsewhere', country: 'JP', electricity_kwh: 9000 });
+    const totals = calcInventory([ok, out], 'AR6', 2025);
+    const alone = calcInventory([ok], 'AR6', 2025);
+    expect(totals.s2_location, 'the refused location adds nothing').toBe(alone.s2_location);
+    const rows = buildWorkings([ok, out], 'AR6', 2025);
+    expect(rows.filter(r => r.declaration === 'country_not_supported').length).toBe(1);
+    expect(rows.some(r => r.location === 'Elsewhere' && r.result_tco2e !== null),
+      'and contributes no priced row').toBe(false);
+  });
+
+  it('the workings row carries the state as its own declaration literal', () => {
+    const rows = buildWorkings([loc({ country: 'JP', electricity_kwh: 1000, grid_region: 'US_FL' })], 'AR6', 2025);
+    const excluded = rows.filter(r => r.declaration === 'country_not_supported');
+    expect(excluded.length).toBe(1);
+    expect(excluded[0].result_tco2e, 'an absence never renders as 0').toBeNull();
+    expect(excluded[0].country_refusal).toEqual({ state: 'country_not_supported', iso2: 'JP' });
+    // No priced row survives for that location.
+    expect(rows.filter(r => r.location === 'Test Site' && r.result_tco2e !== null)).toEqual([]);
   });
 });
 

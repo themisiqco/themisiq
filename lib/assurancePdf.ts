@@ -3,6 +3,8 @@ import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
 import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations } from './ghg/engine'
+import { countryRefusal } from './ghg/engine'
+import { countryRefusalText } from './ghg/countryRefusalCopy'
 import { BRAND } from './brand'
 // MUTE is layout.ts's MUTED under this module's existing local name; the alias keeps every
 // call site below unchanged. lib/pdf/palette.test.ts asserts the two modules agree.
@@ -170,6 +172,38 @@ export function generateAssurancePDF(
     bodyStyles: { fontSize: 9, textColor: TABLE_INK },
     margin: { left: M, right: M },
   })
+
+  // ── WHAT THESE TOTALS LEAVE OUT ─────────────────────────────────
+  //
+  // ⚠️ THIS PACKAGE COULD NOT BE PRODUCED WITH A LOCATION MISSING UNTIL 21 SEP 2026, WHICH IS WHY
+  // THE TABLE ABOVE HAD NO CAVEAT. pricingReady blocked every export while any location was
+  // excluded, so the figures were always whole. Task 2a stopped blocking on a refusal the customer
+  // cannot clear (a country set to "Not listed", or one this platform holds no factors for),
+  // because a gate nobody can pass withholds the report for ever rather than protecting anyone.
+  //   The exclusion being STATED is what makes that safe, and this is the surface where it matters
+  // most: a verifier reading a short Scope 1 with nothing to explain it has been misled by omission.
+  // Same sentences as the wizard, the CSV and the verifier page, from the one copy module.
+  const excludedLocs = inventory.locations
+    .map(loc => ({ loc, refusal: countryRefusal(loc) }))
+    .filter(x => x.refusal !== null)
+  if (excludedLocs.length > 0) {
+    let y = (((doc as any).lastAutoTable?.finalY as number) ?? 92) + 16
+    doc.setFontSize(9); doc.setTextColor(INK); doc.setFont('helvetica', 'bold')
+    doc.text(`Excluded from every figure above: ${excludedLocs.length} location${excludedLocs.length > 1 ? 's' : ''}.`, M, y)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(MUTE)
+    for (const { loc, refusal } of excludedLocs) {
+      y += 12
+      // ⚠️ A FULL STOP, NOT A COLON OR AN ARROW. A name followed by a colon reads as a label on a
+      // machine record; this is a sentence a verifier reads. No arrows, bullets or other symbols
+      // appear in any sentence this package prints, for the same reason.
+      // ⚠️ THE NAME IS NEVER SENTENCE-INITIAL. "The location X." rather than "X.", so a site called
+      // "other" is reproduced exactly as the customer typed it rather than reading as "Other".
+      const sentence = `The location ${loc.name || 'Location'}. ${countryRefusalText(refusal!, 'verifier', false)}`
+      const lines: string[] = doc.splitTextToSize(sentence, 515 - M)
+      doc.text(lines, M, y)
+      y += (lines.length - 1) * 9
+    }
+  }
 
   // ── PAGE 3 — METHODOLOGY ──
   doc.addPage()
