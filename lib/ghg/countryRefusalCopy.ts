@@ -165,3 +165,17 @@ export function refusalBannerTrailer(_refusal: CountryRefusal, hasFigures: boole
     ? "It isn't counted as zero."
     : "It isn't counted as zero, and nothing you've entered here is lost."
 }
+
+/**
+ * The heading over the live results panel for a location that is not priced.
+ *
+ * ⚠️ SAME SPLIT AS refusalBannerHeading, AND FOR THE SAME REASON: "yet" is a promise. On a country
+ * set to "Not listed", or one this platform holds no factors for, no result is coming however long
+ * the customer waits, and a heading that keeps saying "yet" eventually reads as a fault in the
+ * product rather than a limit of it.
+ */
+export function refusalResultsHeading(refusal: CountryRefusal): string {
+  return refusalIsFixable(refusal)
+    ? 'No results for this location yet'
+    : 'No results for this location'
+}

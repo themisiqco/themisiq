@@ -29,14 +29,14 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
-  countryRefusal, refusalIsFixable, unitsForCountryChange,
+  countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry,
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
-import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer } from '../../../lib/ghg/countryRefusalCopy'
+import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading } from '../../../lib/ghg/countryRefusalCopy'
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
@@ -1194,6 +1194,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // A stated refusal is excluded from the totals and named everywhere, and does not block.
   const pricingReady = factorGapLocations.length === 0 && blockingRefusals.length === 0
   const unpriceableById = new Map(unpriceableLocations.map(u => [u.locId, u]))
+  // Every publisher that priced anything in this inventory, in first-appearance order. The union of
+  // the per-location lists, so the checklist note and each location's own line cannot disagree.
+  const inventoryPublishers = [...new Set(
+    inventory.locations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year)),
+  )]
   // One phrasing of "this total leaves something out", used at every site that shows a total.
   // ⚠️ "we can't work out YET" IS TRUE OF A UNIT MISMATCH AND FALSE OF A COUNTRY WE HOLD NO FACTORS
   // FOR. "Yet" promises the customer that something they do will fix it; for country_not_supported,
@@ -2177,7 +2182,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   The rows are removed and the reason takes their place. */}
               {blockedHere ? (
                 <div style={{ padding: '2px 0 6px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 6 }}>⚠ No results for this location yet</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 6 }}>⚠ {blockedHere.kind === 'country' ? refusalResultsHeading(blockedHere.refusal) : 'No results for this location yet'}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
                     Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
@@ -2195,7 +2200,19 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} tCO₂e</span>
                 </div>
               ))}
-              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · IPCC AR6 GWP · eGRID 2023</div>
+              {/* ⚠️ THE PUBLISHERS THAT PRICED THIS LOCATION, NOT THE CATALOGUE OF ALL OF THEM.
+                  This line was the fixed string "EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) ·
+                  IPCC AR6 GWP · eGRID 2023", rendered under every location whatever its country. A
+                  UK site cited the EPA and eGRID, which priced nothing there, and a refused site
+                  cited five publishers when nothing had priced it at all. publishersForLocation
+                  derives from the location's own priced workings rows, so it is empty for a refused
+                  location and for one with no figures, by construction rather than by a guard. */}
+              {(() => {
+                const pubs = publishersForLocation(loc, 'AR6', inventory.reporting_year)
+                return pubs.length === 0 ? null : (
+                  <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{pubs.join(' · ')}</div>
+                )
+              })()}
               {validateCompleteness(loc).map((w, i) => (
                 <div key={i} style={{ marginTop: 8, background: "#FEF3E2", border: "0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)", borderRadius: 6, padding: "6px 10px", fontSize: 10, color: "var(--color-module-climate)", lineHeight: 1.5 }}>{w}</div>
               ))}
@@ -2563,7 +2580,18 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginTop: '1.5rem' }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
               {[
-                { label: 'Emission factors cited with source and year', done: true, note: 'EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · eGRID 2023 · IPCC AR6 GWP' },
+                // ⚠️ THE SECOND COPY OF THE SAME CATALOGUE, AND A CLAIM ABOUT THIS INVENTORY.
+                // This checklist tells the customer their package is assurance-ready; a note listing
+                // five publishers, four of which priced nothing here, is not evidence of that. Built
+                // from the same per-location derivation the live panel uses, unioned across the
+                // inventory, so it names what actually priced these figures and nothing else.
+                // ⚠️ AND `done` IS DERIVED, NOT HARDCODED true. It was `done: true` beside a fixed
+                // catalogue, so the tick was a statement about the PRODUCT (it does cite sources)
+                // rendered as a statement about THIS INVENTORY. On an inventory where nothing is
+                // priced yet, a green tick would sit directly beside "No figures are priced yet",
+                // which is the two halves of one line contradicting each other. A checklist item
+                // whose tick cannot be false is not a checklist item.
+                { label: 'Emission factors cited with source and year', done: inventoryPublishers.length > 0, note: inventoryPublishers.length > 0 ? inventoryPublishers.join(' · ') : 'No figures are priced yet' },
                 { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
                 { label: 'Organizational boundary documented', done: !!inventory.boundary_approach, note: inventory.boundary_approach.replace(/_/g, ' ') },
                 { label: 'Source documents uploaded', done: isPaid && inventory.locations.some(l => l.source_docs.length > 0), note: isPaid ? `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` : 'Available on paid plan' },

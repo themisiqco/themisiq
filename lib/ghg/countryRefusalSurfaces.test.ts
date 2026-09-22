@@ -13,10 +13,10 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-  emptyLocation, unitsForCountryChange, snapUnitsForCountry, buildWorkings, countryRefusal,
+  publishersForLocation, emptyLocation, unitsForCountryChange, snapUnitsForCountry, buildWorkings, countryRefusal,
   gridRegionForCountry, isResolvedGridRegion, type Location,
 } from './engine'
-import { refusalBannerHeading, refusalBannerTrailer, countryRefusalText, countryRefusalLabel, type RefusalSurface } from './countryRefusalCopy'
+import { refusalResultsHeading, refusalBannerHeading, refusalBannerTrailer, countryRefusalText, countryRefusalLabel, type RefusalSurface } from './countryRefusalCopy'
 import type { CountryRefusal } from './engine'
 
 const ALL_REFUSALS: CountryRefusal[] = [
@@ -177,6 +177,60 @@ describe('the Category 3 summary says a location was left out', () => {
   })
 })
 
+// ── THE LIVE RESULTS PANEL ──────────────────────────────────────────────────────────────────────
+describe('the live results panel for a location that is not priced', () => {
+  it('drops "yet" where no result is coming', () => {
+    expect(refusalResultsHeading({ state: 'country_not_set' })).toBe('No results for this location yet')
+    expect(refusalResultsHeading({ state: 'country_not_listed', value: 'Japn' })).toBe('No results for this location yet')
+    expect(refusalResultsHeading({ state: 'country_not_listed', value: 'OTHER' })).toBe('No results for this location')
+    expect(refusalResultsHeading({ state: 'country_not_supported', iso2: 'JP' })).toBe('No results for this location')
+  })
+})
+
+// ── WHICH PUBLISHERS A LOCATION MAY CITE ────────────────────────────────────────────────────────
+describe('a location cites the publishers that priced it, and no others', () => {
+  const uk = loc({ country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: 10_000, natural_gas_unit: 'kwh', electricity_kwh: 5_000 })
+  const us = loc({ country: 'US', grid_region: 'US_FL', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf', electricity_kwh: 5_000 })
+
+  it('a UK location cites DEFRA and nobody else', () => {
+    // ⚠️ THE OLD LINE PUT THE EPA AND eGRID UNDER THIS LOCATION. Neither priced a single figure at a
+    // British site, and eGRID cannot: it is a table of United States subregions.
+    const pubs = publishersForLocation(uk, 'AR6', 2025)
+    expect(pubs.every(p => p.includes('DEFRA')), pubs.join(' · ')).toBe(true)
+    for (const other of ['EPA', 'eGRID', 'ECCC', 'EEA', 'DCCEEW', 'MfE']) {
+      expect(pubs.join(' · '), other).not.toContain(other)
+    }
+  })
+
+  it('a US location cites the EPA and eGRID', () => {
+    const pubs = publishersForLocation(us, 'AR6', 2025).join(' · ')
+    expect(pubs).toContain('US EPA 2024')
+    expect(pubs).toContain('eGRID 2023')
+    expect(pubs, 'and no publisher from another country').not.toContain('DEFRA')
+  })
+
+  it('a refused location cites nothing at all', () => {
+    for (const country of ['OTHER', 'JP', '']) {
+      const l = loc({ country, has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres', electricity_kwh: 2000 })
+      expect(publishersForLocation(l, 'AR6', 2025), country).toEqual([])
+    }
+  })
+
+  it('a location with no figures cites nothing', () => {
+    expect(publishersForLocation(loc({ country: 'GB', grid_region: 'UK' }), 'AR6', 2025)).toEqual([])
+  })
+
+  it('names the GWP set only when a row applied it', () => {
+    // ⚠️ MOST GRID AND STEAM FACTORS ARRIVE ALREADY COMBINED BY THEIR PUBLISHER and are stamped
+    // as-published, so an inventory can price every row without this platform's AR set touching
+    // one. A UK site on gas and electricity is exactly that case, and claiming "IPCC AR6 GWP" there
+    // would assert a basis for figures nobody re-based.
+    expect(publishersForLocation(uk, 'AR6', 2025).join(' · ')).not.toContain('AR6')
+    // A US gas row IS combined here, so the set is named.
+    expect(publishersForLocation(us, 'AR6', 2025).join(' · ')).toContain('IPCC AR6 GWP')
+  })
+})
+
 // ── SURFACES THAT LIVE IN THE PAGE ──────────────────────────────────────────────────
 //
 // Read from disk, like lib/ghg/declarationStates.test.ts and the date guards. These are facts about
@@ -214,6 +268,27 @@ describe('the GHG page surfaces', () => {
 
   it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch', () => {
     expect(PAGE).toContain("{blocked.kind === 'country' ? '' : 'Not included in any total. '}")
+  })
+
+  it('no surface carries a hard-coded publisher catalogue any more', () => {
+    // ⚠️ TWO COPIES OF THE SAME FIXED STRING WERE ON THIS SCREEN: the live results panel under every
+    // location, and the Review step's assurance checklist note. Both are now derived. A catalogue is
+    // correct as a catalogue and wrong as an attribution, which is the same defect 06b6125 removed
+    // from the workings table and a later change removed from the assurance PDF's methodology page.
+    const live = PAGE.split("EPA 2024 (US)").length - 1
+    expect(live, 'only the comment explaining the removal may still contain the old string').toBe(1)
+    expect(PAGE).toContain("publishersForLocation(loc, 'AR6', inventory.reporting_year)")
+    expect(PAGE).toContain('inventoryPublishers.join')
+  })
+
+  it('the assurance checklist never ticks an item it cannot evidence', () => {
+    // ⚠️ THE TICK AND THE NOTE ARE ONE CLAIM. `done: true` beside a derived note meant a green tick
+    // could sit directly beside "No figures are priced yet": the two halves of one line saying
+    // opposite things, on the screen that tells the customer their package is assurance-ready.
+    expect(PAGE, 'done must be derived from the same value as the note')
+      .toContain("{ label: 'Emission factors cited with source and year', done: inventoryPublishers.length > 0,")
+    expect(PAGE, 'and the hardcoded tick is gone')
+      .not.toContain("{ label: 'Emission factors cited with source and year', done: true,")
   })
 
   it('the CSV RESULTS block states what the figures exclude, before METHODS', () => {

@@ -2461,6 +2461,61 @@ export function gridSource(loc: Location): string {
   return EF_SOURCES.electricity_us
 }
 
+// Short publisher labels for the grid tables, one per jurisdiction. The LONG citation lives in
+// EF_SOURCES and is what a workings row and an export print; this is the compact form a live panel
+// has room for. Both are needed and they must not be derived from each other by string surgery.
+const GRID_PUBLISHER: Record<EfJurisdiction, string> = {
+  US: 'eGRID', CA: 'ECCC', UK: 'DEFRA', EU: 'EEA', AU: 'DCCEEW', NZ: 'MfE',
+}
+
+const COMBUSTION_STREAMS = new Set([
+  'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
+])
+
+/**
+ * The publishers that ACTUALLY PRICED this location, as short labels, in first-appearance order.
+ *
+ * ⚠️ IT READS THE PRICED ROWS, NOT THE COUNTRY, AND THAT IS THE WHOLE POINT. The live results panel
+ * carried a hard-coded line reading "EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) · IPCC AR6 GWP
+ * · eGRID 2023" under EVERY location. A UK site cited the EPA and eGRID, which priced nothing there;
+ * a refused site cited five publishers when nothing had priced it at all. A catalogue is correct as
+ * a catalogue and wrong as an attribution, which is the same defect 06b6125 removed from the
+ * workings table and a later change removed from the assurance PDF's methodology page.
+ *
+ * ⚠️ DERIVED FROM buildWorkings, SO IT CANNOT DISAGREE WITH THE ROWS A VERIFIER READS. A row with a
+ * null result priced nothing, so a refused location and a location with no figures both yield an
+ * empty list by construction rather than by a special case.
+ *
+ * MARKET-BASED ROWS ARE EXCLUDED because the panel shows location-based Scope 2 only. Citing the AIB
+ * residual mix beside figures that do not include it would name a publisher for a number not shown.
+ *
+ * This is the beginning of the structured publisher-per-activity record that lib/publisherClaims
+ * .test.ts closes by saying does not exist yet. It is per location, not per page, so it does not
+ * close that gap on its own.
+ */
+export function publishersForLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024): string[] {
+  const j = efJurisdiction(loc)
+  if (j === null) return []
+  const out: string[] = []
+  const add = (label: string | undefined) => { if (label && !out.includes(label)) out.push(label) }
+  let usedOurGwp = false
+  for (const r of buildWorkings([loc], gwpVersion, year)) {
+    if (r.result_tco2e == null) continue
+    if (r.scope2_method === 'market-based') continue
+    const stream = String(r.stream ?? '')
+    if (COMBUSTION_STREAMS.has(stream)) add(COMBUSTION_EDITION[j])
+    else if (stream === 'electricity') add(`${GRID_PUBLISHER[j]} ${getGridFactor(loc.grid_region, year).usedYear}`)
+    else if (stream === 'purchased_steam') add(STEAM_EDITION[j])
+    if (r.gwp_basis === gwpVersion) usedOurGwp = true
+  }
+  // ⚠️ THE GWP SET IS NAMED ONLY WHEN A ROW APPLIED IT. Most grid and steam factors arrive already
+  // combined by their publisher and are stamped as-published, so an inventory can price every row
+  // without this platform's AR set touching any of them. Printing "IPCC AR6 GWP" there would claim
+  // a basis for figures nobody re-based. Same rule as R5 in lib/publisherClaims.test.ts.
+  if (usedOurGwp) add(`IPCC ${gwpVersion} GWP`)
+  return out
+}
+
 // Every DISTINCT electricity citation an inventory resolves to. Mirror of combustionSourcesFor, and
 // it exists for the same reason one level along: the assurance PDF printed EF_SOURCES.electricity —
 // the six-jurisdiction CATALOGUE — on its methodology page. That string is correct as a catalogue and
