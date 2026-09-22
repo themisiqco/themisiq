@@ -29,14 +29,14 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
-  countryRefusal, refusalIsFixable,
+  countryRefusal, refusalIsFixable, unitsForCountryChange,
   findSteamFactorGaps, steamFactorFor,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry,
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
-import { countryRefusalText } from '../../../lib/ghg/countryRefusalCopy'
+import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer } from '../../../lib/ghg/countryRefusalCopy'
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
@@ -436,6 +436,23 @@ function excludedRow(r: { source?: string; note?: string; gwp_basis?: string }, 
   </tr>
 }
 
+// The banner shell around whichever message is shown.
+//
+// ⚠️ THE UNIT-MISMATCH WORDING IS UNCHANGED, DELIBERATELY. That state is always fixable, "yet" is
+// true of it, and its trailer does not repeat its sentence. Only the refusal states needed their
+// own, and they get them from countryRefusalCopy so the verifier page and the exports cannot end up
+// with a different account of the same location.
+function exclusionBannerHeading(u: UnpriceableLocation): string {
+  return u.kind === 'country'
+    ? refusalBannerHeading(u.refusal)
+    : "We can't work out this location's emissions yet"
+}
+function exclusionBannerTrailer(u: UnpriceableLocation): string {
+  return u.kind === 'country'
+    ? refusalBannerTrailer(u.refusal)
+    : "Until then this location is left out of your totals \u2014 it isn't counted as zero, and nothing else you've entered here is lost."
+}
+
 function unpriceableMessage(u: UnpriceableLocation, hasFigures: boolean): string {
   // ⚠️ THE COUNTRY REFUSAL IS A DIFFERENT SENTENCE FROM A DIFFERENT MODULE, NOT A BRANCH OF THIS
   // ONE. Its three states are also rendered by the verifier page, the workings note and the
@@ -817,7 +834,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       if (field === 'country') {
         // Every unit at once, derived from the same option lists the selectors render, so a fuel
         // cannot be snapped by one rule and offered by another. See UNIT_FIELDS in the engine.
-        Object.assign(locs[idx], snapUnitsForCountry(value, locs[idx] as any))
+        // unitsForCountryChange, not snapUnitsForCountry: a unit on a stream with no figure is a
+        // template default, not the customer's choice, and must follow the new country rather than
+        // survive as a United States unit on a site that is not in the United States.
+        Object.assign(locs[idx], unitsForCountryChange(value, locs[idx] as never))
         // UK, EU and NZ grids are national — set grid_region directly from the country.
         // (AU returns '' here and resolves on the state pick; US resolves on the state pick.)
         const gr = gridRegionForCountry(value)
@@ -1818,9 +1838,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             actually changed, so the customer is told next to the controls that fix it. */}
         {unpriceableById.get(loc.id) && (
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ We can&apos;t work out this location&apos;s emissions yet</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ {exclusionBannerHeading(unpriceableById.get(loc.id)!)}</div>
             <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceableMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>Until then this location is left out of your totals — it isn&apos;t counted as zero, and nothing else you&apos;ve entered here is lost.</div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!)}</div>
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
@@ -1980,7 +2000,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {validateElectricity(loc.electricity_kwh)}
                   </div>
                 )}
-                {loc.country === 'AU'
+                {/* ⚠️ NO GRID BANNER ON A REFUSED LOCATION, FOR THE SAME REASON THE GRID GATE SKIPS IT.
+                    The country refusal is the single reason this location is not priced, and it is
+                    already stated at the top of this panel. A second amber box saying the grid
+                    factor is unavailable names a different problem, invites the customer to go and
+                    fix something, and there is nothing to fix: no control sets a grid region for a
+                    country the platform does not support. It still renders for a SUPPORTED country
+                    whose region is unresolved, which is a real and fixable state. */}
+                {countryRefusal(loc) ? null : loc.country === 'AU'
                   ? (loc.grid_region.startsWith('AU_')
                       ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
                       : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Select your state above to resolve the grid emission factor.</div>)
@@ -2335,7 +2362,15 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         </div>
                       </>
                     )}
-                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>Intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
+                    {/* ⚠️ "S1 intensity", THE EXPORT'S OWN WORDING. This read "Intensity:", and the CSV
+                        row for the identical figure reads "S1 intensity (tCO2e/$M revenue)", so one
+                        number had two names across two documents a verifier reads side by side.
+                        ⚠️ AND IT CARRIES THE EXCLUSION NOTE, because it is derived from totals that
+                        exclude a location. An intensity is a ratio of an incomplete numerator; it
+                        is no more complete than the Scope 1 figure above it, and it had been the
+                        one figure on this card with nothing saying so. */}
+                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>S1 intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
+                    {rev > 0 && exclusionNote && <div style={{ fontSize: 10, color: 'var(--color-module-climate)', marginTop: 2, lineHeight: 1.5 }}>{exclusionNote}</div>}
                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
                     {/* Every figure in this card — both scopes, biogenic, the intensities — is built
                         from the same excluded set, so the note belongs to the card, not to one line. */}
@@ -2370,7 +2405,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       {/* No numbers for a blocked location — not even a dash beside "S1:", which
                           still reads as a measured scope. The reason takes the figures' place. */}
                       {blocked
-                        ? <div style={{ fontSize: 12, color: 'var(--color-module-climate)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ Not included in any total. {unpriceableMessage(blocked, locationHasEnteredFigures(loc))}</div>
+                        ? <div style={{ fontSize: 12, color: 'var(--color-module-climate)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {blocked.kind === 'country' ? '' : 'Not included in any total. '}{unpriceableMessage(blocked, locationHasEnteredFigures(loc))}</div>
                         : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
                     </div>
                     <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
@@ -2786,6 +2821,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         [`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s2],
       ] : []),
       ...(rev > 0 ? [['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
+      // ⚠️ DIRECTLY UNDER THE FIGURES, AND IN EVERY FRAMEWORK'S FILE. The refusal appeared only in
+      // the LOCATION BREAKDOWN, far below: a reader who took the RESULTS block at face value, which
+      // is what a results block is for, saw a Scope 1, a Scope 2 and an intensity with nothing
+      // saying a site was missing from all three. This is one line in a fixed position, and it is
+      // the same sentence the wizard and the assurance package use, so the three cannot disagree.
+      //   It sits INSIDE the shared rows array, so it is emitted for cdp, esrs, gri, ecovadis and
+      // ifrs alike. The per-framework branches above add rows; none of them replaces this block.
+      ...(exclusionNote ? [['Excluded from the figures above', exclusionNote]] : []),
       [''],
       ['METHODS'],
       ...combustionSourcesFor(inventory.locations).map(src => ['Combustion factors', src]),
@@ -2824,7 +2867,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         if (blocked) {
           return [loc.name, loc.grid_region, '—', '—',
             blocked.kind === 'country'
-              ? `EXCLUDED FROM TOTALS. ${countryRefusalText(blocked.refusal, 'verifier', locationHasEnteredFigures(loc))}`
+              // ⚠️ NO "EXCLUDED FROM TOTALS" PREFIX ON A REFUSAL ROW. The sentence already ends
+              // "Nothing from this location is included in any total on this report", and the GWP
+              // basis cell beside it reads "excluded". Three statements of one fact in one row.
+              ? countryRefusalText(blocked.refusal, 'verifier', locationHasEnteredFigures(loc))
               : `EXCLUDED FROM TOTALS — ${unpriceableMessage(blocked, locationHasEnteredFigures(loc))} No figure for this location is included in any total on this report.`]
         }
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)

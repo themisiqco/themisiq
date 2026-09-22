@@ -131,3 +131,32 @@ export function countryRefusalLabel(refusal: CountryRefusal): string {
     case 'country_not_supported': return `No factors held (${countryNameEn(refusal.iso2)})`
   }
 }
+
+// ── THE BANNER SHELL AROUND THE SENTENCE ─────────────────────────────────────────────────────────
+//
+// The Energy and fuel step wraps the refusal sentence in a heading and a trailer that were written
+// for a unit mismatch, which is always fixable. Read against a refusal the customer cannot clear
+// they are wrong twice over: "yet" promises a fix that is not coming, and the trailer repeated
+// "left out of your totals" immediately after the sentence had just said it.
+//
+// ⚠️ SELECTED BY refusalIsFixable, THE SAME PREDICATE THE GATE AND THE REMEDY CLAUSE READ. A third
+// answer to "can this be fixed" would be a third thing to keep in step.
+
+/** The banner heading above a refusal sentence. */
+export function refusalBannerHeading(refusal: CountryRefusal): string {
+  return refusalIsFixable(refusal)
+    ? "We can't work out this location's emissions yet"
+    : "We don't calculate emissions for this location"
+}
+
+/**
+ * The line under a refusal sentence.
+ *
+ * ⚠️ IT NO LONGER REPEATS "left out of your totals". Every refusal sentence ends by saying the
+ * location is left out of every total, so the old trailer said it twice in two wordings, one line
+ * apart. What is worth adding is the part the sentence does NOT cover: that an absence is not a
+ * zero, and that nothing entered has been discarded.
+ */
+export function refusalBannerTrailer(_refusal: CountryRefusal): string {
+  return "It isn't counted as zero, and nothing you've entered here is lost."
+}

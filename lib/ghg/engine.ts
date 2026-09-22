@@ -2005,15 +2005,18 @@ function propaneUnitOptions(country: string): Array<[string, string]> {
 //
 // Replaces a hand-written `metric ? 'litres' : …` block in the wizard's country-change handler,
 // which listed the fuels a second time and silently omitted whichever was added last.
+// `amount` is the figure the unit governs. It is here so unitsForCountryChange can tell a unit the
+// customer CHOSE from one the template happened to seed, which is the only thing standing between a
+// new location and a US default it never asked for.
 export const UNIT_FIELDS = [
-  { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions' },
-  { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions' },
-  { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions' },
-  { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions' },
+  { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions',      amount: 'natural_gas_amount' },
+  { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions', amount: 'propane_amount' },
+  { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_stationary_amount' },
+  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'fuel_oil_distillate_amount' },
+  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'fuel_oil_residual_amount' },
+  { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'gasoline_amount' },
+  { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_mobile_amount' },
+  { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions',   amount: 'purchased_steam_mmbtu' },
 ] as const
 
 export type UnitFieldName = typeof UNIT_FIELDS[number]['field']
@@ -2033,6 +2036,42 @@ export function snapUnitsForCountry(
     const opts = f.options(country).map(([v]) => v)
     const held = current[f.field]
     out[f.field] = held && opts.includes(held) ? held : opts[0]
+  }
+  return out
+}
+
+/**
+ * The units to store when a location's COUNTRY changes.
+ *
+ * ⚠️ snapUnitsForCountry CANNOT ANSWER THIS, AND THE DIFFERENCE IS A UNIT NOBODY CHOSE.
+ * That function keeps any unit the new country still offers, which is right for a stream carrying a
+ * figure: the customer picked gallons, gallons are still offered, gallons stand. But emptyLocation
+ * seeds every unit US-first (mcf, gallons, mmbtu) before a country is picked at all, so a BRAND NEW
+ * location arrives already "holding" gallons. Picking a country whose list still offers gallons then
+ * kept them, and a site set to "Not listed" defaulted to a United States billing unit it had never
+ * been offered. GB, FR and AU escaped it only because their lists drop gallons entirely, so the snap
+ * fell through to opts[0]; the states that RETAIN US units for safety were the ones it bit.
+ *
+ * ⚠️ THE TEST IS `amount > 0`, AND IT IS THE SMALLEST THING THE DATA CAN ACTUALLY DISTINGUISH.
+ * Nothing records whether a customer opened a unit selector, so "chose gallons and entered nothing"
+ * and "never touched it" are the same row today. A figure is the one honest evidence of a choice:
+ * if a stream carries one, its unit is treated as chosen and is preserved exactly as before, which
+ * is what keeps this from relabelling anything. If it carries none, there is no figure to relabel
+ * and the country's own default is the better answer.
+ *   The remaining gap is a customer who picks a unit, enters nothing, and changes country: their
+ * pick is discarded. Recording an explicit choice would close it and is not worth a schema column.
+ */
+export function unitsForCountryChange(
+  country: string,
+  loc: Partial<Record<string, unknown>>,
+): Record<UnitFieldName, string> {
+  const out = {} as Record<UnitFieldName, string>
+  for (const f of UNIT_FIELDS) {
+    const opts = f.options(country).map(([v]) => v)
+    const amount = loc[f.amount]
+    const entered = typeof amount === 'number' && amount > 0
+    const held = loc[f.field]
+    out[f.field] = entered && typeof held === 'string' && opts.includes(held) ? held : opts[0]
   }
   return out
 }
@@ -3070,7 +3109,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
         // surface obliged to name them. The first draft of this block did exactly that and the
         // guard caught it. The repetition is the point: it is what makes the states greppable.
         const cells = { ...base, country_refusal: blocked.refusal,
-          note: `EXCLUDED FROM TOTALS. ${countryRefusalText(blocked.refusal, 'verifier', locationHasFigures(loc))}` }
+          // ⚠️ NO PREFIX. The sentence already ends "Nothing from this location is included in any
+          // total on this report", and gwp_basis on this same row reads 'excluded'. That was three
+          // statements of one fact in one row. The unit-mismatch row below KEEPS its prefix,
+          // because its message does not say it.
+          note: countryRefusalText(blocked.refusal, 'verifier', locationHasFigures(loc)) }
         switch (blocked.refusal.state) {
           case 'country_not_set':       rows.push({ ...cells, declaration: 'country_not_set' }); break
           case 'country_not_listed':    rows.push({ ...cells, declaration: 'country_not_listed' }); break

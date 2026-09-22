@@ -196,7 +196,10 @@ describe('Category 3 activity D screening', () => {
     expect(cat3Sentences(priced, read, GWP)).toContain('19,572.33 kg CO2e in all, which is 19.5723 mt CO2e.')
     const src = page()
     expect(src).toContain('status={cat3ExcludedFor3d ? CAT3_3D_NOT_IN_TOTAL_TAG : undefined}')
-    expect(src).toContain('summary={cat3WorkingsSummary(cat3Priced)}')
+    // ⚠️ THE SECOND ARGUMENT WAS ADDED 21 SEP 2026 AND IS PART OF WHAT THIS LINE PINS. The summary
+    // now names any location the GHG inventory excluded, so it needs the read's skip list as well
+    // as the priced result. A call site passing only the result compiles and silently drops that.
+    expect(src).toContain('summary={cat3WorkingsSummary(cat3Priced, cat3Read.skipped)}')
     expect(src).toContain('sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence, cat3ExcludedFor3d)}')
 
     // ⚠️ TWICE IN THE FILE, NOT FOUR TIMES: the header's excluded line and this category's Basis row.

@@ -263,7 +263,12 @@ export function cat3ReasonText(r: Cat3Reason): string {
 export function cat3SkippedText(s: Cat3Skipped): string {
   switch (s.code) {
     case 'location_excluded':
-      return `${s.location} is excluded from the GHG inventory's own totals, so nothing at it is priced here either`
+      // ⚠️ "The location X", NOT "X". A location name is whatever the customer typed, and a
+      // sentence that opens with it invites the reader to correct the case: a site called "other"
+      // rendered as "Other is excluded...", which is a different name from the one on their screen
+      // and on their bills. Every sentence that can carry a name now keeps it out of first
+      // position, so the name is reproduced exactly as entered wherever it appears.
+      return `the location ${s.location} is excluded from the GHG inventory's own totals, so nothing at it is priced here either`
     case 'refrigerants_not_in_category':
       return `refrigerants at ${s.location} are a Scope 1 fugitive emission and are not part of this category`
     case 'market_based_row_not_used':
@@ -388,12 +393,20 @@ export function cat3UnpricedText(u: Cat3Unpriced): string {
  * against the figure (SpendFactorWorkings `status`), and the total sentence inside the card repeats it
  * where the figure appears again.
  */
-export function cat3WorkingsSummary(r: Cat3Result): string {
+export function cat3WorkingsSummary(r: Cat3Result, skipped: readonly Cat3Skipped[] = []): string {
   const locations = new Set(r.lines.map(l => l.location)).size
+  // ⚠️ "AT 1 LOCATION" IS TRUE AND MISLEADING ON ITS OWN IN A TWO-LOCATION INVENTORY, which is why
+  // the exclusion joins it here rather than only in the workings list below. A reader counting
+  // locations against the GHG inventory they came from sees one number and has to go looking for
+  // the other. The names are printed so they can be matched to the wizard, and they are printed
+  // LAST so a name is never sentence-initial.
+  const excluded = skipped.filter(sk => sk.code === 'location_excluded').map(sk => sk.location)
+  const note = excluded.length === 0 ? '' :
+    `; ${excluded.length} ${excluded.length === 1 ? 'location' : 'locations'} excluded (${excluded.join(', ')})`
   return (
     `${r.lines.length} ${r.lines.length === 1 ? 'line' : 'lines'} at ${locations} ` +
     `${locations === 1 ? 'location' : 'locations'}, priced from the DEFRA/DESNZ ${m.year} upstream energy ` +
-    `factors on the bound GHG inventory`
+    `factors on the bound GHG inventory${note}`
   )
 }
 

@@ -3617,7 +3617,7 @@ export default function Scope3Dashboard() {
                           id="cat3-energy"
                           figureMt={cat3Mt() ?? 0}
                           status={cat3ExcludedFor3d ? CAT3_3D_NOT_IN_TOTAL_TAG : undefined}
-                          summary={cat3WorkingsSummary(cat3Priced)}
+                          summary={cat3WorkingsSummary(cat3Priced, cat3Read.skipped)}
                           sentences={cat3Sentences(cat3Priced, cat3Read, cat3GwpSentence, cat3ExcludedFor3d)}
                         />
                       </div>

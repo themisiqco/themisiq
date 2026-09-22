@@ -196,7 +196,9 @@ export function generateAssurancePDF(
       // ⚠️ A FULL STOP, NOT A COLON OR AN ARROW. A name followed by a colon reads as a label on a
       // machine record; this is a sentence a verifier reads. No arrows, bullets or other symbols
       // appear in any sentence this package prints, for the same reason.
-      const sentence = `${loc.name || 'Location'}. ${countryRefusalText(refusal!, 'verifier', false)}`
+      // ⚠️ THE NAME IS NEVER SENTENCE-INITIAL. "The location X." rather than "X.", so a site called
+      // "other" is reproduced exactly as the customer typed it rather than reading as "Other".
+      const sentence = `The location ${loc.name || 'Location'}. ${countryRefusalText(refusal!, 'verifier', false)}`
       const lines: string[] = doc.splitTextToSize(sentence, 515 - M)
       doc.text(lines, M, y)
       y += (lines.length - 1) * 9
