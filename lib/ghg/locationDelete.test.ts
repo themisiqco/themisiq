@@ -10,8 +10,9 @@ import { factorEditionsForSave, buildFactorEditions } from './factorEditions'
 import { editRows } from '../rowList'
 import {
   locationDeleteConfirmation, locationDeleteSaveFailed, locationDeleteStorageFailed,
-  type LocationDeleteFacts,
+  locationDeleteFacts, type LocationDeleteFacts,
 } from './locationDeleteCopy'
+import { DECLARABLE_STREAMS } from './engine'
 
 // ── REMOVING A LOCATION, AND WHAT MUST NOT BE LEFT BEHIND ───────────────────────────────────────
 //
@@ -26,6 +27,83 @@ const facts = (o: Partial<LocationDeleteFacts> = {}): LocationDeleteFacts => ({
 })
 const PAGE = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
 
+// ── THE SHAPES THE WIZARD ACTUALLY PRODUCES ─────────────────────────────────────────────────────
+//
+// ⚠️ THESE START FROM A Location, NOT FROM A HAND BUILT FACTS OBJECT, AND THAT IS THE WHOLE POINT.
+// The first version of this file built every fixture from the copy function's own parameter list, so
+// each one had either everything or nothing. A location carrying nine attestations and no figures at
+// all was never passed through, and that is the commonest shape there is: one click of "Attest all
+// remaining as absent" writes all nine. It reached the preview saying a site with no figures had
+// emissions. A fixture that cannot occur proves nothing about the product.
+
+/** Added, never opened on the energy step. No answers, no figures, no documents. */
+const untouched = () => loc({ id: 'u', name: 'Location 2' })
+
+/** Opened, every stream answered absent, nothing entered. One click of Attest all does this. */
+const attestedOnly = () => loc({
+  id: 'b', name: 'BLANK',
+  stream_attestations: DECLARABLE_STREAMS.map(stream => ({ stream, attested_at: '2026-09-23T00:00:00Z' })) as never,
+})
+
+/** A working location: figures, a document, and the attestations for the streams it does not use. */
+const working = () => loc({
+  id: 'w', name: 'Chicago Warehouse', country: 'US', grid_region: 'US_FL',
+  has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf', electricity_kwh: 5000,
+  stream_attestations: DECLARABLE_STREAMS.filter(x => x !== 'natural_gas' && x !== 'electricity')
+    .map(stream => ({ stream, attested_at: '2026-09-23T00:00:00Z' })) as never,
+  source_docs: [{ id: 'd1', file_name: 'b.pdf', document_type: 'utility_bill_gas', file_path: 'p/d1', uploaded_at: '2025-01-01', extracted: [] }] as never,
+})
+
+describe('the confirmation, for the shapes the wizard produces', () => {
+  it('an attested location with no figures says no total changes, and claims no emissions', () => {
+    // ⚠️ THE PREVIEW DEFECT. This read "It has 9 stream attestations. All of it goes, and its
+    // emissions leave every total", which said a location with nothing entered had emissions, and
+    // counted an answer of "no" as content that goes.
+    const t = locationDeleteConfirmation(locationDeleteFacts(attestedOnly()))
+    expect(t).toBe(
+      'Remove the location BLANK? It holds no figures and no documents, so no total changes.' +
+      ' Its 9 streams attested as absent would need attesting again.')
+    expect(t, 'it has no emissions to lose').not.toContain('emissions')
+    expect(t, 'nothing irrecoverable goes').not.toContain('cannot be undone')
+    expect(t, 'an attestation is not a holding').not.toContain('It has')
+  })
+
+  it('a location nobody has opened says only that nothing is there', () => {
+    expect(locationDeleteConfirmation(locationDeleteFacts(untouched()))).toBe(
+      'Remove the location Location 2? It holds no figures and no documents, so no total changes.')
+  })
+
+  it('a working location names its holdings, its consequences and its answers separately', () => {
+    const t = locationDeleteConfirmation(locationDeleteFacts(working()))
+    expect(t).toContain('It has 1 uploaded document and figures for natural gas and purchased electricity.')
+    expect(t).toContain('Its emissions leave every total and the uploaded documents are deleted from storage straight away.')
+    expect(t).toContain('This cannot be undone.')
+    // ⚠️ THE ATTESTATION CLAUSE IS ABSENT HERE, DELIBERATELY. It used to arrive after "This cannot
+    // be undone", so the last thing read before deciding was the one item that can be recreated,
+    // beside files being destroyed. It belongs only where attestations are all the location holds.
+    expect(t, 'no attestation clause beside destroyed documents').not.toContain('attested as absent')
+    expect(t.endsWith('This cannot be undone.'), t).toBe(true)
+  })
+
+  it('the emissions clause appears only where figures do', () => {
+    // Derived, not fixed text. A location with a document and no figure has nothing in any total.
+    const docOnly = loc({ id: 'd', name: 'Doc Only', source_docs: [{ id: 'd1', file_name: 'b.pdf', document_type: 'utility_bill_gas', file_path: 'p/d1', uploaded_at: '2025-01-01', extracted: [] }] as never })
+    const t = locationDeleteConfirmation(locationDeleteFacts(docOnly))
+    expect(t).toContain('It has 1 uploaded document.')
+    expect(t, 'no figures, so no emissions').not.toContain('emissions')
+    expect(t).toContain('The uploaded documents are deleted from storage straight away.')
+    expect(t).toContain('This cannot be undone.')
+  })
+
+  it('counts coverage resolutions for this location only', () => {
+    const w = working()
+    const t = locationDeleteConfirmation(locationDeleteFacts(w, [
+      { locId: 'w' }, { locId: 'w' }, { locId: 'other' },
+    ]))
+    expect(t).toContain('It has 1 uploaded document, 2 coverage resolutions, and figures for natural gas and purchased electricity.')
+  })
+})
+
 describe('the confirmation', () => {
   it('names the real counts and omits what is zero', () => {
     const t = locationDeleteConfirmation(facts({
@@ -34,21 +112,21 @@ describe('the confirmation', () => {
     }))
     expect(t).toContain('3 uploaded documents')
     expect(t).toContain('figures for natural gas and purchased electricity')
-    expect(t).toContain('7 stream attestations')
+    expect(t, 'an attestation is never counted as a holding').not.toContain('attestation')
     expect(t).toContain('1 coverage resolution')
     expect(t, 'a zero is left out, never printed').not.toMatch(/\b0 /)
     // Singulars, because "1 documents" is the tell that a count was interpolated without thought.
     const one = locationDeleteConfirmation(facts({ documents: 1, attestations: 1, coverageResolutions: 1 }))
-    expect(one).toContain('1 uploaded document,')
-    expect(one).toContain('1 stream attestation')
-    expect(one).toContain('1 coverage resolution')
+    expect(one).toContain('1 uploaded document and 1 coverage resolution')
+    expect(one, 'and no attestation clause, because this location holds documents too')
+      .not.toContain('attested as absent')
   })
 
   it('warns only where something of value goes', () => {
     // ⚠️ A WARNING ON EVERY ROW IS A WARNING NOBODY READS by the time it appears on the row holding
     // three years of bills. An empty row destroys nothing, so it is not warned about.
     expect(locationDeleteConfirmation(facts())).toBe(
-      'Remove the location Chicago Warehouse? It holds no figures and no documents.')
+      'Remove the location Chicago Warehouse? It holds no figures and no documents, so no total changes.')
     expect(locationDeleteConfirmation(facts())).not.toContain('cannot be undone')
     expect(locationDeleteConfirmation(facts({ documents: 1 }))).toContain('This cannot be undone.')
     expect(locationDeleteConfirmation(facts({ streamsWithFigures: ['natural_gas'] })))
@@ -110,6 +188,46 @@ describe('the confirmation', () => {
       expect(t, t).not.toContain('’')
       expect(t, t).not.toMatch(/\bstep\s*\d/i)
     }
+  })
+})
+
+describe('the holdings list punctuation', () => {
+  // ⚠️ ONE ITEM OF THIS LIST IS ITSELF A LIST, which is why it needs its own rule. A fully populated
+  // location read "...purchased electricity and purchased steam or district heating and 2 coverage
+  // resolutions", with nothing to say which "and" closed which list. Two fixes were tried and both
+  // made it worse: a comma inside the shared list helper put a second serial comma in the STREAM
+  // enumeration, and a comma "whenever an item contains and" put one into a plain pair. The
+  // enumeration going last is what fixes it, and these cases are why.
+  const withStreams = (streams: number, docs: number, cov: number) => locationDeleteConfirmation(facts({
+    name: 'Site', documents: docs, coverageResolutions: cov,
+    streamsWithFigures: DECLARABLE_STREAMS.slice(0, streams),
+  }))
+
+  it('a plain pair takes no comma', () => {
+    expect(withStreams(1, 1, 0)).toContain('It has 1 uploaded document and figures for natural gas.')
+  })
+
+  it('a pair whose second item is itself a list still takes no comma', () => {
+    // Nothing follows the enumeration, so there is no second boundary to mistake.
+    expect(withStreams(2, 1, 0)).toContain(
+      'It has 1 uploaded document and figures for natural gas and propane / LPG.')
+    expect(withStreams(2, 1, 0)).not.toContain('document, and figures')
+  })
+
+  it('three or more take a serial comma, and the enumeration comes last', () => {
+    expect(withStreams(1, 1, 1)).toContain(
+      'It has 1 uploaded document, 1 coverage resolution, and figures for natural gas.')
+    expect(withStreams(2, 1, 1)).toContain(
+      'It has 1 uploaded document, 1 coverage resolution, and figures for natural gas and propane / LPG.')
+  })
+
+  it('the stream enumeration itself never takes a serial comma', () => {
+    // The whole point of putting it last: one "and" inside it, one before it, and no comma inside.
+    const t = withStreams(9, 2, 2)
+    expect(t).toContain('and figures for natural gas, propane / LPG,')
+    expect(t).toContain('purchased electricity and purchased steam or district heating.')
+    expect(t, 'no second serial comma inside the enumeration').not.toContain('electricity, and purchased steam')
+    expect(t.indexOf('figures for'), 'the enumeration is the last holding').toBeGreaterThan(t.indexOf('coverage resolutions'))
   })
 })
 

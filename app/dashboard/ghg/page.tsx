@@ -39,7 +39,7 @@ import {
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
-import { locationDeleteConfirmation, locationDeleteSaveFailed, locationDeleteStorageFailed, type LocationDeleteFacts } from '../../../lib/ghg/locationDeleteCopy'
+import { locationDeleteConfirmation, locationDeleteSaveFailed, locationDeleteStorageFailed, locationDeleteFacts } from '../../../lib/ghg/locationDeleteCopy'
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
@@ -1071,24 +1071,6 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   }
 
   /**
-   * What a location holds, counted from the location itself for the confirmation.
-   *
-   * ⚠️ DERIVED, NEVER DESCRIBED. The sentence says "3 uploaded documents" because three are
-   * attached, and omits a clause whose count is zero. Streams are read from the AMOUNTS, not the
-   * has_* flags: a stream flagged present with no figure has nothing to lose.
-   */
-  const locationDeleteFacts = (loc: Location): LocationDeleteFacts => ({
-    name: loc.name ?? '',
-    documents: (loc.source_docs ?? []).length,
-    // streamState is the engine's own answer to "does this stream carry a figure", the same one
-    // findUndeclaredStreams and factorEditions ask. A second definition here would be a second
-    // opinion about what counts as entered data.
-    streamsWithFigures: DECLARABLE_STREAMS.filter(stream => streamState(loc, stream) === 'quantified'),
-    attestations: (loc.stream_attestations ?? []).length,
-    coverageResolutions: (inventory.coverage_resolutions ?? []).filter(r => r.locId === loc.id).length,
-  })
-
-  /**
    * Remove a location, its uploaded files and its coverage resolutions, then save.
    *
    * ⚠️ ADDRESSED BY ID AND EDITED INSIDE THE UPDATER, for the reason removeDoc already carries a
@@ -1112,7 +1094,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // because a guard that exists only in the render is a guard one refactor away from being gone.
     if (inventory.locations.length <= 1) return
 
-    const facts = locationDeleteFacts(loc)
+    const facts = locationDeleteFacts(loc, inventory.coverage_resolutions ?? [])
     if (!window.confirm(locationDeleteConfirmation(facts))) return
 
     const paths = (loc.source_docs ?? []).map(d => d.file_path).filter(Boolean)

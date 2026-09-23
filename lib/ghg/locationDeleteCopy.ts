@@ -8,7 +8,7 @@
 //   no em dashes; straight apostrophes; a location name is reproduced exactly as entered and never
 //   starts a sentence; steps and controls are named as the wizard labels them, never numbered.
 
-import { STREAM_META, type DeclarableStream } from './engine'
+import { STREAM_META, DECLARABLE_STREAMS, streamState, type DeclarableStream, type Location } from './engine'
 
 /** What a location holds, counted from the location itself. Never estimated, never hardcoded. */
 export interface LocationDeleteFacts {
@@ -24,10 +24,59 @@ export interface LocationDeleteFacts {
   coverageResolutions: number
 }
 
-/** "a, b and c". Two items take "and", never a comma. */
+/**
+ * What a location holds, read from the location itself.
+ *
+ * ⚠️ PURE AND EXPORTED, AND IT WAS NOT BEFORE. It lived in the page as a closure over `inventory`,
+ * so the only way to exercise the copy was to hand-build a facts object, and a hand-built object can
+ * describe a location the product cannot produce. That is exactly what happened: every fixture had
+ * either everything or nothing, and the commonest real shape, a location carrying nine attestations
+ * and no figures at all, was never once passed through. Building the facts from a real Location is
+ * what makes the tests answer a question about the product rather than about the parameter list.
+ *
+ * Streams are read through streamState, the engine's own answer to "does this carry a figure", so
+ * there is no second opinion about what counts as entered data.
+ */
+export function locationDeleteFacts(
+  loc: Location,
+  coverageResolutions: readonly { locId?: string }[] = [],
+): LocationDeleteFacts {
+  return {
+    name: loc.name ?? '',
+    documents: (loc.source_docs ?? []).length,
+    streamsWithFigures: DECLARABLE_STREAMS.filter(stream => streamState(loc, stream) === 'quantified'),
+    attestations: (loc.stream_attestations ?? []).length,
+    coverageResolutions: coverageResolutions.filter(r => r.locId === loc.id).length,
+  }
+}
+
+/** "a, b and c". Two items take "and", never a comma. Used for the stream enumeration. */
 function list(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? ''
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
+}
+
+/**
+ * The holdings list, which contains one item that is itself a list.
+ *
+ * ⚠️ THE STREAM ENUMERATION GOES LAST AND TAKES A SERIAL COMMA IN FRONT OF IT. A fully populated
+ * location read "...purchased electricity and purchased steam or district heating and 2 coverage
+ * resolutions", where nothing tells the reader which "and" closes the streams and which closes the
+ * holdings. With three holdings it is worse than untidy: "figures for natural gas and 2 coverage
+ * resolutions" reads as figures for both.
+ *
+ * ⚠️ TWO THINGS THAT LOOK LIKE THE FIX AND ARE NOT, both tried first.
+ * Adding the comma inside `list` put a second serial comma in the STREAM list as well, so the nine
+ * stream case gained two of them and the boundary was no clearer. Adding it whenever any item
+ * contains "and" put one into a plain pair, giving "1 uploaded document, and figures for natural gas
+ * and purchased electricity", which is the stilted form a two item list should never take.
+ * Putting the open ended list LAST is what actually fixes it: nothing follows the enumeration, so
+ * there is no second boundary to mistake, and the serial comma is then needed only for three or more.
+ */
+function holdingsList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? ''
+  const serial = items.length >= 3
+  return `${items.slice(0, -1).join(', ')}${serial ? ',' : ''} and ${items[items.length - 1]}`
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -53,31 +102,54 @@ const nameClause = (name: string): string =>
  * zeroes reads as a form rather than as a description of this location.
  */
 export function locationDeleteConfirmation(f: LocationDeleteFacts): string {
-  const parts: string[] = []
-  if (f.documents > 0) parts.push(plural(f.documents, 'uploaded document', 'uploaded documents'))
-  if (f.streamsWithFigures.length > 0) {
-    parts.push(`figures for ${list(f.streamsWithFigures.map(s => STREAM_META[s].name))}`)
-  }
-  if (f.attestations > 0) parts.push(plural(f.attestations, 'stream attestation', 'stream attestations'))
-  if (f.coverageResolutions > 0) {
-    parts.push(plural(f.coverageResolutions, 'coverage resolution', 'coverage resolutions'))
-  }
-
   const head = `Remove ${nameClause(f.name)}?`
 
-  // ⚠️ NOTHING OF VALUE GOES, SO NOTHING IS WARNED ABOUT. "This cannot be undone" on an empty row
-  // is a warning about nothing, and a warning that appears every time stops being read by the time
-  // it appears on a row that does hold three years of bills.
-  if (parts.length === 0) return `${head} It holds no figures and no documents.`
+  // ⚠️ AN ATTESTATION IS NOT CONTENT, AND COUNTING IT AS CONTENT PRODUCED A FALSE SENTENCE.
+  // A location with nothing on it but nine attestations read "It has 9 stream attestations. All of
+  // it goes, and its emissions leave every total", which said a site with no figures had emissions.
+  // An attestation is an ANSWER: the customer ticked "This location has no natural gas", or clicked
+  // "Attest all remaining as absent" once and wrote all nine. Nothing about it produces a figure,
+  // and it is the one thing here that can be recreated, by answering again. So it never joins the
+  // list of what goes; it gets its own clause, and it never carries "cannot be undone".
+  // Documents, then coverage resolutions, then the streams. The stream clause is the only open ended
+  // one, so it goes last and nothing runs into it.
+  const holdings: string[] = []
+  if (f.documents > 0) holdings.push(plural(f.documents, 'uploaded document', 'uploaded documents'))
+  if (f.coverageResolutions > 0) {
+    holdings.push(plural(f.coverageResolutions, 'coverage resolution', 'coverage resolutions'))
+  }
+  if (f.streamsWithFigures.length > 0) {
+    holdings.push(`figures for ${list(f.streamsWithFigures.map(s => STREAM_META[s].name))}`)
+  }
 
-  // ⚠️ "straight away" IS THE HONEST PART OF THIS SENTENCE. The files go the moment this is
-  // confirmed; the row itself leaves the saved record only when the save that follows succeeds.
-  // A customer should know which half is immediate, because that is the half that cannot be undone.
-  const immediate = f.documents > 0
-    ? ' All of it goes, its emissions leave every total, and the uploaded documents are deleted from storage straight away.'
-    : ' All of it goes, and its emissions leave every total.'
-  return `${head} It has ${list(parts)}.${immediate} This cannot be undone.`
+  // ⚠️ EVERY CONSEQUENCE IS DERIVED FROM WHAT IS ACTUALLY THERE. "Its emissions leave every total"
+  // was fixed text, and it is false of a location that has no figures: it has no emissions. Each
+  // clause below appears only when the thing it describes exists.
+  const consequences: string[] = []
+  if (f.streamsWithFigures.length > 0) consequences.push('its emissions leave every total')
+  if (f.documents > 0) consequences.push('the uploaded documents are deleted from storage straight away')
+
+  // ⚠️ THE ATTESTATION CLAUSE APPEARS ONLY WHERE ATTESTATIONS ARE ALL THERE IS. On a location that
+  // also holds documents and figures it arrived AFTER "This cannot be undone", so the last thing read
+  // before deciding was the one item that can be recreated, beside files being destroyed. It is
+  // built here and used only in the branch below where nothing else is held.
+  const attested = f.attestations > 0
+    ? ` Its ${plural(f.attestations, 'stream', 'streams')} attested as absent would need attesting again.`
+    : ''
+
+  if (holdings.length === 0) {
+    // Nothing that produces a figure, so no total moves. Said plainly, because the customer is
+    // about to remove a row they may believe is load bearing.
+    return `${head} It holds no figures and no documents, so no total changes.${attested}`
+  }
+
+  const sentence = consequences.length > 0
+    ? ` ${capitalise(list(consequences))}. This cannot be undone.`
+    : ' This cannot be undone.'
+  return `${head} It has ${holdingsList(holdings)}.${sentence}`
 }
+
+const capitalise = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1)
 
 /**
  * The save failed after the delete succeeded.
