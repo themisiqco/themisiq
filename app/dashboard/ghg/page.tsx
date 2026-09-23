@@ -29,6 +29,7 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
   applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+  streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
@@ -38,6 +39,7 @@ import {
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
+import { locationDeleteConfirmation, locationDeleteSaveFailed, locationDeleteStorageFailed, locationDeleteFacts } from '../../../lib/ghg/locationDeleteCopy'
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
@@ -527,6 +529,12 @@ const searchParams = useSearchParams()
   const [saved, setSaved] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  // ⚠️ WHAT THE LAST SAVE REPORTED, FOR A CALLER THAT NEEDS TO KNOW. handleSave alerts and returns
+  // on failure; it does not report back, and threading a return value through its five failure
+  // branches would refactor the whole save path to serve one caller. A ref instead: set beside each
+  // existing alert, cleared when a save begins, read synchronously by removeLocation after its
+  // await. No existing failure behaviour changes, and a caller that does not read it sees nothing.
+  const lastSaveError = useRef<string | null>(null)
   const skipSavedReset = useRef(true)
   const [inventoryId, setInventoryId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -1062,6 +1070,65 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     }))
   }
 
+  /**
+   * Remove a location, its uploaded files and its coverage resolutions, then save.
+   *
+   * ⚠️ ADDRESSED BY ID AND EDITED INSIDE THE UPDATER, for the reason removeDoc already carries a
+   * paragraph about: a render-time index is stale the moment a location is added or removed while
+   * this runs, and this function awaits storage in the middle. Nothing here closes over a position.
+   *
+   * ⚠️ STORAGE FIRST, AND A FAILURE STOPS EVERYTHING. Dropping the row first and failing the delete
+   * leaves files in the bucket with nothing pointing at them and nobody to notice: the jsonb that
+   * named them is gone. This way a failure leaves the location exactly as it was, listed with its
+   * documents, and says so. Storage deletes are idempotent, so retrying is safe.
+   *
+   * ⚠️ THEN IT SAVES, BECAUSE THE IRREVERSIBLE HALF HAS ALREADY HAPPENED. Leaving the save to the
+   * customer would leave a window in which the files are destroyed and the stored record still
+   * lists them. The save can still fail, and locationDeleteSaveFailed says precisely what state the
+   * screen, the record and the bucket are each in rather than reporting a generic save error.
+   */
+  const removeLocation = async (locId: string) => {
+    const loc = inventory.locations.find(l => l.id === locId)
+    if (!loc) return
+    // ⚠️ THE LAST LOCATION HAS NO CONTROL AT ALL, so this is unreachable from the UI. It is here
+    // because a guard that exists only in the render is a guard one refactor away from being gone.
+    if (inventory.locations.length <= 1) return
+
+    const facts = locationDeleteFacts(loc, inventory.coverage_resolutions ?? [])
+    if (!window.confirm(locationDeleteConfirmation(facts))) return
+
+    const paths = (loc.source_docs ?? []).map(d => d.file_path).filter(Boolean)
+    if (paths.length > 0) {
+      const { error } = await supabase.storage.from('source-documents').remove(paths)
+      if (error) {
+        console.error('[removeLocation] storage delete failed', error)
+        alert(locationDeleteStorageFailed(facts, error.message))
+        return
+      }
+    }
+
+    // ⚠️ activeLocation IS SET EXPLICITLY, NOT LEFT TO THE CLAMP. It is an index, so the clamp keeps
+    // it in range while silently pointing it at a different site: delete the second of three and the
+    // tab that was Brighton is Manchester, in the same position, with the customer's next figure
+    // going to the wrong location. The row before the removed one is the deliberate answer.
+    const removedAt = inventory.locations.findIndex(l => l.id === locId)
+    setActiveLocation(Math.max(0, removedAt - 1))
+
+    setInventory(inv => ({
+      ...inv,
+      locations: editRows(inv.locations, { kind: 'remove', id: locId }),
+      // The inventory-level array nothing else scopes to a location. Left behind it is invisible on
+      // screen, counted by nothing, and carried in every payload from here on.
+      coverage_resolutions: (inv.coverage_resolutions ?? []).filter(r => r.locId !== locId),
+    }))
+    setSaved(false)
+
+    await handleSave()
+    // Read synchronously after the await: the ref, not state, because state from this tick is not
+    // visible here and the message is needed now.
+    if (lastSaveError.current) alert(locationDeleteSaveFailed(facts, lastSaveError.current))
+  }
+
   // Concierge: update one proposal, then recompute mapped inventory fields from ALL confirmed proposals at this location.
   // fuelType + docType -> field(s). Write = SUM of confirmed proposals mapping to that field.
   // Mixed units for one field are NOT summed (would be wrong) -> those proposals flip to needs_manual_review.
@@ -1332,6 +1399,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   const handleSave = async () => {
     if (isSaving) return
+    lastSaveError.current = null
     setIsSaving(true)
     try {
     const { data: { session } } = await supabase.auth.getSession()
@@ -1355,7 +1423,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           .insert({ user_id: session.user.id, name: trimmedName })
           .select('id')
           .single()
-        if (cErr) { alert('Could not save company: ' + cErr.message); return }
+        if (cErr) { lastSaveError.current = cErr.message; alert('Could not save company: ' + cErr.message); return }
         resolvedCompanyId = created.id
       }
     }
@@ -1430,13 +1498,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     let savedId: string | null = inventoryId
     if (inventoryId) {
       const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
-      if (error) { alert('Save failed: ' + error.message); console.error(error); return }
+      if (error) { lastSaveError.current = error.message; alert('Save failed: ' + error.message); console.error(error); return }
     } else {
       const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
       const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
-      if (dup) { alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
+      if (dup) { lastSaveError.current = 'An inventory for that company and year already exists.'; alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
-      if (error) { alert('Save failed: ' + error.message); console.error(error); return }
+      if (error) { lastSaveError.current = error.message; alert('Save failed: ' + error.message); console.error(error); return }
       if (data) { savedId = data.id; setInventoryId(data.id) }
       loadCompanies() // refresh dropdown in case resolve-or-create added a new company
     }
@@ -1795,6 +1863,21 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
 )}
 {loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && !gridRegionForCountry(loc.country) && (
   <input value={loc.region || ''} onChange={e => updateLocation(i, 'region', e.target.value)} placeholder="State/Region" style={{ ...inputStyle, width: 120 }} />
+)}
+{/* ⚠️ NO CONTROL AT ALL WHEN ONE LOCATION REMAINS, RATHER THAN A DISABLED ONE.
+    A disabled button with its reason in a title attribute has no reason on a touch device, and a
+    control that refuses without saying why is the thing the copy rules exist to prevent. The other
+    option was to render it enabled and refuse in the confirmation, which is worse: it promises an
+    action and then takes it back after the click. An absent control promises nothing, and with a
+    single location there is nothing a customer could be trying to compare it against.
+      It is addressed by id, never by i. i is a render-time position and removeLocation awaits
+    storage in the middle; see the paragraph on removeDoc. */}
+{inventory.locations.length > 1 && (
+  <button
+    onClick={() => removeLocation(loc.id)}
+    aria-label={`Remove ${loc.name?.trim() || 'this unnamed location'}`}
+    style={{ fontSize: 16, lineHeight: 1, padding: '0 10px', background: 'none', border: '0.5px solid #e8e7e4', borderRadius: 8, color: 'var(--color-ink-muted)', cursor: 'pointer', flexShrink: 0 }}
+  >&times;</button>
 )}
               </div>
             ))}
