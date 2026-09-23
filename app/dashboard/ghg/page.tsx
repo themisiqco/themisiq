@@ -22,7 +22,7 @@ import { ghgStepIndex, scope3LinkState, inventoryNotOpenedGhg } from '../../../l
 
 import {
   EF_SOURCES,
-  US_STATES, CA_PROVINCES, US_SUBREGIONS, AU_STATES, EU_COUNTRY_OPTIONS,
+  US_STATES, CA_PROVINCES, US_SUBREGIONS, AU_STATES,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS, canonicalCountryCode,
   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
@@ -36,7 +36,8 @@ import {
   validateElectricity, validateNaturalGas, validateCompleteness,
   parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
 } from '../../../lib/ghg/engine'
-import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading } from '../../../lib/ghg/countryRefusalCopy'
+import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
+import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
 import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
@@ -1720,19 +1721,28 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             {inventory.locations.map((loc, i) => (
               <div key={loc.id} style={{ display: 'flex', gap: 8 }}>
                <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Chicago Warehouse" style={{ ...inputStyle, flex: 1 }} />
-<select value={loc.country} onChange={e => updateLocation(i, 'country', e.target.value)} style={{ ...inputStyle, width: 110 }}>
+{/* ⚠️ THE VALUE IS THE CANONICAL FORM, AND NOTHING IS WRITTEN TO GET IT. A location saved as
+    'UK' or 'GR' before canonicalCountryCode existed holds a value no option carries, and a
+    select that cannot match its value does not show it. selectedCountryValue matches on the
+    canonical form so both display correctly, and returns null when even that matches nothing,
+    which is what the echo entry below is for. The record is unchanged until the customer
+    picks something. */}
+<select value={selectedCountryValue(loc.country) ?? '__stored__'} onChange={e => updateLocation(i, 'country', e.target.value)} style={{ ...inputStyle, width: 190 }}>
   <option value="">Country…</option>
-  <option value="US">🇺🇸 USA</option>
-  <option value="CA">🇨🇦 Canada</option>
-  <option value="GB">🇬🇧 UK</option>
-  <optgroup label="European Union">
-    {EU_COUNTRY_OPTIONS.map(([code, label]) => (
-      <option key={code} value={code}>{label}</option>
+  {selectedCountryValue(loc.country) === null && (
+    <option value="__stored__" disabled>{storedCountryEchoLabel(loc.country)}</option>
+  )}
+  <optgroup label="Factors held">
+    {SUPPORTED_COUNTRY_OPTIONS.map(o => (
+      <option key={o.value} value={o.value}>{o.label}</option>
     ))}
   </optgroup>
-  <option value="AU">🇦🇺 Australia</option>
-  <option value="NZ">🇳🇿 New Zealand</option>
-  <option value="OTHER">Other…</option>
+  <optgroup label="Other countries">
+    {OTHER_COUNTRY_OPTIONS.map(o => (
+      <option key={o.value} value={o.value}>{o.label}</option>
+    ))}
+  </optgroup>
+  <option value={NOT_LISTED_OPTION.value}>{NOT_LISTED_OPTION.label}</option>
 </select>
 {loc.country === 'US' && (
   <select value={loc.state || ''} onChange={e => updateLocation(i, 'state', e.target.value)} style={{ ...inputStyle, width: 130 }}>

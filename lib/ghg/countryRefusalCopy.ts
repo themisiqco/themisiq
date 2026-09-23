@@ -179,3 +179,24 @@ export function refusalResultsHeading(refusal: CountryRefusal): string {
     ? 'No results for this location yet'
     : 'No results for this location'
 }
+
+/**
+ * The label for the country control's echo entry: a stored value no option carries.
+ *
+ * ⚠️ THE CONTROL MUST STATE WHAT IS IN THE RECORD RATHER THAN APPEAR UNSET. A select whose value
+ * matches no option cannot display that value, so a location stored as "Japn" would read as having
+ * no country at all while the sentence under it quotes "Japn" and refuses on it. The screen and the
+ * record would be saying different things about the same location, which is the failure this whole
+ * design exists to remove.
+ *
+ * ⚠️ IT QUOTES THE VALUE THE SAME WAY THE SENTENCE DOES. Beside countryRefusalText the pair reads:
+ *   Recorded as "Japn"
+ *   This location's country is recorded as "Japn", which does not name a country, so its energy is
+ *   not priced and is left out of every total.
+ * One value, quoted identically in both, so a customer can see that the thing named in the sentence
+ * is the thing sitting in the control. The entry is disabled: it is a record of what is stored, not
+ * an option anyone may choose.
+ */
+export function storedCountryEchoLabel(value: string): string {
+  return `Recorded as "${value.trim()}"`
+}
