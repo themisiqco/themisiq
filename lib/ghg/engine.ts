@@ -1427,16 +1427,6 @@ export function efJurisdiction(loc: { country?: string }): EfJurisdiction | null
   const r = efRouting(loc)
   return r.supported ? r.jurisdiction : null
 }
-// EU-27 dropdown options: [ISO, label with flag], alphabetical by country name.
-const EU_COUNTRY_OPTIONS: Array<[string, string]> = [
-  ['AT','🇦🇹 Austria'],['BE','🇧🇪 Belgium'],['BG','🇧🇬 Bulgaria'],['HR','🇭🇷 Croatia'],
-  ['CY','🇨🇾 Cyprus'],['CZ','🇨🇿 Czechia'],['DK','🇩🇰 Denmark'],['EE','🇪🇪 Estonia'],
-  ['FI','🇫🇮 Finland'],['FR','🇫🇷 France'],['DE','🇩🇪 Germany'],['EL','🇬🇷 Greece'],
-  ['HU','🇭🇺 Hungary'],['IE','🇮🇪 Ireland'],['IT','🇮🇹 Italy'],['LV','🇱🇻 Latvia'],
-  ['LT','🇱🇹 Lithuania'],['LU','🇱🇺 Luxembourg'],['MT','🇲🇹 Malta'],['NL','🇳🇱 Netherlands'],
-  ['PL','🇵🇱 Poland'],['PT','🇵🇹 Portugal'],['RO','🇷🇴 Romania'],['SK','🇸🇰 Slovakia'],
-  ['SI','🇸🇮 Slovenia'],['ES','🇪🇸 Spain'],['SE','🇸🇪 Sweden'],
-]
 function detectGridRegion(code: string, country?: string): string {
   const c = (code || '').toUpperCase().trim()
   // ⚠️ canonicalCountryCode HANDLES CODES, THE NAME COMPARISONS BELOW ARE LEFT EXACTLY AS THEY WERE.
@@ -3614,7 +3604,7 @@ export {
   EF_UK, EF_EU, EF_AU, EF_NZ, EF_SOURCES, EF_SOURCE_LOCATORS, GRID_EF, NZ_TD_LOSS,
   RESIDUAL_EU, RESIDUAL_US,
   CA_PROVINCES, US_STATES, US_SUBREGIONS, AU_STATES,
-  EU_COUNTRIES, EU_COUNTRY_OPTIONS,
+  EU_COUNTRIES,
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS,
   COMBUSTION_EDITION, STEAM_EDITION,
   // Functions
