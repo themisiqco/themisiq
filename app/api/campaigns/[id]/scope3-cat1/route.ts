@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../../lib/supabaseAuthed'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../../../lib/emissionFactors'
 import { templateAsks } from '../../../../../lib/supply-chain/templates'
+import { noFigureReasonForStatus } from '../../../../../lib/supply-chain/supplierStatus'
 import {
   assuranceForLine, carriesThirdPartyAssurance, assuranceContradictsFigure, ASSURANCE_QUESTION_ID,
 } from '../../../../../lib/scope3/supplierAssurance'
@@ -192,12 +193,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
 
       // 3) Uncovered: no allocated figure and no spend.
+      //
+      // ⚠️ THE REASON IS A SENTENCE FROM lib/supply-chain/supplierStatus.ts, NOT THE RAW STATUS. This
+      // line previously read `Questionnaire ${s.status} — no allocated figure submitted yet`, which put
+      // the database enum into prose a verifier reads: "Questionnaire in_progress", underscore and
+      // em-dash included. The four display labels already existed as STATUS_CONFIG on the buyer's
+      // campaign screen, so the fix is one authority both surfaces read rather than a second copy here.
+      //   The ternary is gone with it: this branch is reached only when the supplier reported no
+      // allocated figure AND the buyer recorded no spend, so all four statuses say that much and only
+      // differ on why no figure arrived. One lookup, four sentences, no conditional.
+      //
+      // ⚠️ SNAPSHOTS ALREADY WRITTEN KEEP THE OLD STRING AND ARE NOT BACKFILLED. This reason is frozen
+      // into scope3_category_snapshots.uncovered at acceptance, the table is immutable by design, and
+      // the only way to change an existing row is a new snapshot with supersedes_id set, which is a
+      // restatement of a filed figure. A wording defect does not justify restating a filed figure, so
+      // earlier snapshots keep "Questionnaire in_progress" and that is the correct outcome: the record
+      // says what it said when the buyer accepted it. Anything reading those rows should expect both
+      // forms.
       uncovered.push({
         supplier_id: s.id,
         supplier_name: s.supplier_name,
-        reason: s.status !== 'completed'
-          ? `Questionnaire ${s.status} — no allocated figure submitted yet`
-          : 'No allocated emissions reported and no spend recorded',
+        reason: noFigureReasonForStatus(s.status),
       })
     }
 

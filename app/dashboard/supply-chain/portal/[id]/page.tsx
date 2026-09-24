@@ -8,6 +8,7 @@ import { supabase } from '../../../../../lib/supabase'
 import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
+import { supplierStatusLabel, supplierStatusTone } from '../../../../../lib/supply-chain/supplierStatus'
 import { labelForQuestionId } from '../../../../../lib/supply-chain/templates'
 import { btnPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
@@ -38,12 +39,10 @@ const GRAD = 'var(--color-brand)'
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF']
 const GRID_COLS = '2fr 1fr 1fr 1fr 1fr auto'
 
-const STATUS_CONFIG = {
-  invited:     { label: 'Invited', color: '#0C447C', bg: '#E6F1FB' },
-  in_progress: { label: 'In progress', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
-  completed:   { label: 'Completed', color: '#0F6E56', bg: '#E1F5EE' },
-  expired:     { label: 'Expired', color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
-}
+// ⚠️ MOVED TO lib/supply-chain/supplierStatus.ts, NOT COPIED. These four labels are also needed by
+// /api/campaigns/[id]/scope3-cat1, which was interpolating the raw enum into a sentence a verifier
+// reads because it could not reach a const declared inside a client page. The labels and the
+// verifier-facing sentences now live together in one module and both surfaces read it.
 
 export default function CampaignDetail() {
   const { isPaid, loading: entLoading } = useEntitlementState('supply-chain')
@@ -352,7 +351,7 @@ export default function CampaignDetail() {
               ))}
             </div>
             {suppliers.map((s, i) => {
-              const cfg = STATUS_CONFIG[s.status]
+              const cfg = { label: supplierStatusLabel(s.status), ...supplierStatusTone(s.status) }
               const isSending = sending === s.id
               const sent = sentStatus[s.id]
               return (

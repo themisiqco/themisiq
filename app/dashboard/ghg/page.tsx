@@ -3643,6 +3643,13 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
   const [grants, setGrants] = useState<VerifierGrant[]>([])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  // ⚠️ DEFAULTS TO FALSE, AND THE DEFAULT IS THE DECISION. Scope 3 Category 1 discloses SUPPLIER NAMES
+  // and their reported figures, which is third-party commercial data rather than the customer's own.
+  // The column behind it is `not null default false` for the same reason: get_verifier_scope3 is
+  // granted to anon like every verifier RPC, so its existence would otherwise have widened all nine
+  // grants that were live on 24 Sep 2026. Opting in is a deliberate act per link, never a remembered
+  // preference.
+  const [includeScope3, setIncludeScope3] = useState(false)
   const [creating, setCreating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -3668,10 +3675,12 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
       customer_user_id: session.user.id,
       verifier_name: name || null,
       verifier_email: email || null,
+      scope3_included: includeScope3,
     })
     setCreating(false)
     if (error) { alert('Could not create invitation: ' + error.message); return }
-    setName(''); setEmail(''); load()
+    // Reset the opt-in with the rest of the form: the next link should not inherit it silently.
+    setName(''); setEmail(''); setIncludeScope3(false); load()
   }
 
   const revoke = async (id: string) => {
@@ -3717,6 +3726,22 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
         <input value={email} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} placeholder="Verifier email (optional)" style={{ flex: 1, minWidth: 160, fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #e8e7e4' }} />
         <button onClick={createInvite} disabled={creating} style={{ fontSize: 13, fontWeight: 500, ...btnPrimary, padding: '10px 20px', cursor: creating ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}>{creating ? 'Generating…' : 'Generate verifier link'}</button>
       </div>
+
+      {/* ⚠️ THE ONE THING ON THIS FORM THAT DISCLOSES SOMEBODY ELSE'S DATA, so it is stated as that
+          rather than as a feature. Everything else the link shows is the customer's own inventory. The
+          sentence names what travels (supplier names and the figures they reported) and what does not
+          (the questionnaire responses themselves), because a customer cannot consent to a disclosure
+          described only as "include Scope 3". Unticked by default on every new link. */}
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: '1rem', cursor: 'pointer' }}>
+        <input type="checkbox" checked={includeScope3} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setIncludeScope3(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />
+        <span style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>
+          <strong style={{ color: '#0d0d0d', fontWeight: 500 }}>Also share the Scope 3 record.</strong>{' '}
+          The verifier sees each accepted category figure and what it is a total of, which for Category 1
+          means your suppliers by name and the emissions figures they reported to you. It does not include
+          their questionnaire responses. Leave this unticked if your supplier list is commercially
+          sensitive: everything else on the link is your own inventory.
+        </span>
+      </label>
 
       {active.length === 0 && (
         <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>No active verifier links yet.</div>

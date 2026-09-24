@@ -24,6 +24,30 @@ population most likely to have gaps — now evidenced, not theoretical.
   platform is single-org-per-user; this may be a scaffold for the unbuilt
   multi-client layer.
 
+**Added 24 Sep 2026 — a DB-only CONSTRAINT, not a table.** `campaign_suppliers_status_check`
+appears in no migration. `20260618_supplier_portal_schema.sql:53` declares
+`status text NOT NULL DEFAULT 'invited'` with no CHECK, and
+`20260618_supplier_portal_schema.sql:64` re-adds the column with `ADD COLUMN IF NOT
+EXISTS` and still no CHECK. The constraint exists only in the live database, and the
+only record of it in git is `db/dumps/schema_public_*.sql`, which spells it:
+
+```
+CONSTRAINT campaign_suppliers_status_check CHECK ((status = ANY (ARRAY[
+  'invited'::text, 'in_progress'::text, 'completed'::text, 'expired'::text])))
+```
+
+Four permitted values: `invited`, `in_progress`, `completed`, `expired`.
+
+⚠️ **Why this one matters more than a drop-candidate table.** Those four values now drive
+verifier-facing prose. `lib/supply-chain/supplierStatus.ts` carries a sentence per status
+which is frozen into `scope3_category_snapshots.uncovered` at acceptance, and
+`lib/supply-chain/supplierStatus.test.ts` pins the set by reading the newest dump, because
+the dump is the only source in git. So the test is only as fresh as the last dump: widen
+the constraint in the database without taking one and the test keeps passing against a
+stale list while a fifth status falls through to the raw-value path. Capturing the
+constraint into a migration removes that dependency. Extends the sweep above from tables
+to constraints, which nothing has audited.
+
 ### Grant hygiene
 - `user_subscriptions` — `service_role` granted full CRUD, zero code references
   under either quote style. Either RPC-mediated or an over-grant. Confirm and
@@ -554,3 +578,113 @@ available, assert on the value instead: `scope3/categorySnapshot.test.ts` joins
 adjacent SQL string literals so it matches the comment Postgres stores rather than
 the file as written. Stripping is the right tool only where there is no value to
 assert on, such as a render branch or a call site.
+
+### `get_verifier_inventory` does not enforce consent, and a migration header says it does
+
+**Verified 24 Sep 2026 by `pg_get_functiondef`, and independently in the file.**
+
+`public.get_verifier_inventory(uuid)` validates a token on two conditions and no others:
+
+```sql
+where token = p_token and status = 'active' and expires_at > now();
+```
+
+`accepted_at` appears exactly once more in the body, as an output key. `tos_accepted_at`
+and `privacy_accepted_at` do not appear at all. The newest defining migration,
+`20260814_get_verifier_inventory_factor_editions.sql:95`, says the same, so the file and
+the database agree. `revoked_at` is not tested either.
+
+**So the consent gate on the GHG verifier surface is client-side only.**
+`app/verify/[token]/page.tsx:515` returns the accept-terms screen before rendering the
+review, and that is the whole of it: **a direct RPC call with a valid, unaccepted token
+returns the company name, reporting year, boundary, all three scope totals,
+`locations_data`, the full `workings`, `coverage_resolutions`, `gwp_version`,
+`pct_estimated`, `comparability_disclosure`, `factor_editions` and the audit trail.**
+Nine grants were active on 24 Sep 2026.
+
+⚠️ **And `20260909_verifier_invite_term_gate.sql:17-19` states the opposite**, verbatim:
+
+> `-- workings and every evidence document for its own 90 days — get_verifier_inventory`
+> `-- and both document routes check the grant's own status/expiry/consent and never`
+> `-- look at entitlements.`
+
+On entitlements it is right, and that was its subject. On consent it is wrong for the
+function. **The document routes DO check it**: `lib/ghg/verifierGrant.ts:42` hard-gates on
+`accepted_at` and returns `consent_required`, and both document routes defer to it. So the
+claim is half true, which is why it read as true.
+
+**Not falsified elsewhere.** `docs/security-claims-audit.md` carries no row depending on
+verifier consent; a search for verifier, consent, `tos_accepted` and `accepted_at` returns
+one line, 99, about the audit record being append-only. Nothing published to customers
+rests on this.
+
+**What closing it would break, which is why it is logged rather than fixed.**
+Adding `if v_access.accepted_at is null then return jsonb_build_object('error',
+'consent_required'); end if;` to the function is three lines. The consequences are not:
+
+- **Nine live grants, and an unknown number of them unaccepted.** Any verifier mid-engagement
+  who has not accepted would find the page stop loading. Count first:
+  `select count(*) from verifier_access where status = 'active' and accepted_at is null;`
+- **`app/verify/[token]/page.tsx` treats a `consent_required` verdict as nothing.** Its load
+  handler maps the RPC's own verdicts to screens, and this one is not among them, so today it
+  would fall through to the invalid-link screen: *"This verifier link is invalid or has
+  expired"* to a verifier holding a perfectly good link who simply has not ticked the box.
+  That is the exact cause-guessing defect the same handler was rewritten to remove. **The page
+  change has to land in the same commit as the function change, or closing this gap creates a
+  worse defect than it fixes.**
+- **The accept screen needs the payload it currently gets from the gated call.** `verifier_name`
+  and `verifier_email` are seeded from `data.verifier` at `page.tsx:395-398`, which comes from
+  the same response. Gate the whole response and the accept form loses its prefilled email, so
+  either the verdict carries those two fields or the seeding moves to `verifier_accept_invite`.
+
+`get_verifier_scope3` does not inherit the gap: it enforces consent in its own body, reusing
+`verifierGrant.ts`'s two denial strings. That is the reference for what closing this looks
+like, and it deliberately does not touch `get_verifier_inventory`.
+
+### Source-text guards under-report, and `[a-z_]+` is how
+
+**Its own entry rather than a line on the comment-stripping one above, because the failure
+mode is the opposite and so is the remedy.** Both are source-text matching defects. Comment
+stripping fixes a FALSE POSITIVE: prose about a rule reads as a breach of it, the test fails,
+somebody looks. This one produces a SILENT PASS, which nobody looks at.
+
+**Three occurrences on 24 Sep 2026, all mine, all the same mistake:**
+
+1. Enumerating the questionnaire templates with `awk '/^  [a-zA-Z_]+: \{/'`. It found
+   `ecovadis`, `modern_slavery` and `custom`, and missed **`scope3` and `cs3d`** because both
+   contain a digit. I reported "three templates" before rechecking. `scope3` is the only
+   template that asks about assurance, so the miss went to the centre of the question being
+   asked.
+2. The same pattern, again, in the next command. Two misses, same cause, minutes apart.
+3. `[...body.matchAll(/'error',\s*'([a-z_]+)'/g)]` in the `get_verifier_scope3` whitelist
+   test. It found two of four verdicts, because `scope3_not_granted` and `scope3_not_found`
+   both contain a `3`.
+
+⚠️ **Why the third is the serious one.** The first two were greps in a report, corrected in
+the same session. The third was **an assertion in a whitelist test**. Had it not also
+asserted the exact set, it would have passed while checking half of what it claimed to
+check, in a test whose whole job is to guard a disclosure boundary. A guard that
+under-reports does not fail. It reports success over a subset and nothing indicates which
+subset.
+
+**The remedy is not "write better character classes", and this is the part worth carrying.**
+It is to make the parse's own result an assertion, so a pattern that matched less than
+expected fails on that alone. The pattern already exists in this repo:
+`lib/ghg/verifierWhitelist.test.ts` W-1, *"the projection is non-trivial and the parse
+actually found it"*, whose comment says exactly why: *"a parse that silently matched nothing
+would make every assertion below pass vacuously, which is the classic way a source-text test
+rots"*. W-1 guards against zero. It does not guard against "found 2 of 4", which is the case
+here and the harder one.
+
+When the comment-stripping helper is built, do this alongside it:
+
+- Audit every `matchAll` / `match` / `exec` in the test suite whose character class omits
+  `0-9`. The identifiers in this codebase are full of digits: `scope3`, `cs3d`, `cat15`,
+  `s3cat1_allocated`, `ar6`, `sb253`, `iso14001`, `scope2_market_total`. A class without
+  digits is wrong far more often than right here.
+- Where a parse feeds assertions, assert the COUNT or the exact SET, not just non-emptiness.
+  `toEqual([...])` on a sorted list is strictly better than `toContain` plus
+  `toBeGreaterThan(0)`, because it fails on a miss as well as on an extra.
+- ⚠️ Do NOT do this as one sweep. Same reason as the helper: rewriting the matching in a
+  dozen test files touches the safety net, and a mistake there is invisible because the tests
+  still pass.

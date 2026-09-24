@@ -13,6 +13,14 @@ import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
 import type { FactorEditions } from '../../../lib/ghg/factorEditions'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
+// ⚠️ THE SAME MODULE THE BUYER'S SCREEN USES, SO THE TWO AUDIENCES CANNOT BE TOLD DIFFERENT THINGS.
+// Every sentence about assurance attributes to the supplier's reporting and none says a figure is
+// assured; a second set of strings written for the verifier is how that guarantee would quietly lapse.
+import {
+  assuranceLabel, assuranceStatement, assuranceTone, showsAssuranceChip, assuranceWasRecorded,
+  ASSURANCE_SCOPE_NOTE, ASSURANCE_NOT_RECORDED_NOTE,
+  type AssuranceState, type AssuranceTone,
+} from '../../../lib/scope3/supplierAssurance'
 
 // METADATA ONLY — no old_values / new_values. The RPC used to return full before/after row
 // snapshots of ghg_inventories, which put every column back within reach of a verifier regardless of
@@ -151,6 +159,49 @@ interface InventoryData {
   // re-saved: 23 of 29 inventories at the time of whitelisting.
   factor_editions?: FactorEditions | null
 }
+// ── THE SCOPE 3 RECORD, AS get_verifier_scope3 WHITELISTS IT ──────────────────────────────────────
+//
+// ⚠️ `assurance` AND `supplier_assurance_raw` ARE OPTIONAL HERE, AND THAT IS NOT LAXITY. A line with no
+// assurance key is a snapshot accepted before that field existed, and the RPC preserves the absence
+// rather than filling it with null, because null would read as a supplier who was asked and did not
+// answer. The two are optional as a PAIR for the same reason. assuranceWasRecorded() is the test, and
+// ASSURANCE_NOT_RECORDED_NOTE is what a line without them says.
+interface Scope3SnapshotLine {
+  supplier_name: string
+  method: 'supplier-specific' | 'spend-based'
+  data_quality: string
+  value_mt: number
+  basis: string
+  allocation_method?: string | null
+  assurance?: AssuranceState
+  supplier_assurance_raw?: string | null
+}
+interface Scope3Snapshot {
+  category: string
+  accepted_at: string
+  figure_as_used: number
+  unit: string
+  method: string
+  is_restatement: boolean
+  restatement_reason: string | null
+  lines: Scope3SnapshotLine[]
+  uncovered: { supplier_name: string; reason: string }[]
+  currency_flags: { supplier_name: string; spend: number; currency: string; note: string }[]
+}
+interface Scope3Payload {
+  scope3?: {
+    sector: string | null; currency: string | null; country_iso2: string | null
+    factor_basis: string | null; status: string
+    total_scope3_tco2e: number | null
+    scope3_coverage: unknown
+    categories_relevant: number | null; categories_in_total: number | null
+    categories_unpriced: number | null; exclusions_unjustified: number | null
+  }
+  snapshots?: Scope3Snapshot[]
+  has_audit_trail?: boolean
+  error?: string
+}
+
 interface VerifierPayload {
   inventory?: InventoryData
   audit?: AuditEntry[]
@@ -158,6 +209,16 @@ interface VerifierPayload {
   expires_at?: string
   accepted_at?: string | null
   error?: string
+}
+
+const CATEGORY_NUMBER = (c: string): string => c.replace(/[^0-9]/g, '') || c
+
+// Presentation only, and the same four tones the buyer's screen uses. The STATE decides what is said.
+const ASSURANCE_TONE_STYLE: Record<AssuranceTone, { color: string; bg: string }> = {
+  good:  { color: '#0F6E56', bg: '#E1F5EE' },
+  warn:  { color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+  alert: { color: '#B91C1C', bg: '#FCEBEB' },
+  muted: { color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
 }
 
 const FRAMEWORK_NAMES: Record<string, string> = {
@@ -362,6 +423,10 @@ export default function VerifierPage() {
   const [isScrollable, setIsScrollable] = useState(false)
   // Consent gate: local state for the accept flow (only meaningful before acceptance).
   const [accepted, setAccepted] = useState(false)
+  const [scope3, setScope3] = useState<Scope3Payload | null>(null)
+  // Only ever set for a read that did not complete. A grant without Scope 3, and an inventory with no
+  // Scope 3 record, are both silence: neither is a fault and neither is the verifier's to chase.
+  const [scope3Error, setScope3Error] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [tosChecked, setTosChecked] = useState(false)
   const [privacyChecked, setPrivacyChecked] = useState(false)
@@ -403,6 +468,42 @@ export default function VerifierPage() {
   // PAGE LOAD: a verifier who read the workings for eleven minutes found every link on the page
   // dead at once. URLs are now minted per-document on click, so this response holds nothing
   // perishable and the page can sit open as long as the reading takes.
+  // ── SCOPE 3 ───────────────────────────────────────────────────────────────────────────────────
+  //
+  // ⚠️ GATED ON THE SAME hasAccess THE DOCUMENTS FETCH USES, and the RPC gates on consent again in its
+  // own body. Two gates on purpose: the client one keeps the ordinary flow from ever producing a
+  // consent_required, and the server one is the actual boundary, because a direct RPC call ignores this
+  // component entirely. That is exactly the gap get_verifier_inventory has, where consent is checked
+  // only here and a valid token calling the RPC directly bypasses it.
+  //
+  // ⚠️ consent_required AND scope3_not_granted ARE NOT ERRORS AND MUST NOT RENDER AS ONE. The page
+  // already returns the accept-terms screen before any of this renders when the token has not been
+  // accepted, so consent_required can only arrive in a race and the honest response is silence rather
+  // than an error. scope3_not_granted means the customer chose not to share the supplier list, which is
+  // a valid link doing exactly what it was minted to do: the section simply does not appear, because a
+  // verifier told "not granted" would ask the customer to fix something that is not broken.
+  useEffect(() => {
+    if (!token) return
+    const hasAccess = !!data?.accepted_at || accepted
+    if (!hasAccess) return
+    supabase.rpc('get_verifier_scope3', { p_token: token }).then(
+      (res: { data: Scope3Payload | null; error: { message: string } | null }) => {
+        // A read that did not complete is not a record that does not exist. Same rule as the inventory
+        // load: state what was observed. No Scope 3 section is drawn either way, and nothing on the
+        // page says the customer has no Scope 3 inventory.
+        if (res.error) { setScope3Error(res.error.message); return }
+        if (!res.data) { setScope3Error('The Scope 3 request returned neither data nor an error.'); return }
+        if (res.data.error) {
+          if (res.data.error === 'scope3_not_found') setScope3Error(null)
+          setScope3(null)
+          return
+        }
+        setScope3(res.data)
+      },
+      (err: unknown) => setScope3Error(err instanceof Error ? err.message : 'The Scope 3 request did not complete.'),
+    )
+  }, [token, data?.accepted_at, accepted])
+
   useEffect(() => {
     if (!token) return
     const hasAccess = !!data?.accepted_at || accepted
@@ -1086,6 +1187,124 @@ export default function VerifierPage() {
               <SourceDocRow key={d.id ?? `no-id-${i}`} doc={d} token={token} />
             ))}
           </div>
+        )}
+
+        {/* ── SCOPE 3 ─────────────────────────────────────────────────────────────────────────────
+            Drawn only when the RPC returned a record. Absent means one of three things, none of which
+            is a fault: the grant does not include Scope 3, the inventory has no Scope 3 record, or the
+            read did not complete. ⚠️ NONE OF THEM RENDERS "no Scope 3 data", because that is a claim
+            about the customer's inventory that this page is in no position to make. */}
+        {scope3Error && (
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #B91C1C', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20, fontSize: 12, color: '#B91C1C', lineHeight: 1.6 }}>
+            The Scope 3 record could not be read, so it is not shown below. This is not a statement
+            about whether one exists. The database reported: {scope3Error}
+          </div>
+        )}
+
+        {scope3?.scope3 && (
+          <>
+            <SectionHead>Scope 3</SectionHead>
+
+            {/* ⚠️ WHY THERE IS NO AUDIT TRAIL BESIDE THIS, SAID PLAINLY RATHER THAN LEFT AS AN ODD GAP.
+                A verifier who finds a revision history beside the Scope 1 and 2 figures and none here
+                will reasonably wonder what is being withheld. Nothing is: scope3_inventories carries no
+                audit trigger, and the snapshot chain is the substitute. It is arguably the better
+                record, because it holds what was FILED at each acceptance rather than what was edited
+                between them, and each row is immutable once written. */}
+            <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 16, fontSize: 12, color: '#555553', lineHeight: 1.7 }}>
+              The Scope 3 figures below carry no revision history of the kind shown under Audit Trail for
+              Scope 1 and Scope 2. They are recorded differently. Each figure is frozen at the moment the
+              company accepted it, together with everything it is a total of, and a row once written is
+              never altered: a corrected figure is a new record that supersedes the earlier one and says
+              why. So what you are reading is what was filed, rather than a log of edits made on the way
+              to it.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: 'Categories relevant', val: scope3.scope3.categories_relevant },
+                { label: 'Categories in the total', val: scope3.scope3.categories_in_total },
+                { label: 'Categories not priced', val: scope3.scope3.categories_unpriced },
+                { label: 'Exclusions without justification', val: scope3.scope3.exclusions_unjustified },
+              ].map(({ label, val }) => (
+                <div key={label} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
+                  {/* null is not zero. A count the record does not carry renders as "not recorded". */}
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d' }}>{val == null ? 'Not recorded' : val}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {(scope3.snapshots ?? []).length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginBottom: 20 }}>
+                No category figure on this inventory was accepted from supplier data, so there is nothing
+                here to trace to a supplier. Category figures entered directly appear in the company&apos;s
+                own report rather than in this record.
+              </div>
+            )}
+
+            {(scope3.snapshots ?? []).map(snap => (
+              <div key={snap.category} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.1rem 1.25rem', marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>Category {CATEGORY_NUMBER(snap.category)}</div>
+                  <div style={{ fontSize: 14, fontFamily: 'var(--font-display)', color: '#0d0d0d' }}>{snap.figure_as_used} {snap.unit}</div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 10 }}>
+                  Accepted {new Date(snap.accepted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} · method: {snap.method}
+                </div>
+
+                {/* A restatement is a fact a verifier needs and the reason is the company's own words.
+                    An unreasoned restatement renders as exactly that: no reason was recorded. */}
+                {snap.is_restatement && (
+                  <div style={{ fontSize: 12, color: '#92400e', background: '#FEF3E2', borderRadius: 8, padding: '8px 10px', marginBottom: 10, lineHeight: 1.6 }}>
+                    This figure replaces an earlier one that had already been recorded.{' '}
+                    {snap.restatement_reason?.trim()
+                      ? <>The company gave this reason: {snap.restatement_reason}</>
+                      : <>No reason was recorded for the change.</>}
+                  </div>
+                )}
+
+                {snap.lines.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    {snap.lines.map((l, i) => (
+                      <div key={`${l.supplier_name}-${i}`} style={{ padding: '7px 0', borderBottom: i < snap.lines.length - 1 ? '0.5px solid #f3f4f6' : 'none' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                          <span style={{ color: '#0d0d0d', flex: 1 }}>{l.supplier_name}</span>
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, whiteSpace: 'nowrap', background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : 'var(--color-module-climate)' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
+                          {/* Same gate as the buyer's screen: no chip where the label would be identical
+                              on every row. A line with NO assurance key gets the not-recorded note below
+                              instead, which is not the same as "not assured". */}
+                          {l.assurance && showsAssuranceChip({ method: l.method, assurance: l.assurance }) && (
+                            <span title={assuranceStatement(l.assurance)} style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, whiteSpace: 'nowrap', ...ASSURANCE_TONE_STYLE[assuranceTone(l.assurance)] }}>{assuranceLabel(l.assurance)}</span>
+                          )}
+                          <span style={{ color: '#555553', minWidth: 74, textAlign: 'right' }}>{l.value_mt} mt</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.5 }}>{l.basis}</div>
+                        {!assuranceWasRecorded(l) && (
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2, fontStyle: 'italic' }}>{ASSURANCE_NOT_RECORDED_NOTE}</div>
+                        )}
+                      </div>
+                    ))}
+                    {/* Printed once per category, never per row. */}
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8, fontStyle: 'italic', lineHeight: 1.6 }}>{ASSURANCE_SCOPE_NOTE}</div>
+                  </div>
+                )}
+
+                {snap.uncovered.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6, lineHeight: 1.6 }}>
+                    <strong style={{ color: 'var(--color-module-climate)' }}>Not included in this figure:</strong>{' '}
+                    {snap.uncovered.map(u => `${u.supplier_name}: ${u.reason}`).join(' ')}
+                  </div>
+                )}
+
+                {snap.currency_flags.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.6 }}>
+                    {snap.currency_flags.map(c => `${c.supplier_name}: ${c.note}`).join(' ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
         )}
 
         <SectionHead>Audit Trail</SectionHead>
