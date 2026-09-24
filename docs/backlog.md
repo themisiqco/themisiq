@@ -688,3 +688,88 @@ When the comment-stripping helper is built, do this alongside it:
 - ⚠️ Do NOT do this as one sweep. Same reason as the helper: rewriting the matching in a
   dozen test files touches the safety net, and a mistake there is invisible because the tests
   still pass.
+### CS3D copy corrected 24 Sep 2026, with four claims pending EUR-Lex verification
+
+`app/supply-chain/page.tsx` was rewritten on 24 Sep 2026 against **Directive (EU) 2026/470**
+(Omnibus I), published 26 Feb 2026, in force 18 March 2026, amending Directive (EU)
+2024/1760. `lib/cs3d.ts` gained the new constants and is still the single source; the page
+imports every date and figure and retypes none.
+
+What changed on the page: the civil liability framing removed in all four places it appeared,
+the "you must comply" framing reversed to "your customers must and the request lands on you",
+the "12 to 18 months, companies starting in 2026 will not be ready" urgency removed (it was
+written against a 2027 application date), the eliminated phase-in tiers no longer implied,
+the non-EU turnover route added, the value chain contact limit added, and a dates-and-sources
+section added in the `app/cbam/page.tsx` pattern.
+
+⚠️ **FOUR CLAIMS REST ON SECONDARY SOURCES. Nobody here has read the amended articles on
+EUR-Lex.** Recorded so the next reader knows which parts of the page are as solid as its
+citation and which are not:
+
+1. **The exact wording of Article 2(1) as amended: "more than 5,000" versus "at least
+   5,000".** Secondary sources disagree. The Council press release says *"more than 5,000
+   employees and above EUR 1.5 billion net turnover"*; the original art. 2(1)(a) used *"more
+   than 1000 employees"*. The repo says "more than" in three places that agree with each
+   other: `lib/cs3d.ts` `CS3D_EMPLOYEE_THRESHOLD`, and both the `basis` string and
+   `comparison: 'gt'` in `THRESHOLD_TESTS['CS3D']` in `lib/deals/assessment.ts`. ⚠️ **This one
+   is not only copy.** `gt` resolves a deal assessment, so a company with exactly 5,000
+   employees is assessed as out of scope. If the article says "at least", the comparison, both
+   `basis` strings and the copy constant change together, or the report and the page will
+   disagree about that company.
+2. **Deletion of the EU-wide civil liability regime**, reverting to national law. **This is the
+   load-bearing one**, because it is the claim that was REMOVED from the page. Removing an
+   over-claim on secondary sources is safe in a way that adding one is not, which is why it
+   proceeded. If it turns out the regime survives in some form, the page currently understates
+   and would need the claim restored, with its source.
+3. **Deletion of the mandatory climate transition plan obligation** from CSDDD. Not asserted
+   on the page either way, so nothing to correct if wrong.
+4. **Penalties: the 5% minimum floor replaced by a 3% cap.** ⚠️ **DELIBERATELY NOT ON THE
+   PAGE.** Adding a figure on a secondary source is the thing this list exists to avoid. Verify
+   before any surface states a penalty figure.
+
+**Two things that will make the page need review again, and neither has happened:**
+
+- **Commission implementation guidelines, due before 26 July 2027, not yet published.** They
+  will shape how an in-scope company words the request that lands on a supplier, which is the
+  page's whole subject. `CS3D_GUIDELINES_DUE` carries the date and the page states the status.
+- **National transposition, due 26 July 2028, not started in earnest.** Transposition is what
+  turns these dates into obligations, and Member States may diverge on the parts the directive
+  leaves to them, now including civil liability. The page says so rather than implying national
+  law is settled.
+
+**Where the dates live and what guards them.** `lib/cs3d.ts` holds them all;
+`lib/cs3d.test.ts` fails any non-comment line in `app/` or `lib/` containing one as a literal.
+Added to `FORBIDDEN` with this change: `1 January 2030`, `18 March 2026`, `26 July 2027`.
+⚠️ **`26 February 2026` is a constant but is NOT in `FORBIDDEN`**, because the literal already
+appears in live code for a different regime: `lib/sb253.ts:43` dates CARB's Board approval of
+the SB 253 initial regulation to 26 February 2026 inside a citation string. Guarding it would
+fail correct code, which is the cry-wolf failure that file's own header warns leads to the
+guard being deleted. Two of the three new dates could be guarded; the third could not, and
+that is written down rather than papered over.
+### The ESRS S2 framework row still says "(large EU)", and Omnibus I narrowed what that means
+
+`app/supply-chain/page.tsx`, the key-frameworks table:
+`{ fw: 'ESRS S2', scope: 'Value chain workers', deadline: 'FY2024 (large EU)', urgency: 'critical' }`.
+
+⚠️ **This is the same defect that was fixed one row above it on 24 Sep 2026.** The CS3D row read
+`'26 July 2029 (large companies)'`; the qualifier was removed because Directive (EU) 2026/470
+raised the CS3D thresholds fivefold on headcount, so "large companies" had come to describe a
+population five times narrower than when the words were written. Omnibus I also raised the CSRD
+thresholds, and `(large EU)` on the ESRS S2 row is the identical construction with the identical
+problem: a reader self-assessing against it is measuring themselves against a scope that moved.
+
+**Not changed, because the replacement wording cannot be written yet.** Correcting it needs the
+CSRD threshold as amended, and nobody here has read it. Verify on EUR-Lex first, then decide
+between naming the threshold, naming the CSRD wave, or dropping the qualifier as the CS3D row
+did. ⚠️ **Dropping it is not free**, unlike on the CS3D row: `FY2024` alone reads as applying to
+every EU company, which is a wider over-claim than the one being removed.
+
+**`urgency: 'critical'` is correct and should stay.** FY2024 is in the past, so for a wave-one
+reporter this is live rather than upcoming, and it is now the only `critical` row in the table.
+That is the right calibration: everything else there is a future or a customer-driven date.
+
+**While in that file:** `SB253_FRAMEWORK_DEADLINE` in `lib/sb253.ts` is
+`'10 Nov 2026 — proposed, not final'`, which contains an em-dash and is customer-facing, rendered
+in the GHG export summary beside computed totals. The standing copy rule is no em-dashes in
+customer-facing text. One-character fix, but it is a shared constant read by a surface outside
+the supply-chain module, so it belongs to whoever next touches that export.

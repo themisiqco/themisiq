@@ -31,7 +31,22 @@ const FORBIDDEN = [
   'due diligence · 2027',
   // Current — must be imported, never retyped.
   '26 July 2029', '26 July 2028', '2029-07-26', '2028-07-26',
+  // Added 24 Sep 2026 with the CS3D copy correction. All three are CS3D-specific and none appears
+  // anywhere else in app/ or lib/: the art. 16 reporting date, the date (EU) 2026/470 entered into
+  // force, and the date the Commission's implementation guidelines are due.
+  '1 January 2030', '18 March 2026', '26 July 2027',
 ]
+
+// ⚠️ ONE DATE FROM THAT CORRECTION IS DELIBERATELY NOT IN THE LIST ABOVE: 26 February 2026, when
+// (EU) 2026/470 was published. It is a constant, CS3D_OMNIBUS_PUBLISHED, so the single-source rule
+// still holds for it. It is not FORBIDDEN because the literal already appears in live code for a
+// different regime: lib/sb253.ts:43 dates CARB's Board approval of the SB 253 initial regulation to
+// 26 February 2026, inside a citation string, not a comment. Adding it here would fail correct code.
+//   That is the narrowness rule this file already states, hitting a real case. A bare date belongs to
+// whichever regime the surrounding copy is about, and an unqualified `unit: '2027'` was in this list
+// for one run and caught two unrelated regimes. A guard that cries wolf gets deleted, and then the
+// real regression walks in. Two of the three dates could be guarded; the third could not, and saying
+// so is better than guarding it wrongly or pretending it was guarded.
 
 const EXCLUDED_FILES = new Set([
   'lib/cs3d.ts',        // the single source — this is where the dates are SUPPOSED to be

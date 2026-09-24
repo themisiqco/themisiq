@@ -52,6 +52,17 @@ const FORBIDDEN = [
   'miss the November 10', 'November 10 is',
   "val: '10 Nov'", "'SB 253 · 10 Nov'", 'SB 253 · 10 Nov', 'the 10 November deadline',
   'miss the 10 November', '10 November is',
+  // ⚠️ THE SCOPE 3 PHASE-IN YEAR, ADDED 24 Sep 2026, AND QUALIFIED BY "California" ON PURPOSE.
+  // app/supply-chain/page.tsx carried the literal '2027 (California)' in a framework table, stating an
+  // unapproved Californian regulation as settled beside a firm EU directive. It now imports
+  // SB253_SCOPE3_FROM with SB253_DATE_STATUS, so the retired spelling is what this forbids.
+  //   ⚠️ A BARE '2027' IS NOT FORBIDDEN AND MUST NOT BE. It appears on more than a dozen live lines
+  // across unrelated regimes: CBAM's first importer declaration and default mark-up step, the AI Act's
+  // stand-alone limb, the security page, the methodology page, climate risk. lib/cs3d.test.ts records
+  // what happens when a guard is broadened past its regime: an unqualified `unit: '2027'` sat in its
+  // list for one run, caught two regimes it knew nothing about, and a guard that cries wolf gets
+  // deleted. Narrow enough to be kept is the requirement, not broad enough to feel thorough.
+  '2027 (California)',
 ]
 
 const EXCLUDED_FILES = new Set([
