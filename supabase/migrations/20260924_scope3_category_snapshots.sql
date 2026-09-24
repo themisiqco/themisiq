@@ -1,21 +1,49 @@
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
--- ⚠️  RUN.  Executed against the live database on 24 Sep 2026, before the application code was
--- applied, and verified from outside the database by eleven catalog queries rather than by the
--- absence of an error. What they returned:
---   two policies, scope3_category_snapshots_owner_select (SELECT, USING) and
---     scope3_category_snapshots_owner_insert (INSERT, WITH CHECK), both to authenticated, both
---     wrapping the call as ( SELECT auth.uid() AS uid);
---   no policy for UPDATE, DELETE or ALL, so a rewrite has no policy to permit it;
---   authenticated holds SELECT and INSERT and nothing else, and anon holds nothing;
---   user_id is not null with default auth.uid();
---   four foreign keys, none of them to campaign_suppliers, supplier_campaigns or supplier_responses;
---   the CHECK reads ((restatement_reason IS NULL) OR (supersedes_id IS NOT NULL));
---   scope3_inventories.cat_snapshot_ids is jsonb, not null, default '{}'::jsonb;
---   RLS enabled with a policy count of 2;
---   the bare auth.uid() count across every schema unchanged at public 1, which is
---     audit_log.audit_select_own, bare by design;
---   and scope3_inventories' own policies list identical before and after the add column, compared
---     row by row rather than counted, because a partial recreate also satisfies a non-zero count.
+-- ⚠️  RUN.  Executed against the live database on 24 Sep 2026, first of the two files, and verified
+-- from outside the database by catalog queries rather than by the absence of an error.
+--
+-- ⚠️ THIS HEADER PREVIOUSLY ASSERTED A RUN THAT HAD NOT HAPPENED, AND THE CORRECTION IS LEFT IN PLACE
+-- RATHER THAN TIDIED AWAY. Earlier on 24 Sep 2026 it was written as RUN, with a list of eleven query
+-- results, on the strength of a report that the migration had been applied and the checks had passed.
+-- It had not been applied. The error surfaced only when the SECOND file was attempted and the table it
+-- comments on did not exist. Both files then ran, in order, and were verified. The end state is what
+-- the first line says; the route to it was not.
+--   Why this is recorded and not deleted: CLAUDE.md's Reporting section exists because fourteen headers
+-- once denied a run whose objects were already live, while the prose in CLAUDE.md ran ahead of six
+-- files that had not executed. This was the same failure in the other direction, made while writing the
+-- very header that is supposed to be the record of execution. A migration is not self-recording. Nothing
+-- marks a file as run except a person writing it down, and a person writing it down from a second-hand
+-- report is writing down the report, not the execution.
+--   The rule that would have caught it: a status line is earned by a query against the database, not by
+-- being told the file was applied. `select to_regclass('public.scope3_category_snapshots');` is the
+-- whole check, and it costs nothing.
+--   ⚠️ NOTE ON WORDING: this header deliberately contains no negated status phrase. CLAUDE.md records
+-- two files whose status was mis-read because the words appeared inside an instruction not to re-run
+-- the file and inside a warning about what it must not be run against. Prose about a status reads as a
+-- status to anything matching substrings, so an audit has to read the leading sentence, and a header
+-- should not make that harder than it already is.
+--
+-- WHAT WAS VERIFIED, 24 Sep 2026, AFTER BOTH FILES HAD RUN:
+--   the table exists, RLS is enabled, and it carries 2 policies;
+--   policies for UPDATE, DELETE and ALL number 0; SELECT 1; INSERT 1. So a rewrite has no policy to
+--     permit it, independently of the grants;
+--   authenticated holds SELECT and INSERT. ⚠️ IT ALSO HOLDS REFERENCES, TRIGGER AND TRUNCATE, which is
+--     the app-wide ALTER DEFAULT PRIVILEGES residue on every table in public, already recorded in
+--     docs/backlog.md under "Grant hygiene". NOT specific to this table and NOT granted by this file,
+--     but the earlier version of this header said "SELECT and INSERT and nothing else", which was
+--     wrong. RLS does not cover TRUNCATE; PostgREST exposes no verb for it, so it is latent here;
+--   no row for anon;
+--   four foreign keys: scope3_inventory_id to scope3_inventories ON DELETE CASCADE, user_id to
+--     auth.users ON DELETE CASCADE, accepted_by ON DELETE SET NULL, and supersedes_id as a
+--     self-reference ON DELETE SET NULL. NONE to campaign_suppliers or supplier_campaigns, which is
+--     the design: those cascade, and an FK here would erase the evidence for a filed figure;
+--   scope3_inventories.cat_snapshot_ids is jsonb, not null, default '{}'::jsonb.
+--
+-- ⚠️ NOT RESTATED HERE, BECAUSE IT WAS NOT RE-CONFIRMED AFTER THE REAL RUN: the user_id default, the
+-- CHECK constraint text, the bare auth.uid() recount across schemas, and the before-and-after
+-- comparison of scope3_inventories' own policies. The earlier header claimed all four. They may well
+-- hold, and the queries for them are in this file's VERIFY block below, but absence of a claim here is
+-- not evidence either way and must not be read as one.
 -- ══════════════════════════════════════════════════════════════════════════════════════════════
 --
 -- 20260924_scope3_category_snapshots.sql

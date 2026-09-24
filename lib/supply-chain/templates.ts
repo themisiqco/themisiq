@@ -222,6 +222,35 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
   },
 }
 
+// ── WHICH QUESTIONNAIRE A CAMPAIGN ACTUALLY SENT ────────────────────────────────────────────────
+//
+// ⚠️ AN UNKNOWN TEMPLATE KEY FALLS BACK TO ecovadis, AND THAT FALLBACK IS THE WHOLE REASON THIS
+// HELPER EXISTS. Both readers already do it: the supplier portal resolves
+// `camp.questionnaire_template || 'ecovadis'` and then `TEMPLATES[template]?.sections ||
+// TEMPLATES.ecovadis.sections`, and the buyer's response viewer does `(TEMPLATES[template] ||
+// TEMPLATES.ecovadis).sections`. So a campaign carrying a null, an empty string or a typo showed its
+// supplier the EcoVadis form.
+//   Anything asking "was this question put to the supplier?" MUST resolve through the same fallback or
+// it answers about a questionnaire nobody saw. That answer is not cosmetic: templateAsks drives
+// whether a Category 1 line records 'not_asked', which is a claim a verifier reads about what was and
+// was not asked of a supplier. Two spellings of the fallback would eventually disagree.
+export function resolveTemplate(template: string | null | undefined): { key: string; sections: Section[] } {
+  const requested = template || 'ecovadis'
+  const found = TEMPLATES[requested]
+  return found ? { key: requested, sections: found.sections } : { key: 'ecovadis', sections: TEMPLATES.ecovadis.sections }
+}
+
+// ⚠️ FOUR OF THE FIVE TEMPLATES, INCLUDING THE DEFAULT, DO NOT ASK ABOUT ASSURANCE. s3_assurance is in
+// `scope3` alone; `ecovadis` has no assurance question at all, and its proc_audit and proc_ecovadis
+// are about the supplier's OWN suppliers and their rating, neither of which is assurance of their
+// figures. Meanwhile the three s3cat1_* questions that feed Category 1 are in BOTH ecovadis and
+// scope3. So the ordinary case is a campaign that produces supplier-specific Cat 1 lines for which
+// the assurance question was never put to the supplier, and that is a different fact from a supplier
+// declining to answer it.
+export function templateAsks(template: string | null | undefined, questionId: string): boolean {
+  return resolveTemplate(template).sections.some(sec => sec.questions.some(q => q.id === questionId))
+}
+
 // id -> label, flattened across every template. Three ids (s3cat1_allocated,
 // s3cat1_method, s3cat1_quality) appear in both ecovadis and scope3; their labels
 // are byte-identical in both, so the flattening is lossless. If a future edit gives

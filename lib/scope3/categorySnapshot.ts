@@ -1,3 +1,5 @@
+import type { AssuranceState } from './supplierAssurance'
+
 // ── WHAT A CATEGORY FIGURE IS A TOTAL OF, BUILT ONCE AT ACCEPTANCE ───────────────────────────────
 //
 // The Cat 1 route computes a line per supplier, the suppliers it could not cover, and any non-USD
@@ -25,6 +27,26 @@ export interface SnapshotLine {
   /** The sentence DISPLAYED at acceptance. A rendering, never the authority: see the column comment. */
   basis: string
   allocation_method?: string
+
+  // ── WHETHER THE SUPPLIER'S OWN REPORTING IS THIRD-PARTY ASSURED ──
+  //
+  // ⚠️ `assurance` DESCRIBES THIS LINE'S FIGURE; `supplier_assurance_raw` DESCRIBES THE SUPPLIER. They
+  // are not two spellings of one thing. A spend-based line is always 'not_applicable' however the
+  // supplier answered, because its figure is the buyer's spend times a factor and the supplier's
+  // assurance status does not bear on it. ⚠️ SO DO NOT ROLL UP "ASSURED SUPPLIERS" ACROSS LINES: filter
+  // on the state through carriesThirdPartyAssurance(), which returns false for 'not_applicable', and
+  // never on the raw answer. Rolling up the raw answer reports a spend-based estimate as assured.
+  //   Neither field says a figure is assured, and no string in supplierAssurance.ts does either. The
+  // question asks whether the SUPPLIER'S emissions figures are assured, which does not establish that
+  // the slice they attributed to this buyer falls inside that scope.
+  //
+  // ⚠️ REQUIRED, NOT OPTIONAL, AND THAT IS LOAD-BEARING. Every line written from now on carries
+  // `assurance`, so a line with the key ABSENT can only be a snapshot accepted before the field
+  // existed. That is how those rows stay readable as "not recorded" rather than as "not assured".
+  // Snapshots are immutable and are NOT backfilled: a snapshot records what was known at acceptance,
+  // and this was not known. Make either field optional and that inference silently collapses.
+  supplier_assurance_raw: string | null
+  assurance: AssuranceState
 }
 
 export interface SnapshotUncovered { supplier_id: string; supplier_name: string; reason: string }

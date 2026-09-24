@@ -399,3 +399,158 @@ costs the most. Audit offers before assertions.
   (`:57–63`), and `docs/security-claims-audit.md` row 17, which records the pen
   test as deleted rather than deferred.
 
+
+---
+
+## Verified 24 Sep 2026
+
+Found while making the Scope 3 Category 1 supplier data verifier-ready for limited
+assurance. All were confirmed against the codebase on the date.
+
+**Scheduling decision, 24 Sep 2026 (Lisa).** Two of these go first: **the raw status
+enum in the uncovered reason** and **the `data_quality` split**. Not because they are
+the largest, but because both are freezing into immutable snapshots on every
+acceptance from today, and `scope3_category_snapshots` has no UPDATE path by design.
+Every other item on this list can be fixed at any time and the fix applies
+retroactively. These two cannot: a snapshot already written keeps the defective
+string, and the only correction is a new snapshot superseding the old one, which
+means a restatement of a filed figure for a wording defect. The cost of waiting is
+therefore not zero and it compounds.
+
+### `s3_assurance` is absent from `ecovadis`, which is the default questionnaire
+
+`lib/supply-chain/templates.ts` exports five templates. **Only `scope3` asks whether
+the supplier's emissions figures are independently assured.** `ecovadis` has no
+assurance question at all: its `proc_audit` and `proc_ecovadis` are about the
+supplier's OWN suppliers and their rating, neither of which is assurance of their
+figures, and `env_reporting` is disclosure rather than assurance.
+
+`ecovadis` is the default. It is the initial value in the campaign creation form
+(`app/dashboard/supply-chain/portal/page.tsx:44`) and the fallback in both readers
+(`app/supplier/[token]/page.tsx:41`,
+`app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx:69`).
+
+The three `s3cat1_*` questions that feed Category 1 are in **both** `ecovadis` and
+`scope3`, with byte-identical labels. So the ordinary case is a campaign that
+produces supplier-specific Cat 1 lines for which the assurance question was never
+put to the supplier. That is now reported honestly as `not_asked`, with one
+campaign-level sentence, but the answer still does not exist for those campaigns,
+and for a limited assurance engagement it is the first question asked about a
+supplier-reported number.
+
+⚠️ **Adding it is one line, and that is exactly why it needs scheduling rather than
+doing.** `answeredQuestions / totalQuestions` drives the progress percentage on both
+the supplier portal and the buyer's response viewer, so every in-flight `ecovadis`
+response would drop below 100 percent and an unanswered question would appear to a
+supplier who had already finished. Decide what happens to campaigns already in
+flight before touching the template.
+
+### `data_quality` on a Cat 1 line mixes the supplier's words with ours
+
+`app/api/campaigns/[id]/scope3-cat1/route.ts` sets
+`data_quality: quality || 'Supplier-reported (basis unspecified)'`, where `quality`
+is the supplier's own selection from `s3cat1_quality`. One field therefore holds
+either a verbatim source value or a sentence we wrote, and a reader cannot tell
+which without comparing against the option list in `templates.ts`.
+
+**Now frozen into `scope3_category_snapshots.lines`**, so the ambiguity is permanent
+in every snapshot written from here on. The fix is the split already applied to
+assurance in the same pass: one field for what the supplier said, null when they
+said nothing, and a separate normalised field for what we know. See
+`supplier_assurance_raw` and `assurance` in `lib/scope3/supplierAssurance.ts` for
+the shape, and the note on `SnapshotLine` for why the fallback string is the defect.
+
+### The questionnaire picker states two wrong question counts
+
+`app/dashboard/supply-chain/portal/page.tsx:29-30`. Counted by importing `TEMPLATES`
+and summing, not by eye:
+
+| Template | Picker says | Actual |
+|---|---|---|
+| `ecovadis` | "Full 38-question assessment" | **35** |
+| `scope3` | "8 questions on GHG emissions..." | **12** |
+| `modern_slavery` | "12 questions" | 12 |
+| `cs3d` | "15 questions" | 15 |
+
+The buyer chooses a questionnaire partly on its length. Consider deriving the count
+from `TEMPLATES` rather than restating it, which is the same argument as never
+stating a module count in pricing copy.
+
+### The uncovered reason puts a raw status enum in front of a verifier
+
+`app/api/campaigns/[id]/scope3-cat1/route.ts:180-181` builds
+`Questionnaire ${s.status} — no allocated figure submitted yet`, interpolating the
+database enum directly. A buyer and later a verifier reads
+`Questionnaire in_progress — no allocated figure submitted yet`, underscore and
+em-dash included.
+
+⚠️ **As of `20260924_scope3_category_snapshots.sql` this string is frozen into
+`scope3_category_snapshots.uncovered` and cannot be corrected in place**, because
+the table is immutable and a correction is a new snapshot. Every day this stays
+unfixed, more filed records carry it. Fix before the feature sees real use. The
+same file's `STATUS_CONFIG` in `app/dashboard/supply-chain/portal/[id]/page.tsx:41-46`
+already holds display labels for all four statuses and is the obvious source.
+
+### The Cat 1 contradiction notice does not survive a page refresh
+
+The export-step notice naming a supplier who reported a figure while stating they do
+not measure their emissions reads `acceptedCatOneLines` in
+`app/dashboard/scope3/page.tsx`, held in component state from the moment of
+acceptance. It survives the save but **not a reload**, because snapshots are never
+read back from `scope3_category_snapshots` on page load: only `cat_snapshot_ids`,
+the pointer, is loaded.
+
+This is a false negative and it is only tolerable because **nothing asserts the
+absence of a contradiction** anywhere on that screen, so a missing notice is not
+rendered as a clean bill. Fixing it means reading the current snapshot's `lines`
+back by `cat_snapshot_ids.cat1`, which is the same read the verifier surface will
+need. **Do it with `get_verifier_scope3`, not before**, or the read gets written
+twice.
+
+### Comment-stripping in source-reading tests should be one helper
+
+**Approved 24 Sep 2026 (Lisa) as its own task, deliberately not folded into the
+Scope 3 assurance work.** Twelve sites across the test suite strip comments before
+matching source text, in two shapes that disagree with each other:
+
+- `//` and `*` only: `sources.test.ts:76`, `sb261.test.ts:84`, `sb253.test.ts:84`,
+  `ifrsS2.test.ts:59`, `ghg/declarationStates.test.ts:50`,
+  `ghg/engineCallSites.test.ts:63`, `materialityDrResolution.test.ts:341`, and two
+  inline in `scope3/categorySnapshot.test.ts`.
+- also `/*` and `{/*`: `aiAct.test.ts:62`, `cs3d.test.ts:46`,
+  `publisherClaims.test.ts:203`.
+- SQL `--`: `ghg/verifierWhitelist.test.ts:46` (`stripSql`), and
+  `scope3/categorySnapshot.test.ts`.
+
+⚠️ **Deduplication is the weaker reason. The stronger one is that every site is
+LINE-based, and a line filter cannot see the interior of a multi-line comment.** A
+`{/* ... */}` block's continuation lines do not begin with a comment marker, so they
+survive stripping and are matched as if they were code. This is not hypothetical: it
+is how the `carriesThirdPartyAssurance` guard in `scope3/supplierAssurance.test.ts`
+failed on 24 Sep 2026, on a six-line JSX comment whose forbidden token sat on line
+two. There are **447 multi-line JSX comment blocks across 60 files** in `app/` and
+`lib/`, so the precondition is everywhere. NOT VERIFIED: whether any of the twelve is
+currently fooled. That depends on what each asserts and was not checked. The claim is
+a latent hole in the technique, not a live defect in those tests.
+
+Shape when it is done:
+- `lib/testing/stripComments.ts` with TWO functions, `stripTsComments` and
+  `stripSqlComments`. Two, not one: the languages differ in syntax and in escape
+  rules, and one function is wrong for both.
+- Remove comment SPANS, not comment LINES: `{/* */}`, then `/* */`, then whole-line
+  `//`. That is the part the existing sites get wrong.
+- Do NOT unify with `scripts/check-sql.py`. It is Python and its stripper also tracks
+  single-quoted literals with `''` escapes because it feeds a parser. No shared code
+  is possible.
+- Migrate the twelve OPPORTUNISTICALLY, one at a time as each file is next edited for
+  another reason. ⚠️ A single commit rewriting the stripping in ten test files touches
+  the safety net itself, and a mistake there is invisible: the tests still pass, they
+  just stop catching things.
+
+⚠️ **And the limit worth carrying into that task: stripping is a workaround.** The
+real problem is a guard matching substrings over a file that documents its own rules,
+where prose about a rule reads identically to a breach of it. Where a VALUE is
+available, assert on the value instead: `scope3/categorySnapshot.test.ts` joins
+adjacent SQL string literals so it matches the comment Postgres stores rather than
+the file as written. Stripping is the right tool only where there is no value to
+assert on, such as a render branch or a call site.

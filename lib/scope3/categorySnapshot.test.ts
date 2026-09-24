@@ -16,7 +16,8 @@ import {
 const line = (o: Partial<SnapshotLine> = {}): SnapshotLine => ({
   supplier_id: 's1', supplier_name: 'Acme', method: 'supplier-specific',
   data_quality: 'Measured / supplier-specific', value_mt: 10,
-  basis: 'Supplier-reported allocated emissions: 10 mt CO2e (allocated by revenue share)', ...o,
+  basis: 'Supplier-reported allocated emissions: 10 mt CO2e (allocated by revenue share)',
+  supplier_assurance_raw: 'Yes — limited assurance', assurance: 'limited', ...o,
 })
 const result = (lines: SnapshotLine[]): AcceptedResult => ({
   total_mt: lines.reduce((n, l) => n + l.value_mt, 0), lines, uncovered: [], currency_flags: [],
@@ -204,6 +205,44 @@ describe('the migration and the writer agree', () => {
     expect(code, 'no delete policy').not.toMatch(/create policy[^;]*for delete/)
   })
 
+  it('declares assurance as a required field, which is what makes an absent key mean anything', () => {
+    // ⚠️ THE LOAD-BEARING ASSERTION FOR EVERY SNAPSHOT ALREADY WRITTEN. Snapshots are immutable and are
+    // NOT backfilled: a row accepted before this field existed did not carry it, and a snapshot records
+    // what was known at acceptance. So a reader distinguishes those rows by the KEY BEING ABSENT, and
+    // says "supplier assurance status was not recorded when this figure was accepted" rather than "not
+    // assured". That inference holds only while every line written from now on carries the key.
+    //   Make either field optional and old rows stop being distinguishable from new ones whose supplier
+    // was simply never asked. Nothing would report an error; the record would just start lying quietly.
+    const src = readFileSync(join(__dirname, 'categorySnapshot.ts'), 'utf8')
+    const iface = src.slice(src.indexOf('export interface SnapshotLine {'), src.indexOf('export interface SnapshotUncovered'))
+    expect(iface, 'assurance is not optional').toMatch(/^ {2}assurance: AssuranceState$/m)
+    expect(iface, 'the raw answer is not optional either').toMatch(/^ {2}supplier_assurance_raw: string \| null$/m)
+    expect(iface, 'and null is how an unanswered question is carried').not.toMatch(/supplier_assurance_raw\?:/)
+  })
+
+  it('sets assurance on every line the route can produce', () => {
+    // ⚠️ THE TYPE ALONE IS NOT ENOUGH ONCE A THIRD BRANCH APPEARS. tsc catches a line built without the
+    // field TODAY because SnapshotLine requires it, but the route could grow a branch that spreads a
+    // partial or casts. So count the sites: every lines.push in the route must carry an
+    // assuranceForLine spread, and the two numbers must match.
+    const route = readFileSync(join(__dirname, '..', '..', 'app', 'api', 'campaigns', '[id]', 'scope3-cat1', 'route.ts'), 'utf8')
+    const code = route.split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+    const pushes = [...code.matchAll(/lines\.push\(/g)].length
+    const spreads = [...code.matchAll(/\.\.\.assuranceForLine\(/g)].length
+    expect(pushes, 'the route still produces lines').toBeGreaterThan(0)
+    expect(spreads, `${pushes} lines.push sites, ${spreads} assuranceForLine spreads`).toBe(pushes)
+  })
+
+  it('carries the line fields through to the snapshot untouched', () => {
+    // buildCategorySnapshot passes result.lines by reference, so a field the route adds arrives here
+    // without a change in the builder. That is deliberate, and it means the guard above is the one that
+    // has to hold: nothing in the builder would notice a line missing the key.
+    const l = line({ supplier_assurance_raw: 'No — internal only', assurance: 'internal_only' })
+    const snap = buildCategorySnapshot({ category: 'cat1', figureAsUsed: 10, unit: 'mt CO2e', result: result([l]), acceptedAt: AT })
+    expect(snap.lines[0].assurance).toBe('internal_only')
+    expect(snap.lines[0].supplier_assurance_raw).toBe('No — internal only')
+  })
+
   it('has one foreign key to a parent, and none to the supplier tables', () => {
     // An FK to campaign_suppliers would inherit its cascade and delete the evidence for a figure
     // still sitting in a filed report.
@@ -218,12 +257,65 @@ describe('the migration and the writer agree', () => {
       .not.toMatch(/restatement_reason\s+text\s+(not null|default)/i)
   })
 
-  it('the lines comment says why supplier_name is a frozen copy', () => {
-    // So a later reader does not "fix" it into a foreign key and reintroduce the cascade.
-    const c = sql.slice(sql.indexOf('comment on column public.scope3_category_snapshots.lines'))
-    expect(c).toContain('FROZEN COPY, NOT A FOREIGN KEY')
-    expect(c).toContain('Do not "fix" this into a foreign key')
-    expect(c, 'and says basis is a rendering rather than the authority').toContain('`basis` IS A RENDERING')
+  // ⚠️ RESOLVED BY WHICH FILE SETS THE COMMENT LAST, NOT BY THE FILE THAT CREATED THE TABLE. `comment
+  // on` REPLACES rather than appends, so the newest file carrying this statement holds the entire
+  // column comment and every earlier one contributes nothing. Pinning the original file would test
+  // text the database no longer has, and would pass while the live comment had lost half its content.
+  const linesComment = (() => {
+    const needle = 'comment on column public.scope3_category_snapshots.lines is'
+    const f = readdirSync(MIGRATIONS)
+      .filter(x => x.endsWith('.sql') && readFileSync(join(MIGRATIONS, x), 'utf8').includes(needle))
+      .sort().pop()
+    expect(f, 'some migration sets the lines comment').toBeDefined()
+    const src = readFileSync(join(MIGRATIONS, f!), 'utf8')
+    const raw = src.slice(src.indexOf(needle))
+    // ⚠️ ASSERTED AGAINST THE COMMENT'S VALUE, NOT ITS SOURCE FORMATTING, and the first draft of the
+    // test below failed for exactly that reason: the phrase it looked for was split across two adjacent
+    // SQL string literals, so it was present in the comment Postgres stores and absent from the file as
+    // written. Reflowing the SQL to fit 100 columns would otherwise break tests that care about wording
+    // and not about line breaks. Adjacent literals are joined and SQL's doubled quote is unescaped, so
+    // what is matched here is what a reader of the column comment sees.
+    const text = raw
+      .replace(/'\s*\n\s*'/g, '')
+      .replace(/''/g, "'")
+    return { file: f!, text }
+  })()
+
+  it('the effective lines comment still says why supplier_name is a frozen copy', () => {
+    // So a later reader does not "fix" it into a foreign key and reintroduce the cascade. ⚠️ THIS IS
+    // ALSO THE GUARD ON THE REPLACE-NOT-APPEND TRAP: a comment migration that adds a paragraph and
+    // forgets to restate these sentences deletes them from the database, silently and permanently.
+    expect(linesComment.text, `set by ${linesComment.file}`).toContain('FROZEN COPY, NOT A FOREIGN KEY')
+    expect(linesComment.text).toContain('Do not "fix" this into a foreign key')
+    expect(linesComment.text, 'and says basis is a rendering rather than the authority').toContain('`basis` IS A RENDERING')
+  })
+
+  it('the effective lines comment tells a SQL reader that an absent assurance key is not a no', () => {
+    // ⚠️ THE ONE PLACE THIS RULE REACHES SOMEONE IN THE SQL EDITOR. It is enforced in TypeScript and by
+    // tests, none of which is visible to a person writing a query against this table next year. What
+    // they see is rows where some lines carry the key and some do not, with the wrong inference
+    // immediately available. The table is immutable and these rows are never backfilled, so the
+    // ambiguity is permanent and the note has to be too.
+    expect(linesComment.text).toContain('ACCEPTED BEFORE THIS FIELD EXISTED')
+    expect(linesComment.text).toContain('IT DOES NOT MEAN "NOT ASSURED"')
+    expect(linesComment.text, 'names both absence states so the key-present test makes sense')
+      .toMatch(/not_asked[\s\S]*not_answered/)
+    expect(linesComment.text, 'and gives the filter that excludes spend-based lines')
+      .toMatch(/assurance in \('limited', 'reasonable'\)/)
+    expect(linesComment.text, 'and never claims a figure is assured')
+      .toContain('never "this figure is assured"')
+  })
+
+  it('the comment migration changes nothing but comments', () => {
+    // A comment-only file that quietly carries DDL is how a schema change arrives unreviewed.
+    const src = readFileSync(join(MIGRATIONS, linesComment.file), 'utf8')
+    const code = src.split('\n').filter(l => !l.trim().startsWith('--')).join('\n')
+    if (!/create table/i.test(code)) {
+      for (const verb of [/\bcreate\s+(table|policy|index|function)/i, /\balter\s+table/i,
+                          /\bdrop\b/i, /\bgrant\b/i, /\brevoke\b/i, /\binsert\s+into/i, /\bupdate\s+/i]) {
+        expect(code, `${verb} in a comment-only migration`).not.toMatch(verb)
+      }
+    }
   })
 
   it('adds the pointer column as not null with a default, like scope3_coverage', () => {

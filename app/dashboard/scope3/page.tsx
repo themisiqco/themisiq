@@ -70,8 +70,13 @@ import {
 import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
 import {
   buildCategorySnapshot, isUnreasonedRestatement, isMissingSnapshotSchema,
-  type PendingCategorySnapshot,
+  type PendingCategorySnapshot, type SnapshotLine,
 } from '../../../lib/scope3/categorySnapshot'
+import {
+  assuranceLabel, assuranceStatement, assuranceTone, showsAssuranceChip,
+  assuranceSummarySentence, assuranceContradictionSentence, ASSURANCE_SCOPE_NOTE,
+  type AssuranceTone,
+} from '../../../lib/scope3/supplierAssurance'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigure, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
@@ -1153,11 +1158,20 @@ export default function Scope3Dashboard() {
   const justRestored = useRef(false) // suppress the saved-reset effect for one restore pass
 
   // ─── Supplier Portal bridge (pull allocated Cat 1 from campaigns) ────────────
-  interface CatOneLine { supplier_id: string; supplier_name: string; method: 'supplier-specific' | 'spend-based'; data_quality: string; value_mt: number; basis: string; allocation_method?: string }
+  // ⚠️ THE LINE SHAPE IS SnapshotLine, IMPORTED, NOT REDECLARED. A local copy stood here and drifted
+  // from the route the moment the route gained a field, which is how a figure and the record of what it
+  // was made of come to disagree. `assurance` is required on SnapshotLine, so this page cannot hold a
+  // line the snapshot could not have frozen.
+  type CatOneLine = SnapshotLine
   interface CatOneResult {
     campaign: { id: string; name: string; reporting_year: number }
     total_mt: number; supplier_specific_mt: number; spend_based_mt: number
-    counts: { suppliers_total: number; supplier_specific: number; spend_based: number; uncovered: number }
+    counts: {
+      suppliers_total: number; supplier_specific: number; spend_based: number; uncovered: number
+      assured: number; assurance_contradictions: number; assurance_answered: number
+    }
+    assurance_asked: boolean
+    supplier_specific_assured_mt: number
     lines: CatOneLine[]
     uncovered: { supplier_id: string; supplier_name: string; reason: string }[]
     currency_flags: { supplier_id: string; supplier_name: string; spend: number; currency: string; note: string }[]
@@ -1178,6 +1192,13 @@ export default function Scope3Dashboard() {
   // is never saved was never reported. It would also mean creating a scope3_inventories row as a side
   // effect of a button that is not Save.
   const [pendingSnapshots, setPendingSnapshots] = useState<Record<string, PendingCategorySnapshot>>({})
+  // ⚠️ SEPARATE FROM pendingSnapshots BECAUSE THAT ONE IS CLEARED ON SAVE. This holds the lines behind
+  // the figure the buyer accepted, so the export step can name a contradiction after the save as well
+  // as before it. Session-scoped: it is NOT reloaded from scope3_category_snapshots on page load, so
+  // after a refresh the lines are gone and the notice cannot appear. Reading snapshots back belongs
+  // with the verifier surface task. Nothing here ever asserts the absence of a contradiction, so a
+  // missing notice is never read as a clean bill.
+  const [acceptedCatOneLines, setAcceptedCatOneLines] = useState<SnapshotLine[] | null>(null)
   // category -> snapshot id as last saved. Read to set supersedes_id on a re-acceptance.
   const [catSnapshotIds, setCatSnapshotIds] = useState<Record<string, string>>({})
 
@@ -1576,6 +1597,15 @@ export default function Scope3Dashboard() {
     setPulling(false)
   }
 
+  // Presentation only. The STATE decides what is said (lib/scope3/supplierAssurance.ts); this decides
+  // what it looks like, so a new state cannot arrive without a colour.
+  const ASSURANCE_TONE_STYLE: Record<AssuranceTone, { color: string; bg: string }> = {
+    good:   { color: '#0F6E56', bg: '#E1F5EE' },
+    warn:   { color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+    alert:  { color: '#B91C1C', bg: '#FCEBEB' },
+    muted:  { color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
+  }
+
   const useCatOneFigure = (mt: number) => {
     // ⚠️ ROUNDED ONCE, AND THE SNAPSHOT RECORDS THE ROUNDED FIGURE. This is the number that goes into
     // the category total, so recording the route's raw total beside it would put a snapshot against a
@@ -1599,6 +1629,7 @@ export default function Scope3Dashboard() {
         reason: restatementReason.cat1 ?? null,
       }),
     }))
+    setAcceptedCatOneLines(catOneResult.lines)
   }
 
   // The buyer's words for why a figure was restated. Empty is allowed: the report gates it, not the
@@ -3448,10 +3479,53 @@ export default function Scope3Dashboard() {
                               <div key={l.supplier_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11, padding: '4px 0', borderBottom: '0.5px solid #f3f4f6' }}>
                                 <span style={{ color: '#0d0d0d', flex: 1 }}>{l.supplier_name}</span>
                                 <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : 'var(--color-module-climate)', whiteSpace: 'nowrap' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
+                                {/* ⚠️ NOT ON EVERY ROW, AND showsAssuranceChip IS THE ONE PLACE THAT DECIDES.
+                                    A spend-based line is always 'not_applicable' and a 'not_asked' line says
+                                    something about the questionnaire rather than the supplier, so either would
+                                    put one identical label on every row, in the column a reader scans for
+                                    differences. The campaign sentence below carries 'not_asked' instead.
+                                    The title is the supplier-attributed statement, never a claim about this
+                                    figure. */}
+                                {showsAssuranceChip(l) && (
+                                  <span title={assuranceStatement(l.assurance)} style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, whiteSpace: 'nowrap', ...ASSURANCE_TONE_STYLE[assuranceTone(l.assurance)] }}>{assuranceLabel(l.assurance)}</span>
+                                )}
                                 <span style={{ color: '#555553', minWidth: 70, textAlign: 'right' }}>{l.value_mt.toFixed(2)} mt</span>
                               </div>
                             ))}
                           </div>
+                          {/* ⚠️ THE ROUTE'S ROLLUP, FORMATTED, NOT RECOMPUTED HERE. supplier_specific_assured_mt
+                              is summed in /api/campaigns/[id]/scope3-cat1 through carriesThirdPartyAssurance,
+                              which excludes spend-based lines. A second summation in this component is the
+                              defect the GHG engine's one-renderer rule exists to prevent.
+                              Null when no supplier reported a figure: nothing to say, so nothing is said. */}
+                          {(() => {
+                            const summary = assuranceSummarySentence({
+                              asked: catOneResult.assurance_asked,
+                              supplierSpecificCount: catOneResult.counts.supplier_specific,
+                              supplierSpecificMt: catOneResult.supplier_specific_mt,
+                              assuredCount: catOneResult.counts.assured,
+                              assuredMt: catOneResult.supplier_specific_assured_mt,
+                              answeredCount: catOneResult.counts.assurance_answered,
+                            })
+                            if (!summary) return null
+                            return (
+                              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 8, lineHeight: 1.5 }}>
+                                <strong style={{ color: '#0d0d0d' }}>Supplier assurance:</strong> {summary}
+                                {/* Printed once, beside the share, never repeated per row. */}
+                                <div style={{ marginTop: 3, fontStyle: 'italic' }}>{ASSURANCE_SCOPE_NOTE}</div>
+                              </div>
+                            )
+                          })()}
+
+                          {/* Named, never gated. The same sentence from the same builder appears beside
+                              unjustifiedExclusions on the export step. */}
+                          {(() => {
+                            const clash = assuranceContradictionSentence(catOneResult.lines)
+                            return clash ? (
+                              <div style={{ fontSize: 10, color: '#92400e', background: '#FEF3E2', borderRadius: 8, padding: '6px 8px', marginBottom: 8, lineHeight: 1.5 }}>{clash}</div>
+                            ) : null
+                          })()}
+
                           {catOneResult.uncovered.length > 0 && (
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 8, lineHeight: 1.5 }}>
                               <strong style={{ color: 'var(--color-module-climate)' }}>Not included:</strong> {catOneResult.uncovered.map(u => `${u.supplier_name} (${u.reason})`).join('; ')}
@@ -4197,6 +4271,26 @@ export default function Scope3Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ⚠️ BESIDE THE EXCLUSIONS NOTICE AND TREATED THE SAME WAY: named here, not blocked here. A
+          supplier who reported a figure while stating they measure nothing has contradicted themselves,
+          and only they can say which half they meant. The figure is included exactly as reported and
+          the export is not gated on it.
+          Sourced from the lines behind the figure the buyer ACCEPTED rather than from the last pull, so
+          it still holds after the save. ⚠️ SESSION-SCOPED: snapshots are not read back on page load, so
+          after a refresh there are no lines and no notice. Its absence therefore asserts nothing, which
+          is why nothing here ever says "no contradictions". */}
+      {(() => {
+        const clash = acceptedCatOneLines ? assuranceContradictionSentence(acceptedCatOneLines) : null
+        return clash ? (
+          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
+              A supplier figure and a supplier answer disagree
+            </div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{clash}</div>
+          </div>
+        ) : null
+      })()}
 
       <div className="tq-summary" data-module="ghg" style={{ marginBottom: 20 }}>
         <div style={{ flex: 1, padding: '20px 24px' }}>

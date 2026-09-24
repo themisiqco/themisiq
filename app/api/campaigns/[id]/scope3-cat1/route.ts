@@ -25,23 +25,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../../../lib/supabaseAuthed'
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../../../lib/emissionFactors'
+import { templateAsks } from '../../../../../lib/supply-chain/templates'
+import {
+  assuranceForLine, carriesThirdPartyAssurance, assuranceContradictsFigure, ASSURANCE_QUESTION_ID,
+} from '../../../../../lib/scope3/supplierAssurance'
+import type { SnapshotLine } from '../../../../../lib/scope3/categorySnapshot'
 
 // Response question ids written by the supplier form (both templates).
 const Q_ALLOCATED = 's3cat1_allocated'
 const Q_METHOD = 's3cat1_method'
 const Q_QUALITY = 's3cat1_quality'
 
-type LineMethod = 'supplier-specific' | 'spend-based'
+type LineMethod = SnapshotLine['method']
 
-interface CatOneLine {
-  supplier_id: string
-  supplier_name: string
-  method: LineMethod
-  data_quality: string        // supplier's stated basis, or 'Estimated (spend-based)'
-  value_mt: number            // contribution in mt CO2e
-  basis: string               // human-readable workings string for the audit trail
-  allocation_method?: string  // supplier's free-text "how I allocated" (if given)
-}
+// ⚠️ ONE DEFINITION OF A LINE, IN lib/scope3/categorySnapshot.ts, AND THIS IS AN ALIAS OF IT. The shape
+// existed three times until now: here, again inside app/dashboard/scope3/page.tsx, and again as
+// SnapshotLine. Three copies of the shape a snapshot freezes is three chances for the record to
+// disagree with what produced it, and the same duplication in lib/supply-chain/templates.ts drifted on
+// 68 of 75 labels before it was collapsed. The snapshot is the authority because it is the thing a
+// verifier reads, so the producer conforms to it rather than the other way round.
+//   The practical gain: `assurance` is REQUIRED on SnapshotLine, so a branch here that builds a line
+// without it fails tsc. The mandatory key is enforced by the compiler, not by remembering.
+type CatOneLine = SnapshotLine
 
 interface UncoveredLine {
   supplier_id: string
@@ -75,7 +80,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // want a clean 404 rather than an empty aggregate if it isn't theirs).
     const { data: campaign, error: campErr } = await supabase
       .from('supplier_campaigns')
-      .select('id, name, buyer_id, reporting_year')
+      .select('id, name, buyer_id, reporting_year, questionnaire_template')
       .eq('id', campaignId)
       .single()
 
@@ -95,6 +100,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (supErr) {
       return NextResponse.json({ error: supErr.message }, { status: 500 })
     }
+
+    // ⚠️ RESOLVED THROUGH resolveTemplate's FALLBACK, not by reading the column directly. A campaign
+    // carrying a null, an empty string or a typo showed its supplier the EcoVadis form, which has no
+    // assurance question, so "was this asked?" has to be answered about the form the supplier actually
+    // saw. Computed once: it is a property of the campaign, not of a supplier.
+    const askedAssurance = templateAsks(campaign.questionnaire_template, ASSURANCE_QUESTION_ID)
 
     const supplierList = suppliers || []
     const supplierIds = supplierList.map((s) => s.id)
@@ -123,6 +134,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const allocated = num(resp[Q_ALLOCATED])
       const quality = resp[Q_QUALITY] || ''
       const method = resp[Q_METHOD] || ''
+      // No extra query: resp already holds every answer this supplier gave.
+      const assuranceRaw = resp[ASSURANCE_QUESTION_ID]
 
       // 1) Supplier-specific (primary): they reported an allocated figure.
       if (allocated != null && allocated > 0) {
@@ -134,6 +147,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           value_mt: allocated,
           basis: `Supplier-reported allocated emissions: ${allocated} mt CO2e${method ? ` (allocated by ${method})` : ''}`,
           allocation_method: method || undefined,
+          ...assuranceForLine({ raw: assuranceRaw, asked: askedAssurance, method: 'supplier-specific' }),
         })
         continue
       }
@@ -169,6 +183,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           data_quality: 'Estimated (spend-based, sector: Other)',
           value_mt: valueMt,
           basis: `Spend-based estimate: ${spend} USD x ${ef} kg/USD (sector default 'Other') / 1000 = ${valueMt.toFixed(3)} mt CO2e`,
+          // Always 'not_applicable' here, whatever the supplier answered: this figure is the buyer's
+          // spend times a factor, so the supplier's assurance status does not describe it. The raw
+          // answer is still carried, because it is true about the supplier.
+          ...assuranceForLine({ raw: assuranceRaw, asked: askedAssurance, method: 'spend-based' }),
         })
         continue
       }
@@ -191,6 +209,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .reduce((sum, l) => sum + l.value_mt, 0)
     const totalMt = supplierSpecificMt + spendBasedMt
 
+    // ⚠️ THE ASSURED SHARE IS COMPUTED HERE, ONCE, AND NOT IN THE COMPONENT. Same rule the GHG engine
+    // holds: app/dashboard/ghg/page.tsx renders buildWorkings() output and never re-derives a row,
+    // because a second derivation in a component drifted from the engine once and had to be removed.
+    // A share of an emissions total that two places compute is a share that can disagree with itself.
+    //   Filtered through carriesThirdPartyAssurance, which is false for 'not_applicable', so a
+    // spend-based line whose supplier happens to hold assurance is NOT counted. Its figure is an
+    // estimate from spend; counting it would report an estimate as assured.
+    const assuredMt = lines
+      .filter((l) => carriesThirdPartyAssurance(l.assurance))
+      .reduce((sum, l) => sum + l.value_mt, 0)
+
     return NextResponse.json({
       campaign: { id: campaign.id, name: campaign.name, reporting_year: campaign.reporting_year },
       total_mt: Number(totalMt.toFixed(3)),
@@ -201,7 +230,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         supplier_specific: lines.filter((l) => l.method === 'supplier-specific').length,
         spend_based: lines.filter((l) => l.method === 'spend-based').length,
         uncovered: uncovered.length,
+        assured: lines.filter((l) => carriesThirdPartyAssurance(l.assurance)).length,
+        assurance_contradictions: lines.filter(assuranceContradictsFigure).length,
+        // Supplier-specific lines carrying an answer, whatever it said. The summary sentence branches
+        // on this rather than on assurance_asked alone: a response can survive a change of template,
+        // and telling the buyer the question was never put to a supplier while holding that supplier's
+        // answer would be false.
+        assurance_answered: lines.filter((l) => l.method === 'supplier-specific' && l.supplier_assurance_raw !== null).length,
       },
+      // ⚠️ A PROPERTY OF THE QUESTIONNAIRE, NOT OF THE SUPPLIERS. False means the form sent for this
+      // campaign carries no assurance question, so every line reads 'not_asked' and the honest thing to
+      // say is one sentence about the questionnaire rather than the same label on every row.
+      assurance_asked: askedAssurance,
+      // Of supplier_specific_mt, the part whose supplier states their reporting is assured. NOT
+      // "assured emissions": see the note on SnapshotLine.assurance.
+      supplier_specific_assured_mt: Number(assuredMt.toFixed(3)),
       lines,
       uncovered,
       currency_flags: currencyFlags,
