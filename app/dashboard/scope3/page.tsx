@@ -68,6 +68,10 @@ import {
 // them into DEFRA-priced lines; the copy module is where every sentence about them lives. None of the
 // three imports lib/ghg/engine.ts, so the Scope 3 bundle does not gain the engine's factor tables.
 import { cat3InputsFrom } from '../../../lib/scope3/cat3Inputs'
+import {
+  buildCategorySnapshot, isUnreasonedRestatement, isMissingSnapshotSchema,
+  type PendingCategorySnapshot,
+} from '../../../lib/scope3/categorySnapshot'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigure, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
@@ -1168,6 +1172,14 @@ export default function Scope3Dashboard() {
   const [pulling, setPulling] = useState(false)
   const [pullError, setPullError] = useState<string | null>(null)
   const [catOneResult, setCatOneResult] = useState<CatOneResult | null>(null)
+  // ⚠️ THE SNAPSHOT IS HELD HERE BETWEEN ACCEPTANCE AND THE SAVE THAT WRITES IT. accepted_at is fixed
+  // at the click, so the record says when the buyer accepted rather than when they happened to save.
+  // Nothing is persisted at acceptance: a snapshot records what was REPORTED, and an acceptance that
+  // is never saved was never reported. It would also mean creating a scope3_inventories row as a side
+  // effect of a button that is not Save.
+  const [pendingSnapshots, setPendingSnapshots] = useState<Record<string, PendingCategorySnapshot>>({})
+  // category -> snapshot id as last saved. Read to set supersedes_id on a re-acceptance.
+  const [catSnapshotIds, setCatSnapshotIds] = useState<Record<string, string>>({})
 
   // Load this buyer's campaigns once, so the Cat 1 step can offer a "pull" source.
   useEffect(() => {
@@ -1485,6 +1497,12 @@ export default function Scope3Dashboard() {
       .maybeSingle()
     if (s3) {
       justRestored.current = true
+      // ⚠️ READ WITH `in` SO A RECORD SAVED BEFORE THE MIGRATION STILL LOADS. select('*') returns
+      // whatever columns exist, so cat_snapshot_ids is simply absent until the migration runs, and
+      // absent is not {} : it means no acceptance has been recorded, which is the same starting state.
+      if ('cat_snapshot_ids' in s3 && s3.cat_snapshot_ids) {
+        setCatSnapshotIds(s3.cat_snapshot_ids as Record<string, string>)
+      }
       if (s3.sector) setSector(s3.sector)
       if (s3.currency) setCurrency(s3.currency)
       if (s3.country_iso2) {
@@ -1559,9 +1577,42 @@ export default function Scope3Dashboard() {
   }
 
   const useCatOneFigure = (mt: number) => {
+    // ⚠️ ROUNDED ONCE, AND THE SNAPSHOT RECORDS THE ROUNDED FIGURE. This is the number that goes into
+    // the category total, so recording the route's raw total beside it would put a snapshot against a
+    // figure that never went into anything.
+    const figure = Number(mt.toFixed(3))
     updateCat('cat1', 'has_supplier_data', true)
-    updateCat('cat1', 'supplier_emissions', Number(mt.toFixed(3)))
+    updateCat('cat1', 'supplier_emissions', figure)
+    if (!catOneResult) return
+    setPendingSnapshots(prev => ({
+      ...prev,
+      // A second acceptance supersedes the first rather than replacing it. The previous id comes from
+      // what was last SAVED, not from another pending snapshot: an unsaved acceptance was never
+      // reported, so there is nothing for it to supersede.
+      cat1: buildCategorySnapshot({
+        category: 'cat1',
+        figureAsUsed: figure,
+        unit: 'mt CO2e',
+        result: catOneResult,
+        acceptedAt: new Date().toISOString(),
+        previousId: catSnapshotIds.cat1 ?? null,
+        reason: restatementReason.cat1 ?? null,
+      }),
+    }))
   }
+
+  // The buyer's words for why a figure was restated. Empty is allowed: the report gates it, not the
+  // insert, which is the same treatment an unjustified exclusion gets.
+  const [restatementReason, setRestatementReason] = useState<Record<string, string>>({})
+
+  /**
+   * Restatements accepted with nothing said about why.
+   *
+   * ⚠️ BESIDE unjustifiedExclusions, NOT INSTEAD OF A CONSTRAINT. The table deliberately allows a null
+   * reason, because a NOT NULL on customer prose produces a full stop that reads as a justification.
+   * This is where the absence becomes visible.
+   */
+  const unreasonedRestatements = Object.values(pendingSnapshots).filter(isUnreasonedRestatement)
 
 
   /**
@@ -2487,6 +2538,57 @@ export default function Scope3Dashboard() {
       setSaved(true)
       setSavedTotal(totalScope3) // exactly the value written above, from the same render
       setSavedCat3Fingerprint(cat3FingerprintNow) // ditto: the notice must clear on a save that worked
+
+      // ── THE SNAPSHOTS, AFTER THE FIGURE THEY DESCRIBE IS COMMITTED ──────────────────────────
+      //
+      // ⚠️ AFTER, AND DELIBERATELY NOT INSIDE THE UPSERT ABOVE. The figure is what the report stands
+      // on; the snapshot is the evidence for it. Writing them together would make a snapshot failure
+      // fail the save, which would withhold a correct figure over its workings. Writing the snapshot
+      // first would record evidence for a figure that then failed to save.
+      //
+      // ⚠️ AND IT TOLERATES THE SCHEMA BEING ABSENT, SO CODE AND MIGRATION CAN SHIP IN EITHER ORDER.
+      // isMissingSnapshotSchema matches exactly three PostgREST failures: absent table, absent column,
+      // and a schema-cache miss for a column it has never seen. Anything else is a real write failure
+      // and is surfaced, because a customer who is told their figures saved must not be left believing
+      // the workings behind them were recorded when they were not.
+      const pending = Object.entries(pendingSnapshots)
+      if (pending.length > 0) {
+        const { data: record } = await supabase
+          .from('scope3_inventories').select('id').eq('inventory_id', boundInventoryId).single()
+        if (record?.id) {
+          const rows = pending.map(([category, snap]) => ({
+            ...snap, category, scope3_inventory_id: record.id, user_id: uid, accepted_by: uid,
+          }))
+          const { data: written, error: snapErr } = await supabase
+            .from('scope3_category_snapshots').insert(rows).select('id, category')
+          if (snapErr) {
+            if (isMissingSnapshotSchema(snapErr)) {
+              // The migration has not run. The figure is saved and correct; the workings are not
+              // recorded yet and the next save will record them. Noted, not shown: nothing the
+              // customer did failed, and nothing they can do changes it.
+              console.warn('[scope3] snapshot schema absent, workings not recorded yet:', snapErr.code)
+            } else {
+              console.error('Scope 3 snapshot write failed:', snapErr)
+              setSaveError(saveErrorText(snapErr))
+            }
+          } else if (written) {
+            const ids = Object.fromEntries(written.map(r => [r.category as string, r.id as string]))
+            const nextIds = { ...catSnapshotIds, ...ids }
+            const { error: ptrErr } = await supabase
+              .from('scope3_inventories').update({ cat_snapshot_ids: nextIds }).eq('id', record.id)
+            if (ptrErr && !isMissingSnapshotSchema(ptrErr)) {
+              console.error('Scope 3 snapshot pointer failed:', ptrErr)
+              setSaveError(saveErrorText(ptrErr))
+            } else if (!ptrErr) {
+              // Only now is the acceptance reported. Clearing pending here and not earlier is what
+              // makes a failed write retry on the next save instead of being lost.
+              setCatSnapshotIds(nextIds)
+              setPendingSnapshots({})
+              setRestatementReason({})
+            }
+          }
+        }
+      }
     } finally { setSaving(false) }
   }
 
