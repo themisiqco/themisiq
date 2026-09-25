@@ -1013,7 +1013,8 @@
     "mt": 30,
     "in_total": false,
     "unpriced": false,
-    "reason": null
+    "reason": null,
+    "excluded_reason": "Sold products are not processed further by any customer."
    },
    "basis": {
     "basis": "Flat factor, unsourced",

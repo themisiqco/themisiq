@@ -147,15 +147,56 @@ export interface Scope3CoverageEntry {
    * submission quotes PCAF's number rather than ours.
    */
   dq?: number
+  /**
+   * The customer's own justification for an answered exclusion, verbatim.
+   *
+   * ⚠️ THEIR WORDS, NOT OURS, AND THAT IS WHY IT IS NOT `reason`. `reason` is the PLATFORM's sentence for
+   * why it produced no figure. This is the CUSTOMER's sentence for why they judged a category irrelevant.
+   * Putting both in one field would make it mean two or three different things depending on `status` and
+   * `unpriced`, and would mix our prose with theirs in a string a verifier reads as the company's own. The
+   * platform already did that once: data_quality on a Category 1 line substitutes 'Supplier-reported
+   * (basis unspecified)' into the field that otherwise holds the supplier's own words, and that ambiguity
+   * is now frozen into every snapshot. The assurance work split it the other way and this follows that:
+   * supplier_assurance_raw is theirs and null when absent, `assurance` is ours and a closed set.
+   *
+   * ⚠️ NULL WHEN BLANK. NEVER A FALLBACK STRING. 'No justification recorded' is OUR sentence; it belongs
+   * at the render, which is where the CSV already puts it. A field that holds either the customer's words
+   * or ours, with nothing to tell them apart, is the defect above.
+   *
+   * ⚠️ PRESENT ONLY FOR AN ANSWERED EXCLUSION, following `dq`'s precedent rather than emitting null on the
+   * other fourteen. The three states are then readable from the entry alone:
+   *   key absent          the category is not an exclusion, so the question does not apply
+   *   key present, null   an exclusion with no justification recorded
+   *   key present, prose  the justification, as the customer wrote it
+   *
+   * ⚠️ REQUIRED BY GHG PROTOCOL CHAPTER 11.1, which obliges a report to list the categories excluded WITH
+   * justification of their exclusion. Until 25 Sep 2026 get_verifier_scope3 disclosed the exclusions and
+   * the COUNT of unjustified ones (scope3_exclusions_unjustified) and not one justification, justified or
+   * not: a verifier could see that two exclusions lacked a reason and could not read the reasons that
+   * existed, nor tell which two the count meant.
+   *
+   * NULLABLE AT WRITE, NAMED AT THE REPORT. Nothing validates this at capture and nothing should: a
+   * NOT NULL on customer prose produces a full stop, and a justification written because a form refused
+   * without one looks like a justification and is read as one. unjustifiedExclusions names the gap on the
+   * export step, the CSV prints 'No justification recorded', and the count is stored.
+   */
+  excluded_reason?: string | null
 }
 
 /**
- * Build a coverage entry, with the two invariants enforced rather than trusted:
- * a CALCULATED category cannot be unpriced (it has a figure), and a reason belongs only to an unpriced one.
+ * Build a coverage entry, with the invariants enforced rather than trusted:
+ *   1. a CALCULATED category cannot be unpriced, because it has a figure;
+ *   2. `reason` belongs only to an unpriced entry;
+ *   3. `dq` describes a figure, so it cannot outlive one;
+ *   4. an exclusion justification cannot ride on a category that is not an answered exclusion.
  */
 export function coverageEntry(
   status: Scope3Status,
-  opts: { mt: number | null; unpriced: boolean; reason: string | null; dq?: number | null },
+  opts: {
+    mt: number | null; unpriced: boolean; reason: string | null; dq?: number | null
+    /** The customer's `excluded_reason` as stored, however blank. Trimmed and nulled here, once. */
+    excludedReason?: string | null
+  },
 ): Scope3CoverageEntry {
   const unpriced = opts.unpriced && !status.calculated
   const entry: Scope3CoverageEntry = {
@@ -168,5 +209,15 @@ export function coverageEntry(
   // ⚠️ A THIRD INVARIANT: a data-quality score describes a figure, so it cannot outlive one. A dq on an
   // entry with mt null would claim a quality for something that was never calculated.
   if (entry.mt !== null && opts.dq != null) entry.dq = opts.dq
+  // ⚠️ THE FOURTH INVARIANT. requiresExplanation is `relevant === false`, so the key appears for an
+  // ANSWERED exclusion and for nothing else. A justification on a relevant category, or on one nobody has
+  // answered, would attribute a judgement to the customer that they have not made — the same error
+  // scope3Status exists to prevent by refusing to read a figure as a relevance answer.
+  //   Trimmed to null here rather than at the call site, so every writer of a coverage entry gets the same
+  // answer about what counts as blank. Whitespace is not a justification.
+  if (status.requiresExplanation) {
+    const written = (opts.excludedReason ?? '').trim()
+    entry.excluded_reason = written === '' ? null : written
+  }
   return entry
 }

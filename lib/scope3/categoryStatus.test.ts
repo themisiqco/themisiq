@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { scope3Status, scope3StatusLabel, relevanceFromStored, coverageEntry, type Relevance } from './categoryStatus'
 
 describe('Scope 3 category status', () => {
@@ -86,5 +88,97 @@ describe('Scope 3 category status', () => {
       .toMatchObject({ status: 'not_relevant_calculated', mt: 3, in_total: false })
     // mt is dropped wherever nothing was calculated, so a stale figure cannot ride along.
     expect(coverageEntry(scope3Status(null, false), { mt: 9, unpriced: false, reason: null }).mt).toBeNull()
+  })
+})
+
+// ── THE EXCLUSION JUSTIFICATION, AND THE GATE ON THE KEY SET ────────────────────────────────────
+//
+// GHG Protocol chapter 11.1 obliges a report to list the categories excluded WITH justification of their
+// exclusion. Until 25 Sep 2026 the justification lived only in cat_data, which get_verifier_scope3
+// withholds wholesale, so a verifier received the exclusions and the count of unjustified ones and not one
+// justification.
+
+describe('the exclusion justification on a coverage entry', () => {
+  const excluded = scope3Status(false, false)
+  const excludedCalculated = scope3Status(false, true)
+
+  it('carries the customer prose verbatim, untouched', () => {
+    const e = coverageEntry(excluded, { mt: null, unpriced: false, reason: null, excludedReason: 'No leased assets in the reporting year.' })
+    expect(e.excluded_reason).toBe('No leased assets in the reporting year.')
+  })
+
+  it('is null when blank, and never a fallback string', () => {
+    // ⚠️ 'No justification recorded' IS OUR SENTENCE AND BELONGS AT THE RENDER. A field holding either the
+    // customer's words or ours, with nothing to tell them apart, is the data_quality defect one field over:
+    // it substitutes 'Supplier-reported (basis unspecified)' into a field that otherwise holds the
+    // supplier's own words, and that ambiguity is frozen into every snapshot already written.
+    for (const blank of ['', '   ', '\n', undefined, null]) {
+      const e = coverageEntry(excluded, { mt: null, unpriced: false, reason: null, excludedReason: blank })
+      expect(e.excluded_reason, `blank: ${JSON.stringify(blank)}`).toBeNull()
+      expect(e).toHaveProperty('excluded_reason')
+    }
+  })
+
+  it('trims, because whitespace is not a justification', () => {
+    expect(coverageEntry(excluded, { mt: null, unpriced: false, reason: null, excludedReason: '  no such activity  ' }).excluded_reason)
+      .toBe('no such activity')
+  })
+
+  it('appears only for an answered exclusion, and is absent rather than null elsewhere', () => {
+    // The dq precedent: omission is the type's way of saying the question does not apply. The three states
+    // are then readable from the entry alone, without cross-referencing status.
+    for (const st of [scope3Status(true, true), scope3Status(true, false), scope3Status(null, false), scope3Status(null, true)]) {
+      const e = coverageEntry(st, { mt: null, unpriced: false, reason: null, excludedReason: 'should not survive' })
+      expect(e, `${st.key} must not carry a justification`).not.toHaveProperty('excluded_reason')
+    }
+    expect(coverageEntry(excluded, { mt: null, unpriced: false, reason: null })).toHaveProperty('excluded_reason')
+    expect(coverageEntry(excludedCalculated, { mt: 3, unpriced: false, reason: null })).toHaveProperty('excluded_reason')
+  })
+
+  it('rides beside the figure that justifies the exclusion', () => {
+    // ⚠️ not_relevant_calculated IS THE INTERESTING CASE, and it is correct under 11.1: a customer who
+    // calculated a category, found it immaterial and excluded it on that basis has BOTH a figure and an
+    // exclusion, and the figure is the evidence for the exclusion. The entry carries both, and the
+    // verifier page has to say why a number appears beside a category the company excluded.
+    const e = coverageEntry(excludedCalculated, { mt: 3.25, unpriced: false, reason: null, excludedReason: 'Under 1% of the inventory.' })
+    expect(e.mt).toBe(3.25)
+    expect(e.in_total).toBe(false)
+    expect(e.excluded_reason).toBe('Under 1% of the inventory.')
+  })
+
+  it('is written by the calculator, not left to a future caller', () => {
+    const page = readFileSync(join(__dirname, '..', '..', 'app', 'dashboard', 'scope3', 'page.tsx'), 'utf8')
+    const code = page.split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+    expect(code, 'scope3Coverage must pass the stored justification into coverageEntry')
+      .toContain("excludedReason: catData[c.id]?.excluded_reason")
+  })
+})
+
+describe('the coverage key set is a disclosure boundary', () => {
+  it('has exactly these keys, because get_verifier_scope3 projects the map WHOLESALE', () => {
+    // ⚠️ THIS IS A GATE, NOT AN INVENTORY. get_verifier_scope3 rebuilds `lines`, `uncovered` and
+    // `currency_flags` key by key precisely so a field added to a snapshot is NOT disclosed until it is
+    // named in the RPC. scope3_coverage gets none of that: the RPC projects
+    // `'scope3_coverage', s.scope3_coverage` as a whole column, so EVERY KEY ADDED HERE REACHES AN
+    // EXTERNAL VERIFIER THE MOMENT IT IS WRITTEN, with no review step anywhere.
+    //   That is portal_get's lesson one level down. There the June review asked which ROWS a definer
+    // function could reach and answered correctly, and nobody asked which COLUMNS. Here the column is
+    // whitelisted and the keys inside it are not.
+    //   Wholesale projection is the right behaviour: all seven keys are designed for exactly this reader.
+    // But it must be a decision rather than an accident, so adding a key means editing this list, and
+    // editing this list means reading this comment.
+    const all = coverageEntry(scope3Status(false, true), {
+      mt: 1, unpriced: false, reason: null, dq: 2, excludedReason: 'x',
+    })
+    const unpricedEntry = coverageEntry(scope3Status(true, false), {
+      mt: null, unpriced: true, reason: 'No factor is held for the sector selected.',
+    })
+    const keys = [...new Set([...Object.keys(all), ...Object.keys(unpricedEntry)])].sort()
+    expect(keys, 'A KEY ADDED HERE IS DISCLOSED WHOLESALE TO AN EXTERNAL VERIFIER by ' +
+      'get_verifier_scope3, which projects scope3_coverage as a whole column and whitelists nothing ' +
+      'inside it. Confirm the new key is fit for that reader, then add it here and to the column comment ' +
+      '(the 20260917 chain).').toEqual(
+      ['dq', 'excluded_reason', 'in_total', 'mt', 'reason', 'status', 'unpriced'],
+    )
   })
 })

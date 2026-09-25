@@ -1693,6 +1693,13 @@ export default function Scope3Dashboard() {
         // Cat 15: a submission quotes PCAF's number rather than ThemisIQ's confidence pill. coverageEntry
         // drops it wherever there is no figure to describe.
         dq: c.id === 'cat15' ? cat15Result().dqScore : null,
+        // ⚠️ THE CUSTOMER'S JUSTIFICATION FOR AN EXCLUSION, INTO THE RECORD A VERIFIER READS. It lived only
+        // in cat_data, which get_verifier_scope3 withholds wholesale, so until 25 Sep 2026 the RPC
+        // disclosed the exclusions and the COUNT of unjustified ones and not one justification. GHG
+        // Protocol 11.1 requires the categories excluded to be listed WITH justification.
+        //   Passed raw. coverageEntry trims it, nulls a blank, and emits the key only for an answered
+        // exclusion, so nothing here has to know those rules.
+        excludedReason: catData[c.id]?.excluded_reason,
       })]
     }))
 

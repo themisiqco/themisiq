@@ -188,12 +188,30 @@ interface Scope3Snapshot {
   uncovered: { supplier_name: string; reason: string }[]
   currency_flags: { supplier_name: string; spend: number; currency: string; note: string }[]
 }
+// One category's row in the stored coverage map. ⚠️ `mt` IS NULL, NEVER 0, WHERE NOTHING WAS CALCULATED:
+// a zero would claim the category emits nothing. ⚠️ `excluded_reason` IS ABSENT unless the category is an
+// answered exclusion, and NULL within that when the company wrote no justification. Absent and null are
+// different facts and the render says which.
+interface Scope3CoverageRow {
+  status: string
+  mt: number | null
+  in_total: boolean
+  unpriced: boolean
+  reason: string | null
+  dq?: number
+  excluded_reason?: string | null
+}
+
 interface Scope3Payload {
   scope3?: {
     sector: string | null; currency: string | null; country_iso2: string | null
     factor_basis: string | null; status: string
     total_scope3_tco2e: number | null
-    scope3_coverage: unknown
+    // ⚠️ TYPED, BECAUSE IT IS NOW READ. It was `unknown` and rendered nowhere, which is why the exclusion
+    // justifications reached this payload and never the screen. Fifteen entries, one per category, written
+    // at save. The keys are lib/scope3/categoryStatus.ts's Scope3CoverageEntry; get_verifier_scope3
+    // projects the whole map, so what is here is what a verifier gets.
+    scope3_coverage: Record<string, Scope3CoverageRow> | null
     categories_relevant: number | null; categories_in_total: number | null
     categories_unpriced: number | null; exclusions_unjustified: number | null
   }
@@ -212,6 +230,18 @@ interface VerifierPayload {
 }
 
 const CATEGORY_NUMBER = (c: string): string => c.replace(/[^0-9]/g, '') || c
+
+// The company's own answer to "is this category relevant, and was it calculated", as CDP asks the pair.
+// Straight from lib/scope3/categoryStatus.ts's labels so the verifier reads the same words the company saw.
+const SCOPE3_STATUS_LABEL: Record<string, string> = {
+  relevant_calculated: 'Relevant, calculated',
+  relevant_not_calculated: 'Relevant, not yet calculated',
+  not_relevant_calculated: 'Not relevant, calculated',
+  not_relevant_not_calculated: 'Not relevant, not calculated',
+  not_evaluated: 'Not evaluated',
+}
+const scope3StatusText = (k: string): string => SCOPE3_STATUS_LABEL[k] ?? k
+const isExclusion = (k: string): boolean => k.startsWith('not_relevant')
 
 // Presentation only, and the same four tones the buyer's screen uses. The STATE decides what is said.
 const ASSURANCE_TONE_STYLE: Record<AssuranceTone, { color: string; bg: string }> = {
@@ -1240,6 +1270,62 @@ export default function VerifierPage() {
                 No category figure on this inventory was accepted from supplier data, so there is nothing
                 here to trace to a supplier. Category figures entered directly appear in the company&apos;s
                 own report rather than in this record.
+              </div>
+            )}
+
+            {/* ── THE FIFTEEN CATEGORIES, AND THE COMPANY'S DECISION ON EACH ──────────────────────
+                ⚠️ EVERY CATEGORY IS LISTED, INCLUDING THE EXCLUDED ONES AND THE UNANSWERED ONES. GHG
+                Protocol chapter 11.1 obliges a report to list the categories excluded WITH justification
+                of their exclusion. Until 25 Sep 2026 this surface showed neither: the exclusions were in
+                the payload with no justification beside them, and nothing rendered the map at all. */}
+            {scope3.scope3.scope3_coverage && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 8 }}>Coverage of the fifteen categories</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      {['Category', 'Status', 'In total', 'mt CO2e', 'Justification or reason'].map(h => (
+                        <th key={h} style={{ background: 'var(--color-sunken)', borderBottom: '2px solid var(--color-ink)', padding: '8px 10px', textAlign: 'left' as const, fontSize: 11, fontWeight: 500 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(scope3.scope3.scope3_coverage)
+                      .sort((a, b) => Number(CATEGORY_NUMBER(a[0])) - Number(CATEGORY_NUMBER(b[0])))
+                      .map(([cat, row], i) => (
+                        <tr key={cat}>
+                          <td style={{ padding: '8px 10px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>Category {CATEGORY_NUMBER(cat)}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: '#555553' }}>{scope3StatusText(row.status)}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: '#555553' }}>{row.in_total ? 'Yes' : 'No'}</td>
+                          {/* null is not zero: a blank cell rather than a 0 that would claim the category emits nothing. */}
+                          <td style={{ padding: '8px 10px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: '#555553', textAlign: 'right' as const }}>{row.mt == null ? '' : row.mt}</td>
+                          <td style={{ padding: '8px 10px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: '#555553', lineHeight: 1.6 }}>
+                            {/* ⚠️ THREE DIFFERENT FACTS, AND THE CELL SAYS WHICH. An exclusion with prose shows
+                                the company's own words. An exclusion with the key present and null shows that
+                                none was recorded, which is OUR sentence and stays out of their field. A
+                                relevant category the platform could not price shows the platform's reason. */}
+                            {isExclusion(row.status)
+                              ? (row.excluded_reason == null
+                                  ? <em>No justification recorded.</em>
+                                  : row.excluded_reason)
+                              : (row.unpriced && row.reason ? row.reason : '')}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {/* ⚠️ WHY A NUMBER SITS BESIDE A CATEGORY THE COMPANY EXCLUDED, said rather than left to be
+                    inferred. "Not relevant, calculated" is the interesting state and it is correct under
+                    11.1: a company that calculated a category, found it immaterial and excluded it on that
+                    basis has both a figure and an exclusion, and the figure is the evidence for the
+                    exclusion. Without this note a verifier reasonably reads it as a figure wrongly omitted. */}
+                <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: 10 }}>
+                  Where a category reads &quot;Not relevant, calculated&quot; and still shows a figure, that is
+                  deliberate. The company calculated it, judged it immaterial, and excluded it on that basis, so
+                  the figure is the evidence for the exclusion rather than a number left out of the total by
+                  mistake. It is not in the total because the total is what the company claims as its inventory.
+                  A blank figure means nothing was calculated, not that the category emits nothing.
+                </p>
               </div>
             )}
 
