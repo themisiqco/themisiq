@@ -5,7 +5,16 @@ import { auditTrailLine } from './auditTrailNotice'
 import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations } from './ghg/engine'
 import { countryRefusal } from './ghg/engine'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
-import { BRAND } from './brand'
+// ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
+// TEXT: a subheading at what was line 258 and the running eyebrow in sectionTitle(). Both are now INK.
+//   WHY: lib/pdf/palette.test.ts asserts that every colour in the print palette clears AA against the
+// surface it is drawn on, and BRAND is not in that palette — palette.ts says so explicitly, because it
+// lives in lib/brand.ts with the rest of the brand literals. So the one brand colour that printed as text
+// sat outside the only contrast test in the repo. #095C6B is 7.13:1 on PAPER and passed by luck; the
+// incoming colourway's #0097B2 is 3.23:1 and would have failed silently, in a document an auditor reads.
+//   The fix is not to widen the contrast test. It is for print text to come from the print palette, which
+// is neutral by design and does not move when the brand does. lib/pdf/palette.test.ts now also asserts
+// that neither PDF module sets BRAND as text, so this cannot come back unnoticed.
 // MUTE is layout.ts's MUTED under this module's existing local name; the alias keeps every
 // call site below unchanged. lib/pdf/palette.test.ts asserts the two modules agree.
 import { INK, MUTED as MUTE, TABLE_INK, HAIRLINE, ON_COVER_MUTED, ON_COVER } from './pdf/palette'
@@ -255,7 +264,9 @@ export function generateAssurancePDF(
   // Market-based Scope 2 residual-mix citation (only when ESRS/GRI is in scope).
   if (residualRows.length > 0) {
     const afterMethods = (doc as any).lastAutoTable?.finalY ?? 92
-    doc.setTextColor(BRAND); doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
+    // INK, like every other subheading in this document (see the two at the methods and locations
+    // tables). It was BRAND, which made this one heading the only brand-coloured text in the package.
+    doc.setTextColor(INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
     doc.text('Market-based Scope 2 — Residual Mix', M, afterMethods + 30)
     doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
     doc.text(
@@ -371,7 +382,15 @@ export function generateAssurancePDF(
 }
 
 function sectionTitle(doc: jsPDF, text: string, m: number) {
-  doc.setTextColor(BRAND); doc.setFont('helvetica', 'bold'); doc.setFontSize(9)
+  // ⚠️ THE EYEBROW IS INK, NOT BRAND, AND THIS IS THE ONE WORTH A SECOND THOUGHT. It prints the product
+  // name at the head of every section, so brand colour was defensible here in a way it was not on the
+  // subheading above. It goes anyway, because the rule this change enforces is that NO brand value is
+  // print text: an auditor reads this document in greyscale as often as in colour, the brand hue is about
+  // to move to one that would be 3.23:1 on paper, and a running header set in a failing colour is worse
+  // than one set in ink. If the eyebrow should carry brand colour after the swap, the deeper companion
+  // (--color-brand-ink) is the value to use, and it must be added to lib/pdf/palette.ts so the contrast
+  // test covers it rather than being imported from lib/brand.ts and escaping it again.
+  doc.setTextColor(INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(9)
   doc.text('THEMISIQ ASSURANCE PACKAGE', m, 48)
   doc.setTextColor(INK); doc.setFontSize(18)
   doc.text(text, m, 72)

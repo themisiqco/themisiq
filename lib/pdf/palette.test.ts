@@ -78,6 +78,46 @@ describe('the PDF palette', () => {
     expect(failures, `PDF palette below AA:\n  ${failures.join('\n  ')}`).toEqual([])
   })
 
+  it('no brand colour is set as print TEXT, in either generator', () => {
+    // ⚠️ THIS IS THE GUARD THAT REPLACES "ADD BRAND TO THE CONTRAST CHECK ABOVE", AND IT IS THE RIGHT
+    // SHAPE WHERE THAT WOULD HAVE BEEN THE WRONG ONE.
+    //
+    // Until 25 Sep 2026 lib/assurancePdf.ts called doc.setTextColor(BRAND) twice: a subheading and the
+    // running eyebrow in sectionTitle(). BRAND is not in ./palette — palette.ts says so on purpose, because
+    // it belongs to lib/brand.ts with the other brand literals — so the only brand colour that printed as
+    // text was outside the only contrast test in this repo. #095C6B is 7.13:1 on PAPER and passed by luck.
+    //
+    // ⚠️ WHY NOT JUST ADD BRAND TO THE LOOP ABOVE. Because a contrast requirement is a property of TEXT,
+    // and BRAND's one remaining PDF use is layout.ts's RULE_COLOUR — a hairline. The loop already encodes
+    // that distinction with NON_TEXT, which exempts PAPER and HAIRLINE for exactly this reason. Asserting
+    // AA on a rule colour would assert a requirement that does not apply, and it would pass today and then
+    // FAIL when the brand hue moves to the incoming #0097B2 at 3.23:1 — failing for a reason that is not
+    // real, about a value used only to draw a line. lib/cs3d.test.ts records what that costs: a guard that
+    // cries wolf gets deleted, and then the real regression walks in.
+    //
+    // So the invariant asserted is the one that is actually true: print TEXT comes from the print palette,
+    // which is neutral by design and does not move when the brand does. A rule may be any colour.
+    const offences: string[] = []
+    for (const file of [LAYOUT, ASSURANCE]) {
+      const src = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+      for (const m of src.matchAll(/setTextColor\(\s*([A-Za-z_][A-Za-z0-9_]*)/g)) {
+        const name = m[1]
+        if (name === 'BRAND' || /_BRAND$|^BRAND_/.test(name)) {
+          offences.push(`${file} sets ${name} as text`)
+        }
+      }
+    }
+    expect(offences, offences.length === 0 ? '' :
+      `\n\nA brand colour is being drawn as PDF text:\n  ${offences.join('\n  ')}\n\n` +
+      'Print text takes its colour from lib/pdf/palette.ts, which is neutral and is the only palette this\n' +
+      "repo contrast-tests. A brand value imported from lib/brand.ts escapes that check: it is not in\n" +
+      'palette, so the loop above never sees it. If a brand colour genuinely belongs on print text, add the\n' +
+      'AA-passing companion to lib/pdf/palette.ts so it is covered, rather than importing the hue.\n',
+    ).toEqual([])
+  })
+
   it('the two generators agree on every shared role', () => {
     // Both import from ./palette, so agreement is structural rather than coincidental — this
     // asserts that neither has quietly reintroduced a local declaration that shadows it.
