@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { scope3MethodDescription, type Scope3Method } from './categoryMethods'
 import { methodologyHierarchyLines } from './methodSummary'
 import { SPEND_EF_SOURCES, type SpendFactorSource } from '../emissionFactors/spend'
-import { KNOWN_EMISSIONS_PLACEHOLDER } from './formCopy'
+import { KNOWN_EMISSIONS_PLACEHOLDER, NO_ESTIMATE_PLACEHOLDER } from './formCopy'
 
 // ── SCOPE 3 CUSTOMER TEXT: NO EM-DASHES, AND NO PLACEHOLDER THAT READS AS AN ENTERED VALUE ─────────────
 //
@@ -89,7 +89,7 @@ describe('Scope 3 customer text', () => {
   })
 
   it('SC3 ⚠️ no em-dash in any Scope 3 method description or hierarchy line', () => {
-    const methods: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'fuel_and_energy_upstream']
+    const methods: Scope3Method[] = ['exiobase_spend', 'no_method', 'waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'fuel_and_energy_upstream']
     for (const m of methods) expect(scope3MethodDescription(m), m).not.toContain('—')
     for (const line of methodologyHierarchyLines()) expect(line.slice(0, 60)).toBe(line.slice(0, 60)) // readable failure below
     expect(methodologyHierarchyLines().filter(l => l.includes('—'))).toEqual([])
@@ -113,13 +113,19 @@ describe('Scope 3 customer text', () => {
     const low = block.split('\n').find(l => /^\s*low:/.test(l))
     expect(low, 'the flat group\'s confidence pill').toBeTruthy()
     expect(low!, 'the flat group\'s confidence pill').not.toMatch(/spend/i)
-    expect(low!).toContain("label: 'Flat factor'")
+    // ⚠️ 'Not calculated' SINCE 25 SEP 2026. 'Flat factor' was true while GENERIC_SPEND_FACTOR was applied
+    // to Categories 8, 9, 10, 11, 13 and 14; the factor is deleted and every path to 'low' is now a
+    // category that was not calculated, so the label says that. The ban on the word "spend" above still
+    // holds and for the original reason.
+    expect(low!).toContain("label: 'Not calculated'")
+    expect(low!, 'no factor is applied, so none may be named').not.toMatch(/factor/i)
     // The key is what getConfidence returns and the code dispatches on; it is deliberately untouched.
     expect(low!).toMatch(/^\s*low: \{/)
     const badge = page.split('\n').find(l => l.includes('{lowCount}'))
     expect(badge, 'the Results badge for the flat group').toBeTruthy()
     expect(badge!, 'the Results badge').not.toMatch(/spend/i)
-    expect(badge!).toContain('{lowCount} on the flat factor')
+    expect(badge!).toContain('{lowCount} not calculated')
+    expect(badge!, 'the badge must not name a factor either').not.toMatch(/factor/i)
   })
 
   it('SC7 \u26a0\ufe0f the known-emissions placeholder does not call the figure spend', () => {
@@ -129,10 +135,16 @@ describe('Scope 3 customer text', () => {
     // behind the figure at all. Two literals in two panels is also how the two spellings arose.
     expect(KNOWN_EMISSIONS_PLACEHOLDER).not.toMatch(/spend/i)
     expect(KNOWN_EMISSIONS_PLACEHOLDER).toBe('Leave blank to use the estimate')
-    // All three panels that offer an override render the constant, so none can drift back to a literal
-    // of its own: the EXIOBASE one, the generic flat one, and Category 3's since 20 Sep 2026.
+    // ⚠️ TWO CONSTANTS SINCE 25 SEP 2026, AND THE SECOND EXISTS BECAUSE THE FIRST BECAME FALSE. 'Leave
+    // blank to use the estimate' is true on the EXIOBASE panel and on Category 3's, where blank does fall
+    // back to a computed figure. On the panel for Categories 8, 9, 10, 11, 13 and 14 there is no estimate to
+    // fall back to: the flat factor is deleted and blank produces nothing. Telling that customer a figure
+    // would appear is the defect this test was written to prevent, one wording later.
     const page = read('app/dashboard/scope3/page.tsx')
-    expect(page.match(/placeholder=\{KNOWN_EMISSIONS_PLACEHOLDER\}/g) ?? []).toHaveLength(3)
+    expect(page.match(/placeholder=\{KNOWN_EMISSIONS_PLACEHOLDER\}/g) ?? [], 'EXIOBASE and Category 3').toHaveLength(2)
+    expect(page.match(/placeholder=\{NO_ESTIMATE_PLACEHOLDER\}/g) ?? [], 'the six with no method').toHaveLength(1)
+    expect(NO_ESTIMATE_PLACEHOLDER, 'it must not promise an estimate').not.toMatch(/estimate/i)
+    expect(NO_ESTIMATE_PLACEHOLDER).not.toMatch(/spend/i)
     expect(page).not.toMatch(/Leave blank to use (the )?spend/)
   })
 
@@ -188,7 +200,10 @@ describe('Scope 3 customer text', () => {
     // 27 since 20 Sep 2026: Category 3's known-emissions override. Its Annual spend field went at the
     // same time, but that input is ONE element in the source rendered for each flat category, so the
     // count moved by one and not by two.
-    expect(numeric.length).toBe(27)
+    // ⚠️ 26 SINCE 25 SEP 2026, for the same reason in reverse: the Annual spend field was removed from the
+    // panel shared by Categories 8, 9, 10, 11, 13 and 14, because nothing reads a spend for them now. One
+    // element in the source, so the count drops by one and not by six.
+    expect(numeric.length).toBe(26)
     const bare = numeric.filter(x => x.placeholder !== null && /^\s*[\d.,\s]+\s*$/.test(x.placeholder))
     expect(bare).toEqual([])
   })

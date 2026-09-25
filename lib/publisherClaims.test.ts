@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { EF_SOURCES, FRAMEWORKS, buildWorkings, emptyLocation } from './ghg/engine'
 import { SPEND_EF_SOURCES } from './emissionFactors/spend'
 import { DEFRA_WASTE_META } from './emissionFactors/defraWaste'
-import { GENERIC_SPEND_FACTOR } from './emissionFactors'
+import { scope3MethodFor } from './scope3/categoryMethods'
 import { DEFRA_TRAVEL_META } from './emissionFactors/defraTravel'
 
 // ── NO SURFACE MAY CLAIM A PUBLISHER'S FACTORS THAT NO FACTOR RECORD HOLDS ─────────────────────────
@@ -114,11 +114,19 @@ const HELD_PUBLISHERS = new Set(HELD_CITATIONS.flatMap(c => mentions(c).map(m =>
 // the licence of the published hotel factors is unconfirmed), so "DEFRA hotel factors" would be a false
 // claim. It is not keyed to any provenance record because there is no factor to record one for; if hotels
 // are ever priced, remove it here in the same change.
-//   The transport words stay keyed to GENERIC_SPEND_FACTOR, which still prices Cat 9 with no source.
+//   ⚠️ THE TRANSPORT WORDS WERE KEYED TO GENERIC_SPEND_FACTOR UNTIL 25 SEP 2026, and that factor has been
+// deleted. The guard was `GENERIC_SPEND_FACTOR.source === null ? [...] : []`, so deleting the factor would
+// have made the condition unevaluable and, had it been written the other way round, would have silently
+// stopped barring the words. Re-pointed at the METHOD instead, which is the thing that actually decides
+// whether a figure is produced: Category 9 is downstream transportation and now carries `no_method`, so
+// naming a publisher beside a freight claim would assert factors for a category the platform does not
+// calculate at all. The words are barred while that is true and unbar themselves if Cat 9 ever gains a
+// sourced method, which is the same self-correcting shape the rest of this file uses.
 const UNPRICED_ACTIVITY_WORDS: RegExp[] = [/\bhotel/i]
+const CAT9_UNSOURCED = scope3MethodFor('cat9') === 'no_method'
 const UNSOURCED_ACTIVITY_WORDS: RegExp[] = [
   ...UNPRICED_ACTIVITY_WORDS,
-  ...(GENERIC_SPEND_FACTOR.source === null ? [/\bfreight/i, /\blogistic/i, /\bshipping/i] : []),
+  ...(CAT9_UNSOURCED ? [/\bfreight/i, /\blogistic/i, /\bshipping/i] : []),
 ]
 
 /** A line's clauses: split after . ; or · followed by whitespace. */

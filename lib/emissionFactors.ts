@@ -57,21 +57,23 @@ export const EMISSION_FACTORS_PROVENANCE: { source: string | null; year: number 
 }
 
 /**
- * The flat factor the Scope 3 calculator applies to every category priced by calcGenericSpend: one
- * number for every sector, in whatever currency the inventory is in.
+ * ⚠️ GENERIC_SPEND_FACTOR WAS DELETED ON 25 SEP 2026, AND THIS NOTE IS WHY IT IS NOT COMING BACK.
  *
- * Named here, with its provenance, so a description of those figures is derived from the factor
- * rather than typed beside it. Same value as DEFAULT_SPEND_EF but a different role: that is a
- * fallback for an unmatched sector; this is applied to every sector unconditionally.
+ * It held 0.5 kg CO2e per unit of the inventory's currency, with source, year and region all null, and the
+ * Scope 3 calculator applied it to Categories 8, 9, 10, 11, 13 and 14 through calcGenericSpend. The figure
+ * went into total_scope3_tco2e and, through get_verifier_scope3, to a verifier.
+ *
+ * GHG Protocol Scope 3 chapter 11.1 requires, per category, a description of the methodology and the
+ * source of the emission factors. Estimation is expected; an estimate with nothing citable behind it
+ * cannot meet that, because there is no source to report. Five of the six categories also price what a
+ * CUSTOMER, TENANT or FRANCHISEE did, so there was no spend of the company's for the factor to multiply:
+ * the number was not merely unsourced, its input was the wrong quantity.
+ *
+ * Those six now carry `no_method` in lib/scope3/categoryMethods.ts, produce no figure, and are named as
+ * missing from the total rather than being silently summed into it.
+ *
+ * ⚠️ DEFAULT_SPEND_EF ABOVE IS NOT THIS AND STAYS. It is the unmatched-sector fallback in
+ * app/api/campaigns/[id]/scope3-cat1, which prices a real purchase from a real supplier against
+ * EMISSION_FACTORS.spend and needs an answer when the sector is not in the table. Same number, different
+ * question: that one is "this sector is unknown", this one was "every sector is the same".
  */
-export const GENERIC_SPEND_FACTOR: {
-  kg_co2e_per_currency_unit: number
-  source: string | null
-  year: number | null
-  region: string | null
-} = {
-  kg_co2e_per_currency_unit: 0.5,
-  source: null,
-  year: null,
-  region: null,
-}

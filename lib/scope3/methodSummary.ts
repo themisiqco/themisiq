@@ -15,11 +15,10 @@
 //
 // CLIENT-SAFE: imports categoryMethods.ts and the two factor records it already reads.
 
-import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method, FLAT_FACTOR_SAMENESS } from './categoryMethods'
+import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method } from './categoryMethods'
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
-import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { CAT15_GWP_TAIL } from './cat15'
 import { CAT6_ASSISTANT_PHRASE } from './businessTravelCopy'
 import { CAT7_ASSISTANT_PHRASE } from './commutingCopy'
@@ -71,7 +70,9 @@ const METHOD_RANK: Readonly<Record<Scope3Method, number>> = {
   business_travel_factors: 5,
   employee_commuting_factors: 6,
   pcaf: 7,
-  flat_spend: 8,
+  // ⚠️ LAST, AND IT IS NOT A METHOD RANKING. The list is a reading order, strongest source first, and a
+  // category the platform does not calculate belongs at the end of it because there is nothing to read.
+  no_method: 8,
 }
 
 export interface Scope3MethodGroup {
@@ -169,11 +170,12 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
   business_travel_factors: () => CAT6_ASSISTANT_PHRASE,
   employee_commuting_factors: () => CAT7_ASSISTANT_PHRASE,
   pcaf: () => 'assessed through a PCAF-aligned path',
-  // ⚠️ THE CLAUSE IS SHARED, NOT RESTATED (FLAT_FACTOR_SAMENESS). The full description cannot be embedded
-  // here: this phrase is a lowercase predicate fragment that assistantScope3Basis joins with semicolons,
-  // and scope3MethodDescription('flat_spend') is two sentences beginning with a capital.
-  flat_spend: () =>
-    `priced from ONE flat factor of ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's currency, ${FLAT_FACTOR_SAMENESS}, with no source, year or region recorded`,
+  // A lowercase predicate fragment, like the others: assistantScope3Basis joins these with semicolons.
+  // ⚠️ IT DESCRIBES AN ABSENCE, SO IT MUST NOT READ AS A WEAK METHOD. "estimated roughly" or "priced from a
+  // generic factor" would both be false; nothing is priced. It also says what is accepted, because the
+  // assistant is asked "can I do Category 11" and the answer is yes if you have the number.
+  no_method: () =>
+    'not calculated by ThemisIQ: no emission factor is applied and no estimate is produced, though a figure you enter yourself is used as given',
 }
 
 const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen']
@@ -201,11 +203,15 @@ export function assistantScope3Basis(): string {
   // rest by ellipsis, which only reads while the EXIOBASE clause happens to come first.
   const clauses = merged.map(m => `${categoryHeading(m.categories)} ${m.categories.length === 1 ? 'is' : 'are'} ${m.phrase}`)
   const joined = clauses.length <= 1 ? clauses.join('') : `${clauses.slice(0, -1).join('; ')}; and ${clauses[clauses.length - 1]}`
-  const flat = scope3MethodGroups().find(g => g.method === 'flat_spend')
-  const warning = !flat ? ''
-    : flat.categories.length === 1 ? ' That one is a rough order-of-magnitude estimate, not a sourced figure,'
-    : ` Those ${NUMBER_WORDS[flat.categories.length]} are a rough order-of-magnitude estimate, not a sourced figure,`
-  return `${joined}.${warning}${warning ? ' and every' : ' Every'} export names the method used for each category`
+  // ⚠️ THE FLAT-FACTOR WARNING IS GONE BECAUSE THE FLAT FACTOR IS (25 Sep 2026). It read "Those six are a
+  // rough order-of-magnitude estimate, not a sourced figure", which was the right thing to say while an
+  // unsourced figure was being summed into the total. The clause for those six now says they are not
+  // calculated at all, so a warning about the quality of their estimate would describe something that does
+  // not happen, and a reader would take "rough estimate" to mean a figure exists.
+  //   ⚠️ NO PLACEHOLDER IS LEFT BEHIND FOR IT. A lookup that can never match is worse than nothing: it
+  // reads as live machinery and the comment beside it goes stale unnoticed. If a future method produces an
+  // unsourced figure, the warning is written then, against that method.
+  return `${joined}. Every export names the method used for each category`
 }
 
 // ── THE GWP BASIS OF SCOPE 3 FIGURES, FOR THE ASSISTANT ───────────────────────────────────────────
@@ -250,7 +256,10 @@ const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
     basis: DEFRA_TRAVEL_META.gwp_basis,
     publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} land travel and homeworking factors`,
   },
-  flat_spend: { kind: 'not_recorded' },
+  // 'not_recorded' still, and for a stronger reason than before: there is no figure whose GWP basis could
+  // be recorded. An entered figure's basis is whatever the customer's own reporting used, which this
+  // platform does not know and must not assert.
+  no_method: { kind: 'not_recorded' },
   // The energy artefact states its basis in its own metadata (DEFRA_ENERGY_META.gwp_basis, 'AR5'), the
   // way the waste and travel records do. Named for the sheets Category 3 reads, so it keeps its own
   // clause rather than merging into the waste one.

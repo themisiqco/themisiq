@@ -179,7 +179,6 @@ describe('Category 3 copy', () => {
     // and the derived one, so the dispatch spans two lines; what this guards is that an entered figure
     // is read FIRST and that the derived figure is the only other source.
     expect(src).toContain('return catData[id]?.emissions_override || (cat3ExcludedFor3d ? 0 : cat3Mt() || 0)')
-    expect(src).not.toMatch(/case 'fuel_and_energy_upstream': return calcGenericSpend/)
     // The calculation's only inputs are the two bound columns; no spend field reaches it.
     expect(src).toContain('const cat3Read = cat3InputsFrom(boundWorkings, boundLocations)')
     // Cat 3 is out of the generic panel, so no Annual spend field renders for it.
@@ -416,20 +415,24 @@ describe('Category 3 copy', () => {
     // priced by accident.
     expect(src).toContain("const cat3RetiredSpend: string | null = catData['cat3']?.annual_spend")
     expect(src).toContain('cat3GwpSentence, cat3SellsEnergyOn, cat3RetiredSpend)')
-    // calcGenericSpend, the only thing that turns a spend into a figure, is reachable from the
-    // flat_spend case alone.
-    // getCatEmissions declares before the unpriced sets; the slice is its own body, by its two ends.
+    // ⚠️ THE ASSERTION GOT STRONGER ON 25 SEP 2026, NOT WEAKER. It used to allow exactly ONE call to
+    // calcGenericSpend, on the flat_spend case, because that was the only thing in the page that turned a
+    // stored spend into a figure. calcGenericSpend and GENERIC_SPEND_FACTOR are both deleted, so the
+    // requirement is now that nothing in the page turns a spend into a figure at all.
     const dispatch = src.slice(src.indexOf('const getCatEmissions'), src.indexOf('// ── CATEGORIES THAT CANNOT BE PRICED'))
-    // One CALL, on the flat_spend case. (The method's own arm names calcGenericSpend in a comment, to
-    // say it must not be used; a match on the bare name would count that too.)
-    expect([...dispatch.matchAll(/return calcGenericSpend\(/g)]).toHaveLength(1)
-    expect(dispatch).toContain("case 'flat_spend': return calcGenericSpend(id)")
-    // ⚠️ AND THE CONFIDENCE PILL CANNOT MOVE ON IT EITHER. getConfidence ends with a spend test and a
-    // fall-through that return the SAME value, so a stored spend cannot change the label of a category
-    // that is not priced from spend. If the fall-through ever returns something else, this fails and
-    // Category 3 needs its own branch there.
+    expect([...src.matchAll(/calcGenericSpend\(/g)], 'calcGenericSpend is deleted, not merely unused').toHaveLength(0)
+    expect(dispatch, 'the no-method arm returns an entered figure or nothing')
+      .toContain("case 'no_method': return catData[id]?.emissions_override || 0")
+    // ⚠️ COMMENTS STRIPPED, AND THIS FAILED WITHOUT IT. The page's own comment inside getConfidence quotes
+    // the retired line `if (d.annual_spend || d.total_spend) return 'low'` in order to record that it was
+    // removed, so a match over the raw source finds the prose describing the rule and reports the rule as
+    // broken. Fifth occurrence of that shape in this work; docs/backlog.md carries the approved task to
+    // make the stripping one shared helper.
     const conf = src.slice(src.indexOf('const getConfidence ='))
-    expect(conf).toMatch(/if \(d\.annual_spend \|\| d\.total_spend\) return 'low'\n\s*return 'low'/)
+      .split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+    expect(conf, 'no branch may key the confidence label on a stored spend')
+      .not.toMatch(/d\.annual_spend \|\| d\.total_spend/)
+    expect([...conf.matchAll(/return 'low'/g)], 'one fall-through, not a spend test beside it').toHaveLength(1)
   })
 
   it('C3C-8 the basis says what priced THIS record, in each of its five states', () => {

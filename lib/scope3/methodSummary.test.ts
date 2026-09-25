@@ -66,13 +66,22 @@ describe('Scope 3 method summary: every category, under the method that prices i
     for (const n of SCOPE3_CATEGORY_NUMBERS) expect(counts.get(n) ?? 0, `category ${n}`).toBe(1)
   })
 
-  it('SM5 ⚠️ the flat group\'s size is counted, not typed', () => {
-    const flat = scope3MethodGroups().find(g => g.method === 'flat_spend')!
-    const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen']
-    expect(assistantScope3Basis()).toContain(`Those ${words[flat.categories.length]} are a rough order-of-magnitude estimate`)
-    expect(assistantScope3Basis()).not.toMatch(/remaining (ten|eight|seven)/)
+  it('SM5 ⚠️ the assistant says the six are not calculated, and warns about no estimate it does not produce', () => {
+    // ⚠️ THIS TEST ASSERTED THE OPPOSITE UNTIL 25 SEP 2026. It required the sentence "Those six are a rough
+    // order-of-magnitude estimate, not a sourced figure", which was correct while an unsourced figure was
+    // computed for Categories 8, 9, 10, 11, 13 and 14 and summed into the total. The flat factor is gone,
+    // so that sentence would now tell a customer a rough figure exists where none does, which is a larger
+    // error than the one the sentence was written to prevent.
+    const out = assistantScope3Basis()
+    const flat = scope3MethodGroups().find(g => g.method === 'no_method')!
+    expect(flat.categories, 'the six are still grouped together').toEqual([8, 9, 10, 11, 13, 14])
+    expect(out, 'the six are described as not calculated').toContain('not calculated by ThemisIQ')
+    expect(out, 'and as still accepting an entered figure').toContain('a figure you enter yourself is used as given')
+    expect(out, 'no warning about the quality of an estimate that is not produced')
+      .not.toMatch(/rough order-of-magnitude|not a sourced figure/)
+    expect(out).not.toMatch(/remaining (ten|eight|seven|six)/)
     // The bullet it completes has always ended without a full stop; the next bullet follows on a new line.
-    expect(assistantScope3Basis()).toMatch(/for each category$/)
+    expect(out).toMatch(/for each category$/)
   })
 
   it('SM6 headings read the same for one category or many', () => {

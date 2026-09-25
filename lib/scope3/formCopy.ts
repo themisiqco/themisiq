@@ -20,6 +20,20 @@
 export const KNOWN_EMISSIONS_PLACEHOLDER = 'Leave blank to use the estimate'
 
 /**
+ * The same field on the panel for the six categories the platform does not calculate.
+ *
+ * ⚠️ A SECOND CONSTANT BECAUSE THE FIRST ONE BECAME FALSE THERE, not because two spellings were wanted.
+ * 'Leave blank to use the estimate' is true on the EXIOBASE and Category 15 panels, where leaving it blank
+ * does fall back to a computed figure. On Categories 8, 9, 10, 11, 13 and 14 there is no estimate to fall
+ * back to since 25 Sep 2026: leaving it blank produces nothing, and the category is reported as not
+ * calculated. Pointing that panel at the shared constant would have told the customer a figure would
+ * appear.
+ * ⚠️ WORDS, NEVER A BARE NUMBER. A tester once read Cat 6's grey "1" as an entered value; SC5 bans a
+ * numeric placeholder on every number input on the page, so 'e.g. 1,250' is not available here either.
+ */
+export const NO_ESTIMATE_PLACEHOLDER = 'Enter a figure if you hold one'
+
+/**
  * The Results table when it has no rows, in its two forms.
  *
  * ⚠️ "No data entered yet" WAS UNTRUE OF A WHOLE STATE. With Category 3 the only relevant category and

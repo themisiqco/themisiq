@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { useEntitlementState } from '../../../lib/useEntitlement'
-import { GENERIC_SPEND_FACTOR } from '../../../lib/emissionFactors'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
 import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
@@ -17,7 +16,7 @@ import { PRODUCT_OPTION_GROUPS, productName } from '../../../lib/emissionFactors
 import { inScopeFor, scopeNote, outOfScopeDisclosure, CATEGORY_SCOPE_LABEL, type SpendCategoryId } from '../../../lib/scope3/categoryScope'
 import { spendSector } from '../../../lib/scope3/spendSector'
 import { SCOPE3_DATA_SOURCE } from '../../../lib/scope3/dataSources'
-import { KNOWN_EMISSIONS_PLACEHOLDER, RESULTS_TABLE_EMPTY, resultsTableAllUnpriced } from '../../../lib/scope3/formCopy'
+import { KNOWN_EMISSIONS_PLACEHOLDER, NO_ESTIMATE_PLACEHOLDER, RESULTS_TABLE_EMPTY, resultsTableAllUnpriced } from '../../../lib/scope3/formCopy'
 import {
   cat15Figure, assessHolding, cat15HoldingIncomplete, CAT15_ASSESSMENT_FAILED, cat15HasPortfolioFields, type Cat15Figure,
   CAT15_GUIDANCE, CAT15_PANEL_METHOD, CAT15_PANEL_NO_PROXY, CAT15_RECORDED_NOT_USED,
@@ -1993,14 +1992,11 @@ export default function Scope3Dashboard() {
   /** A record saved under the previous form: shown, not priced. null when there is none. */
   const cat7Legacy = hasLegacyCommuting(catData['cat7']) ? cat7LegacyNotice(catData['cat7']) : null
 
-  const calcGenericSpend = (id: string): number => {
-    const d = catData[id] ?? ({} as CategoryData)
-    if (d.emissions_override) return d.emissions_override
-    const spend = d.annual_spend || 0
-    // GENERIC_SPEND_FACTOR is 0.5, the literal that stood here. Named so that every description of
-    // these figures reads the factor and its (empty) provenance instead of restating them.
-    return (spend * GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit) / 1000
-  }
+  // ⚠️ calcGenericSpend WAS DELETED ON 25 SEP 2026, with GENERIC_SPEND_FACTOR. It multiplied a saved
+  // annual_spend by a flat 0.5 kg CO2e per unit of currency, unsourced, for Categories 8, 9, 10, 11, 13
+  // and 14, and the result was summed into total_scope3_tco2e. Those six now carry `no_method`: an entered
+  // figure is used and nothing else is computed. A saved annual_spend on one of them is left in cat_data
+  // untouched and simply no longer read, so no customer input is destroyed by this change.
 
   /**
    * Category 3, from the bound GHG inventory: the adapter's reading of it, and the priced result.
@@ -2095,7 +2091,12 @@ export default function Scope3Dashboard() {
       case 'business_travel_factors':
       case 'employee_commuting_factors': return rowPricedResult(catData, id)?.mt ?? 0
       case 'pcaf': return calcCat15()
-      case 'flat_spend': return calcGenericSpend(id)
+      // ⚠️ AN ENTERED FIGURE OR NOTHING. No factor is applied, and a saved annual_spend is deliberately
+      // NOT read: it was the input to a calculation that no longer exists, and for five of these six it
+      // was never the company's spend in the first place.
+      // ⚠️ ZERO HERE IS NOT A CLAIM OF NO EMISSIONS. unpricedCatIds includes a no_method category with no
+      // entered figure, and totalScope3 filters those out rather than summing the 0 in.
+      case 'no_method': return catData[id]?.emissions_override || 0
       // ⚠️ NEVER calcGenericSpend. Category 3 is priced from the bound GHG inventory's own energy; a
       // spend figure saved under the old method prices nothing. An entered known figure still wins,
       // as METHOD_TAKES_ENTERED_FIGURE says it does for this method, and is handled first.
@@ -2145,7 +2146,11 @@ export default function Scope3Dashboard() {
       // calculated answer, and the note above about a genuine zero reading as not-calculated no longer
       // applies to this path.
       case 'pcaf': return cat15Result().mt !== null
-      case 'flat_spend': return !!d.annual_spend
+      // ⚠️ AN ENTERED FIGURE IS THE ONLY WAY THIS IS CALCULATED, and it is already returned true above by
+      // the takesEnteredFigure branch, so reaching here means there is none. It read `!!d.annual_spend`
+      // until 25 Sep 2026: a saved spend made the category "Relevant, calculated", put an unsourced figure
+      // in the total and labelled it on the pill.
+      case 'no_method': return false
       // ⚠️ A CALCULATED ZERO COUNTS, A WITHHELD CATEGORY DOES NOT, and a saved annual_spend is not
       // consulted at all. 'zero' means every stream at every location was answered and none holds any
       // energy, which is an answer; 'withheld' means a stream was never answered, where a zero would
@@ -2176,6 +2181,12 @@ export default function Scope3Dashboard() {
       // Category 3 is missing from the total whenever it has no figure: the inventory could not be read,
       // or a stream was never answered. A calculated zero is a figure and is NOT unpriced.
       if (c.id === 'cat3') return cat3ExcludedFor3d || (!catData[c.id]?.emissions_override && cat3Mt() === null)
+      // ⚠️ NAMED AS MISSING, NOT SILENTLY ABSENT. A category the platform does not calculate, which the
+      // customer has claimed as relevant and given no figure for, is missing from the total, and the amber
+      // notice on the Results step says so category by category. Before 25 Sep 2026 these six were never
+      // in this set: with a saved spend they were summed at an unsourced figure, and without one they
+      // simply did not appear, which read as if nothing were outstanding.
+      if (scope3MethodFor(c.id) === 'no_method') return !catData[c.id]?.emissions_override
       return false
     }).map(c => c.id),
   )
@@ -2188,8 +2199,15 @@ export default function Scope3Dashboard() {
    * ⚠️ NARROWER THAN unpricedCatIds, AND THE DIFFERENCE IS WHOSE TURN IT IS. That set answers "is this
    * category missing from the total", which is true of a category nobody has filled in yet — and the amber
    * notice it drives says so, category by category, which is the right thing on screen. This one answers
-   * "did we fail to price something the customer completed", which is what the stored record calls
-   * unpriced, and what a consumer of a baseline needs to tell a platform gap from an unfinished one.
+   * "is the gap OURS", which is what the stored record calls unpriced, and what a consumer of a baseline
+   * needs to tell a platform gap from an unfinished one.
+   *
+   * ⚠️ "OURS" WIDENED ON 25 SEP 2026 AND THE COLUMN COMMENT SAYS SO. It read "did we fail to price
+   * something the customer completed", which had one shape in mind: inputs supplied, calculation attempted,
+   * no figure. A category the platform has NO METHOD for never gets as far as an attempt, and yet the gap is
+   * unambiguously ours rather than the customer's: there is nothing they could enter in the panel that would
+   * produce an estimate. Both are "we did not give you a figure and it is not because you left something
+   * blank", which is the only distinction a consumer of this flag can act on.
    */
   const couldNotPriceCatIds = new Set(
     CATEGORIES.filter(c => {
@@ -2201,6 +2219,11 @@ export default function Scope3Dashboard() {
       // on inputs the customer completed. A withdrawn proxy is a method boundary and an incomplete holding
       // is the customer's turn — neither is our failure. The one case that is: every holding computes on
       // its own and the portfolio assessment still throws.
+      // ⚠️ THE PLATFORM HAS NO METHOD, SO THE GAP IS OURS. Placed before the per-category cases below
+      // because it is a property of the method rather than of this record's inputs: no spend, no entered
+      // figure and no amount of customer work changes the answer. An entered figure is handled by the
+      // guard above, since a category with one is calculated and coverageEntry drops `unpriced` anyway.
+      if (scope3MethodFor(c.id) === 'no_method') return true
       if (c.id === 'cat15') return cat15Result().reason === CAT15_ASSESSMENT_FAILED
       // ⚠️ ONE OF CATEGORY 3'S TWO WITHHOLDINGS IS OURS AND THE OTHER IS NOT. 'nothing_priced' means the
       // inventory holds energy at these locations and we could price none of it, which is a platform
@@ -2270,6 +2293,11 @@ export default function Scope3Dashboard() {
     // Same rule as Cat 15's line above: the reason is the sentence that withheld the figure, verbatim,
     // so the panel, the amber box and the export cannot describe the gap three ways.
     if (id === 'cat3') return cat3ExcludedFor3d ? cat3ThreeDWithheld(where) : (cat3NoticeText || NO_REASON)
+    // ⚠️ THE SHARED SENTENCE, SO THE AMBER NOTICE, THE EXPORT AND THE SAVED COVERAGE ENTRY CANNOT DESCRIBE
+    // THE GAP THREE WAYS. Same rule Cats 3 and 15 follow above: the reason is the wording that withheld the
+    // figure, verbatim. This is also what `unpriced` now means for these six, and the column comment on
+    // scope3_coverage says so: not "we tried and failed" but "there is no method here to try".
+    if (scope3MethodFor(id) === 'no_method') return scope3MethodDescription('no_method')
     return NO_REASON
   }
 
@@ -2364,22 +2392,33 @@ export default function Scope3Dashboard() {
       if (f.basis === 'decomposed') return f.dqScore !== null && f.dqScore <= 2 ? 'high' : 'medium'
     }
     if (spendPricedLine(id)) return 'exiobase_spend'
-    if (d.annual_spend || d.total_spend) return 'low'
+    // ⚠️ ONE RETURN, NOT TWO. `if (d.annual_spend || d.total_spend) return 'low'` sat here and returned the
+    // same value as the line below it. The distinction was real while 'low' meant "priced by the flat
+    // factor": a stored spend was the input that produced the figure. Nothing is priced that way now, so a
+    // stored spend says nothing about the figure, and two branches returning one value only invite someone
+    // to give them different meanings later.
     return 'low'
   }
 
   // The pill labels. The longest, 'EXIOBASE spend', fits the 96px Method column at 9px — see the
   // column-width note above the results grid, which was measured against it.
   //
-  // ⚠️ 'Flat spend' UNTIL 20 SEP 2026, AND FIVE OF THE SEVEN FLAT CATEGORIES SPEND NOTHING. Categories
-  // 9, 10, 11, 13 and 14 price what a customer, tenant or franchisee did; the label named a purchase
-  // the company never made, on the pill a verifier reads first. 'low' is the KEY and is unchanged:
-  // getConfidence returns it, and the CSV's Confidence column carries the LABEL, which nothing parses.
+  // ⚠️ 'Flat spend' UNTIL 20 SEP 2026, THEN 'Flat factor', AND 'Not calculated' SINCE 25 SEP 2026. Each
+  // rename followed the same discovery: the label described a calculation that was not what happened.
+  // 'Flat spend' named a purchase the company never made for five of the six categories. 'Flat factor'
+  // was true while a flat factor was applied, and the factor was deleted with GENERIC_SPEND_FACTOR.
+  //   ⚠️ NOW EVERY PATH TO 'low' IS A CATEGORY THAT WAS NOT CALCULATED, which is why the label can say so
+  // plainly. Check that before adding a branch: an entered figure returns 'high', the DEFRA and PCAF
+  // methods return 'medium' or better when they price, EXIOBASE returns its own key, and what falls
+  // through is a category with no figure. A calculated category reaching 'low' would make this label a
+  // lie, and nothing else would notice.
+  // 'low' is the KEY and is unchanged: getConfidence returns it, and the CSV's Confidence column carries
+  // the LABEL, which nothing parses.
   const confidenceConfig = {
     high: { label: 'Primary data', color: '#0F6E56', bg: '#E1F5EE' },
     medium: { label: 'Activity data', color: '#0C447C', bg: '#E6F1FB' },
     exiobase_spend: { label: 'EXIOBASE spend', color: '#0C447C', bg: '#E6F1FB' },
-    low: { label: 'Flat factor', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+    low: { label: 'Not calculated', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
   }
 
   /**
@@ -2442,25 +2481,23 @@ export default function Scope3Dashboard() {
       return notPriced
     }
 
-    if (method === 'flat_spend') {
+    if (method === 'no_method') {
       if (d?.emissions_override) {
         return { basis: 'Entered figure', detail: `${d.emissions_override} mt CO2e entered directly; no emission factor was applied.` }
       }
+      // ⚠️ A SAVED annual_spend IS REPORTED AS HELD AND NOT AS PRICED. Until 25 Sep 2026 this arm returned
+      // 'Flat factor, unsourced' with a figure computed from that spend. The spend is still in cat_data and
+      // is not deleted, so a customer who entered it sees that it is held and why it produces nothing:
+      // silently ignoring a number somebody typed is how a record comes to disagree with what the person
+      // in front of it believes. The method sentence is the shared one, so this cannot describe the absence
+      // differently from the CSV's Method cell or the methodology page.
       if (d?.annual_spend) {
-        // ⚠️ THE METHOD SENTENCE IS THE SHARED ONE, NOT A THIRD PHRASING. This restated the factor, the
-        // currency and the provenance gap in its own words, and said "of spend … the same whatever was
-        // bought" of five categories where the company buys nothing. The figure is this record's; the
-        // method is scope3MethodDescription('flat_spend'), the same words the methodology page and the
-        // CSV's Method cell carry.
         return {
-          // 'Flat spend factor, unsourced' until 20 Sep 2026. Categories 9, 10, 11, 13 and 14 are priced
-          // this way and the company spends nothing in any of them: the factor is flat, the figure is
-          // whatever was entered, and the label should not call it spend either.
-          basis: 'Flat factor, unsourced',
-          detail: `Figure entered: ${amountText(d.annual_spend)} ${currency}. ${scope3MethodDescription('flat_spend')}`,
+          basis: 'Not calculated',
+          detail: `A spend of ${amountText(d.annual_spend)} ${currency} is held against this category and is not used. ${scope3MethodDescription('no_method')}`,
         }
       }
-      return { basis: 'No data', detail: 'No spend or figure was entered, so nothing was calculated.' }
+      return { basis: 'Not calculated', detail: scope3MethodDescription('no_method') }
     }
 
     if (method === 'end_of_life_factors') {
@@ -4050,14 +4087,22 @@ export default function Scope3Dashboard() {
 
                   {/* Generic spend-based for the six categories that keep the flat factor (8, 9, 10, 11, 13
                       and 14). Cat 12 left on 18 Sep 2026 and Cat 3 on 20 Sep 2026, each for its own panel. */}
+                  {/* ⚠️ THE ANNUAL SPEND FIELD WAS REMOVED HERE ON 25 SEP 2026. The nine ids excluded above
+                      have panels of their own, so what reaches this block is exactly Categories 8, 9, 10,
+                      11, 13 and 14 — the six that now carry `no_method`. Nothing reads a spend for them any
+                      more, and a field that accepts a number no calculation consults is worse than no
+                      field: the customer does the work and the product quietly discards it. For five of
+                      the six it was never their spend to give.
+                        The known-emissions field STAYS and is now the only input, because
+                      METHOD_TAKES_ENTERED_FIGURE is true for no_method: a company that holds its own
+                      Category 11 figure is not blocked by the platform having no estimate of its own. */}
                   {!['cat1', 'cat2', 'cat3', 'cat4', 'cat6', 'cat7', 'cat5', 'cat12', 'cat15'].includes(cat.id) && <>
                     <div>
-                      <label style={labelStyle}>Annual spend / value ({currency})</label>
-                      <input style={inputStyle} type="number" value={catData[cat.id]?.annual_spend || ''} onChange={e => updateCat(cat.id, 'annual_spend', Number(e.target.value))} placeholder="e.g. 400,000" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Known emissions (mt CO₂e), optional override</label>
-                      <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder={KNOWN_EMISSIONS_PLACEHOLDER} />
+                      <label style={labelStyle}>Known emissions (mt CO₂e)</label>
+                      <input style={inputStyle} type="number" value={catData[cat.id]?.emissions_override || ''} onChange={e => updateCat(cat.id, 'emissions_override', Number(e.target.value))} placeholder={NO_ESTIMATE_PLACEHOLDER} />
+                      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.6 }}>
+                        {scope3MethodDescription('no_method')}
+                      </div>
                     </div>
                   </>}
                 </div>
@@ -4108,7 +4153,7 @@ export default function Scope3Dashboard() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {highCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', fontWeight: 600 }}>{highCount} primary data</span>}
               {medCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{medCount} activity data</span>}
-              {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', fontWeight: 600 }}>{lowCount} on the flat factor</span>}
+              {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', fontWeight: 600 }}>{lowCount} not calculated</span>}
             </div>
             <div className="tq-summary-sub">{company} · {reportingYear} · GHG Protocol Scope 3 Standard</div>
           </div>

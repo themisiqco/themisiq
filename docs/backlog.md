@@ -773,3 +773,101 @@ That is the right calibration: everything else there is a future or a customer-d
 in the GHG export summary beside computed totals. The standing copy rule is no em-dashes in
 customer-facing text. One-character fix, but it is a shared constant read by a surface outside
 the supply-chain module, so it belongs to whoever next touches that export.
+
+### A genuine nil is still not expressible, and must never be inferred from absence
+
+**Deliberately not built with the flat-rate removal on 25 Sep 2026.** Those six categories now read as
+not calculated, which is honest, but it means a category that genuinely emits nothing cannot say so.
+
+⚠️ **THE CASE IS REAL AND IT IS NOT AN EDGE CASE.** A product with no use-phase emissions has a
+Category 11 of zero within the GHG Protocol's minimum boundary. That is a **valid nil return**, not a
+gap: the company evaluated the category, applied the boundary, and the answer is nothing. Today it is
+indistinguishable from "we have no method" and from "nobody has filled this in".
+
+What it needs, and why each part matters:
+
+- **An explicit per-category customer declaration.** ⚠️ **NEVER INFERRED FROM ABSENCE.** A blank field
+  and a declared zero are different facts, and the platform has made that mistake before: `isCalculated`
+  for `flat_spend` read `!!d.annual_spend`, so an entered zero and an empty box were the same thing.
+  Category 3 already solved its own version properly, and its comment is the model: *"'zero' means every
+  stream at every location was answered and none holds any energy, which is an answer; 'withheld' means a
+  stream was never answered, where a zero would assert something nobody said."* Category 15 does the same
+  with `mt !== null` rather than `> 0`, so a portfolio financing no emissions is calculated at zero.
+- **`calculated: true` with `mt: 0`**, which the coverage entry type already permits. Nothing in
+  `lib/scope3/categoryStatus.ts` blocks it; what refuses is each method's per-category `isCalculated`.
+  So this is not a schema change.
+- **A distinction between nil-by-boundary and zero-computed.** These are not the same claim. A DEFRA
+  waste calculation that happens to total zero is a computed figure; a company declaring Category 11 nil
+  is asserting a boundary judgement, which a verifier may want to test. The minimum-boundary reasoning is
+  the company's and should be recorded as theirs, the way `excluded_reason` is.
+- **Consider whether a nil belongs in `categoriesInTotal`.** That count filters on
+  `getCatEmissions(c.id) > 0`, so a declared nil would be counted as relevant, calculated, in the total,
+  and still absent from the "categories in total" figure. Decide that before building, not after.
+
+### `scope3_exclusions_unjustified` is now a second source for something derivable
+
+Since 25 Sep 2026 `scope3_coverage` carries `excluded_reason` per entry, so **a verifier can count the
+unjustified exclusions themselves**: entries whose `status` starts `not_relevant` and whose
+`excluded_reason` is null. The stored `scope3_exclusions_unjustified` column is therefore no longer the
+only way to know, and two sources for one number can disagree.
+
+They agree today by construction: the column is written at save from `unjustifiedExclusions`, which tests
+`catData[id].excluded_reason` after trimming, and the entry is written in the same pass from the same
+field. But nothing holds them together, so a future change to either side moves one and not the other.
+`get_verifier_scope3` discloses both, so a verifier could read `exclusions_unjustified: 2` beside three
+entries with no justification and have no way to tell which is right.
+
+**Decide, rather than leaving both:**
+
+- **Keep it as a convenience** and add a test asserting the column equals the count derived from the
+  entries, so a disagreement fails in CI rather than in front of a verifier. The sibling columns are
+  already defended on this ground: the column comment argues *"a consumer reading a trend should not have
+  to parse jsonb to answer 'how many'"*, which is a real argument and applies here too.
+- **Or drop it from the verifier projection** and let the entries answer, keeping the column for the
+  trend series alone.
+
+⚠️ **Do not simply delete the column.** The same comment records that the relevant-count *"is a customer
+judgement that cannot be reconstructed later"*, so the sibling counts are not uniformly derivable and
+this one should not be removed by analogy with them. This entry is about **one** count, the unjustified
+one, which now is.
+
+### The product has no error boundaries, so any unhandled render error is a blank page
+
+**Verified 25 Sep 2026 while reasoning about the Scope 3 unknown-id guard.** There is no error boundary
+of any kind anywhere in this product:
+
+- **No React boundary.** `componentDidCatch`, `getDerivedStateFromError`, `ErrorBoundary` and
+  `react-error-boundary` return zero hits across `app/` and `lib/`.
+- **No Next.js route-segment boundary.** `find app -name "error.tsx"` returns 0, and there is no
+  `global-error.tsx`. `app/dashboard/scope3/` contains `page.tsx` alone, and the layout chain above it is
+  `app/layout.tsx` and `app/pricing/layout.tsx`, neither of which catches anything.
+
+So **any unhandled error thrown during render, in any dashboard, is a white screen** rather than
+something the customer can act on. That is true today for every dashboard and every cause, not only for
+the case that surfaced it.
+
+**`app/dashboard/error.tsx` is the cheapest net and it covers the whole dashboard**, every module at
+once, because a Next route-segment boundary catches everything below it. One file.
+
+⚠️ **BUT A ROUTE-SEGMENT BOUNDARY STILL LOSES THE WHOLE PAGE, NOT ONE ROW.** It replaces the segment's
+rendered output with the boundary's, so a customer sees a recoverable message instead of a blank screen,
+which is a real improvement and is **not** the same as the page continuing to work. Per-row degradation,
+where one category fails and the other fourteen render, needs a boundary **around the category list
+itself** (a client component wrapping the list, or one per row), which is a different and larger change.
+Decide which of the two is wanted before building either; they are not steps on the same path.
+
+⚠️ **AND IF A BOUNDARY IS ADDED, REVISIT THE PRODUCTION NO-THROW GUARD IN `lib/scope3/categoryMethods.ts`.**
+`scope3MethodFor` logs and returns `no_method` in production instead of throwing, and the ONLY reason is
+that there is nothing to catch a throw: `no_method` is a meaningful product state, so returning it for a
+bad id renders a bug to a customer, and discloses it to a verifier through `get_verifier_scope3`, as a
+deliberate statement that ThemisIQ does not calculate that category. With a boundary in place, throwing
+in production becomes the better option for the same reason it is better in dev.
+  ⚠️ **Reconsider all ELEVEN render-path call sites at once, not one at a time.** They are in
+`app/dashboard/scope3/page.tsx`: `getCatEmissions`, `isCalculated`, `unpricedCatIds`,
+`couldNotPriceCatIds`, `unpricedReason`, `getConfidence` (four separate branches), `categoryBasis` and the
+CSV builder, plus one in `lib/scope3/rowPriced.ts` that the same render reaches. Changing the guard for
+some and not others would mean one bad id behaves differently depending on which surface reads it first,
+which is worse than either answer applied consistently.
+
+**Do not add a boundary as part of the Scope 3 work.** It touches every module in the dashboard and
+deserves its own change with its own preview check.

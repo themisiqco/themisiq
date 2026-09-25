@@ -20,7 +20,13 @@
 //                             bound GHG inventory's own fuel, electricity and heat (cat3Energy.ts,
 //                             cat3Inputs.ts, cat3Copy.ts)
 //   Cat 15                    the PCAF-aligned path in lib/pcaf
-//   the other six             one flat spend factor, with no source, no year and no region
+//   the other six             NOT CALCULATED. Until 25 Sep 2026 they took one flat factor of 0.5 kg CO2e
+//                             per unit of currency, with no source, no year and no region, and that figure
+//                             was summed into the inventory total a verifier reads. GHG Protocol chapter
+//                             11.1 requires a description of the methodology and the emission factor
+//                             source for each category; an estimate with nothing citable behind it cannot
+//                             satisfy that, so the honest answer is that the platform does not calculate
+//                             them and says so. An entered figure is still accepted and is primary data.
 //
 // CLIENT-SAFE: imports spend.ts (types and the source catalogue) and lib/emissionFactors.ts, neither
 // of which pulls in a factor file, and defraWaste.ts, which pulls in the ~30 KB waste artefact the
@@ -29,14 +35,37 @@
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
-import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { cat15MethodDescription } from './cat15'
 import { cat6MethodDescription } from './businessTravelCopy'
 import { cat7MethodDescription } from './commutingCopy'
 
+/**
+ * The fifteen GHG Protocol Scope 3 categories, as a union.
+ *
+ * ⚠️ THIS IS WHAT MAKES METHOD_BY_CATEGORY EXHAUSTIVE. The map is a Record over it, so a sixteenth
+ * category cannot be added to this union without tsc demanding a method for it. Before 25 Sep 2026 the
+ * map was Record<string, …> with a `?? 'flat_spend'` fallback, so an unnamed category silently inherited
+ * a flat 0.5 kg factor and its figure went into the total. The fallback was the defect, not the six
+ * categories that used it: whatever the default is, a default means a category can acquire a calculation
+ * nobody chose for it.
+ */
+export const SCOPE3_CATEGORY_IDS = [
+  'cat1', 'cat2', 'cat3', 'cat4', 'cat5', 'cat6', 'cat7', 'cat8',
+  'cat9', 'cat10', 'cat11', 'cat12', 'cat13', 'cat14', 'cat15',
+] as const
+export type Scope3CategoryId = typeof SCOPE3_CATEGORY_IDS[number]
+
 export type Scope3Method =
   | 'exiobase_spend'
-  | 'flat_spend'
+  /**
+   * ⚠️ THE PLATFORM HAS NO METHOD FOR THIS CATEGORY. It is not a calculation and it produces no figure.
+   * It replaced 'flat_spend' on 25 Sep 2026, which multiplied annual spend by one flat 0.5 kg CO2e factor
+   * carrying no source, no year and no region, and summed the result into the total.
+   *   A method rather than an absence, deliberately: the dispatch switches on this, so "we do not
+   * calculate this" has to be a value the switch can hold. It also keeps METHOD_TAKES_ENTERED_FIGURE
+   * meaningful, which is true here: a customer's own Category 11 figure is primary data and is used.
+   */
+  | 'no_method'
   | 'waste_factors'
   | 'business_travel_factors'
   | 'employee_commuting_factors'
@@ -44,7 +73,7 @@ export type Scope3Method =
   | 'end_of_life_factors'
   | 'fuel_and_energy_upstream'
 
-const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
+const METHOD_BY_CATEGORY: Readonly<Record<Scope3CategoryId, Scope3Method>> = {
   cat1: 'exiobase_spend',
   // ⚠️ CAT 2 AND CAT 4 JOINED CAT 1 ON 17 SEP 2026, AND THE OTHER SEVEN DID NOT. These three are the
   // categories a customer BUYS — purchased goods and services, capital goods, inbound freight — so a
@@ -74,14 +103,70 @@ const METHOD_BY_CATEGORY: Readonly<Record<string, Scope3Method>> = {
   // EMISSION_FACTORS with no recorded source, a blank distance at 15 km, a missing mode as a petrol car and
   // 235 working days. The one saved record in the old shape is shown as not priced (cat7LegacyNotice).
   cat7: 'employee_commuting_factors',
+  // ⚠️ THE SIX ARE NAMED NOW, NOT DEFAULTED. They reached 'flat_spend' by omission until 25 Sep 2026,
+  // through a `?? 'flat_spend'` in scope3MethodFor, so nothing in this file said what they were priced
+  // with and nothing failed when a category joined them. Written out so the map is the whole answer and
+  // the Record type above can hold it to fifteen.
+  //   Cat 8 upstream leased assets, Cat 9 downstream transportation, Cat 10 processing of sold products,
+  // Cat 11 use of sold products, Cat 13 downstream leased assets, Cat 14 franchises. Five of the six price
+  // what a CUSTOMER, TENANT or FRANCHISEE did, where the company made no purchase for a spend figure to
+  // stand for, and Cat 8's own guidance says spend is not appropriate. So the flat factor was not merely
+  // unsourced for these: there was no spend of the company's for it to multiply.
+  cat8: 'no_method',
+  cat9: 'no_method',
+  cat10: 'no_method',
+  cat11: 'no_method',
   cat12: 'end_of_life_factors',
+  cat13: 'no_method',
+  cat14: 'no_method',
   cat15: 'pcaf',
 }
 
-/** The method a category is calculated with. Anything not named above takes the flat spend factor,
- *  exactly as the calculator's default branch does. */
+/**
+ * The method a category is calculated with. Every one of the fifteen is named in the map above.
+ *
+ * ⚠️ THE `?? 'flat_spend'` FALLBACK IS GONE. The old default answered an unnamed category with a
+ * CALCULATION: 0.5 kg CO2e per unit of currency, unsourced, summed into the total. The gate that replaced
+ * it is the RECORD TYPE, not anything in this function: METHOD_BY_CATEGORY is
+ * Record<Scope3CategoryId, …>, so a sixteenth category fails tsc until someone decides what prices it.
+ *
+ * ⚠️ AND AN UNKNOWN ID IS REPORTED, NOT ANSWERED. Returning 'no_method' quietly was the wrong shape for a
+ * second time, in a subtler way than the flat factor was. 'no_method' is a MEANINGFUL PRODUCT STATE: the
+ * category reads "Not calculated" on the pill, is counted in the not-calculated badge, joins
+ * unpricedCatIds, and writes `unpriced: true` with a reason into scope3_coverage, which reaches a verifier
+ * through get_verifier_scope3. So a typo'd id would have been rendered to a customer, and disclosed to a
+ * verifier, as a deliberate statement that ThemisIQ does not calculate that category. A bug would have
+ * arrived dressed as a decision.
+ *   ⚠️ THE RETURN VALUE IS STILL 'no_method', BECAUSE THERE IS NO SAFER FIGURE THAN NO FIGURE. What changes
+ * is that the condition is announced: logged at error level always, and thrown outside production so it
+ * fails in a test run or a dev session rather than reaching a customer.
+ *
+ * ⚠️ PRODUCTION DOES NOT THROW, AND THE REASON IS THE ABSENCE OF AN ERROR BOUNDARY, NOT A GRACEFUL
+ * DEGRADATION. This platform has no error boundary of any kind: no React boundary anywhere
+ * (componentDidCatch, getDerivedStateFromError, ErrorBoundary and react-error-boundary return nothing
+ * across app/ and lib/), and no Next.js route-segment boundary either, since there is no error.tsx at any
+ * level and no global-error.tsx. app/dashboard/scope3/ contains page.tsx alone.
+ *   scope3MethodFor is called during render in ELEVEN places in app/dashboard/scope3/page.tsx
+ * (getCatEmissions, isCalculated, unpricedCatIds, couldNotPriceCatIds, unpricedReason, getConfidence four
+ * times, categoryBasis and the CSV builder), plus once in lib/scope3/rowPriced.ts, which that render
+ * reaches. With nothing to catch it, a throw here would WHITE-SCREEN THE ENTIRE SCOPE 3 PAGE rather than
+ * degrade one category row. That is the whole argument for the guard, and it is an argument about this
+ * repo's structure rather than about what is kind to a customer.
+ *   ⚠️ SO REVISIT THIS IF A BOUNDARY IS EVER ADDED. With a boundary in place, throwing in production
+ * becomes the better option for the same reason it is better in dev, and the eleven call sites should be
+ * reconsidered together rather than one at a time. docs/backlog.md carries that as an entry.
+ */
 export function scope3MethodFor(categoryId: string): Scope3Method {
-  return METHOD_BY_CATEGORY[categoryId] ?? 'flat_spend'
+  const method = (METHOD_BY_CATEGORY as Readonly<Record<string, Scope3Method | undefined>>)[categoryId]
+  if (method) return method
+  const message =
+    `scope3MethodFor: "${categoryId}" is not one of the fifteen Scope 3 category ids. ` +
+    'Falling back to no_method, which renders as "Not calculated" and is disclosed to a verifier as a ' +
+    'deliberate statement that this category is not calculated. That is a bug, not a decision.'
+  console.error(message)
+  // Dev and test throw; production logs and carries on. process.env.NODE_ENV is inlined by Next at build.
+  if (process.env.NODE_ENV !== 'production') throw new Error(message)
+  return 'no_method'
 }
 
 /**
@@ -103,7 +188,9 @@ export function scope3MethodFor(categoryId: string): Scope3Method {
  */
 export const METHOD_TAKES_ENTERED_FIGURE: Readonly<Record<Scope3Method, boolean>> = {
   exiobase_spend: true,
-  flat_spend: true,
+  // ⚠️ TRUE, AND IT IS THE ONLY THING THIS METHOD DOES. A customer's own Category 11 figure is primary
+  // data; the platform having no estimate of its own is no reason to refuse theirs.
+  no_method: true,
   pcaf: true,
   waste_factors: false,
   // Category 6 takes no entered total: its figure is the customer's flight legs and rail journeys, priced.
@@ -138,22 +225,24 @@ export function provenanceGap(p: { source: string | null; year: number | null; r
   return missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`
 }
 
-/**
- * What the flat factor is indifferent to, in one clause, because three surfaces say it and they said it
- * three ways.
- *
- * ⚠️ IT SAID "THE SAME WHATEVER WAS BOUGHT" UNTIL 20 SEP 2026, AND FIVE OF THE SEVEN FLAT CATEGORIES BUY
- * NOTHING. Categories 9, 10, 11, 13 and 14 price what a customer, tenant or franchisee did: the company
- * is not the buyer, there is no purchase behind the figure, and the old wording told the customer there
- * was. The claim that is actually true of the factor is that it does not vary: not by category, and not
- * by what the number in the box is meant to represent.
- *
- * Shared rather than repeated because the description below, the assistant prompt's clause
- * (lib/scope3/methodSummary.ts) and the panel's basis detail (app/dashboard/scope3/page.tsx) all carry
- * it, and the first two embed THIS constant. categoryMethods.test.ts fails if any of them stops.
- */
-export const FLAT_FACTOR_SAMENESS =
-  'the same for every category priced this way, whatever the figure represents'
+// ── FLAT_FACTOR_SAMENESS, RETIRED 25 SEP 2026 ───────────────────────────────────────────────────
+//
+// ⚠️ PLAIN COMMENT, NOT JSDOC, BECAUSE IT DESCRIBES NOTHING NOW. Left as a /** */ block it attached
+// itself as documentation to listSheets below, which it has no connection to.
+//
+// It held one clause that three surfaces shared: the description, the assistant's prompt and the panel's
+// basis detail. Two wordings of it were wrong before it was removed, and both are worth keeping on the
+// record because the same mistake is available to the next person who describes an estimate.
+//   It read "the same whatever was bought" until 20 Sep 2026, and five of the six categories buy nothing:
+// Categories 9, 10, 11, 13 and 14 price what a customer, tenant or franchisee did, so the company is not
+// the buyer, there is no purchase behind the figure, and the wording told the customer there was. It was
+// changed to "the same for every category priced this way, whatever the figure represents", which was
+// true of the factor.
+//   Then the factor itself went. Nothing is priced that way now, so the sentence has no subject, and
+// keeping it would leave three surfaces carrying a warning about a calculation the product does not
+// perform. The same reasoning retired 'travel_factors' and 'commuting_factors' rather than renaming them.
+//   The ban on "whatever was bought" across app/ and lib/ outlives all of it: categoryMethods.test.ts
+// M10a still enforces it, because removing the factor did not make the sentence true.
 
 /** The artefact's own sheet names, in one clause: "A, B and C". Read from the record, never typed. */
 const listSheets = (sheets: readonly string[]): string =>
@@ -184,11 +273,20 @@ export function scope3MethodDescription(method: Scope3Method): string {
         `region the inventory's country of supply belongs to.`
       )
     }
-    case 'flat_spend':
+    // ⚠️ A NOUN PHRASE, NOT A SENTENCE ABOUT "THIS CATEGORY", and the first draft got that wrong. Every
+    // other description opens the same way ("Spend-based, priced from...", "Activity-based, per flight leg
+    // and rail journey"), because the methodology page renders one description under a heading naming ALL
+    // the categories on that method: "Categories 8, 9, 10, 11, 13 and 14 (...): ThemisIQ does not calculate
+    // this category" read as a singular claim about six.
+    // ⚠️ NO FACTOR IS NAMED HERE BECAUSE NONE IS APPLIED. This is the sentence a verifier reads in the CSV's
+    // Method column and in the saved factor_basis, so it has to say that nothing was calculated rather than
+    // describe a calculation. It also says what IS accepted, because an entered figure is used and is
+    // primary data: a customer with their own Category 11 number is not blocked, they are just not
+    // estimated for.
+    case 'no_method':
       return (
-        `A flat ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's ` +
-        `currency entered, ${FLAT_FACTOR_SAMENESS}.` +
-        gapSentence(GENERIC_SPEND_FACTOR, 'This factor is')
+        'Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure ' +
+        'entered directly is used as given, and is reported as primary data.'
       )
     case 'waste_factors': {
       const w = DEFRA_WASTE_META

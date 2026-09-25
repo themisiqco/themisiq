@@ -9,9 +9,9 @@
    "Category 6 (business travel): Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0.",
    "Category 7 (employee commuting): Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0.",
    "Category 15 (investments): PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%. Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. A holding missing its emissions, outstanding amount or attribution value withholds the category figure. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way.",
-   "Categories 8, 9, 10, 11, 13 and 14 (upstream leased assets; downstream transportation and distribution; processing of sold products; use of sold products; downstream leased assets; franchises): A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "Categories 8, 9, 10, 11, 13 and 14 (upstream leased assets; downstream transportation and distribution; processing of sold products; use of sold products; downstream leased assets; franchises): Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
   ],
-  "assistant_scope3": "Categories 1, 2 and 4 (purchased goods and services; capital goods; upstream transportation and distribution) are priced from EXIOBASE 3.8.2 through a named factor edition, by sector or product and country, and for Category 1 also from supplier-specific figures where the customer enters them; Category 3 (fuel- and energy-related activities) is derived from the energy already recorded in the bound GHG inventory and priced on the UK DEFRA/DESNZ 2026 upstream factors, well-to-tank for fuels and generation, transmission and distribution for electricity and heat, excluding the combustion already counted in Scope 1 and Scope 2; Category 5 (waste generated in operations) is priced from the UK DEFRA/DESNZ 2026 waste factors, per material and treatment route; Category 12 (end-of-life treatment of sold products) is priced from the same UK DEFRA/DESNZ 2026 waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes; Category 6 (business travel) is priced from the UK DEFRA/DESNZ 2026 business travel factors, per flight leg (by origin, destination, cabin class and distance) and per rail journey, with well-to-tank emissions added, radiative forcing included unless the inventory turns it off, and hotel stays not included; Category 7 (employee commuting) is priced from the UK DEFRA/DESNZ 2026 land travel factors, per group of employees by mode, distance, days commuted and, for cars and motorbikes, occupancy, with well-to-tank emissions added, and homeworking priced only for employees in the UK; Category 15 (investments) is assessed through a PCAF-aligned path; and Categories 8, 9, 10, 11, 13 and 14 (upstream leased assets; downstream transportation and distribution; processing of sold products; use of sold products; downstream leased assets; franchises) are priced from ONE flat factor of 0.5 kg CO2e per unit of the inventory's currency, the same for every category priced this way, whatever the figure represents, with no source, year or region recorded. Those six are a rough order-of-magnitude estimate, not a sourced figure, and every export names the method used for each category",
+  "assistant_scope3": "Categories 1, 2 and 4 (purchased goods and services; capital goods; upstream transportation and distribution) are priced from EXIOBASE 3.8.2 through a named factor edition, by sector or product and country, and for Category 1 also from supplier-specific figures where the customer enters them; Category 3 (fuel- and energy-related activities) is derived from the energy already recorded in the bound GHG inventory and priced on the UK DEFRA/DESNZ 2026 upstream factors, well-to-tank for fuels and generation, transmission and distribution for electricity and heat, excluding the combustion already counted in Scope 1 and Scope 2; Category 5 (waste generated in operations) is priced from the UK DEFRA/DESNZ 2026 waste factors, per material and treatment route; Category 12 (end-of-life treatment of sold products) is priced from the same UK DEFRA/DESNZ 2026 waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes; Category 6 (business travel) is priced from the UK DEFRA/DESNZ 2026 business travel factors, per flight leg (by origin, destination, cabin class and distance) and per rail journey, with well-to-tank emissions added, radiative forcing included unless the inventory turns it off, and hotel stays not included; Category 7 (employee commuting) is priced from the UK DEFRA/DESNZ 2026 land travel factors, per group of employees by mode, distance, days commuted and, for cars and motorbikes, occupancy, with well-to-tank emissions added, and homeworking priced only for employees in the UK; Category 15 (investments) is assessed through a PCAF-aligned path; and Categories 8, 9, 10, 11, 13 and 14 (upstream leased assets; downstream transportation and distribution; processing of sold products; use of sold products; downstream leased assets; franchises) are not calculated by ThemisIQ: no emission factor is applied and no estimate is produced, though a figure you enter yourself is used as given. Every export names the method used for each category",
   "assistant_gwp": "In the Scope 3 module, Category 3 uses the UK DEFRA/DESNZ 2026 upstream energy factors, which their publisher combined on AR5; Categories 5 and 12 use the UK DEFRA/DESNZ 2026 waste factors, which their publisher combined on AR5; Category 6 uses the UK DEFRA/DESNZ 2026 business travel factors, which their publisher combined on AR5; Category 7 uses the UK DEFRA/DESNZ 2026 land travel and homeworking factors, which their publisher combined on AR5; Category 15 uses investee emissions on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was.",
   "method_descriptions": {
    "cat1": "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
@@ -21,18 +21,18 @@
    "cat5": "Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
    "cat6": "Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0.",
    "cat7": "Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0.",
-   "cat8": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-   "cat9": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-   "cat10": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-   "cat11": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat8": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data.",
+   "cat9": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data.",
+   "cat10": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data.",
+   "cat11": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data.",
    "cat12": "Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
-   "cat13": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-   "cat14": "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
+   "cat13": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data.",
+   "cat14": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data.",
    "cat15": "PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%. Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. A holding missing its emissions, outstanding amount or attribution value withholds the category figure. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way."
   },
   "entered_figure_sentence": "For Categories 1, 2, 3, 4, 8, 9, 10, 11, 13, 14 and 15, a figure entered directly is used instead of any estimate. Categories 5, 6, 7 and 12 take no entered figure: they are calculated only from the data their method asks for.",
   "known_emissions_placeholder": "Leave blank to use the estimate",
-  "total_scope3_mt": 7787.436919,
+  "total_scope3_mt": 7372.436919,
   "csv_other_rows": [
    [
     "ThemisIQ Scope 3 GHG Inventory"
@@ -51,11 +51,11 @@
    ],
    [
     "Total Scope 3",
-    "7787.44 mt CO2e"
+    "7372.44 mt CO2e"
    ],
    [
     "Excluded from total",
-    "Cat 4 Upstream transportation: Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category). Left out of the total rather than counted as zero."
+    "Cat 4 Upstream transportation: Not estimated, because this has not been entered: the service provider sector (the EXIOBASE industry for this category). Cat 8 Upstream leased assets: Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. Cat 9 Downstream transportation: Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. Cat 11 Use of sold products: Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. Cat 13 Downstream leased assets: Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. Cat 14 Franchises: Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. Left out of the total rather than counted as zero."
    ],
    [
     "End-of-life split without a source",
@@ -114,8 +114,8 @@
   ],
   "saved_counts": {
    "relevant": 14,
-   "in_total": 13,
-   "unpriced": 0,
+   "in_total": 8,
+   "unpriced": 5,
    "exclusions_unjustified": 0
   }
  },
@@ -446,7 +446,7 @@
   "cat4": {
    "figure_mt": 0,
    "is_calculated": false,
-   "confidence_label": "Flat factor",
+   "confidence_label": "Not calculated",
    "status": {
     "key": "relevant_not_calculated",
     "label": "Relevant, not yet calculated",
@@ -904,189 +904,183 @@
    "factor_basis_line": "Cat 7 Employee commuting: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, land travel factors per km with well-to-tank added, and homeworking per FTE working hour. Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0. 1 commuting group and 1 homeworking group priced."
   },
   "cat8": {
-   "figure_mt": 60,
-   "is_calculated": true,
-   "confidence_label": "Flat factor",
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Not calculated",
    "status": {
-    "key": "relevant_calculated",
-    "label": "Relevant, calculated",
+    "key": "relevant_not_calculated",
+    "label": "Relevant, not yet calculated",
     "relevant": true,
-    "calculated": true,
-    "inTotal": true,
-    "reportFigure": true,
+    "calculated": false,
+    "inTotal": false,
+    "reportFigure": false,
     "requiresExplanation": false
    },
    "coverage_entry": {
-    "status": "relevant_calculated",
-    "mt": 60,
-    "in_total": true,
-    "unpriced": false,
-    "reason": null
+    "status": "relevant_not_calculated",
+    "mt": null,
+    "in_total": false,
+    "unpriced": true,
+    "reason": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
    "basis": {
-    "basis": "Flat factor, unsourced",
-    "detail": "Figure entered: 120,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    "basis": "Not calculated",
+    "detail": "A spend of 120,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
-   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. For leased assets that is what you paid under those leases in the reporting year, from your lease schedule or accounts payable. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If you already hold an emissions figure for these assets, from the landlord or from your own metering, enter it as known emissions and that figure is used instead of the estimate.",
+   "data_source": "Upstream leased assets: the emissions of the space or equipment you lease in, which the landlord or your own metering of that space can give you. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. If you hold such a figure, enter it as known emissions.",
    "guidance": "Emissions from assets you lease from others (as lessee) that aren't already in your Scope 1 and 2, e.g. leased offices or equipment you don't operationally control.",
    "csv_rows": [
     [
      "Cat 8",
      "Upstream leased assets",
-     "60.00",
-     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-     "Flat factor",
-     "Relevant, calculated",
-     "Yes",
+     "not priced",
+     "—",
+     "—",
+     "Relevant, not yet calculated",
+     "No",
      ""
     ],
     [
      "Cat 8",
      "Upstream leased assets",
-     "Flat factor, unsourced",
-     "Figure entered: 120,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+     "Not calculated",
+     "A spend of 120,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
     ]
    ],
-   "factor_basis_line": "Cat 8 Upstream leased assets: Flat factor, unsourced. Figure entered: 120,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "factor_basis_line": "Cat 8 Upstream leased assets: Not calculated. A spend of 120,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
   },
   "cat9": {
-   "figure_mt": 45,
-   "is_calculated": true,
-   "confidence_label": "Flat factor",
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Not calculated",
    "status": {
-    "key": "relevant_calculated",
-    "label": "Relevant, calculated",
+    "key": "relevant_not_calculated",
+    "label": "Relevant, not yet calculated",
     "relevant": true,
-    "calculated": true,
-    "inTotal": true,
-    "reportFigure": true,
+    "calculated": false,
+    "inTotal": false,
+    "reportFigure": false,
     "requiresExplanation": false
    },
    "coverage_entry": {
-    "status": "relevant_calculated",
-    "mt": 45,
-    "in_total": true,
-    "unpriced": false,
-    "reason": null
+    "status": "relevant_not_calculated",
+    "mt": null,
+    "in_total": false,
+    "unpriced": true,
+    "reason": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
    "basis": {
-    "basis": "Flat factor, unsourced",
-    "detail": "Figure entered: 90,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    "basis": "Not calculated",
+    "detail": "A spend of 90,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
-   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The transport this category covers is paid for by your customers or distributors, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If a carrier or distributor has given you an emissions figure for moving your sold products, enter it as known emissions and that figure is used instead of the estimate.",
+   "data_source": "The transport this category covers is paid for by your customers or distributors, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. If a carrier or distributor has given you an emissions figure for moving your sold products, enter it as known emissions.",
    "guidance": "Emissions from transporting and distributing the products you sell, after they leave you: outbound logistics, distribution centres, retail, paid for by others.",
    "csv_rows": [
     [
      "Cat 9",
      "Downstream transportation",
-     "45.00",
-     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-     "Flat factor",
-     "Relevant, calculated",
-     "Yes",
+     "not priced",
+     "—",
+     "—",
+     "Relevant, not yet calculated",
+     "No",
      ""
     ],
     [
      "Cat 9",
      "Downstream transportation",
-     "Flat factor, unsourced",
-     "Figure entered: 90,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+     "Not calculated",
+     "A spend of 90,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
     ]
    ],
-   "factor_basis_line": "Cat 9 Downstream transportation: Flat factor, unsourced. Figure entered: 90,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "factor_basis_line": "Cat 9 Downstream transportation: Not calculated. A spend of 90,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
   },
   "cat10": {
-   "figure_mt": 30,
-   "is_calculated": true,
-   "confidence_label": "Flat factor",
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Not calculated",
    "status": {
-    "key": "not_relevant_calculated",
-    "label": "Not relevant, calculated",
+    "key": "not_relevant_not_calculated",
+    "label": "Not relevant, not calculated",
     "relevant": false,
-    "calculated": true,
+    "calculated": false,
     "inTotal": false,
-    "reportFigure": true,
+    "reportFigure": false,
     "requiresExplanation": true
    },
    "coverage_entry": {
-    "status": "not_relevant_calculated",
-    "mt": 30,
+    "status": "not_relevant_not_calculated",
+    "mt": null,
     "in_total": false,
     "unpriced": false,
     "reason": null,
     "excluded_reason": "Sold products are not processed further by any customer."
    },
    "basis": {
-    "basis": "Flat factor, unsourced",
-    "detail": "Figure entered: 60,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    "basis": "Not calculated",
+    "detail": "A spend of 60,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
-   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The processing this category covers is done and paid for by your customers, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If a customer who processes your intermediate products has given you an emissions figure, enter it as known emissions and that figure is used instead of the estimate.",
+   "data_source": "The processing this category covers is done and paid for by your customers, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. If a customer who processes your intermediate products has given you an emissions figure, enter it as known emissions.",
    "guidance": "Emissions from third parties further processing your sold intermediate products before final use (e.g. you sell a component that's then assembled or refined).",
    "csv_rows": [
     [
      "Cat 10",
      "Processing of sold products",
-     "30.00",
-     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-     "Flat factor",
-     "Not relevant, calculated",
+     "—",
+     "—",
+     "—",
+     "Not relevant, not calculated",
      "No",
      "Sold products are not processed further by any customer."
-    ],
-    [
-     "Cat 10",
-     "Processing of sold products",
-     "Flat factor, unsourced",
-     "Figure entered: 60,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
     ]
    ],
-   "factor_basis_line": "Cat 10 Processing of sold products: Flat factor, unsourced. Figure entered: 60,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "factor_basis_line": null
   },
   "cat11": {
-   "figure_mt": 250,
-   "is_calculated": true,
-   "confidence_label": "Flat factor",
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Not calculated",
    "status": {
-    "key": "relevant_calculated",
-    "label": "Relevant, calculated",
+    "key": "relevant_not_calculated",
+    "label": "Relevant, not yet calculated",
     "relevant": true,
-    "calculated": true,
-    "inTotal": true,
-    "reportFigure": true,
+    "calculated": false,
+    "inTotal": false,
+    "reportFigure": false,
     "requiresExplanation": false
    },
    "coverage_entry": {
-    "status": "relevant_calculated",
-    "mt": 250,
-    "in_total": true,
-    "unpriced": false,
-    "reason": null
+    "status": "relevant_not_calculated",
+    "mt": null,
+    "in_total": false,
+    "unpriced": true,
+    "reason": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
    "basis": {
-    "basis": "Flat factor, unsourced",
-    "detail": "Figure entered: 500,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    "basis": "Not calculated",
+    "detail": "A spend of 500,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
-   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The emissions this category covers happen when your customers use what you sold, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If you have modelled the emissions of your products in use, or hold a figure from a product footprint study, enter it as known emissions and that figure is used instead of the estimate.",
+   "data_source": "The emissions this category covers happen when your customers use what you sold, so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. If you have modelled the emissions of your products in use, or hold a figure from a product footprint study, enter it as known emissions.",
    "guidance": "Emissions from customers using the products you sell over their lifetime. This is often the largest category for energy-using or fuel products.",
    "csv_rows": [
     [
      "Cat 11",
      "Use of sold products",
-     "250.00",
-     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-     "Flat factor",
-     "Relevant, calculated",
-     "Yes",
+     "not priced",
+     "—",
+     "—",
+     "Relevant, not yet calculated",
+     "No",
      ""
     ],
     [
      "Cat 11",
      "Use of sold products",
-     "Flat factor, unsourced",
-     "Figure entered: 500,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+     "Not calculated",
+     "A spend of 500,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
     ]
    ],
-   "factor_basis_line": "Cat 11 Use of sold products: Flat factor, unsourced. Figure entered: 500,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "factor_basis_line": "Cat 11 Use of sold products: Not calculated. A spend of 500,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
   },
   "cat12": {
    "figure_mt": 5.623169,
@@ -1237,96 +1231,96 @@
    "factor_basis_line": "Cat 12 End-of-life treatment: UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting, Waste disposal sheet, per material and route, on the customer's split. Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0. 2 materials priced. Source of the split: not recorded."
   },
   "cat13": {
-   "figure_mt": 40,
-   "is_calculated": true,
-   "confidence_label": "Flat factor",
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Not calculated",
    "status": {
-    "key": "relevant_calculated",
-    "label": "Relevant, calculated",
+    "key": "relevant_not_calculated",
+    "label": "Relevant, not yet calculated",
     "relevant": true,
-    "calculated": true,
-    "inTotal": true,
-    "reportFigure": true,
+    "calculated": false,
+    "inTotal": false,
+    "reportFigure": false,
     "requiresExplanation": false
    },
    "coverage_entry": {
-    "status": "relevant_calculated",
-    "mt": 40,
-    "in_total": true,
-    "unpriced": false,
-    "reason": null
+    "status": "relevant_not_calculated",
+    "mt": null,
+    "in_total": false,
+    "unpriced": true,
+    "reason": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
    "basis": {
-    "basis": "Flat factor, unsourced",
-    "detail": "Figure entered: 80,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    "basis": "Not calculated",
+    "detail": "A spend of 80,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
-   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The energy use this category covers is your tenants', so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If a tenant has given you an emissions figure for what they lease from you, enter it as known emissions and that figure is used instead of the estimate.",
+   "data_source": "The energy use this category covers is your tenants', so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. If a tenant has given you an emissions figure for what they lease from you, enter it as known emissions.",
    "guidance": "Emissions from assets you own and lease out to others (as lessor) that aren't in your Scope 1 and 2, e.g. property you rent to tenants.",
    "csv_rows": [
     [
      "Cat 13",
      "Downstream leased assets",
-     "40.00",
-     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-     "Flat factor",
-     "Relevant, calculated",
-     "Yes",
+     "not priced",
+     "—",
+     "—",
+     "Relevant, not yet calculated",
+     "No",
      ""
     ],
     [
      "Cat 13",
      "Downstream leased assets",
-     "Flat factor, unsourced",
-     "Figure entered: 80,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+     "Not calculated",
+     "A spend of 80,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
     ]
    ],
-   "factor_basis_line": "Cat 13 Downstream leased assets: Flat factor, unsourced. Figure entered: 80,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "factor_basis_line": "Cat 13 Downstream leased assets: Not calculated. A spend of 80,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
   },
   "cat14": {
-   "figure_mt": 20,
-   "is_calculated": true,
-   "confidence_label": "Flat factor",
+   "figure_mt": 0,
+   "is_calculated": false,
+   "confidence_label": "Not calculated",
    "status": {
-    "key": "relevant_calculated",
-    "label": "Relevant, calculated",
+    "key": "relevant_not_calculated",
+    "label": "Relevant, not yet calculated",
     "relevant": true,
-    "calculated": true,
-    "inTotal": true,
-    "reportFigure": true,
+    "calculated": false,
+    "inTotal": false,
+    "reportFigure": false,
     "requiresExplanation": false
    },
    "coverage_entry": {
-    "status": "relevant_calculated",
-    "mt": 20,
-    "in_total": true,
-    "unpriced": false,
-    "reason": null
+    "status": "relevant_not_calculated",
+    "mt": null,
+    "in_total": false,
+    "unpriced": true,
+    "reason": "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
    "basis": {
-    "basis": "Flat factor, unsourced",
-    "detail": "Figure entered: 40,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+    "basis": "Not calculated",
+    "detail": "A spend of 40,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
    },
-   "data_source": "The estimate uses one field: Annual spend / value, in the inventory's currency. The operations this category covers are your franchisees', so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region. If your franchisees report emissions to you, enter that figure as known emissions and it is used instead of the estimate.",
+   "data_source": "The operations this category covers are your franchisees', so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data. If your franchisees report emissions to you, enter that figure as known emissions.",
    "guidance": "Emissions from the operations of your franchisees. Relevant if you're a franchisor.",
    "csv_rows": [
     [
      "Cat 14",
      "Franchises",
-     "20.00",
-     "A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region.",
-     "Flat factor",
-     "Relevant, calculated",
-     "Yes",
+     "not priced",
+     "—",
+     "—",
+     "Relevant, not yet calculated",
+     "No",
      ""
     ],
     [
      "Cat 14",
      "Franchises",
-     "Flat factor, unsourced",
-     "Figure entered: 40,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+     "Not calculated",
+     "A spend of 40,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
     ]
    ],
-   "factor_basis_line": "Cat 14 Franchises: Flat factor, unsourced. Figure entered: 40,000 USD. A flat 0.5 kg CO2e per unit of the inventory's currency entered, the same for every category priced this way, whatever the figure represents. This factor is recorded with no published source, no year and no region."
+   "factor_basis_line": "Cat 14 Franchises: Not calculated. A spend of 40,000 USD is held against this category and is not used. Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure entered directly is used as given, and is reported as primary data."
   },
   "cat15": {
    "figure_mt": 6000,

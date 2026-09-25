@@ -1,20 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { scope3MethodFor, scope3MethodDescription, provenanceGap, METHOD_TAKES_ENTERED_FIGURE, takesEnteredFigure, FLAT_FACTOR_SAMENESS, type Scope3Method } from './categoryMethods'
+import { scope3MethodFor, scope3MethodDescription, provenanceGap, METHOD_TAKES_ENTERED_FIGURE, takesEnteredFigure, SCOPE3_CATEGORY_IDS, type Scope3Method } from './categoryMethods'
 import { enteredFigureSentence, assistantScope3Basis } from './methodSummary'
-import { GENERIC_SPEND_FACTOR } from '../emissionFactors'
 import { defraCitation } from '../ghg/engine'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
 import { methodologyHierarchyLines } from './methodSummary'
 import { SCOPE3_DATA_SOURCE } from './dataSources'
 
 const IDS = Array.from({ length: 15 }, (_, i) => `cat${i + 1}`)
-const METHODS: Scope3Method[] = ['exiobase_spend', 'flat_spend', 'waste_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'end_of_life_factors', 'fuel_and_energy_upstream']
+const METHODS: Scope3Method[] = ['exiobase_spend', 'no_method', 'waste_factors', 'business_travel_factors', 'employee_commuting_factors', 'pcaf', 'end_of_life_factors', 'fuel_and_energy_upstream']
 
 const VOCABULARY: Record<Scope3Method, RegExp[]> = {
   exiobase_spend:             [/EXIOBASE/i, /supplier-specific/i],
-  flat_spend:                 [/\bflat\b/i],
+  // ⚠️ NO FACTOR WORD IS REQUIRED OF IT, BECAUSE IT APPLIES NONE. The other seven must each name their
+  // own source vocabulary; this one must say that nothing is calculated, which M2 asserts in full.
+  no_method:                  [/\bnot calculate\b/i],
   waste_factors:              [/DEFRA/i, /DESNZ/i, /\btonnes?\b/i, /treatment route/i, /activity data/i],
   end_of_life_factors:        [/DEFRA/i, /DESNZ/i, /\btonnes?\b/i, /treatment route/i],
   business_travel_factors:    [/DEFRA/i, /DESNZ/i, /distance/i, /\bflight/i, /\brail\b/i],
@@ -52,12 +53,16 @@ describe('Scope 3 category methods', () => {
     expect(IDS.map(id => [id, scope3MethodFor(id)])).toEqual([
       ['cat1', 'exiobase_spend'], ['cat2', 'exiobase_spend'], ['cat3', 'fuel_and_energy_upstream'], ['cat4', 'exiobase_spend'],
       ['cat5', 'waste_factors'], ['cat6', 'business_travel_factors'], ['cat7', 'employee_commuting_factors'],
-      ['cat8', 'flat_spend'], ['cat9', 'flat_spend'], ['cat10', 'flat_spend'], ['cat11', 'flat_spend'],
-      ['cat12', 'end_of_life_factors'], ['cat13', 'flat_spend'], ['cat14', 'flat_spend'], ['cat15', 'pcaf'],
+      ['cat8', 'no_method'], ['cat9', 'no_method'], ['cat10', 'no_method'], ['cat11', 'no_method'],
+      ['cat12', 'end_of_life_factors'], ['cat13', 'no_method'], ['cat14', 'no_method'], ['cat15', 'pcaf'],
     ])
     // SIX: the generic ten were 2, 3, 4, 8, 9, 10, 11, 12, 13, 14; Cats 2 and 4 left for EXIOBASE on
     // 17 Sep 2026, Cat 12 for the DEFRA end-of-life factors on 18 Sep 2026, and Cat 3 on 20 Sep 2026.
-    expect(IDS.filter(id => scope3MethodFor(id) === 'flat_spend')).toEqual(['cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
+    // ⚠️ ON 25 SEP 2026 THE REMAINING SIX STOPPED BEING CALCULATED RATHER THAN CHANGING METHOD. They are
+    // now ASSIGNED 'no_method' in the map, not defaulted into it: the `?? 'flat_spend'` in scope3MethodFor
+    // is gone and METHOD_BY_CATEGORY is a Record over Scope3CategoryId, so a sixteenth category fails tsc
+    // until someone decides.
+    expect(IDS.filter(id => scope3MethodFor(id) === 'no_method')).toEqual(['cat8', 'cat9', 'cat10', 'cat11', 'cat13', 'cat14'])
     expect(IDS.filter(id => scope3MethodFor(id) === 'exiobase_spend')).toEqual(['cat1', 'cat2', 'cat4'])
     // ⚠️ ONE CATEGORY, AND THE ASSIGNMENT CAME WITH ITS PANEL AND ITS CALCULATOR. M11 is what holds that
     // together: it fails if this list grows without the surfaces that describe what was priced.
@@ -65,10 +70,19 @@ describe('Scope 3 category methods', () => {
   })
 
   it('M2 descriptions are derived: the flat factor and the gap come from the factor record', () => {
-    expect(scope3MethodDescription('flat_spend')).toBe(
-      `A flat ${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's currency ` +
-      `entered, ${FLAT_FACTOR_SAMENESS}. This factor is recorded with no published source, no year and no region.`,
+    // ⚠️ IT NAMES NO FACTOR, NO NUMBER AND NO PROVENANCE GAP, because none is applied. This sentence is the
+    // CSV's Method cell and the saved factor_basis for six categories, so it has to say that nothing was
+    // calculated rather than describe a weak calculation. It also states what IS accepted.
+    expect(scope3MethodDescription('no_method')).toBe(
+      'Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced. A figure ' +
+      'entered directly is used as given, and is reported as primary data.',
     )
+    // ⚠️ A NOUN PHRASE, LIKE EVERY OTHER DESCRIPTION. methodologyHierarchyLines renders one description
+    // under a heading that names all six categories on this method, so a sentence about "this category"
+    // read as a singular claim about six.
+    expect(scope3MethodDescription('no_method'), 'no singular claim under a plural heading')
+      .not.toMatch(/this category/i)
+    expect(scope3MethodDescription('no_method'), 'no factor may be named').not.toMatch(/\bfactor of\b|\bkg CO2e per\b/)
     expect(scope3MethodDescription('waste_factors')).toContain(`published for that pair in ${defraCitation(2026)} (full set v1, Waste disposal sheet, AR5 GWPs)`)
     // The OGL v3.0 attribution, verbatim, closes the description the methodology page and the CSV carry.
     expect(scope3MethodDescription('waste_factors').endsWith(` ${DEFRA_WASTE_META.attribution_required}`)).toBe(true)
@@ -246,8 +260,8 @@ describe('Scope 3 category methods', () => {
     const sources = (m: Scope3Method) => new Set(bannedFor(m).map(String))
 
     // The six flat categories, which is where a spend text could most easily borrow a DEFRA word.
-    const flat = sources('flat_spend')
-    for (const re of MOVED) expect(flat.has(re), `flat_spend must still bar ${re}`).toBe(true)
+    const flat = sources('no_method')
+    for (const re of MOVED) expect(flat.has(re), `no_method must still bar ${re}`).toBe(true)
     // Every pattern that was banned for flat_spend before the move is still banned for it. This is the
     // list as it stood on 19 Sep 2026, typed out, so the comparison does not read the same table twice.
     const FLAT_BANNED_BEFORE = [
@@ -291,10 +305,12 @@ describe('Scope 3 category methods', () => {
     const conf = page.slice(page.indexOf('const getConfidence ='))
     expect(conf.indexOf(branch), 'the branch must precede the final return').toBeLessThan(conf.indexOf("return 'low'\n  }"))
 
-    // (2) THE FIGURE IS NEVER SPEND. A category on this method priced by calcGenericSpend would put a
-    // flat-factor number under an activity-data description: the disagreement between calculation and
-    // claim that this file opens by naming.
-    expect(page).not.toMatch(/case 'fuel_and_energy_upstream': return calcGenericSpend/)
+    // (2) WAS "THE FIGURE IS NEVER SPEND", ASSERTING THAT THIS METHOD'S ARM DOES NOT CALL
+    // calcGenericSpend. Deleted on 25 Sep 2026: calcGenericSpend and GENERIC_SPEND_FACTOR are gone, so the
+    // assertion could no longer fail, and a green expectation about a deleted function reads as coverage
+    // it is not providing. lib/scope3/cat3Copy.test.ts C3C-15 covers the whole page with
+    // `matchAll(/calcGenericSpend\(/g)` at length 0, which is stronger than one arm and cannot rot the
+    // same way.
 
     if (assigned.length === 0) {
       // The state this task ships in. The two dispatch arms say, in code, that nothing prices yet: an
@@ -329,21 +345,21 @@ describe('Scope 3 category methods', () => {
     }
   })
 
-  it('M10 ⚠️ the three surfaces that state the flat factor say one thing, not three', () => {
-    // ⚠️ "THE SAME WHATEVER WAS BOUGHT" WAS FALSE FOR FIVE OF THE SEVEN FLAT CATEGORIES. Categories 9,
-    // 10, 11, 13 and 14 price what a customer, tenant or franchisee did: the company buys nothing, so
-    // there is no purchase for the factor to be indifferent to. The claim that IS true of the factor is
-    // FLAT_FACTOR_SAMENESS, and all three surfaces now carry it.
-    expect(scope3MethodDescription('flat_spend')).toContain(FLAT_FACTOR_SAMENESS)
-    // The assistant's clause cannot embed the description (a lowercase fragment joined by semicolons, and
-    // the description is two sentences), so it embeds the clause and is checked here instead.
-    const assistant = assistantScope3Basis()
-    expect(assistant).toContain(FLAT_FACTOR_SAMENESS)
-    expect(assistant).toContain(`${GENERIC_SPEND_FACTOR.kg_co2e_per_currency_unit} kg CO2e per unit of the inventory's currency`)
-    // The panel and CSV basis detail embeds the description itself.
-    const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
-    expect(page).toContain("detail: `Figure entered: ${amountText(d.annual_spend)} ${currency}. ${scope3MethodDescription('flat_spend')}`")
-    // ⚠️ AND THE SUPERSEDED PHRASE IS GONE FROM EVERY CUSTOMER-FACING FILE, not just from these three.
+  // ⚠️ M10 WAS DELETED ON 25 SEP 2026, AND HALF OF IT SURVIVES BELOW AS ITS OWN TEST.
+  //
+  // M10 asserted that the three surfaces stating the flat factor said one thing: the description, the
+  // assistant's clause and the panel's basis detail all had to carry FLAT_FACTOR_SAMENESS and the 0.5
+  // figure. GENERIC_SPEND_FACTOR and FLAT_FACTOR_SAMENESS are both gone, so that half has no subject.
+  // Adjusting it would have meant pinning three surfaces to a claim the product no longer makes, which is
+  // worse than having no test: a green assertion about a deleted calculation reads as coverage.
+  //
+  // ⚠️ ITS SECOND HALF WAS A DIFFERENT TEST WEARING THE SAME NAME, and that one is still live. It banned
+  // the phrase "whatever was bought" from every non-test file under app/ and lib/, because it was FALSE for
+  // five of the six categories: they price what a customer, tenant or franchisee did, so the company buys
+  // nothing for the factor to be indifferent to. Deleting M10 wholesale would have taken that ban with it,
+  // and the phrase is exactly the kind of thing that walks back in when a description is rewritten.
+  // Removing the factor does not make the sentence true, so the ban outlives the method it was written for.
+  it('M10a ⚠️ the superseded "whatever was bought" claim is gone from every customer-facing file', () => {
     const offenders: string[] = []
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {
@@ -358,5 +374,83 @@ describe('Scope 3 category methods', () => {
     }
     for (const d of ['app', 'lib']) walk(join(__dirname, '../..', d))
     expect(offenders).toEqual([])
+  })
+
+  it('M10b ⚠️ every one of the fifteen categories is named in the map, so none can be defaulted', () => {
+    // ⚠️ THIS IS THE GATE THAT REPLACED THE FALLBACK. scope3MethodFor returned `?? 'flat_spend'` until
+    // 25 Sep 2026, so a category absent from METHOD_BY_CATEGORY silently acquired a calculation: 0.5 kg
+    // CO2e per unit of currency, unsourced, summed into the inventory total. The map is now a Record over
+    // Scope3CategoryId, so tsc refuses an incomplete one; this asserts the union itself is the fifteen, and
+    // that every one resolves to a method the METHODS list above knows about.
+    expect([...SCOPE3_CATEGORY_IDS]).toEqual(IDS)
+    for (const id of SCOPE3_CATEGORY_IDS) {
+      expect(METHODS, `${id} resolves to a method this file does not know`).toContain(scope3MethodFor(id))
+    }
+  })
+
+  it('M12 ⚠️ an unknown category id is reported as a bug, not answered as a decision', () => {
+    // ⚠️ WHY THIS NEEDS A TEST AT ALL. scope3MethodFor returns 'no_method' for an id the map does not name,
+    // and 'no_method' IS A MEANINGFUL PRODUCT STATE: the category reads "Not calculated" on the pill, is
+    // counted in the not-calculated badge, joins unpricedCatIds, and writes `unpriced: true` with a reason
+    // into scope3_coverage, which get_verifier_scope3 discloses to an external verifier. So returning it
+    // quietly would render a typo to a customer, and disclose it to a verifier, as ThemisIQ's deliberate
+    // statement that it does not calculate that category. The value returned is still the safest one there
+    // is; what this pins is that the condition is ANNOUNCED.
+    //
+    // ⚠️ console.error IS SPIED ON BECAUSE THIS REPO HAS NO LOGGER. There is no lib/logger module and no
+    // existing console-mock convention in the suite, so there is nothing to mock; vi.spyOn is the whole of
+    // it. If a logger is ever introduced, this is one of the call sites to move.
+    //
+    // ⚠️ NODE_ENV IS RESTORED IN A finally, NOT AFTER THE ASSERTIONS. A failed expectation would otherwise
+    // leave NODE_ENV='production' set for every test that follows in this file, and they would pass or fail
+    // for a reason unrelated to what they assert. Same for the spy.
+    const original = process.env.NODE_ENV
+    const env = process.env as Record<string, string | undefined>
+    const setEnv = (v: string | undefined) => { if (v === undefined) delete env.NODE_ENV; else env.NODE_ENV = v }
+
+    // 1. A KNOWN ID RETURNS ITS DECLARED METHOD, and logs nothing. Asserted first so the two cases below
+    // cannot pass by the function being broken for every input.
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(scope3MethodFor('cat11')).toBe('no_method')
+      expect(scope3MethodFor('cat1')).toBe('exiobase_spend')
+      expect(scope3MethodFor('cat5')).toBe('waste_factors')
+      expect(quiet, 'a known id must not log').not.toHaveBeenCalled()
+    } finally {
+      quiet.mockRestore()
+    }
+
+    // 2. OUTSIDE PRODUCTION IT THROWS, so a bad id fails a test run or a dev session rather than reaching a
+    // customer. 'test', 'development' and unset are all checked: the guard is `!== 'production'`, and
+    // writing it the other way round would have let a dev session through.
+    for (const mode of ['test', 'development', undefined]) {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        setEnv(mode)
+        expect(() => scope3MethodFor('cat16'), `NODE_ENV=${String(mode)} must throw`).toThrow(/not one of the fifteen/)
+        expect(spy, 'and it logs before throwing').toHaveBeenCalled()
+      } finally {
+        spy.mockRestore()
+        setEnv(original)
+      }
+    }
+
+    // 3. IN PRODUCTION IT LOGS AND CARRIES ON. With no error boundary anywhere in this repo, a throw would
+    // white-screen the whole Scope 3 page rather than degrade one row; the log is what tells us. The message
+    // has to name the id, or the log cannot be acted on.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      setEnv('production')
+      expect(scope3MethodFor('cat16')).toBe('no_method')
+      expect(spy).toHaveBeenCalledTimes(1)
+      const logged = String(spy.mock.calls[0][0])
+      expect(logged, 'the log must name the offending id').toContain('"cat16"')
+      expect(logged, 'and say it is a bug rather than a decision').toContain('That is a bug, not a decision')
+    } finally {
+      spy.mockRestore()
+      setEnv(original)
+    }
+
+    expect(process.env.NODE_ENV, 'NODE_ENV is restored').toBe(original)
   })
 })

@@ -34,8 +34,18 @@ import { scope3MethodDescription } from './categoryMethods'
 
 /** Shared closings: the same sentence on every category whose method takes an entered figure. */
 const KNOWN_FIGURE = 'If you already hold a figure for this category, enter it as known emissions and that figure is used instead of the estimate.'
-/** The generic panel's only inputs, named as its labels name them (app/dashboard/scope3/page.tsx). */
-const ONE_FIELD = 'The estimate uses one field: Annual spend / value, in the inventory\'s currency.'
+// ⚠️ ONE_FIELD IS GONE (25 Sep 2026). It read "The estimate uses one field: Annual spend / value, in the
+// inventory's currency", and it was the label of a field that no longer exists on those six panels: the
+// flat factor it fed was deleted, so asking for the number described work the product then discarded.
+/**
+ * For the six categories the platform does not calculate.
+ *
+ * ⚠️ THE SHARED DESCRIPTION, NOT A LOCAL SENTENCE. categoryMethods.test.ts M9 requires each of these six to
+ * EMBED scope3MethodDescription(its method), so the CSV's Method cell, the saved factor_basis, the
+ * methodology page and this "Where to find it" text cannot describe the absence in four different ways. A
+ * local paraphrase passed as prose and would have drifted the moment one of them was reworded.
+ */
+const NO_METHOD = scope3MethodDescription('no_method')
 /** For the categories where the spending is someone else's: Cats 9, 10, 11, 13 and 14. */
 const NO_INVOICE_OF_YOURS = 'so there is no invoice of yours behind the figure, and ThemisIQ does not define what it should represent.'
 
@@ -62,36 +72,33 @@ const CAT4_DATA_SOURCE =
   KNOWN_FIGURE
 
 const CAT8_DATA_SOURCE =
-  `${ONE_FIELD} For leased assets that is what you paid under those leases in the reporting year, from ` +
-  `your lease schedule or accounts payable. ${scope3MethodDescription('flat_spend')} If you already hold an emissions figure for these ` +
-  'assets, from the landlord or from your own metering, enter it as known emissions and that figure is ' +
-  'used instead of the estimate.'
+  'Upstream leased assets: the emissions of the space or equipment you lease in, which the landlord or '
+  + `your own metering of that space can give you. ${NO_METHOD} `
+  + 'If you hold such a figure, enter it as known emissions.'
 
 const CAT9_DATA_SOURCE =
-  `${ONE_FIELD} The transport this category covers is paid for by your customers or distributors, ` +
-  `${NO_INVOICE_OF_YOURS} ${scope3MethodDescription('flat_spend')} If a carrier or distributor has given you an emissions figure for ` +
-  'moving your sold products, enter it as known emissions and that figure is used instead of the estimate.'
+  `The transport this category covers is paid for by your customers or distributors, ${NO_INVOICE_OF_YOURS} `
+  + `${NO_METHOD} If a carrier or distributor has given you an emissions figure for moving your sold `
+  + 'products, enter it as known emissions.'
 
 const CAT10_DATA_SOURCE =
-  `${ONE_FIELD} The processing this category covers is done and paid for by your customers, ` +
-  `${NO_INVOICE_OF_YOURS} ${scope3MethodDescription('flat_spend')} If a customer who processes your intermediate products has given you ` +
-  'an emissions figure, enter it as known emissions and that figure is used instead of the estimate.'
+  `The processing this category covers is done and paid for by your customers, ${NO_INVOICE_OF_YOURS} `
+  + `${NO_METHOD} If a customer who processes your intermediate products has given you an emissions `
+  + 'figure, enter it as known emissions.'
 
 const CAT11_DATA_SOURCE =
-  `${ONE_FIELD} The emissions this category covers happen when your customers use what you sold, ` +
-  `${NO_INVOICE_OF_YOURS} ${scope3MethodDescription('flat_spend')} If you have modelled the emissions of your products in use, or hold ` +
-  'a figure from a product footprint study, enter it as known emissions and that figure is used instead ' +
-  'of the estimate.'
+  `The emissions this category covers happen when your customers use what you sold, ${NO_INVOICE_OF_YOURS} `
+  + `${NO_METHOD} If you have modelled the emissions of your products in use, or hold a figure from a `
+  + 'product footprint study, enter it as known emissions.'
 
 const CAT13_DATA_SOURCE =
-  `${ONE_FIELD} The energy use this category covers is your tenants', ` +
-  `${NO_INVOICE_OF_YOURS} ${scope3MethodDescription('flat_spend')} If a tenant has given you an emissions figure for what they lease ` +
-  'from you, enter it as known emissions and that figure is used instead of the estimate.'
+  `The energy use this category covers is your tenants', ${NO_INVOICE_OF_YOURS} `
+  + `${NO_METHOD} If a tenant has given you an emissions figure for what they lease from you, enter it as `
+  + 'known emissions.'
 
 const CAT14_DATA_SOURCE =
-  `${ONE_FIELD} The operations this category covers are your franchisees', ` +
-  `${NO_INVOICE_OF_YOURS} ${scope3MethodDescription('flat_spend')} If your franchisees report emissions to you, enter that figure as ` +
-  'known emissions and it is used instead of the estimate.'
+  `The operations this category covers are your franchisees', ${NO_INVOICE_OF_YOURS} `
+  + `${NO_METHOD} If your franchisees report emissions to you, enter that figure as known emissions.`
 
 /**
  * CATEGORIES[].dataSource, keyed by category id: the text under "Where to find it:" on the Calculate
