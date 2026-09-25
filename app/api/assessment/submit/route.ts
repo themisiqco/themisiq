@@ -5,7 +5,7 @@ import { disclaimerParas } from '../../../../lib/disclaimer'
 // places and let a cached page email a link nothing could audit. The route resolves label, href and
 // price from the same accessors /assess renders, so the two cannot quote different figures.
 import { OBLIGATIONS, obligationHref, obligationPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
-import { BRAND, INK_MUTED } from '@/lib/brand'
+import { BRAND, INK_MUTED, ACCENT, STATE_ERROR, STATE_WARN, STATE_INFO, STATE_INFO_WASH } from '@/lib/brand'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -25,14 +25,43 @@ const MONITOR_EMAIL    = process.env.RESEND_MONITOR_EMAIL!
 const DISCLAIMER_HTML = `<p style="font-size:10px;font-weight:700;color:#888;letter-spacing:0.06em;text-transform:uppercase;line-height:1.6;margin:0 0 6px;">Important Notice</p>`
   + disclaimerParas('screening').map(par => `<p style="font-size:10px;color:#aaa;line-height:1.6;margin:0 0 6px;">${par}</p>`).join('')
 
+// ⚠️ A SEVERITY SCALE, SO IT READS THE STATE TOKENS. critical / high / medium / monitor is what the
+// platform means by error / warn / info / muted, and until 25 Sep 2026 all three maps typed the hex out
+// by hand. This is an EMAIL, so it cannot resolve a CSS custom property: lib/brand.ts exists for exactly
+// this and the file already imported INK_MUTED from it.
+//
+// ⚠️ TWO ENTRIES WERE BROKEN AND HAD BEEN FOR AS LONG AS THEY HAVE EXISTED. `monitor` read
+// '${INK_MUTED}' in SINGLE QUOTES on both URGENCY_COLOR and URGENCY_TEXT, so the value was the seven
+// literal characters and not a colour. Rendered at the obligations table it emitted `color:${INK_MUTED};`
+// into the inline CSS, which every mail client drops, so a monitor-priority row printed in the client's
+// default ink instead of muted grey. tsc could not see it: both sides are string. That is the precise
+// failure the token layer exists to prevent, a value retyped by hand, right-looking and wrong, and it is
+// why these maps now reference constants rather than repeating them.
+//
+// ⚠️ #501313 AND #633806 STAY AS LITERALS, DELIBERATELY. They are darker-still text variants of the
+// critical and high washes, used where the pill sets its own background, and no token holds either. They
+// are the only hand-typed colours left in this file; docs/backlog.md carries them.
 const URGENCY_COLOR: Record<string, string> = {
-  critical: '#B91C1C', high: '#A94E0D', medium: '#0C447C', monitor: '${INK_MUTED}'
+  critical: STATE_ERROR, high: STATE_WARN, medium: STATE_INFO, monitor: INK_MUTED,
 }
+// ⚠️ high TAKES ACCENT.amber.wash AND NOT STATE_WARN_WASH, WHICH WOULD MOVE A PIXEL. The two state
+// tokens share the warn COLOUR (#A94E0D) and not the wash: state-warn-wash is #FBE7DD, and what has
+// always been here is #FEF3E2, which is accent-amber's. Substituting the state wash "for consistency"
+// would have changed this email's high-priority pill from one amber tint to another, in a step whose
+// whole point is that nothing moves. Same value, correctly named.
+//   ⚠️ THREE OF THE FOUR WASHES CAUGHT THE SAME MISTAKE, one after another, while this map was being
+// written. Each time the plausibly-named constant held a DIFFERENT value:
+//     high     STATE_WARN_WASH is #FBE7DD;  what is here is #FEF3E2  -> ACCENT.amber.wash
+//     monitor  SUNKEN          is #EDEFF0;  what is here is #f8f7f5  -> ACCENT.neutral.wash
+//     critical STATE_ERROR_WASH is #FEE5E6; what is here is #FCEBEB  -> ACCENT.red.wash
+// Only `medium` matched its state token first time. A constant whose NAME fits is not a constant whose
+// VALUE fits, nothing here would have failed a test, and the only thing that settles it is printing both
+// and comparing. That is the whole argument for this family existing.
 const URGENCY_BG: Record<string, string> = {
-  critical: '#FCEBEB', high: '#FEF3E2', medium: '#E6F1FB', monitor: '#f8f7f5'
+  critical: ACCENT.red.wash, high: ACCENT.amber.wash, medium: STATE_INFO_WASH, monitor: ACCENT.neutral.wash,
 }
 const URGENCY_TEXT: Record<string, string> = {
-  critical: '#501313', high: '#633806', medium: '#0C447C', monitor: '${INK_MUTED}'
+  critical: '#501313', high: '#633806', medium: STATE_INFO, monitor: INK_MUTED,
 }
 
 export async function POST(req: NextRequest) {

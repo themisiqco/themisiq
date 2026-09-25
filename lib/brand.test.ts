@@ -59,6 +59,13 @@ function brandColours(): Record<string, string> {
     out[`module-${key}`] = hue.color
     out[`module-${key}-wash`] = hue.wash
   }
+  // ⚠️ ACCENT IS EXPANDED LIKE MODULE, AND FOR THE SAME REASON. Both are objects rather than flat string
+  // exports, so the loop above skips them and every one of their tokens would be reported as having no
+  // constant. Added 25 Sep 2026 with the accent family; a third grouped export needs a third clause here.
+  for (const [key, hue] of Object.entries(brand.ACCENT)) {
+    out[`accent-${key}`] = hue.color
+    out[`accent-${key}-wash`] = hue.wash
+  }
   return out
 }
 
@@ -81,8 +88,9 @@ describe('lib/brand.ts stays in sync with app/styles/themisiq-tokens.css', () =>
     const wrong: string[] = []
 
     for (const [token, cssValue] of Object.entries(tokens)) {
-      const expectedName = token.startsWith('module-')
-        ? `MODULE.${token.replace(/^module-/, '').replace(/-wash$/, '')}` +
+      const grouped = token.startsWith('module-') ? 'MODULE' : token.startsWith('accent-') ? 'ACCENT' : null
+      const expectedName = grouped
+        ? `${grouped}.${token.replace(/^(module|accent)-/, '').replace(/-wash$/, '')}` +
           (token.endsWith('-wash') ? '.wash' : '.color')
         : constName(token)
       const tsValue = colours[token]

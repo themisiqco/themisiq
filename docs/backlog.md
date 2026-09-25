@@ -927,3 +927,57 @@ values are typed out beside it. It should read `STATE_ERROR`, `STATE_WARN` and `
 Small, and worth doing with the `-error`/`-info`/`-ok` pass rather than alone: `lib/brand.test.ts` checks
 that the token layer and `lib/brand.ts` agree, but **nothing checks that a call site reads the constant
 rather than retyping its value**, which is how this line came to hold three literals in the first place.
+### The retired brand violet #7425e3 has 32 live uses, and is deliberately not an accent token
+
+**Step 3 of the brand token work, 25 Sep 2026, declared `--color-accent-*` with six members and left the
+violet out.** Adopting it as a named accent would make a retired colour permanent, and that decision
+belongs to the palette swap, when there is a replacement to put in its place.
+
+CLAUDE.md already records the purple/blue/lime gradient as retired, surviving "as flat category colours
+in charts and module accents, and in the transactional email templates". **It is more widespread than
+that reads: 32 live uses across 22 files.** Six are email routes, where `lib/brand.ts` is the only
+palette and no test renders one: `api/survey-invite`, `api/supplier-invite`, `api/impact-invite`,
+`api/order/quote-request`, `api/webhooks/stripe`, `api/assessment/submit`. The rest are in `app/page.tsx`,
+`app/dashboard/page.tsx`, the CBAM disclosures and `DisclosureQuestion.tsx`, SBTi, cyber, climate-risk and
+its report, trends, reports, materiality, `lib/ghg/engine.ts` and `lib/supply-chain/templates.ts`.
+
+**Three of those sites were in step 3's scope and were left as literals**, because the family has no
+member for them: `lib/supply-chain/templates.ts:57` (Labour & Human Rights), `:173` (Risk
+Identification), `:209` (the custom questionnaire); `app/trust/page.tsx:24, 30`;
+`app/dashboard/supply-chain/portal/page.tsx:29` (the EcoVadis swatch).
+
+⚠️ **Decide at the swap, not before, and decide it once.** Either the violet becomes
+`--color-accent-violet` with its current value, or the incoming colourway supplies a sixth accent hue and
+all 32 uses move to it. Doing it per-file is how it came to be in 22 of them.
+
+### Accent, state and module members still carrying literals
+
+Step 3 pointed seven sites at `--color-accent-*` and left the rest of each set on hand-typed hex. **This
+is not a defect today** — every literal holds exactly the value its token holds — and it becomes one the
+moment a token moves and the literals do not follow.
+
+- **Framework chips**, `lib/ghg/engine.ts`: `sb253` `#B91C1C`/`#FCEBEB`, `cdp` `#0C447C`/`#E6F1FB`,
+  `gri` `#0F6E56`/`#E1F5EE`, `ifrs` `#555553`/`#f8f7f5`. All four map onto existing accent members.
+- **Questionnaire sections**, `lib/supply-chain/templates.ts`: ten of the thirteen, on green, blue, red
+  and the violet.
+- **Trust page cards**, `app/trust/page.tsx`: five of six, on green, blue, red and the violet twice.
+- **Portal swatches**, `app/dashboard/supply-chain/portal/page.tsx`: four of five.
+- **`app/api/assessment/submit/route.ts`**: `URGENCY_TEXT.critical` `#501313` and `.high` `#633806`,
+  darker-still text variants used where the pill supplies its own background. **No token holds either**,
+  and they are the only hand-typed colours left in that file. If they are wanted long term they want
+  naming; if they are not, the pill can take the accent colour on the accent wash.
+
+⚠️ **THE LESSON FROM WRITING THAT ROUTE, WHICH IS THE ARGUMENT FOR FINISHING THIS.** Three of the four
+washes in its severity maps were assigned a plausibly-named constant that held a **different value**, one
+after another, and each was caught only by printing both and comparing:
+
+| Key | The obvious constant | Its value | What was actually there |
+|---|---|---|---|
+| `high` | `STATE_WARN_WASH` | `#FBE7DD` | `#FEF3E2` = `ACCENT.amber.wash` |
+| `monitor` | `SUNKEN` | `#EDEFF0` | `#f8f7f5` = `ACCENT.neutral.wash` |
+| `critical` | `STATE_ERROR_WASH` | `#FEE5E6` | `#FCEBEB` = `ACCENT.red.wash` |
+
+Only `medium` matched its state token first time. **Nothing would have failed a test**: `lib/brand.test.ts`
+checks that the token layer and `lib/brand.ts` agree with each other, not that a call site picked the
+constant matching the value it replaced. A name that fits is not a value that fits. Whoever does the
+remaining migration should diff computed values, not read names.

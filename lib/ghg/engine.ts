@@ -1524,7 +1524,11 @@ const FRAMEWORKS = [
     // hue separation, not by what the framework is about. "EU framework, so use the EU-ish blue"
     // is the reasoning that produced the collision — CDP is already blue, and thematic fit says
     // nothing about whether two cards can be told apart.
-    id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD (Scope 3 mandatory)', color: '#AF3790', bg: '#F9E6F2',
+    // ⚠️ THE VALUES ARE UNCHANGED; ONLY WHERE THEY ARE DECLARED HAS MOVED (25 Sep 2026). #AF3790 /
+    // #F9E6F2 is now --color-accent-magenta, so this chip no longer carries Supply Chain's module hue as
+    // a literal. Everything above about hue separation still governs the VALUE and now lives with the
+    // token as well, because whoever edits the family next will be reading that file and not this one.
+    id: 'esrs', name: 'ESRS E1', full: 'ESRS E1 — EU CSRD (Scope 3 mandatory)', color: 'var(--color-accent-magenta)', bg: 'var(--color-accent-magenta-wash)',
     gwp: 'AR6', deadline: 'FY2024 (large EU companies)',
     desc: 'Full ESRS E1 disclosure — location AND market-based Scope 2, biogenic, by gas',
     requires: ['market_based_s2', 'renewable_energy_kwh', 'biogenic_co2'],
@@ -1538,7 +1542,10 @@ const FRAMEWORKS = [
     intensity_denominator: 'revenue',
   },
   {
-    id: 'ecovadis', name: 'EcoVadis', full: 'EcoVadis — E1 Module', color: 'var(--color-module-climate)', bg: '#FEF3E2',
+    // ⚠️ WAS --color-module-climate, WHICH WAS NEVER ABOUT CLIMATE RISK. EcoVadis is a framework, and this
+    // chip borrowed a module hue for want of an accent family. Same colour, #A94E0D; the wash #FEF3E2 is
+    // now named too. Note accent-amber and --color-state-warn share the colour and NOT the wash.
+    id: 'ecovadis', name: 'EcoVadis', full: 'EcoVadis — E1 Module', color: 'var(--color-accent-amber)', bg: 'var(--color-accent-amber-wash)',
     gwp: 'AR6', deadline: 'Annual — assessment cycle',
     desc: 'Simplified Scope 1 + 2 total with revenue and employee intensity ratios',
     requires: ['employee_count'],

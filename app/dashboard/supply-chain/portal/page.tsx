@@ -30,7 +30,7 @@ const TEMPLATES = [
   { id: 'scope3', label: 'Scope 3 Cat.1', desc: '8 questions on GHG emissions, energy use and reduction targets', color: '#0F6E56' },
   { id: 'modern_slavery', label: 'Modern Slavery Act', desc: '12 questions on forced labour, child labour and working conditions', color: '#B91C1C' },
   { id: 'cs3d', label: 'CS3D HRDD', desc: '15 questions on human rights due diligence across the value chain', color: '#0C447C' },
-  { id: 'custom', label: 'Custom questionnaire', desc: 'Define your own questions after creating the campaign', color: 'var(--color-module-climate)' },
+  { id: 'custom', label: 'Custom questionnaire', desc: 'Define your own questions after creating the campaign', color: 'var(--color-accent-amber)' },
 ]
 
 const GRAD = 'var(--color-brand)'

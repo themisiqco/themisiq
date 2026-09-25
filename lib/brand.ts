@@ -83,6 +83,32 @@ export const STATE_INFO_WASH   = '#E6F1FB'
 export const STATE_OK          = '#0F6E56'   // complete, passed,    5.0:1
 export const STATE_OK_WASH     = '#E1F5EE'
 
+/* ---- Accent ------------------------------------------------------------ */
+/**
+ * Telling one category from another: framework chips, questionnaire sections, card accents, swatches.
+ *
+ * ⚠️ NO SEMANTICS. Named by hue because these mean nothing. Three of the six share a value with a state
+ * token (green/ok, blue/info, red/error) and one with a module hue's colour (amber, #A94E0D, though not
+ * its wash). Before 25 Sep 2026 they WERE those tokens, so a category accent and a state claim were one
+ * value and neither could move without the other.
+ *
+ * ⚠️⚠️ LOAD-BEARING. Read lib/ghg/engine.ts:1508-1526 before changing one: a framework colour is chosen
+ * against the other five by HUE SEPARATION, and two candidates have already been measured and reversed.
+ * The token layer's own comment carries the full account.
+ *
+ * ⚠️ #7425e3, the retired brand violet, is NOT a member. It has 32 live uses across 22 files including
+ * six email routes; adopting it here would make it permanent. That belongs to the palette swap.
+ */
+export const ACCENT = {
+  green:   { color: '#0F6E56', wash: '#E1F5EE' },  // hue 162
+  blue:    { color: '#0C447C', wash: '#E6F1FB' },  // hue 210
+  red:     { color: '#B91C1C', wash: '#FCEBEB' },  // hue   0
+  amber:   { color: '#A94E0D', wash: '#FEF3E2' },  // hue  24
+  magenta: { color: '#AF3790', wash: '#F9E6F2' },  // hue 313
+  neutral: { color: '#555553', wash: '#f8f7f5' },  // hue  60
+} as const
+export type AccentKey = keyof typeof ACCENT
+
 export const MODULE = {
   ghg:     { color: '#095C6B', wash: '#D7EFF6' },  // GHG Emissions
   cbam:    { color: '#1C5EAA', wash: '#E6EBFC' },  // CBAM

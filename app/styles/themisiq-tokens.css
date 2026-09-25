@@ -83,6 +83,58 @@
   --color-state-ok:          #0F6E56; /* complete, primary data, passed        5.0:1 */
   --color-state-ok-wash:     #E1F5EE;
 
+  /* ── ACCENT ───────────────────────────────────────────────────────────────────────────────────
+     TELLING ONE CATEGORY FROM ANOTHER. NOT A MODULE, NOT A STATE, NOT AN ORDER.
+
+     ⚠️ NAMED BY HUE, NOT BY MEANING, AND THAT IS THE POINT. These carry no semantics whatever. A
+     questionnaire section called "Forced & Compulsory Labour" is drawn in the red one and "Prevention
+     & Remediation" in the green one, and neither is a claim: they are two categories that need to be
+     told apart. Giving them semantic names would re-create the confusion this family exists to end.
+
+     ⚠️ WHY THEY EXIST (25 Sep 2026). Four unrelated surfaces were drawing from one undeclared palette:
+     the six framework chips in lib/ghg/engine.ts, the thirteen questionnaire section headers in
+     lib/supply-chain/templates.ts, the six trust-page card accents and the five portal template
+     swatches. Its members were borrowed from wherever: three of them ARE the state colours
+     (#0F6E56 ok, #0C447C info, #B91C1C error), one was a module hue (--color-module-climate), one was
+     Supply Chain's #AF3790, one the retired brand violet. So a category accent and a state claim were
+     the same value, and a palette change to either would have moved the other.
+
+     ⚠️ accent-amber SHARES ITS COLOUR WITH --color-state-warn AND NOT ITS WASH. #A94E0D either way;
+     the wash here is #FEF3E2 against state-warn's #FBE7DD. They are separate declarations because they
+     answer different questions, and the day one moves the other must be able to stay.
+
+     ⚠️⚠️ THESE VALUES ARE LOAD-BEARING AND MUST NOT BE REASSIGNED FOR TIDINESS. READ
+     lib/ghg/engine.ts:1508-1526 BEFORE TOUCHING ONE. A framework colour is chosen against the OTHER
+     FIVE by HUE SEPARATION, not by what the framework is about, and that rule was learned the hard
+     way. Two candidates have been tried and reversed:
+       #7425e3 / #EDE9FE  the retired brand violet, which made an ESRS card read as a ThemisIQ action
+         rather than as a framework, because the same violet was every button and link.
+       #1C5EAA / #E6EBFC  CBAM's blue, tried 5 Sep 2026 on the reasoning that CBAM and ESRS are both EU
+         instruments. MEASURED AND REVERSED THE SAME DAY: it is 2 degrees from CDP's #0C447C, the two
+         text colours are 1.51:1 apart and the two WASHES are 1.04:1 apart. Those cards sit adjacent in
+         the framework grid, so that is not a difference, it is one colour appearing twice. The only
+         separation was 12 points of lightness, and lightness alone is exactly what fails in greyscale,
+         on a projector and on a photocopy.
+     "EU framework, so use the EU-ish blue" is the reasoning that produced that collision. Thematic fit
+     says nothing about whether two cards can be told apart.
+
+     ⚠️ THE RETIRED VIOLET #7425e3 IS DELIBERATELY NOT A MEMBER. It has 32 live uses across 22 files,
+     six of them email routes, and declaring it here would adopt it as a permanent accent. That is a
+     decision for the palette swap, when there is a replacement to put in its place, not for a cleanup.
+     Until then those sites keep their literal. See docs/backlog.md. */
+  --color-accent-green:        #0F6E56; /* hue 162 */
+  --color-accent-green-wash:   #E1F5EE;
+  --color-accent-blue:         #0C447C; /* hue 210 */
+  --color-accent-blue-wash:    #E6F1FB;
+  --color-accent-red:          #B91C1C; /* hue   0 */
+  --color-accent-red-wash:     #FCEBEB;
+  --color-accent-amber:        #A94E0D; /* hue  24 */
+  --color-accent-amber-wash:   #FEF3E2;
+  --color-accent-magenta:      #AF3790; /* hue 313 */
+  --color-accent-magenta-wash: #F9E6F2;
+  --color-accent-neutral:      #555553; /* hue  60, effectively grey */
+  --color-accent-neutral-wash: #f8f7f5;
+
   /* ---- Reversed text --------------------------------------------- */
   /* Off-white, never #FFF. Pure white haloes against dark and is the
      usual cause of type that looks blurred at reversed polarity. */

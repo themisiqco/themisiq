@@ -9,6 +9,15 @@
 // qualifiers that change what the answer means ("in the past 3 years", "if
 // processing EU personal data"). One definition, one wording.
 
+// ⚠️ SECTION COLOURS ARE CATEGORY ACCENTS, NOT STATES, AND THREE OF THEM MOVED ON 25 SEP 2026. The
+// Sustainable Procurement, Child Labour and Monitoring & Disclosure headers carried
+// --color-module-climate, which is the Climate Risk module's hue and was also the platform's warning
+// colour. None of those sections is a warning and none belongs to Climate Risk: "Forced & Compulsory
+// Labour" is drawn in red and "Prevention & Remediation" in green, and neither is a claim. They are
+// categories that need telling apart. The three now read --color-accent-amber, same value.
+//   ⚠️ THE OTHER TEN STILL CARRY LITERALS, four of them the retired brand violet #7425e3, which is
+// deliberately not an accent token yet. docs/backlog.md carries both.
+
 export type QuestionType = 'radio' | 'checkbox' | 'number' | 'text' | 'textarea'
 
 export interface Question {
@@ -83,7 +92,7 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         ],
       },
       {
-        id: 'procurement', title: 'Sustainable Procurement', color: 'var(--color-module-climate)', bg: '#FEF3E2',
+        id: 'procurement', title: 'Sustainable Procurement', color: 'var(--color-accent-amber)', bg: 'var(--color-accent-amber-wash)',
         desc: 'Your own supply chain sustainability practices',
         questions: [
           { id: 'proc_code', type: 'radio', label: 'Do you have a supplier code of conduct?', options: ['Yes — signed by suppliers', 'Yes — not yet enforced', 'In development', 'No'] },
@@ -135,7 +144,7 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         ],
       },
       {
-        id: 'child_labour', title: 'Child Labour', color: 'var(--color-module-climate)', bg: '#FEF3E2',
+        id: 'child_labour', title: 'Child Labour', color: 'var(--color-accent-amber)', bg: 'var(--color-accent-amber-wash)',
         desc: 'Child labour prevention and minimum age compliance',
         questions: [
           { id: 'ms_child_policy', type: 'radio', label: 'Does your company have a minimum age policy aligned to ILO Convention 138?', options: ['Yes — documented and enforced', 'Yes — informal', 'No'] },
@@ -190,7 +199,7 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         ],
       },
       {
-        id: 'hrdd_monitoring', title: 'Monitoring & Disclosure', color: 'var(--color-module-climate)', bg: '#FEF3E2',
+        id: 'hrdd_monitoring', title: 'Monitoring & Disclosure', color: 'var(--color-accent-amber)', bg: 'var(--color-accent-amber-wash)',
         desc: 'Monitoring effectiveness and public disclosure',
         questions: [
           { id: 'cs_monitoring', type: 'radio', label: 'Does your company monitor the effectiveness of its HRDD measures?', options: ['Yes — KPIs tracked and reported', 'Yes — internal monitoring', 'Ad hoc', 'No'] },

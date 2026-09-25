@@ -33,7 +33,9 @@ const PRINCIPLES = [
   },
   {
     title: 'Encrypted in transit and at rest',
-    color: 'var(--color-module-climate)',
+    // Category accent, not a warning and not Climate Risk. Same value, now named. The other five cards
+    // still carry literals, two of them the retired violet: see docs/backlog.md.
+    color: 'var(--color-accent-amber)',
     bg: '#FEF3E2',
     content: 'All data transmitted to and from ThemisIQ is encrypted using TLS 1.2+. All data stored in ThemisIQ is encrypted at rest using AES-256. Our infrastructure runs on Supabase (hosted on AWS) with SOC 2 Type II certified data centres.',
   },
