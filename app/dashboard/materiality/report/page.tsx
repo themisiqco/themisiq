@@ -286,7 +286,7 @@ const SCENARIO_LABEL: Record<string, { l: string; d: string }> = {
 const GRAD = 'var(--color-brand)'
 const SEV = {
   high: { color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  med:  { color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  med:  { color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
   low:  { color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
@@ -571,7 +571,7 @@ function ReportInner() {
               'conflict' only. 'ok' needs no words; 'not_stated' is already visible from the two
               rows above; and 'unparseable' belongs to a free-text API caller, not to this cover. */}
           {isCsrd && a.workings?.disclosure?.periodVersionCheck?.status === 'conflict' && (
-            <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 12px', padding: '10px 12px', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8 }}>
+            <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, margin: '0 0 12px', padding: '10px 12px', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 8 }}>
               <strong style={{ color: '#0d0d0d' }}>Reporting period and standard version.</strong>{' '}
               {a.workings.disclosure.periodVersionCheck.message}{' '}
               {a.workings.disclosure.periodVersionCheck.certainty === 'inferred' && (
@@ -598,7 +598,7 @@ function ReportInner() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: isCsrd ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 12, margin: '18px 0' }}>
             <Stat label="High physical risks" val={result.summary?.physicalHigh ?? 0} color="#B91C1C" bg="#FCEBEB" />
-            <Stat label="High transition risks" val={result.summary?.transitionHigh ?? 0} color="var(--color-module-climate)" bg="#FEF3E2" />
+            <Stat label="High transition risks" val={result.summary?.transitionHigh ?? 0} color="var(--color-state-warn)" bg="#FEF3E2" />
             {isCsrd && <Stat label="Topics material on both axes" val={result.summary?.topicsBothAxes ?? 0} color="var(--color-brand)" bg="var(--color-brand-wash)" />}
           </div>
           <h3 style={h3}>Key findings</h3>
@@ -995,7 +995,7 @@ function Pill({ band }: { band: 'high' | 'med' | 'low' | 'unknown' }) {
   // 'unknown' = a data gap (no baseline for this industry × topic, or no reference hazard data —
   // engine FIX A/C). Amber "Not assessed", NEVER an assessed LOW: a gap must not read as immateriality.
   if (band === 'unknown') {
-    return <span style={{ background: '#FDF6EC', color: 'var(--color-module-climate)', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
+    return <span style={{ background: '#FDF6EC', color: 'var(--color-state-warn)', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
   }
   const c = SEV[band]
   return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{band.toUpperCase()}</span>

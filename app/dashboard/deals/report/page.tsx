@@ -81,7 +81,7 @@ type DealRow = {
 const GRAD = 'var(--color-brand)'
 const SEV = {
   critical: { label: 'CRITICAL', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  high:     { label: 'HIGH', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  high:     { label: 'HIGH', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
   medium:   { label: 'MEDIUM', color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
 } as const
 
@@ -90,9 +90,9 @@ const SEV = {
 // greyscale print.
 const STATE = {
   applies:      { label: 'APPLIES', color: '#0F6E56', bg: '#E1F5EE', border: 'rgba(15,110,86,0.35)' },
-  verify:       { label: 'APPLIES — VERIFY', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-module-climate) 35%, transparent)' },
-  nearBelow:    { label: 'NEAR THRESHOLD — VERIFY', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-module-climate) 35%, transparent)' },
-  notAssessed:  { label: 'NOT ASSESSED', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-module-climate) 35%, transparent)' },
+  verify:       { label: 'APPLIES — VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  nearBelow:    { label: 'NEAR THRESHOLD — VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  notAssessed:  { label: 'NOT ASSESSED', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
 } as const
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
@@ -310,8 +310,8 @@ function Chip({ s }: { s: { label: string; color: string; bg: string; border: st
 // rendered as a finding — on the wizard screens or here.
 function NotAssessed({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="page" style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 25%, transparent)', borderRadius: 8, padding: '12px 14px', margin: '0 0 14px' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--color-module-climate)', marginBottom: 5 }}>{title}</div>
+    <div className="page" style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 25%, transparent)', borderRadius: 8, padding: '12px 14px', margin: '0 0 14px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--color-state-warn)', marginBottom: 5 }}>{title}</div>
       <div style={{ fontSize: 12, lineHeight: 1.7, color: '#555553' }}>{children}</div>
     </div>
   )
@@ -456,7 +456,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{fw}</div>
                           {citation && <p style={cite}>{citation}</p>}
-                          {near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-module-climate)' }}>{nearSentence(near)}</p>}
+                          {near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{nearSentence(near)}</p>}
                         </td>
                         <td style={td}><Chip s={near ? STATE.verify : STATE.applies} /></td>
                       </tr>
@@ -527,7 +527,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           {nearBelow.length > 0 && (
             <div style={{ marginTop: 4 }}>
               {nearBelow.map(f => (
-                <p key={f.framework} style={{ ...note, color: 'var(--color-module-climate)' }}>
+                <p key={f.framework} style={{ ...note, color: 'var(--color-state-warn)' }}>
                   <strong style={{ fontWeight: 600 }}>{f.framework}:</strong> {nearSentence(f)}
                 </p>
               ))}
@@ -567,7 +567,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                       </td>
                       <td style={td}>{r.valueApplied}</td>
                       <td style={td}>{r.threshold}</td>
-                      <td style={{ ...td, fontWeight: 600, color: r.state === 'met' ? '#0F6E56' : r.state === 'not-assessed' ? 'var(--color-module-climate)' : '#555553' }}>{r.result}</td>
+                      <td style={{ ...td, fontWeight: 600, color: r.state === 'met' ? '#0F6E56' : r.state === 'not-assessed' ? 'var(--color-state-warn)' : '#555553' }}>{r.result}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -620,13 +620,13 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                               so a conditioned finding survives a greyscale print as text rather
                               than as a colour a reader has to interpret. */}
                           {r.scope === 'conditional' && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-module-climate)' }}>{r.condition}</p>
+                            <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.condition}</p>
                           )}
                           {/* Per-finding token check AND per-deal note — see the wizard's note on
                               why both. The colon and full stop belong to the BODY, not the heading:
                               a heading-only line must not trail punctuation introducing nothing. */}
                           {cs3dNote && tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-module-climate)' }}>
+                            <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>
                               <strong style={{ fontWeight: 600 }}>{cs3dNote.heading}{cs3dNote.body ? ':' : ''}</strong>
                               {cs3dNote.body ? ` ${cs3dNote.body}.` : ''}
                             </p>

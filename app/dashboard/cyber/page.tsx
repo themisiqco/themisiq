@@ -82,7 +82,7 @@ const CONTROLS = [
 
 const MATURITY_CONFIG: Record<Maturity, { label: string; score: number; color: string; bg: string }> = {
   none:        { label: 'Not implemented', score: 0, color: '#B91C1C', bg: '#FCEBEB' },
-  partial:     { label: 'Partially implemented', score: 1, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+  partial:     { label: 'Partially implemented', score: 1, color: 'var(--color-state-warn)', bg: '#FEF3E2' },
   implemented: { label: 'Fully implemented', score: 2, color: '#0F6E56', bg: '#E1F5EE' },
   optimised:   { label: 'Optimised & tested', score: 3, color: '#0C447C', bg: '#E6F1FB' },
 }
@@ -92,7 +92,7 @@ const FRAMEWORK_CONFIG: Record<Framework, { label: string; color: string; deadli
   dora:    { label: 'EU DORA', color: '#7425e3', deadline: 'Active Jan 2025' },
   sec:     { label: 'SEC Cyber', color: '#0C447C', deadline: 'Active Dec 2023' },
   iso27001:{ label: 'ISO 27001', color: '#0F6E56', deadline: 'Ongoing' },
-  nist:    { label: 'NIST CSF 2.0', color: 'var(--color-module-climate)', deadline: 'Ongoing' },
+  nist:    { label: 'NIST CSF 2.0', color: 'var(--color-state-warn)', deadline: 'Ongoing' },
 }
 
 const DOMAINS = [...new Set(CONTROLS.map(c => c.domain))]
@@ -202,7 +202,7 @@ export default function CyberDashboard() {
   const { score, maxScore, pct, gaps } = calcScore(inventory.responses, inventory.frameworks)
   const top5 = getTop5(gaps, inventory.frameworks)
 
-  const scoreColor = pct >= 75 ? '#0F6E56' : pct >= 50 ? 'var(--color-module-climate)' : '#B91C1C'
+  const scoreColor = pct >= 75 ? '#0F6E56' : pct >= 50 ? 'var(--color-state-warn)' : '#B91C1C'
   const scoreLabel = pct >= 75 ? 'Good' : pct >= 50 ? 'Developing' : pct >= 25 ? 'At Risk' : 'Critical Gaps'
 
   const domainControls = CONTROLS.filter(c =>
@@ -402,7 +402,7 @@ export default function CyberDashboard() {
           const domControls = CONTROLS.filter(c => c.domain === domain && inventory.frameworks.some(f => c[f as keyof typeof c]))
           const domGaps = domControls.filter(c => !inventory.responses[c.id] || inventory.responses[c.id] === 'none' || inventory.responses[c.id] === 'partial').length
           const domPct = domControls.length > 0 ? Math.round(((domControls.length - domGaps) / domControls.length) * 100) : 100
-          const color = domPct >= 75 ? '#0F6E56' : domPct >= 50 ? 'var(--color-module-climate)' : '#B91C1C'
+          const color = domPct >= 75 ? '#0F6E56' : domPct >= 50 ? 'var(--color-state-warn)' : '#B91C1C'
           return (
             <div key={domain} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{domain}</div>
@@ -427,7 +427,7 @@ export default function CyberDashboard() {
           const fwControls = CONTROLS.filter(c => c[fw as keyof typeof c] && inventory.frameworks.includes(fw))
           const fwGaps = fwControls.filter(c => !inventory.responses[c.id] || inventory.responses[c.id] === 'none').length
           const status = fwGaps === 0 ? 'Compliant' : fwGaps <= 2 ? 'Near compliant' : 'Gaps identified'
-          const statusColor = fwGaps === 0 ? '#0F6E56' : fwGaps <= 2 ? 'var(--color-module-climate)' : '#B91C1C'
+          const statusColor = fwGaps === 0 ? '#0F6E56' : fwGaps <= 2 ? 'var(--color-state-warn)' : '#B91C1C'
           return (
             <div key={fw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
               <div>

@@ -25,7 +25,7 @@ const getResponseColor = (response: string): string => {
   const lower = response.toLowerCase()
   if (POSITIVE_RESPONSES.some(p => lower.startsWith(p))) return '#0F6E56'
   if (NEGATIVE_RESPONSES.some(n => lower === n || lower.startsWith(n))) return '#B91C1C'
-  return 'var(--color-module-climate)'
+  return 'var(--color-state-warn)'
 }
 
 const GRAD = 'var(--color-brand)'
@@ -131,7 +131,7 @@ export default function SupplierResponseViewer() {
               {supplier?.contact_name && <div style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>{supplier.contact_name}</div>}
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 99, background: supplier?.status === 'completed' ? '#E1F5EE' : '#FEF3E2', color: supplier?.status === 'completed' ? '#0F6E56' : 'var(--color-module-climate)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 99, background: supplier?.status === 'completed' ? '#E1F5EE' : '#FEF3E2', color: supplier?.status === 'completed' ? '#0F6E56' : 'var(--color-state-warn)' }}>
                 {supplier?.status === 'completed' ? '✓ Completed' : 'In progress'}
               </span>
               <button onClick={exportCSV} style={{ fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
@@ -172,7 +172,7 @@ export default function SupplierResponseViewer() {
           {/* ⚠️ THE TRAFFIC LIGHT WAS TUNED AGAINST BLACK AND NONE OF IT SURVIVES ON WHITE:
               #64fe3e 14.61 -> 1.33:1, #fde68a 15.61 -> 1.25:1, #f87171 7.03 -> 2.77:1. Re-picked
               from the palette the rest of the app already uses for the same three meanings. */}
-          <div className="tq-summary-figure" style={{ color: pct >= 80 ? '#0F6E56' : pct >= 50 ? 'var(--color-module-climate)' : '#B91C1C' }}>{pct}%<small>complete</small></div>
+          <div className="tq-summary-figure" style={{ color: pct >= 80 ? '#0F6E56' : pct >= 50 ? 'var(--color-state-warn)' : '#B91C1C' }}>{pct}%<small>complete</small></div>
           </div>
         </div>
 

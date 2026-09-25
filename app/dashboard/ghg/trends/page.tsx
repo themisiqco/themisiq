@@ -282,13 +282,13 @@ export default function TrendsPage() {
             <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>
               Baseline year {selected.baselineYear}
               {!selected.baselineUsable && (
-                <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}> — not usable, so no year is shown as a change against it</span>
+                <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}> — not usable, so no year is shown as a change against it</span>
               )}
               {' · '}
               {selected.gwpConsistent ? (
                 <span>GWP basis: {gwpVersion}</span>
               ) : (
-                <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>Mixed GWP basis — comparison may not be valid</span>
+                <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>Mixed GWP basis — comparison may not be valid</span>
               )}
               {/* Factor editions — the SHORT label only. The full sentence is the panel below; this
                   strip is 12px muted text and the changed disclosure runs to 233 characters. Both
@@ -297,7 +297,7 @@ export default function TrendsPage() {
               {editionDisclosure && (
                 <>
                   {' · '}
-                  <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>{editionDisclosure.label}</span>
+                  <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>{editionDisclosure.label}</span>
                 </>
               )}
             </div>
@@ -310,7 +310,7 @@ export default function TrendsPage() {
               records no editions and cannot be made to, so this panel is what most series show
               until the back catalogue is re-saved. It must never read as consistent. */}
           {editionDisclosure && (
-            <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+            <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
               {editionDisclosure.detail}
             </div>
           )}
@@ -331,7 +331,7 @@ export default function TrendsPage() {
                 </div>
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.vsBaselinePct == null ? 'var(--color-ink-muted)' : latest.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-module-climate)' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.vsBaselinePct == null ? 'var(--color-ink-muted)' : latest.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-state-warn)' }}>
                   {latest.vsBaselinePct == null ? '—' : `${latest.vsBaselinePct > 0 ? '+' : ''}${latest.vsBaselinePct}%`}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>vs {selected.baselineYear}</div>
@@ -341,7 +341,7 @@ export default function TrendsPage() {
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>
                   per $M revenue
                   {intensityDelta != null && (
-                    <span style={{ color: intensityDelta <= 0 ? '#0F6E56' : 'var(--color-module-climate)', fontWeight: 600 }}>{' '}({intensityDelta > 0 ? '+' : ''}{intensityDelta.toFixed(2)})</span>
+                    <span style={{ color: intensityDelta <= 0 ? '#0F6E56' : 'var(--color-state-warn)', fontWeight: 600 }}>{' '}({intensityDelta > 0 ? '+' : ''}{intensityDelta.toFixed(2)})</span>
                   )}
                 </div>
               </div>
@@ -391,8 +391,8 @@ export default function TrendsPage() {
               story. 'excluded' and 'unverifiable' get their own sentences from describeYearStatus:
               one says what was left out, the other says we can't tell. */}
           {brokenYears.length > 0 && (
-            <div style={{ marginTop: 12, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1.1rem' }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 6 }}>
+            <div style={{ marginTop: 12, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1.1rem' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>
                 ⚠ {brokenYears.length === 1 ? 'One year is' : `${brokenYears.length} years are`} missing from this chart
               </div>
               {brokenYears.map((y) => (
@@ -413,11 +413,11 @@ export default function TrendsPage() {
               <span key={y.year} style={{ color: '#555553' }}>
                 <strong style={{ color: '#0d0d0d' }}>{y.year}</strong>{' '}
                 {y.dataStatus !== 'ok' ? (
-                  <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>not shown</span>
+                  <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>not shown</span>
                 ) : y.year === selected.baselineYear || y.vsBaselinePct == null ? (
                   <span style={{ color: 'var(--color-ink-muted)' }}>baseline</span>
                 ) : (
-                  <span style={{ color: y.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-module-climate)', fontWeight: 600 }}>
+                  <span style={{ color: y.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-state-warn)', fontWeight: 600 }}>
                     {y.vsBaselinePct > 0 ? '+' : ''}{y.vsBaselinePct}%
                   </span>
                 )}
@@ -461,9 +461,9 @@ export default function TrendsPage() {
 
           {/* Scope 3 not reported marker — years with NO Scope 3 record at all. */}
           {missingS3Years.length > 0 && (
-            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
               Scope 3 not reported for: {missingS3Years.join(', ')}.{' '}
-              <a href="/dashboard/scope3" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>Complete Scope 3</a> to include it.
+              <a href="/dashboard/scope3" style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>Complete Scope 3</a> to include it.
             </div>
           )}
 
@@ -475,7 +475,7 @@ export default function TrendsPage() {
               {note.includes('counts no categories') && (
                 <>
                   {' '}
-                  <a href="/dashboard/scope3" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>Answer the categories</a> to bring it into the chart.
+                  <a href="/dashboard/scope3" style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>Answer the categories</a> to bring it into the chart.
                 </>
               )}
             </div>
@@ -483,7 +483,7 @@ export default function TrendsPage() {
 
           {/* SURFACED, NOT GATED — the same treatment gwpConsistent and estimationConsistent get. */}
           {scope3Drift && (
-            <div style={{ marginTop: 12, background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+            <div style={{ marginTop: 12, background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
               {scope3Drift}
             </div>
           )}

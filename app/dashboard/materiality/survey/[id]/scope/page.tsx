@@ -49,7 +49,7 @@ import { resolveTopicLabels, isStandardVersion, type EsrsTopic } from '../../../
 const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = 'var(--color-module-climate)'
+const AMBER = 'var(--color-state-warn)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'
@@ -376,7 +376,7 @@ export default function SurveyScope() {
               return (
                 <button key={g.code}
                   onClick={() => document.getElementById(`scope-group-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.15)', background: all ? 'transparent' : 'color-mix(in srgb, var(--color-module-climate) 18%, transparent)', color: all ? 'rgba(255,255,255,0.65)' : '#f0b357', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  style={{ flexShrink: 0, padding: '5px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.15)', background: all ? 'transparent' : 'color-mix(in srgb, var(--color-state-warn) 18%, transparent)', color: all ? 'rgba(255,255,255,0.65)' : '#f0b357', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {g.label} <span style={{ opacity: 0.65 }}>{inc}/{g.questions.length}</span>
                 </button>
               )

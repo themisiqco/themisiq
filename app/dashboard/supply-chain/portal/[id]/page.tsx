@@ -281,7 +281,7 @@ export default function CampaignDetail() {
           {[
             { label: 'Total invited', val: suppliers.length, color: '#0d0d0d', bg: '#fff' },
             { label: 'Completed', val: completed, color: '#0F6E56', bg: '#E1F5EE' },
-            { label: 'In progress', val: inProgress, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+            { label: 'In progress', val: inProgress, color: 'var(--color-state-warn)', bg: '#FEF3E2' },
             { label: 'Awaiting response', val: invited, color: '#0C447C', bg: '#E6F1FB' },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background: bg, border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem', textAlign: 'center' }}>

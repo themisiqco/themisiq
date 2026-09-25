@@ -150,8 +150,8 @@ const CATEGORIES = [
  *  accurate one for Cat 15. */
 function NoFactorNotice({ what, detail, title }: { what: string; detail?: string; title?: string }) {
   return (
-    <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginTop: 10 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>{title ?? '⚠ No spend factor for this sector yet'}</div>
+    <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginTop: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>{title ?? '⚠ No spend factor for this sector yet'}</div>
       <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
         {detail ?? `${what} cannot be estimated from spend until a factor is available for the sector you selected.`}
       </div>
@@ -1601,7 +1601,7 @@ export default function Scope3Dashboard() {
   // what it looks like, so a new state cannot arrive without a colour.
   const ASSURANCE_TONE_STYLE: Record<AssuranceTone, { color: string; bg: string }> = {
     good:   { color: '#0F6E56', bg: '#E1F5EE' },
-    warn:   { color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+    warn:   { color: 'var(--color-state-warn)', bg: '#FEF3E2' },
     alert:  { color: '#B91C1C', bg: '#FCEBEB' },
     muted:  { color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
   }
@@ -2419,7 +2419,7 @@ export default function Scope3Dashboard() {
     high: { label: 'Primary data', color: '#0F6E56', bg: '#E1F5EE' },
     medium: { label: 'Activity data', color: '#0C447C', bg: '#E6F1FB' },
     exiobase_spend: { label: 'EXIOBASE spend', color: '#0C447C', bg: '#E6F1FB' },
-    low: { label: 'Not calculated', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+    low: { label: 'Not calculated', color: 'var(--color-state-warn)', bg: '#FEF3E2' },
   }
 
   /**
@@ -2700,7 +2700,7 @@ export default function Scope3Dashboard() {
             </a>
             {/* Directly under the link it warns about, not under the paragraph. */}
             {!showSaved && (
-              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-state-warn)', lineHeight: 1.5 }}>
                 {CAT3_SAVE_FIRST_HINT}
               </div>
             )}
@@ -3216,7 +3216,7 @@ export default function Scope3Dashboard() {
             if (!picked) {
               // A stored code the concordance no longer carries. Say so; do not guess a region.
               return (
-                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--color-module-climate)' }}>
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--color-state-warn)' }}>
                   <span>⚠ {countryIso2}: not in the country list; no region resolved</span>
                   <button type="button" onClick={clearCountry} style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>Clear</button>
                 </div>
@@ -3355,7 +3355,7 @@ export default function Scope3Dashboard() {
                               placeholder="e.g. no leased assets in the reporting year"
                             />
                             {!reason.trim() && (
-                              <div style={{ fontSize: 10, color: 'var(--color-module-climate)', marginTop: 4, lineHeight: 1.5 }}>
+                              <div style={{ fontSize: 10, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>
                                 The GHG Protocol requires a justification for every excluded category. Until you write one, your export names this exclusion as unjustified.
                               </div>
                             )}
@@ -3424,7 +3424,7 @@ export default function Scope3Dashboard() {
                     // all. What IS observed is that no figure was produced. unpricedReason, which the panel
                     // and the amber box below both render, is where the cause belongs — it quotes what was
                     // actually seen, per category.
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-module-climate)' }}>not priced</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-state-warn)' }}>not priced</span>
                   ) : getCatEmissions(cat.id) > 0 && (
                     // The figure, and — where the customer has judged the category not relevant — why it is
                     // still here. Without the second half a number on a panel the total does not contain
@@ -3523,7 +3523,7 @@ export default function Scope3Dashboard() {
                             {catOneResult.lines.map(l => (
                               <div key={l.supplier_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 11, padding: '4px 0', borderBottom: '0.5px solid #f3f4f6' }}>
                                 <span style={{ color: '#0d0d0d', flex: 1 }}>{l.supplier_name}</span>
-                                <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : 'var(--color-module-climate)', whiteSpace: 'nowrap' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
+                                <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : 'var(--color-state-warn)', whiteSpace: 'nowrap' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
                                 {/* ⚠️ NOT ON EVERY ROW, AND showsAssuranceChip IS THE ONE PLACE THAT DECIDES.
                                     A spend-based line is always 'not_applicable' and a 'not_asked' line says
                                     something about the questionnaire rather than the supplier, so either would
@@ -3573,7 +3573,7 @@ export default function Scope3Dashboard() {
 
                           {catOneResult.uncovered.length > 0 && (
                             <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 8, lineHeight: 1.5 }}>
-                              <strong style={{ color: 'var(--color-module-climate)' }}>Not included:</strong> {catOneResult.uncovered.map(u => `${u.supplier_name} (${u.reason})`).join('; ')}
+                              <strong style={{ color: 'var(--color-state-warn)' }}>Not included:</strong> {catOneResult.uncovered.map(u => `${u.supplier_name} (${u.reason})`).join('; ')}
                             </div>
                           )}
                           {catOneResult.currency_flags.length > 0 && (
@@ -3644,8 +3644,8 @@ export default function Scope3Dashboard() {
                   {cat.id === 'cat7' && <>
                     {/* Old saved data, first: it is the customer's own entry, and it is not in the figure. */}
                     {cat7Legacy && (
-                      <div style={{ gridColumn: '1 / -1', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ Saved commuting figures not priced: {cat7Legacy.summary}</div>
+                      <div style={{ gridColumn: '1 / -1', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ Saved commuting figures not priced: {cat7Legacy.summary}</div>
                         <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{cat7Legacy.sentences.join(' ')}</div>
                       </div>
                     )}
@@ -3690,8 +3690,8 @@ export default function Scope3Dashboard() {
                   {cat.id === 'cat5' && <>
                     {/* Old saved data, first: it is the customer's own entry, and it is not in the figure. */}
                     {cat5LegacyNotice && (
-                      <div style={{ gridColumn: '1 / -1', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ Saved waste figures not priced: {cat5LegacyNotice.tonnages}</div>
+                      <div style={{ gridColumn: '1 / -1', background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ Saved waste figures not priced: {cat5LegacyNotice.tonnages}</div>
                         <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{cat5LegacyNotice.sentences.join(' ')}</div>
                       </div>
                     )}
@@ -3859,7 +3859,7 @@ export default function Scope3Dashboard() {
                           </div>
                         ))}
                         {!showSaved && (
-                          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.5 }}>
+                          <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-state-warn)', lineHeight: 1.5 }}>
                             {CAT3_SAVE_FIRST_HINT}
                           </div>
                         )}
@@ -4154,7 +4154,7 @@ export default function Scope3Dashboard() {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {highCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56', fontWeight: 600 }}>{highCount} primary data</span>}
               {medCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{medCount} activity data</span>}
-              {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', fontWeight: 600 }}>{lowCount} not calculated</span>}
+              {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-state-warn)', fontWeight: 600 }}>{lowCount} not calculated</span>}
             </div>
             <div className="tq-summary-sub">{company} · {reportingYear} · GHG Protocol Scope 3 Standard</div>
           </div>
@@ -4168,8 +4168,8 @@ export default function Scope3Dashboard() {
               .tq-summary-body's 24px padding so the box lines up with the content above it; the
               body's own 20px bottom padding now provides the gap marginTop used to. */}
           {unpricedCats.length > 0 && (
-            <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', margin: '0 24px 20px', textAlign: 'left' as const }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
+            <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', margin: '0 24px 20px', textAlign: 'left' as const }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>
                 ⚠ This total excludes {unpricedCats.length} categor{unpricedCats.length === 1 ? 'y' : 'ies'} that {unpricedCats.length === 1 ? 'was' : 'were'} not priced
               </div>
               {/* One line per category, each with its OWN observed reason. See unpricedReason. */}
@@ -4220,7 +4220,7 @@ export default function Scope3Dashboard() {
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{cat.name}</div>
                   <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{cat.stream}</div>
                   {!st.inTotal && st.calculated && (
-                    <div style={{ fontSize: 10, color: 'var(--color-module-climate)', lineHeight: 1.4, marginTop: 2 }}>
+                    <div style={{ fontSize: 10, color: 'var(--color-state-warn)', lineHeight: 1.4, marginTop: 2 }}>
                       {st.label} (reported, not in the total)
                     </div>
                   )}
@@ -4277,7 +4277,7 @@ export default function Scope3Dashboard() {
                     <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>Cat {c.num} {c.name}:</strong>{' '}
                     {reason
                       ? reason
-                      : <span style={{ color: 'var(--color-module-climate)' }}>No justification recorded. The GHG Protocol requires one for every excluded category. Add it in the Relevance step.</span>}
+                      : <span style={{ color: 'var(--color-state-warn)' }}>No justification recorded. The GHG Protocol requires one for every excluded category. Add it in the Relevance step.</span>}
                     {statusOf(c.id).calculated && <span style={{ color: 'var(--color-ink-muted)' }}> · calculated at {getCatEmissions(c.id).toFixed(2)} mt CO₂e, reported but not in the total.</span>}
                   </div>
                 )
@@ -4313,8 +4313,8 @@ export default function Scope3Dashboard() {
           gated on it: a customer who has not written one yet still gets their inventory, and the file says
           "No justification recorded" against that category rather than leaving the cell blank. */}
       {unjustifiedExclusions.length > 0 && (
-        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
+        <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>
             {unjustifiedExclusions.length} excluded {unjustifiedExclusions.length === 1 ? 'category has' : 'categories have'} no justification
           </div>
           <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
@@ -4336,8 +4336,8 @@ export default function Scope3Dashboard() {
       {(() => {
         const clash = acceptedCatOneLines ? assuranceContradictionSentence(acceptedCatOneLines) : null
         return clash ? (
-          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>
+          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>
               A supplier figure and a supplier answer disagree
             </div>
             <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{clash}</div>
@@ -4433,15 +4433,15 @@ export default function Scope3Dashboard() {
             {/* An id in the URL that did not open. One sentence, from lib/moduleLinks.ts, ending the
                 way this page can honour: the picker is right below it. */}
             {bindError && (
-              <div role="alert" style={{ background: '#FEF3C7', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
+              <div role="alert" style={{ background: '#FEF3C7', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
                 {bindError}
               </div>
             )}
             {inventoryList.length > 0 ? (
               <>
                 {cameFromGhg && (
-                  <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 20%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>Came from a GHG inventory? If you don&apos;t see it below, it isn&apos;t saved yet: <a href="/dashboard/ghg" style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>go back and save it first</a>.</div>
+                  <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>Came from a GHG inventory? If you don&apos;t see it below, it isn&apos;t saved yet: <a href="/dashboard/ghg" style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>go back and save it first</a>.</div>
                   </div>
                 )}
                 <p style={sectionSub}>Your Scope 3 inventory links to one of your GHG inventories so the company and reporting year stay aligned across both records. Pick which one this is for.</p>

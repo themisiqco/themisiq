@@ -165,7 +165,7 @@ const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
   critical: { label: 'CRITICAL', color: '#fff', bg: '#B91C1C', border: '#B91C1C' },
   high:     { label: 'HIGH', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  medium:   { label: 'MEDIUM', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  medium:   { label: 'MEDIUM', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
   low:      { label: 'LOW', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
 }
 
@@ -759,7 +759,7 @@ function SupplyChainDashboardInner() {
             {[
               { label: 'Critical risk', count: critical, color: '#B91C1C', bg: '#FCEBEB' },
               { label: 'High risk', count: high, color: '#B91C1C', bg: '#FCEBEB' },
-              { label: 'Need assessment', count: needsAssessment, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+              { label: 'Need assessment', count: needsAssessment, color: 'var(--color-state-warn)', bg: '#FEF3E2' },
               { label: 'Total suppliers', count: inventory.suppliers.length, color: '#0d0d0d', bg: '#f8f7f5' },
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
@@ -844,8 +844,8 @@ function SupplyChainDashboardInner() {
               // and the withholding is explained, rather than a number appearing that nothing
               // supports. See app/dashboard/ghg/page.tsx, "We can't work out this location's
               // emissions yet".
-              <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 4 }}>⚠ No Scope 3 estimate yet</div>
+              <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ No Scope 3 estimate yet</div>
                 <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
                   {unpricedCount === inventory.suppliers.length
                     ? 'No spend factors are held for the sectors in this register yet, so no Scope 3 Cat.1 estimate is shown.'
@@ -873,7 +873,7 @@ function SupplyChainDashboardInner() {
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{s.name || `Supplier ${i + 1}`}</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>{industryName(s.sector)}</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>{s.annual_spend > 0 ? `${s.currency} ${s.annual_spend.toLocaleString()}` : '—'}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: s.scope3_emissions === null ? '#92400e' : s.scope3_emissions > 100 ? '#B91C1C' : s.scope3_emissions > 10 ? 'var(--color-module-climate)' : '#0F6E56' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: s.scope3_emissions === null ? '#92400e' : s.scope3_emissions > 100 ? '#B91C1C' : s.scope3_emissions > 10 ? 'var(--color-state-warn)' : '#0F6E56' }}>
                   {s.scope3_emissions === null ? 'not available' : s.scope3_emissions > 0 ? `${s.scope3_emissions.toFixed(2)} mt` : '—'}
                 </div>
               </div>
@@ -906,7 +906,7 @@ function SupplyChainDashboardInner() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-climate)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-state-warn)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -1056,7 +1056,7 @@ function SupplyChainDashboardInner() {
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-climate)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
                 </div>

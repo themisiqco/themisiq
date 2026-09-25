@@ -19,7 +19,7 @@ const GRAD = 'var(--color-brand)'
 
 const SEVERITY_CONFIG = {
   critical: { label: 'CRITICAL', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  high:     { label: 'HIGH', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  high:     { label: 'HIGH', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
   medium:   { label: 'MEDIUM', color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
 }
 
@@ -205,14 +205,14 @@ export default function DealAssessmentPage() {
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{risk.risk}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{regimeLabel(mapFramework(risk.framework))}</span>
-                      {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 35%, transparent)' }}>CONDITIONAL</span>}
+                      {risk.scope === 'conditional' && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-state-warn)', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 35%, transparent)' }}>CONDITIONAL</span>}
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
                     </div>
                   </div>
                   <div style={{ padding: '10px 16px' }}>
                     <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{risk.detail}</div>
                     {risk.scope === 'conditional' && (
-                      <div style={{ fontSize: 11, color: 'var(--color-module-climate)', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.55, marginTop: 8 }}>{risk.condition}</div>
                     )}
                   </div>
                 </div>
@@ -292,7 +292,7 @@ export default function DealAssessmentPage() {
           ].map(({ label, ready }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 16px' }}>
               <span style={{ fontSize: 13, color: '#0d0d0d' }}>{label}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: ready ? '#E1F5EE' : '#FEF3E2', color: ready ? '#0F6E56' : 'var(--color-module-climate)' }}>{ready ? 'Available' : 'Not yet available'}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: ready ? '#E1F5EE' : '#FEF3E2', color: ready ? '#0F6E56' : 'var(--color-state-warn)' }}>{ready ? 'Available' : 'Not yet available'}</span>
             </div>
           ))}
         </div>

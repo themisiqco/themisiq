@@ -281,7 +281,7 @@ export default function PeopleDashboard() {
           { id: 'sasb', name: 'SASB Human Capital', desc: 'Sector-specific workforce metrics · investor-grade', urgency: 'medium' },
         ].map(fw => {
           const selected = inventory.jurisdictions.includes(fw.id)
-          const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
+          const urgencyColor = fw.urgency === 'critical' ? '#B91C1C' : fw.urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
           const urgencyBg = fw.urgency === 'critical' ? '#FCEBEB' : fw.urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
           return (
             <div key={fw.id} onClick={() => toggleJurisdiction(fw.id)} style={{ border: `2px solid ${selected ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 12, padding: '1.25rem', cursor: 'pointer', background: selected ? '#fff' : '#f8f7f5', transition: 'all 0.15s' }}>

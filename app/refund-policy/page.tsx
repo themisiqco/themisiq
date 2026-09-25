@@ -17,7 +17,7 @@ export default function Page() {
               <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
-          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-module-climate)', '--tq-state-wash': '#FEF3E2' } as React.CSSProperties}>
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-state-warn)', '--tq-state-wash': '#FEF3E2' } as React.CSSProperties}>
             <div className="tq-callout-heading">All sales are final once performance begins</div>
             <div className="tq-callout-text">The Service is sold to businesses as a twelve-month license with immediate access and unlimited report generation. Please read this policy in full before purchasing.</div>
           </div>

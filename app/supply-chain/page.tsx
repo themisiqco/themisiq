@@ -74,7 +74,7 @@ export default function Page() {
               // sources, pending EUR-Lex verification: see docs/backlog.md. The claim went with it, and
               // the red went with the claim, because a 2029 date carried in the same colour as an overdue
               // one is its own small overstatement.
-              { val: 'CS3D', unit: CS3D_APPLIES_FROM, label: 'Your in-scope customers must diligence their value chain, and ask you for what they need', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+              { val: 'CS3D', unit: CS3D_APPLIES_FROM, label: 'Your in-scope customers must diligence their value chain, and ask you for what they need', color: 'var(--color-state-warn)', bg: '#FEF3E2' },
               { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP supplier engagement · ESRS S2, one platform', color: '#0F6E56', bg: '#E1F5EE' },
               { val: '$2,900', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach, same outcome', color: '#0C447C', bg: '#E6F1FB' },
             ].map(({ val, unit, label, color, bg }) => (
@@ -146,7 +146,7 @@ export default function Page() {
               { fw: 'Modern Slavery Act', scope: 'UK + Australia transparency statement', deadline: 'Annual', urgency: 'medium' },
               { fw: 'EcoVadis', scope: 'Supplier sustainability ratings', deadline: 'Customer-requested', urgency: 'medium' },
             ].map(({ fw, scope, deadline, urgency }) => {
-              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
+              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
               return (
                 <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-line)' }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 5 }} />

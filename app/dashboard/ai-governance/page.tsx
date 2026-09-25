@@ -179,7 +179,7 @@ const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-
 const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bg: string; border: string }> = {
   prohibited:   { label: 'PROHIBITED', color: '#fff', bg: '#B91C1C', border: '#B91C1C' },
   high_risk:    { label: 'HIGH RISK', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  limited_risk: { label: 'LIMITED RISK', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  limited_risk: { label: 'LIMITED RISK', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
   minimal_risk: { label: 'MINIMAL RISK', color: '#0F6E56', bg: '#E1F5EE', border: '#0F6E56' },
   unclassified: { label: 'NOT CLASSIFIED', color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 }
@@ -535,7 +535,7 @@ export default function AIGovernanceDashboard() {
                  app/styles/themisiq-tokens.css, semantic state takes the top edge; the fill and
                  the label stay put and only the rule and the badge change. */
               return (
-                <div key={s.id} className="tq-callout" style={{ overflow: 'hidden', '--tq-state': s.risk_level === 'prohibited' ? '#B91C1C' : s.risk_level === 'high_risk' ? 'var(--color-module-climate)' : 'var(--color-line)' } as React.CSSProperties}>
+                <div key={s.id} className="tq-callout" style={{ overflow: 'hidden', '--tq-state': s.risk_level === 'prohibited' ? '#B91C1C' : s.risk_level === 'high_risk' ? 'var(--color-state-warn)' : 'var(--color-line)' } as React.CSSProperties}>
                   <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name || `System ${i + 1}`}</div>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}` }}>{cfg.label}</span>
@@ -554,7 +554,7 @@ export default function AIGovernanceDashboard() {
             {[
               { label: 'Prohibited', count: prohibited, color: '#B91C1C', bg: '#FCEBEB' },
               { label: 'High risk', count: highRisk, color: '#B91C1C', bg: '#FCEBEB' },
-              { label: 'Limited risk', count: limitedRisk, color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+              { label: 'Limited risk', count: limitedRisk, color: 'var(--color-state-warn)', bg: '#FEF3E2' },
               { label: 'Minimal risk', count: minimalRisk, color: '#0F6E56', bg: '#E1F5EE' },
             ].map(({ label, count, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}>
@@ -581,7 +581,7 @@ export default function AIGovernanceDashboard() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {inventory.systems.filter(s => s.risk_level === 'prohibited' || s.risk_level === 'high_risk').map(s => (
-            <div key={s.id} className="tq-callout" style={{ overflow: 'hidden', '--tq-state': s.risk_level === 'prohibited' ? '#B91C1C' : s.risk_level === 'high_risk' ? 'var(--color-module-climate)' : 'var(--color-line)' } as React.CSSProperties}>
+            <div key={s.id} className="tq-callout" style={{ overflow: 'hidden', '--tq-state': s.risk_level === 'prohibited' ? '#B91C1C' : s.risk_level === 'high_risk' ? 'var(--color-state-warn)' : 'var(--color-line)' } as React.CSSProperties}>
               <div style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
                 <span style={{ fontSize: 10, fontWeight: 700, color: '#B91C1C', background: '#FCEBEB', padding: '2px 8px', borderRadius: 99 }}>
@@ -620,7 +620,7 @@ export default function AIGovernanceDashboard() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '0.85rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 500, color: urgent ? 'var(--color-module-climate)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '0.85rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 500, color: urgent ? 'var(--color-state-warn)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -704,7 +704,7 @@ export default function AIGovernanceDashboard() {
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-climate)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
                 </div>

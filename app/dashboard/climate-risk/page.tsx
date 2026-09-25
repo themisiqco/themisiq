@@ -623,7 +623,7 @@ export default function MaterialityWizard() {
               something the user just DID; the sector prompt is something they have not yet done.
               One is feedback, the other would be a reprimand for inaction. */}
           {blockers.find(b => b.field === 'period') && (
-            <div style={{ fontSize: 11.5, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--color-state-warn)', marginTop: 6, lineHeight: 1.6 }}>
               {blockers.find(b => b.field === 'period')!.atField}
             </div>
           )}
@@ -677,8 +677,8 @@ export default function MaterialityWizard() {
         const chk = checkReportingPeriod(periodStart || null, periodEnd || null, standardVersion)
         if (chk.status !== 'conflict') return null
         return (
-          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-module-climate)', marginBottom: 3 }}>
+          <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '10px 14px', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 3 }}>
               The reporting period and the ESRS version you selected do not agree
             </div>
             <div style={{ fontSize: 11.5, color: '#555553', lineHeight: 1.6 }}>
@@ -702,7 +702,7 @@ export default function MaterialityWizard() {
         })}
       </div>
       {blockerAt('sector') && (
-        <div style={{ fontSize: 11.5, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11.5, color: 'var(--color-state-warn)', marginTop: 6, lineHeight: 1.6 }}>
           {blockerAt('sector')!.atField}
         </div>
       )}
@@ -745,7 +745,7 @@ export default function MaterialityWizard() {
         </div>
       ))}
       {blockerAt('regions') && (
-        <div style={{ fontSize: 11.5, color: 'var(--color-module-climate)', marginTop: 6, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 11.5, color: 'var(--color-state-warn)', marginTop: 6, lineHeight: 1.6 }}>
           {blockerAt('regions')!.atField}
         </div>
       )}
@@ -1000,7 +1000,7 @@ export default function MaterialityWizard() {
     const trans: any[] = result?.transition || []
     return (
       <>
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-module-climate)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-state-warn)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Physical risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry × geography × scenario</span></div>
           <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
           <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</span>}</div>
@@ -1056,7 +1056,7 @@ export default function MaterialityWizard() {
         {/* count cards */}
         <div style={{ display: 'grid', gridTemplateColumns: mode === 'csrd' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
           <div style={{ background: '#FCEBEB', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#B91C1C' }}>{s.physicalHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High physical risks</div></div>
-          <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-module-climate)' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
+          <div style={{ background: '#FEF3E2', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-state-warn)' }}>{s.transitionHigh ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>High transition risks</div></div>
           <div style={{ background: '#E1F5EE', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: '#0F6E56' }}>{s.opportunitiesStrong ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Strong opportunities</div></div>
           {mode === 'csrd' && <div style={{ background: 'var(--color-brand-wash)', borderRadius: 10, padding: '0.75rem', textAlign: 'center' }}><div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color: 'var(--color-brand)' }}>{s.topicsBothAxes ?? 0}</div><div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>Topics material on both axes</div></div>}
         </div>
@@ -1274,7 +1274,7 @@ export default function MaterialityWizard() {
         )}
 
         {/* comparison grids */}
-        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-module-climate)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
+        <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-state-warn)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 10 }}>Physical risks across scenarios</div>
           {physical.length ? itemRows(physical, 'physical') : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</span>}
         </div>

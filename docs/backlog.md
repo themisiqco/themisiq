@@ -871,3 +871,59 @@ which is worse than either answer applied consistently.
 
 **Do not add a boundary as part of the Scope 3 work.** It touches every module in the dashboard and
 deserves its own change with its own preview check.
+### The scale palette: amber as a data value, not a warning
+
+**Left behind deliberately by step 1 of the brand token work, 25 Sep 2026.** When
+`--color-state-warn` was extracted from `--color-module-climate`, 273 uses moved and 29 stayed.
+**Fourteen of those 29 are steps in an ORDERED SCALE**, which is neither module identity nor a warning:
+
+- risk severity `med` and `unknown`, against `#A32D2D` for high:
+  `app/dashboard/climate-risk/page.tsx:59, 63, 1166`, `app/dashboard/climate-risk/report/page.tsx:53, 159`
+- the materiality matrix dot, "Material on one axis", between `#A32D2D` "both" and
+  `--color-ink-muted` "lower priority": `app/dashboard/climate-risk/page.tsx:902, 953`,
+  `app/dashboard/materiality/report/page.tsx:695, 1011`
+- IPCC warming scenarios, "Current trajectory ~2.7C" and "High warming ~4.4C":
+  `app/page.tsx:166`, `app/climate-risk/page.tsx:137`
+
+⚠️ **A WARMING SCENARIO IS NOT A WARNING.** Putting these on `--color-state-warn` would be defensible
+mechanically and wrong in meaning: nothing is amiss about the 2.7C pathway, it is the middle value on
+an axis. Putting them on a module hue is what created the problem step 1 fixed.
+
+**What they want is a `--color-scale-*` family**: a low, a mid and a high, with the mid at today's
+`#A94E0D` so nothing moves on the day it is introduced. ⚠️ **Decide the scale's grounds before its
+values**: the severity chips sit on `#FEF3E2`, the matrix dots on white, so a mid that clears AA on
+one may not on the other, which is the same trap the module `-ink` companions hit.
+
+⚠️ **This must land before the palette swap, or the scale steps inherit whatever Climate Risk becomes.**
+Under the intended colourway that is `#004AAD`, a deep blue, which would render "medium risk" and
+"current trajectory" in the same blue as the module's identity.
+
+### `-error`, `-info` and `-ok` are declared and almost nothing reads them
+
+Step 1 declared `--color-state-error` `#B91C1C`, `--color-state-info` `#0C447C` and `--color-state-ok`
+`#0F6E56` with their washes, and mirrored them in `lib/brand.ts`. **The extraction was the whole of it:
+roughly a hundred call sites still carry those three as hardcoded hex.**
+
+That is not a defect today, because the tokens hold exactly the values the literals hold. It becomes one
+the moment anybody changes a token and assumes the literals followed. The migration is mechanical and
+much easier than the warn one was, because the meanings do not collide: `#B91C1C` is a failure
+everywhere it appears, `#0F6E56` a success, `#0C447C` a neutral notice. There is no
+identity-versus-state ambiguity to resolve, only volume.
+
+⚠️ **One caveat before a blanket replacement.** `#0F6E56` and `#0C447C` are also used as
+CONFIDENCE-PILL colours in the Scope 3 calculator (`confidenceConfig`: `high` is `#0F6E56`, `medium` and
+`exiobase_spend` are `#0C447C`), which is a data-quality scale rather than a state. Same distinction as
+the scale entry above. Settle `--color-scale-*` first, then do this pass, or those pills will move to
+state tokens for want of a better home.
+
+### `app/api/assessment/submit/route.ts:29` hardcodes the warning colour in an email
+
+`const URGENCY_COLOR = { critical: '#B91C1C', high: '#A94E0D', medium: '#0C447C', monitor: '${INK_MUTED}' }`.
+
+⚠️ **It is an email, so it cannot read a CSS token** — that is exactly what `lib/brand.ts` exists for, and
+the same line already interpolates `INK_MUTED` from there, so the import is present and three of the four
+values are typed out beside it. It should read `STATE_ERROR`, `STATE_WARN` and `STATE_INFO`.
+
+Small, and worth doing with the `-error`/`-info`/`-ok` pass rather than alone: `lib/brand.test.ts` checks
+that the token layer and `lib/brand.ts` agree, but **nothing checks that a call site reads the constant
+rather than retyping its value**, which is how this line came to hold three literals in the first place.

@@ -118,8 +118,8 @@ interface WorkingRow {
 function CountryRefusalCell({ refusal }: { refusal: CountryRefusal }) {
   return (
     <>
-      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>{countryRefusalLabel(refusal)}</span>
-      <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
+      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>{countryRefusalLabel(refusal)}</span>
+      <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-state-warn)' }}>
         {countryRefusalText(refusal, 'verifier', false)} This is not a figure of zero.
       </div>
     </>
@@ -246,7 +246,7 @@ const isExclusion = (k: string): boolean => k.startsWith('not_relevant')
 // Presentation only, and the same four tones the buyer's screen uses. The STATE decides what is said.
 const ASSURANCE_TONE_STYLE: Record<AssuranceTone, { color: string; bg: string }> = {
   good:  { color: '#0F6E56', bg: '#E1F5EE' },
-  warn:  { color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+  warn:  { color: 'var(--color-state-warn)', bg: '#FEF3E2' },
   alert: { color: '#B91C1C', bg: '#FCEBEB' },
   muted: { color: 'var(--color-ink-muted)', bg: '#f8f7f5' },
 }
@@ -743,7 +743,7 @@ export default function VerifierPage() {
           {' · '}
           {inv.gwp_version
             ? <>GWP basis: {inv.gwp_version}</>
-            : <span style={{ color: 'var(--color-module-climate)', fontWeight: 600 }}>GWP basis not stated</span>}
+            : <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>GWP basis not stated</span>}
         </p>
 
         {/*
@@ -1048,8 +1048,8 @@ export default function VerifierPage() {
                       )}
                       {w.declaration === 'undeclared' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Not declared</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Not declared</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-state-warn)' }}>
                             Nobody has said whether this location has this or not, so the inventory cannot be shown
                             to be complete without it. This is not a figure of zero.
                           </div>
@@ -1064,8 +1064,8 @@ export default function VerifierPage() {
                           matched pair with opposite polarity. */}
                       {w.declaration === 'declared_unquantified' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Present, no figure</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Present, no figure</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-state-warn)' }}>
                             The operator has confirmed this location has this, and has given no figure for it.
                             Whatever it emitted is missing from every total on this page. This is not a figure of
                             zero — and unlike a stream nobody was asked about, this one is known to be here.
@@ -1085,8 +1085,8 @@ export default function VerifierPage() {
                           supply a figure, and how big it is, is what a verifier is judging. */}
                       {w.declaration === 'no_published_factor' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Stream not priced</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Stream not priced</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-state-warn)' }}>
                             The operator reported a quantity for this stream, and no emission factor is published
                             for it in this jurisdiction. The quantity shown is what they reported; the emissions it
                             represents are missing from every total on this page. This is not a figure of zero, and
@@ -1113,8 +1113,8 @@ export default function VerifierPage() {
                       {w.declaration === 'country_not_supported' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
                       {w.declaration === 'unpriceable' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-module-climate)', background: 'color-mix(in srgb, var(--color-module-climate) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>
-                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-module-climate)' }}>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>
+                          <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-state-warn)' }}>
                             No published emission factor exists for the unit this location&apos;s figures are in, so it
                             could not be calculated. Every total on this page is missing this location. This is not
                             a figure of zero.
@@ -1356,7 +1356,7 @@ export default function VerifierPage() {
                       <div key={`${l.supplier_name}-${i}`} style={{ padding: '7px 0', borderBottom: i < snap.lines.length - 1 ? '0.5px solid #f3f4f6' : 'none' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12 }}>
                           <span style={{ color: '#0d0d0d', flex: 1 }}>{l.supplier_name}</span>
-                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, whiteSpace: 'nowrap', background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : 'var(--color-module-climate)' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, whiteSpace: 'nowrap', background: l.method === 'supplier-specific' ? '#E1F5EE' : '#FEF3E2', color: l.method === 'supplier-specific' ? '#0F6E56' : 'var(--color-state-warn)' }}>{l.method === 'supplier-specific' ? 'primary' : 'spend-based'}</span>
                           {/* Same gate as the buyer's screen: no chip where the label would be identical
                               on every row. A line with NO assurance key gets the not-recorded note below
                               instead, which is not the same as "not assured". */}
@@ -1378,7 +1378,7 @@ export default function VerifierPage() {
 
                 {snap.uncovered.length > 0 && (
                   <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6, lineHeight: 1.6 }}>
-                    <strong style={{ color: 'var(--color-module-climate)' }}>Not included in this figure:</strong>{' '}
+                    <strong style={{ color: 'var(--color-state-warn)' }}>Not included in this figure:</strong>{' '}
                     {snap.uncovered.map(u => `${u.supplier_name}: ${u.reason}`).join(' ')}
                   </div>
                 )}

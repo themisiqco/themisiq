@@ -43,7 +43,7 @@ import { finalisationStamp, type Readiness }
 const BRAND = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = 'var(--color-module-climate)'
+const AMBER = 'var(--color-state-warn)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'

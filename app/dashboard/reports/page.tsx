@@ -137,7 +137,7 @@ export default function ReportsPage() {
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{title}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: kc.bg, color: kc.color }}>{kindLabel(r)}</span>
                         {r.status && r.status !== 'complete' && (
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-module-climate)' }}>{String(r.status).toUpperCase()}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-state-warn)' }}>{String(r.status).toUpperCase()}</span>
                         )}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>

@@ -101,7 +101,7 @@ export default function SupplierPortalDashboard() {
   const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
   const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 
-  const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? 'var(--color-ink-muted)' : 'var(--color-module-climate)'
+  const statusColor = (s: string) => s === 'active' ? '#0F6E56' : s === 'closed' ? 'var(--color-ink-muted)' : 'var(--color-state-warn)'
   const statusBg = (s: string) => s === 'active' ? '#E1F5EE' : s === 'closed' ? '#f8f7f5' : '#FEF3E2'
 
   if (entLoading) return (

@@ -42,7 +42,7 @@ import {
 const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
 const GREEN_BG = '#E1F5EE'
-const AMBER = 'var(--color-module-climate)'
+const AMBER = 'var(--color-state-warn)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'

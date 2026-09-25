@@ -54,7 +54,7 @@ export const SUPPLIER_STATUS: Record<SupplierStatus, SupplierStatusCopy> = {
       'The questionnaire was sent and has not been opened. No allocated figure and no spend are recorded for this supplier yet.',
   },
   in_progress: {
-    label: 'In progress', color: 'var(--color-module-climate)', bg: '#FEF3E2',
+    label: 'In progress', color: 'var(--color-state-warn)', bg: '#FEF3E2',
     noFigureReason:
       'The questionnaire has been opened but not submitted. No allocated figure and no spend are recorded for this supplier yet.',
   },

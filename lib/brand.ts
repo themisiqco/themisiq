@@ -62,6 +62,27 @@ export const ON_DARK_MUTED = '#B2BDC1'
 // they are not brand colours and must not stand in for BRAND.
 export type ModuleHue = { readonly color: string; readonly wash: string }
 
+/* ---- State ------------------------------------------------------------- */
+/**
+ * ⚠️ AN EXTRACTION FROM --color-module-climate, NOT A NEW PALETTE. Until 25 Sep 2026 the Climate Risk
+ * module hue was also the platform's warning colour: 273 of its 302 uses were warnings rather than
+ * module identity, and three fallbacks in the token layer read
+ * `var(--tq-state, var(--color-module-climate))`. Nothing renders differently for this change; the point
+ * is that a palette swap can now give Climate Risk a new hue without recolouring every warning.
+ *
+ * ⚠️ app/api/assessment/submit/route.ts HARDCODES #A94E0D in an email severity map and should read
+ * STATE_WARN from here instead. docs/backlog.md carries it; the -error, -info and -ok values are
+ * likewise still hardcoded at about a hundred call sites, which is a later pass.
+ */
+export const STATE_WARN        = '#A94E0D'   // caution, incomplete, 5.6:1 on white
+export const STATE_WARN_WASH   = '#FBE7DD'
+export const STATE_ERROR       = '#B91C1C'   // failed, invalid,     6.1:1
+export const STATE_ERROR_WASH  = '#FEE5E6'
+export const STATE_INFO        = '#0C447C'   // neutral notice,      8.6:1
+export const STATE_INFO_WASH   = '#E6F1FB'
+export const STATE_OK          = '#0F6E56'   // complete, passed,    5.0:1
+export const STATE_OK_WASH     = '#E1F5EE'
+
 export const MODULE = {
   ghg:     { color: '#095C6B', wash: '#D7EFF6' },  // GHG Emissions
   cbam:    { color: '#1C5EAA', wash: '#E6EBFC' },  // CBAM

@@ -139,7 +139,7 @@ export default function Page() {
               figure stay exactly as they were.
               sbStatVal / sbStatUnit stay DERIVED from SB253_FIRST_REPORT_DATE (see the note at the
               top of this file) — the date is never retyped here. ── */}
-          <div className="tq-callout" style={{ '--tq-state': 'var(--color-module-climate)', marginTop: 34 } as React.CSSProperties}>
+          <div className="tq-callout" style={{ '--tq-state': 'var(--color-state-warn)', marginTop: 34 } as React.CSSProperties}>
             <div className="tq-callout-body">
               <div>
                 <div className="tq-callout-label">Next reporting date</div>
@@ -192,7 +192,7 @@ export default function Page() {
               { date: '2030+', event: 'Reasonable assurance (Scope 1 + 2)', status: 'future', days: 'Build toward' },
             ].map(({ date, event, status, days }) => (
               <div key={date} style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '12px 0', borderBottom: '0.5px solid var(--color-line)' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: status === 'critical' ? '#B91C1C' : status === 'upcoming' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)', flexShrink: 0, marginTop: 5 }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: status === 'critical' ? '#B91C1C' : status === 'upcoming' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)', flexShrink: 0, marginTop: 5 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{event}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{date}</div>

@@ -173,7 +173,7 @@ export default function TrustPage() {
               The amber state matches the "In progress" badge those same three certifications carry
               on /security, so the two pages say the same thing in the same colour. Keep them in
               step: if a target date moves on /security, it moves here. */}
-          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-module-climate)', '--tq-state-wash': '#FEF3E2', marginBottom: '1.25rem' } as React.CSSProperties}>
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-state-warn)', '--tq-state-wash': '#FEF3E2', marginBottom: '1.25rem' } as React.CSSProperties}>
             <div className="tq-callout-heading">ThemisIQ holds neither SOC 2 nor ISO 27001 today</div>
             <div className="tq-callout-text">The certifications named below are held by our subprocessors, not by ThemisIQ. Our own SOC 2 Type I, SOC 2 Type II and ISO 27001:2022 are in progress — <a href="/security" style={{ color: 'var(--color-brand)' }}>current status and target dates</a>.</div>
           </div>

@@ -51,6 +51,38 @@
   --color-module-ai:           #136C3D; /* AI Governance      6.5:1 */
   --color-module-ai-wash:      #DEEFE3;
 
+  /* ── STATE ────────────────────────────────────────────────────────────────────────────────────
+     WHAT A SURFACE IS TELLING YOU, AS OPPOSED TO WHICH MODULE IT BELONGS TO.
+
+     ⚠️ THESE ARE AN EXTRACTION, NOT NEW COLOURS. Every value below was already in use as a literal
+     or borrowed from a module hue; none of them changes what any pixel renders today. They exist so
+     that the two meanings stop sharing one token.
+
+     ⚠️ WHY: --color-module-climate WAS THE PLATFORM'S WARNING COLOUR. On 25 Sep 2026 it had 302 live
+     uses across 52 files, and only FOUR of them were Climate Risk identity: the module card on the
+     dashboard, the module's section of the methodology page, and the banner on its marketing page.
+     The other 273 were warnings — "not priced", "GWP basis not stated", "In progress", severity
+     amber in a red/amber/grey scale, sixteen files declaring `const AMBER = var(--color-module-climate)`.
+     Three of the fallbacks in this very file read `var(--tq-state, var(--color-module-climate))`, so
+     the state hook defaulted to a module hue.
+       That coupling made a palette change unsafe in a way no test could catch: giving Climate Risk a
+     new hue would have turned two hundred warnings that colour, silently, with every contrast check
+     still passing. The 273 moved to --color-state-warn on the same day, by an explicit line list.
+
+     ⚠️ TWENTY-NINE USES OF --color-module-climate REMAIN AND ARE DELIBERATE. Four are the identity
+     sites above; fourteen are steps in an ordered SCALE (risk severity MED, IPCC warming scenarios,
+     the materiality matrix's "material on one axis"), which is neither identity nor a warning and
+     wants a --color-scale-* family of its own; four are decorative category accents; three are
+     one-offs; four are the declaration and the [data-module] plumbing. See docs/backlog.md. */
+  --color-state-warn:        #A94E0D; /* caution, incomplete, not yet priced   5.6:1 */
+  --color-state-warn-wash:   #FBE7DD;
+  --color-state-error:       #B91C1C; /* failed, invalid, refused              6.1:1 */
+  --color-state-error-wash:  #FEE5E6;
+  --color-state-info:        #0C447C; /* neutral notice, activity data         8.6:1 */
+  --color-state-info-wash:   #E6F1FB;
+  --color-state-ok:          #0F6E56; /* complete, primary data, passed        5.0:1 */
+  --color-state-ok-wash:     #E1F5EE;
+
   /* ---- Reversed text --------------------------------------------- */
   /* Off-white, never #FFF. Pure white haloes against dark and is the
      usual cause of type that looks blurred at reversed polarity. */
@@ -342,7 +374,7 @@ h3 { font-size: var(--text-xl); }
      the call site, so the DEVICE (4px top rule, 1px border, radius) lives only here. */
   background: var(--tq-state-wash, var(--color-paper));
   border: 1px solid var(--color-line);
-  border-top: 4px solid var(--tq-state, var(--color-module-climate));
+  border-top: 4px solid var(--tq-state, var(--color-state-warn));
   border-radius: var(--radius-panel);
 }
 
@@ -376,7 +408,7 @@ h3 { font-size: var(--text-xl); }
 .tq-callout-label {
   font-size: var(--text-2xs);
   font-weight: 700;
-  color: var(--tq-state, var(--color-module-climate));
+  color: var(--tq-state, var(--color-state-warn));
   letter-spacing: 0.012em;
 }
 .tq-callout-figure {
@@ -384,7 +416,7 @@ h3 { font-size: var(--text-xl); }
   font-size: var(--text-3xl);
   font-weight: 600;
   line-height: 1;
-  color: var(--tq-state, var(--color-module-climate));
+  color: var(--tq-state, var(--color-state-warn));
   font-variant-numeric: tabular-nums lining-nums;
   text-align: right;
   white-space: nowrap;

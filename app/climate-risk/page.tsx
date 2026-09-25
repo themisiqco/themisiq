@@ -79,7 +79,7 @@ export default function Page() {
               { who: 'Investors', desc: 'Institutional investors and PE/VC backers increasingly require TCFD- or IFRS S2-aligned climate risk disclosure as part of diligence and ongoing portfolio monitoring. PRI signatories ask portfolio companies directly.', color: 'var(--color-module-deals)' },
               { who: 'Banks & lenders', desc: 'Climate risk assessment is now routine in credit decisions and loan covenants. Lenders need to understand the physical and transition risk on their books — and they push that requirement down to borrowers.', color: 'var(--color-module-cbam)' },
               { who: 'Boards & audit committees', desc: 'Directors carry oversight duty for material climate risk. A structured assessment gives the board the documented risk picture they need — and protects them if exposure is later questioned.', color: 'var(--color-module-ai)' },
-              { who: 'Customers & supply chain', desc: 'Large buyers cascade their own climate commitments down to suppliers. A credible risk assessment is increasingly a condition of winning or keeping enterprise contracts.', color: 'var(--color-module-climate)' },
+              { who: 'Customers & supply chain', desc: 'Large buyers cascade their own climate commitments down to suppliers. A credible risk assessment is increasingly a condition of winning or keeping enterprise contracts.', color: 'var(--color-state-warn)' },
             ].map(({ who, desc, color }) => (
               <div key={who} style={{ background: 'var(--color-paper)', border: '0.5px solid var(--color-line)', borderRadius: 12, padding: '1.5rem' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color, marginBottom: 8 }}>{who}</div>

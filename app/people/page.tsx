@@ -45,7 +45,7 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: 'var(--color-module-climate)', bg: '#FEF3E2' },
+              { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: 'var(--color-state-warn)', bg: '#FEF3E2' },
 { val: 'Jun 2027', unit: 'first report', label: 'EU pay-gap reporting — employers 150+', color: '#B91C1C', bg: '#FCEBEB' },
               { val: 'ESRS S1', unit: 'active now', label: 'large EU companies reporting on own workforce from FY2024', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
               { val: '100+', unit: 'CA employees', label: 'triggers California Pay Data Reporting Act — annual DFEH submission', color: '#0F6E56', bg: '#E1F5EE' },
@@ -107,7 +107,7 @@ export default function Page() {
               const renderVal = (val: boolean | string) => {
                 if (val === true) return <span style={{ color: '#0F6E56', fontWeight: 700 }}>✓</span>
                 if (val === false) return <span style={{ color: '#B91C1C' }}>✗</span>
-                if (val === 'partial') return <span style={{ color: 'var(--color-module-climate)', fontSize: 11 }}>Partial</span>
+                if (val === 'partial') return <span style={{ color: 'var(--color-state-warn)', fontSize: 11 }}>Partial</span>
                 return <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>{val}</span>
               }
               return (
@@ -160,7 +160,7 @@ export default function Page() {
               { fw: 'GRI 401–410', scope: 'Employment, H&S, training, diversity', deadline: 'Annual', urgency: 'medium' },
               { fw: 'SASB Human Capital', scope: 'Sector-specific workforce metrics', deadline: 'Annual', urgency: 'medium' },
             ].map(({ fw, scope, deadline, urgency }) => {
-              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
+              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
               return (
                 <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-line)' }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 5 }} />
@@ -298,7 +298,7 @@ export default function Page() {
                 output: 'SASB human capital metrics table',
               },
             ].map(({ name, ref, deadline, urgency, who, what, output }) => {
-              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
+              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
               const urgencyBg = urgency === 'critical' ? '#FCEBEB' : urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
               return (
                 <div key={name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', background: '#fff', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>

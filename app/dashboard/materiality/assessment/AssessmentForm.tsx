@@ -34,7 +34,7 @@ import {
 const CONTACT = 'lisa.foster@themisiq.co'
 
 const BRAND = 'var(--color-brand)'
-const AMBER = 'var(--color-module-climate)'
+const AMBER = 'var(--color-state-warn)'
 const AMBER_BG = '#FEF3E2'
 const FAIL = '#b42318'
 const FAIL_BG = '#fef3f2'

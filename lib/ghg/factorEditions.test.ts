@@ -710,7 +710,14 @@ describe('the trends page renders a DISTINCT output for each state', () => {
     // customer's own numbers.
     expect(trendsSrc, 'amber panel, same tokens as the SBTi estimation panel').toContain('#FDF6EC')
     expect(trendsSrc).toContain('#EAD9BE')
-    expect(trendsSrc, 'the strip label uses the same amber the GWP warning uses').toContain('var(--color-module-climate)')
+    // ⚠️ THE TOKEN IS NOT NAMED IN THIS MESSAGE, AND THAT IS ON PURPOSE. Writing the module token's
+    // name here would leave it in a string literal, where any audit counting that token's uses counts
+    // it as one. It was 30 rather than the expected 29 for exactly that reason before this comment.
+    expect(trendsSrc,
+      'the strip label and the GWP warning share an amber because both are WARNINGS, not because both '
+      + 'belong to Climate Risk. The warning state got its own token on 25 Sep 2026, extracted from the '
+      + 'module hue that had been doing both jobs.')
+      .toContain('var(--color-state-warn)')
     // Nothing about the state may appear in a condition that suppresses the chart or the metrics.
     for (const gate of ['factorEditionState !== ', 'factorEditionState ===']) {
       expect(trendsSrc, `${gate} would be a gate, not a disclosure`).not.toContain(gate)

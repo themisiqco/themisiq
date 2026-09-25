@@ -119,11 +119,11 @@ function latestActualYear(years: SeriesYear[], sc: Scope): number | null {
 const PILL: Record<'on_track' | 'off_track' | 'best_efforts' | 'no_actual' | 'baseline_review' | 'long_term', { label: string; color: string; bg: string }> = {
   on_track:        { label: 'On track',         color: '#0F6E56', bg: '#ECFDF5' },
   off_track:       { label: 'Off track',        color: '#B91C1C', bg: '#FEF2F2' },
-  best_efforts:    { label: 'Best efforts',     color: 'var(--color-module-climate)', bg: '#FEF3C7' },
+  best_efforts:    { label: 'Best efforts',     color: 'var(--color-state-warn)', bg: '#FEF3C7' },
   no_actual:       { label: 'No actuals yet',   color: '#555553', bg: '#f8f7f5' },
   // Base year materially changed since commitment — neither pass nor fail; the grade cannot be
   // computed until the user assesses recalculation. Amber, tied to the drift note beneath it.
-  baseline_review: { label: 'Review baseline',  color: 'var(--color-module-climate)', bg: '#FDF6EC' },
+  baseline_review: { label: 'Review baseline',  color: 'var(--color-state-warn)', bg: '#FDF6EC' },
   long_term:       { label: 'Long-term target', color: '#555553', bg: 'var(--color-brand-wash)' },
 }
 const pillStyle = (k: keyof typeof PILL): React.CSSProperties => ({
@@ -483,7 +483,7 @@ export default function SbtiDashboard() {
     if (!drift) return null
     const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 1 })
     return (
-      <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 10, fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+      <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 10, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
         Your {draft.baseYear} inventory has changed since this target was set ({fmt(drift.stored)} → {fmt(drift.live)} tCO₂e, a {drift.pct > 0 ? '+' : ''}{drift.pct.toFixed(1)}% change). SBTi requires base-year recalculation to be assessed and disclosed. This target is still anchored to its original baseline.
       </div>
     )
@@ -989,12 +989,12 @@ export default function SbtiDashboard() {
                     carries on the trends page. baselinePctEstimated: this baseline's estimated share;
                     estimationConsistent: whether the years being compared share one evidence basis. */}
                 {series && series.baselinePctEstimated != null && series.baselinePctEstimated > 0 && (
-                  <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+                  <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
                     Baseline includes <strong>{series.baselinePctEstimated.toFixed(1)}%</strong> estimated data (extrapolated from partial bills). SBTi permits estimation where it is disclosed.
                   </div>
                 )}
                 {series && !series.estimationConsistent && (
-                  <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+                  <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
                     <span style={{ fontWeight: 600 }}>Evidence basis varies across years</span> — one or more reporting years include estimated data, so a year-over-year comparison may not be like-for-like.
                   </div>
                 )}
@@ -1018,7 +1018,7 @@ export default function SbtiDashboard() {
                 {/* The current-emissions figure is a separate refusal from the baseline: the latest
                     year can be unusable while the base year is fine, and vice versa. */}
                 {series && series.years.length > 0 && series.years[series.years.length - 1].dataStatus !== 'ok' && (
-                  <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-module-climate) 30%, transparent)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-module-climate)', lineHeight: 1.6 }}>
+                  <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
                     <span style={{ fontWeight: 600 }}>Your most recent year isn&rsquo;t being used</span> — {describeYearStatus(series.years[series.years.length - 1])} Progress is graded against the most recent year we can stand behind, not that one.
                   </div>
                 )}
@@ -1077,12 +1077,12 @@ export default function SbtiDashboard() {
                               {/* Their judgement, their call: warned, never blocked. */}
                               {sc === 's3' && s3Basis === 'measured' && baselineYearRow?.scope3Relevant != null && baselineYearRow.scope3InTotal != null
                                 && baselineYearRow.scope3Relevant > baselineYearRow.scope3InTotal && (
-                                <div style={{ marginTop: 4, color: 'var(--color-module-climate)' }}>
+                                <div style={{ marginTop: 4, color: 'var(--color-state-warn)' }}>
                                   {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal} categor{baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'y you marked relevant has' : 'ies you marked relevant have'} no figure yet, so {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'it is' : 'they are'} not in this baseline. You can set a target on it — the baseline is fixed once you do.
                                 </div>
                               )}
                               {sc === 's3' && s3Basis === 'not_recorded' && (
-                                <div style={{ marginTop: 4, color: 'var(--color-module-climate)' }}>
+                                <div style={{ marginTop: 4, color: 'var(--color-state-warn)' }}>
                                   Coverage was not recorded for this year, so how many categories this figure counts is unknown. Re-saving the Scope 3 inventory records it.
                                 </div>
                               )}
@@ -1260,7 +1260,7 @@ export default function SbtiDashboard() {
                     </div>
 
                     {/* Honest-scoping note — a per-target ✓ is NOT full net-zero compliance. */}
-                    <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid var(--color-module-climate)33', borderRadius: 12, padding: '1rem 1.2rem' }}>
+                    <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid var(--color-state-warn)33', borderRadius: 12, padding: '1rem 1.2rem' }}>
                       <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.65 }}>
                         <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>These checks are per-target only.</strong> A ✓ confirms this scope&rsquo;s net-zero rules (≥{NET_ZERO.minAbsoluteReductionPct}% reduction, ≤{NET_ZERO.latestNetZeroYear}, absolute method). It does <strong style={{ fontWeight: 600 }}>not</strong> confirm full net-zero compliance, which also requires aggregate coverage of ≥90% of total emissions across all scopes, ≥90% Scope 3 coverage, and neutralisation of residual emissions via permanent removals — all assessed separately in a later step.
                       </div>

@@ -63,7 +63,7 @@ import type { Determination, Overall, RegisterSubTopic }
   from '../../../../../lib/materiality/register'
 
 const BRAND = 'var(--color-brand)'
-const AMBER = 'var(--color-module-climate)'
+const AMBER = 'var(--color-state-warn)'
 const AMBER_BG = '#FEF3E2'
 const BLUE = '#0C447C'
 const BLUE_BG = '#E6F1FB'

@@ -17,7 +17,7 @@ export default function Page() {
               <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
-          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-module-climate)', '--tq-state-wash': '#FEF3E2' } as React.CSSProperties}>
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-state-warn)', '--tq-state-wash': '#FEF3E2' } as React.CSSProperties}>
             <div className="tq-callout-heading">Master Subscription Agreement</div>
             <div className="tq-callout-text">{`These Terms of Service (the "Agreement") govern access to and use of the ThemisIQ platform and related services provided by ThemisIQ Compliance Inc. ("ThemisIQ", "we", "us", or "our"). By purchasing or using the Service, you agree to be bound by this Agreement.`}</div>
           </div>
