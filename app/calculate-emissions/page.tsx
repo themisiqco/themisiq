@@ -18,6 +18,7 @@
 // =================================================================
 
 import type { Metadata } from "next";
+import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
 import { GHG_TIERS } from '../../lib/pricing';
 import Link from "next/link";
@@ -141,7 +142,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by number of locations; Concierge from $799; Advisory is custom; Scope 3 (all 15 categories) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by number of locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
       },
     },
     {
@@ -626,7 +627,11 @@ export default function CalculateEmissionsPage() {
                   <p className="qa-subhead">Which scopes apply to you?</p>
                   <p><strong>Scope 1 &amp; 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, proposed for {SB253_FIRST_REPORT_DATE} and not yet final.</p>
                   <p><strong>Scope 3 required:</strong> SB 253 adds Scope 3 from 2027 (covering fiscal-year 2026 data), with CARB still finalizing the details. The EU&rsquo;s CSRD (ESRS&nbsp;E1) requires your material Scope 3 categories, and IFRS&nbsp;S2 requires Scope 3 as well &mdash; with first-year transition relief in many adopting jurisdictions.</p>
-                  <p>If you need it, we&rsquo;ve got it. ThemisIQ covers the full <strong>GHG Protocol Scope 3 Value Chain standard</strong> across all 15 categories &mdash; including PCAF-aligned financed-emissions estimates &mdash; with supplier data collected directly through our portal. <Link href={CONFIG.SUPPLY_CHAIN_URL}>See the Supply Chain module for primary supplier data &rarr;</Link></p>
+                  {/* ⚠️ "COVERS THE FULL STANDARD ACROSS ALL 15 CATEGORIES" WAS A CONFORMANCE CLAIM, and the
+                      strongest of its kind on the site. Nine of the fifteen have a calculation method; the
+                      other six take a figure the company holds. The scope claim is derived so the sentence
+                      cannot go stale when Category 11 is built. */}
+                  <p>If you need it, we&rsquo;ve got it. ThemisIQ works to the <strong>GHG Protocol Scope 3 Value Chain standard</strong>, including PCAF-aligned financed emissions for Category 15, with supplier data collected directly through our portal. {scope3ScopeClaim()} <Link href={CONFIG.SUPPLY_CHAIN_URL}>See the Supply Chain module for primary supplier data &rarr;</Link></p>
                 </div>
               </details>
 
@@ -669,7 +674,7 @@ export default function CalculateEmissionsPage() {
                     <li><strong>SBTi</strong> &mdash; a Scope 3 target is required where Scope 3 is a significant share of your total (over 40% under current criteria).</li>
                   </ul>
                   <p><strong>EcoVadis</strong> rates you across all three scopes &mdash; reporting Scope 3 strengthens your score rather than being a hard requirement.</p>
-                  <p>Scope 3 is part of the GHG module &mdash; the full GHG Protocol Value Chain standard across all 15 categories. The <Link href={CONFIG.SUPPLY_CHAIN_URL}>Supply Chain module</Link> adds primary supplier data collection for Category 1. Because these frameworks&rsquo; thresholds and timelines shift often, we keep the mappings current and stamp the exact basis used on every export.</p>
+                  <p>Scope 3 is part of the GHG module, worked to the GHG Protocol Value Chain standard. {scope3ScopeClaim()} The <Link href={CONFIG.SUPPLY_CHAIN_URL}>Supply Chain module</Link> adds primary supplier data collection for Category 1. Because these frameworks&rsquo; thresholds and timelines shift often, we keep the mappings current and stamp the exact basis used on every export.</p>
                 </div>
               </details>
 

@@ -301,3 +301,110 @@ export function assistantScope3GwpClause(): string {
   ].filter((x): x is string => typeof x === 'string' && x.length > 0)
   return parts.length > 0 ? `In the Scope 3 module, ${parts.join('; ')}.` : ''
 }
+
+// ── THE SHORT DERIVED CLAIMS, FOR MARKETING AND PRICING COPY ────────────────────────────────────
+//
+// ⚠️ WHY THESE EXIST RATHER THAN NINE HAND-WRITTEN SENTENCES. methodologyHierarchyLines() is nine lines
+// and about 8,000 characters, and assistantScope3Basis() is about 2,000: they fit the methodology page and
+// the assistant prompt, and nothing else. A pricing feature row is thirty characters. So nine surfaces
+// were restating the claim in their own words, and two of them said "hybrid and supplier-specific
+// methods", where no method in Scope3Method has ever been hybrid and supplier-specific is Category 1
+// alone.
+//
+// ⚠️ app/api/ghg-bot/route.ts IS THE MODEL AND IS DELIBERATELY UNTOUCHED. It embeds assistantScope3Basis()
+// after the words "WHAT IT RESTS ON DIFFERS SHARPLY BY CATEGORY, and you must say so", and when flat_spend
+// went from ten members to six, and then to zero, that prompt corrected itself with no copy edit. That is
+// the property these functions exist to give every other surface.
+//
+// ⚠️ THE COUNT HAS MOVED TWICE IN EIGHT DAYS and will move again when Category 11 is built: ten flat
+// categories on 17 Sep 2026, then eight, then six, then nine calculated of fifteen on 25 Sep. A number
+// typed into copy is a number that goes stale in nine places at once, which is the same defect
+// lib/cs3d.ts and lib/sb253.ts exist to prevent for dates. scope3CategoryCountGuard.test.ts is the
+// equivalent guard for these.
+
+/**
+ * The family of calculation each method belongs to, for copy that names method KINDS rather than methods.
+ *
+ * ⚠️ A Record OVER Scope3Method, WHICH IS WHAT MAKES "hybrid" UNTYPABLE. There is no way to produce a
+ * family name that is not a value in this map, and no way to add a method without giving it one, because
+ * tsc refuses an incomplete Record. Copy that said "primary data collection, spend-based, hybrid and
+ * supplier-specific methods" could name a family the product has never had; copy built from
+ * scope3MethodFamilies() cannot.
+ *
+ * ⚠️ THESE ARE CALCULATION FAMILIES, NOT DATA QUALITIES. "Primary data" and "supplier-specific" are
+ * properties of a FIGURE THE CUSTOMER ENTERS, not of a method the platform runs, and they belong to the
+ * separate axis METHOD_TAKES_ENTERED_FIGURE describes. Conflating the two is how "supplier-specific
+ * methods" came to be claimed of all fifteen categories when it is Category 1's supplier figure alone.
+ */
+export const SCOPE3_METHOD_FAMILY: Readonly<Record<Scope3Method, string>> = {
+  exiobase_spend: 'spend-based',
+  fuel_and_energy_upstream: 'activity data on published factors',
+  waste_factors: 'activity data on published factors',
+  end_of_life_factors: 'activity data on published factors',
+  business_travel_factors: 'activity data on published factors',
+  employee_commuting_factors: 'activity data on published factors',
+  pcaf: 'PCAF-aligned financed emissions',
+  // ⚠️ NAMED AS A FAMILY SO IT CANNOT BE OMITTED FROM A LIST OF FAMILIES. Six categories are in this one,
+  // and a list of "the methods we use" that silently left them out would be the over-claim in a new form.
+  no_method: 'not calculated',
+}
+
+/**
+ * The families actually in use, deduplicated, in METHOD_RANK reading order.
+ *
+ * Derived from the assignment, so a family with no categories on it does not appear and a new one appears
+ * the day a method is assigned. Nothing here can be typed by hand.
+ */
+export function scope3MethodFamilies(): string[] {
+  const out: string[] = []
+  for (const g of scope3MethodGroups()) {
+    const family = SCOPE3_METHOD_FAMILY[g.method]
+    if (!out.includes(family)) out.push(family)
+  }
+  return out
+}
+
+/**
+ * How many of the fifteen the platform calculates, and how many it does not.
+ *
+ * ⚠️ COUNTED FROM METHOD_BY_CATEGORY, NEVER TYPED. 9 and 6 today; 11 and 4 when Categories 8 and 11 gain
+ * methods. Every surface below reads this, so that day is one edit in one file.
+ */
+export function scope3CategoryCounts(): { total: number; calculated: number; notCalculated: number } {
+  const notCalculated = SCOPE3_CATEGORY_NUMBERS.filter(n => scope3MethodFor(`cat${n}`) === 'no_method').length
+  return {
+    total: SCOPE3_CATEGORY_NUMBERS.length,
+    calculated: SCOPE3_CATEGORY_NUMBERS.length - notCalculated,
+    notCalculated,
+  }
+}
+
+/**
+ * The scope-first claim, for any surface with room for a sentence.
+ *
+ * ⚠️ SCOPE FIRST, THEN THE SPLIT, AND THE ORDER IS THE POINT. "9 of 15 calculated" leads with a shortfall
+ * and understates what the product does: all fifteen ARE recorded, each with a relevance decision, an
+ * exclusion justification where one applies, and a place in the export. Leading with the count invites a
+ * buyer to think six categories are missing from the product rather than not estimated by it.
+ *   It is also the honest order for the second clause: those six are not blank, they take a figure the
+ * company holds and report it as primary data.
+ */
+export function scope3ScopeClaim(): string {
+  const c = scope3CategoryCounts()
+  return (
+    `All ${c.total} categories recorded and reported. ${c.calculated} calculated by a named method, ` +
+    `${c.notCalculated} reported from your own figures.`
+  )
+}
+
+/**
+ * The same claim for a slot that genuinely cannot hold a sentence: a pricing feature row, a chip.
+ *
+ * ⚠️ USE scope3ScopeClaim() WHEREVER THERE IS ROOM. This is shorter at the cost of dropping what happens
+ * to the six, and a reader who stops here learns only that some are not calculated. It is the fallback,
+ * not the default.
+ */
+export function scope3ShortClaim(): string {
+  const c = scope3CategoryCounts()
+  return `all ${c.total} recorded, ${c.calculated} calculated`
+}

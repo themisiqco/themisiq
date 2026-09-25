@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { scope3ScopeClaim, scope3ShortClaim, scope3MethodFamilies } from '../../lib/scope3/methodSummary'
 import Nav from '../components/Nav'
 import { GHG_TIERS } from '@/lib/pricing'
 import Footer from '@/app/components/Footer'
@@ -90,7 +91,12 @@ export default function Page() {
             <tbody>
               {[
                 { label: 'Scope coverage', big: 'Scope 1, 2 and 3',
-                  note: 'All 15 Scope 3 categories — primary data collection, spend-based, hybrid and supplier-specific methods.' },
+                  // ⚠️ SAID "hybrid and supplier-specific methods" UNTIL 25 SEP 2026. No method in
+                  // Scope3Method has ever been hybrid, and supplier-specific is Category 1's entered
+                  // figure rather than a method the platform runs on fifteen categories. Both are now
+                  // derived: scope3MethodFamilies() cannot produce a family no method has, and
+                  // scope3ScopeClaim() cannot state a count that is not counted.
+                  note: `${scope3ScopeClaim()} Methods: ${scope3MethodFamilies().join(', ')}.` },
                 // ⚠️ "Every data entry, edit, and deletion is logged" was corrected on 17 Sep 2026, here and in the
                 // card below. Seven audit triggers exist (verified live that day) and they cover ghg_inventories,
                 // ghg_entries, two cbam_* tables and three concierge_* tables — NOT scope3_inventories, the supply
@@ -215,7 +221,13 @@ export default function Page() {
             // "immutable" claimed more than the database enforces.
             { icon: '', title: 'Audit trail you cannot edit', desc: AUDIT_TRAIL_NOTE },
             { icon: '', title: 'Multi-framework export', desc: 'One inventory exports to: CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
-            { icon: '', title: 'Scope 3 — all 15 categories', desc: 'Primary data collection, spend-based, hybrid, and supplier-specific methods. CDP supplier engagement. CS3D value chain mapping.' },
+            // Same over-claim as the note above, second instance. The title keeps its scope framing; the
+            // desc is derived.
+            // ⚠️ THE TITLE CARRIED THE COUNT TOO, AND THE GUARD CAUGHT IT. It read "Scope 3 — all 15
+            // categories"; changing only the desc left the number in the heading, where a reader of a
+            // feature grid meets it first. The title now claims the standard's scope and the desc states
+            // the split, derived. scope3CategoryCount.test.ts SCC-1 is what found this.
+            { icon: '', title: 'Scope 3: the full value chain', desc: `${scope3ScopeClaim()} Methods: ${scope3MethodFamilies().join(', ')}. CDP supplier engagement. CS3D value chain mapping.` },
             { icon: '', title: 'Assurance-ready package', desc: 'Pre-formatted data room for your verifier: methodology documentation, emission factor citations, uncertainty assessment, and boundary justification.' },
           ].map(({ icon, title, desc }) => (
             <div key={title} style={{ background: '#fff', padding: '2rem' }}>
@@ -304,7 +316,7 @@ export default function Page() {
           <p style={sectionSub}>Essentials covers your full GHG inventory — Scope 1, 2 &amp; 3 across all frameworks — everything you need for SB 253. Step up to Professional for more locations and hands-on advisory.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: '2.5rem', textAlign: 'left' }}>
             {[
-              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', 'Scope 3 · all 15 categories', 'IPCC AR6 · country-matched factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', allowanceLabel(GHG_TIERS.starter.locationAllowance)], featured: false },
+              { plan: 'Essentials', price: '$' + GHG_TIERS.starter.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Scope 1 + 2 · CARB SB 253 ready', `Scope 3 · ${scope3ShortClaim()}`, 'IPCC AR6 · country-matched factors', 'Audit trail + assurance package', 'All reporting frameworks included', 'Multi-year trends dashboard', allowanceLabel(GHG_TIERS.starter.locationAllowance)], featured: false },
               { plan: 'Professional', price: '$' + GHG_TIERS.professional.priceUSD?.toLocaleString(), cadence: '/ reporting year', features: ['Everything in Essentials', allowanceLabel(GHG_TIERS.professional.locationAllowance), '10 hours of expert advisory / year', 'Quarterly sector roundtables', 'Regulatory Monitor — weekly alerts'], featured: true },
             ].map(({ plan, price, cadence, features, featured }) => (
               <div key={plan} style={{ background: featured ? 'var(--color-brand-wash)' : '#fff', borderRadius: 12, padding: '2rem', border: featured ? '1px solid var(--color-brand)' : '0.5px solid #e8e7e4' }}>

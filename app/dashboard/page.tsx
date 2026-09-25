@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import { supabase } from '../../lib/supabase'
@@ -61,7 +62,8 @@ const MODULES: DashboardModule[] = [
     id: 'scope3',
     name: 'Scope 3 Calculator',
     sub: 'Included with GHG Inventory',
-    desc: 'All 15 GHG Protocol categories, including financed emissions. Builds on a saved GHG inventory.',
+    // Derived: the count moved twice in eight days and this card would have gone stale silently.
+    desc: `GHG Protocol Scope 3: ${scope3ShortClaim()}, including PCAF-aligned financed emissions. Builds on a saved GHG inventory.`,
     href: '/dashboard/scope3',
     color: 'var(--color-module-ghg)',
     bg: 'var(--color-module-ghg-wash)',

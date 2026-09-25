@@ -2750,6 +2750,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Ready to calculate your Scope 3 emissions?</div>
+                {/* ⚠️ "all 15 categories" STAYS HERE ON PURPOSE. DO NOT "FIX" IT FOR CONSISTENCY WITH THE
+                    MARKETING PAGES. This is a pointer to the Scope 3 calculator, and that calculator does
+                    cover all fifteen: it asks about each one, records a relevance decision, and reports
+                    every one in the export. The claim is the scope of enquiry, not a count of calculations.
+                    On a pricing page or a feature list the same words are read as fifteen CALCULATED
+                    categories, which is why those sites derive their claim from METHOD_BY_CATEGORY instead.
+                    The sibling that also stays is the in-product banner in app/dashboard/scope3/page.tsx. */}
                 <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories — GHG Protocol aligned.</div>
               </div>
               <Scope3Control compact />

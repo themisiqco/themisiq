@@ -3,7 +3,7 @@
 import Nav from '../components/Nav'
 import Footer from '../components/Footer'
 import { scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
-import { methodologyHierarchyLines } from '../../lib/scope3/methodSummary'
+import { methodologyHierarchyLines, scope3ScopeClaim } from '../../lib/scope3/methodSummary'
 import { cat15MethodologyPassage } from '../../lib/scope3/cat15'
 import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE } from '../../lib/emissionFactors'
 import { DEFRA_DESNZ_PUBLICATION } from '../../lib/ghg/defraPublication'
@@ -95,7 +95,11 @@ const METHODOLOGIES = [
     sections: [
       {
         title: 'Primary standard',
-        content: 'ThemisIQ follows the GHG Protocol Corporate Value Chain (Scope 3) Accounting and Reporting Standard across all 15 upstream and downstream categories.',
+        // ⚠️ SAID "follows the Standard across all 15 upstream and downstream categories" UNTIL 25 SEP 2026.
+        // That is a conformance claim about fifteen, and nine of the fifteen have a calculation method. The
+        // per-method lines further down this page have always told the truth; this heading paragraph did
+        // not, and a reader who stopped here took the stronger claim away.
+        content: `ThemisIQ works to the GHG Protocol Corporate Value Chain (Scope 3) Accounting and Reporting Standard across the fifteen upstream and downstream categories. ${scope3ScopeClaim()}`,
       },
       {
         title: 'Calculation hierarchy',

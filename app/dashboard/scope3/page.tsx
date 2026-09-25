@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase'
 import { useEntitlementState } from '../../../lib/useEntitlement'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
+import { scope3ScopeClaim, scope3MethodFamilies } from '../../../lib/scope3/methodSummary'
 import { scope3Status, relevanceFromStored, coverageEntry, type Relevance, type Scope3Status, type Scope3CoverageEntry } from '../../../lib/scope3/categoryStatus'
 // ⚠️ NOTHING FROM lib/pcaf/engine. resolvePcafResult, imported here until 17 Sep 2026, chose between the
 // decomposed assessment and the lumped spend proxy and answered with the proxy whenever any holding was
@@ -4471,6 +4472,13 @@ export default function Scope3Dashboard() {
       <Nav />
       <div style={{ background: 'var(--color-module-ghg)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+        {/* ⚠️ "All 15 categories" STAYS HERE ON PURPOSE. DO NOT "FIX" IT FOR CONSISTENCY WITH THE
+            MARKETING PAGES. This is an in-product banner above the calculator itself: the customer is
+            looking at all fifteen rows, each showing its own status, method and figure. The claim is about
+            the SCOPE OF ENQUIRY, which is genuinely fifteen, and the per-category truth is on the screen
+            beneath it. It is on a pricing page or a feature list that the same words are read as fifteen
+            CALCULATED categories, which is why those sites now derive their claim instead.
+            The sibling that also stays is the Scope 3 pointer in app/dashboard/ghg/page.tsx. */}
         <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>GHG Protocol Scope 3 Standard · All 15 categories · CSRD ESRS E1-6 · CDP · SBTi · SB 253</span>
       </div>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
@@ -4541,7 +4549,10 @@ export default function Scope3Dashboard() {
                 </div>
               </div>
               <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 10, padding: '0.75rem', marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: '#0F6E56', lineHeight: 1.6 }}><strong>GHG Protocol Scope 3 Standard</strong><br />All 15 categories · Spend-based + activity-based + primary data</div>
+                {/* ⚠️ THE METHOD LIST IS DERIVED. It read "Spend-based + activity-based + primary data", which was not
+                    false but omitted the fourth state: six categories with no method at all. A hand-typed list of
+                    method families cannot notice when one appears or empties. */}
+                <div style={{ fontSize: 11, color: '#0F6E56', lineHeight: 1.6 }}><strong>GHG Protocol Scope 3 Standard</strong><br />{scope3ScopeClaim()}<br />{scope3MethodFamilies().join(' · ')}</div>
               </div>
               <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem' }}>
                 <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6 }}>Need supplier emissions data? <a href="/dashboard/supply-chain/portal" style={{ color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 600 }}>Use the Supplier Portal →</a></div>
