@@ -37,6 +37,13 @@ const FORBIDDEN = [
   'August 2, 2026', 'Aug 2, 2026', 'August 2 2026', '2026-08-02',
   'August 2, 2027', 'Aug 2, 2027', 'August 2 2027', '2027-08-02',
   '2 December 2027', '2 August 2028', '2027-12-02', '2028-08-02',
+  // Added 26 Sep 2026 with the constants for the dates that did NOT move. They were literals on
+  // app/ai-governance/page.tsx, which now reads AI_ACT_ALREADY_APPLIES_SENTENCE.
+  // ⚠️ '2 August 2026' IS DELIBERATELY ABSENT. It is a superseded high-risk date AND the verification
+  // date on a dozen unrelated constants (lib/sb253.ts, lib/nis2.ts, lib/ifrsS2.ts, lib/sources.ts,
+  // lib/pdf/layout.ts and more). Forbidding it would fire on thirteen files that are correct, which is
+  // the same crying-wolf failure that removed an over-broad `unit: '2027'` pattern from this list.
+  '2 February 2025', '2 August 2025', '2 December 2026',
 ]
 
 const EXCLUDED_FILES = new Set([

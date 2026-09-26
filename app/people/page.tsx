@@ -1,356 +1,276 @@
-'use client'
+import type { Metadata } from 'next'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
-import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { FLAT_MODULE_PRICES } from '@/lib/pricing'
+import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
+import {
+  ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection,
+  ModuleArrivals, ModuleFaq, bodyCopy, moduleEyebrow, type Faq,
+} from '@/app/components/modulePage'
 
-export default function Page() {
-  // Price from the single source of truth, formatted as app/cbam/page.tsx does.
-  const peoplePrice = FLAT_MODULE_PRICES['people'].toLocaleString('en-US')
+const KEY = 'people' as const
+
+export const metadata: Metadata = {
+  title: 'Workforce Disclosure: Pay Gaps, Safety and Training | ThemisIQ',
+  description:
+    'Turn the data your HR system already holds into the workforce disclosures ESRS S1, EU Pay Transparency and the GRI 400 series ask for, with a record of what was excluded and why.',
+  alternates: { canonical: '/people' },
+}
+
+/**
+ * The People and Workforce module page, seventh and last to the shared ten-section shape.
+ *
+ * ⚠️ FOUR LINES ARE HELD. See HELD_LINES below. They are the only thing waiting on this page, and one of
+ * them is the module's central argument, so the version that ships is written to be strong rather than to
+ * be a placeholder.
+ *
+ * ⚠️ "DFEH" DOES NOT APPEAR ON THIS PAGE ANY MORE, AND IT USED TO APPEAR EIGHT TIMES. The Department of
+ * Fair Employment and Housing became the CALIFORNIA CIVIL RIGHTS DEPARTMENT in 2022. lib/sources.ts had
+ * it right all along; this page and the People dashboard's framework picker did not. The picker was fixed
+ * in the same commit as this rebuild, because it was the one occurrence a rebuild would not have removed.
+ *
+ * ⚠️ SEC ITEM 101 AND SASB ARE NOT IN THE FRAMEWORKS ROW, AND THAT IS DELIBERATE. SEC Item 101 is a real
+ * OBLIGATIONS entry mapped to this module, but its `does` line records that the module supplies THREE OF
+ * THE FOUR figures the 10-K human capital section reports: "Turnover is not collected and has to come
+ * from your HR system", and what it records is training HOURS, not spend. Naming it in a chips row
+ * without that sentence invites a buyer to infer the module fills the whole section. If it goes in, the
+ * sentence goes with it. `UN SDG 8` and `ISO 45001` were on the old page and have no backing in lib/ or
+ * the module at all, so they are simply gone.
+ *
+ * ⚠️ --color-module-people IS IDENTITY_ONLY AND #FFDE59 IS THE WORST VALUE IN THE SET: 1.33:1 on paper,
+ * below even the 3:1 non-text threshold. The hue is used here as a 4px rule and a wash only, which is
+ * fill-only and inside that decision. The rule is built as specced so it can be judged on screen — if it
+ * is invisible at that ratio, no rule is more honest than a rule nobody can see, and that is a decision
+ * to take with it rendered rather than from the ratio. Note also there is no incoming People wash in
+ * docs/colourway-2026.md, so --color-module-people-wash stays today's value until the swap derives one.
+ */
+export default function PeoplePage() {
+  const price = FLAT_MODULE_PRICES[KEY].toLocaleString()
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
+    <div style={{ background: 'var(--color-paper)', color: 'var(--color-ink)' }}>
       <Nav />
 
-      {/* URGENCY BANNER */}
-     <div style={{ background: 'var(--color-module-people)', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, position: 'sticky', top: 64, zIndex: 99 }}>
- <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>EU Pay Transparency Directive is now in force — first gender pay-gap reports due 2027. Applies to employers with 100+ EU employees.</span>
-        <a href="/dashboard/people" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check if this applies to you →</a>
-      </div>
-
-      {/* HERO */}
-      <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={eyebrow}>People & Workforce</div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-              Workforce<br />
-              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Intelligence</span>
-            </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
-              Human capital reporting. Gender pay gap analysis. DEI metrics. Health & safety. Training and development. ESRS S1, GRI 401–410, EU Pay Transparency, SEC Item 101, and California Pay Data — one platform.
-            </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/dashboard/people" style={{ ...btnPrimary, textDecoration: 'none' }}>Calculate your pay gap →</a>
-              <a href="/order?modules=people" style={{ ...btnSecondary, textDecoration: 'none' }}>${peoplePrice}/yr</a>
-              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-              {['ESRS S1', 'GRI 401–410', 'EU Pay Transparency', 'CA Pay Data', 'SEC Item 101', 'SASB', 'UN SDG 8', 'ISO 45001'].map(tag => (
-                <span key={tag} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* STAT CARDS */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[
-              { val: '5%', unit: 'gap trigger', label: 'EU Pay Transparency — gaps above 5% require mandatory joint pay assessment', color: 'var(--color-state-warn)', bg: '#FEF3E2' },
-{ val: 'Jun 2027', unit: 'first report', label: 'EU pay-gap reporting — employers 150+', color: '#B91C1C', bg: '#FCEBEB' },
-              { val: 'ESRS S1', unit: 'active now', label: 'large EU companies reporting on own workforce from FY2024', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
-              { val: '100+', unit: 'CA employees', label: 'triggers California Pay Data Reporting Act — annual DFEH submission', color: '#0F6E56', bg: '#E1F5EE' },
-            ].map(({ val, unit, label, color, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-
-      {/* NOT AN HR SYSTEM */}
-      <section style={{ padding: '2.5rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' as const, gap: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0, fontWeight: 700, color: '#0F6E56' }}>&#8800;</div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>ThemisIQ is not an HR system.</div>
-              <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, maxWidth: 560 }}>Workday, SAP, and SuccessFactors manage your people data. But none of them generate your EU Pay Transparency disclosure, your ESRS S1 workforce report, or your California DFEH submission. ThemisIQ does — in minutes, not months, at a fraction of consulting cost.</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, flexShrink: 0 }}>
-            {['Works alongside Workday', 'Works alongside SAP', 'Works alongside BambooHR', 'Works alongside any HR system'].map(t => (
-              <span key={t} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#fff', border: '0.5px solid #e8e7e4', color: '#555553' }}>{t}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-
-      {/* COMPARISON TABLE */}
-      <section style={{ padding: '4rem 2.5rem', background: '#fff', borderBottom: '0.5px solid #e8e7e4' }}>
+      {/* ── 1. HERO ── */}
+      <section style={{ borderTop: '4px solid var(--color-module-people)', background: 'var(--color-module-people-wash)', padding: '4.5rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>How we compare</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d' }}>The gap we fill.</h2>
-          </div>
-          <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)' }}>
-              {['', 'Big HR platforms', 'Pay equity specialists', 'ThemisIQ'].map((h, i) => (
-                <div key={i} style={{ padding: '14px 16px', fontSize: 11, fontWeight: 700, color: i === 3 ? 'var(--color-module-people)' : 'var(--color-ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' as const, textAlign: i === 0 ? 'left' : 'center' as const }}>{h}</div>
-              ))}
-            </div>
-            {/* Rows */}
-            {[
-              { feature: 'EU Pay Transparency disclosure', big: false, specialist: 'partial', themis: true },
-              { feature: 'ESRS S1 workforce report', big: false, specialist: false, themis: true },
-              { feature: 'California DFEH submission', big: 'partial', specialist: true, themis: true },
-              { feature: 'GRI 401–410 export', big: false, specialist: false, themis: true },
-              { feature: 'Multi-module compliance platform', big: false, specialist: false, themis: true },
-              { feature: 'Works without existing HR system', big: false, specialist: false, themis: true },
-              { feature: 'Annual cost', big: '$200k+', specialist: '$30–100k', themis: '$1,499 / year' },
-            ].map(({ feature, big, specialist, themis }, i) => {
-              const renderVal = (val: boolean | string) => {
-                if (val === true) return <span style={{ color: '#0F6E56', fontWeight: 700 }}>✓</span>
-                if (val === false) return <span style={{ color: '#B91C1C' }}>✗</span>
-                if (val === 'partial') return <span style={{ color: 'var(--color-state-warn)', fontSize: 11 }}>Partial</span>
-                return <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>{val}</span>
-              }
-              return (
-                <div key={feature} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', borderBottom: i < 6 ? '0.5px solid #e8e7e4' : 'none', background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>
-                  <div style={{ padding: '12px 16px', fontSize: 13, color: '#0d0d0d', fontWeight: 400 }}>{feature}</div>
-                  <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const }}>{renderVal(big)}</div>
-                  <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const }}>{renderVal(specialist)}</div>
-                  <div style={{ padding: '12px 16px', fontSize: 13, textAlign: 'center' as const, background: 'color-mix(in srgb, var(--color-brand) 4%, transparent)' }}>{renderVal(themis)}</div>
-                </div>
-              )
-            })}
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>
-            Big HR platforms = Workday, SAP SuccessFactors · Pay equity specialists = Syndio, Trusaic, Visier
+          <p style={moduleEyebrow}>People and Workforce module</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.1rem, 4vw, 3.1rem)', fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.75rem', maxWidth: '26ch' }}>
+            Pay gaps, headcount, safety and training, from the data your HR system already holds.
+          </h1>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.05rem, 1.9vw, 1.3rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.4rem' }}>
+            {MODULE_SUBLINE}
+          </p>
+          {/* HELD LINE 1 of 4 — see HELD_LINES. Was "counted their way rather than yours". */}
+          <p style={{ ...bodyCopy, marginBottom: '2rem' }}>
+            Your HR system tracks your people. This turns that data into the workforce disclosures
+            sustainability frameworks and customer questionnaires ask for, in the form each one asks for
+            it.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
+            <a href={`/order?modules=${KEY}`} style={{ ...btnSecondary, textDecoration: 'none' }}>Order the module, ${price}/yr</a>
           </div>
         </div>
       </section>
 
-      {/* PAY TRANSPARENCY CALLOUT */}
-      <section className="tq-band-bleed" style={{ padding: '4rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 8 }}>EU Pay Transparency Directive (2023/970)</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.5vw, 2rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem' }}>
-              Do you know your gender pay gap?
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-             Most companies don't. The EU Pay Transparency Directive — now in force — requires employers with 100+ EU employees to report their gender pay gap annually (250+ employees) or every 3 years (100–249 employees). A gap exceeding 5% in any job band triggers a mandatory joint pay assessment with worker representatives.
-            </p>
-            {[
-              'Mean and median gender pay gap calculation by job band',
-              'Identification of bands exceeding the 5% joint assessment threshold',
-              'Pay equity root cause analysis and remediation tracking',
-              'Annual disclosure report generation',
-              'Joint pay assessment workflow and documentation',
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                <span style={{ color: 'var(--color-module-ai)', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: 'var(--color-paper)', border: '0.5px solid var(--color-line)', borderRadius: 16, padding: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 16 }}>Workforce framework coverage</div>
-            {[
-             { fw: 'EU Pay Transparency Dir.', scope: 'Gender pay gap reporting · 100+ EU employees', deadline: 'In force · 2027', urgency: 'critical' },
-              { fw: 'ESRS S1', scope: 'Own workforce disclosure · large EU companies', deadline: 'FY2024 active', urgency: 'critical' },
-              { fw: 'CA Pay Data Reporting', scope: 'Annual DFEH pay data · 100+ CA employees', deadline: 'Annual · May', urgency: 'high' },
-              { fw: 'SEC Item 101', scope: 'Human capital disclosure · US public companies', deadline: 'Annual 10-K', urgency: 'high' },
-              { fw: 'GRI 401–410', scope: 'Employment, H&S, training, diversity', deadline: 'Annual', urgency: 'medium' },
-              { fw: 'SASB Human Capital', scope: 'Sector-specific workforce metrics', deadline: 'Annual', urgency: 'medium' },
-            ].map(({ fw, scope, deadline, urgency }) => {
-              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
-              return (
-                <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-line)' }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 5 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{fw}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{scope}</div>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-ink-2)', flexShrink: 0 }}>{deadline}</div>
-                </div>
-              )
-            })}
-          </div>
+      {/* ── NOT AN HR PLATFORM ──
+      The argument the module rests on, above the covers rows as specced. It sits on the 4px TOP rule
+      that the EDGE VOCABULARY reserves for semantic state, not the 6px left bar that means module
+      identity: this is a statement about what the product is, not about which product you are in.
+      HELD LINE 2 of 4 — the "same headcount counted two ways" sentence is not here. See HELD_LINES. */}
+      <ModuleSection>
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-state-info)', borderRadius: 6, padding: '1.75rem 2rem', maxWidth: '72ch' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--color-state-info)', marginBottom: '0.75rem' }}>
+            Not an HR platform
+          </p>
+          <p style={{ ...bodyCopy, margin: 0 }}>
+            Keep your HR system. This takes what it holds and answers the questions that come from
+            sustainability frameworks and customer questionnaires. An HR system reports your workforce to
+            you. This reports it to a framework&rsquo;s requirements, which is a different job and the one
+            nobody has done for you.
+          </p>
         </div>
-      </section>
+      </ModuleSection>
 
-      {/* FEATURES */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>Platform capabilities</div>
-          <h2 style={sectionTitle}>Everything your workforce programme needs.</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
-          {[
-            { title: 'Gender pay gap analysis', desc: 'Mean and median pay gap calculation by job band, level, and function. Automated identification of bands exceeding the 5% EU Pay Transparency threshold. Remediation tracking.' },
-            { title: 'DEI metrics', desc: 'Workforce composition by gender, ethnicity, age, disability, and seniority. Representation tracking against targets. Board and senior management diversity reporting.' },
-            { title: 'Health & safety', desc: 'LTIFR, TRIR, near-miss tracking, and fatality reporting. ISO 45001 alignment. ESRS S1-14 health and safety outcome disclosure preparation.' },
-            { title: 'Training & development', desc: 'Training hours per employee, investment per FTE, skills gap tracking, and development programme effectiveness. GRI 404 and ESRS S1-13 disclosure preparation.' },
-            { title: 'Labour relations', desc: 'Collective bargaining coverage, works council engagement, freedom of association policy management. ESRS S1-4 documentation and GRI 402–407 reporting.' },
-            { title: 'Multi-framework export', desc: 'One workforce data set exports to ESRS S1, GRI 401–410, SEC Item 101, California Pay Data DFEH submission, SASB, and CDP human capital sections.' },
-          ].map(({ title, desc }) => (
-            <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
+      {/* ── 2. HOW PEOPLE ARRIVE ── */}
+      <ModuleSection>
+        <ModuleArrivals items={ARRIVALS} />
+      </ModuleSection>
+
+      {/* ── 3. WHAT IT COVERS ── */}
+      <ModuleSection tinted>
+        <h2 style={sectionTitle}>What the module covers</h2>
+        <dl style={{ margin: '2rem 0 0', borderTop: '1px solid var(--color-line-strong)' }}>
+          {COVERS.map(([k, v]) => (
+            <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(12rem, 16rem) 1fr', gap: '1.5rem', padding: '1.1rem 0', borderBottom: '1px solid var(--color-line)' }}>
+              <dt style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink)' }}>{k}</dt>
+              <dd style={{ margin: 0, fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.7 }}>{v}</dd>
             </div>
           ))}
-        </div>
-      </section>
+        </dl>
+      </ModuleSection>
 
-      {/* ESRS S1 */}
-      <section style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4', padding: '5rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={eyebrow}>ESRS S1 — Own workforce</div>
-            <h2 style={sectionTitle}>Every ESRS S1 disclosure point. Covered.</h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
+      {/* ── 4. HOW IT WORKS ──
+      HELD LINE 4 of 4 is the `applies` value. See HELD_LINES. */}
+      <ModuleSection>
+        <h2 style={sectionTitle}>How it works</h2>
+        <div style={{ marginTop: '2rem' }}>
+          <ModuleSpine
+            bring="HR exports, payroll bands, incident logs and training records."
+            applies="What each framework asks for, in the form it asks for it, with a record of what was excluded and why."
+            get="Disclosure-ready tables for each framework, a gap analysis, and a record of what was excluded and why."
+          />
+        </div>
+      </ModuleSection>
+
+      {/* ── 5. EVIDENCE ── */}
+      <ModuleSection tinted>
+        <EvidenceSection
+          moduleKey={KEY}
+          workings="Every figure keeps the export it came from and the basis it was assembled on, so a number in a disclosure can be traced back to the record behind it rather than to a spreadsheet somebody rebuilt."
+        />
+      </ModuleSection>
+
+      {/* ── 6. WHAT THE MODULE PRODUCES ──
+      Absent: no sample workforce disclosure in public/samples/, and no preview route. */}
+
+      {/* ── 7. WHAT IT SATISFIES ── */}
+      <ModuleSection>
+        <h2 style={sectionTitle}>What it satisfies</h2>
+        <p style={{ ...bodyCopy, margin: '1rem 0 1.75rem' }}>
+          Each of these is described, sourced and mapped to a module on the regulations page.
+        </p>
+        <FrameworkChips names={FRAMEWORKS} />
+      </ModuleSection>
+
+      {/* ── 8. PRICING ── */}
+      <ModuleSection tinted>
+        <p style={moduleEyebrow}>Pricing</p>
+        <h2 style={sectionTitle}>One flat annual price.</h2>
+        <p style={{ ...bodyCopy, marginTop: '1rem' }}>
+          Add modules and the multi-module discount applies automatically: two modules −10%, three or
+          more −20%.
+        </p>
+        <div style={{ maxWidth: 420, marginTop: '2.5rem' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-people)', borderRadius: 6, padding: '2rem' }}>
+            <div style={{ ...moduleEyebrow, marginBottom: 8 }}>People and Workforce</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: 'var(--color-ink)' }}>
+              ${price}
+              <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-ink-muted)' }}> / reporting year</span>
+            </div>
+            <div style={{ height: 1, background: 'var(--color-line)', margin: '1.25rem 0' }} />
             {[
-              { ref: 'S1-1', title: 'Policies', desc: 'Workforce policies and commitments documentation' },
-              { ref: 'S1-2', title: 'Engagement', desc: 'Worker engagement, consultation, and participation' },
-              { ref: 'S1-3', title: 'Processes', desc: 'Processes to remediate negative impacts' },
-              { ref: 'S1-4', title: 'Actions', desc: 'Actions and resources for workforce management' },
-              { ref: 'S1-5', title: 'Targets', desc: 'Workforce diversity and inclusion targets' },
-              { ref: 'S1-6', title: 'Characteristics', desc: 'Headcount, employment type, contract type' },
-              { ref: 'S1-7', title: 'Non-employees', desc: 'Contractors and non-employee workers in value chain' },
-              { ref: 'S1-8', title: 'Bargaining', desc: 'Collective bargaining coverage and social dialogue' },
-              { ref: 'S1-9', title: 'Diversity', desc: 'Gender and age diversity at board and management level' },
-              { ref: 'S1-10', title: 'Remuneration', desc: 'Adequate wages and pay ratio disclosure' },
-              { ref: 'S1-14', title: 'Health & Safety', desc: 'LTIFR, TRIR, fatalities, and ill health rates' },
-              { ref: 'S1-16', title: 'Pay gap', desc: 'Gender pay gap — mean and median by category' },
-            ].map(({ ref, title, desc }) => (
-              <div key={ref} style={{ background: '#fff', padding: '1.25rem' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-brand)', letterSpacing: '0.06em', marginBottom: 4 }}>{ref}</div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.4 }}>{desc}</div>
+              'Headcount and workforce composition',
+              'Pay gap analysis, with the basis for every figure kept',
+              'Health and safety incidents and rates',
+              'Training and development',
+              'A record of what was excluded and why',
+            ].map(f => (
+              <div key={f} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <span style={{ color: 'var(--color-state-ok)', flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55 }}>{f}</span>
               </div>
             ))}
+            <a href={`/order?modules=${KEY}`} style={{ ...btnPrimary, textDecoration: 'none', display: 'block', textAlign: 'center', marginTop: '1.5rem' }}>
+              Order the module
+            </a>
           </div>
         </div>
-      </section>
+      </ModuleSection>
 
+      {/* ── 9. THE QUESTIONS ── */}
+      <ModuleSection>
+        <ModuleFaq items={FAQ} />
+      </ModuleSection>
 
-      {/* FRAMEWORK GRID */}
-      <section style={{ padding: '5rem 2.5rem', background: '#fff', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Framework coverage</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>Every requirement. One platform.</h2>
-            <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, maxWidth: 540, margin: '0 auto', lineHeight: 1.75 }}>One workforce data set generates every report automatically — regulators, investors, customers, and boards all answered from a single source of truth.</p>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {[
-              {
-                name: 'EU Pay Transparency Directive',
-                ref: 'Directive 2023/970',
-  deadline: 'In force · 2027',
-                urgency: 'critical',
-                who: 'Companies with 100+ EU employees',
-                what: 'Annual gender pay gap reporting by job band · 5% threshold triggers joint pay assessment · remediation tracking',
-                output: 'EU Pay Transparency annual disclosure report',
-              },
-              {
-                name: 'ESRS S1 — Own Workforce',
-                ref: 'ESRS S1 · CSRD',
-                deadline: 'FY2024 active',
-                urgency: 'critical',
-                who: 'Large EU companies (CSRD scope)',
-                what: '16 disclosure points · headcount, employment type, H&S, training, diversity, collective bargaining, parental leave',
-                output: 'Full ESRS S1 disclosure package',
-              },
-              {
-                name: 'California Pay Data Reporting',
-                ref: 'CA SB 973 · DFEH',
-                deadline: 'Annual · May',
-                urgency: 'high',
-                who: 'Companies with 100+ CA employees',
-                what: 'Pay data by race/ethnicity, gender, job category · annual DFEH submission · civil penalties for non-compliance',
-                output: 'DFEH-ready pay data submission',
-              },
-              {
-                name: 'GRI 401–410',
-                ref: 'GRI Standards',
-                deadline: 'Annual · voluntary',
-                urgency: 'medium',
-                who: 'Companies reporting to GRI',
-                what: 'Employment · labour relations · H&S · training · diversity · equal remuneration · non-discrimination · freedom of association',
-                output: 'GRI 401–410 disclosure tables',
-              },
-              {
-                name: 'SEC Item 101',
-                ref: 'Regulation S-K',
-                deadline: 'Annual 10-K',
-                urgency: 'medium',
-                who: 'US public companies',
-                what: 'Human capital resources disclosure · material aspects of workforce management · headcount, development, retention',
-                output: 'SEC Item 101 narrative disclosure',
-              },
-              {
-                name: 'SASB Human Capital',
-                ref: 'SASB Standards',
-                deadline: 'Annual · investor-driven',
-                urgency: 'medium',
-                who: 'Companies reporting to SASB / IFRS S1',
-                what: 'Sector-specific workforce metrics · employee engagement · gender and diversity · compensation discussion',
-                output: 'SASB human capital metrics table',
-              },
-            ].map(({ name, ref, deadline, urgency, who, what, output }) => {
-              const urgencyColor = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
-              const urgencyBg = urgency === 'critical' ? '#FCEBEB' : urgency === 'high' ? '#FEF3E2' : '#f8f7f5'
-              return (
-                <div key={name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', background: '#fff', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', lineHeight: 1.3 }}>{name}</div>
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: urgencyBg, color: urgencyColor, textTransform: 'uppercase' as const, letterSpacing: '0.06em', flexShrink: 0 }}>{urgency}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{ref}</span>
-                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: urgencyBg, color: urgencyColor, border: `0.5px solid color-mix(in srgb, ${urgencyColor} 20%, transparent)` }}>{deadline}</span>
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Who</div>
-                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>{who}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What ThemisIQ collects</div>
-                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5, flex: 1 }}>{what}</div>
-                  <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 10, marginTop: 4 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', marginBottom: 2 }}>Output</div>
-                    <div style={{ fontSize: 12, color: '#0F6E56', lineHeight: 1.4 }}>✓ {output}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+      {/* ── 10. CLOSING BAND ── */}
+      <ClosingBand
+        heading="Not sure which workforce rules apply to you?"
+        body="Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country."
+        primary={{ href: '/assess', label: 'Start the free assessment' }}
+        secondary={{ href: '/advisory', label: 'Talk to us' }}
+      />
+      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
 
-      {/* CTA */}
-      <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          Do you know your gender pay gap<br />
-          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>by job band?</span>
-        </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
-        Most companies don't — and the EU Pay Transparency Directive is now in force, with first pay-gap reports due in 2027. ThemisIQ calculates your gap, identifies bands above 5%, and prepares your disclosure.
-
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/people" style={{ ...btnPrimary, textDecoration: 'none' }}>Calculate your pay gap →</a>
-          <a href="/order?modules=people" style={{ ...btnSecondary, textDecoration: 'none' }}>${peoplePrice}/yr</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
-        </div>
-      </section>
-
-      {/* FOOTER */}
       <Footer />
-
-      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; }`}</style>
     </div>
   )
 }
 
-const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
-const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
+// ── DATA ──────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * ⚠️ FOUR HELD LINES, AND THEY ARE THE ONLY THING WAITING ON THIS PAGE. All four assert that the module
+ * counts a measure to each framework's OWN DEFINITION, which is the module's central argument and the most
+ * checkable claim on the page. As written they were:
+ *
+ *   1. hero paragraph   "...ask for, counted their way rather than yours."
+ *   2. Not an HR platform  "The same headcount counted two ways gives two answers, and only one of them
+ *                           is the one the framework asked for."
+ *   3. covers row       "Headcount and workforce composition, counted to each framework's own definition."
+ *   4. spine `applies`  "Each framework's own definitions and boundaries, and a record of which was used
+ *                           for every figure."
+ *
+ * THE MEASUREMENT BEHIND THE HOLD, taken in app/dashboard/people/page.tsx on 26 Sep 2026: ZERO
+ * occurrences of `definition`, `boundary`, `headcount_basis` or `counted`. What the module does have is a
+ * six-framework picker whose own copy reads "ThemisIQ will tailor your data collection and outputs to
+ * cover every requirement" — which is a claim about WHAT IS COLLECTED AND EXPORTED, not about how a
+ * measure is defined. Selecting ESRS S1 changes the fields and the output; nothing visible gives ESRS S1
+ * a headcount basis distinct from GRI's.
+ *
+ * ⚠️ THIS IS PRODUCT KNOWLEDGE, NOT A CODE GAP NECESSARILY. The definitions may live in the collection
+ * fields without the word ever appearing. If Lisa can point at where they live, ALL FOUR GO BACK IN ONE
+ * EDIT and this comment goes with them.
+ *
+ * WHAT SHIPPED INSTEAD IS NOT A PLACEHOLDER. "In the form each one asks for it", "an HR system reports
+ * your workforce to you, this reports it to a framework's requirements", and "a record of what was
+ * excluded and why" are all supportable and are a real argument: one data set, several frameworks'
+ * questions, each export shaped to the asker. The exclusion record is the strongest of the three, because
+ * it is the part an auditor asks about and the part a spreadsheet never has.
+ */
+const ARRIVALS = [
+  { title: 'A pay transparency requirement applies',
+    body: 'And the first report needs numbers nobody has assembled in that form before.' },
+  { title: 'A customer questionnaire asked about your workforce',
+    body: 'And the answers have to match what you would disclose elsewhere.' },
+  { title: 'You report under CSRD',
+    body: 'And ESRS S1 asks for workforce data on its own terms rather than yours.' },
+] as const
+
+/** HELD LINE 3 of 4 is the first row's body. See the block above. */
+const COVERS = [
+  ['Headcount and composition', 'Assembled for each framework you report under, from the exports your HR system already produces.'],
+  ['Pay gap analysis', 'With the basis for every figure kept, so a number in a filing can be explained a year later.'],
+  ['Health and safety', 'Incidents and rates, including the ones a questionnaire asks for by name.'],
+  ['Training and development', 'Recorded as hours, which is the measure the disclosures ask for.'],
+] as const
+
+const FRAMEWORKS = ['ESRS S1', 'EU Pay Transparency', 'GRI 400 series', 'CSRD'] as const
+
+/**
+ * ⚠️ DRAFTED FROM THE CODE, AWAITING REVIEW, like the AI Governance four.
+ *
+ * ⚠️ THE FOURTH ANSWER IS THE OLD PAGE'S ARGUMENT, KEPT. It named Workday, SAP and SuccessFactors and
+ * said none of them generates an EU Pay Transparency disclosure or an ESRS S1 workforce report. That is
+ * the true and useful form of the comparison, and it survives the rebuild in this answer rather than in a
+ * competitor table.
+ *
+ * ⚠️ THE SECOND ANSWER DOES NOT SAY WHETHER YOU MUST PUBLISH. Whether a pay gap is published, and where,
+ * differs by regime and by employer size, and nothing in lib/ resolves it for a given reader. So the
+ * answer says what the module does and sends the question to /assess, which is what /assess is for.
+ *
+ * ⚠️ THE THIRD ANSWER IS THE ONE TO REVISIT IF THE HELD LINES GO BACK IN. "Which employees count" is
+ * exactly the per-framework-definition question, and the answer below is deliberately about the module's
+ * exclusion record rather than about differing definitions.
+ */
+const FAQ: readonly Faq[] = [
+  { q: 'Our HR data is messy. Is that a problem?',
+    a: 'It is the normal starting point. You bring the exports you already have, and where a figure is missing or a record does not reconcile it is flagged rather than filled in, so what you publish is what your data supports. Cleaning it up is usually a by-product of the first report rather than a prerequisite for starting.' },
+  { q: 'Do we have to publish our pay gap?',
+    a: 'That depends on which requirement reaches you and how large you are, and it is the sort of question the free assessment answers for your company rather than in general. What the module does either way is produce the analysis with the basis for every figure kept, so you are ready to publish if you must and able to explain the number if you are asked.' },
+  { q: 'Which employees count?',
+    a: 'Whoever the framework you are reporting under includes, which is rarely the same as the headcount on your payroll run. The module keeps a record of what was excluded and why, so the figure you disclose can be reconciled against your HR system rather than quietly differing from it.' },
+  { q: 'We already use Workday. Do we need this?',
+    a: 'Keep Workday. It manages your people, and it is not built to produce an EU Pay Transparency disclosure or an ESRS S1 workforce report. This takes its exports and assembles them into what those frameworks ask for, with the working kept. The same is true of SAP and SuccessFactors.' },
+]

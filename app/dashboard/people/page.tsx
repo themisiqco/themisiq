@@ -275,7 +275,11 @@ export default function PeopleDashboard() {
         {[
           { id: 'eu_pay', name: 'EU Pay Transparency Directive', desc: 'Gender pay gap reporting by job band · 100+ EU employees · Jun 2026', urgency: 'critical' },
           { id: 'esrs_s1', name: 'ESRS S1 — Own Workforce', desc: 'Full workforce disclosure · large EU companies · FY2024 active', urgency: 'critical' },
-          { id: 'ca_pay', name: 'California Pay Data Reporting', desc: 'Annual DFEH submission · 100+ CA employees · May deadline', urgency: 'high' },
+          // The DFEH was renamed the CALIFORNIA CIVIL RIGHTS DEPARTMENT in 2022, so "DFEH submission" named an
+            // agency that no longer exists. lib/sources.ts already had it right — "California Civil Rights
+            // Department's pay data reporting portal" — while this picker and two lines on app/people/page.tsx
+            // said DFEH. The other two went with that page's rebuild on 26 Sep 2026; this was the survivor.
+            { id: 'ca_pay', name: 'California Pay Data Reporting', desc: 'Annual Civil Rights Department submission · 100+ CA employees · May deadline', urgency: 'high' },
           { id: 'gri', name: 'GRI 401–410', desc: 'Employment, H&S, training, diversity · voluntary · annual', urgency: 'medium' },
           { id: 'sec', name: 'SEC Item 101', desc: 'Human capital disclosure · US public companies · annual 10-K', urgency: 'medium' },
           { id: 'sasb', name: 'SASB Human Capital', desc: 'Sector-specific workforce metrics · investor-grade', urgency: 'medium' },
