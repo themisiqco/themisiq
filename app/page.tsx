@@ -1,368 +1,394 @@
 'use client'
+import Image from 'next/image'
 import HomePricing from './components/HomePricing'
-import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS } from '../lib/sb253'
-// PACKS dropped from this import with the old-model cards below. It was retired, then DELETED from
-// lib/pricing.ts on 8 Sep 2026 together with PackId and app/get-started/_pack/PackFlow.tsx — there
-// is no declaration left to point at. NEW_PRICING_ACTIVE STAYS: the live cards still gate on it.
-import { NEW_PRICING_ACTIVE } from '../lib/pricing'
-import { PACK_SLUG_MODULES } from '../lib/packEntryPoints'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
-import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { btnPrimary, btnSecondary, btnOnBand, btnOnBandOutline } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
-import ThemisIQLogo from './components/ThemisIQLogo'
+import { SB253_SHORT } from '../lib/sb253'
+
+/**
+ * The homepage.
+ *
+ * ⚠️ THE COLOURWAY IS A FILL VALUE AND NEVER TEXT. docs/colourway-2026.md has the measurements and the
+ * two approaches that were rejected to arrive at that rule. On this page the colourway appears in
+ * exactly two forms: --gradation-band, as the hero and closing grounds, and --color-module-* on the 4px
+ * card rules. Nothing on this page sets a colourway value on text, and nothing should.
+ *
+ * ⚠️ WHY THE 4px CARD RULES ARE PERMITTED AND THE 6px BAR IN THE PRODUCT IS NOT. WCAG 1.4.11 exempts a
+ * graphic whose information is available in another form. Each card names its module in 1.2rem display
+ * text and links to it, so the rule duplicates an identification already made in words and is
+ * decorative. `.tq-summary`'s 6px left bar in the dashboard is the OPPOSITE case: it is the only module
+ * identifier on that surface, so it carries meaning and needs 3:1 — which is why
+ * lib/tokenContrast.test.ts asserts --tq-mod separately and why six modules will fail it after the swap.
+ * Measured on --color-paper, today: ghg 7.62, climate 5.55, supply 5.57, cbam 6.50, deals 6.23, ai 6.48,
+ * cyber 7.53, people 5.78. After the swap six of the eight fall below 3:1. They stay on the token rather
+ * than the spec's literal hex so they move once, with the swap, from one source of truth.
+ *
+ * ⚠️ NO FIGURE ON THIS PAGE IS TYPED. The previous version carried three that were: a module count of
+ * '7' (CLAUDE.md forbids stating a count at all, and MODULES has nine keys while the grid drew eight),
+ * '30+' frameworks (ALL_OBLIGATION_IDS has sixteen and the chip row showed twenty — three unrelated
+ * numbers for one claim), and a "See all six results" panel label. Prices come from HomePricing, which
+ * derives everything from lib/pricing. If a figure is wanted here, it needs a constant first.
+ */
 
 export default function Home() {
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d', margin: 0, padding: 0 }}>
+    <div style={{ background: 'var(--color-paper)', color: 'var(--color-ink)' }}>
       <Nav />
 
-      {/* ── HERO ── */}
-      <section style={{ padding: '7rem 2.5rem 5rem', borderBottom: '0.5px solid #e8e7e4', textAlign: 'center' }}>
-        <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '3.5rem' }}>
-            <ThemisIQLogo size={76} />
-            <p style={{ fontSize: 15, color: 'var(--color-ink-muted)', letterSpacing: '0.02em', fontWeight: 400 }}>
-              Compliance Intelligence for Sustainable Business
+      {/* ── HERO ─────────────────────────────────────────────────────────────────────────────────
+      Full-bleed --gradation-band. Copy is held to --gradation-ink-safe, the light 60%: --color-ink
+      clears AA body to 72% of the width and AA large text to 88%, so 60% is the margin. If this ever
+      needs copy on the right, FLIP THE BAND — see the GRADATION block in the token file. */}
+      <section style={{ background: 'var(--gradation-band)', padding: '6rem 2.5rem 5.5rem' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 34rem)' }}>
+            <p style={eyebrowOnBand}>Published methodologies and prices you can trust</p>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 4.6vw, 3.7rem)', fontWeight: 400, lineHeight: 1.14, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.9rem' }}>
+              Sustainability reporting that suits your needs and budget.
+            </h1>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.1rem, 2vw, 1.4rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.5rem' }}>
+              Self-guided, or with human advisors standing by to help.
             </p>
-          </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.6rem, 5vw, 4rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-            Countless compliance requirements.<br />
-            <em style={gradText}>One Intelligent Platform.</em>
-          </h1>
-          <p style={{ fontSize: 17, color: '#555553', maxWidth: 580, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.75 }}>
-            From GHG emissions and climate risk to supply chain, M&A diligence, AI governance, workforce, and cybersecurity — ThemisIQ turns complex compliance into competitive clarity.
-          </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: '2.5rem' }}>
-            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>See where you stand — free assessment →</a>
-            <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
-          </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#555553', background: '#f8f7f5', border: '0.5px solid #e8e7e4', padding: '8px 16px', borderRadius: 99 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#B91C1C', display: 'inline-block', animation: 'pulse 1.8s infinite' }} />
-            SB 253 first report: {SB253_FIRST_REPORT_DATE} ({SB253_DATE_STATUS}) — Scope 1 + 2
+            <p style={{ fontSize: 15, color: 'var(--color-ink)', lineHeight: 1.7, maxWidth: '58ch', marginBottom: '2.25rem' }}>
+              Customers, lenders and regulators are each asking for something different, and the rules change by country and by year. ThemisIQ works out which of them apply to you, tells you what to submit and when, and builds the reports from your own data.
+            </p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <a href="/assess" style={{ ...btnOnBand, textDecoration: 'none' }}>Start the free assessment</a>
+              <a href="/methodology" style={{ ...btnOnBandOutline, textDecoration: 'none' }}>See how it works</a>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--color-ink)', marginTop: '1rem', opacity: 0.85 }}>
+              Three questions, no account needed.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* ── STATS BAR ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '0.5px solid #e8e7e4', background: '#f8f7f5' }}>
-        {[
-          ['7', 'Compliance modules'],
-          ['30+', 'Frameworks covered'],
-          ['Practitioner-built', 'Big 4 & consulting experience'],
-          ['Audit-ready', 'Verifier-ready by design'],
-          ['deadlines', 'Do you have upcoming compliance deadlines?'],
-        ].map(([val, label], i) => (
-          <div key={i} style={{ padding: '1.75rem 1rem', textAlign: 'center', borderRight: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}>
-            {val === 'deadlines' ? (
-              <a href="/assess" style={{ textDecoration: 'none', display: 'block' }}>
-                <div style={{ fontSize: 12, color: 'var(--color-brand)', fontWeight: 600, lineHeight: 1.4, marginBottom: 4 }}>Check your compliance deadlines →</div>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
-              </a>
-            ) : (
-              <>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: 'var(--color-brand)', marginBottom: 4 }}>{val}</div>
-                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{label}</div>
-              </>
-            )}
+      {/* ── THE REQUEST ── */}
+      <section style={{ padding: '5.5rem 2.5rem', maxWidth: 1180, margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '3.5rem', alignItems: 'center' }}>
+          {/* Photograph with the sample panel overlapping its lower right. */}
+          <div style={{ position: 'relative', paddingBottom: '3.5rem', paddingRight: '1rem' }}>
+            <Image src={PHOTOS.stillLife.src} alt={PHOTOS.stillLife.alt} width={PHOTOS.stillLife.w} height={PHOTOS.stillLife.h}
+              style={{ width: '100%', height: 'auto', borderRadius: 6, display: 'block' }} />
+            {/* ⚠️ A RENDERING, NOT A SCREENSHOT, AND LABELLED SO ON THE FACE OF IT. The assessment does
+            not produce this view yet. Replace the whole panel with a real screenshot once it does; do
+            not quietly drop the Sample marker in the meantime.
+            ⚠️ THE COUNT IS NOT TYPED. The link read "See all six results" in the approved copy. There is
+            no constant behind six, the assessment does not exist to be counted, and a number that is
+            wrong on a sample panel is the kind of small checkable claim that turns out false. */}
+            <div style={{ position: 'absolute', right: 0, bottom: 0, width: 'min(88%, 22rem)', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, boxShadow: '0 10px 30px rgb(21 26 29 / 0.12)', padding: '1.1rem 1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Your assessment</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', border: '0.5px solid var(--color-line)', borderRadius: 99, padding: '2px 7px' }}>Sample</span>
+              </div>
+              {SAMPLE_RESULTS.map(r => (
+                <div key={r.regulation} style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 9, marginBottom: 9, borderBottom: '0.5px solid var(--color-line)' }}>
+                  <span style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: `var(--color-module-${r.moduleKey})`, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink)', flex: 1 }}>{r.regulation}</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' }}>{r.module}</span>
+                </div>
+              ))}
+              <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See all your results →</a>
+            </div>
           </div>
-        ))}
-      </div>
 
-     {/* ── TRUST BAR ── */}
-      <div className="tq-band-bleed" style={{ padding: '1.5rem 2.5rem', textAlign: 'center' as const }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1rem, 2vw, 1.3rem)', fontWeight: 400, marginBottom: '1rem', lineHeight: 1.5 }}>
-            We know trust is everything. At ThemisIQ, you can trust our methodologies and how we handle your data.
-          </p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/methodology" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', textDecoration: 'none', background: 'none' }}>Our methodologies →</a>
-            <a href="/trust" style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', textDecoration: 'none', background: 'none' }}>How we handle your data →</a>
+          <div>
+            <h2 style={sectionTitle}>It usually starts with one email.</h2>
+            <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, margin: '1rem 0 2rem', maxWidth: '58ch' }}>
+              A customer sends a supplier questionnaire. A bank asks about climate risk before renewing a loan. Your board wants to know which regulations apply. ThemisIQ turns the request into a clear list of what you owe, then helps you produce it.
+            </p>
+            <dl style={{ margin: 0, borderTop: '1px solid var(--color-line-strong)' }}>
+              {[
+                ['You bring', 'Utility bills, supplier data, finance and HR exports.'],
+                ['ThemisIQ applies', 'The right methodology and versioned factors for each framework.'],
+                ['You get', 'Framework-ready reports with a trail back to every source document.'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(8rem, 10rem) 1fr', gap: '1.25rem', padding: '0.95rem 0', borderBottom: '1px solid var(--color-line)' }}>
+                  <dt style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', paddingTop: 2 }}>{k}</dt>
+                  <dd style={{ margin: 0, fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{v}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
         </div>
-      </div>
-      {/* ── FRAMEWORKS ── */}
-      <div style={{ padding: '4rem 2.5rem', background: '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Framework coverage</p>
-          <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, marginBottom: '1.5rem' }}>Every major regulatory and voluntary framework. Pre-mapped. Export-ready.</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-            {['SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis', 'TCFD', 'GHG Protocol', 'SEC Climate Rule', 'GRI', 'SBTi', 'RE100', 'NIST AI RMF', 'EU AI Act', 'ISO 27001', 'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA'].map(fw => (
-              <span key={fw} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 99, background: '#fff', border: '0.5px solid #e8e7e4', color: '#555553', cursor: 'default' }}>{fw}</span>
+      </section>
+
+      {/* ── PHOTO ESSAY ── */}
+      <section style={{ padding: '5rem 2.5rem', background: 'var(--color-ground)', borderTop: '0.5px solid var(--color-line)', borderBottom: '0.5px solid var(--color-line)' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <h2 style={sectionTitle}>The compliance landscape is expanding.</h2>
+          <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, margin: '1rem 0 3rem', maxWidth: '62ch' }}>
+            It now reaches companies that never thought of themselves as regulated. A few of the situations we see most:
+          </p>
+          {/* Offset grid: every second card drops, so the row reads as an essay rather than a table. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+            {ESSAY.map((e, i) => (
+              <figure key={e.who} style={{ margin: 0, marginTop: i % 2 === 1 ? '2.5rem' : 0 }}>
+                <Image src={e.src} alt={e.alt} width={e.w} height={e.h}
+                  style={{ width: '100%', height: 'auto', borderRadius: 6, display: 'block', marginBottom: '0.85rem' }} />
+                <figcaption>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 4 }}>{e.who}</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{e.what}</div>
+                </figcaption>
+              </figure>
             ))}
           </div>
+          <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid var(--color-line-strong)', display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.7, maxWidth: '62ch', margin: 0 }}>
+              Every country adds its own rules. Tell us where you operate, where you sell and who is asking, and the free assessment lists the regulations that apply to you.
+            </p>
+            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none', flexShrink: 0 }}>Start the free assessment</a>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── PRODUCTS ── */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <p style={eyebrow}>The ThemisIQ platform</p>
-        <h2 style={sectionTitle}>Purpose-built modules. One source of truth.</h2>
-        <p style={sectionSub}>Purpose-built for each obligation. Mapped to the frameworks that apply.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden', marginTop: '3rem' }}>
-          {modules.filter(m => m.family !== 'Advisory').map((mod, i) => (
-            <a key={i} href={mod.href} style={{ background: '#fff', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', textDecoration: 'none', transition: 'background 0.15s', cursor: 'pointer', borderRight: i % 4 < 3 ? '0.5px solid #e8e7e4' : 'none', borderBottom: i < 4 ? '0.5px solid #e8e7e4' : 'none' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f8f7f5' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#fff' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.2 }}>{mod.name === 'Supply Chain & Scope 3' ? <>Supply Chain &amp; <span style={{ whiteSpace: 'nowrap' }}>Scope 3</span></> : mod.name}</div>
-              <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{mod.desc}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: 8 }}>
-                {mod.tags.map(t => <span key={t} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>{t}</span>)}
+      {/* ── MODULES ── */}
+      <section style={{ padding: '5.5rem 2.5rem', maxWidth: 1180, margin: '0 auto' }}>
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: '2.75rem' }}>
+          <div>
+            <h2 style={sectionTitle}>ThemisIQ takes the guesswork out of sustainability reporting</h2>
+            <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, marginTop: '1rem', maxWidth: '60ch' }}>
+              Each one is built for a specific obligation and mapped to the frameworks that apply to it. Enter a figure once and it serves every report that needs it.
+            </p>
+          </div>
+          <a href="/assess" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}>Unsure where you need to report? →</a>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>
+          {MODULES_HOME.map(m => (
+            <a key={m.name} href={m.href}
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: `4px solid var(--color-module-${m.key})`, borderRadius: 6, padding: '1.4rem', textDecoration: 'none', transition: 'background 0.15s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-ground)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-paper)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2 }}>{m.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{m.desc}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: '0.6rem' }}>
+                {m.chips.map(c => (
+                  <span key={c} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: 'var(--color-ground)', border: '0.5px solid var(--color-line)', color: 'var(--color-ink-muted)' }}>{c}</span>
+                ))}
               </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', paddingTop: '0.3rem' }}>See the module →</div>
             </a>
           ))}
         </div>
 
-        {/* Advisory — full-width closing band below the 4×2 module grid (moved out of the grid) */}
-        <CrossLinkBand
-          href="/advisory"
-          label="Advisory Services"
-          title="Available across all modules"
-          body="Expert advisory services — sector-specific guidance, assurance prep, and board-ready narratives from practitioners who speak your language."
-          cta="Talk to a specialist"
-          style={{ marginTop: '1.25rem' }}
-        />
-      </section>
-
-      {/* ── MATERIALITY CAPABILITY STRIP ── */}
-      <section style={{ padding: '0 2.5rem', marginTop: '-1rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <CrossLinkBand
-            href="/materiality"
-            label="Single or double · which one applies to you"
-            title="The Materiality Assessment"
-            body="Single materiality for IFRS S2, double materiality for CSRD — the methodology your auditor expects. See two sample reports for the same entity."
-            cta="See sample reports"
-          />
+        {/* Three wider cards on a tinted ground. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '1.25rem' }}>
+          {WIDER.map(w => (
+            <a key={w.title} href={w.href}
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', background: 'var(--color-ground)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.5rem', textDecoration: 'none', transition: 'background 0.15s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-sunken)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-ground)' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>{w.eyebrow}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2 }}>{w.title}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{w.desc}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginTop: 'auto', paddingTop: '0.7rem' }}>{w.cta} →</div>
+            </a>
+          ))}
         </div>
       </section>
 
-      {/* ── FLAGSHIP: CLIMATE RESILIENCE REPORT SHOWCASE ──
-      ⚠️ A SECTION ON THE PAGE, NOT A BAND. It was a full-bleed '#0d0d0d' block. A dark band and a
-      tinted band both read as "marketing"; a 2px ink rule and a heading read as "next section",
-      which is what this is. The change is also forced, not stylistic: the scenario ramp below needs
-      white beneath it — var(--color-module-climate) measures 4.29:1 on the teal band, under AA. */}
-      <section style={{ padding: '4rem 2.5rem 5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', borderTop: '2px solid var(--color-ink)', paddingTop: '2.25rem' }}>
-          <div style={{ maxWidth: 640, marginBottom: '2.5rem' }}>
-            <p style={{ ...eyebrow, marginBottom: 8 }}>Flagship output · Climate Risk &amp; Materiality</p>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: '1rem' }}>
-              A climate resilience report that holds up under scrutiny.
+      {/* ── FRAMEWORKS ──
+      ⚠️ NO COUNT, AND THAT IS A RULE RATHER THAN A STYLE CHOICE. This row previously sat under a stat
+      reading "30+ Frameworks covered". Nothing supported the 30: ALL_OBLIGATION_IDS has sixteen entries,
+      the row itself has nineteen chips, and the GHG engine maps five frameworks to GWP sets — three
+      unrelated numbers for one claim. The heading now says what the row is and the row is the evidence.
+
+      ⚠️ TWO CHIPS WERE REMOVED ON 25 SEP 2026 AND MUST NOT COME BACK WITHOUT SOMETHING BEHIND THEM.
+      "SEC Climate Rule" appeared nowhere in lib/ or app/ — nothing mapped, nothing scored, no export —
+      and the rule's own status has never been settled. "RE100" appeared in exactly one place, a pricing
+      bullet. Both claimed coverage the product does not have. Of the nineteen below, nine are entries in
+      OBLIGATIONS (lib/obligations.ts); the other ten are standards the engine or a module cites by name,
+      each verified in the tree: ESRS/CSRD 26 files in lib/, GHG Protocol 17, SBTi 12 (lib/sbti.ts), TCFD
+      6, GRI 3, and ISO 27001, NIST AI RMF, NIST CSF, ISO 42001 and SASB in the Cyber, AI Governance and
+      People module surfaces, which keep their control sets in app/ rather than lib/. Adding a chip means
+      finding its evidence first. */}
+      <section style={{ padding: '4rem 2.5rem', borderTop: '0.5px solid var(--color-line)' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', textAlign: 'center' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.6vw, 2rem)', fontWeight: 400, color: 'var(--color-ink)', marginBottom: '0.6rem' }}>
+            Frameworks we cover
+          </h2>
+          <p style={{ fontSize: 14, color: 'var(--color-ink-2)', marginBottom: '1.75rem' }}>
+            Pre-mapped and export-ready, so a figure you enter once reaches every report that asks for it.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+            {FRAMEWORKS.map(f => (
+              <span key={f} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 99, background: 'var(--color-ground)', border: '0.5px solid var(--color-line)', color: 'var(--color-ink-2)' }}>{f}</span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <HomePricing />
+
+      {/* ── TRUST ── */}
+      <section style={{ padding: '5rem 2.5rem', background: 'var(--color-ground)', borderTop: '0.5px solid var(--color-line)' }}>
+        <div style={{ maxWidth: 780, margin: '0 auto' }}>
+          <h2 style={sectionTitle}>We know trust is everything.</h2>
+          <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, marginTop: '1rem' }}>
+            We fully disclose all our methodologies so you can see how our reports stand up to review and verification. We handle your privacy and data with care, and encourage you to read how we are protecting your information.
+          </p>
+          {/* ⚠️ "EMISSIONS", NOT "YOUR DATA", AND THE NARROWNESS IS THE POINT. The verifier portal covers
+          GHG Scope 1 and 2, CBAM, and Scope 3 Category 1, each behind a per-grant opt-in. Widening this
+          to the platform would claim verifier access to modules that have no verifier surface at all. */}
+          <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, marginTop: '1rem' }}>
+            Your verifier can check your emissions figures back to their source, through access you grant and can revoke.
+          </p>
+          {/* ⚠️ THIS PARAGRAPH IS SCOPED AND MUST NOT LOOSEN. It moved here from the retired "How it
+          works" section on 25 Sep 2026, intact. The platform-wide version — "every calculation and data
+          point is logged with a full audit trail" — WAS FALSE: audit_log triggers cover the GHG, CBAM and
+          concierge tables only (verified live 17 Sep 2026), and they record a saved change to a row
+          rather than every edit. The three module names and the words "each saved change" are what make
+          it true. This is the homepage-length form of AUDIT_TRAIL_NOTE in app/climate-ghg/page.tsx;
+          correct them together. */}
+          <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, marginTop: '1rem' }}>
+            Every figure carries its factor citation and its workings. In the GHG, CBAM and concierge modules, each saved change is written to an audit log by a database trigger — who, when, and the row as it was before — and you can read your own entries but not alter them.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
+            <a href="/methodology" style={{ ...btnSecondary, textDecoration: 'none' }}>Our methodologies</a>
+            <a href="/trust" style={{ ...btnSecondary, textDecoration: 'none' }}>How we handle your data</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CLOSING BAND ──
+      Same direction as the hero and roughly a third its height, from the same token, so the two cannot
+      drift. Copy left inside --gradation-ink-safe; buttons right, which sit past the safe width and are
+      therefore ink-filled and ink-outlined rather than relying on the ground behind them. */}
+      <section style={{ background: 'var(--gradation-band)', padding: '2.75rem 2.5rem' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 28rem)' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: '0.6rem' }}>
+              Face the next request with confidence.
             </h2>
-            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400 }}>
-              IFRS S2 and CSRD/ESRS don&apos;t just ask you to run a scenario — they ask you to show resilience across a <em>diverse range</em> of climate futures, and to document the judgment behind it. ThemisIQ produces exactly that: a multi-scenario resilience report, generated from your assessment, with every figure traceable to its basis.
+            <p style={{ fontSize: 14, color: 'var(--color-ink)', lineHeight: 1.65, margin: 0, maxWidth: '54ch' }}>
+              Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country.
+            </p>
+            {/* ⚠️ SB253_SHORT, NOT A SENTENCE WRITTEN HERE. It renders "SB 253 · 10 Nov 2026 proposed",
+            and the word "proposed" is the whole reason the constant exists: lib/sb253.ts records that a
+            surface printing the date without it "states as settled a date that has already moved once".
+            Do not compose a local variant, and do not trim the status word to fit the line. */}
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', marginTop: '1rem', letterSpacing: '0.01em' }}>
+              {SB253_SHORT}
             </p>
           </div>
-
-          {/* The diverse trio — the ONE tier that stays cards: three parallel, comparable things
-          with figures. Colour is on the 4px TOP rule and the figure, never the fill, per the EDGE
-          VOCABULARY in app/styles/themisiq-tokens.css. Cool to warm across the module hues, which
-          measure 6.50 / 5.55 / 7.53 on white; on the retired dark band their predecessors were
-          lime, sky and amber, which fall to 1.33 / 2.39 / 3.72 the moment the ground goes light. */}
-          <div style={subHead}>Tested across a diverse trio of scenarios</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: '2.5rem' }}>
-            {[
-              { role: 'Paris-aligned', warming: '~1.8°C', src: 'IPCC SSP1-2.6', tone: 'var(--color-module-cbam)' },
-              { role: 'Current trajectory', warming: '~2.7°C', src: 'IPCC SSP2-4.5', tone: 'var(--color-module-climate)' },
-              { role: 'High warming', warming: '~4.4°C', src: 'IPCC SSP5-8.5', tone: 'var(--color-module-cyber)' },
-            ].map(s => (
-              <div key={s.role} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: `4px solid ${s.tone}`, borderRadius: 6, padding: '1.25rem' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 400, color: s.tone, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.warming}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', marginTop: 8 }}>{s.role}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>{s.src}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* What the report documents — the credibility registers.
-          ⚠️ NOT CARDS ANY MORE, AND THE REASON IS MEASURED. These were six panels with their own
-          fill, i.e. a second light tier on top of the section's own light ground — but paper reads
-          1.07:1 against that ground and sunken 1.08:1, so no light fill can announce itself as a
-          separate surface. A tier that cannot be seen is not a tier. Six unlike statements are a
-          definition list, so that is what they are now: a hairline rule between rows, label left,
-          text right. The 2px left border went with the card — by then it was brand teal, not the
-          old violet (task 21 converted it), so it was removed on the edge vocabulary, not colour. */}
-          <div style={subHead}>Documented for assurance, not just generated</div>
-          <dl style={{ margin: '0 0 2.5rem', borderTop: '1px solid var(--color-line-strong)' }}>
-            {[
-              ['Resilience conclusion', 'A rules-based read of how exposure shifts across the trio — persistent, warming-driven, or policy-driven.'],
-              ['Scenario rationale', 'Why these pathways, including a Paris-aligned scenario as IFRS S2 requires — the choice itself is disclosable.'],
-              ['Methodology & basis', 'IPCC AR6 regions and impact-drivers, TCFD transition categories, SSP scenarios — public frameworks throughout.'],
-              ['Assumptions register', 'Every weighting and threshold stated as a disclosed methodological choice, not a black box.'],
-              ['Data lineage', 'A clear boundary between your inputs and platform reference defaults — what assurance needs to see.'],
-              ['Limitations & notice', 'Where the screening ends and formal assessment begins, with a formal Important Notice on every report.'],
-            ].map(([title, desc]) => (
-              <div key={title} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 230px) 1fr', gap: '1.5rem', padding: '15px 0', borderBottom: '1px solid var(--color-line)' }}>
-                <dt style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', margin: 0 }}>{title}</dt>
-                <dd style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, fontWeight: 400, margin: 0, maxWidth: '62ch' }}>{desc}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const }}>
-            <a href="/dashboard/climate-risk" style={{ ...btnPrimary, textDecoration: 'none' }}>Assess your climate risk</a>
-            <a href="/climate-risk" style={{ ...btnSecondary, textDecoration: 'none' }}>See how it works</a>
-            <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Also produces the CSRD double-materiality matrix across all ten ESRS topics.</span>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
+            <a href="/assess" style={{ ...btnOnBand, textDecoration: 'none' }}>Start the free assessment</a>
+            <a href="/advisory" style={{ ...btnOnBandOutline, textDecoration: 'none' }}>Talk to us</a>
           </div>
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
-      <div style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={eyebrow}>How it works</p>
-          <h2 style={sectionTitle}>Collect once. Comply everywhere.</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2.5rem', marginTop: '3rem' }}>
-            {[
-              ['01', 'Tell us about your business', "Answer a few guided questions about your operations, locations, and obligations. ThemisIQ's Wizard does the heavy lifting — no compliance expertise required to get started."],
-              ['02', 'We apply the right methodology', 'ThemisIQ automatically applies the correct frameworks, factors, and calculations for your selected modules — versioned, auditable, and traceable to source.'],
-              ['03', 'Generate the reports you need', 'One data set. Numerous reports. Whether it\'s a regulator, an investor, a customer, or a board asking — ThemisIQ generates the right output automatically.'],
-              // ⚠️ "Every calculation and data point is logged with a full audit trail" was platform-wide and false:
-              // audit_log triggers cover the GHG, CBAM and concierge tables only (verified live 17 Sep 2026), and
-              // they record a saved change to a row rather than every edit. The wording below is the homepage-length
-              // form of AUDIT_TRAIL_NOTE in app/climate-ghg/page.tsx; correct them together.
-              ['04', 'Stand behind your numbers', 'Every figure carries its factor citation and its workings. In the GHG, CBAM and concierge modules, each saved change is written to an audit log by a database trigger — who, when, and the row as it was before — and you can read your own entries but not alter them.'],
-            ].map(([num, title, desc]) => (
-              <div key={num}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: 'var(--color-brand)', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* 4px gradation rule separating the closing band from the footer. */}
+      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
 
-      {/* ── Starter Packs ── */}
-      <section style={{ padding: '5rem 2.5rem', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Not sure where to start?</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Built for who's asking.</h2>
-            <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto', fontWeight: 400 }}>Whether it's a customer, your bank, your board or your investor — here's where to start for each.</p>
-          </div>
-          {/* The OLD-model cards stood here — four priced pack tiles reading PACKS and routing to
-              /get-started/*. Deleted, not left behind a flag: NEW_PRICING_ACTIVE has been true since
-              the June 2026 rescope so they could not render, and every price they carried is 43-78%
-              under what cartQuote charges for the same modules. (PACKS carried a retirement note
-              recording those figures; both it and PackId were deleted from lib/pricing.ts on
-              8 Sep 2026, so the spread survives only in that commit.)
-              A dead branch holding under-priced money is worth less than nothing —
-              it reads as a rollback that is still available, and it is not.
-              The cards below are the live ones: same four use cases, no price, straight into the
-              configurator. */}
-
-          {/* Use-case pack cards (NEW model) — configurator entry points, no price */}
-          {NEW_PRICING_ACTIVE && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            {[
-              { slug: 'supplier', name: 'Supplier Readiness', driver: 'A customer is asking', color: '#0F6E56', items: ['GHG Inventory', 'Supply Chain risk register', 'Supplier questionnaire'] },
-              { slug: 'climate', name: 'Climate Readiness', driver: 'Your bank is asking', color: '#0C447C', items: ['GHG Inventory', 'Climate Risk assessment', 'TCFD / IFRS S2 output'] },
-              { slug: 'foundation', name: 'ESG Foundation', driver: 'Your board wants it', color: '#7425e3', items: ['GHG Inventory', 'People & Workforce', 'Climate Risk'] },
-              { slug: 'investor', name: 'Investor ESG', driver: 'Your investor requires it', color: '#B91C1C', items: ['GHG Inventory', 'Climate Risk', 'Supply Chain', 'Deals & Investment'] },
-            ].map(pack => (
-              <a key={pack.name} href={`/pricing?modules=${PACK_SLUG_MODULES[pack.slug]}`} style={{ background: '#fff', border: `1.5px solid color-mix(in srgb, ${pack.color} 15%, transparent)`, borderRadius: 14, padding: '1.5rem', textDecoration: 'none', display: 'block', transition: 'all 0.15s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = pack.color}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = `color-mix(in srgb, ${pack.color} 15%, transparent)`}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: pack.color, marginBottom: 6 }}>{pack.driver}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>{pack.name}</div>
-                {pack.items.map(item => (
-                  <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                    <span style={{ color: pack.color, flexShrink: 0, fontSize: 12 }}>✓</span>
-                    <span style={{ fontSize: 12, color: '#555553' }}>{item}</span>
-                  </div>
-                ))}
-                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 12 }}>Multi-module — priced in the configurator</div>
-                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: pack.color }}>Configure →</div>
-              </a>
-            ))}
-          </div>
-          )}
-        </div>
-      </section>
-      <HomePricing />
-      {/* ── CTA ── */}
-      <section style={{ padding: '6rem 2.5rem', textAlign: 'center', borderTop: '0.5px solid #e8e7e4' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          The first SB 253 report is <em style={gradText}> {SB253_FIRST_REPORT_DATE}, {SB253_DATE_STATUS}.</em>
-        </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
-          ThemisIQ can have your Scope 1 and 2 inventory complete and the CARB template pre-filled in days — not months.
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="/dashboard/ghg" style={{ ...btnPrimary, textDecoration: 'none' }}>See your emissions instantly — no credit card needed</a>
-          <a href="/advisory" style={{ ...btnSecondary, textDecoration: 'none' }}>Talk to a specialist</a>
-        </div>
-      </section>
-
-      {/* ── FOOTER ── */}
       <Footer />
-
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { margin: 0; }
-        a { cursor: pointer; }
-      `}</style>
     </div>
   )
 }
 
-// ── DATA ────────────────────────────────────────────────────────────
-const modules = [
-  { family: 'ThemisIQ Climate', name: 'GHG Emissions', desc: 'Full Scope 1, 2 and 3 inventory under GHG Protocol. Audit-trail-first, verifier-ready. CARB SB 253 pre-filled export.', tags: ['SB 253', 'CDP C6', 'ESRS E1-6', 'GHG Protocol'], href: '/climate-ghg', dark: false },
-  { family: 'ThemisIQ Climate', name: 'Climate Risk', desc: 'TCFD-aligned physical and transition risk disclosures. Scenario analysis under IPCC pathways to ~1.8°C, ~2.7°C and ~4.4°C.', tags: ['SB 261', 'IFRS S2', 'TCFD', 'CDP-P'], href: '/dashboard/climate-risk', dark: false },
-  { family: 'ThemisIQ', name: 'Supply Chain & Scope 3', desc: 'Supplier emissions mapping. Scope 3 Cat. 1 primary data collection portal. Labour compliance. Human rights risk.', tags: ['Scope 3 Cat.1', 'EcoVadis', 'ESRS S2', 'CS3D'], href: '/supply-chain', dark: false },
-  { family: 'ThemisIQ', name: 'Deals & Investment', desc: 'M&A climate diligence. Investment committee reporting.', tags: ['M&A diligence', 'PE / family office', 'IFRS S2', 'TCFD'], href: '/deals', dark: false },
-  { family: 'ThemisIQ', name: 'AI Governance', desc: 'AI risk register. Model inventory. Policy management. EU AI Act readiness. Board-level AI oversight documentation.', tags: ['EU AI Act', 'NIST AI RMF', 'ISO 42001', 'Model risk'], href: '/ai-governance', dark: false },
-  { family: 'ThemisIQ', name: 'People & Workforce', desc: 'Human capital reporting. DEI metrics. Pay equity and gender pay gap. Health & safety. Training management.', tags: ['ESRS S1', 'GRI 401-410', 'Pay Transparency', 'CA Pay Data'], href: '/people', dark: false },
-  { family: 'ThemisIQ', name: 'Cyber Governance', desc: 'Cyber risk registers. Policy management. Vendor cybersecurity reviews. Incident workflows. CISO dashboards.', tags: ['NIS2', 'DORA', 'ISO 27001', 'NIST CSF'], href: '/cyber', dark: false },
-  { family: 'ThemisIQ', name: 'CBAM', desc: 'Carbon Border Adjustment Mechanism. Specific embedded emissions for goods entering the EU — installation-level actuals, direct and indirect, with an Annex IV §1.2 summary you can hand to a verifier.', tags: ['Non-EU exporters', '(EU) 2023/956', 'Annex IV §1.2 summary'], href: '/cbam', dark: false },
-]
+// ── DATA ──────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * ⚠️ SIX PHOTOGRAPHS, SUPPLIED SEPARATELY, AND NOT ONE OF THEM IS STOCK. The files below do not exist
+ * in the repo yet: until they land the page renders with broken images, which is the intended failure —
+ * a placeholder would be indistinguishable from a finished page. Required, all in public/home/:
+ *   still-life.jpg   1200 x 900   the request section
+ *   essay-steel.jpg  800 x 1000   } the five essay photographs, portrait, so the offset grid reads
+ *   essay-parts.jpg  800 x 1000   } as a column of unlike scenes rather than a filmstrip
+ *   essay-grain.jpg  800 x 1000   }
+ *   essay-timber.jpg 800 x 1000   }
+ *   essay-software.jpg 800 x 1000 }
+ * Alt text describes the SCENE, never the caption: a screen reader user gets the caption from the
+ * figcaption immediately after it, so repeating it there says the same thing twice and describes
+ * nothing.
+ */
+const PHOTOS = {
+  stillLife: { src: '/home/still-life.jpg', w: 1200, h: 900, alt: 'A printed utility bill, a laptop and a coffee cup on a wooden desk beside a window.' },
+} as const
+
+const ESSAY = [
+  { who: 'Steel and aluminium exporter', what: 'Shipping into the EU. The embedded emissions in each shipment are declarable under CBAM.',
+    src: '/home/essay-steel.jpg', w: 800, h: 1000, alt: 'Coils of rolled steel stacked in a warehouse, lit from a high window.' },
+  { who: 'Tier 2 parts supplier', what: 'An automotive customer wants Scope 1 and 2 data before the next contract renewal.',
+    src: '/home/essay-parts.jpg', w: 800, h: 1000, alt: 'Machined metal components in a tray on a factory bench.' },
+  { who: 'Grain grower or processor', what: 'A food brand wants farm-level emissions data for its Scope 3 target.',
+    src: '/home/essay-grain.jpg', w: 800, h: 1000, alt: 'A combine harvester moving through a ripe wheat field.' },
+  { who: 'Timber and wood products producer', what: 'Buyers want land use, carbon removals and sourcing evidence on the record.',
+    src: '/home/essay-timber.jpg', w: 800, h: 1000, alt: 'Stacked sawn timber in a mill yard with forest behind it.' },
+  { who: 'Growing software company', what: 'Enterprise procurement wants AI and cybersecurity governance policies.',
+    src: '/home/essay-software.jpg', w: 800, h: 1000, alt: 'Two people at a desk looking at code on a monitor in an open-plan office.' },
+] as const
 
 /**
- * The two cross-link bands — Advisory and The Materiality Assessment — as ONE component.
- *
- * ⚠️ THEY WERE ALWAYS THE SAME COMPONENT IN TWO COLOURS. Identical shape: a flex row with an
- * eyebrow, a display heading, a supporting line, and a button held right. One was '#0d0d0d' with
- * white text, the other '#fff' with ink. That is why converting either one alone would have made
- * them disagree — the shape said "these are a pair" while the colour said "these are unrelated".
- * They are one treatment now, so a change lands on both by construction rather than by memory.
- *
- * ⚠️ PLAIN 1px BORDER, DEFINITELY NOT A LEFT BAR. The EDGE VOCABULARY in
- * app/styles/themisiq-tokens.css reserves a 6px left edge for module identity and a 4px top edge
- * for semantic state; everything else takes a 1px border. A cross-link to Advisory is neither, and
- * the two bands share this component, so a module-identity edge here would assert that Advisory is
- * a module. The mockup drew a 6px brand left edge; the instruction overrides it, and this comment
- * is the record of why.
- *
- * ⚠️ HOVER CHANGES BACKGROUND, NEVER opacity. The dark band used `opacity: 0.9`, which composites
- * the whole element — label included — toward the page. See the DISABLED AND INACTIVE STATE block
- * in the token file: opacity is never applied to anything containing text.
+ * The sample assessment panel's three rows. `moduleKey` is a --color-module-* key, so the stripe
+ * matches the card for the same module further down the page and follows it through the palette swap.
  */
-function CrossLinkBand({ href, label, title, body, cta, style }: {
-  href: string; label: string; title: string; body: string; cta: string; style?: React.CSSProperties
-}) {
-  return (
-    <a href={href} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', flexWrap: 'wrap', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.5rem 2rem', textDecoration: 'none', transition: 'background 0.15s', ...style }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-ground)' }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-paper)' }}>
-      <div style={{ flex: '1 1 420px' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 6 }}>{label}</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: 6 }}>{title}</div>
-        <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, fontWeight: 400, maxWidth: '60ch' }}>{body}</div>
-      </div>
-      <span style={{ ...btnPrimary, flexShrink: 0, whiteSpace: 'nowrap' }}>{cta}</span>
-    </a>
-  )
-}
+const SAMPLE_RESULTS = [
+  { regulation: 'California SB 253', module: 'GHG Emissions', moduleKey: 'ghg' },
+  { regulation: 'EU CBAM', module: 'CBAM', moduleKey: 'cbam' },
+  { regulation: 'EU CS3D', module: 'Supply Chain', moduleKey: 'supply' },
+] as const
 
-// ── STYLES ──────────────────────────────────────────────────────────
-/** Sub-heading inside the flagship section, ruled off from the rows beneath it. */
-const subHead: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--color-line-strong)' }
-const navLink: React.CSSProperties = { fontSize: 13, color: '#555553', textDecoration: 'none' }
-const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', border: 'none', cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }
-const gradText: React.CSSProperties = { fontStyle: 'italic', color: 'var(--color-brand)' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400 }
+/**
+ * ⚠️ `key` IS A --color-module-* TOKEN KEY, NOT A HEX. The approved design named a colourway value per
+ * card; using those literals here would put eight colourway values live on one page, outside
+ * lib/tokenContrast.test.ts's sight, and leave them to be found again at the swap. The token means the
+ * cards move once, with everything else. See the note at the top of this file for why a 4px rule may
+ * carry a fill value at all.
+ */
+const MODULES_HOME = [
+  { name: 'GHG Emissions', key: 'ghg', href: '/climate-ghg',
+    desc: 'Scope 1, 2 and 3 inventory with an audit trail behind every figure.',
+    chips: ['SB 253', 'GHG Protocol', 'ESRS E1-6'] },
+  { name: 'Climate Risk', key: 'climate', href: '/climate-risk',
+    desc: 'Physical and transition risk, scenario analysis, resilience reporting.',
+    chips: ['SB 261', 'IFRS S2', 'TCFD'] },
+  { name: 'Supply Chain', key: 'supply', href: '/supply-chain',
+    desc: 'Supplier data collection, human rights risk mapping, and the primary data that feeds Scope 3 Category 1.',
+    chips: ['CS3D', 'EcoVadis', 'Modern Slavery Act', 'ESRS S2'] },
+  { name: 'CBAM', key: 'cbam', href: '/cbam',
+    desc: 'Embedded emissions for goods entering the EU, installation by installation.',
+    chips: ['(EU) 2023/956', 'Annex IV'] },
+  { name: 'Deals and Investment', key: 'deals', href: '/deals',
+    desc: 'For M&A, family offices and companies getting ready to sell. Which rules apply, from what year, and what they cost to meet. Run it on a target before you buy, or on yourself before you are asked.',
+    chips: ['SB 253', 'SECR', 'CSRD', 'IFRS S2'] },
+  { name: 'AI Governance', key: 'ai', href: '/ai-governance',
+    desc: 'Model inventory, risk register and policy management.',
+    chips: ['EU AI Act', 'NIST AI RMF', 'ISO 42001'] },
+  { name: 'Cyber Governance', key: 'cyber', href: '/cyber',
+    desc: 'Cyber risk registers, vendor reviews and incident workflows.',
+    chips: ['NIS2', 'DORA', 'ISO 27001'] },
+  { name: 'People and Workforce', key: 'people', href: '/people',
+    desc: 'Human capital reporting, pay equity, health and safety.',
+    chips: ['ESRS S1', 'Pay Transparency', 'CSRD'] },
+] as const
+
+/**
+ * Nineteen. Not a count to be printed — see the section comment for why the "30+" stat went — and not a
+ * hand-typed list forever: it duplicates names that lib/obligations.ts already holds for nine of them.
+ * Deriving the nine from OBLIGATIONS and keeping ten literals would be a smaller lie than this, and is
+ * logged rather than done here because it changes what a chip IS.
+ */
+const FRAMEWORKS = [
+  'SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis',
+  'TCFD', 'GHG Protocol', 'GRI', 'SBTi', 'NIST AI RMF', 'EU AI Act', 'ISO 42001', 'ISO 27001',
+  'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA',
+] as const
+
+const WIDER = [
+  { eyebrow: 'Start here if you report under CSRD', title: 'The Materiality Assessment',
+    desc: 'Work out which sustainability topics actually matter to your business, and which of them you have to report on. Add Climate Risk for the full CSRD picture.',
+    cta: 'See sample reports', href: '/materiality' },
+  { eyebrow: 'Part of the GHG module', title: 'SBTi Targets',
+    desc: 'Set and track science-based targets under the Corporate Net-Zero Standard, using the inventory you have already built.',
+    cta: 'See how targets are set', href: '/climate-ghg' },
+  { eyebrow: 'When you want a person', title: 'Advisory Services',
+    desc: 'Assurance preparation, sector guidance and board-ready narratives from practitioners.',
+    cta: 'Talk to a specialist', href: '/advisory' },
+] as const
+
+// ── STYLES ────────────────────────────────────────────────────────────────────────────────────────
+/** Eyebrow over the gradation band: ink, because nothing on the band is any other colour. */
+const eyebrowOnBand: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink)', marginBottom: '1.1rem' }

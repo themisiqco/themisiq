@@ -1304,3 +1304,94 @@ happen is reverting it by leaving `--tq-mod` set to a value nobody can read, whi
 companion — its fill *is* its text colour, so the collision is between a module identity and a state at
 full strength. Two of the three genuine collisions in the target set are therefore module-against-state,
 which suggests the state family, not the module family, is where the swap has the freedom to move.
+
+---
+
+## Retired from app/page.tsx: why the climate resilience showcase was a section and not a band
+
+Moved here 25 Sep 2026 when the homepage was rebuilt and the Flagship section did not survive. **Kept
+because it records a measured result, not a preference.** The comment read, in the file:
+
+> ⚠️ A SECTION ON THE PAGE, NOT A BAND. It was a full-bleed `#0d0d0d` block. A dark band and a tinted
+> band both read as "marketing"; a 2px ink rule and a heading read as "next section", which is what this
+> is. The change is also forced, not stylistic: the scenario ramp below needs white beneath it —
+> `var(--color-module-climate)` measures **4.29:1 on the teal band**, under AA.
+
+Two things worth carrying forward:
+
+1. **The measured part.** A module hue on a tinted band loses roughly a third of its ratio against the
+   same hue on paper: `--color-module-climate` `#A94E0D` is 5.55:1 on `--color-paper` and 4.29:1 on the
+   teal band. Any future band that carries module-coloured text needs its own measurement; the paper
+   figure does not transfer. Under the 2026 colourway this gets much worse — see the fill-versus-text
+   rule in `docs/colourway-2026.md`.
+2. **The judgement part**, which is still the platform's position: a full-bleed dark or tinted block
+   reads as an advertisement, and a rule plus a heading reads as the next section. That is why the
+   rebuilt homepage puts its only two bands at the top and the bottom, where a page IS advertising
+   itself, and keeps the body of the page on paper.
+
+The section's content — the IPCC trio and the six-row "Documented for assurance" list — is not preserved
+here. The trio survives at `app/climate-risk/page.tsx:134`, reconciled to one tone on 25 Sep 2026.
+
+---
+
+## ✅ DECIDED 25 Sep 2026 — was: the four use-case pack entry points lost their only discovery surface
+
+Logged 25 Sep 2026, in the homepage rebuild. **`lib/packEntryPoints.ts` is not orphaned** — the four
+`/get-started/*` routes still redirect through `PACK_SLUG_MODULES`, so every existing link still works:
+
+| Route | Preselects | Homepage card, until 25 Sep 2026 |
+|---|---|---|
+| `/get-started/supplier` | `ghg,supply` | Supplier Readiness — "A customer is asking" |
+| `/get-started/climate` | `ghg,risk` | Climate Readiness — "Your bank is asking" |
+| `/get-started/foundation` | `ghg,people,risk` | ESG Foundation — "Your board wants it" |
+| `/get-started/investor` | `ghg,risk,supply,deals` | Investor ESG — "Your investor requires it" |
+
+What was lost is **discovery**, not the mechanism: the four URLs now work only for someone who already
+has one. `HomePricing` links to `/pricing` with nothing preselected, so a visitor who arrives because a
+customer is asking has to assemble `ghg,supply` themselves in the configurator.
+
+**Restoring it is small.** The cards were four `<a>` elements in a grid reading `PACK_SLUG_MODULES`, and
+the natural home is beside the three wider cards under the module grid — same tinted treatment, same
+eyebrow-heading-description-link shape, so no new component. Two things would need fixing rather than
+copying: the old cards carried a per-card accent colour, one of which was the **retired violet
+`#7425e3`** (its last use on the page, gone with the section), so a restored set takes
+`--color-accent-*`; and each listed its modules as plain text (`'GHG Inventory'`, `'Supply Chain risk
+register'`) beside a `PACK_SLUG_MODULES` value, which is the same fact written twice and free to drift.
+`MODULES` in `lib/pricing.ts` has the canonical names, so the list should derive from the slug's module
+ids rather than be typed beside them.
+
+**DECIDED: documented as legacy link targets, cards NOT restored.** `/assess` answers "where do I start"
+better than four cards do, by asking about the visitor's situation instead of making them pick from four
+guesses about it. All four route files and `lib/packEntryPoints.ts` now carry a note saying nothing links
+to them by design, so neither the routes nor the constant reads as dead code. The restoration notes below
+are kept in case the decision is revisited; they are not a to-do.
+
+Original entry. ⚠️ **The decision is whether the homepage should offer a multi-module starting point at all**, not
+whether to paste four cards back. The rebuilt page sends every visitor to `/assess` — which answers the
+same question better, by asking about their situation instead of making them pick a card. If that is the
+intent, the four routes are legacy link targets and should be documented as such; if it is not, the cards
+come back.
+
+---
+
+## The homepage framework chip row is nineteen hand-typed strings
+
+Logged 25 Sep 2026. **Not a defect** — every chip was verified against the tree in that pass, and two
+were removed for having no evidence (`SEC Climate Rule`, nowhere in `lib/` or `app/`; `RE100`, one
+pricing bullet). It becomes one the next time a framework is added or renamed in `lib/` and the row is
+not touched.
+
+Nine of the nineteen are entries in `OBLIGATIONS` (`lib/obligations.ts`) and could be derived from it:
+SB 253, SB 261, IFRS S2, CDP, EcoVadis, EU AI Act, EU Pay Transparency, NIS2, DORA. The other ten are
+standards the engine or a module cites rather than obligations it scores — ESRS/CSRD, GHG Protocol, SBTi,
+TCFD, GRI, ISO 27001, ISO 42001, NIST AI RMF, NIST CSF, SASB — and `OBLIGATIONS` is the wrong home for
+them, because an obligation there carries a deadline, a driver and a module mapping.
+
+So the fix is not "derive the row". It is to decide whether a **standard cited** deserves a registry of
+its own alongside a **rule we score**, at which point the row derives from both and a new module's
+standards appear on the homepage by construction. That is a bigger change than the rebuild and is why
+this is logged rather than done: it changes what a chip is.
+
+⚠️ **Whatever happens, no count goes back on that section.** The row replaced a stat reading "30+
+Frameworks covered", against which `ALL_OBLIGATION_IDS` has sixteen, the row has nineteen, and the GHG
+engine maps five to GWP sets.

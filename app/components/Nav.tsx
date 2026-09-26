@@ -74,7 +74,7 @@ export default function Nav() {
 
   const navLinkStyle: React.CSSProperties = { fontSize: 15, color: '#555553', textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 400 }
   const platformItemStyle: React.CSSProperties = { display: 'block', padding: '9px 12px', borderRadius: 8, textDecoration: 'none' }
-  const ghostBtn: React.CSSProperties = { fontSize: 12, fontWeight: 400, padding: '7px 14px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }
+  const inkBtn: React.CSSProperties = { fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: 'var(--color-ink)', color: 'var(--color-paper)', border: 'none', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }
   const primaryBtn: React.CSSProperties = { fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, background: GRAD, color: '#fff', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }
 
   const moduleRow = (m: typeof MODULES_NAV[number]) => (
@@ -125,6 +125,10 @@ export default function Nav() {
               )}
             </div>
 
+            {/* Regulations, not "Frameworks": the page is /frameworks, but a customer arrives asking
+                which RULES apply to them, not which reporting standards exist. Outside the Platform
+                dropdown for the same reason Advisory is — that list is modules and this is not one. */}
+            <a href="/frameworks" style={navLinkStyle}>Regulations</a>
             <a href="/pricing" style={navLinkStyle}>Pricing</a>
             {/* Outside the Platform dropdown on purpose: that list is modules, and advisory is
                 not one. It sits beside Pricing as a peer destination. */}
@@ -136,8 +140,13 @@ export default function Nav() {
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
           {!isAuthed && (
             <>
-              <a href="/login" style={{ fontSize: 12, fontWeight: 500, padding: '7px 10px', color: '#555553', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">Log in</a>
-              <a href="/assess" style={ghostBtn} className="desktop-only">Take the assessment →</a>
+              <a href="/login" style={{ fontSize: 12, fontWeight: 500, padding: '7px 10px', color: '#555553', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">Sign in</a>
+              {/* ⚠️ FILLED INK, NOT BRAND. This nav sits above a --gradation-band hero on the homepage,
+                  where a brand-teal pill would be a third colour against the ground; ink reads the same
+                  on the band and on paper, which is what a nav on 49 pages needs. It replaced an
+                  outlined `ghostBtn`, which was too quiet for the page's one primary action — and that
+                  style was DELETED in the same pass, because this was its only call site. */}
+              <a href="/assess" style={inkBtn} className="desktop-only">Free assessment</a>
             </>
           )}
           {isAuthed && (
@@ -208,9 +217,10 @@ export default function Nav() {
         }}>
           {[
             ...MODULES_NAV,
+            { href: '/frameworks', label: 'Regulations', sub: 'Every rule we cover, and who it applies to' },
             { href: '/pricing', label: 'Pricing', sub: 'Plans, tiers, and what each includes' },
             { href: '/advisory', label: 'Advisory', sub: 'Expert judgment on your obligation' },
-            { href: '/assess', label: 'Take the assessment →', sub: 'Check which regulations apply to you' },
+            { href: '/assess', label: 'Free assessment', sub: 'Check which regulations apply to you' },
           ].map(({ href, label, sub }) => (
             <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
               display: 'block', padding: '14px 0',
@@ -243,7 +253,7 @@ export default function Nav() {
               textDecoration: 'none',
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{isAuthed ? 'Log out' : 'Log in'}</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{isAuthed ? 'Sign out' : 'Sign in'}</div>
             <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{isAuthed ? 'Sign out of your account' : 'Access your dashboard'}</div>
           </a>
           <div style={{ marginTop: '1rem' }}>

@@ -4,7 +4,11 @@
  * one saturated brand accent. The eight module hues are a wayfinding layer
  * underneath the brand, not part of it.
  *
- * There are no gradients and no filled dark panels anywhere in this system.
+ * There are no gradients and no filled dark panels anywhere in this system, WITH ONE EXCEPTION,
+ * added 25 Sep 2026 and named so it stays one: --gradation-band. See the GRADATION block below. It is
+ * a full-bleed decorative GROUND and nothing else. This line previously read as an absolute and is
+ * amended rather than quietly contradicted, because a page introducing a second gradient would
+ * otherwise be able to cite the exception as precedent.
  *
  * Import order in app/globals.css:
  *   @import "tailwindcss";
@@ -184,6 +188,34 @@
   --color-scale-mid:        #A94E0D; /* 5.06:1 on its own wash, 5.55:1 on white */
   --color-scale-mid-wash:   #FEF3E2;
   --color-scale-gap-wash:   #FDF6EC; /* the N/A band's ground: a gap, not a rung */
+
+  /* ── GRADATION ────────────────────────────────────────────────────────────────────
+     THE ONE GRADIENT IN THE SYSTEM. The four stops are the 2026 colourway's gradation, recorded in
+     docs/colourway-2026.md. It is the only place a colourway value is live ahead of the module swap,
+     and that is deliberate: a gradient is a FILL by construction, so it is the one use that the
+     fill-versus-text rule permits at full saturation.
+
+     ⚠️ A FULL-BLEED DECORATIVE GROUND. NEVER TEXT, NEVER A GRAPHIC CARRYING MEANING, NEVER A SMALL
+     AREA. background-clip: text on this is forbidden — the platform retired a gradient wordmark once
+     and the name `gradText` survived it for months as an invitation to bring it back.
+
+     ⚠️ DIRECTION IS A CORRECTNESS CONSTRAINT, NOT A LAYOUT PREFERENCE. The band runs LIGHT TO DARK,
+     LEFT TO RIGHT, and copy sits LEFT. --color-ink over the band, measured by sRGB interpolation
+     across the full width:
+       0%    #FFDE59  13.23:1
+       33%   #7ED957   9.98:1
+       66%   #0097B2   5.07:1
+       72%   #008BB1   4.45:1  ← ink drops below AA body here
+       88%   #0066AF   2.94:1  ← and below AA large text here
+       100%  #004AAD   2.16:1
+     So --gradation-ink-safe is the width ink may occupy, set to 60% rather than 72% so a long word,
+     a wider viewport or a future stop tweak cannot push a line past the crossover.
+
+     ⚠️ IF A LAYOUT NEEDS COPY ON THE RIGHT, FLIP THE BAND — DO NOT CHANGE THE TEXT COLOUR. Two text
+     colours crossing one band means a boundary that is approximate, and approximate is the wrong
+     property for a contrast threshold. One band, one text colour, orientation adjusted to suit. */
+  --gradation-band:     linear-gradient(90deg, #FFDE59 0%, #7ED957 33%, #0097B2 66%, #004AAD 100%);
+  --gradation-ink-safe: 60%;
 
   /* ---- Reversed text --------------------------------------------- */
   /* Off-white, never #FFF. Pure white haloes against dark and is the

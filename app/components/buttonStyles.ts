@@ -37,6 +37,44 @@ export const btnPrimary: CSSProperties = {
   display: 'inline-block',
 }
 
+/**
+ * ON A GRADATION BAND. The band is --gradation-band and carries --color-ink text on its light end, so
+ * a brand-teal fill here would be a third colour competing with the ground. These two are ink and
+ * paper only.
+ *
+ * ⚠️ THEY EXIST SO THE HERO AND THE CLOSING BAND CANNOT DRIFT APART. Both bands draw from here, the
+ * way the two cross-link bands on the homepage became one component after spending months as "the same
+ * shape in two colours". A one-off inline style on either band is how that starts again.
+ *
+ * ⚠️ VALID ONLY OVER --gradation-ink-safe, the band's light 60%. btnOnBandOutline is paper-on-band,
+ * so its edge and label inherit the ground's contrast: over the dark end it would be invisible, which
+ * is the same constraint the ink text has and the reason the band's direction is fixed.
+ */
+export const btnOnBand: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 500,
+  padding: '13px 32px',
+  borderRadius: 8,
+  background: 'var(--color-ink)',
+  color: 'var(--color-paper)',
+  border: 'none',
+  cursor: 'pointer',
+  display: 'inline-block',
+}
+
+/** The outlined half of the band pair: no fill, ink label and edge. */
+export const btnOnBandOutline: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 400,
+  padding: '13px 32px',
+  borderRadius: 8,
+  background: 'none',
+  color: 'var(--color-ink)',
+  border: '1px solid var(--color-ink)',
+  cursor: 'pointer',
+  display: 'inline-block',
+}
+
 /** Outlined: no fill, brand text and edge. */
 export const btnSecondary: CSSProperties = {
   fontSize: 14,

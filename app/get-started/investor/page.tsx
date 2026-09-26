@@ -1,3 +1,17 @@
+/**
+ * LEGACY LINK TARGET. Decided 25 Sep 2026, in the homepage rebuild.
+ *
+ * ⚠️ NOTHING LINKS HERE FROM THE SITE ANY MORE, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT.
+ * The homepage's four use-case pack cards were this route's only entry point. They were removed
+ * because /assess answers "where do I start" better than four cards do: it asks about the visitor's
+ * situation instead of making them pick from four guesses about it. This route is kept so that every
+ * /get-started/investor link already in an email, a deck or a search index still lands on the right
+ * preselected configurator.
+ *
+ * So: do NOT add a link to this page, and do NOT delete it. If a multi-module starting point is wanted
+ * on the site again, that is a decision about /assess, not about restoring these four routes. The
+ * module set lives in lib/packEntryPoints.ts, which carries the same note.
+ */
 import { redirect } from 'next/navigation'
 import { NEW_PRICING_ACTIVE } from '../../../lib/pricing'
 import { PACK_SLUG_MODULES } from '../../../lib/packEntryPoints'
