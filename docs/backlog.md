@@ -1766,3 +1766,15 @@ merely exist.
 
 **Do it in one pass, not per file.** Twenty-two of the thirty-two arrived one file at a time, which is how
 the value outlived its own retirement.
+
+---
+
+## `next dev` rewrites `AGENTS.md`, so it is dirty after every local run — decide once
+
+Logged 26 Sep 2026. **One decision needed: commit the block, or ignore the file.** Running `next dev`
+rewrites `AGENTS.md` and the block says so itself: *"This block is written and re-added by `next dev` —
+verify at `node_modules/next/dist/server/lib/generate-agent-files.js`."* Reverting it only re-creates the
+change on the next run, so the tree cannot be kept clean by discarding it. Either commit it and let the
+next Next.js version produce a small diff, or add it to `.gitignore` and accept that the guidance it
+carries stops being reviewed. It has been excluded from every stage line by hand so far, which works and
+relies on somebody remembering.

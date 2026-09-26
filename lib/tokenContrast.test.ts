@@ -55,6 +55,45 @@ function tokens(): Record<string, string> {
   return out
 }
 
+/**
+ * HSL hue in degrees, 0–360. Grey returns 0, which is why the separation check below treats a pair as
+ * distinct on saturation before it ever compares hue: an unsaturated colour has no meaningful hue and a
+ * naive comparison would report every grey as 0° from every other.
+ *
+ * ⚠️ THE SAME FORMULA THE ANALYSIS USED. The values in docs/colourway-2026.md and docs/backlog.md were
+ * computed with Python's colorsys.rgb_to_hls, and this is that function's hue arm: for the max channel
+ * r it is (g-b)/d, for g it is 2+(b-r)/d, for b it is 4+(r-g)/d, times 60. Written out rather than
+ * imported so the figures in those documents can be reproduced from this file alone.
+ */
+function hueDeg(hex: string): number {
+  const h = hex.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  if (d === 0) return 0
+  const raw = max === r ? (g - b) / d : max === g ? 2 + (b - r) / d : 4 + (r - g) / d
+  const deg = raw * 60
+  return deg < 0 ? deg + 360 : deg
+}
+
+/** Saturation, 0–1, HSL. Used only to exempt greys from the hue comparison. */
+function satHsl(hex: string): number {
+  const h = hex.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  if (d === 0) return 0
+  const l = (max + min) / 2
+  return l > 0.5 ? d / (2 - max - min) : d / (max + min)
+}
+
+/** Shortest distance between two hues on the wheel, so 350° and 10° are 20° apart, not 340°. */
+const hueGap = (a: string, b: string): number => {
+  const d = Math.abs(hueDeg(a) - hueDeg(b)) % 360
+  return Math.min(d, 360 - d)
+}
+
+const HUE_GATE = 20      // degrees
+const RATIO_GATE = 1.5   // contrast
+
 const AA = 4.5               // WCAG AA, body text
 const TINT_CEILING = 1.25    // a wash is a tint, not a fill — see the wash test for the derivation
 const T = tokens()
@@ -143,6 +182,51 @@ function tqMod(): Record<string, string> {
 const moduleKeys = () => [...new Set(
   Object.keys(T).flatMap(k => { const m = /^--color-module-([a-z0-9]+)(?:-wash|-ink)?$/.exec(k); return m ? [m[1]] : [] })
 )].sort()
+
+/**
+ * Pairs that overlap ON PURPOSE. ⚠️ EXACT PAIRS, NEVER A LOOSER THRESHOLD — the gates are calibrated
+ * against colours that already ship, and widening either one to absorb a specific overlap would exempt
+ * every pair like it.
+ *
+ * ⚠️ ONE ENTRY, AND IT IS A DESIGN DECISION RATHER THAN A DEFECT WE TOLERATE. The 2026 colourway put GHG
+ * at 189.1° and CBAM at 186.5°, and GHG and CBAM STAY TOGETHER as the emissions family: an inventory and
+ * a border declaration are related territory, and a reader moving between them is not lost by finding the
+ * same hue. Cyber Governance was the third module in that 3° band and it MOVED, to violet at 269.6°,
+ * precisely so this list has one entry and not three. docs/colourway-2026.md, "Cyber Governance is a
+ * ninth value, outside the Canva colourway".
+ *
+ * Because both companions are derived by one formula from fills 2.6° apart, they land 1.8° apart at
+ * 1.00:1. Separating them would mean abandoning either the formula or the family.
+ *
+ * Keys are the two token names sorted and joined with " vs ", so the order they are written in does not
+ * matter and a pair cannot be listed twice under two spellings.
+ */
+/**
+ * Every colliding pair among the FOREGROUND tokens, keyed by the two names sorted and joined, so a pair
+ * has one spelling however it is written. Shared by the two assertions below, which is the point: they
+ * check opposite directions of the same computation and must not be able to disagree about it.
+ */
+function collisions(): Map<string, string> {
+  const FOREGROUND = /^--color-(module-[a-z0-9]+(-ink)?|state-[a-z0-9]+)$/
+  const names = Object.keys(T).filter(n => FOREGROUND.test(n)).sort()
+  const out = new Map<string, string>()
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      const a = names[i], b = names[j]
+      if (satHsl(T[a]) < 0.1 || satHsl(T[b]) < 0.1) continue   // greys have no meaningful hue
+      const gap = hueGap(T[a], T[b])
+      const ratio = contrast(T[a], T[b])
+      if (gap <= HUE_GATE && ratio < RATIO_GATE) {
+        out.set([a, b].sort().join(' vs '), `${a} ${T[a]} vs ${b} ${T[b]} — ${r2(ratio)}:1 at ${gap.toFixed(1)}°`)
+      }
+    }
+  }
+  return out
+}
+
+const KNOWN_COLLISIONS = new Set<string>([
+  '--color-module-cbam-ink vs --color-module-ghg-ink',
+])
 
 describe('app/styles/themisiq-tokens.css is legible against itself', () => {
   it('the token layer is readable and declares the colours these tests reference', () => {
@@ -325,6 +409,65 @@ describe('app/styles/themisiq-tokens.css is legible against itself', () => {
       'docs/colourway-2026.md has the measured companion values and the reason the swap cannot be ' +
       'landed in pieces: the bar inversion and the companions are BOTH wrong against the current ' +
       'values and only become right when the values move.').toEqual([])
+  })
+
+  it('no two foreground tokens are two names for one colour', () => {
+    // ⚠️ TWO PARTS, AND A ONE-PART RULE WOULD CONDEMN THE PALETTE THAT SHIPS. A pair collides only when
+    // its hues are within HUE_GATE AND its contrast is below RATIO_GATE. Contrast ratio measures
+    // LIGHTNESS ONLY, so on its own it flags red against green: --color-state-error #B91C1C against
+    // --color-state-ok #0F6E56 is 1.04:1 and 165° apart, and nobody confuses them. An earlier sweep that
+    // used ratio alone returned twenty-two "collisions" of which two were real.
+    //
+    // ⚠️ AND A HUE-ONLY RULE WOULD BE WORSE, because a module fill and its own -ink companion share a hue
+    // by construction — that is what makes a companion read as its module. --color-module-cyber #AB81D6
+    // and --color-module-cyber-ink #8A4FC6 are 0.1° apart and 1.70:1, which is the design working.
+    //
+    // ⚠️ WHY THIS EXISTS AT ALL. Nothing enforced separation until 26 Sep 2026, so
+    // --color-module-climate #004AAD and --color-state-info #0C447C sat at 1.21:1 and 4.3° apart — a
+    // neutral notice and a module identity rendering as one colour — and it reached a backlog entry
+    // rather than a red build. Applying the rule for the first time also found three collisions nobody
+    // had recorded, all of which the colourway swap then resolved.
+    //
+    // ⚠️ WASHES ARE EXCLUDED, AND THE RULE CANNOT BE APPLIED TO THEM. A wash shares its fill's hue by
+    // construction (--color-module-cbam-wash is 0.3° from --color-module-cbam) and every wash sits at the
+    // same tint depth, so all wash-vs-wash pairs are about 1.00:1 to each other. Including them turns one
+    // real collision into thirteen reported ones, eleven of which are the design. Measured: the full set
+    // with washes gives 13, the foreground set gives 1.
+    //
+    // ⚠️ GREYS ARE EXEMPT FROM THE HUE TEST. hueDeg returns 0 for an unsaturated colour, so two greys
+    // would read as 0° apart and collide on lightness alone. No foreground token is grey today; the guard
+    // is here so that adding one does not produce a false failure nobody can interpret.
+    const names = Object.keys(T).filter(n => /^--color-(module-[a-z0-9]+(-ink)?|state-[a-z0-9]+)$/.test(n))
+    expect(names.length, 'the foreground set collapsed — the token naming changed and the regex in ' +
+      'collisions() did not follow it, so this test would pass by scanning nothing').toBeGreaterThan(10)
+
+    const found = collisions()
+    const unexpected = [...found.entries()].filter(([k]) => !KNOWN_COLLISIONS.has(k)).map(([, v]) => v)
+    expect(unexpected, unexpected.length === 0 ? '' :
+      `two foreground tokens are two names for one colour:\n  ${unexpected.join('\n  ')}\n\n` +
+      `A pair collides when its hues are within ${HUE_GATE}° AND its contrast is under ${RATIO_GATE}:1. ` +
+      'Move one of them, or — only if the overlap is a decision somebody made on purpose — add the exact ' +
+      'pair to KNOWN_COLLISIONS with the document that records why. Do NOT loosen either gate: they are ' +
+      'calibrated against pairs that already ship, and --color-state-warn against --color-state-error is ' +
+      '25° apart, so a wider hue gate starts failing colours nobody confuses.').toEqual([])
+
+  })
+
+  it('every KNOWN_COLLISIONS entry still collides, so a stale exemption cannot survive', () => {
+    // ⚠️ ITS OWN it() BECAUSE ONE TEST CANNOT ASSERT BOTH DIRECTIONS. These two checks lived in a single
+    // test until the proof that was supposed to demonstrate this one instead demonstrated the flaw:
+    // moving --color-module-cbam-ink onto another token's value created a NEW collision, the first expect
+    // threw, and the staleness check never ran. A stale exemption would therefore have been invisible for
+    // exactly as long as any unexpected collision existed — which is when it matters most.
+    //
+    // An allow-list entry that no longer collides is how an allow-list becomes a blanket: the next real
+    // collision in that pair would be permitted by a line written for a problem that no longer exists.
+    const found = collisions()
+    const stale = [...KNOWN_COLLISIONS].filter(k => !found.has(k))
+    expect(stale, stale.length === 0 ? '' :
+      `KNOWN_COLLISIONS lists a pair that no longer collides:\n  ${stale.join('\n  ')}\n\n` +
+      'Remove the entry. It was an exemption for a specific overlap, that overlap is gone, and leaving ' +
+      'the line behind would silently permit the next one.').toEqual([])
   })
 
   it('every -wash is light enough to be a background', () => {
