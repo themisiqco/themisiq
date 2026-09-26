@@ -128,23 +128,69 @@ export const EU_AI_ACT_URL = 'https://digital-strategy.ec.europa.eu/en/policies/
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
 export const NIS2_COMMISSION_URL = 'https://digital-strategy.ec.europa.eu/en/policies/nis2-directive'
 
-// Intent: the Commission's DORA page under financial-services legislation, including the implementing
-// and delegated acts — which is the part that matters, since DORA's detail lives in the RTS.
-// UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
-export const DORA_COMMISSION_URL =
-  'https://finance.ec.europa.eu/regulation-and-supervision/financial-services-legislation/implementing-and-delegated-acts/digital-operational-resilience-act-dora_en'
+// ── Border carbon ────────────────────────────────────────────────────────────────────────────────
+// The regulation itself, as an ELI URI. VERIFIED 200 on 25 Sep 2026. Preferred over the Commission's
+// topic page for the same reason as DORA below: an ELI URI is stable by design and is the legal text.
+export const CBAM_REGULATION_URL = 'https://eur-lex.europa.eu/eli/reg/2023/956/oj'
+
+// The Commission's CBAM page, which is where the implementing regulations, sector rules and default
+// values actually live — the regulation alone does not carry them. VERIFIED 200 on 25 Sep 2026.
+// ⚠️ NOTE THE PATH HAS NO /taxation SEGMENT. The obvious
+// taxation-customs.ec.europa.eu/taxation/carbon-border-adjustment-mechanism_en returns 404; the live
+// path is one level shallower. Checked, not assumed.
+export const CBAM_COMMISSION_URL = 'https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_en'
+
+// ── Assurance ────────────────────────────────────────────────────────────────────────────────────
+// ISO 14064-3:2019, the GHG validation and verification standard the assurance pack is assembled for.
+// ✅ FORM-VERIFIED 25 Sep 2026. 66455 is ISO 14064-3:2019's catalogue id and /standard/<id>.html is
+// ISO's convention, confirmed by a human opening ISO_27001_URL — see the full reasoning there. iso.org
+// 403s every automated client, so no fetch can confirm this one and a 403 is not evidence of a dead
+// link. Do not redo that search.
+export const ISO_14064_3_URL = 'https://www.iso.org/standard/66455.html'
+
+// ── Thresholds ───────────────────────────────────────────────────────────────────────────────────
+// The UK government's environmental reporting guidelines, which contain the SECR guidance itself.
+// VERIFIED 200 on 25 Sep 2026. Chosen over /guidance/measuring-and-reporting-environmental-impacts
+// (also 200) because that page is general business guidance and this one is the SECR publication.
+export const SECR_GUIDANCE_URL =
+  'https://www.gov.uk/government/publications/environmental-reporting-guidelines-including-mandatory-greenhouse-gas-emissions-reporting-guidance'
+
+// ⚠️ WAS THE COMMISSION'S DORA PAGE, AND THAT PAGE IS GONE. Checked 25 Sep 2026: the
+// finance.ec.europa.eu implementing-and-delegated-acts path returned 404, and so did the obvious
+// successor path. This is now the EUR-Lex ELI URI for Regulation (EU) 2022/2554 itself (verified 200),
+// chosen over EIOPA's live summary page for three reasons: an ELI URI is stable by design, it is the
+// legal text rather than a supervisor's reading of it, and it matches how lib/cs3d.ts cites directives.
+// Renamed from DORA_COMMISSION_URL, because it is no longer the Commission's.
+// A Commission topic page is exactly the kind of link that moves; a consolidated ELI URI is not.
+export const DORA_REGULATION_URL =
+  'https://eur-lex.europa.eu/eli/reg/2022/2554/oj'
 
 // ── STANDARDS BODIES ─────────────────────────────────────────────────────────────────────────────
 
-// Intent: the ISO catalogue entry for ISO/IEC 42001 (AI management systems).
-// UNVERIFIED: carried over from app/frameworks/page.tsx, not opened. Note the numeric-id form
-// (/standard/81230.html) is more fragile than a slug — ISO renumbers on revision.
+// The ISO catalogue entry for ISO/IEC 42001 (AI management systems).
+// ✅ FORM-VERIFIED 25 Sep 2026, and that is as far as a fetch can go — see ISO_27001_URL below for the
+// reasoning, which applies to every ISO link here: iso.org 403s automated clients, so a 403 is not
+// evidence of a dead link. 81230 is an ISO catalogue id and /standard/<id>.html is ISO's convention,
+// confirmed by a human opening the 27001 link. The earlier note here called the id form "more fragile
+// than a slug"; the accurate statement is that the id PINS AN EDITION while a slug tracks the current
+// one, and pinning is the safer default for a framework reference page.
 export const ISO_42001_URL = 'https://www.iso.org/standard/81230.html'
 
-// Intent: the ISO catalogue entry for ISO/IEC 27001.
-// UNVERIFIED: carried over from app/frameworks/page.tsx, not opened. Note this one uses the SLUG form
-// (/standard/27001) while its sibling above uses a numeric id — two shapes for one catalogue, and
-// only one of them can be the current convention.
+// The ISO catalogue entry for ISO/IEC 27001.
+// ✅ VERIFIED BY HUMAN CLICK, 25 Sep 2026: it resolves and serves the ISO/IEC 27001:2022 page. The
+// slug form is a WORKING VANITY REDIRECT, not a mistake, and the earlier note here — that two shapes
+// for one catalogue meant only one could be the convention — was wrong. Both are current, and they are
+// stable in DIFFERENT WAYS:
+//   /standard/27001        tracks whatever edition is current, and survives a revision
+//   /standard/82875.html   the 2022 edition's catalogue id: pins that edition, and says WHICH one
+// ⚠️ 82875 IS THE CANONICAL FALLBACK IF THE VANITY PATH EVER BREAKS. Recorded here so nobody has to
+// find it again. Note ISO issues a NEW catalogue id per edition (27001:2013 was 54534), so an id form
+// goes stale as a link to a withdrawn standard — which for a framework reference page is arguably the
+// right behaviour, since it pins the edition the mapping was built against.
+//
+// ⚠️ A 403 FROM iso.org IS NOT EVIDENCE OF A DEAD LINK. It blocks automated clients at the edge, with
+// or without full browser headers. Every ISO link in this file is therefore FORM-VERIFIED, not
+// fetch-verified, and the form is confirmed by this one having been opened by hand.
 export const ISO_27001_URL = 'https://www.iso.org/standard/27001'
 
 // Intent: NIST's AI Risk Management Framework page.
@@ -186,6 +232,9 @@ export const CA_PAY_DATA_URL = 'https://www.calcivilrights.ca.gov/paydatareporti
 // S2, the CSRD/ESRS entry point, and the two GRI standard pages. Until someone sources them, these
 // two constants are HONEST ABOUT BEING FRONT DOORS, and the names say so. Do not rename them to
 // something that implies more.
-// UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
-export const EFRAG_HOME_URL = 'https://www.efrag.org'
+// ⚠️ THE /en IS LOAD-BEARING. Checked 25 Sep 2026: the bare https://www.efrag.org returns 403 to any
+// client without a full browser header set, while https://www.efrag.org/en returns 200. Four entries on
+// app/frameworks/page.tsx depend on this one constant — CSRD/ESRS, ESRS E1, ESRS S1 and ESRS S2 — so it
+// is the most-used source link on that page. Do not "tidy" the path segment away.
+export const EFRAG_HOME_URL = 'https://www.efrag.org/en'
 export const GRI_HOME_URL = 'https://www.globalreporting.org'
