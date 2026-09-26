@@ -83,8 +83,11 @@ export const STATE_WARN        = '#A94E0D'   // caution, incomplete, 5.6:1 on wh
 export const STATE_WARN_WASH   = '#FBE7DD'
 export const STATE_ERROR       = '#B91C1C'   // failed, invalid,     6.1:1
 export const STATE_ERROR_WASH  = '#FEE5E6'
-export const STATE_INFO        = '#0C447C'   // neutral notice,      8.6:1
-export const STATE_INFO_WASH   = '#E6F1FB'
+// ⚠️ MOVED OFF BLUE 26 Sep 2026 BECAUSE CLIMATE RISK TOOK BLUE — #004AAD was 1.21:1 at 4.3° from the
+// old value. ACCENT.blue still holds #0C447C and the split is deliberate: see the note in
+// app/styles/themisiq-tokens.css. Do not "restore" the pair.
+export const STATE_INFO        = '#B5179E'   // neutral notice,      5.86:1
+export const STATE_INFO_WASH   = '#F6EFF5'
 export const STATE_OK          = '#0F6E56'   // complete, passed,    5.0:1
 export const STATE_OK_WASH     = '#E1F5EE'
 

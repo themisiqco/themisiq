@@ -87,8 +87,14 @@ the lightest value that clears AA on both grounds, which keeps the companion as 
 requirement allows. The formula's value is what shipped, on consistency: the other four sit at 5.22, 5.22,
 5.23 and 5.24 on paper, so `#7A4AAE` would have been the only companion outside that band.
 
-**`#7A4AAE` is not wrong and is strictly safer** — nearly a full point of extra headroom. If the family
-band matters less than the margin, it is a one-line change in two files.
+**DECIDED 26 Sep 2026: `#8A4FC6` keeps, `#7A4AAE` rejected.** The reason is the band and nothing else —
+the five companions now read 5.22, 5.22, 5.23, 5.23 and 5.24 on paper, and `#7A4AAE` at 6.14 would have
+been the only one outside it. A family whose members are derived by one rule is easier to extend than one
+with an exception nobody can date.
+
+**`#7A4AAE` was not wrong and was strictly safer** — nearly a full point of extra headroom, and both of
+its figures verified exactly as supplied. If the margin ever matters more than the band, it is a one-line
+change in `app/styles/themisiq-tokens.css` and `lib/brand.ts`.
 
 ## The original hold, kept for the record
 

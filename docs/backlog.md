@@ -1678,3 +1678,91 @@ out of scope and should stay out: different language, harder job, and its stripp
 literals because it feeds a parser, where a mangled string is a syntax error rather than a missed match.
 A function with tests and no production consumer looks load-bearing without being it. The separation
 argument still holds when the second function is written, so write it then.
+
+---
+
+## ✅ RESOLVED 26 Sep 2026 — `--color-state-info` moved off blue, because Climate Risk took blue
+
+Was: *"STEP 6 DECISION: Climate Risk `#004AAD` would be indistinguishable from `--color-state-info`
+`#0C447C`"*. Resolved in the commit after the colourway swap.
+
+| | |
+|---|---|
+| `--color-state-info` | `#0C447C` → **`#B5179E`** |
+| `--color-state-info-wash` | `#E6F1FB` → **`#F6EFF5`** |
+
+**The figures.** `#B5179E` measures **5.86:1 on `--color-paper`** and **5.19:1 on its own wash**, both
+clearing the AA 4.5 that `lib/tokenContrast.test.ts` requires of every state colour. Against the module it
+was colliding with it is **1.39:1 at 94° of hue** from `#004AAD`. Against every other post-swap token —
+eight identities, five companions, three other states — it has **zero** collisions under the two-part rule;
+its nearest neighbour by hue is `--color-state-error` `#B91C1C` at **51.3°** apart.
+
+**The state moved, not the module.** The module value is given by the colourway; the state value was not,
+so the state was the cheaper thing to move. Only two surfaces read the token — `app/people/page.tsx:84`
+and `:85` — so the change is small where it is not free.
+
+### Why `#C026D3` was rejected
+
+It was the first candidate and it is **4.71:1 on paper**, which passes. It fails on its **wash**. The four
+shipping state washes sit at 1.135–1.196 against paper; the deepest fuchsia wash inside that band is
+`#F3F0F4`, on which `#C026D3` measures **4.17:1 — below AA**. Making it pass needed a wash at about 1.015
+against paper, which is not a wash but white with a rumour of colour. `app/people/page.tsx:85` renders the
+info colour as **11px uppercase text**, the smallest thing on that page, so relaxing to large-text 3.0 was
+not available either.
+
+⚠️ **AND `#B5179E` COULD NOT HAVE SHIPPED BEFORE THE SWAP.** Supply Chain's *old* module colour was
+`#AF3790`, hue 315.5° — **6.8° and 1.05:1 from `#B5179E`**. Moving info to fuchsia first would have
+relocated the collision rather than removed it. That is why this was sequenced after the colourway, and it
+is the reason the separation assertion is sequenced after both: an allow-list computed on the old values
+would have been wrong on the new ones.
+
+### `--color-accent-blue` and `--color-state-info` are now deliberately split
+
+`--color-accent-blue` keeps `#0C447C`. The two tokens held the same value and now differ, which is what
+two families are for: the day one moves, the other must be able to stay.
+
+⚠️ **THE ~60 HARD-CODED `#0C447C` COPIES WERE LEFT ALONE, AND MOST OF THEM SHOULD STAY.** They are
+accent-blue semantics, not state-info: the CDP framework chip (`lib/ghg/engine.ts:1501`), the Ethics and
+HRDD questionnaire sections, `EV_BLUE`, nine `const BLUE` declarations across the materiality worksheets,
+CBAM readiness, and `"medium"` severity in Deals and `/assess` — which is a scale position, not a notice.
+**Do not sweep `#0C447C`.** A handful of genuinely informational panels (the `#E6F1FB` notices in
+`dashboard/ghg`, `dashboard/scope3`, `dashboard/climate-risk`, `dashboard/people`) arguably want the new
+info token, and that is its own small triage rather than a find-and-replace.
+
+---
+
+## Retire the 32 remaining `#7425E3` literals, now that Cyber owns violet
+
+Logged 26 Sep 2026, as a consequence of the Cyber decision. **A separate task; nothing changed now.**
+
+The retired brand violet is still live, and `--color-module-cyber-ink` `#8A4FC6` is **1.29:1 at 4.8°** from
+it. So a Cyber accent and a materiality diagram are now the same colour family, by accident. ⚠️ **NEITHER
+IS A TOKEN AS FAR AS ANY TEST IS CONCERNED**, so nothing will fail and nothing will warn.
+
+**What makes this newly decidable.** The violet's own entry above has been blocked on one question: does it
+become `--color-accent-violet` at its current value, or does the colourway supply a sixth accent hue?
+**There is now a third answer that is better than both — Cyber owns 270°, so the violet family can point at
+the Cyber tokens** and the platform gains a hue rather than keeping an orphan.
+
+The files, from a sweep on 26 Sep 2026:
+
+| File | What it is |
+|---|---|
+| `app/materiality/page.tsx` | the **five-step ladder**: `PURPLE #7425E3`, `PURPLE_MID #534AB7`, `PURPLE_SLATE #3C3489`, `PURPLE_INK #26215C`, `PURPLE_TINT #FAF9FE`, plus the decomposed RGB channels for the fill-opacity grounds |
+| `lib/supply-chain/templates.ts` | `:66` Labour & Human Rights, `:173` Risk Identification, `:209` the custom questionnaire |
+| `app/trust/page.tsx` | `:24`, `:30` — two of the six card accents |
+| `app/dashboard/supply-chain/portal/page.tsx` | `:29` — the EcoVadis swatch |
+
+⚠️ **THE LADDER IS THE HARD PART AND MUST NOT BE FLATTENED.** `app/materiality/page.tsx` documents it as
+information design, where "colour carries meaning — container weight, lens against ground, a five-step
+luminance ladder", with a measured note that `PURPLE_SLATE` rather than `PURPLE_MID` is used on the deepest
+card because `PURPLE_MID` is 4.28:1 there, under AA for 12px text. Any replacement needs five steps that
+hold those ratios, not one token substituted five times.
+
+⚠️ **AND THE FOUR `ecovadis` SECTION COLOURS ARE A SET READ TOGETHER** — Environment green, Labour violet,
+Ethics blue, Sustainable Procurement — so whatever replaces the violet stays subject to the hue-separation
+constraint in `lib/ghg/engine.ts:1508-1526`. It has to remain distinguishable from the other three, not
+merely exist.
+
+**Do it in one pass, not per file.** Twenty-two of the thirty-two arrived one file at a time, which is how
+the value outlived its own retirement.

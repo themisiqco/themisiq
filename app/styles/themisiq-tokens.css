@@ -107,8 +107,21 @@
   --color-state-warn-wash:   #FBE7DD;
   --color-state-error:       #B91C1C; /* failed, invalid, refused              6.1:1 */
   --color-state-error-wash:  #FEE5E6;
-  --color-state-info:        #0C447C; /* neutral notice, activity data         8.6:1 */
-  --color-state-info-wash:   #E6F1FB;
+  /* ⚠️ FUCHSIA, AND IT MOVED OFF BLUE BECAUSE CLIMATE RISK TOOK BLUE. Changed 26 Sep 2026, the commit
+     after the colourway swap. --color-module-climate is now #004AAD, which measured 1.21:1 at 4.3° from
+     the old #0C447C — same hue, same lightness, two names for one colour. A neutral notice and a module
+     identity became visually interchangeable, on the module whose surfaces carry the most state chips.
+     THE STATE MOVED, NOT THE MODULE: the module value is given by the colourway and the state was not.
+     5.86:1 on paper, 5.19:1 on its own wash, and 1.39:1 at 94° from #004AAD. docs/backlog.md carries the
+     full resolution, including why #C026D3 was rejected.
+
+     ⚠️ THIS SPLITS state-info FROM --color-accent-blue, WHICH STILL HOLDS #0C447C. They were the same
+     value and are now deliberately different, which is exactly what two families are for: accent-blue is
+     a category colour (CDP, Ethics sections, "medium", the BLUE consts) and state-info is a semantic
+     notice. The ~60 hard-coded #0C447C copies in the tree are accent-blue semantics, NOT state-info, and
+     were deliberately left alone. Do not sweep them. */
+  --color-state-info:        #B5179E; /* neutral notice, activity data         5.86:1 */
+  --color-state-info-wash:   #F6EFF5;
   --color-state-ok:          #0F6E56; /* complete, primary data, passed        5.0:1 */
   --color-state-ok-wash:     #E1F5EE;
 
