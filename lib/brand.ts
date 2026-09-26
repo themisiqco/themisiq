@@ -60,7 +60,12 @@ export const ON_DARK_MUTED = '#B2BDC1'
 /* ---- Module hues — wayfinding only, never the brand --------------------- */
 // One accent per module, each with its wash. These identify WHICH module a surface belongs to;
 // they are not brand colours and must not stand in for BRAND.
-export type ModuleHue = { readonly color: string; readonly wash: string }
+export type ModuleHue = { readonly color: string; readonly wash: string
+  /** The text-safe companion, where one exists. ⚠️ ABSENT IS MEANINGFUL: climate needs none at 8.13:1,
+   *  and people and ai are identity-only and must not have one. lib/brand.test.ts only mirrors it where
+   *  present, so an `ink` added here for one of those three makes lib/tokenContrast.test.ts fail. */
+  ink?: string
+}
 
 /* ---- State ------------------------------------------------------------- */
 /**
@@ -131,14 +136,19 @@ export const ACCENT = {
 export type AccentKey = keyof typeof ACCENT
 
 export const MODULE = {
-  ghg:     { color: '#095C6B', wash: '#D7EFF6' },  // GHG Emissions
-  cbam:    { color: '#1C5EAA', wash: '#E6EBFC' },  // CBAM
-  deals:   { color: '#754CAA', wash: '#F0E8F8' },  // Deals & Investment
-  supply:  { color: '#AF3790', wash: '#F9E6F2' },  // Supply Chain
-  cyber:   { color: '#A41A3B', wash: '#FEE5E6' },  // Cyber Governance
-  climate: { color: '#A94E0D', wash: '#FBE7DD' },  // Climate Risk
-  people:  { color: '#7B630D', wash: '#F3EADA' },  // People & Workforce
-  ai:      { color: '#136C3D', wash: '#DEEFE3' },  // AI Governance
+  // ⚠️ THE 2026 COLOURWAY, and `ink` is OPTIONAL BY DESIGN rather than by omission. Five modules carry a
+  // companion because their fill cannot be text; climate needs none at 8.13:1; people and ai are
+  // identity-only and must not have one. docs/colourway-2026.md records each decision, and
+  // lib/tokenContrast.test.ts fails if a companion appears for climate, people or ai.
+  ghg:     { color: '#0097B2', wash: '#E6F0F1', ink: '#00778C' },  // GHG Emissions
+  cbam:    { color: '#A9D2D7', wash: '#D9F3F6', ink: '#3A757D' },  // CBAM
+  deals:   { color: '#BEC4ED', wash: '#ECEEF5', ink: '#5262CF' },  // Deals & Investment
+  supply:  { color: '#7ED957', wash: '#E0F4D8', ink: '#387B1C' },  // Supply Chain
+  // ⚠️ A NINTH VALUE, outside the Canva colourway — see the note in app/styles/themisiq-tokens.css.
+  cyber:   { color: '#AB81D6', wash: '#F3EBFC', ink: '#8A4FC6' },  // Cyber Governance — violet, 269.6
+  climate: { color: '#004AAD', wash: '#E6EFFB' },                  // Climate Risk — fill carries text
+  people:  { color: '#FFDE59', wash: '#F1EEE5' },                  // People — identity only
+  ai:      { color: '#F47068', wash: '#F9EBEA' },                  // AI Governance — identity only
 } as const satisfies Record<string, ModuleHue>
 
 export type ModuleHueKey = keyof typeof MODULE

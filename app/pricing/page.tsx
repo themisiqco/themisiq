@@ -186,7 +186,7 @@ const TAG_STYLES: Record<string, React.CSSProperties> = {
   blue:   { background: '#E6F1FB', color: '#0C447C', border: '1px solid #bfdbfe' },
   green:  { background: '#E1F5EE', color: '#0F6E56', border: '1px solid #bbf7d0' },
   orange: { background: '#FEF3E2', color: '#92400e', border: '1px solid #fde68a' },
-  purple: { background: 'var(--color-module-deals-wash)', color: 'var(--color-module-deals)', border: '1px solid var(--color-module-deals)' },
+  purple: { background: 'var(--color-module-deals-wash)', color: 'var(--color-module-deals-ink)', border: '1px solid var(--color-module-deals)' },
 }
 
 const tag = (label: string, color: string): React.CSSProperties => ({
@@ -684,7 +684,7 @@ function PricingPageInner() {
                     </div>
                   )}
                   {quote.requiresInvoice && (
-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--color-module-cbam-wash)', color: 'var(--color-module-cbam)', border: '1px solid var(--color-module-cbam)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--color-module-cbam-wash)', color: 'var(--color-module-cbam-ink)', border: '1px solid var(--color-module-cbam)' }}>
                       Over $10k — completed by invoice
                     </div>
                   )}

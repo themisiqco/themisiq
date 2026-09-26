@@ -102,7 +102,7 @@ const TEXT_FAMILY = /^--color-ink(-[a-z0-9-]+)?$/
 const IDENTITY_ONLY = new Set(['ai', 'people'])
 
 /** Modules that HAVE an -ink companion. Grows as step 6 declares them; must match the layer exactly. */
-const HAS_INK = new Set<string>([])
+const HAS_INK = new Set<string>(['cbam', 'cyber', 'deals', 'ghg', 'supply'])
 
 /**
  * Modules that need a companion and do not have one yet. This is the swap's remaining work, written as
@@ -113,7 +113,10 @@ const HAS_INK = new Set<string>([])
  * measures 8.13:1 on paper, so it needs no companion and is in NEEDS_NO_INK below. Counted from the
  * measurements in docs/colourway-2026.md on 25 Sep 2026.
  */
-const PENDING_STEP_6 = new Set(['cbam', 'cyber', 'deals', 'ghg', 'supply'])
+// ⚠️ EMPTY, AND THAT IS THE COLOURWAY SWAP LANDING. All five moved to HAS_INK on 26 Sep 2026 in the same
+// commit as the values they exist for. Kept rather than deleted: the partition check below needs a home
+// for a module that has neither a companion nor a decision, and a ninth module would land here.
+const PENDING_STEP_6 = new Set<string>([])
 
 /**
  * Modules whose own value clears body AA, so a companion would be a second name for a colour that

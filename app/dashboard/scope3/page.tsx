@@ -4470,8 +4470,12 @@ export default function Scope3Dashboard() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
+      {/* ⚠️ INK ON THE FILL, NOT WHITE. Inverted 26 Sep 2026 with the colourway. White on this fill
+          measures 3.46:1 — below AA for 12-13px text — because the 2026 module values are light. Measured
+          with --color-ink instead: 5.07:1. Only Climate Risk's #004AAD still takes white, and it has no bar.
+          docs/colourway-2026.md lists all of them. */}
       <div style={{ background: 'var(--color-module-ghg)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-ink)', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
         {/* ⚠️ "All 15 categories" STAYS HERE ON PURPOSE. DO NOT "FIX" IT FOR CONSISTENCY WITH THE
             MARKETING PAGES. This is an in-product banner above the calculator itself: the customer is
             looking at all fifteen rows, each showing its own status, method and figure. The claim is about
@@ -4479,7 +4483,7 @@ export default function Scope3Dashboard() {
             beneath it. It is on a pricing page or a feature list that the same words are read as fifteen
             CALCULATED categories, which is why those sites now derive their claim instead.
             The sibling that also stays is the Scope 3 pointer in app/dashboard/ghg/page.tsx. */}
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>GHG Protocol Scope 3 Standard · All 15 categories · CSRD ESRS E1-6 · CDP · SBTi · SB 253</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ink)' }}>GHG Protocol Scope 3 Standard · All 15 categories · CSRD ESRS E1-6 · CDP · SBTi · SB 253</span>
       </div>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

@@ -2282,11 +2282,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   </div>
                 </div>
               ) : [
-                { label: 'Heating & fuel', val: calc!.s1_stationary, color: 'var(--color-module-deals)' },
-                { label: 'Vehicles', val: calc!.s1_mobile, color: 'var(--color-module-cbam)' },
+                { label: 'Heating & fuel', val: calc!.s1_stationary, color: 'var(--color-module-deals-ink)' },
+                { label: 'Vehicles', val: calc!.s1_mobile, color: 'var(--color-module-cbam-ink)' },
                 { label: 'Refrigerants', val: calc!.s1_fugitive, color: 'var(--color-state-warn)' },
                 { label: 'Scope 1 total', val: calc!.s1_total, color: 'var(--color-ink)', bold: true },
-                { label: 'Scope 2 (electricity)', val: calc!.s2_location, color: 'var(--color-module-ai)', bold: true },
+                { label: 'Scope 2 (electricity)', val: calc!.s2_location, color: 'var(--color-brand)', bold: true },
               ].map(({ label, val, color, bold }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '0.5px solid var(--color-line)' }}>
                   <span style={{ fontSize: 12, color: bold ? 'var(--color-ink)' : 'var(--color-ink-2)', fontWeight: bold ? 600 : 400 }}>{label}</span>

@@ -58,6 +58,13 @@ function brandColours(): Record<string, string> {
   for (const [key, hue] of Object.entries(brand.MODULE)) {
     out[`module-${key}`] = hue.color
     out[`module-${key}-wash`] = hue.wash
+    // ⚠️ `ink` IS OPTIONAL AND ITS ABSENCE IS MEANINGFUL, so it is only mirrored where it exists. Three
+    // modules have none: climate because its fill is 8.13:1 and a companion would be a second name for a
+    // working colour, people and ai because they are identity-only. Emitting a key for them would make
+    // this test demand --color-module-climate-ink, which lib/tokenContrast.test.ts forbids — the two
+    // guards would then contradict each other, and one of them would have to be weakened to pass.
+    const ink = (hue as { ink?: string }).ink
+    if (ink) out[`module-${key}-ink`] = ink
   }
   // ⚠️ ACCENT IS EXPANDED LIKE MODULE, AND FOR THE SAME REASON. Both are objects rather than flat string
   // exports, so the loop above skips them and every one of their tokens would be reported as having no

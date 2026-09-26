@@ -502,7 +502,7 @@ export default function CyberDashboard() {
           ].map(({ label, val, urgent }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-2)', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-cyber)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
+              <div style={{ fontSize: typeof val === 'number' ? '1.6rem' : '1rem', fontFamily: typeof val === 'number' ? 'var(--font-display)' : 'inherit', fontWeight: typeof val === 'number' ? 400 : 600, color: urgent ? 'var(--color-module-cyber-ink)' : 'var(--color-ink)', lineHeight: 1.2 }}>{val}</div>
             </div>
           ))}
         </div>
@@ -540,9 +540,13 @@ export default function CyberDashboard() {
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
+      {/* ⚠️ INK ON THE FILL, NOT WHITE. Inverted 26 Sep 2026 with the colourway. White on this fill
+          measures 2.28:1 — below AA for 12-13px text — because the 2026 module values are light. Measured
+          with --color-ink instead: 7.69:1. Only Climate Risk's #004AAD still takes white, and it has no bar.
+          docs/colourway-2026.md lists all of them. */}
       <div style={{ background: 'var(--color-module-cyber)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#fff' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber active since Dec 2023. Check your compliance now.</span>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-ink)', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ink)' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber active since Dec 2023. Check your compliance now.</span>
       </div>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -593,7 +597,7 @@ export default function CyberDashboard() {
                   ].map(({ label, val, urgent }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-cyber)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-module-cyber-ink)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
                     </div>
                   ))}
                 </div>

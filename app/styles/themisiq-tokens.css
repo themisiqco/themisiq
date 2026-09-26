@@ -38,22 +38,47 @@
   --color-brand-line:  #9FCBD6;
 
   /* ---- Module hues — wayfinding only ----------------------------- */
-  --color-module-ghg:          #095C6B; /* GHG Emissions      7.6:1 */
-  --color-module-ghg-wash:     #D7EFF6;
-  --color-module-cbam:         #1C5EAA; /* CBAM               6.5:1 */
-  --color-module-cbam-wash:    #E6EBFC;
-  --color-module-deals:        #754CAA; /* Deals & Investment 6.2:1 */
-  --color-module-deals-wash:   #F0E8F8;
-  --color-module-supply:       #AF3790; /* Supply Chain       5.6:1 */
-  --color-module-supply-wash:  #F9E6F2;
-  --color-module-cyber:        #A41A3B; /* Cyber Governance   7.5:1 */
-  --color-module-cyber-wash:   #FEE5E6;
-  --color-module-climate:      #A94E0D; /* Climate Risk       5.6:1 */
-  --color-module-climate-wash: #FBE7DD;
-  --color-module-people:       #7B630D; /* People & Workforce 5.8:1 */
-  --color-module-people-wash:  #F3EADA;
-  --color-module-ai:           #136C3D; /* AI Governance      6.5:1 */
-  --color-module-ai-wash:      #DEEFE3;
+  /* ⚠️ THE 2026 COLOURWAY. Swapped 26 Sep 2026; docs/colourway-2026.md is the record and holds every
+     measurement. READ THAT FILE BEFORE CHANGING A VALUE HERE — why each module has or lacks an -ink
+     companion is recorded there and is not guessable from the hex.
+
+     ⚠️ THE FILL IS NOT TEXT. Only --color-module-climate clears body AA on paper. Fill ratios, measured:
+     climate 8.13, ghg 3.46, ai 2.85, cyber 2.28, supply 1.76, deals 1.71, cbam 1.63, people 1.33. Five
+     of the eight are below even the 3:1 non-text threshold, so a fill must not carry text OR a graphic
+     that means something. That is what the -ink companions are for. */
+  --color-module-ghg:          #0097B2; /* GHG Emissions      fill 3.46:1 — not text */
+  --color-module-ghg-wash:     #E6F0F1;
+  --color-module-ghg-ink:      #00778C; /* 5.23 on paper, 4.51 on its wash */
+  --color-module-cbam:         #A9D2D7; /* CBAM               fill 1.63:1 — not text */
+  --color-module-cbam-wash:    #D9F3F6;
+  --color-module-cbam-ink:     #3A757D; /* 5.22 on paper, 4.50 on its wash */
+  --color-module-deals:        #BEC4ED; /* Deals & Investment fill 1.71:1 — not text */
+  --color-module-deals-wash:   #ECEEF5;
+  --color-module-deals-ink:    #5262CF; /* 5.24 on paper, 4.52 on its wash */
+  --color-module-supply:       #7ED957; /* Supply Chain       fill 1.76:1 — not text */
+  --color-module-supply-wash:  #E0F4D8;
+  --color-module-supply-ink:   #387B1C; /* 5.23 on paper, 4.50 on its wash */
+  /* ⚠️ CYBER IS A NINTH VALUE, OUTSIDE THE CANVA COLOURWAY, AND THAT IS A DESIGN DECISION NOT A DRIFT.
+     The colourway put GHG at 189.1°, CBAM at 186.5° and Cyber at 186.0° — three modules inside 3° of
+     hue, which made all three fills mutually indistinguishable AND converged all three companions on one
+     teal (1.00–1.01:1). GHG and CBAM STAY together deliberately: they are the emissions family, and a
+     reader moving between an inventory and a border declaration is in related territory. Cyber is not,
+     so Cyber moved. docs/colourway-2026.md records it. */
+  --color-module-cyber:        #AB81D6; /* Cyber Governance   fill 3.07:1 — not text. hue 269.6 */
+  --color-module-cyber-wash:   #F3EBFC;
+  --color-module-cyber-ink:    #8A4FC6; /* 5.23 on paper, 4.51 on its wash */
+  /* ⚠️ CLIMATE HAS NO COMPANION AND NEEDS NONE: #004AAD is 8.13:1 on paper, so a second name for it
+     would be a token that does nothing. NEEDS_NO_INK in lib/tokenContrast.test.ts asserts the absence. */
+  --color-module-climate:      #004AAD; /* Climate Risk       fill 8.13:1 — carries text */
+  --color-module-climate-wash: #E6EFFB;
+  /* ⚠️ PEOPLE AND AI GOVERNANCE ARE IDENTITY-ONLY, BY DECISION RATHER THAN BY ARITHMETIC. People's
+     AA-passing companion is olive, 3.85:1 from #FFDE59, so it stops reading as the module; AI
+     Governance's is 1.28:1 from --color-state-error, so a module accent would read as an error.
+     lib/tokenContrast.test.ts FAILS if a companion is declared for either. */
+  --color-module-people:       #FFDE59; /* People & Workforce fill 1.33:1 — identity only */
+  --color-module-people-wash:  #F1EEE5;
+  --color-module-ai:           #F47068; /* AI Governance      fill 2.85:1 — identity only */
+  --color-module-ai-wash:      #F9EBEA;
 
   /* ── STATE ────────────────────────────────────────────────────────────────────────────────────
      WHAT A SURFACE IS TELLING YOU, AS OPPOSED TO WHICH MODULE IT BELONGS TO.
@@ -372,29 +397,42 @@ h3 { font-size: var(--text-xl); }
    value is contextual — it can't be resolved at utility-build time.
    ================================================================ */
 
+/* ⚠️ --tq-mod RESOLVES TO THE COMPANION, NOT THE FILL. It feeds .tq-summary-label (11px/700 TEXT),
+   .tq-summary-figure, .tq-nav-active and the 6px left bar that means module identity, so it must clear
+   4.5:1 as text and 3:1 as a graphic. Under the 2026 colourway the fills do not: pointing these at
+   --color-module-<k> would render every dashboard summary label between 1.33:1 and 3.46:1.
+   lib/tokenContrast.test.ts asserts this, and asserts the two omissions below. */
 [data-module="ghg"] {
-  --tq-mod: var(--color-module-ghg);     --tq-mod-wash: var(--color-module-ghg-wash);
+  --tq-mod: var(--color-module-ghg-ink);     --tq-mod-wash: var(--color-module-ghg-wash);
 }
 [data-module="cbam"] {
-  --tq-mod: var(--color-module-cbam);    --tq-mod-wash: var(--color-module-cbam-wash);
+  --tq-mod: var(--color-module-cbam-ink);    --tq-mod-wash: var(--color-module-cbam-wash);
 }
 [data-module="deals"] {
-  --tq-mod: var(--color-module-deals);   --tq-mod-wash: var(--color-module-deals-wash);
+  --tq-mod: var(--color-module-deals-ink);   --tq-mod-wash: var(--color-module-deals-wash);
 }
 [data-module="supply"] {
-  --tq-mod: var(--color-module-supply);  --tq-mod-wash: var(--color-module-supply-wash);
+  --tq-mod: var(--color-module-supply-ink);  --tq-mod-wash: var(--color-module-supply-wash);
 }
 [data-module="cyber"] {
-  --tq-mod: var(--color-module-cyber);   --tq-mod-wash: var(--color-module-cyber-wash);
+  --tq-mod: var(--color-module-cyber-ink);   --tq-mod-wash: var(--color-module-cyber-wash);
 }
 [data-module="climate"] {
   --tq-mod: var(--color-module-climate); --tq-mod-wash: var(--color-module-climate-wash);
 }
 [data-module="people"] {
-  --tq-mod: var(--color-module-people);  --tq-mod-wash: var(--color-module-people-wash);
+  /* ⚠️ NO --tq-mod, DELIBERATELY. People & Workforce is identity-only and has no companion, so anything
+     reading --tq-mod would render at 1.33:1. Omitting it lets var(--tq-mod, var(--color-brand))
+     fall back to brand teal, which is legible. The WASH is still set: a wash is a ground, and a
+     ground at 1.16:1 against paper is safe whatever the fill does. */
+  --tq-mod-wash: var(--color-module-people-wash);
 }
 [data-module="ai"] {
-  --tq-mod: var(--color-module-ai);      --tq-mod-wash: var(--color-module-ai-wash);
+  /* ⚠️ NO --tq-mod, DELIBERATELY. AI Governance is identity-only and has no companion, so anything
+     reading --tq-mod would render at 2.85:1. Omitting it lets var(--tq-mod, var(--color-brand))
+     fall back to brand teal, which is legible. The WASH is still set: a wash is a ground, and a
+     ground at 1.16:1 against paper is safe whatever the fill does. */
+  --tq-mod-wash: var(--color-module-ai-wash);
 }
 
 .tq-nav-active { color: var(--tq-mod, var(--color-brand)); font-weight: 600; }

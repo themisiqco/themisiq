@@ -11,7 +11,86 @@ authority for what is **live**, and the two will disagree for the duration of th
 
 ---
 
-## ⚠️ STEP 6 IS ON HOLD. NO MODULE VALUE MOVES UNTIL THIS IS ANSWERED.
+## ✅ SWAPPED 26 Sep 2026. The three facts below were what held it, and this is how each was answered.
+
+The eight module values, their washes and five `-ink` companions are live in
+`app/styles/themisiq-tokens.css` and mirrored in `lib/brand.ts`.
+
+| | How the hold was answered |
+|---|---|
+| Only one fill clears body AA | **The fill is never text.** Five modules gained an `-ink` companion; `--tq-mod` points at the companion, not the fill, so every dashboard summary label, figure, nav label and 6px identity bar reads the companion. |
+| Five fail the 3:1 non-text bar | **Six sticky bars inverted** from white-on-fill to `--color-ink`-on-fill. Fills now appear only as grounds, washes, 4px card rules beside a module named in text, and the gradation. |
+| The two identity-only modules have no escape hatch | **Their `[data-module]` blocks set no `--tq-mod` at all**, so `var(--tq-mod, var(--color-brand))` falls back to brand teal. Their wash is still set: a ground is safe whatever the fill does. |
+
+⚠️ **`--color-brand` WAS NOT CHANGED, AND THAT IS A DECISION.** It stays `#095C6B`. The colourway records
+eight module values and says nothing about the brand; `#0097B2` was only ever an inference from brand and
+GHG having held the same value. **So for the first time the brand and the GHG module are different
+colours** — which is now load-bearing, because the two identity-only modules fall back to brand for their
+text. Confirm the brand's target before changing it, and note that `#0097B2` measures 3.46:1 on paper and
+could not carry the body text `--color-brand` currently carries.
+
+⚠️ **THREE COLLISIONS RESOLVED, TWO CREATED, ONE PRE-EXISTING SURVIVES.** Measured on the post-swap layer
+with the two-part rule (hue within 20° **and** contrast below 1.5):
+
+| Pair | Before | After | |
+|---|---|---|---|
+| `module-ai` / `state-ok` | #136C3D / #0F6E56 — 1.04:1, 16.5° | #F47068 / #0F6E56 | **resolved** |
+| `module-climate` / `state-warn` | #A94E0D / #A94E0D — identical | #004AAD / #A94E0D | **resolved** |
+| `module-cyber` / `state-error` | #A41A3B / #B91C1C — 1.16:1, 14.3° | #67B8C1 / #B91C1C | **resolved** |
+| `module-cbam` / `module-cyber` | 133.5° apart | #A9D2D7 / #67B8C1 — **1.40:1, 0.5°** | **created** |
+| the three cyan `-ink` companions | did not exist | 1.00–1.01:1, under 2.5° | **created** |
+| `module-climate` / `state-info` | 4.3°, 1.21:1 | unchanged — **live now** | cleared by the next commit |
+
+The three companions colliding is the consequence recorded earlier in this file: GHG, CBAM and Cyber sit
+inside 3° of hue, so darkening all three to one contrast target converges them. **The lightness-separated
+alternative was tried and rejected** — see that section. Their WASHES are identical for the same reason:
+`--color-module-cbam-wash` and `--color-module-cyber-wash` are both `#D9F3F6`, and no hue-preserving tint
+can separate half a degree.
+
+## Cyber Governance is a ninth value, outside the Canva colourway
+
+Decided 26 Sep 2026, in the swap commit. **The colourway supplies eight values; the product ships nine.**
+
+| | |
+|---|---|
+| `--color-module-cyber` | `#AB81D6` — fill, hue 269.6°, 3.07:1 on paper |
+| `--color-module-cyber-wash` | `#F3EBFC` — 1.160 against paper |
+| `--color-module-cyber-ink` | `#8A4FC6` — 5.23:1 on paper, 4.51:1 on its wash |
+
+**Why it moved.** The colourway put GHG at **189.1°**, CBAM at **186.5°** and Cyber at **186.0°** — three
+modules inside three degrees of hue. The consequences were not cosmetic: the three fills were mutually
+indistinguishable, and darkening all three to one contrast target converged their companions on a single
+teal at **1.00–1.01:1**. Their washes came out identical too (`#D9F3F6` for both CBAM and Cyber), because
+no hue-preserving tint can separate half a degree.
+
+**Why Cyber and not one of the others. GHG and CBAM stay together as the emissions family, deliberately.**
+An inventory and a border declaration are related territory, and a reader moving between them is not lost
+by finding the same hue. Cyber Governance is not in that family, so Cyber is the one that moved.
+
+**What this leaves.** One collision survives in the foreground set — `ghg-ink` `#00778C` against
+`cbam-ink` `#3A757D`, 1.00:1 at 1.8° — and it is now the *intended* consequence of the emissions-family
+decision rather than an accident of the palette. It should be the single entry on the allow-list the
+separation assertion will carry, named as a decision.
+
+⚠️ **VIOLET AT 270° IS NOT UNOCCUPIED, and the occupant is invisible to the token layer.** The retired
+brand violet `#7425E3` is still live in 32 places, including the materiality page's five-step purple
+ladder. `cyber-ink` `#8A4FC6` measures **1.29:1 at 4.8°** from it. Both are literals as far as any test is
+concerned, so nothing will fail — but a Cyber accent and a materiality diagram are now the same colour
+family. Two ways to read that: a reason to reconsider 270°, or the thing that finally settles the violet's
+retirement, since Cyber can now claim the hue. See the violet's own entry in `docs/backlog.md`.
+
+### One figure differs from the design brief, and the brief's is the safer one
+
+The supplied companion was `#7A4AAE` — **6.14:1 on paper, 5.30:1 on wash**, both verified. The formula
+this file's other four companions were derived by yields `#8A4FC6` — **5.23:1 / 4.51:1** — because it takes
+the lightest value that clears AA on both grounds, which keeps the companion as close to its fill as the
+requirement allows. The formula's value is what shipped, on consistency: the other four sit at 5.22, 5.22,
+5.23 and 5.24 on paper, so `#7A4AAE` would have been the only companion outside that band.
+
+**`#7A4AAE` is not wrong and is strictly safer** — nearly a full point of extra headroom. If the family
+band matters less than the margin, it is a one-line change in two files.
+
+## The original hold, kept for the record
 
 Held 25 Sep 2026, on the strength of the measurements below. Three facts, stated plainly, because they
 changed the decision and the decision had already been taken once:

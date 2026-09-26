@@ -14,10 +14,14 @@ export default function Page() {
       <Nav />
 
       {/* URGENCY BANNER */}
+      {/* ⚠️ INK ON THE FILL, NOT WHITE. Inverted 26 Sep 2026 with the colourway. White on this fill
+          measures 2.28:1 — below AA for 12-13px text — because the 2026 module values are light. Measured
+          with --color-ink instead: 7.69:1. Only Climate Risk's #004AAD still takes white, and it has no bar.
+          docs/colourway-2026.md lists all of them. */}
       <div style={{ background: 'var(--color-module-cyber)', padding: '10px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber disclosure active since Dec 2023. Are you compliant?</span>
-        <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: '#fff', textDecoration: 'underline' }}>Check your obligations →</a>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-ink)', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-ink)' }}>NIS2 active since Oct 2024 · DORA active since Jan 2025 · SEC cyber disclosure active since Dec 2023. Are you compliant?</span>
+        <a href="/assess" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-ink)', textDecoration: 'underline' }}>Check your obligations →</a>
       </div>
 
       {/* HERO */}
