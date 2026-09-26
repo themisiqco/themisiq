@@ -981,3 +981,181 @@ Only `medium` matched its state token first time. **Nothing would have failed a 
 checks that the token layer and `lib/brand.ts` agree with each other, not that a call site picked the
 constant matching the value it replaced. A name that fits is not a value that fits. Whoever does the
 remaining migration should diff computed values, not read names.
+---
+
+## 🚫 BLOCKER for step 6 of the palette swap: two homepage warming figures fail large-text AA under the incoming colourway
+
+Logged 25 Sep 2026, during step 4. **Step 6, the swap itself, cannot ship until this is resolved.** It is a
+blocker rather than an open item because the failure lands on the homepage, at 32px, in text.
+
+**The gate:** `app/page.tsx:166` renders the three IPCC pathways in three MODULE tones —
+`--color-module-cbam`, `--color-module-climate` and `--color-module-cyber`. Under the incoming colourway,
+**two of those three fail large-text AA (3.0:1) at the 28px those warming figures render at**, in display
+text, on the homepage.
+
+Step 4 left that line alone on purpose: pointing three module identities at `--color-scale-*` would have
+been a third answer rather than a reconciliation, and its rows are `tone:`, not `color:`, feeding a shared
+card component. **Leaving it alone is fine until step 6 and not after**, because step 6 is what moves the
+module values.
+
+Recompute the three ratios against the incoming values before touching the file; do not trust this note's
+arithmetic, which was done against the values of 25 Sep 2026. What unblocks it is the decision recorded
+under *Is an IPCC pathway a value on a scale, or a module identity?* below — the fix is not "darken two
+tones", because that leaves the same three scenarios drawn in two palettes.
+
+---
+
+## Does the platform have ONE worst colour, or two?
+
+Logged 25 Sep 2026, during step 4, and this is why `--color-scale-high` was not declared.
+
+Two values are in use for the top of a scale: `#B91C1C` (risk severity `SEV.high`, persistence
+`persistent`, the `-error` state) and `#A32D2D` (the materiality matrix's "material on both", in both
+`app/dashboard/climate-risk/page.tsx` and `app/dashboard/materiality/report/page.tsx`).
+
+**They are 1.09:1 apart. That is one colour with two names** — no viewer can tell them apart, and no
+methodology distinction is recorded anywhere for the difference.
+
+⚠️ **THERE IS NO NO-OP HERE, WHICH IS THE WHOLE DIFFICULTY.** Declaring `--color-scale-high` as either value
+renames one scale's high arm and MOVES the other's. Step 4 declared only `mid` for that reason: every one of
+its thirteen migrations resolved to a byte-identical value, and `high` cannot. Someone has to choose, and
+the choice should be made as a decision about the palette rather than discovered as a diff.
+
+Note this is separable from the blocker above and from `--color-scale-low`, which needs no decision at all:
+every scale's low arm is already `--color-ink-muted`.
+
+---
+
+## `unknown` is not a rung on the scale, and `--color-scale-gap-wash` is what keeps it off one
+
+Logged 25 Sep 2026, during step 4. **Recorded as a decision already taken**, so that a future tidy-up does
+not undo it as duplication.
+
+The risk severity N/A band borrows the scale mid's HUE — it is `--color-scale-mid` on
+`--color-scale-gap-wash` `#FDF6EC` with a `#EAD9BE` border — while MED is the same colour on
+`--color-scale-mid-wash` `#FEF3E2`. Two washes 1.01:1 apart, holding two different claims.
+
+That looks like exactly the kind of near-duplicate a cleanup collapses. It must not be collapsed:
+
+- **A data gap is scored `null`, never `0`.** The comment beside `SEV` in
+  `app/dashboard/climate-risk/page.tsx` says the band must never read as an assessed finding of no
+  exposure, and the report page's `NOT ASSESSED` chip repeats it. "We did not assess this" and "we assessed
+  this as middling" are different statements to a verifier.
+- **The ground and the border are the ONLY things separating them**, because the foreground is shared. Fold
+  `#FDF6EC` into `#FEF3E2` and a data gap becomes a medium finding on screen with no other signal left.
+
+So `unknown` gets a ground of its own but deliberately no colour of its own: giving it a fourth hue would
+imply a fourth severity, which is the opposite error. If a rung is ever added between LOW and MED, it takes
+`--color-scale-*`; the gap wash stays out of that sequence.
+
+---
+
+## Is an IPCC pathway a value on a scale, or a module identity?
+
+Logged 25 Sep 2026, during step 4. This is the decision that unblocks the step-6 blocker above, and it is
+recorded separately because it outlives that blocker: it is a question about what the palette MEANS, and
+answering it "darken the two failing tones" would ship a passing contrast ratio and leave the platform
+drawing one set of scenarios two ways.
+
+Two surfaces present the same three pathways, and they agree on nothing:
+
+| Scenario | `app/climate-risk/page.tsx:137` (scale D) | `app/page.tsx:166` (scale C) |
+|---|---|---|
+| ~1.8 &deg;C SSP1-2.6 | `#0F6E56` green on `#E1F5EE` | `--color-module-cbam` |
+| ~2.7 &deg;C SSP2-4.5 | `#0C447C` blue on `#E6F1FB` | `--color-module-climate` |
+| ~4.4 &deg;C SSP5-8.5 | `--color-scale-mid` on its wash | `--color-module-cyber` |
+
+Scale D reads as an ordered axis — good, caution, bad — and step 4 migrated its high arm accordingly. Scale
+C reads as three unrelated products, because that is literally what its tones name.
+
+**RESOLVE IT AS ONE DECISION, NOT TWO.** Either scale C becomes an ordered axis, or scale D becomes
+identity-coloured, and either way both files change in the same pass. Deciding them one at a time is how
+they came to disagree: each is locally defensible and only the pair is wrong.
+
+Worth noting which way the evidence points. A warming pathway is ordered by construction, the customer is
+being shown that ordering, and nothing about SSP2-4.5 belongs to the Climate Risk module any more than
+SSP5-8.5 belongs to Cyber — that mapping is arbitrary, and arbitrary colour on a page about severity reads
+as meaning that is not there. But this is a brand decision, not a code one, so it is recorded rather than
+taken.
+
+---
+
+## Step 7 cannot recompute the 96 ratio comments against white, because they do not all quote the same ground
+
+Logged 25 Sep 2026, while writing `lib/tokenContrast.test.ts`. **This changes what step 7 is**, from a
+mechanical recompute into a per-comment decision.
+
+Three of the four `--color-state-*` comments were already wrong when the contrast test was written, and
+the fourth is wrong in a more interesting way:
+
+| Token | Comment says | On `--color-paper` | On its own wash |
+|---|---|---|---|
+| `--color-state-warn` | 5.6:1 | **5.55** ✓ | 4.65 |
+| `--color-state-error` | 6.1:1 | **6.47** | 5.41 |
+| `--color-state-info` | 8.6:1 | 9.84 | **8.60** |
+| `--color-state-ok` | 5.0:1 | **6.20** | 5.46 |
+
+⚠️ **`state-info`'s "8.6" IS ITS RATIO ON ITS OWN WASH, TO TWO DECIMAL PLACES.** That is not a
+coincidence and it is not a stale number: whoever wrote it measured a different ground from the three
+beside it. So the 96 comments are a mixed population — some against white, at least one against its own
+wash, and an unknown number against neither — and "recompute everything against white" would replace
+three wrong numbers with four, silently converting a correct measurement into an incorrect one.
+
+**What step 7 has to do instead.** Each comment states its ground explicitly, or drops the number. A bare
+`5.6:1` is unfalsifiable by inspection, which is how three of these survived; `5.55:1 on --color-paper` can
+be checked by anyone, and can be asserted. The step-4 SCALE block and `lib/brand.ts` already name their
+grounds by token for this reason, and an earlier draft of that comment mislabelled `#f8f7f5` as "paper"
+(it is `--color-accent-neutral-wash`) — caught only because the test names grounds by token and the two
+then disagreed. **A list of bare hex cannot catch a wrong ground; a token name can.**
+
+Worth considering in step 7: once every comment names its ground, `lib/tokenContrast.test.ts` can assert
+the comments themselves, which is the only thing that stops them going stale a third time.
+
+---
+
+## `--color-ink-muted` on `--color-module-ai-wash` is the tightest pairing in the layer
+
+Logged 25 Sep 2026. **Step 6 should know this before it moves any value.**
+
+Measured across every body-text-on-wash combination the token layer permits — three text colours against
+twenty-one washes, sixty-three pairings:
+
+| | On `--color-paper` | Worst wash |
+|---|---|---|
+| `--color-ink` `#151A1D` | 17.54 | 14.67 |
+| `--color-ink-2` `#3B474D` | 9.57 | 8.00 |
+| `--color-ink-muted` `#5A686E` | 5.77 | **4.82** on `--color-module-ai-wash` `#DEEFE3` |
+
+**0.32 of headroom.** `--color-ink-muted` is the labels-and-captions colour and it lands on every wash in
+the layer, so the constraint is not "the AI Governance wash" specifically — it is that ANY wash darkened
+by roughly 3% puts caption text below AA, and the AI wash is simply the one already closest. Second
+tightest is the `#FEE5E6` pair used by both `--color-state-error-wash` and `--color-module-cyber-wash`.
+
+`lib/tokenContrast.test.ts` now asserts all sixty-three, so this fires rather than shipping. It is logged
+anyway because a test tells you *after* you have chosen a value, and step 6 is choosing twenty of them.
+
+---
+
+## `--color-ink*` and `*-ink` are different ideas sharing a word
+
+Logged 25 Sep 2026, while writing `lib/tokenContrast.test.ts`. **Not a defect. A naming hazard, recorded
+before step 6 declares six more tokens in the second form.**
+
+| Form | Means | Members |
+|---|---|---|
+| `--color-ink`, `--color-ink-2`, `--color-ink-muted` | **body text**, the prefix form | 3, today |
+| `--color-<x>-ink` | **`<x>`'s text companion**: the value to set when `<x>`'s identity colour is too light to read, the suffix form | 0 today, 6 planned |
+
+The two are unrelated. One is a text hierarchy; the other is a per-colour escape hatch. They also need
+different grounds: the prefix family has no "own" wash and lands on all twenty-one, while a companion has
+exactly one by construction.
+
+⚠️ **`--color-ink` ITSELF ENDS IN `-ink`**, so a naive `/-ink$/` sweeps the primary text colour into the
+companion family and measures it against a `--color--wash` that does not exist. `lib/tokenContrast.test.ts`
+uses `/^--color-(.+)-ink$/` for companions, requiring a non-empty prefix, and `/^--color-ink(-[a-z0-9-]+)?$/`
+for the text family. Note `-ink-2` and `-ink-muted` do not end in `-ink` at all, so only the one token
+collides — which is exactly the kind of single exception a regex written quickly gets wrong.
+
+Renaming is NOT proposed: `-ink` is the right word in both places and both are already in the tree or
+confirmed. This entry exists so the collision is known rather than rediscovered, and so nobody "tidies"
+the two regexes into one.

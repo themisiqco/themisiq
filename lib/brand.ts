@@ -83,6 +83,27 @@ export const STATE_INFO_WASH   = '#E6F1FB'
 export const STATE_OK          = '#0F6E56'   // complete, passed,    5.0:1
 export const STATE_OK_WASH     = '#E1F5EE'
 
+/* ---- Scale ------------------------------------------------------------- */
+/**
+ * A value on an ordered axis: risk severity, IPCC warming, materiality, persistence.
+ *
+ * ⚠️ ONE MEMBER, DELIBERATELY. `low` is --color-ink-muted and already has a token. `high` has TWO
+ * values in use, #B91C1C and #A32D2D, which are 1.09:1 apart and read as one colour, so naming either
+ * would move a pixel on the other scale. docs/backlog.md carries that decision.
+ *
+ * ⚠️ ITS FOUR GROUNDS ARE --color-paper #FFFFFF (5.55), --color-ground #F7F8F8 (5.22), SCALE_MID_WASH
+ * (5.06) and SCALE_GAP_WASH (5.17), all clearing AA body. lib/tokenContrast.test.ts asserts them by
+ * token name. #f8f7f5 is NOT paper — it is ACCENT.neutral.wash — and an earlier draft of this comment
+ * said otherwise.
+ *
+ * ⚠️ SCALE_MID_WASH AND ACCENT.amber.wash HOLD THE SAME VALUE AND STAY SEPARATE, so one family can
+ * move without dragging the other. SCALE_GAP_WASH is #FDF6EC and is NOT interchangeable with it: the
+ * N/A band is a data gap scored null rather than a middling finding, and its ground is what says so.
+ */
+export const SCALE_MID      = '#A94E0D'   // 5.06:1 on SCALE_MID_WASH, 5.55:1 on --color-paper #FFFFFF
+export const SCALE_MID_WASH = '#FEF3E2'
+export const SCALE_GAP_WASH = '#FDF6EC'
+
 /* ---- Accent ------------------------------------------------------------ */
 /**
  * Telling one category from another: framework chips, questionnaire sections, card accents, swatches.

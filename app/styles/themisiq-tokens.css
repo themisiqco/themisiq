@@ -135,6 +135,56 @@
   --color-accent-neutral:      #555553; /* hue  60, effectively grey */
   --color-accent-neutral-wash: #f8f7f5;
 
+  /* ── SCALE ────────────────────────────────────────────────────────────────────────
+     A VALUE ON AN ORDERED AXIS. Not a module, not a state, not a category.
+
+     ⚠️ ONE MEMBER TODAY, AND BOTH OMISSIONS ARE DECISIONS RATHER THAN OVERSIGHTS.
+       LOW ALREADY HAS A TOKEN. Every scale's low arm is --color-ink-muted. A --color-scale-low aliasing
+         it would add a name without adding information, and would invite someone to move one and not
+         the other.
+       HIGH CANNOT BE DECLARED WITHOUT MOVING A PIXEL. Two values are in use for "worst": #B91C1C on the
+         risk severity and persistence scales, #A32D2D on the materiality matrix. They are 1.09:1 apart,
+         which reads as one colour, so the platform has two names for one thing. Naming either renames
+         one scale's high and MOVES the other's. That is a decision about whether there is one worst
+         colour or two, and it belongs in docs/backlog.md rather than happening as a side effect of
+         naming the mid.
+
+     ⚠️ WHY IT EXISTS (25 Sep 2026). Thirteen uses were reading --color-module-climate: risk severity
+     MED and N/A, the persistence classification's "warming-contingent", the materiality matrix's
+     "material on one axis", and the high-warming IPCC scenario. None is a warning and none belongs to
+     Climate Risk. Left there, the palette swap would have rendered "MED" and "~4.4°C" in that module's
+     incoming deep blue.
+
+     ⚠️ THE GROUNDS WERE DECIDED BEFORE THE VALUE, and the value clears AA body (4.5:1) on all four.
+     Measured:
+       --color-paper            #FFFFFF  5.55:1  the matrix dot and legend swatch, which are FILLS
+                                                  and read no text
+       --color-ground           #F7F8F8  5.22:1  the app background behind a chip row
+       --color-scale-mid-wash   #FEF3E2  5.06:1  the MED chip at 11px, a warming figure at 32px, a
+                                                  contingent chip
+       --color-scale-gap-wash   #FDF6EC  5.17:1  the N/A chip at 11px
+     The tightest is the mid wash at 5.06, so ONE value serves every ground and no per-ground pair is
+     needed. Note that the least demanding ground is --color-paper, because nothing is read off it.
+     These four are named BY TOKEN and lib/tokenContrast.test.ts asserts the same four, which is what
+     keeps this list from drifting. An earlier draft of this comment called #f8f7f5 "paper": that value
+     is --color-accent-neutral-wash (5.19:1, also passing), --color-paper is #FFFFFF, and the app
+     background is --color-ground. The arithmetic was right and the NAME was wrong, which a list of
+     bare hex cannot catch.
+
+     ⚠️ TWO WASHES, AND THEY ARE NOT INTERCHANGEABLE. --color-scale-gap-wash exists because the N/A
+     band is a DATA GAP, not a rung: no reference data is scored null, never 0, and the comment beside
+     SEV in app/dashboard/climate-risk/page.tsx says it must never read as an assessed finding of no
+     exposure. It borrows the mid's HUE and is separated from MED by its ground and its border alone.
+     Swapping #FEF3E2 and #FDF6EC for each other would make a data gap indistinguishable from a medium
+     finding, which is a methodology claim, not a styling slip.
+
+     ⚠️ --color-scale-mid-wash HOLDS THE SAME VALUE AS --color-accent-amber-wash, AND STAYS SEPARATE.
+     Same reasoning as accent-amber sharing its colour with --color-state-warn but not its wash: three
+     families answer three questions, and the day one moves, the others must be able to stay. */
+  --color-scale-mid:        #A94E0D; /* 5.06:1 on its own wash, 5.55:1 on white */
+  --color-scale-mid-wash:   #FEF3E2;
+  --color-scale-gap-wash:   #FDF6EC; /* the N/A band's ground: a gap, not a rung */
+
   /* ---- Reversed text --------------------------------------------- */
   /* Off-white, never #FFF. Pure white haloes against dark and is the
      usual cause of type that looks blurred at reversed polarity. */
