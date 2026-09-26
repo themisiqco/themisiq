@@ -491,7 +491,15 @@ export default function CyberDashboard() {
     <div>
       <h2 style={sectionHead}>Export your assessment</h2>
       <p style={sectionSub}>Download your full gap assessment report including all controls, scores and remediation priorities.</p>
-      <div className="tq-summary" style={{ marginBottom: 20, display: 'block' }}>
+      {/* ⚠️ display:'block' ON .tq-summary REQUIRES PADDING HERE, AND IT WAS MISSING. The class is a FLEX
+          row whose padding lives on its child, either .tq-summary-body or the inline
+          `{ flex: 1, padding: '20px 24px' }` that the deals, people, supply-chain, ai-governance and
+          scope3 summaries use. Overriding it to block and putting children directly inside leaves them
+          flush against the 6px left rule and the right edge. The other idiom — block plus padding on the
+          outer element, as app/dashboard/ghg/page.tsx does four times — is what these two cards were
+          reaching for and is what they now use. Pre-existing: git log shows c389415 touched this file for
+          colour only. */}
+      <div className="tq-summary" style={{ marginBottom: 20, display: 'block', padding: '20px 24px' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Assessment summary — {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
@@ -582,7 +590,8 @@ export default function CyberDashboard() {
           </div>
           {step < 4 && (
             <div style={{ position: 'sticky', top: 80 }}>
-              <div className="tq-summary" style={{ marginBottom: 12, display: 'block' }}>
+              {/* Same defect as the Assessment summary above, same fix — see that comment. */}
+              <div className="tq-summary" style={{ marginBottom: 12, display: 'block', padding: '20px 24px' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Live score</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: pct > 0 ? scoreColor : 'var(--color-ink-muted)', lineHeight: 1, marginBottom: 4 }}>{pct > 0 ? `${pct}%` : '—'}</div>
                 {pct > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: scoreColor, marginBottom: 12 }}>{scoreLabel}</div>}
