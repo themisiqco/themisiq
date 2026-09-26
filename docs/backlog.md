@@ -1532,3 +1532,29 @@ Two reasons beyond the page:
 ⚠️ **One thing to get right if this is built:** the same fictional entity as the existing samples, so a
 prospect reading the resilience report and the assurance pack sees one company. Two fictional companies
 across three samples would read as stock content.
+
+---
+
+## The retired violet is still on the supplier portal's Labour & Human Rights section
+
+Logged 26 Sep 2026, rebuilding `app/supply-chain/page.tsx`. **Deliberately not fixed in that commit:**
+widening a page rebuild to reach the portal is how a page rebuild becomes something else.
+
+`lib/supply-chain/templates.ts:66` sets the `ecovadis` template's Labour & Human Rights section to
+`color: '#7425e3'`, `bg: '#EDE9FE'`. That is the retired purple from the old brand gradient, and it is
+one of the three sites the step-3 accent work left as a literal **because the accent family has no member
+for it** — the others being Risk Identification and the custom questionnaire in the same file, plus
+`app/trust/page.tsx` and the portal swatch.
+
+It reaches a real surface: a supplier opening the EcoVadis questionnaire sees that section header
+coloured. So it is customer-facing, on a page shown to someone else's supplier, in a colour the platform
+retired.
+
+**Blocked on the same decision as the other 32 uses**, recorded above: either the violet becomes
+`--color-accent-violet` at its current value, or the 2026 colourway supplies a sixth accent hue and all
+of them move to it. ⚠️ **Doing it per-file is how it came to be in 22 of them.**
+
+One thing this instance adds to that decision: the four `ecovadis` sections are a **set of category
+colours read together** (Environment green, Labour violet, Ethics blue, Sustainable Procurement), so they
+are subject to the hue-separation constraint in `lib/ghg/engine.ts:1508-1526`. Whatever replaces the
+violet has to stay distinguishable from the other three, not merely exist.

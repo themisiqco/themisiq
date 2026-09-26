@@ -1,327 +1,252 @@
 import type { Metadata } from 'next'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
-import { FLAT_MODULE_PRICES } from '../../lib/pricing'
-import { SB253_SCOPE3_FROM, SB253_DATE_STATUS } from '../../lib/sb253'
+import { FLAT_MODULE_PRICES } from '@/lib/pricing'
+import { MODULE_SUBLINE } from '@/lib/modulePages'
 import {
-  CS3D_APPLIES_FROM, CS3D_TRANSPOSITION, CS3D_ARTICLE_16_FROM,
+  CS3D_APPLIES_FROM, CS3D_TRANSPOSITION, CS3D_GUIDELINES_DUE,
   CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVER_THRESHOLD, CS3D_NON_EU_TURNOVER_THRESHOLD,
-  CS3D_VALUE_CHAIN_CONTACT_LIMIT, CS3D_OTHER_ROUTES_NOTE,
-  CS3D_CITATION, CS3D_REGIME_CITATION, CS3D_OMNIBUS_CITATION,
-  CS3D_OMNIBUS_PUBLISHED, CS3D_OMNIBUS_IN_FORCE, CS3D_GUIDELINES_DUE,
-} from '../../lib/cs3d'
+  CS3D_OMNIBUS_CITATION, CS3D_OTHER_ROUTES_NOTE, CS3D_VALUE_CHAIN_CONTACT_LIMIT,
+} from '@/lib/cs3d'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
+import {
+  ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection,
+  ModuleArrivals, ModuleFaq, bodyCopy, moduleEyebrow, type Faq,
+} from '@/app/components/modulePage'
 
-// --- SEO ---------------------------------------------------------
-// Shape follows app/calculate-emissions/page.tsx. No `revalidate` here: that page
-// sets one because it renders a live SB 253 countdown; this page reads only the
-// fixed thresholds in lib/cs3d, so there is nothing to go stale between builds.
+const KEY = 'supply-chain' as const
+
 export const metadata: Metadata = {
-  title: 'Supplier Data Collection and Supply Chain Risk | ThemisIQ',
+  title: 'Supplier Data Collection: Scope 3, CS3D and EcoVadis | ThemisIQ',
   description:
-    'Collect sustainability data from your suppliers, and answer the CS3D, EcoVadis, Modern Slavery and ESRS S2 questionnaires your customers send you. Without spreadsheets or consultants.',
+    'A supplier portal your suppliers can use without an account. Questionnaire templates for EcoVadis, CS3D, Modern Slavery and Scope 3, with primary data feeding Scope 3 Category 1.',
   alternates: { canonical: '/supply-chain' },
-  openGraph: {
-    title: 'Supplier Data Collection and Supply Chain Risk | ThemisIQ',
-    description:
-      'Collect sustainability data from your suppliers, and answer the CS3D, EcoVadis, Modern Slavery and ESRS S2 questionnaires your customers send you. Without spreadsheets or consultants.',
-    url: '/supply-chain',
-    type: 'website',
-  },
 }
 
-export default function Page() {
-  // Price from the single source of truth, formatted as app/cbam/page.tsx does.
-  const supplyPrice = FLAT_MODULE_PRICES['supply-chain'].toLocaleString('en-US')
+/**
+ * The Supply Chain module page, fourth to the shared ten-section shape.
+ *
+ * ⚠️ THE PAGE MAY SAY A SUPPLIER TOLD YOU THEIR FIGURE IS ASSURED. IT MAY NEVER SAY YOUR FIGURE IS
+ * ASSURED. That is the rule from lib/scope3/supplierAssurance.ts, whose own header reads: "THE FIELD
+ * DESCRIBES THE SUPPLIER'S REPORTING, NOT THIS LINE'S FIGURE, AND NO STRING IN THIS FILE SAYS
+ * OTHERWISE." Every assurance claim on this page is written to that constraint, and an editor
+ * shortening one will meet this note first. "Their own reporting is third-party assured" is inside the
+ * rule; "assured Scope 3 figures" is outside it and would be a claim to an auditor that nothing
+ * supports.
+ *   The second half matters as much: AssuranceState has eight members and NOT ONE means "we did not
+ * record this" — absence is carried separately. So "the basis recorded per supplier" is right, and
+ * "we know every supplier's assurance status" would not be.
+ *
+ * ⚠️ NO COUNT OF TEMPLATES, DELIBERATELY. There are five — ecovadis (35 questions), cs3d (15), scope3
+ * (12), modern_slavery (12) and custom (7), counted by importing TEMPLATES rather than by eye. They are
+ * NAMED here and never counted, because docs/backlog.md already records the portal's own picker stating
+ * two wrong counts: "Full 38-question assessment" where ecovadis has 35, and "8 questions" where scope3
+ * has 12. A marketing page adding a third number to keep true is the defect three other pages have
+ * already had removed.
+ *
+ * ⚠️ THE CS3D FRAMING IS INHERITED, NOT REWRITTEN. Four claims were removed from this page on
+ * 24 Sep 2026 because each was false rather than merely strong: civil liability, "you must comply",
+ * "large companies", and the phase-in that (EU) 2026/470 eliminated. What replaced them is the true and
+ * more useful fact — the obligation lands on the customer and the request lands on the reader — and that
+ * is now the page's whole CS3D position. THE PAGE IS SILENT ON CIVIL LIABILITY: it neither threatens it
+ * nor says it is gone, because the deletion rests on secondary sources pending EUR-Lex verification.
+ */
+export default function SupplyChainPage() {
+  const price = FLAT_MODULE_PRICES[KEY].toLocaleString()
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
+    <div style={{ background: 'var(--color-paper)', color: 'var(--color-ink)' }}>
       <Nav />
 
-      {/* HERO */}
-      <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={eyebrow}>Supply Chain & Sustainable Procurement</div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-             Supply Chain & <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Sustainable Procurement</span>
-            </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
-             {/* Was "Meet CS3D ... obligations", which told a supplier the directive applied to them.
-                 CS3D binds the company asking, not the company answering. Both directions of the
-                 module are stated instead: requests you receive, and requests you send. */}
-             Know your supply chain risks. Answer the CS3D, EcoVadis, Modern Slavery and ESRS S2 questionnaires your customers send you, and collect the same from your own suppliers. Without spreadsheets or consultants.
-            </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
-              <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-              <a href="/dashboard/supply-chain" style={{ ...btnSecondary, textDecoration: 'none' }}>See how supplier data reaches Scope 3 →</a>
-              <a href="/order?modules=supply" style={{ ...btnSecondary, textDecoration: 'none' }}>${supplyPrice}/yr</a>
-              <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-              {['Scope 3 Cat.1', 'ESRS S2', 'CS3D', 'EcoVadis', 'CDP supplier engagement', 'Modern Slavery', 'UNGP', 'GRI 414'].map(tag => (
-                <span key={tag} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* STAT CARDS */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[
-              { val: '70%', unit: 'of emissions', label: 'typically in Scope 3 Cat.1 for manufacturers', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
-              // Was 'civil liability for failures' in critical red. (EU) 2026/470 is understood to have
-              // deleted the EU-wide civil liability regime and reverted it to national law, on secondary
-              // sources, pending EUR-Lex verification: see docs/backlog.md. The claim went with it, and
-              // the red went with the claim, because a 2029 date carried in the same colour as an overdue
-              // one is its own small overstatement.
-              { val: 'CS3D', unit: CS3D_APPLIES_FROM, label: 'Your in-scope customers must diligence their value chain, and ask you for what they need', color: 'var(--color-state-warn)', bg: '#FEF3E2' },
-              { val: '5+', unit: 'frameworks', label: 'CS3D · EcoVadis · Modern Slavery · CDP supplier engagement · ESRS S2, one platform', color: '#0F6E56', bg: '#E1F5EE' },
-              { val: '$2,900', unit: 'portal/yr', label: 'vs $15,000–$50,000 for EcoVadis supplier outreach, same outcome', color: '#0C447C', bg: '#E6F1FB' },
-            ].map(({ val, unit, label, color, bg }) => (
-              <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
-              </div>
-            ))}
+      {/* ── 1. HERO ── */}
+      <section style={{ borderTop: '4px solid var(--color-module-supply)', background: 'var(--color-module-supply-wash)', padding: '4.5rem 2.5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <p style={moduleEyebrow}>Supply Chain module</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.1rem, 4vw, 3.1rem)', fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.75rem', maxWidth: '26ch' }}>
+            Make it easy for your suppliers to give you their data.
+          </h1>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.05rem, 1.9vw, 1.3rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.4rem' }}>
+            {MODULE_SUBLINE}
+          </p>
+          <p style={{ ...bodyCopy, marginBottom: '2rem' }}>
+            Your suppliers are not sustainability experts, so the portal explains what each question
+            means and why you are asking. What comes back is evidence, human rights risk mapping, and the
+            primary data that feeds Scope 3 Category 1.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
+            <a href={`/order?modules=${KEY}`} style={{ ...btnSecondary, textDecoration: 'none' }}>Order the module, ${price}/yr</a>
           </div>
         </div>
       </section>
 
-      {/* CS3D CALLOUT */}
-      <section className="tq-band-bleed" style={{ padding: '4rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 8 }}>EU CS3D: Corporate Sustainability Due Diligence</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem' }}>
-              Your customer's obligation.<br />Your questionnaire.
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              {/* ⚠️ REWRITTEN 24 Sep 2026. Four claims were removed rather than softened, because each was
-                  false rather than merely strong. (1) Civil liability: (EU) 2026/470 is understood to have
-                  deleted the EU-wide regime and reverted it to national law. That rests on secondary
-                  sources and is pending EUR-Lex verification (docs/backlog.md), which is why the page
-                  neither threatens liability nor states that it is gone. (2) "you must comply": with one tier at 5,000
-                  employees, almost no reader of this page is in scope, and the ones who are do not need
-                  a marketing page to tell them. (3) "large companies": scoped nothing a reader could
-                  check, and means something five times narrower than when it was written. (4) The
-                  phase-in: 2026/470 eliminated the two lower tiers, so there is no staged entry left to
-                  prepare for.
-                  What replaces them is the true and more useful fact: the obligation lands on the
-                  customer, and the request lands on the reader. */}
-              CS3D obliges large companies to carry out human rights and environmental due diligence across their value chain, not just tier 1. Almost certainly that is not you: since {CS3D_OMNIBUS_CITATION} there is a single scope tier, and an EU company is caught only with {CS3D_EMPLOYEE_THRESHOLD} and {CS3D_TURNOVER_THRESHOLD}. A non-EU company is caught on {CS3D_NON_EU_TURNOVER_THRESHOLD}, with no employee test. {CS3D_OTHER_ROUTES_NOTE}
-            </p>
-            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              What reaches you is the request. Your in-scope customers cannot diligence a value chain they have no information about, so they will ask, and they will ask before their own deadline rather than on it. {CS3D_VALUE_CHAIN_CONTACT_LIMIT} That limit is worth knowing: it is the basis on which you can ask a customer why they need something.
-            </p>
-            {/* Was a list of the READER's obligations, one of which ("Civil liability for failures")
-                no longer exists in the directive at all. Now a list of what the module does for a
-                company on the receiving end of the request. */}
-            {['Answer once, reuse across every customer that asks', 'Structured human rights and environmental questionnaires, not a spreadsheet per customer', 'Collect the same from your own suppliers, where you are the one asking', 'Evidence of a grievance mechanism, where you have one', 'Mapping to ESRS S2 and G1, if you report under CSRD yourself'].map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                <span style={{ color: 'var(--color-module-ai)', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ background: 'var(--color-paper)', border: '0.5px solid var(--color-line)', borderRadius: 16, padding: '2rem' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-2)', marginBottom: 16 }}>Key supply chain frameworks</div>
-            {[
-              // "(large companies)" removed: the phase-in it referred to was eliminated, and the word
-              // now means something five times narrower. Urgency dropped from critical to high: the
-              // date is 2029, and the questionnaires arrive earlier than that, which is what 'high'
-              // says. 'critical' beside ESRS S2's FY2024 was not a defensible comparison.
-              { fw: 'EU CS3D', scope: 'HRDD by your in-scope customers', deadline: CS3D_APPLIES_FROM, urgency: 'high' },
-              { fw: 'ESRS S2', scope: 'Value chain workers', deadline: 'FY2024 (large EU)', urgency: 'critical' },
-              // ⚠️ IMPORTED AND POSTURED, 24 Sep 2026. Was the literal '2027 (California)', which stated an
-              // unapproved Californian regulation as settled, in a table where it now sits beside a firm
-              // directive. lib/sb253.ts is the single source and is explicit: SB253_DATE_STATUS is
-              // 'proposed', never 'final', until CARB finalises and OAL approves, and the citation
-              // records that an earlier date was approved and then WITHDRAWN before it took effect.
-              //   The word comes from the library, not from here. SB253_FRAMEWORK_DEADLINE exists for a
-              // cell this shape but carries the FIRST-REPORT date (10 Nov 2026, Scope 1 and 2); this row
-              // is Scope 3, so the Scope 3 constant is used with the status beside it.
-              { fw: 'SB 253 Scope 3', scope: 'Category 1 purchased goods', deadline: `${SB253_SCOPE3_FROM} (California, ${SB253_DATE_STATUS})`, urgency: 'high' },
-              { fw: 'CDP supplier engagement', scope: 'Supplier engagement programme', deadline: 'Annual · July', urgency: 'medium' },
-              { fw: 'Modern Slavery Act', scope: 'UK + Australia transparency statement', deadline: 'Annual', urgency: 'medium' },
-              { fw: 'EcoVadis', scope: 'Supplier sustainability ratings', deadline: 'Customer-requested', urgency: 'medium' },
-            ].map(({ fw, scope, deadline, urgency }) => {
-              const color = urgency === 'critical' ? '#B91C1C' : urgency === 'high' ? 'var(--color-state-warn)' : 'var(--color-ink-muted)'
-              return (
-                <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--color-line)' }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 5 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{fw}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-ink-2)' }}>{scope}</div>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-ink-2)', flexShrink: 0, textAlign: 'right' as const }}>{deadline}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+      {/* ── 2. HOW PEOPLE ARRIVE ── */}
+      <ModuleSection>
+        <ModuleArrivals items={ARRIVALS} />
+      </ModuleSection>
 
-      {/* FEATURES */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>Platform capabilities</div>
-          <h2 style={sectionTitle}>Everything your supply chain programme needs.</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
-          {[
-            { title: 'Supplier portal', desc: 'Branded supplier sustainability data collection portal. Suppliers complete structured questionnaires on emissions, labour practices, and environmental performance, with no spreadsheets.' },
-            { title: 'Scope 3 Cat.1 primary data', desc: 'Collect spend data, activity data, and supplier-specific emission factors directly from your supply base: the primary supplier data that feeds your Scope 3 Category 1 calculation in the GHG module, across all GHG Protocol methods.' },
-            { title: 'Human rights risk mapping', desc: 'Risk-based HRDD across your value chain. Country and sector risk scoring. Supplier prioritisation for deeper assessment. Questionnaires cover grievance mechanisms and remediation.' },
-            { title: 'EcoVadis-themed questionnaires', desc: 'Supplier questionnaires structured to the four EcoVadis themes (Environment, Labour & Human Rights, Ethics, and Sustainable Procurement), so the evidence you collect maps to the scorecard you\'re rated against.' },
-            { title: 'Modern Slavery Act', desc: 'UK and Australia Modern Slavery Act. Structured supplier questionnaires across forced and compulsory labour, child labour, and due diligence and remediation, with supply chain mapping and risk identification.' },
-            { title: 'ESRS S2 supplier data', desc: 'Supplier questionnaires aligned to ESRS S2 (value chain workers): the value chain worker data your disclosure needs, collected and evidenced.' },
-          ].map(({ title, desc }) => (
-            <div key={title} style={{ background: '#fff', padding: '2rem' }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
+      {/* ── 3. WHAT IT COVERS ── */}
+      <ModuleSection tinted>
+        <h2 style={sectionTitle}>What the module covers</h2>
+        <dl style={{ margin: '2rem 0 0', borderTop: '1px solid var(--color-line-strong)' }}>
+          {COVERS.map(([k, v]) => (
+            <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(12rem, 16rem) 1fr', gap: '1.5rem', padding: '1.1rem 0', borderBottom: '1px solid var(--color-line)' }}>
+              <dt style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink)' }}>{k}</dt>
+              <dd style={{ margin: 0, fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.7 }}>{v}</dd>
             </div>
           ))}
-        </div>
-      </section>
+        </dl>
+      </ModuleSection>
 
-      {/* HOW IT WORKS */}
-      <section style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4', padding: '5rem 2.5rem' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={eyebrow}>How it works</div>
-            <h2 style={sectionTitle}>From supplier list to Scope 3 data.</h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '1rem' }}>
+      {/* ── 4. HOW IT WORKS ── */}
+      <ModuleSection>
+        <h2 style={sectionTitle}>How it works</h2>
+        <div style={{ marginTop: '2rem' }}>
+          <ModuleSpine
+            bring="Your supplier list and what you spend with each one."
+            applies="Asks your suppliers the right questions, follows up with anyone who has not replied, and maps every answer to the framework that asked for it."
+            get="Answers from your suppliers, kept with the proof behind them, and Scope 3 Category 1 figures you can explain."
+          />
+        </div>
+      </ModuleSection>
+
+      {/* ── 5. EVIDENCE ──
+      ⚠️ 'workings', NOT 'verifier'. There is no supplier verifier surface: get_verifier_inventory and
+      get_verifier_scope3 are the only two RPCs and neither reaches the supplier registers, and
+      scope3_inventories carries no audit_log trigger. EvidenceSection enforces it from
+      lib/modulePages.ts, so this page cannot assert one by wording. */}
+      <ModuleSection tinted>
+        <EvidenceSection
+          moduleKey={KEY}
+          workings="Every supplier answer is kept with the evidence attached to it and the date it arrived, so a figure traces back to the response that produced it rather than to a spreadsheet nobody can find."
+        />
+      </ModuleSection>
+
+      {/* ── 6. WHAT THE MODULE PRODUCES ──
+      Absent: there is no supplier-portal sample or preview route, and public/samples/ holds only the two
+      Climate Risk reports. ModuleOutputs exists so a module with nothing to show omits the section. */}
+
+      {/* ── 7. WHAT IT SATISFIES ── */}
+      <ModuleSection>
+        <h2 style={sectionTitle}>What it satisfies</h2>
+        <p style={{ ...bodyCopy, margin: '1rem 0 1.75rem' }}>
+          Each of these is described, sourced and mapped to a module on the regulations page.
+        </p>
+        <FrameworkChips names={FRAMEWORKS} />
+      </ModuleSection>
+
+      {/* ── 8. PRICING ── */}
+      <ModuleSection tinted>
+        <p style={moduleEyebrow}>Pricing</p>
+        <h2 style={sectionTitle}>One flat annual price.</h2>
+        <p style={{ ...bodyCopy, marginTop: '1rem' }}>
+          Unlimited suppliers on the portal. Add modules and the multi-module discount applies
+          automatically: two modules −10%, three or more −20%.
+        </p>
+        <div style={{ maxWidth: 420, marginTop: '2.5rem' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-supply)', borderRadius: 6, padding: '2rem' }}>
+            <div style={{ ...moduleEyebrow, marginBottom: 8 }}>Supply Chain</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: 'var(--color-ink)' }}>
+              ${price}
+              <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-ink-muted)' }}> / reporting year</span>
+            </div>
+            <div style={{ height: 1, background: 'var(--color-line)', margin: '1.25rem 0' }} />
             {[
-              ['01', 'Map your supply base', 'Upload your supplier list. ThemisIQ risk-scores each supplier by country, sector, and spend, prioritising who needs deep assessment first.'],
-              ['02', 'Collect supplier data', 'Send branded data collection requests via the ThemisIQ supplier portal. Track completion status and send reminders to non-responders.'],
-              ['03', 'Collect Category 1 data', 'Suppliers report their Category 1 emissions through the portal. Where a supplier hasn\'t responded, spend-based estimates fill the gap.'],
-              ['04', 'Feed your Scope 3', 'Pull supplier-reported Category 1 emissions into your GHG inventory, with spend-based gap-fill for non-responders. You review the full breakdown before it\'s applied.'],
-            ].map(([num, title, desc]) => (
-              <div key={num}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: 'var(--color-brand)', opacity: 0.5, marginBottom: '0.75rem' }}>{num}</div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: '0.5rem' }}>{title}</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
+              'Supplier portal, no account needed for your suppliers',
+              'EcoVadis, CS3D, Modern Slavery and Scope 3 templates',
+              'A custom questionnaire for anything they do not cover',
+              'Human rights and supply chain risk mapping',
+              'Primary data into Scope 3 Category 1, with its basis',
+            ].map(f => (
+              <div key={f} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <span style={{ color: 'var(--color-state-ok)', flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55 }}>{f}</span>
               </div>
             ))}
+            <a href={`/order?modules=${KEY}`} style={{ ...btnPrimary, textDecoration: 'none', display: 'block', textAlign: 'center', marginTop: '1.5rem' }}>
+              Order the module
+            </a>
           </div>
         </div>
-      </section>
+      </ModuleSection>
 
-      {/* CS3D DATES AND SOURCES
-          Follows app/cbam/page.tsx: every date named in prose above appears here with the instrument
-          it comes from, and the instruments get their own two-row table with a role each. A compliance
-          page that states a date without its source asks to be taken on trust, which is the one thing
-          this product cannot ask for. */}
-      <section style={{ padding: '4rem 2.5rem', borderTop: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <h2 style={sectionTitle}>CS3D dates, and where they come from</h2>
-          <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, marginBottom: '1.5rem' }}>
-            {CS3D_OMNIBUS_CITATION} (Omnibus I) was published on {CS3D_OMNIBUS_PUBLISHED} and entered
-            into force on {CS3D_OMNIBUS_IN_FORCE}, amending {CS3D_REGIME_CITATION}. It raised the size
-            thresholds, eliminated the two lower phase-in tiers, and moved the dates below.
-          </p>
-          {/* ⚠️ THE LIABILITY DELETION IS NOT ASSERTED HERE, DELIBERATELY. (EU) 2026/470 is understood to
-              have deleted the EU-wide civil liability regime and reverted it to national law, and that
-              understanding is why the liability framing was removed from this page on 24 Sep 2026. But it
-              rests on secondary sources: nobody here has read the amended article on EUR-Lex.
-                REMOVING an over-claim on a secondary source is safe in a way that ADDING one is not. So
-              the page no longer threatens the reader with liability, and it also does not tell them the
-              liability is gone. Silence is the only position both honest and available. docs/backlog.md
-              carries it as pending verification, together with the 3% penalty cap, which is kept off
-              this page for the same reason. */}
+      {/* ── 9. THE QUESTIONS ── */}
+      <ModuleSection>
+        <ModuleFaq items={FAQ} />
+      </ModuleSection>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13, marginBottom: '2rem' }}>
-            <thead>
-              <tr>
-                {['What', 'When', 'Source'].map(h => (
-                  <th key={h} style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '10px 14px', textAlign: 'left' as const, fontSize: 11, fontWeight: 500 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['Member States transpose into national law', CS3D_TRANSPOSITION, CS3D_CITATION],
-                ['Obligations apply to companies in scope', CS3D_APPLIES_FROM, CS3D_CITATION],
-                ['Article 16 public reporting', CS3D_ARTICLE_16_FROM, CS3D_CITATION],
-              ].map((row, i) => (
-                <tr key={i}>
-                  {row.map((cell, j) => (
-                    <td key={j} style={{ padding: '10px 14px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: j === 1 ? '#0d0d0d' : '#555553', fontWeight: j === 1 ? 500 : 400 }}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* ── 10. CLOSING BAND ── */}
+      <ClosingBand
+        heading="Good supplier data makes everything downstream easier."
+        body="ThemisIQ helps you gather it once and use it wherever it is asked for."
+        primary={{ href: '/assess', label: 'Start the free assessment' }}
+        secondary={{ href: '/advisory', label: 'Talk to us' }}
+      />
+      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
-            <thead>
-              <tr>
-                {['Instrument', 'Reference', 'Role'].map(h => (
-                  <th key={h} style={{ background: 'var(--color-sunken)', color: 'var(--color-ink)', borderBottom: '2px solid var(--color-ink)', padding: '10px 14px', textAlign: 'left' as const, fontSize: 11, fontWeight: 500 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['CSDDD', CS3D_REGIME_CITATION, 'The regime itself'],
-                ['Omnibus I', CS3D_OMNIBUS_CITATION, 'Amends the above: scope, dates, reporting'],
-              ].map((row, i) => (
-                <tr key={i}>
-                  {row.map((cell, j) => (
-                    <td key={j} style={{ padding: '10px 14px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: j === 2 ? '#0F6E56' : '#555553', fontWeight: j === 2 ? 500 : 400 }}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* ⚠️ SAID ON THE PAGE, NOT ONLY IN THE BACKLOG. Two things a reader could otherwise take from
-              the table that it does not support: that national law is settled, and that the Commission's
-              guidance exists. Neither is true yet, and a supplier planning around this page deserves to
-              know which parts are still moving. */}
-          <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7, marginTop: '1.5rem' }}>
-            Transposition is what turns these dates into national obligations, and it has not happened
-            in earnest yet. The Commission is due to publish implementation guidelines before
-            {' '}{CS3D_GUIDELINES_DUE}, and they are not published at the time of writing. Both will
-            change how the questionnaires you receive are worded, so treat the wording of a request as
-            your customer&apos;s reading of the directive rather than as the directive.
-          </p>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          CS3D applies to your customers from {CS3D_APPLIES_FROM}.<br />
-          <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Start building now.</span>
-        </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
-          {/* Was "12-18 months to establish ... the ones starting in 2026 won't be", written against a
-              2027 application date that (EU) 2026/470 moved to 2029. The urgency was real when written
-              and is not now, and an invented deadline on a compliance page is the one thing a reader
-              can check against the directive. What is still true is that the request arrives before
-              the deadline does. */}
-          Your customers have to gather value chain information before their own deadline, not on it, so the questionnaires arrive first. Answer once and reuse it.
-        </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/supply-chain" style={{ ...btnPrimary, textDecoration: 'none' }}>Map your supply chain →</a>
-          <a href="/order?modules=supply" style={{ ...btnSecondary, textDecoration: 'none' }}>${supplyPrice}/yr</a>
-          <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
-        </div>
-      </section>
-
-      {/* FOOTER */}
       <Footer />
-
-      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; }`}</style>
     </div>
   )
 }
 
-const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
-const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
-const sectionSub: React.CSSProperties = { fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }
+// ── DATA ──────────────────────────────────────────────────────────────────────────────────────────
+/**
+ * ⚠️ THE CS3D ARRIVAL IS "YOUR CUSTOMER IS IN SCOPE", NEVER "YOU ARE". With a single tier at more than
+ * 5,000 employees and EUR 1.5bn, almost no reader of this page is caught, and the ones who are do not
+ * need a marketing page to tell them. That sentence replaced "you must comply" on 24 Sep 2026.
+ */
+const ARRIVALS = [
+  { title: 'A customer sent you a questionnaire',
+    body: 'One you cannot answer without asking your own suppliers first.' },
+  { title: 'Your largest customer is in scope for CS3D',
+    body: 'Their obligation becomes your questionnaire.' },
+  { title: 'You need primary supplier data for Scope 3',
+    body: 'And you have been estimating from spend.' },
+] as const
+
+/**
+ * ⚠️ THE FIFTH TEMPLATE IS NAMED, NOT COUNTED. `custom` exists alongside ecovadis, cs3d, scope3 and
+ * modern_slavery in lib/supply-chain/templates.ts. Listing four and stopping told a buyer the product
+ * cannot ask anything the four do not cover.
+ *
+ * ⚠️ "WHETHER THEIR OWN FIGURE WAS THIRD-PARTY ASSURED" IS THE EXACT LIMIT OF THE CLAIM. It describes
+ * the SUPPLIER'S reporting. It does not say your Category 1 total is assured, and no wording on this
+ * page may. See the note at the top of the file and lib/scope3/supplierAssurance.ts.
+ */
+const COVERS = [
+  ['A supplier portal', 'Your suppliers can use it without an account, and each question explains what it means and why you are asking.'],
+  ['Questionnaire templates', 'EcoVadis, CS3D, Modern Slavery and Scope 3, plus a custom questionnaire for anything the four do not cover.'],
+  ['Risk mapping', 'Human rights and supply chain risk, mapped from the answers rather than assumed from the sector.'],
+  ['Primary data for Scope 3', 'Feeds Category 1 with the basis recorded per supplier, including whether their own figure was third-party assured.'],
+] as const
+
+const FRAMEWORKS = ['CS3D', 'EcoVadis', 'Modern Slavery Act', 'ESRS S2'] as const
+
+/**
+ * ⚠️ THE CS3D ANSWER CARRIES THE TRANSPOSITION PARAGRAPH, WHICH WAS PREVIOUSLY REACHABLE ONLY FROM A
+ * SECTION THIS SHAPE HAS NO SLOT FOR. Its original comment read "SAID ON THE PAGE, NOT ONLY IN THE
+ * BACKLOG": two things a reader could otherwise assume are that national law is settled and that the
+ * Commission's guidance exists, and neither is true. It is the most useful thing on this page for the
+ * reader it is written for, so it became an answer rather than being dropped.
+ *
+ * ⚠️ THE SPEND GAP-FILL IN THE SECOND ANSWER IS TRUE AND WAS CHECKED. lib/scope3/categorySnapshot.ts's
+ * snapshotMethod comment: "a supplier who reported an allocated figure is priced supplier-specific, and
+ * one who did not is gap-filled from spend, in the same total" — which is why the method is recorded as
+ * 'mixed' rather than either single value. Worth re-checking if the Scope 3 method map changes again:
+ * the flat rate was removed from six categories on 25 Sep 2026 and Category 1 was not one of them.
+ *
+ * ⚠️ THE FOURTH ANSWER'S CONTRADICTION CHECK IS assuranceContradictsFigure, and it is a real function,
+ * not a manner of speaking. It exists so a supplier's stated assurance and the figure they gave cannot
+ * be reconciled silently.
+ */
+const FAQ: readonly Faq[] = [
+  { q: 'Our suppliers are small. Is this too much to ask of them?',
+    a: 'The portal is built for someone who has never been asked this before. No account, no login, and each question explains what it means and why you are asking. Most answers come from a utility bill and a headcount. Where a supplier genuinely cannot answer, that is recorded as an absence rather than left as a gap you discover later.' },
+  { q: 'What if a supplier does not respond?',
+    a: 'You see who has not replied and the platform follows up. Where no figure arrives, the category is estimated from the spend you recorded and marked as an estimate, so the split between reported and estimated is visible to you and to anyone checking your inventory.' },
+  { q: 'Does CS3D apply to us?',
+    a: `Almost certainly not. Since ${CS3D_OMNIBUS_CITATION} there is a single scope tier, and an EU company is caught only with ${CS3D_EMPLOYEE_THRESHOLD} and ${CS3D_TURNOVER_THRESHOLD}. A non-EU company is caught on ${CS3D_NON_EU_TURNOVER_THRESHOLD}, with no employee test. ${CS3D_OTHER_ROUTES_NOTE} What reaches you instead is the request: your in-scope customers cannot diligence a value chain they have no information about, so they will ask, and they will ask before their own deadline of ${CS3D_APPLIES_FROM} rather than on it. ${CS3D_VALUE_CHAIN_CONTACT_LIMIT}`,
+    extra: `Transposition is what turns these dates into national obligations, and it has not happened in earnest yet. Member States transpose by ${CS3D_TRANSPOSITION}. The Commission is due to publish implementation guidelines before ${CS3D_GUIDELINES_DUE}, and they are not published at the time of writing. Both will change how the questionnaires you receive are worded, so treat the wording of a request as your customer's reading of the directive rather than as the directive.` },
+  { q: 'How does this connect to our Scope 3 inventory?',
+    a: 'Supplier figures feed Category 1 directly, each carrying the basis it came in on and whether the supplier told you their own reporting is third-party assured. Where a supplier’s stated assurance disagrees with the figure they gave, that is flagged rather than reconciled silently.' },
+]
