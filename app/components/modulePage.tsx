@@ -84,7 +84,70 @@ export function EvidenceSection({ moduleKey, workings, heading = 'How you stand 
   )
 }
 
-/* ── 4. What the module produces ─────────────────────────────────────────────────────────────────── */
+/* ── 4. How people arrive ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * ⚠️ THE HEADING CARRIES NO COUNT, AND THAT IS WHY IT IS NOT A PROP. Both pages that had this section
+ * before it was extracted said "Three ways people arrive here", and hard-coding "Three" into shared
+ * code would put a typed count in the one place seven pages read — while making the heading a prop
+ * would let each page state its own number and get it wrong. The heading states the question instead,
+ * so a page with two arrivals or four needs no permission and no edit here.
+ */
+export function ModuleArrivals({ items }: { items: readonly { title: string; body: string }[] }) {
+  return (
+    <>
+      <h2 style={sectionTitle}>How people arrive here</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
+        {items.map(a => (
+          <div key={a.title} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25, marginBottom: '0.6rem' }}>{a.title}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{a.body}</div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+/* ── 5. The questions ───────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * ⚠️ THE TYPE IS EXPORTED BECAUSE TWO FILES HAD TO DECLARE IT SEPARATELY, AND THAT WAS THE SIGNAL TO
+ * EXTRACT. `extra` exists on some answers and not others, so an inferred array widens to a union where
+ * `q.extra` does not compile — app/climate-risk/page.tsx and app/frameworks/page.tsx each hit it and
+ * each declared a local type to escape it. Two files solving one typing problem is a component.
+ *
+ * `extra` renders as an indented, ruled block beneath the answer. It exists for a quoted CONSTANT that
+ * must not be paraphrased — SB261_STATUS_SENTENCE is the case it was built for — so its wording can be
+ * verbatim while the answer around it stays in the page's own voice.
+ */
+export type Faq = { q: string; a: string; extra?: string }
+
+export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
+  items: readonly Faq[]
+  heading?: string
+}) {
+  return (
+    <>
+      <h2 style={sectionTitle}>{heading}</h2>
+      <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-line-strong)' }}>
+        {items.map(q => (
+          <div key={q.q} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-ink)', marginBottom: '0.5rem' }}>{q.q}</div>
+            <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, maxWidth: '68ch' }}>{q.a}</div>
+            {q.extra && (
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.7, maxWidth: '68ch', marginTop: '0.7rem', paddingLeft: '0.9rem', borderLeft: '2px solid var(--color-line-strong)' }}>
+                {q.extra}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+/* ── 6. What the module produces ─────────────────────────────────────────────────────────────────── */
 
 /**
  * The outputs section. ⚠️ EXTRACTED ON THE SECOND PAGE, WHICH IS WHEN IT EARNED IT — and the second
@@ -123,7 +186,7 @@ export function ModuleOutputs({ intro, outputs }: { intro: string; outputs: read
   )
 }
 
-/* ── 5. The closing band ─────────────────────────────────────────────────────────────────────────── */
+/* ── 7. The closing band ─────────────────────────────────────────────────────────────────────────── */
 
 /**
  * ⚠️ SHARED BECAUSE TWO BANDS ALREADY DRIFTED ONCE. app/page.tsx's hero and closing band are both

@@ -552,9 +552,13 @@ function PricingPageInner() {
             after it. Nothing pointed into the deleted blocks — the prompt at the top of the page had
             already stopped naming tiers. */}
 
-        {/* Module selector (NEW model) — per-module pricing, GHG inline tier picker */}
+        {/* Module selector (NEW model) — per-module pricing, GHG inline tier picker.
+            ⚠️ scrollMarginTop ON #build-your-stack IS NOT DECORATION. Nav is sticky at top:64, so
+            without it the anchor lands this heading underneath the nav bar. The anchor itself is
+            load-bearing and module pages link to it by name: app/climate-ghg/page.tsx carries a
+            comment saying /pricing?modules=ghg alone lands five sections above this picker. */}
         {NEW_PRICING_ACTIVE && (
-          <div id="build-your-stack" style={s.moduleWrap}>
+            <div id="build-your-stack" style={{ ...s.moduleWrap, scrollMarginTop: 80 }}>
             <div style={s.moduleHeader}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Select your compliance modules</div>
               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Click any row to add or remove</div>

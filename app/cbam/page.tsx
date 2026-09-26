@@ -7,7 +7,7 @@ import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
   ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection, ModuleOutputs,
-  bodyCopy, moduleEyebrow, type ModuleOutput,
+  ModuleArrivals, ModuleFaq, bodyCopy, moduleEyebrow, type ModuleOutput, type Faq,
 } from '@/app/components/modulePage'
 
 const KEY = 'cbam' as const
@@ -70,15 +70,7 @@ export default function CbamPage() {
 
       {/* ── 2. THREE WAYS PEOPLE ARRIVE ── */}
       <ModuleSection>
-        <h2 style={sectionTitle}>Three ways people arrive here</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
-          {ARRIVALS.map(a => (
-            <div key={a.title} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25, marginBottom: '0.6rem' }}>{a.title}</div>
-              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{a.body}</div>
-            </div>
-          ))}
-        </div>
+        <ModuleArrivals items={ARRIVALS} />
       </ModuleSection>
 
       {/* ── 3. WHAT IT COVERS, plus the sector split ── */}
@@ -217,15 +209,7 @@ export default function CbamPage() {
 
       {/* ── 9. FOUR QUESTIONS ── */}
       <ModuleSection tinted>
-        <h2 style={sectionTitle}>Four questions people ask first</h2>
-        <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-line-strong)' }}>
-          {FAQ.map(q => (
-            <div key={q.q} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-ink)', marginBottom: '0.5rem' }}>{q.q}</div>
-              <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, maxWidth: '68ch' }}>{q.a}</div>
-            </div>
-          ))}
-        </div>
+        <ModuleFaq items={FAQ} />
       </ModuleSection>
 
       {/* ── 10. CLOSING BAND ── */}
@@ -289,7 +273,7 @@ const FRAMEWORKS = ['(EU) 2023/956', 'Annex IV', 'Implementing regulations'] as 
  * access is recorded" is true because those tables carry audit_log triggers; do not copy this answer to
  * a module that has neither.
  */
-const FAQ = [
+const FAQ: readonly Faq[] = [
   { q: 'We export to the EU but we are not the importer. Does this apply to us?',
     a: "The obligation is your customer's. The data request is yours. Your EU importer has to declare the embedded emissions of the goods you ship them, and they cannot do it without your figures. ThemisIQ is built around that: you produce the figures and grant them to named customers." },
   { q: 'What if we do not have installation-level data?',
@@ -298,7 +282,7 @@ const FAQ = [
     a: 'Iron and steel, and aluminium, with per-country default values and route-level benchmarks for steel. The module is built to take more sectors as they arrive.' },
   { q: 'Can our EU customer see the figures directly?',
     a: 'Yes. You grant access to a named customer, and you can revoke it. The same applies to a verifier, who sees the installation data and the calculation behind every figure. Every access is recorded.' },
-] as const
+]
 
 // ── STYLES ────────────────────────────────────────────────────────────────────────────────────────
 /** Carried from the previous version of this page, where they lived in app/components/sectionStyles. */

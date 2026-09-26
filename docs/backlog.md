@@ -1497,3 +1497,38 @@ turns five independent claims into one.
 Not fixed in this pass because the Climate Risk pricing feature list was carried over verbatim
 deliberately: it holds the hard-won "screening, NOT materiality" wording, and editing it in the same
 change as a layout rebuild is how that word would get lost.
+
+---
+
+## GHG has no sample output, and it is the largest module
+
+Logged 26 Sep 2026, rebuilding `app/climate-ghg/page.tsx` to the shared module shape. **Section 6, "What
+the module produces", is absent from that page** — deliberately, because `ModuleOutputs` was built so a
+module with nothing to show omits the section rather than rendering a "coming soon" tile.
+
+What exists and why none of it fills the slot:
+
+| | Why not |
+|---|---|
+| `public/samples/` | Two Climate Risk PDFs only. No GHG artefact. |
+| `lib/assurancePdf.ts` | Generates the pack **per inventory**. Needs data; nothing to open cold. |
+| `/calculate-emissions` | A calculator, not a report. |
+
+So the largest module, carrying the most corrected copy on the site, is the one page that cannot show its
+output — while Climate Risk shows two reports and CBAM a worked preview.
+
+**The fix, and it is worth more than a marketing asset.** Generate the assurance package for the same
+fictional company as the Climate Risk samples (`magnetic-industrial-*`) and put it in `public/samples/`.
+Two reasons beyond the page:
+
+1. **It exercises `lib/assurancePdf.ts` end to end**, which today is covered by
+   `lib/assurancePdf.exclusion.test.ts` and `lib/materiality/boardReport.test.ts` asserting structure —
+   and both files' own comments say they prove the document BUILDS, not that anything in it is readable.
+   A generated artefact someone looks at is the check neither test can be.
+2. **It would be the strongest artefact on the site.** The page's claim is that every figure carries its
+   method, its factor edition and its source document. A pack a prospect can open is that claim
+   demonstrated rather than asserted.
+
+⚠️ **One thing to get right if this is built:** the same fictional entity as the existing samples, so a
+prospect reading the resilience report and the assurance pack sees one company. Two fictional companies
+across three samples would read as stock content.

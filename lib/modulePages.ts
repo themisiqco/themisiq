@@ -34,14 +34,27 @@ export const MODULE_SUBLINE = 'Self-guided, or with advisors at the ready.'
  *
  * ⚠️ 'workings' IS DELIBERATELY NOT CALLED 'audit-trail', AND THAT NAMING WAS A NEAR-MISS. The brief
  * for this file described the non-verifier paragraph as "the audit-trail paragraph, which is true
- * everywhere". It is not. Checked against the migrations on 25 Sep 2026: audit_log triggers exist on
- * ghg_inventories (audit_ghg_inventories, live but captured in no migration), and on
- * cbam_production_processes and cbam_installation_disclosures
- * (supabase/migrations/20260726_cbam_audit_triggers.sql). THAT IS THE COMPLETE LIST. Climate Risk,
+ * everywhere". It is not. SEVEN audit triggers exist, verified LIVE on 17 Sep 2026, covering
+ * ghg_inventories, ghg_entries, two cbam_* tables and three concierge_* tables. Climate Risk,
  * Materiality, People, Cyber, AI Governance and Deals write no audit_log rows at all, so a page of
- * theirs claiming an audit trail would be asserting a database object that does not exist for it —
- * the same defect CLAUDE.md records on the homepage, where "every calculation and data point is logged
- * with a full audit trail" was platform-wide and false.
+ * theirs claiming an audit trail would assert a database object that does not exist for it — the same
+ * defect CLAUDE.md records on the homepage, where "every calculation and data point is logged with a
+ * full audit trail" was platform-wide and false.
+ *
+ * ⚠️ THIS COMMENT SAID THREE TRIGGERS AND "THAT IS THE COMPLETE LIST" UNTIL 26 SEP 2026, AND THE METHOD
+ * WAS THE DEFECT, NOT THE ARITHMETIC. The three came from grepping supabase/migrations/, which
+ * UNDERCOUNTS BY DESIGN: 20260726_capture_audit_log_infrastructure.sql says of the ghg_inventories
+ * trigger that it is "intentionally NOT recreated here — it already exists in prod", and the concierge
+ * and ghg_entries triggers are in the same category. CLAUDE.md is explicit that much of the schema is
+ * not in git and that the DATABASE is the source of truth, with the migration header only a record of
+ * execution. A complete list cannot be asserted from an incomplete source.
+ *   DO NOT REPEAT THE METHOD. To recount, query the database:
+ *     select tgrelid::regclass as table_name, tgname from pg_trigger
+ *     where not tgisinternal and tgfoid = 'public.log_audit'::regproc;
+ *   plus the same for log_audit_cbam_disclosures, which is the composite-PK variant.
+ *   The outcome of the gate did not change — GHG and CBAM remain the only verifier modules, and
+ * concierge is a mode of GHG rather than a module of its own — which is exactly why a wrong figure
+ * could sit here for a day without anything failing.
  *   So the modules with an audit log are exactly the modules with a verifier, and the other five get a
  * claim about workings, which is true and is not smaller than it sounds.
  *

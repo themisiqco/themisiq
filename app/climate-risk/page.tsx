@@ -8,7 +8,7 @@ import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
   ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection, ModuleOutputs,
-  bodyCopy, moduleEyebrow, type ModuleOutput,
+  ModuleArrivals, ModuleFaq, bodyCopy, moduleEyebrow, type ModuleOutput, type Faq,
 } from '@/app/components/modulePage'
 
 const KEY = 'climate-risk' as const
@@ -78,15 +78,7 @@ export default function ClimateRiskPage() {
 
       {/* ── 2. THREE WAYS PEOPLE ARRIVE ── */}
       <ModuleSection>
-        <h2 style={sectionTitle}>Three ways people arrive here</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
-          {ARRIVALS.map(a => (
-            <div key={a.title} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25, marginBottom: '0.6rem' }}>{a.title}</div>
-              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{a.body}</div>
-            </div>
-          ))}
-        </div>
+        <ModuleArrivals items={ARRIVALS} />
       </ModuleSection>
 
       {/* ── 3. WHAT IT COVERS ── */}
@@ -195,20 +187,7 @@ export default function ClimateRiskPage() {
 
       {/* ── 9. FOUR QUESTIONS ── */}
       <ModuleSection tinted>
-        <h2 style={sectionTitle}>Four questions people ask first</h2>
-        <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-line-strong)' }}>
-          {FAQ.map(q => (
-            <div key={q.q} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-ink)', marginBottom: '0.5rem' }}>{q.q}</div>
-              <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, maxWidth: '68ch' }}>{q.a}</div>
-              {q.extra && (
-                <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.7, maxWidth: '68ch', marginTop: '0.7rem', paddingLeft: '0.9rem', borderLeft: '2px solid var(--color-line-strong)' }}>
-                  {q.extra}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <ModuleFaq items={FAQ} />
       </ModuleSection>
 
       {/* ── 10. CLOSING BAND ── */}
@@ -271,11 +250,7 @@ const FRAMEWORKS = ['SB 261', 'IFRS S2', 'TCFD', 'ESRS E1'] as const
  * ⚠️ "Advisors are available" — a person. Never "human-led", which is a product claim wearing a
  * person's clothes.
  */
-/** Declared, not inferred: without it `extra` widens to a union where it exists on one arm only and
- *  does not compile. The same trap as Cover on app/frameworks/page.tsx. */
-type Faq = { q: string; a: string; extra?: string }
-
-const FAQ: Faq[] = [
+const FAQ: readonly Faq[] = [
   { q: 'We do not have a risk register. Can we still use this?',
     a: 'Yes. There is nothing to import. You start from your industry, your operating regions and your asset profile, and the module produces the register. Most companies using it have never done a climate risk assessment before.' },
   { q: 'Does this cover opportunities as well as risks?',

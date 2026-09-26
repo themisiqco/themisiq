@@ -6,6 +6,7 @@ import Footer from './components/Footer'
 import { btnPrimary, btnSecondary, btnOnBand, btnOnBandOutline } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import { SB253_SHORT } from '../lib/sb253'
+import { AUDIT_TRAIL_NOTE_SHORT } from '../lib/auditTrailNotice'
 
 /**
  * The homepage.
@@ -241,10 +242,13 @@ export default function Home() {
           point is logged with a full audit trail" — WAS FALSE: audit_log triggers cover the GHG, CBAM and
           concierge tables only (verified live 17 Sep 2026), and they record a saved change to a row
           rather than every edit. The three module names and the words "each saved change" are what make
-          it true. This is the homepage-length form of AUDIT_TRAIL_NOTE in app/climate-ghg/page.tsx;
-          correct them together. */}
+          it true. ⚠️ IT IS NO LONGER A LITERAL HERE. This paragraph and the fuller form on
+          app/climate-ghg/page.tsx were two strings in two files, each with a comment saying they must be
+          corrected together — which no comment can enforce across a file boundary. Both now read from
+          lib/auditTrailNotice.ts, which holds three widths of the one claim and the rule that a slot
+          needing more does not invent a fourth form. Correct the constant, not this line. */}
           <p style={{ fontSize: 15, color: 'var(--color-ink-2)', lineHeight: 1.75, marginTop: '1rem' }}>
-            Every figure carries its factor citation and its workings. In the GHG, CBAM and concierge modules, each saved change is written to an audit log by a database trigger — who, when, and the row as it was before — and you can read your own entries but not alter them.
+            {AUDIT_TRAIL_NOTE_SHORT}
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
             <a href="/methodology" style={{ ...btnSecondary, textDecoration: 'none' }}>Our methodologies</a>
