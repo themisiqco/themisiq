@@ -1395,3 +1395,77 @@ this is logged rather than done: it changes what a chip is.
 ⚠️ **Whatever happens, no count goes back on that section.** The row replaced a stat reading "30+
 Frameworks covered", against which `ALL_OBLIGATION_IDS` has sixteen, the row has nineteen, and the GHG
 engine maps five to GWP sets.
+
+---
+
+## Fifteen `UNVERIFIED` markers remain in `lib/sources.ts`, and a dead source link is a stale-date-class defect
+
+Logged 25 Sep 2026, after the DORA link turned out to be a 404. **These URLs render to a customer as
+"Official source ↗" on `app/frameworks/page.tsx`, beside a claim about what a regulation requires.** A
+reader who clicks one and lands on a 404 has been given the same thing as a stale date: a checkable claim
+that turns out false, on the surface whose whole purpose is to be checkable.
+
+### What the DORA case showed
+
+`DORA_COMMISSION_URL` pointed at `finance.ec.europa.eu/…/implementing-and-delegated-acts/digital-operational-resilience-act-dora_en`.
+It **404s**, and so does the obvious successor path. It had been marked `UNVERIFIED: carried over from
+app/frameworks/page.tsx, not opened` since the constant was created. Nothing failed. `tsc` passed, the
+tests passed, the build passed, and the card rendered a link to nothing — the same failure mode as a
+retired model string, which is also only a string.
+
+`EFRAG_HOME_URL` was a second, quieter case: `https://www.efrag.org` returns **403** where
+`https://www.efrag.org/en` returns 200, and four entries depend on that one constant.
+
+### ⚠️ Twelve of the fourteen were fetched on 25 Sep 2026 and returned 200 — AND THE MARKERS STILL STAND
+
+This is the part worth getting right. Confirmed to resolve: `GHG_PROTOCOL_URL`, `IFRS_S2_STANDARD_URL`,
+`TCFD_URL`, `CDP_URL`, `SBTI_URL`, `CS3D_COMMISSION_URL`, `EU_AI_ACT_URL`, `NIS2_COMMISSION_URL`,
+`NIST_AI_RMF_URL`, `NIST_CSF_URL`, `ECOVADIS_URL`, `CA_PAY_DATA_URL`.
+
+**A 200 does not discharge the marker, because the marker does not say "not fetched" — it says NOT
+OPENED.** Those are different claims:
+
+| | What it proves | What it misses |
+|---|---|---|
+| A 200 | the URL resolves | nothing about whether the page is the page the comment claims |
+| Opening it | the content matches the comment's stated intent | — |
+
+So the twelve are **live, and still unverified**. A link that resolves to the wrong page is worse than a
+404: a 404 tells the reader something is broken, while a live page about the wrong regulation reads as
+confirmation. Several of these comments assert an *intent* a fetch cannot check — `CS3D_COMMISSION_URL`
+is described as the page the thresholds framing rests on, and `EU_AI_ACT_URL`'s comment mentions "two
+application dates". Whether those pages still say that needs a human.
+
+**Two were not checked at all:** `SBTI_NET_ZERO_STANDARD_URL` (its own comment says it has no rendered
+call site, so it is the lowest priority of the fifteen) and `EPA_EGRID_POWER_PROFILER_URL`.
+
+The fifteenth marker is on the file header at `lib/sources.ts:25` and is a general statement about the
+whole file rather than one constant.
+
+### The method that worked — use it before concluding a link is dead
+
+1. **Request with a full browser header set before believing a failure.** A bare `curl` gets 403 from
+   sites that are perfectly alive. `TCFD_URL` and `EFRAG_HOME_URL` both went **403 → 200** on adding a
+   real `User-Agent`, `Accept: text/html,application/xhtml+xml` and `Accept-Language`. Concluding from
+   the first 403 would have replaced two working links.
+2. **`iso.org` 403s regardless, and that is not evidence of anything.** It blocks automated clients at
+   the edge with or without headers. Every ISO link in the file is therefore **form-verified, not
+   fetch-verified** — see `ISO_27001_URL`, which a human opened on 25 Sep 2026, confirming that
+   `/standard/<catalogue-id>.html` is ISO's convention and that the `/standard/<number>` vanity path also
+   works.
+3. **Check the obvious successor path too, before picking a replacement.** DORA's `…-dora_en` 404'd and
+   so did `…-act_en`; assuming the first was a typo would have produced a second dead link.
+4. **Prefer a permanent identifier to a topic page.** The two replacements chosen were EUR-Lex ELI URIs
+   (`/eli/reg/2022/2554/oj` for DORA, `/eli/reg/2023/956/oj` for CBAM): stable by design, the legal text
+   rather than a supervisor's summary, and consistent with how `lib/cs3d.ts` cites directives. **A
+   Commission topic page is exactly the kind of link that moves** — one just did.
+5. **Follow redirects and read where you land.** `-L` plus `%{redirect_url}` catches a link that still
+   returns 200 by way of a generic landing page, which is a silent failure a bare status check misses.
+
+### Worth considering rather than a one-off sweep
+
+Every URL in that file is a string, so nothing in the build can see it break — the same class as a
+retired model string. A test cannot fetch (no network in CI, and it would be flaky), but it **can** assert
+the shape: that every `*_URL` is `https`, that no two constants hold the same value under different names,
+and that none still carries an `UNVERIFIED` marker once cleared. That last one turns the marker from a
+comment into something with teeth.
