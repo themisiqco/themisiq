@@ -1617,3 +1617,64 @@ misread the same construction.
 `mr_esrs_topics` is asserted to keep ten rows by a comment in `lib/materiality.ts:52`, the reference route
 calls that fetch fatal if it fails, and `ESRS_TOPIC_COUNT` is hand-maintained. The database and the
 constant can disagree and nothing would notice.
+
+---
+
+## Comment stripping: `lib/testing/stripComments.ts` exists; seventeen call sites still on the old forms
+
+Logged 26 Sep 2026, with the helper. `stripTsComments` blanks comment SPANS in place, preserving line
+numbers, and `lib/aiAct.test.ts` and `lib/cs3d.test.ts` are migrated. **Both migrations were
+mutation-proved rather than accepted on a green suite**, which was the requirement: a span stripper strips
+more, so the risk was a claim caught by accident quietly ceasing to be caught.
+
+| Guard | Literal in rendered copy | Same string inside a JSX comment |
+|---|---|---|
+| `lib/aiAct.test.ts` | **fires** — `app/ai-governance/page.tsx:140 — "2 December 2027"` | correctly silent |
+| `lib/cs3d.test.ts` | **fires** — `app/supply-chain/page.tsx:248 — "26 July 2029"` | correctly silent |
+
+### The corrected survey: 22 files in four shapes, not twelve in two
+
+An earlier count here said twelve. It was wrong, and so was the shape count.
+
+| Shape | Files | Reads a JSX continuation line as code? |
+|---|---|---|
+| **span-based** (the new helper) | `aiAct`, `cs3d` | no |
+| **block-tracking**, byte-identical in five | `ghg/declarationStates`, `ifrsS2`, `sb253`, `sb261`, `sources` | no, but LINE-granular |
+| **block-tracking**, one variant | `csrd` | same |
+| **per-line `//` only**, twelve files | `deals/gates`, `ghg/engine`, `ghg/engineCallSites`, `ghg/verifierWhitelist`, `materialityDrResolution`, `pdf/palette`, `scope3/cat3Copy`, `scope3/categorySnapshot`, `scope3/categoryStatus`, `scope3/scope3CategoryCount`, `scope3/supplierAssurance`, `scope3/verifierScope3Whitelist`, `supply-chain/supplierStatus` | **yes, and they never strip block comments at all** |
+
+`lib/cbam/boundaries.test.ts` was a false positive in the survey: its `.replace(/\*\*/g, '')` strips
+markdown emphasis.
+
+### Why the six block-tracking files were left alone
+
+They are correct about JSX continuation lines and still **line-granular**, returning a set of comment line
+numbers. That loses a line which is both code and comment:
+
+```
+try { body = await res.json() } catch { /* a non-JSON body is still a failure below */ }
+```
+
+Four such lines exist (`app/api/survey-invite/route.ts:58`, `app/api/impact-invite/route.ts:51`,
+`app/verify/[token]/page.tsx:554`, `app/verify-cbam/[token]/page.tsx:119`). **Six files agreeing on that
+shape is consensus on the wrong thing rather than evidence for it.** They should move to
+`commentOnlyLines`, which the helper exports for exactly this: the same answer, computed correctly.
+
+### Why the twelve are not urgent, and the argument for converting on touch
+
+They are the weakest form and mostly the lowest risk, because **most operate on a narrow slice** —
+`ghg/verifierWhitelist` and `ghg/engine` scan a region between two markers, `pdf/palette` and
+`supplierStatus` scan one known module. Risk varies by call site, so each conversion wants its own look at
+what that guard is actually matching.
+
+⚠️ **AND A SINGLE COMMIT REWRITING THE MATCHING IN A DOZEN TEST FILES TOUCHES THE SAFETY NET.** A mistake
+there is invisible: the tests still pass. Convert each when its file is next edited, and mutation-prove it
+the way the two above were.
+
+### `stripSqlComments` is not built, deliberately
+
+Nothing in `lib/` strips SQL comments today — the SQL work goes through `scripts/check-sql.py`, which is
+out of scope and should stay out: different language, harder job, and its stripper tracks single-quoted
+literals because it feeds a parser, where a mangled string is a syntax error rather than a missed match.
+A function with tests and no production consumer looks load-bearing without being it. The separation
+argument still holds when the second function is written, so write it then.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { stripTsComments } from './testing/stripComments'
 
 // A DATE THAT LIVES IN ONE PLACE CANNOT GO STALE IN SEVEN.
 //
@@ -58,16 +59,6 @@ const EXCLUDED_FILES = new Set([
   'app/methodology/page.tsx',
 ])
 
-// Line-based, deliberately crude: a line whose first non-space characters open a comment is prose
-// ABOUT the change, not a live date. Two such lines exist today and are expected to be skipped —
-// app/ai-governance/page.tsx and app/dashboard/ai-governance/page.tsx each explain the countdown
-// they replaced by naming `2026-08-02`. Skipping comment LINES keeps the pattern strict rather than
-// weakening it to accommodate them. It does NOT skip a trailing comment after code on the same line,
-// which is the correct bias: that line still contains code.
-const isCommentLine = (line: string): boolean => {
-  const t = line.trimStart()
-  return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('{/*')
-}
 
 const walk = (dir: string, out: string[] = []): string[] => {
   for (const entry of readdirSync(dir)) {
@@ -87,9 +78,12 @@ describe('AI Act dates live in exactly one place', () => {
       for (const file of walk(join(ROOT, dir))) {
         const rel = relative(ROOT, file).split('\\').join('/')
         if (EXCLUDED_FILES.has(rel)) continue
-        const lines = readFileSync(file, 'utf8').split('\n')
+        // ⚠️ SPANS, NOT LINES, VIA THE SHARED STRIPPER. The per-line predicate that used to live here
+        // admitted its own gap: a line "whose first non-space characters open a comment" is prose, but a
+        // JSX comment CONTINUATION line opens with neither // nor *, so it was read as code. See
+        // lib/testing/stripComments.ts for the cases and for why a span is not a line.
+        const lines = stripTsComments(readFileSync(file, 'utf8')).split('\n')
         lines.forEach((line, i) => {
-          if (isCommentLine(line)) return
           for (const pattern of FORBIDDEN) {
             if (line.includes(pattern)) offences.push(`${rel}:${i + 1} — "${pattern}"`)
           }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { stripTsComments } from './testing/stripComments'
 
 // A DATE THAT LIVES IN ONE PLACE CANNOT GO STALE IN EIGHT.
 //
@@ -53,13 +54,6 @@ const EXCLUDED_FILES = new Set([
   'lib/cs3d.test.ts',   // this file names them to forbid them
 ])
 
-// Line-based, matching lib/aiAct.test.ts: a line whose first non-space characters open a comment is
-// prose ABOUT the change, not a live date. Does NOT skip a trailing comment after code on the same
-// line — that line still contains code, which is the correct bias.
-const isCommentLine = (line: string): boolean => {
-  const t = line.trimStart()
-  return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('{/*')
-}
 
 const walk = (dir: string, out: string[] = []): string[] => {
   for (const entry of readdirSync(dir)) {
@@ -79,9 +73,11 @@ describe('CS3D dates live in exactly one place', () => {
       for (const file of walk(join(ROOT, dir))) {
         const rel = relative(ROOT, file).split('\\').join('/')
         if (EXCLUDED_FILES.has(rel)) continue
-        const lines = readFileSync(file, 'utf8').split('\n')
+        // ⚠️ SPANS, NOT LINES, VIA THE SHARED STRIPPER. Migrated with lib/aiAct.test.ts, which carried the
+        // identical per-line predicate: a CS3D threshold inside a multi-line JSX comment would have been
+        // read as a live claim. See lib/testing/stripComments.ts.
+        const lines = stripTsComments(readFileSync(file, 'utf8')).split('\n')
         lines.forEach((line, i) => {
-          if (isCommentLine(line)) return
           for (const pattern of FORBIDDEN) {
             if (line.includes(pattern)) offences.push(`${rel}:${i + 1} — "${pattern}"`)
           }
