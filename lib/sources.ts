@@ -22,6 +22,26 @@
 //
 // ⚠️ VERIFICATION STATUS, STATED PER CONSTANT AND NOT IMPLIED BY THIS FILE'S EXISTENCE. Only the two
 // CARB URLs have been opened and checked, on 12 August 2026. EVERY OTHER URL HERE IS CARRIED OVER
+// ⚠️ EVERY *_URL CARRIES AN @source-status TAG, AND lib/sources.test.ts ASSERTS IT. Four values, and
+// the distinction between the middle two is the whole point:
+//
+//   unverified      never checked. Nobody has fetched it or opened it.
+//   resolves <date> HTTP 200 on that date. THE PAGE WAS NOT READ, so this does NOT discharge whatever
+//                   the comment above the constant claims the page says. A link that resolves to the
+//                   WRONG page is worse than a 404: a 404 tells the reader something is broken, while a
+//                   live page about the wrong regulation reads as confirmation.
+//   form-verified <date>  cannot be fetched at all — iso.org 403s every automated client, headers or
+//                   not — but the URL's SHAPE matches the publisher's documented convention.
+//   verified <date> A HUMAN OPENED IT and the content matches the comment's claim. This is the only
+//                   value that discharges the claim. See EPA_USEEIO_URL for what that looks like: it
+//                   records what the page said AND what it failed to say.
+//
+// ⚠️ MOVING A TAG UP TO `verified` IS A CLAIM ABOUT HAVING READ SOMETHING. lib/sources.test.ts holds the
+// expected status for every constant, so changing a tag fails the test until the list is edited in the
+// same commit — which is the point. It makes clearing a marker a visible act rather than a quiet one.
+// Before concluding a link is dead, see the METHOD section in docs/backlog.md: a bare curl gets 403 from
+// sites that are perfectly alive, and two links here went 403 -> 200 on adding real browser headers.
+//
 // UNVERIFIED from the call site it replaces — moved, not validated. Collecting them into one file
 // makes them checkable; it does not make them checked. A future reader must not read registry
 // membership as a warrant. Each constant says which it is.
@@ -64,12 +84,14 @@ export { SB261_DOCKET_URL } from './sb261'
 // Intent: the GHG Protocol's own site, as the methodology the inventory is built on. A homepage is
 // the right target here — the Corporate Standard is one of several and the card names the body, not
 // a document. UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const GHG_PROTOCOL_URL = 'https://ghgprotocol.org'
 
 // Intent: the IFRS Foundation's navigator entry for IFRS S2 specifically — the standard itself, not
 // the ISSB landing page. If this ever resolves to a general sustainability index, it has drifted and
 // the card's "Official source" claim is weaker than it reads.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const IFRS_S2_STANDARD_URL =
   'https://www.ifrs.org/issued-standards/ifrs-sustainability-standards-navigator/ifrs-s2-climate-related-disclosures/'
 
@@ -77,14 +99,17 @@ export const IFRS_S2_STANDARD_URL =
 // and its monitoring passed to the ISSB, so this host is the likeliest in the whole file to have
 // become an archive or a redirect. That would still return 200 — the exact failure this file's
 // header is about. UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const TCFD_URL = 'https://www.fsb-tcfd.org/'
 
 // Intent: CDP's own site, as the body running the disclosure system.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const CDP_URL = 'https://www.cdp.net'
 
 // Intent: the SBTi's own site, as the body setting the target criteria.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const SBTI_URL = 'https://sciencebasedtargets.org'
 
 // Intent: the Corporate Net-Zero Standard V2.0 CRITERIA document, which lib/sbti/params.ts cites as
@@ -92,12 +117,14 @@ export const SBTI_URL = 'https://sciencebasedtargets.org'
 // V2.1 lands and the params file's figures change with it — check both together.
 // UNVERIFIED: carried over from a provenance comment in lib/sbti/params.ts, not opened. NO RENDERED
 // CONSUMER TODAY — it is here so a checker can reach it and so the citation has one home.
+// @source-status: unverified
 export const SBTI_NET_ZERO_STANDARD_URL =
   'https://files.sciencebasedtargets.org/production/files/Corporate-Net-Zero-Standard-V2-Criteria.pdf'
 
 // Intent: the EPA's eGRID Power Profiler, which the GHG wizard links so a user can look up their own
 // grid region. The one link in this file attached to a TOOL rather than to a text.
 // UNVERIFIED: carried over from app/dashboard/ghg/page.tsx, not opened.
+// @source-status: unverified
 export const EPA_EGRID_POWER_PROFILER_URL = 'https://www.epa.gov/egrid/power-profiler'
 
 // Intent: the EPA's landing page for the USEEIO environmentally-extended input-output models, cited
@@ -108,6 +135,7 @@ export const EPA_EGRID_POWER_PROFILER_URL = 'https://www.epa.gov/egrid/power-pro
 // sector classification — which is exactly why those three fields are null on that source record.
 // The "Current Versions and Other Technical Resources" page it links, /land-research/
 // useeio-technical-content, returned 404 on the same date.
+// @source-status: verified 2026-09-14
 export const EPA_USEEIO_URL =
   'https://www.epa.gov/land-research/us-environmentally-extended-input-output-useeio-models'
 
@@ -116,21 +144,25 @@ export const EPA_USEEIO_URL =
 // Intent: the Commission's CSDDD (CS3D) policy page — the due-diligence directive's official landing
 // page, not EUR-Lex. lib/cs3d.ts holds the citation and dates; this is where a reader goes to read
 // around them. UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const CS3D_COMMISSION_URL =
   'https://commission.europa.eu/business-economy-euro/doing-business-eu/sustainability-due-diligence-responsible-business/corporate-sustainability-due-diligence_en'
 
 // Intent: the Commission's AI Act regulatory-framework page. lib/aiAct.ts holds the citation and the
 // two application dates. UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const EU_AI_ACT_URL = 'https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai'
 
 // Intent: the Commission's NIS2 directive page. lib/nis2.ts holds the citation, the size test and the
 // DORA carve-out — this is the general reference beside them.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const NIS2_COMMISSION_URL = 'https://digital-strategy.ec.europa.eu/en/policies/nis2-directive'
 
 // ── Border carbon ────────────────────────────────────────────────────────────────────────────────
 // The regulation itself, as an ELI URI. VERIFIED 200 on 25 Sep 2026. Preferred over the Commission's
 // topic page for the same reason as DORA below: an ELI URI is stable by design and is the legal text.
+// @source-status: resolves 2026-09-25
 export const CBAM_REGULATION_URL = 'https://eur-lex.europa.eu/eli/reg/2023/956/oj'
 
 // The Commission's CBAM page, which is where the implementing regulations, sector rules and default
@@ -138,6 +170,7 @@ export const CBAM_REGULATION_URL = 'https://eur-lex.europa.eu/eli/reg/2023/956/o
 // ⚠️ NOTE THE PATH HAS NO /taxation SEGMENT. The obvious
 // taxation-customs.ec.europa.eu/taxation/carbon-border-adjustment-mechanism_en returns 404; the live
 // path is one level shallower. Checked, not assumed.
+// @source-status: resolves 2026-09-25
 export const CBAM_COMMISSION_URL = 'https://taxation-customs.ec.europa.eu/carbon-border-adjustment-mechanism_en'
 
 // ── Assurance ────────────────────────────────────────────────────────────────────────────────────
@@ -146,12 +179,14 @@ export const CBAM_COMMISSION_URL = 'https://taxation-customs.ec.europa.eu/carbon
 // ISO's convention, confirmed by a human opening ISO_27001_URL — see the full reasoning there. iso.org
 // 403s every automated client, so no fetch can confirm this one and a 403 is not evidence of a dead
 // link. Do not redo that search.
+// @source-status: form-verified 2026-09-25
 export const ISO_14064_3_URL = 'https://www.iso.org/standard/66455.html'
 
 // ── Thresholds ───────────────────────────────────────────────────────────────────────────────────
 // The UK government's environmental reporting guidelines, which contain the SECR guidance itself.
 // VERIFIED 200 on 25 Sep 2026. Chosen over /guidance/measuring-and-reporting-environmental-impacts
 // (also 200) because that page is general business guidance and this one is the SECR publication.
+// @source-status: resolves 2026-09-25
 export const SECR_GUIDANCE_URL =
   'https://www.gov.uk/government/publications/environmental-reporting-guidelines-including-mandatory-greenhouse-gas-emissions-reporting-guidance'
 
@@ -162,6 +197,7 @@ export const SECR_GUIDANCE_URL =
 // legal text rather than a supervisor's reading of it, and it matches how lib/cs3d.ts cites directives.
 // Renamed from DORA_COMMISSION_URL, because it is no longer the Commission's.
 // A Commission topic page is exactly the kind of link that moves; a consolidated ELI URI is not.
+// @source-status: resolves 2026-09-25
 export const DORA_REGULATION_URL =
   'https://eur-lex.europa.eu/eli/reg/2022/2554/oj'
 
@@ -174,6 +210,7 @@ export const DORA_REGULATION_URL =
 // confirmed by a human opening the 27001 link. The earlier note here called the id form "more fragile
 // than a slug"; the accurate statement is that the id PINS AN EDITION while a slug tracks the current
 // one, and pinning is the safer default for a framework reference page.
+// @source-status: form-verified 2026-09-25
 export const ISO_42001_URL = 'https://www.iso.org/standard/81230.html'
 
 // The ISO catalogue entry for ISO/IEC 27001.
@@ -191,20 +228,24 @@ export const ISO_42001_URL = 'https://www.iso.org/standard/81230.html'
 // ⚠️ A 403 FROM iso.org IS NOT EVIDENCE OF A DEAD LINK. It blocks automated clients at the edge, with
 // or without full browser headers. Every ISO link in this file is therefore FORM-VERIFIED, not
 // fetch-verified, and the form is confirmed by this one having been opened by hand.
+// @source-status: verified 2026-09-25
 export const ISO_27001_URL = 'https://www.iso.org/standard/27001'
 
 // Intent: NIST's AI Risk Management Framework page.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const NIST_AI_RMF_URL = 'https://www.nist.gov/itl/ai-risk-management-framework'
 
 // Intent: NIST's Cybersecurity Framework page. The cards reference CSF 2.0; this URL is version-less,
 // so it will follow NIST forward — which is right for a framework page and wrong if the card ever
 // needs to cite a specific version.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const NIST_CSF_URL = 'https://www.nist.gov/cyberframework'
 
 // Intent: EcoVadis's own site, as the body operating the rating.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const ECOVADIS_URL = 'https://ecovadis.com'
 
 // ── US STATE ─────────────────────────────────────────────────────────────────────────────────────
@@ -212,6 +253,7 @@ export const ECOVADIS_URL = 'https://ecovadis.com'
 // Intent: California Civil Rights Department's pay data reporting portal — the filing surface, which
 // is the right target for a card about an annual submission.
 // UNVERIFIED: carried over from app/frameworks/page.tsx, not opened.
+// @source-status: resolves 2026-09-25
 export const CA_PAY_DATA_URL = 'https://www.calcivilrights.ca.gov/paydatareporting/'
 
 // ── ⚠️ OPEN: FOUR CARDS, ONE FRONT PAGE ──────────────────────────────────────────────────────────
@@ -236,5 +278,7 @@ export const CA_PAY_DATA_URL = 'https://www.calcivilrights.ca.gov/paydatareporti
 // client without a full browser header set, while https://www.efrag.org/en returns 200. Four entries on
 // app/frameworks/page.tsx depend on this one constant — CSRD/ESRS, ESRS E1, ESRS S1 and ESRS S2 — so it
 // is the most-used source link on that page. Do not "tidy" the path segment away.
+// @source-status: resolves 2026-09-25
 export const EFRAG_HOME_URL = 'https://www.efrag.org/en'
+// @source-status: resolves 2026-09-25
 export const GRI_HOME_URL = 'https://www.globalreporting.org'
