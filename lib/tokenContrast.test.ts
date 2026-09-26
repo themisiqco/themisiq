@@ -105,11 +105,37 @@ const IDENTITY_ONLY = new Set(['ai', 'people'])
 const HAS_INK = new Set<string>([])
 
 /**
- * Modules that need a companion and do not have one yet. This is step 6's remaining work, written as
+ * Modules that need a companion and do not have one yet. This is the swap's remaining work, written as
  * an assertion so it cannot be quietly forgotten: when a companion is declared, its key moves from
  * here to HAS_INK, and the partition check below fails until it does.
+ *
+ * ⚠️ FIVE, NOT SIX. `climate` was listed here and should not have been: its target value #004AAD
+ * measures 8.13:1 on paper, so it needs no companion and is in NEEDS_NO_INK below. Counted from the
+ * measurements in docs/colourway-2026.md on 25 Sep 2026.
  */
-const PENDING_STEP_6 = new Set(['cbam', 'climate', 'cyber', 'deals', 'ghg', 'supply'])
+const PENDING_STEP_6 = new Set(['cbam', 'cyber', 'deals', 'ghg', 'supply'])
+
+/**
+ * Modules whose own value clears body AA, so a companion would be a second name for a colour that
+ * already works. Distinct from IDENTITY_ONLY: these modules DO carry text, in their own value.
+ * Asserted both ways below — a companion declared for one of these fails, and so does a value here
+ * that stops clearing 4.5:1.
+ */
+const NEEDS_NO_INK = new Set(['climate'])
+
+/**
+ * What each `[data-module="k"]` block sets `--tq-mod` to, as { ghg: '--color-module-ghg', … }.
+ * A module absent from the result sets no --tq-mod, which is a meaningful state — see the test.
+ */
+function tqMod(): Record<string, string> {
+  const src = readFileSync(join(ROOT, CSS_PATH), 'utf8')
+  const out: Record<string, string> = {}
+  for (const m of src.matchAll(/\[data-module="([a-z0-9]+)"\]\s*\{([^}]*)\}/g)) {
+    const set = /--tq-mod\s*:\s*var\((--color-[a-z0-9-]+)\)/.exec(m[2])
+    if (set) out[m[1]] = set[1]
+  }
+  return out
+}
 
 const moduleKeys = () => [...new Set(
   Object.keys(T).flatMap(k => { const m = /^--color-module-([a-z0-9]+)(?:-wash|-ink)?$/.exec(k); return m ? [m[1]] : [] })
@@ -199,14 +225,103 @@ describe('app/styles/themisiq-tokens.css is legible against itself', () => {
     expect(shouldHaveInk, 'HAS_INK does not match the -ink companions the token layer actually declares')
       .toEqual([...HAS_INK].filter(k => !IDENTITY_ONLY.has(k)).sort())
 
-    const unclassified = keys.filter(k => !HAS_INK.has(k) && !IDENTITY_ONLY.has(k) && !PENDING_STEP_6.has(k))
-    expect(unclassified, unclassified.length === 0 ? '' :
-      `module(s) ${unclassified.join(', ')} are in none of HAS_INK, IDENTITY_ONLY or PENDING_STEP_6. ` +
-      'A new module needs a decision about whether its identity colour is ever set on text.').toEqual([])
+    const wronglyNoInk = [...NEEDS_NO_INK].filter(k => declared.has(k)).sort()
+    expect(wronglyNoInk, wronglyNoInk.length === 0 ? '' :
+      `${wronglyNoInk.join(', ')} is in NEEDS_NO_INK because its own value already clears body AA, so a ` +
+      'companion would be a second name for a colour that works. Either remove the companion, or move ' +
+      'the key to HAS_INK because the value changed and no longer clears 4.5:1.').toEqual([])
 
-    const ghosts = [...HAS_INK, ...IDENTITY_ONLY, ...PENDING_STEP_6].filter(k => !keys.includes(k)).sort()
+    const unclassified = keys.filter(k =>
+      !HAS_INK.has(k) && !IDENTITY_ONLY.has(k) && !PENDING_STEP_6.has(k) && !NEEDS_NO_INK.has(k))
+    expect(unclassified, unclassified.length === 0 ? '' :
+      `module(s) ${unclassified.join(', ')} are in none of HAS_INK, IDENTITY_ONLY, PENDING_STEP_6 or ` +
+      'NEEDS_NO_INK. A new module needs a decision about whether its identity colour is ever set on text.').toEqual([])
+
+    const ghosts = [...HAS_INK, ...IDENTITY_ONLY, ...PENDING_STEP_6, ...NEEDS_NO_INK].filter(k => !keys.includes(k)).sort()
     expect(ghosts, ghosts.length === 0 ? '' :
       `${ghosts.join(', ')} are listed in this file but no --color-module-* token declares them.`).toEqual([])
+  })
+
+  it('whatever --tq-mod resolves to can carry the text AND the bar it feeds', () => {
+    // ⚠️ WHAT --tq-mod IS WIRED TO, so the two thresholds below are not arbitrary. Setting
+    // data-module on a container makes --tq-mod the colour of:
+    //   .tq-summary-label    11px / 700  TEXT          -> 4.5:1
+    //   .tq-summary-figure   --text-3xl  TEXT          -> 4.5:1 (large-text 3.0 would also apply,
+    //                                                    but the label shares the value and is small)
+    //   .tq-summary          6px LEFT bar              -> 3.0:1, WCAG 1.4.11: it is the platform's
+    //                                                    only module-identity mark, so it carries
+    //                                                    meaning and is not decorative
+    //   .tq-nav-active       nav label   TEXT          -> 4.5:1
+    //   .tq-callout          4px TOP rule              -> 3.0:1
+    // plus app/dashboard/deals/page.tsx:949, a 1.9rem figure reading var(--tq-mod) directly.
+    //
+    // ⚠️ THE DEFECT THIS EXISTS TO PREVENT IS LATENT, NOT LIVE, AND THAT IS WHY IT IS A TEST AND NOT
+    // A FIX. On 25 Sep 2026 this was reported as a live defect on the People and AI Governance
+    // summaries and it was not: --color-module-people #7B630D measures 5.78:1 and
+    // --color-module-ai #136C3D 6.48:1, so both render correctly. The 1.33:1 and 2.85:1 figures that
+    // prompted the report were the INCOMING colourway values applied to today's code path. Stripping
+    // --tq-mod from those two blocks now would have removed a working identity colour from three
+    // summary blocks for no present benefit.
+    //
+    // ⚠️ THE DEFECT IS THE COMBINATION, WHICH IS WHY IT IS ASSERTED RATHER THAN PRE-EMPTED. A module
+    // may set --tq-mod, or may have a value that cannot carry text — not both. Today every module
+    // satisfies it on the second arm. The instant a colourway value lands in the token layer without
+    // its companion, this fires and names the block to change. It covers ALL EIGHT modules, not only
+    // the two identity-only ones: cbam, cyber, supply and deals all set --tq-mod and all fall below
+    // 3.0:1 under the 2026 colourway too. See docs/colourway-2026.md.
+    const wired = tqMod()
+    const bad: string[] = []
+    for (const [k, token] of Object.entries(wired)) {
+      if (!T[token]) { bad.push(`[data-module="${k}"] sets --tq-mod to ${token}, which is not declared`); continue }
+      const v = T[token]
+      const onPaper = contrast(v, T[PAPER])
+      if (onPaper < AA) bad.push(
+        `[data-module="${k}"] -> ${token} ${v}: ${r2(onPaper)}:1 on ${PAPER}, below ${AA} for ` +
+        '.tq-summary-label and .tq-summary-figure')
+      if (onPaper < 3) bad.push(
+        `[data-module="${k}"] -> ${token} ${v}: ${r2(onPaper)}:1 on ${PAPER}, below 3.0 for the 6px identity bar`)
+    }
+    expect(bad, bad.length === 0 ? '' :
+      `--tq-mod resolves to a value that cannot carry what it feeds:\n  ${bad.join('\n  ')}\n\n` +
+      'TWO REMEDIES, and which one applies is a decision already recorded. If the module has an -ink ' +
+      'companion, point its [data-module] block at the companion instead of the fill — that is what a ' +
+      'companion is for. If the module is in IDENTITY_ONLY and therefore has none, REMOVE the --tq-mod ' +
+      'declaration from its block entirely so the var(--tq-mod, var(--color-brand)) fallback fires and ' +
+      'the surface renders in brand teal. What must not happen is leaving the declaration in place ' +
+      'pointing at a value nobody can read: that renders invisible text while appearing to work.').toEqual([])
+  })
+
+  it('every module whose own value cannot carry text has a companion, and --tq-mod uses it', () => {
+    // Three assertions, all vacuous today because all eight values clear 4.5:1, and all three fire
+    // during the swap. They are what makes a HALF-DONE swap fail rather than ship: values moved but no
+    // companions declared; companions declared but [data-module] still pointing at the fill; a
+    // companion declined for a module that is not identity-only.
+    const keys = moduleKeys()
+    const wired = tqMod()
+    const bad: string[] = []
+    for (const k of keys) {
+      const fill = T[`--color-module-${k}`]
+      if (!fill) continue
+      const ink = T[`--color-module-${k}-ink`]
+      const fillCarriesText = contrast(fill, T[PAPER]) >= AA
+
+      if (!fillCarriesText && !ink && !IDENTITY_ONLY.has(k)) bad.push(
+        `${k}: fill ${fill} is ${r2(contrast(fill, T[PAPER]))}:1 on paper and there is no ` +
+        `--color-module-${k}-ink. It is not in IDENTITY_ONLY, so it needs one.`)
+
+      if (ink && wired[k] === `--color-module-${k}`) bad.push(
+        `${k}: --color-module-${k}-ink ${ink} exists, but [data-module="${k}"] still points --tq-mod at ` +
+        `the FILL ${fill}. The companion is declared and unused, which is the shape of a half-done swap.`)
+
+      if (!fillCarriesText && IDENTITY_ONLY.has(k) && wired[k]) bad.push(
+        `${k}: fill ${fill} is ${r2(contrast(fill, T[PAPER]))}:1 on paper and ${k} is IDENTITY_ONLY with ` +
+        `no companion, but [data-module="${k}"] still sets --tq-mod. Remove that declaration.`)
+    }
+    expect(bad, bad.length === 0 ? '' :
+      `the companion scheme is incomplete:\n  ${bad.join('\n  ')}\n\n` +
+      'docs/colourway-2026.md has the measured companion values and the reason the swap cannot be ' +
+      'landed in pieces: the bar inversion and the companions are BOTH wrong against the current ' +
+      'values and only become right when the values move.').toEqual([])
   })
 
   it('every -wash is light enough to be a background', () => {

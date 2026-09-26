@@ -983,12 +983,20 @@ constant matching the value it replaced. A name that fits is not a value that fi
 remaining migration should diff computed values, not read names.
 ---
 
-## 🚫 BLOCKER for step 6 of the palette swap: two homepage warming figures fail large-text AA under the incoming colourway
+## ✅ CLEARED 25 Sep 2026 — was: BLOCKER for step 6, two homepage warming figures fail large-text AA
 
 Logged 25 Sep 2026, during step 4. **Step 6, the swap itself, cannot ship until this is resolved.** It is a
 blocker rather than an open item because the failure lands on the homepage, at 32px, in text.
 
-**The gate:** `app/page.tsx:166` renders the three IPCC pathways in three MODULE tones —
+**Cleared by reconciling scales C and D on one tone.** Both trio surfaces now draw all three pathways in
+`--color-ink-2` on `--color-paper`, so no module hue reaches a warming figure and the swap cannot make one
+unreadable. Confirmed arithmetic: the two failures were CBAM `#A9D2D7` at **1.63:1** and Cyber `#67B8C1`
+at **2.28:1** on white, against large-text AA's 3.0:1 at 28px. Climate `#004AAD` was never one of them —
+it measures 8.13:1. **The decision recorded below turned out to be the fix, and it was a correctness fix
+rather than a consistency one**; see the comment at `app/climate-risk/page.tsx:134`. Left here as the
+record of what blocked what.
+
+**The gate was:** `app/page.tsx:166` rendered the three IPCC pathways in three MODULE tones —
 `--color-module-cbam`, `--color-module-climate` and `--color-module-cyber`. Under the incoming colourway,
 **two of those three fail large-text AA (3.0:1) at the 28px those warming figures render at**, in display
 text, on the homepage.
@@ -1050,9 +1058,22 @@ imply a fourth severity, which is the opposite error. If a rung is ever added be
 
 ---
 
-## Is an IPCC pathway a value on a scale, or a module identity?
+## ✅ RESOLVED 25 Sep 2026 — was: is an IPCC pathway a value on a scale, or a module identity?
 
-Logged 25 Sep 2026, during step 4. This is the decision that unblocks the step-6 blocker above, and it is
+**Answered: NEITHER.** The trio is not a severity scale and not a module identity, so it takes no colour
+that means anything — one tone for all three, at both sites, with the ordering left in the figure and the
+label where it was already stated twice per card. The deciding argument was not consistency: a cool-to-hot
+or green-to-red ramp asserts that 1.8°C is the good end, while `app/dashboard/climate-risk/report/page.tsx`
+tells the same customer a policy-driven exposure is "most acute under the Paris-aligned pathway" and that
+"physical and transition risk therefore move in opposite directions across the trio". Warming is ordered;
+risk is not ordered across it.
+
+⚠️ **THIS DID NOT FORCE "ONE WORST COLOUR OR TWO", AND THE TWO COME APART CLEANLY.** `--color-scale-high`
+is still undeclared and still needed by the severity scales A, B and E, where a high arm genuinely means
+worst. The trio needed no `high` at all, so the swap unblocked without settling it. Bundling them is how C
+and D came to disagree in the first place.
+
+Original entry, for the record. Logged 25 Sep 2026, during step 4. This is the decision that unblocks the step-6 blocker above, and it is
 recorded separately because it outlives that blocker: it is a question about what the palette MEANS, and
 answering it "darken the two failing tones" would ship a passing contrast ratio and leave the platform
 drawing one set of scenarios two ways.
@@ -1159,3 +1180,127 @@ collides — which is exactly the kind of single exception a regex written quick
 Renaming is NOT proposed: `-ink` is the right word in both places and both are already in the tree or
 confirmed. This entry exists so the collision is known rather than rediscovered, and so nobody "tidies"
 the two regexes into one.
+
+---
+
+## STEP 6 DECISION: Climate Risk `#004AAD` would be indistinguishable from `--color-state-info` `#0C447C`
+
+Logged 25 Sep 2026, on closing the scale C/D arithmetic. **A genuine collision, and it needs deciding
+inside step 6 rather than after it.**
+
+| | Hue | Lightness | Apart |
+|---|---|---|---|
+| `--color-module-climate` target `#004AAD` | 214.3° | 33.9% | |
+| `--color-state-info` `#0C447C` | 210.0° | 26.7° | **4.3° of hue, 1.21:1** |
+
+Same hue, near-same lightness. This is the `#B91C1C` / `#A32D2D` pattern again, in blue: two names for
+one colour, where no reader can tell which they are looking at.
+
+**Why it matters more than an aesthetic clash.** `--color-state-info`'s own comment reads *"neutral
+notice, activity data"*. After the swap, a neutral notice and the Climate Risk module's identity render in
+the same blue, so a module accent and a system message become visually interchangeable — and the module
+whose identity it is happens to be the one whose surfaces carry the most state chips.
+
+⚠️ **AND `#0C447C` IS WHERE SCALE D'S MIDDLE CARD USED TO BE.** `app/climate-risk/page.tsx:136` drew
+"Current trajectory ~2.7°C" in exactly that value until 25 Sep 2026. That use is gone — the trio is one
+tone now — but it is worth knowing the collision was already latent on the page most affected by it.
+
+**Three ways out, and this is the one decision, not three:** move the module (`#004AAD` is a given from the
+colourway, so probably not); move the state (`--color-state-info` is not in the colourway and could darken
+or shift hue, and ~100 literals hold its value — see the accent/state literal entry above); or accept it
+and rule that the two never appear on the same surface, which is unenforceable and therefore not a
+decision. **Deliberately not a collision:** Climate `#004AAD` against Deals `#BEC4ED` at 4.77:1, same hue
+family but separated by lightness.
+
+---
+
+## STEP 6 DECISION: CBAM `#A9D2D7` and Cyber `#67B8C1` are 0.5° of hue and 1.40:1 apart
+
+Logged 25 Sep 2026, on closing the scale C/D arithmetic. The second genuine collision in the target set,
+and this one is **between two modules**, which is worse than a module against a state: module colour exists
+to answer "which product am I in", and these two cannot answer it.
+
+| | Hue | Lightness |
+|---|---|---|
+| `--color-module-cbam` target `#A9D2D7` | 186.5° | 75.3% |
+| `--color-module-cyber` target `#67B8C1` | 186.0° | 58.0% |
+
+Half a degree of hue. Both are also in the same family as GHG `#0097B2` (189.1°), so **three of the eight
+modules sit inside 3° of hue** — separated only by lightness, at 3.46 / 2.28 / 1.63 on white, and all three
+below body AA.
+
+⚠️ **THE HUE-SEPARATION CONSTRAINT IN `lib/ghg/engine.ts:1508-1526` ALREADY EXISTS FOR THIS**, and step 3
+carried it into the accent family's comment. The module family has no such guard, which is why this was
+found by measuring rather than by a test. Whatever is decided, the fix is worth asserting: a test that
+fails when two module tokens land within N degrees of hue and under 1.5:1 would have caught it before the
+values were chosen.
+
+**Note the detection method, because contrast ratio alone misses this class.** Contrast measures lightness
+only: `#B91C1C` against `#0F6E56` scans as 1.04:1 while being red against green. A collision is same hue
+AND same lightness, so the test is hue within 20° *and* contrast under 1.5:1. An earlier pass of this
+analysis used contrast alone and produced twenty-two "collisions", of which two were real.
+
+---
+
+## Three chart series and five tick marks are module hues that were never about modules
+
+Logged 25 Sep 2026, found while surveying what module colour actually does in the product before the palette
+swap. **Not part of the swap. Both are the step-3 accent problem in places step 3 did not look**, and both
+become visible failures the moment module values move, which is why they are logged now.
+
+**The chart series**, `app/dashboard/ghg/page.tsx:2285-2289`. Three rows of an emissions breakdown:
+
+| Row | Colour | What it means |
+|---|---|---|
+| Heating & fuel | `--color-module-deals` | Scope 1 stationary |
+| Vehicles | `--color-module-cbam` | Scope 1 mobile |
+| Scope 2 (electricity) | `--color-module-ai` | Scope 2, and it is `bold: true` |
+
+None is about Deals, CBAM or AI Governance. They are **categories in one chart**, which is what
+`--color-accent-*` is for — declared in step 3 with the hue-separation constraint carried over from
+`lib/ghg/engine.ts:1508-1526` precisely so a set of category colours stays mutually distinguishable. These
+three are currently distinguishable **by accident**: they inherit three modules' hues, and under the 2026
+colourway CBAM and Cyber land 0.5° apart, so the accident stops holding.
+
+**The tick marks**, five of them, all `--color-module-ai`:
+`app/climate-ghg/page.tsx:181`, `:255`, `:328`, `app/people/page.tsx:148`, `app/supply-chain/page.tsx:122`.
+Each is a `✓` marking an included feature. It means **"included"**, which is `--color-state-ok` — the token
+whose comment reads *"complete, primary data, passed"*. A tick is also a meaningful graphic under WCAG
+1.4.11, so it needs 3:1; `--color-module-ai` `#F47068` reaches **2.85:1** under the colourway and fails.
+
+Both are one-line-per-site changes and neither needs a decision. They are logged rather than done because
+they are unrelated to the swap and would have made its diff harder to read.
+
+---
+
+## STEP 6 DECISION: the AI Governance companion collides with `--color-state-error`
+
+Logged 25 Sep 2026. **This is the measurement that confirms `IDENTITY_ONLY` was right**, and it should be
+read before anyone revisits that decision.
+
+`lib/tokenContrast.test.ts`'s `IDENTITY_ONLY` comment has said since step 5 that AI Governance is off text
+because *"coral darkened to an AA-passing companion is indistinguishable from `--color-state-error`'s red"*.
+That was an inspection claim. It is now measured:
+
+| | | Hue apart | Ratio |
+|---|---|---|---|
+| `ai-ink` `#DA1B10` (derived to clear 4.5:1) | `--color-state-error` `#B91C1C` | 3.3° | **1.28:1** |
+
+So a companion for AI Governance would give that module a text and figure colour **indistinguishable from
+the colour the platform uses for "failed, invalid, refused"**. A red figure on an AI Governance summary
+block would read as a failure. Declining the companion is the correct answer rather than a concession, and
+the cost of declining it is recorded in `docs/colourway-2026.md`: the module has no accent in the product
+and its `[data-module]` block must set no `--tq-mod`, so the brand fallback fires.
+
+**People & Workforce is the closer call and went the same way.** Its companion `#866B00` is legible and
+collides with nothing — hue 48° is unoccupied — but it is olive, 3.85:1 from `#FFDE59`, so it does not read
+as the module either. The decision was that "People has no accent" is a better sentence than "People's
+colour is olive". ⚠️ **If that is ever revisited, `#866B00` is the value and it works**; what must not
+happen is reverting it by leaving `--tq-mod` set to a value nobody can read, which the assertion in
+`lib/tokenContrast.test.ts` now prevents.
+
+**Related and already logged above:** `--color-module-climate` `#004AAD` against `--color-state-info`
+`#0C447C` at 1.21:1. That one survives into the companion scheme unchanged, because Climate needs no
+companion — its fill *is* its text colour, so the collision is between a module identity and a state at
+full strength. Two of the three genuine collisions in the target set are therefore module-against-state,
+which suggests the state family, not the module family, is where the swap has the freedom to move.
