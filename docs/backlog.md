@@ -1469,3 +1469,31 @@ retired model string. A test cannot fetch (no network in CI, and it would be fla
 the shape: that every `*_URL` is `https`, that no two constants hold the same value under different names,
 and that none still carries an `UNVERIFIED` marker once cleared. That last one turns the marker from a
 comment into something with teeth.
+
+---
+
+## "ten ESRS topics" is stated in five places and derived from none
+
+Logged 25 Sep 2026, while rebuilding `app/climate-risk/page.tsx` to the shared module shape. **Not a
+defect found, a figure not verifiable from `lib/`** — which is the condition CLAUDE.md's no-typed-figures
+rule exists for.
+
+The claim appears in `lib/pricing.ts:31` and `:164` (prose in the module-split comment),
+`app/dashboard/materiality/report/page.tsx:652`, `app/materiality/page.tsx:116`, and the Climate Risk
+pricing feature list. All five say **ten**, so nothing contradicts anything today.
+
+⚠️ **The count comes from the DATABASE, not from code.** `lib/materiality.ts` has no ESRS topic array;
+`esrs_topic` is a column, and the topics live in `mr_esrs_subtopics` and its siblings. So no test can
+check the five statements against a constant, and a topic added or retired in the DB makes all five stale
+at once with nothing failing. That is the same shape as `mr_jurisdictions.active` being a dormant column:
+the code and the database can disagree silently.
+
+**Two ways to fix it, and they are different sizes.** Export a `ESRS_TOPIC_COUNT` from `lib/materiality.ts`
+with its own as-of date and a note saying where the real list lives, and have the five sites read it — 
+cheap, and it makes them consistent by construction rather than by luck. Or derive the count at build
+time from the DB, which is the honest version and much more work. The cheap one is worth doing because it
+turns five independent claims into one.
+
+Not fixed in this pass because the Climate Risk pricing feature list was carried over verbatim
+deliberately: it holds the hard-won "screening, NOT materiality" wording, and editing it in the same
+change as a layout rebuild is how that word would get lost.
