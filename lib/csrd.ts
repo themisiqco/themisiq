@@ -129,7 +129,29 @@ export const ESRS_SET1_CITATION = 'Commission Delegated Regulation (EU) 2023/277
 // date below rather than a derivation from data. If a topic is ever added or retired, this is the one
 // place to change — and the sentence above changes with it, because the arithmetic is in its comment.
 export const ESRS_TOPIC_COUNT = 10
+
+// ⚠️ THE WORD FORM EXISTS SO INTERPOLATION DOES NOT REWRITE THE COPY. Every customer-facing sentence
+// spells this out — "the ten ESRS topical standards", "all ten ESRS topics" — and substituting the
+// numeral would change "ten" to "10" in a dozen places, which is a copy edit disguised as a
+// de-duplication. Two named forms of one fact, the way lib/sb261.ts carries SB261_SHORT,
+// SB261_TABLE_STATUS and SB261_STATUS_SENTENCE. lib/csrd.test.ts asserts they agree.
+export const ESRS_TOPIC_COUNT_WORD = 'ten'
+
 export const ESRS_TOPIC_COUNT_AS_OF = 'as at September 2026'
+
+// ⚠️ THIS CONSTANT IS HAND-MAINTAINED AND THE DATABASE IS NOT, SO THE TWO CAN DISAGREE SILENTLY.
+// lib/materiality.ts:52 asserts, in a comment, that "mr_esrs_topics keeps ten rows and a
+// single-column PK". app/api/materiality/reference/route.ts:34 fetches those rows and calls the fetch
+// FATAL if it fails: "without them the wizard's impact step has" nothing to score. So the real list
+// lives in the database while the number quoted to customers lives here, and NOTHING RECONCILES THEM.
+// A row added to or retired from mr_esrs_topics makes every sentence built from this constant wrong,
+// the build stays green, and the wizard keeps working with a different number of topics than the
+// marketing pages claim.
+//   THE COMMENT IS THE ONLY PLACE THIS CAN CURRENTLY LIVE, which is why it is here rather than logged:
+// a test cannot query the database, and the route that can is not a place to assert marketing copy.
+// To close it properly the count would have to be read from mr_esrs_topics at build time, or the
+// reference route would have to fail when the row count is not ESRS_TOPIC_COUNT. Until then, check
+// both when either changes.
 
 export const ESRS_TEN_TOPICS_SENTENCE =
   'ESRS Set 1 organises those topics into ten topical standards — E1–E5 environmental, S1–S4 '

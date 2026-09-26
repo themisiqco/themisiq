@@ -1570,3 +1570,50 @@ One thing this instance adds to that decision: the four `ecovadis` sections are 
 colours read together** (Environment green, Labour violet, Ethics blue, Sustainable Procurement), so they
 are subject to the hue-separation constraint in `lib/ghg/engine.ts:1508-1526`. Whatever replaces the
 violet has to stay distinguishable from the other three, not merely exist.
+
+---
+
+## The ESRS topic count: seven dashboard sites left, and they are a different commit
+
+Logged 26 Sep 2026, after sweeping the marketing side. `ESRS_TOPIC_COUNT` and `ESRS_TOPIC_COUNT_WORD` are
+in `lib/csrd.ts` and `lib/csrd.test.ts` guards them; `app/materiality/page.tsx` (7 occurrences),
+`app/climate-risk/page.tsx` (2), `app/pricing/page.tsx` (1) and `app/methodology/page.tsx` (1) are
+converted. **Seven rendered occurrences remain, all under `app/dashboard/`, plus one in a PDF generator.**
+
+| File | Lines |
+|---|---|
+| `app/dashboard/climate-risk/page.tsx` | 514, 1098, 1381 |
+| `app/dashboard/materiality/report/page.tsx` | 532, 635, 652, **707** |
+| `lib/materiality/boardReport.ts` | 538 (not scanned: `SCAN_DIRS` is `app` only) |
+
+Both dashboard files are in `PENDING` in `lib/csrd.test.ts`, which asserts they still hold a literal — so
+the list cannot rot in either direction.
+
+⚠️ **WHY THIS IS NOT THE SAME COMMIT.** `app/dashboard/materiality/report/page.tsx` generates a
+**verifier-facing document** and carries correction history in its comments, including the ESRS 1 §10.3
+phase-in that "was true when written and is now FALSE". Four of the seven are in it. A sweep through that
+file is a different risk profile from a marketing-copy edit and deserves its own review.
+
+⚠️ **LINE 707 IS THE TRAP.** It reads *"All ten ESRS topical standards, with their financial and impact
+materiality scores (0–10) and band"* — **one real occurrence and one score scale on one line.** A
+search-and-replace on `10` breaks the scale. The 26 Sep sweep also found `borderRadius: 10`,
+`fontSize: 10`, a `0–10` materiality score and five `ESRS 1 §10.3` citations among its candidates, which
+is why the guard matches the WORD and never the digit.
+
+⚠️ **AND TWO OF MY OWN CLASSIFICATIONS WERE WRONG, WHICH IS THE USEFUL PART OF THIS ENTRY.** The report
+that preceded the sweep listed twelve rendered occurrences. Three were not rendered at all:
+`app/climate-risk/page.tsx:153` (inside the "screening, NOT materiality" JSX comment),
+`app/dashboard/materiality/survey/[id]/results/page.tsx:352` and
+`.../worksheet/[id]/determine/page.tsx:14`. All three were **continuation lines inside multi-line
+comments**, which a per-line comment test reads as code. I converted the first before the guard's
+span-based stripper caught it, and the `PENDING` both-directions check reported the other two as stale
+entries on its first run.
+  **The lesson is the one already logged for the shared comment-stripping helper: strip comment SPANS,
+not comment LINES.** This is the fourth occurrence in one session. `lib/csrd.test.ts` now has a
+block-tracking stripper; `lib/aiAct.test.ts` and `lib/cs3d.test.ts` still use the per-line form and would
+misread the same construction.
+
+**Also recorded, in the constant's own comment rather than here, because a test cannot check it:**
+`mr_esrs_topics` is asserted to keep ten rows by a comment in `lib/materiality.ts:52`, the reference route
+calls that fetch fatal if it fails, and `ESRS_TOPIC_COUNT` is hand-maintained. The database and the
+constant can disagree and nothing would notice.

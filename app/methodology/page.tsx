@@ -7,6 +7,7 @@ import { methodologyHierarchyLines, scope3ScopeClaim } from '../../lib/scope3/me
 import { cat15MethodologyPassage } from '../../lib/scope3/cat15'
 import { EMISSION_FACTORS, EMISSION_FACTORS_PROVENANCE } from '../../lib/emissionFactors'
 import { DEFRA_DESNZ_PUBLICATION } from '../../lib/ghg/defraPublication'
+import { ESRS_TOPIC_COUNT_WORD } from '@/lib/csrd'
 
 // ⚠️ SCOPE 3 BASIS PARAGRAPHS ARE BUILT, NOT WRITTEN. Two entries on this page said Scope 3 spend
 // estimates used "DEFRA and Exiobase" / "DEFRA (2023) and Exiobase v3", which was false: no DEFRA spend
@@ -251,7 +252,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Geographic and topic frameworks',
-        content: 'Physical-risk geography uses the IPCC Sixth Assessment Report (AR6) Working Group I reference regions (Iturbide et al., 2020) — public, climate-science-defined land regions, not country borders. Transition risks use the TCFD four-category classification. The impact-materiality axis (CSRD mode) uses the ten ESRS topical standards: E1–E5 environmental, S1–S4 social, G1 governance.',
+        content: `Physical-risk geography uses the IPCC Sixth Assessment Report (AR6) Working Group I reference regions (Iturbide et al., 2020) — public, climate-science-defined land regions, not country borders. Transition risks use the TCFD four-category classification. The impact-materiality axis (CSRD mode) uses the ${ESRS_TOPIC_COUNT_WORD} ESRS topical standards: E1–E5 environmental, S1–S4 social, G1 governance.`,
       },
       {
         title: 'Scoring scheme',

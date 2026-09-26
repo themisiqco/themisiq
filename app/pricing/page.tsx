@@ -19,6 +19,7 @@ import { SB261_SHORT } from '../../lib/sb261'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import ThemisIQLogo from '../components/ThemisIQLogo'
 import Footer from '../components/Footer'
+import { ESRS_TOPIC_COUNT_WORD } from '@/lib/csrd'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ const MODULES: Module[] = [
     // Sits next to Climate Risk deliberately — the two halves of double materiality.
     id: 'impact',
     name: 'Materiality Assessment',
-    description: 'CSRD · ESRS 1 §6.2 · ESRS 2 IRO-1 / IRO-2 / SBM-3 · stakeholder engagement · ten ESRS topics assessed in both directions · divergence register · disclosure roadmap',
+    description: `CSRD · ESRS 1 §6.2 · ESRS 2 IRO-1 / IRO-2 / SBM-3 · stakeholder engagement · ${ESRS_TOPIC_COUNT_WORD} ESRS topics assessed in both directions · divergence register · disclosure roadmap`,
     // PURPLE, NOT ORANGE, AND NOT A DATE. The orange slots on this page are enforcement
     // deadlines; a 'CSRD · FY2027' tag would be a regulatory-timing claim standing on a page
     // with nothing to qualify it. The footnotes that carry that qualification live on

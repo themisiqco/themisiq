@@ -57,7 +57,7 @@ import {
   CSRD_FIRST_REPORT_FY, CSRD_FIRST_REPORT_PUBLISHED, CSRD_ASSESSMENT_YEAR,
   ESRS_TEN_TOPICS_SENTENCE, ESRS_SET1_CITATION,
 } from '@/lib/csrd'
-import { ESRS_TOPIC_COUNT } from '@/lib/csrd'
+import { ESRS_TOPIC_COUNT, ESRS_TOPIC_COUNT_WORD } from '@/lib/csrd'
 import { MODULE_SUBLINE, CSRD_BOTH_HALVES, CSRD_BOTH_HALVES_SHORT } from '@/lib/modulePages'
 import { ClosingBand, ModuleFaq, type Faq } from '@/app/components/modulePage'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
@@ -131,7 +131,7 @@ export default function Page() {
               <span style={{ fontStyle: 'italic', color: HEADLINE_ACCENT }}>Assessment</span>
             </h1>
             <p style={{ fontSize: 17, color: BODY, lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem' }}>
-              The impact half of a double materiality assessment, run by your own team: stakeholder engagement, all ten ESRS topics determined in both directions, and a record of who decided what. For companies reporting under CSRD &mdash; and for the suppliers their reporting puts questions to.
+              The impact half of a double materiality assessment, run by your own team: stakeholder engagement, all {ESRS_TOPIC_COUNT_WORD} ESRS topics determined in both directions, and a record of who decided what. For companies reporting under CSRD &mdash; and for the suppliers their reporting puts questions to.
             </p>
             {/* ⚠️ THE SHARED SUB-LINE, SO THIS PAGE BELONGS TO THE SET WITHOUT BEING RESHAPED BY IT.
                 This page deliberately does NOT take the ten-section module shape: six of its sections are
@@ -306,14 +306,14 @@ export default function Page() {
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: PURPLE, marginBottom: 6 }}>The impact half &middot; you are here</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>Materiality Assessment</div>
             <p style={{ fontSize: 13, color: BODY, lineHeight: 1.7, margin: 0 }}>
-              How your organisation affects people and the environment. Stakeholder engagement, all ten ESRS topics determined by named people, a divergence register and a disclosure roadmap.
+              How your organisation affects people and the environment. Stakeholder engagement, all {ESRS_TOPIC_COUNT_WORD} ESRS topics determined by named people, a divergence register and a disclosure roadmap.
             </p>
           </div>
           <a href="/climate-risk" style={{ display: 'block', background: '#fff', border: `0.5px solid ${HAIR}`, borderRadius: 14, padding: '1.5rem 1.75rem', textDecoration: 'none' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#0C447C', marginBottom: 6 }}>The financial half</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: INK, marginBottom: 8 }}>Climate Risk</div>
             <p style={{ fontSize: 13, color: BODY, lineHeight: 1.7, margin: '0 0 12px' }}>
-              How sustainability issues affect your organisation. IFRS S2 single materiality, physical and transition risk, multi-scenario resilience, and a ten-topic screening.
+              How sustainability issues affect your organisation. IFRS S2 single materiality, physical and transition risk, multi-scenario resilience, and a {ESRS_TOPIC_COUNT_WORD}-topic screening.
             </p>
             <span style={{ fontSize: 13, fontWeight: 600, color: PURPLE }}>Climate Risk &rarr;</span>
           </a>
@@ -389,7 +389,7 @@ export default function Page() {
           </div>
 
           <p style={{ ...bodyPara, maxWidth: 760, margin: '2.5rem 0 0' }}>
-            Ten topics, each assessed twice &mdash; once for harm, once for benefit.
+            {capitalise(ESRS_TOPIC_COUNT_WORD)} topics, each assessed twice &mdash; once for harm, once for benefit.
           </p>
 
           {/* ═══ 6b · DIAGRAM 2 — THE TEN TOPICS ═══════════════════════════════
@@ -397,8 +397,8 @@ export default function Page() {
               text string unchanged. Placed mid-section by instruction. */}
           <div style={{ maxWidth: 760, margin: '2.5rem 0 3rem' }}>
             <svg width="100%" viewBox="0 0 680 420" role="img" style={{ height: 'auto', display: 'block' }} fontFamily={FONT}>
-              <title>The ten ESRS topics</title>
-              <desc>Ten topics in three groups, each assessed twice.</desc>
+              <title>The {ESRS_TOPIC_COUNT_WORD} ESRS topics</title>
+              <desc>{capitalise(ESRS_TOPIC_COUNT_WORD)} topics in three groups, each assessed twice.</desc>
               <defs>
                 <marker id="marr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                   <path d="M2 1L8 5L2 9" fill="none" stroke={MUTED} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -584,7 +584,7 @@ export default function Page() {
           <div style={{ maxWidth: 760 }}>
             <h2 style={sectionTitle}>If you already have Climate Risk</h2>
             <p style={bodyPara}>
-              That module screens all ten topics on both axes, so you already have a first-pass view of where your impacts sit. What it can&rsquo;t do is meet the ESRS requirement that your impact conclusions be informed by the people affected by them &mdash; its own report says so, on the cover.
+              That module screens all {ESRS_TOPIC_COUNT_WORD} topics on both axes, so you already have a first-pass view of where your impacts sit. What it can&rsquo;t do is meet the ESRS requirement that your impact conclusions be informed by the people affected by them &mdash; its own report says so, on the cover.
             </p>
             <p style={{ ...bodyPara, marginBottom: 0 }}>
               This module is what closes that gap: real stakeholder engagement, determinations made by named people, and a record that holds up when someone asks how you got there.
@@ -700,6 +700,13 @@ const FAQ: readonly Faq[] = [
   { q: 'What do we get at the end?',
     a: `A board report: the ${ESRS_TOPIC_COUNT} ESRS topics determined on both directions, the reasoning recorded against each, the divergence register, and a frozen disclosure roadmap you can hand to whoever asks how the conclusions were reached. No sample of it is published. The two reports on the Climate Risk page are that module\u2019s outputs rather than this one\u2019s, so pointing you at them would show you the wrong module\u2019s deliverable.` },
 ]
+
+/**
+ * ⚠️ SENTENCE-CASE FOR A CONSTANT THAT IS LOWER CASE. Two of this page's uses start a sentence or a
+ * caption with the count, and ESRS_TOPIC_COUNT_WORD is 'ten' because most uses sit mid-sentence. This
+ * capitalises at the point of use rather than adding a second constant, so there is still one source.
+ */
+const capitalise = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1)
 
 // ─── Styles — same set as app/deals/page.tsx, plus bodyPara / footnote / 2-col grid ──────
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }

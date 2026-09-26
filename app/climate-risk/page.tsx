@@ -5,6 +5,7 @@ import { SB261_STATUS_SENTENCE } from '@/lib/sb261'
 import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '@/lib/ifrsS2'
 import { MODULE_SUBLINE, CSRD_BOTH_HALVES } from '@/lib/modulePages'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { ESRS_TOPIC_COUNT_WORD } from '@/lib/csrd'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
   ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection, ModuleOutputs,
@@ -168,7 +169,7 @@ export default function ClimateRiskPage() {
             <div style={{ height: 1, background: 'var(--color-line)', margin: '1.25rem 0' }} />
             {[
               'Physical and transition risk assessment',
-              'Materiality screening, both axes, ten ESRS topics (IFRS S2 · CSRD/ESRS)',
+              `Materiality screening, both axes, ${ESRS_TOPIC_COUNT_WORD} ESRS topics (IFRS S2 · CSRD/ESRS)`,
               'Several IPCC scenario pathways',
               'TCFD-aligned report structure',
               'IFRS S2 · CSRD ESRS E1 · SB 261 mapping',
@@ -231,7 +232,7 @@ const OUTPUTS: readonly ModuleOutput[] = [
   { kind: 'document', title: 'Climate resilience report', href: '/samples/magnetic-industrial-s2-climate-resilience.pdf',
     body: 'Physical and transition risk across the scenario range, with the resilience conclusion and the basis for each classification.' },
   { kind: 'document', title: 'Double materiality screening report', href: '/samples/magnetic-industrial-csrd-double-materiality.pdf',
-    body: 'The ten ESRS topics scored on both axes, with the matrix and the per-topic reasoning.' },
+    body: `The ${ESRS_TOPIC_COUNT_WORD} ESRS topics scored on both axes, with the matrix and the per-topic reasoning.` },
 ]
 
 const FRAMEWORKS = ['SB 261', 'IFRS S2', 'TCFD', 'ESRS E1'] as const
