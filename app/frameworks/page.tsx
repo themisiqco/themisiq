@@ -8,6 +8,7 @@ import {
 } from '@/lib/cs3d'
 import { SB261_CITATION, SB261_DOCKET_URL, SB261_TABLE_STATUS } from '@/lib/sb261'
 import { groupHeading, pageTitle as h1 } from '@/app/components/headingStyles'
+import { CSRD_BOTH_HALVES } from '@/lib/modulePages'
 import {
   CA_PAY_DATA_URL,
   CDP_URL,
@@ -135,7 +136,7 @@ const groups: Group[] = [
       // ⚠️ TWO LINKS, BECAUSE CSRD REPORTING GENUINELY NEEDS BOTH MODULES. Materiality covers the impact
       // half of double materiality, Climate Risk the financial half. Pointing at Materiality alone told
       // a CSRD reporter they had what they needed when they had half of it.
-      { name: 'CSRD and ESRS', body: 'The EU Corporate Sustainability Reporting Directive and its European Sustainability Reporting Standards.', maps: 'Double materiality across both halves: Materiality assesses impact, Climate Risk assesses financial. CSRD reporting needs both, plus ESRS datapoints across the topical standards.', href: EFRAG_HOME_URL, covers: [{ href: '/materiality', label: 'Materiality \u2192' }, { href: '/climate-risk', label: 'Climate Risk \u2192' }] },
+      { name: 'CSRD and ESRS', body: 'The EU Corporate Sustainability Reporting Directive and its European Sustainability Reporting Standards.', maps: `${CSRD_BOTH_HALVES} Plus ESRS datapoints across the topical standards.`, href: EFRAG_HOME_URL, covers: [{ href: '/materiality', label: 'Materiality \u2192' }, { href: '/climate-risk', label: 'Climate Risk \u2192' }] },
       // ⚠️ GRI UNIVERSAL IS NOT A WORKFORCE STANDARD. It pointed at /people, which is true only of the
       // 400 series, listed separately under People and workforce. GRI 1, 2 and 3 are general reporting
       // principles, disclosures and material-topic determination.

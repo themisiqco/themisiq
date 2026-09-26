@@ -34,13 +34,20 @@ const PAGE_BY_MODULE: Record<ModuleKey, string> = {
 }
 
 /**
- * Pages rebuilt to the shared module shape. ⚠️ ONE MEMBER TODAY, AND THE LIST IS THE POINT: Climate
- * Risk was built first, alone, so the shape could be settled before it was repeated six times. As each
- * page is converted its key moves here in the same commit, and the assertions below fail until it does.
- * A converted page that does NOT import MODULE_SUBLINE fails, and an unconverted page that somehow
- * imports it fails too — so the list cannot quietly fall behind reality in either direction.
+ * Pages that take the shared module claims. Climate Risk was built first, alone, so the shape could be
+ * settled before it was repeated; each page's key moved here in the same commit as the page, and the
+ * assertions below fail until it does. A listed page that does NOT import MODULE_SUBLINE fails, and an
+ * unlisted page that imports it fails too, so the list cannot fall behind reality in either direction.
+ *
+ * ⚠️ THIS IS NOT "REBUILT TO THE TEN-SECTION SHAPE", AND IT SAID SO UNTIL 26 SEP 2026.
+ * `double-materiality` (app/materiality/page.tsx) is listed and is deliberately NOT on that shape: six of
+ * its sections are hand-tuned information design and its section 4 is a routing guardrail the shape has no
+ * slot for — its header records that trimming that section brings back "the wrong-module purchase it
+ * prevents". It takes three of the shared things (the sub-line, the questions, the closing band) and none
+ * of the layout. What this list tracks is the SHARED CLAIMS, which is what the test below actually checks,
+ * and the old wording would have made adding that key assert something untrue.
  */
-const CONVERTED: ModuleKey[] = ['ai-governance', 'cbam', 'climate-risk', 'deals', 'ghg', 'people', 'supply-chain']
+const CONVERTED: ModuleKey[] = ['ai-governance', 'cbam', 'climate-risk', 'deals', 'double-materiality', 'ghg', 'people', 'supply-chain']
 
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 

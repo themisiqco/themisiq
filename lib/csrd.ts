@@ -113,6 +113,24 @@ export const CSRD_DOUBLE_MATERIALITY_SENTENCE =
 export const ESRS_SET1_CITATION = 'Commission Delegated Regulation (EU) 2023/2772'
 
 // The topical structure. Ten = E1–E5 environmental (5) + S1–S4 social (4) + G1 governance (1).
+//
+// ⚠️ THE NUMBER, FOR SURFACES THAT NEED IT WITHOUT THE SENTENCE. Added 26 Sep 2026: the count appeared
+// as a LITERAL in 28 places across 21 files, and one of them — the stat tile on app/materiality/page.tsx
+// — held it SPLIT ACROSS TWO ADJACENT FIELDS as `{ val: '10', unit: 'ESRS topics' }`. That is the exact
+// construction lib/aiAct.test.ts's KNOWN LIMIT note says "EVADES EVERY PATTERN HERE", and its own example
+// was a date tile doing the same thing. A whole-string guard cannot see it; only derivation prevents it.
+//
+// ⚠️ IT LIVES UNDER THE ESRS HEADING AND NEVER THE CSRD ONE. The comment on
+// CSRD_DOUBLE_MATERIALITY_SENTENCE above records why: the topical structure is ESRS, the
+// double-materiality requirement is the Directive, "the halves also rot on different schedules", and
+// fusing them once already put ESRS structure inside a constant named for CSRD.
+//
+// The real list is in the database (mr_esrs_subtopics and its siblings), so this is the count AS AT the
+// date below rather than a derivation from data. If a topic is ever added or retired, this is the one
+// place to change — and the sentence above changes with it, because the arithmetic is in its comment.
+export const ESRS_TOPIC_COUNT = 10
+export const ESRS_TOPIC_COUNT_AS_OF = 'as at September 2026'
+
 export const ESRS_TEN_TOPICS_SENTENCE =
   'ESRS Set 1 organises those topics into ten topical standards — E1–E5 environmental, S1–S4 '
   + 'social, and G1 governance.'

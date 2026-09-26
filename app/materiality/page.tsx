@@ -57,6 +57,9 @@ import {
   CSRD_FIRST_REPORT_FY, CSRD_FIRST_REPORT_PUBLISHED, CSRD_ASSESSMENT_YEAR,
   ESRS_TEN_TOPICS_SENTENCE, ESRS_SET1_CITATION,
 } from '@/lib/csrd'
+import { ESRS_TOPIC_COUNT } from '@/lib/csrd'
+import { MODULE_SUBLINE, CSRD_BOTH_HALVES, CSRD_BOTH_HALVES_SHORT } from '@/lib/modulePages'
+import { ClosingBand, ModuleFaq, type Faq } from '@/app/components/modulePage'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 
@@ -73,14 +76,27 @@ const PURPLE_MID   = '#534AB7'  // mid indigo — left/lens body copy, heavier c
 const PURPLE_SLATE = '#3C3489'  // right-circle body copy and its divider only
 const PURPLE_INK   = '#26215C'  // darkest — every title in both diagrams
 
-// ⚠️ THE HEADLINE USES THE BRAND GRADIENT; THE DIAGRAMS USE FLAT PURPLE. THE SPLIT IS
-// DELIBERATE — DO NOT "ALIGN" THEM. The headline is brand furniture: /climate-risk sets
-// "Intelligence" in this gradient and /deals sets "A valuation question." in it, and matching
-// that is what puts this page in the family. The diagrams are information design, where colour
-// carries meaning — container weight, lens against ground, a five-step luminance ladder — and
-// a three-stop gradient would destroy the very thing that makes them readable. Two different
-// jobs, two different treatments; consistency between them would be the mistake.
-const GRAD = 'var(--color-brand)'
+// ⚠️ THIS COMMENT CLAIMED THE HEADLINE USED THE BRAND GRADIENT. IT DID NOT, AND THERE IS NO BRAND
+// GRADIENT. Corrected 26 Sep 2026. The old text read "THE HEADLINE USES THE BRAND GRADIENT; THE DIAGRAMS
+// USE FLAT PURPLE… /climate-risk sets 'Intelligence' in this gradient and /deals sets 'A valuation
+// question.' in it" — three claims, all false: this constant had been flat `var(--color-brand)` for
+// months, and both sibling pages were rebuilt and set nothing in a gradient. CLAUDE.md records the
+// gradient as retired and warns that a stale line in a file every session reads is the worst place for one.
+//
+// ⚠️ AND THE MECHANISM WENT WITH THE COMMENT, WHICH IS THE ACTUAL FIX. The headline still carried
+// `WebkitBackgroundClip: 'text'`, `WebkitTextFillColor: 'transparent'` and `backgroundClip: 'text'` over
+// this flat value — the gradient TECHNIQUE, outliving the gradient, where it is an elaborate no-op with a
+// failure mode: if background-clip is unsupported the text renders INVISIBLE rather than teal. It was also
+// one word away from a gradient wordmark again, which is what the GRADATION block in
+// app/styles/themisiq-tokens.css forbids: "background-clip: text on this is forbidden — the platform
+// retired a gradient wordmark once and the name `gradText` survived it for months as an invitation to
+// bring it back." The span now sets `color` and nothing else, and the constant is renamed so nothing in
+// this file still says "grad".
+//
+// What WAS true in the old comment and is kept: the diagrams are information design, where colour carries
+// meaning (container weight, lens against ground, a five-step luminance ladder), so they are deliberately
+// NOT aligned with the headline's treatment. Consistency between them would be the mistake.
+const HEADLINE_ACCENT = 'var(--color-brand)'
 
 // ⚠️ #7425e3 DECOMPOSED, because a fill-opacity ground needs channels, not a hex string.
 // Diagram 2 gets this free from SVG fillOpacity; CSS has no equivalent that tints a box without
@@ -106,14 +122,24 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ maxWidth: 760 }}>
             <div style={eyebrow}>ThemisIQ module</div>
-            {/* Two-tone, same construction as /climate-risk's "Climate Risk / Intelligence"
-                and /deals' "Not a values question. / A valuation question." — see the GRAD note. */}
+            {/* Two-tone. ⚠️ THE TWO PAGES THIS CITED NO LONGER DO THIS. /climate-risk's "Climate Risk /
+                Intelligence" and /deals' "Not a values question. / A valuation question." were both
+                rebuilt in September 2026 and neither sets a two-tone headline now, so this is the last
+                one. Kept because it works, not because it matches: see the HEADLINE_ACCENT note. */}
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.5rem', color: INK }}>
               Materiality<br />
-              <span style={{ fontStyle: 'italic', background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Assessment</span>
+              <span style={{ fontStyle: 'italic', color: HEADLINE_ACCENT }}>Assessment</span>
             </h1>
             <p style={{ fontSize: 17, color: BODY, lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem' }}>
               The impact half of a double materiality assessment, run by your own team: stakeholder engagement, all ten ESRS topics determined in both directions, and a record of who decided what. For companies reporting under CSRD &mdash; and for the suppliers their reporting puts questions to.
+            </p>
+            {/* ⚠️ THE SHARED SUB-LINE, SO THIS PAGE BELONGS TO THE SET WITHOUT BEING RESHAPED BY IT.
+                This page deliberately does NOT take the ten-section module shape: six of its sections are
+                hand-tuned information design, and section 4 is a routing guardrail the shape has no slot
+                for. What it takes instead are the three things that make the set one set — this line, the
+                questions, and the closing gradation band. */}
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.05rem, 1.9vw, 1.3rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.5rem' }}>
+              {MODULE_SUBLINE}
             </p>
             {/* ⚠️ THE PRICE LIVES HERE NOW. The merged page carried a standalone pricing card
                 (its §6); the hero already had the reader's attention and a second full-width card
@@ -156,8 +182,13 @@ export default function Page() {
             // exactly — same alphas, same strokes. The deepest is the linked card: weight is how
             // "clickable" reads before anyone hovers.
             { val: 'CSRD', unit: 'mandatory',   label: 'double materiality is where reporting starts', alpha: 0.08, edge: PURPLE,     href: null },
-            { val: '10',   unit: 'ESRS topics', label: 'each assessed in both directions',             alpha: 0.17, edge: PURPLE,     href: null },
-            { val: '2',    unit: 'halves',      label: 'impact here, financial in Climate Risk',       alpha: 0.28, edge: PURPLE_MID, href: '/climate-risk' },
+            // ⚠️ val IS INTERPOLATED, NOT TYPED, AND THIS TILE IS WHY ESRS_TOPIC_COUNT EXISTS. It read
+              // `val: '10', unit: 'ESRS topics'` — a figure SPLIT ACROSS TWO ADJACENT FIELDS, rendering as
+              // "10 ESRS topics" while containing no whole-string match. lib/aiAct.test.ts's KNOWN LIMIT
+              // note says that construction "EVADES EVERY PATTERN HERE", and its own example was a date
+              // tile doing the same thing on app/ai-governance/page.tsx. Only derivation prevents it.
+              { val: String(ESRS_TOPIC_COUNT), unit: 'ESRS topics', label: 'each assessed in both directions', alpha: 0.17, edge: PURPLE,     href: null },
+            { val: '2',    unit: 'halves',      label: CSRD_BOTH_HALVES_SHORT,                        alpha: 0.28, edge: PURPLE_MID, href: '/climate-risk' },
           ].map(({ val, unit, label, alpha, edge, href }) => {
             const box: React.CSSProperties = { background: purpleGround(alpha), borderRadius: 12, padding: '1.5rem', border: `0.5px solid ${edge}`, display: 'block', textDecoration: 'none' }
             const inner = (
@@ -607,12 +638,68 @@ export default function Page() {
         </div>
       </section>
 
+      {/* ═══ 12 · THE QUESTIONS ═══════════════════════════════════════════════════════════════════
+      ⚠️ THE PAIRING IS FIRST BECAUSE IT IS THE MODULE'S COMMONEST CONFUSION, AND THIS DOES NOT REPLACE
+      SECTION 4. That section is a ROUTING GUARDRAIL with a "you are here" marker, placed before anyone
+      reaches a price; this answers the question for a reader who has seen it and wants the reasoning.
+      The header records what happens if the guardrail is ever trimmed as redundant: "the wrong-module
+      purchase it prevents comes back." */}
+      <section style={{ padding: '4.5rem 2.5rem', background: 'var(--color-ground)', borderTop: '0.5px solid var(--color-line)' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <ModuleFaq items={FAQ} />
+        </div>
+      </section>
+
+      {/* ═══ 13 · CLOSING BAND ════════════════════════════════════════════════════════════════════
+      Shared with the seven module pages, from the same token, so the bands cannot drift. The secondary
+      button is /climate-risk rather than /advisory: on THIS page the most useful second action is the
+      other half, which is the same reasoning as section 4. */}
+      <ClosingBand
+        heading="Not sure which half you need?"
+        body="Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country."
+        primary={{ href: '/assess', label: 'Start the free assessment' }}
+        secondary={{ href: '/climate-risk', label: 'See Climate Risk' }}
+      />
+      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
+
       <Footer />
 
       <style>{`* { box-sizing: border-box; margin: 0; padding: 0; }`}</style>
     </div>
   )
 }
+
+
+/**
+ * ⚠️ THE FOURTH ANSWER SAYS PLAINLY THAT NO SAMPLE IS PUBLISHED, AND EXPLAINS WHY THE TWO VISIBLE PDFs ARE
+ * NOT THIS MODULE'S. That reasoning existed only in this file's header until 26 Sep 2026: both PDFs in
+ * public/samples are climate-risk outputs, emitted by a screen gated on
+ * useEntitlementState('climate-risk'), so pointing this page at them would show the buyer the OTHER
+ * module's deliverable. Saying it on the page beats section 7's silence, because the reader most likely to
+ * ask has just come from /climate-risk and seen two.
+ *
+ * ⚠️ THE THIRD ANSWER IS THE ONE THAT PREVENTS A REFUND. Stakeholder engagement is what buyers
+ * underestimate, so it is specific rather than general: named people recorded against their judgements,
+ * survey rounds, an anonymity floor, and a divergence register that keeps disagreement instead of
+ * averaging it away. All four are real mechanisms in lib/materiality.
+ *
+ * ⚠️ EVERY CSRD FIGURE IS INTERPOLATED, per this file's own rule. CSRD_ASSESSMENT_YEAR carries a warning
+ * in lib/csrd.ts that it is NOT the current year but the reporting year minus one, which is exactly why
+ * the second answer names it.
+ *
+ * ⚠️ THE COUNT IS INTERPOLATED TOO, AND THE SENTENCE IS STIFFER FOR IT. That is the price: the number
+ * lives in one place now, and if it reads badly the fix is rewording around it, never typing it.
+ */
+const FAQ: readonly Faq[] = [
+  { q: 'Do we need Climate Risk as well?',
+    a: `Yes, if you are reporting under CSRD. ${CSRD_BOTH_HALVES} If you only need one of them, that is worth knowing before you buy: a lot of people arrive at this page wanting the financial half, and the name does not tell them apart.` },
+  { q: 'We are not sure double materiality applies to us.',
+    a: `CSRD requires it, and whether CSRD reaches you depends on size, listing and where you operate, which the free assessment answers for your company rather than in general. The dates matter as much as the scope: the first reports cover financial year ${CSRD_FIRST_REPORT_FY} and are published in ${CSRD_FIRST_REPORT_PUBLISHED}, so the assessment work falls in ${CSRD_ASSESSMENT_YEAR}, a year earlier than the date most people have in mind.` },
+  { q: 'Who has to be involved?',
+    a: 'More people than a screening needs, and that is the main difference. The impact half is not something one person completes: topics are determined by named people who are recorded against their judgements, the stakeholder survey runs in rounds with an anonymity floor so a small group of respondents cannot be identified from its own answers, and where contributors disagree the difference is kept in a divergence register rather than averaged away. Budget for your colleagues\u2019 time, not just yours. It is the part most often underestimated, and the reason a screening cannot be turned into an assessment after the fact.' },
+  { q: 'What do we get at the end?',
+    a: `A board report: the ${ESRS_TOPIC_COUNT} ESRS topics determined on both directions, the reasoning recorded against each, the divergence register, and a frozen disclosure roadmap you can hand to whoever asks how the conclusions were reached. No sample of it is published. The two reports on the Climate Risk page are that module\u2019s outputs rather than this one\u2019s, so pointing you at them would show you the wrong module\u2019s deliverable.` },
+]
 
 // ─── Styles — same set as app/deals/page.tsx, plus bodyPara / footnote / 2-col grid ──────
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }

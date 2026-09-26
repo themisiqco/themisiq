@@ -19,6 +19,34 @@ import type { ModuleKey } from './pricing'
 export const MODULE_SUBLINE = 'Self-guided, or with advisors at the ready.'
 
 /**
+ * WHICH MODULE COVERS WHICH HALF OF DOUBLE MATERIALITY. Two widths, and a slot needing more does not
+ * invent a fifth form.
+ *
+ * ⚠️ IT IS HERE AND NOT IN lib/csrd.ts, AND THAT IS THE POINT. This is a PRODUCT MAPPING, not a fact
+ * about the Directive. lib/csrd.ts's own comment on CSRD_DOUBLE_MATERIALITY_SENTENCE records being burned
+ * by exactly that conflation: a sentence there "used to end 'across all ten ESRS topical standards',
+ * which is ESRS STRUCTURE attributed to CSRD inside a constant named for CSRD — two instruments fused in
+ * the one place most likely to be copied out." A ThemisIQ module split inside a constant named for the
+ * Directive is the same error one step further out. This file already holds the claims that must not
+ * drift across module pages, which is what this is.
+ *
+ * ⚠️ FOUR SURFACES HAD FOUR WORDINGS BEFORE THIS EXISTED: app/frameworks/page.tsx's CSRD entry,
+ * app/climate-risk/page.tsx's FAQ, app/page.tsx's wider card, and app/materiality/page.tsx's stat tile.
+ * The mapping is the module's commonest point of confusion — app/materiality/page.tsx's header records
+ * that "a large share of its visitors need Climate Risk and not this" — so four forms of it was the worst
+ * possible arrangement.
+ *
+ * ⚠️ NEITHER FORM NAMES A MODULE COUNT. CLAUDE.md forbids stating one, and the materiality page's stat
+ * tile already had to reason about this: its comment reads "'2 · HALVES', NOT '2 · MODULES'".
+ */
+export const CSRD_BOTH_HALVES_SHORT = 'Materiality covers impact, Climate Risk covers financial.'
+
+export const CSRD_BOTH_HALVES =
+  'CSRD needs both halves: the Materiality Assessment covers the impact half, how your organisation '
+  + 'affects people and the environment, and Climate Risk covers the financial half, how the climate '
+  + 'affects you.'
+
+/**
  * What a module can truthfully say about evidence. THE GATE, and it is the reason this file exists.
  *
  * ⚠️ THERE ARE TWO CLAIMS AND THEY ARE NOT INTERCHANGEABLE.

@@ -3,7 +3,7 @@ import Footer from '@/app/components/Footer'
 import { FLAT_MODULE_PRICES } from '@/lib/pricing'
 import { SB261_STATUS_SENTENCE } from '@/lib/sb261'
 import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '@/lib/ifrsS2'
-import { MODULE_SUBLINE } from '@/lib/modulePages'
+import { MODULE_SUBLINE, CSRD_BOTH_HALVES } from '@/lib/modulePages'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
@@ -259,5 +259,5 @@ const FAQ: readonly Faq[] = [
     a: 'No, and the module says so in its own output. What it produces is a structured first pass built on IPCC AR6 climatic impact-drivers and the TCFD categories, to scope a formal assessment rather than to file. Advisors are available if you want the assessment taken further.',
     extra: SB261_STATUS_SENTENCE },
   { q: 'Can we pair it with the Materiality Assessment for CSRD?',
-    a: 'Yes, and CSRD needs both. Materiality covers the impact half and Climate Risk the financial half. The module has a CSRD mode that adds an impact step and the ESRS topics.' },
+    a: `${CSRD_BOTH_HALVES} This module has a CSRD mode that adds an impact step and the ESRS topics.` },
 ]
