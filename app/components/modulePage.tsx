@@ -120,8 +120,15 @@ export function ModuleArrivals({ items }: { items: readonly { title: string; bod
  * `extra` renders as an indented, ruled block beneath the answer. It exists for a quoted CONSTANT that
  * must not be paraphrased — SB261_STATUS_SENTENCE is the case it was built for — so its wording can be
  * verbatim while the answer around it stays in the page's own voice.
+ *
+ * ⚠️ AN ARRAY OF LINES IS NOT A STYLE CHOICE, IT IS FOR A BLOCK TOO IMPORTANT TO SKIM. The Deals page's
+ * near-threshold answer lists four ways a test diverges from the statute it implements, and every one of
+ * them can produce a wrong answer in the direction of complacency. As one paragraph a reader skips it; as
+ * named lines they can find the one that applies to them. Widened for that, the way ModuleOutputs took a
+ * `kind` when CBAM had a page where Climate Risk had documents. A single string still renders as one
+ * block, so nothing else changes.
  */
-export type Faq = { q: string; a: string; extra?: string }
+export type Faq = { q: string; a: string; extra?: string | readonly string[] }
 
 export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
   items: readonly Faq[]
@@ -137,7 +144,11 @@ export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
             <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, maxWidth: '68ch' }}>{q.a}</div>
             {q.extra && (
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.7, maxWidth: '68ch', marginTop: '0.7rem', paddingLeft: '0.9rem', borderLeft: '2px solid var(--color-line-strong)' }}>
-                {q.extra}
+                {typeof q.extra === 'string'
+                  ? q.extra
+                  : q.extra.map((line, i) => (
+                      <p key={line.slice(0, 40)} style={{ margin: i === 0 ? 0 : '0.6rem 0 0' }}>{line}</p>
+                    ))}
               </div>
             )}
           </div>

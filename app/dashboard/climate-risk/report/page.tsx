@@ -50,7 +50,7 @@ const JURISDICTION_LABEL: Record<string, string> = {
 const GRAD = 'var(--color-brand)'
 const SEV = {
   high: { color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  med:  { color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  med:  { color: 'var(--color-scale-mid)', bg: 'var(--color-scale-mid-wash)', border: 'var(--color-scale-mid)' },
   low:  { color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
 } as const
 
@@ -156,7 +156,7 @@ function Pill({ band }: { band: 'high' | 'med' | 'low' | 'unknown' }) {
   // 'unknown' shouldn't reach here — but the band union now includes it, so guard defensively rather
   // than crash on a future invariant change. Amber "Not assessed", never a silent LOW.
   if (band === 'unknown') {
-    return <span style={{ background: '#FDF6EC', color: 'var(--color-module-climate)', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
+    return <span style={{ background: 'var(--color-scale-gap-wash)', color: 'var(--color-scale-mid)', border: '0.5px solid #EAD9BE', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>NOT ASSESSED</span>
   }
   const c = SEV[band]
   return <span style={{ background: c.bg, color: c.color, border: `0.5px solid ${c.border}`, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>{band.toUpperCase()}</span>

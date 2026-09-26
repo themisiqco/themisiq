@@ -692,7 +692,7 @@ function ReportInner() {
             </p>
             <Matrix topics={matrix} />
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-              {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['var(--color-ink-muted)', 'Lower priority']].map(([c, l]) => (
+              {[['#A32D2D', 'Material on both'], ['var(--color-scale-mid)', 'Material on one axis'], ['var(--color-ink-muted)', 'Lower priority']].map(([c, l]) => (
                 <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
               ))}
             </div>
@@ -1008,7 +1008,7 @@ function Matrix({ topics }: { topics: any[] }) {
   const W = 600, H = 400, padL = 56, padR = 20, padT = 20, padB = 48
   const midX = padL + 0.5 * (W - padL - padR)
   const midY = padT + 0.5 * (H - padT - padB)
-  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
+  const color = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-scale-mid)' : 'var(--color-ink-muted)'
 
   // Offset dots that would land on top of an earlier-placed dot so labels stay readable.
   // 8 directions in a small circle; first collision -> right, second -> left, etc.

@@ -716,6 +716,18 @@ citation and which are not:
    employees is assessed as out of scope. If the article says "at least", the comparison, both
    `basis` strings and the copy constant change together, or the report and the page will
    disagree about that company.
+   ⚠️ **UPDATED 26 Sep 2026: A FOURTH CONSUMER, AND A PARTIAL MITIGATION.** `app/deals/page.tsx`
+   now reads the same engine, so four surfaces rest on one unverified reading of the article.
+   **It was proposed that this item be closed on the strength of those four agreeing, and it was
+   not.** Internal agreement between consumers of one assumption is the evidence this entry already
+   holds and already judged insufficient. What closes it is one read of art. 2(1)(a) as amended on
+   EUR-Lex, and nothing else does.
+   The mitigation, such as it is: `NEAR_THRESHOLD_BAND` is 0.10 with an INCLUSIVE boundary, so a
+   company at exactly 5,000 employees falls inside the marginal band and is flagged near-threshold
+   wherever that limb decides the outcome. A reader of the report therefore sees the figure is
+   borderline even though the comparison resolves it as out of scope. **That reduces the harm and
+   does not remove it** — a flag beside a wrong answer is still a wrong answer, and the flag fires
+   only where the limb is decisive.
 2. **Deletion of the EU-wide civil liability regime**, reverting to national law. **This is the
    load-bearing one**, because it is the claim that was REMOVED from the page. Removing an
    over-claim on secondary sources is safe in a way that adding one is not, which is why it

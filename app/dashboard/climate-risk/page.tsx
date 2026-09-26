@@ -53,14 +53,16 @@ const sectionSub: React.CSSProperties = { fontSize: 13, color: 'var(--color-ink-
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: '#555553', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6, display: 'block' }
 const inputStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #e8e7e4', fontSize: 13, color: '#0d0d0d', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 
-// severity palette (matches live climate page)
+// severity palette (matches live climate page). MED and N/A are --color-scale-*, NOT a module hue:
+// they are rungs on an ordered axis, and putting a Climate Risk colour back would repaint "medium"
+// whenever that module's identity moves. See the SCALE block in app/styles/themisiq-tokens.css.
 const SEV = {
   high: { label: 'HIGH', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  med:  { label: 'MED', color: 'var(--color-module-climate)', bg: '#FEF3E2', border: 'var(--color-module-climate)' },
+  med:  { label: 'MED', color: 'var(--color-scale-mid)', bg: 'var(--color-scale-mid-wash)', border: 'var(--color-scale-mid)' },
   low:  { label: 'LOW', color: 'var(--color-ink-muted)', bg: '#f8f7f5', border: '#e8e7e4' },
   // Data gap (no reference data / no baseline) — amber, distinct from LOW grey. Never reads as an
   // assessed finding of no exposure/immateriality; scored null, not 0.
-  unknown: { label: 'N/A', color: 'var(--color-module-climate)', bg: '#FDF6EC', border: '#EAD9BE' },
+  unknown: { label: 'N/A', color: 'var(--color-scale-mid)', bg: 'var(--color-scale-gap-wash)', border: '#EAD9BE' },
 }
 
 // opportunity palette — green to read as upside, distinct from the risk reds/ambers
@@ -899,7 +901,7 @@ export default function MaterialityWizard() {
     const W = 500, H = 360, padL = 48, padR = 16, padT = 16, padB = 40
     const midX = padL + 0.5 * (W - padL - padR)
     const midY = padT + 0.5 * (H - padT - padB)
-    const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-module-climate)' : 'var(--color-ink-muted)'
+    const dotColor = (q: string) => q === 'both' ? '#A32D2D' : (q === 'financial' || q === 'impact') ? 'var(--color-scale-mid)' : 'var(--color-ink-muted)'
 
     // Offset overlapping dots so labels remain readable when topics share coordinates
     const OFFSET = 14
@@ -950,7 +952,7 @@ export default function MaterialityWizard() {
           ))}
         </svg>
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
-          {[['#A32D2D', 'Material on both'], ['var(--color-module-climate)', 'Material on one axis'], ['var(--color-ink-muted)', 'Lower priority']].map(([c, l]) => (
+          {[['#A32D2D', 'Material on both'], ['var(--color-scale-mid)', 'Material on one axis'], ['var(--color-ink-muted)', 'Lower priority']].map(([c, l]) => (
             <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}</span>
           ))}
         </div>
@@ -1163,7 +1165,7 @@ export default function MaterialityWizard() {
     }
     const clsColor: Record<string, { bg: string; color: string; border: string }> = {
       'persistent': { bg: '#FCEBEB', color: '#B91C1C', border: '#B91C1C' },
-      'warming-contingent': { bg: '#FEF3E2', color: 'var(--color-module-climate)', border: 'var(--color-module-climate)' },
+      'warming-contingent': { bg: 'var(--color-scale-mid-wash)', color: 'var(--color-scale-mid)', border: 'var(--color-scale-mid)' },
       'policy-path-contingent': { bg: 'var(--color-brand-wash)', color: 'var(--color-brand)', border: 'var(--color-brand)' },
       'low-across-futures': { bg: '#f8f7f5', color: 'var(--color-ink-muted)', border: '#e8e7e4' },
     }

@@ -32,7 +32,15 @@ const LAYOUT = 'lib/pdf/layout.ts'
 const ASSURANCE = 'lib/assurancePdf.ts'
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
-/** WCAG relative luminance. */
+/**
+ * WCAG relative luminance.
+ *
+ * ⚠️ lib/tokenContrast.test.ts CARRIES THE SAME EIGHT LINES, AND THEY ARE NOT SHARED ON PURPOSE. That
+ * file measures the CSS token layer against itself; this one measures the two PDF palettes. The formula
+ * is fixed by the WCAG 2.x spec so the copies cannot drift in substance, while a single shared helper
+ * carrying one typo would make BOTH files green and wrong at once. Two copies mean the error has to be
+ * made twice. If you change one, change the other and say why.
+ */
 function luminance(hex: string): number {
   const h = hex.replace('#', '')
   const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255)

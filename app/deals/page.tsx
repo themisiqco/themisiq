@@ -1,284 +1,251 @@
-'use client'
+import type { Metadata } from 'next'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
-import { FLAT_MODULE_PRICES } from '../../lib/pricing'
-import { IFRS_S2_ADOPTION_COUNT, IFRS_S2_ADOPTION_SOURCE } from '../../lib/ifrsS2'
-import { SB253_STATUTE } from '../../lib/sb253'
-import { THRESHOLD_TESTS } from '../../lib/deals/assessment'
+import { FLAT_MODULE_PRICES } from '@/lib/pricing'
+import { MODULE_SUBLINE } from '@/lib/modulePages'
+import { NEAR_BAND_PCT, FX_AS_OF } from '@/lib/deals/assessment'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
-import { sectionTitle, ruledSectionTitle } from '@/app/components/headingStyles'
-import { ruledSection, ruledSectionInner, ruledSectionSplit, listGroup, listRow } from '@/app/components/sectionStyles'
+import { sectionTitle } from '@/app/components/headingStyles'
+import {
+  ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection,
+  ModuleArrivals, ModuleFaq, bodyCopy, moduleEyebrow, type Faq,
+} from '@/app/components/modulePage'
 
-export default function Page() {
-  // Price from the single source of truth, formatted as app/cbam/page.tsx does.
-  const dealsPrice = FLAT_MODULE_PRICES['deals'].toLocaleString('en-US')
+const KEY = 'deals' as const
 
-  // The SB 253 revenue trigger is READ FROM THE TEST THE ENGINE RUNS, never retyped. The card and
-  // the screen therefore cannot disagree: if the limb is ever amended, both move together.
-  const sb253Bn = THRESHOLD_TESTS['SB 253'].limbs[0].amount / 1_000_000_000
+export const metadata: Metadata = {
+  title: 'Sustainability Diligence for M&A: Threshold Screening | ThemisIQ',
+  description:
+    'Test what a target company owes across SB 253, SECR, Canada S-211, CSRD and CS3D. Each limb tested separately, with near-threshold flagging and an investment committee pack.',
+  alternates: { canonical: '/deals' },
+}
 
+/**
+ * The Deals and Investment module page, fifth to the shared ten-section shape.
+ *
+ * ⚠️ THE THRESHOLD ENGINE DOCUMENTS ITS OWN DIVERGENCES FROM THE STATUTES IT IMPLEMENTS, AND THIS PAGE
+ * MUST NOT OUT-CLAIM IT. lib/deals/assessment.ts records, per regime, which limbs it tests, which routes
+ * it does not model, and where a single input stands in for a measure the law defines differently. Those
+ * are in the near-threshold answer below, as named lines rather than a paragraph, because every one of
+ * them can produce a wrong answer in the direction of COMPLACENCY — the dangerous direction in diligence.
+ *
+ * ⚠️ FIVE REGIMES, COUNTED BY THE PARSER AND NOT BY GREP. THRESHOLD_TESTS holds SB 253, SECR,
+ * Canada S-211, CSRD and CS3D, all active. A grep for the keys returned FOUR on 26 Sep 2026 because the
+ * character class used to match them excluded the hyphen in "Canada S-211" — the third instance of that
+ * blind spot in docs/backlog.md, whose recorded remedy is to assert the parse's own count rather than to
+ * write a better class. Object.keys(THRESHOLD_TESTS).length returned 5 immediately.
+ *
+ * ⚠️ getComplianceCost's `low`/`high` ARE DELIBERATELY NOT ON THIS PAGE. They are a RISK-EXPOSURE figure
+ * for the dashboard's "ESG value-at-risk exposure" block, and that function's own comment records that a
+ * cost framing was already removed from them once ("the old Math.max(7500/25000) floors were a
+ * cost-framing artifact"). The cost claim here rests on CONSULTANT_RANGES and the itemised ranges, which
+ * are what the equivalent work costs to BUY ELSEWHERE — not ThemisIQ's fee, and not a quote.
+ *
+ * ⚠️ DEFAULT_PIPELINE_TARGETS IS NOT ON THIS PAGE EITHER. Its own comment: "DASHBOARD-ONLY … Display-only
+ * — never enters any per-deal figure. Not used on the public /deals/[token] page (wrong audience)." It is
+ * an ROI illustration, not a limit, and a marketing page would read it as one.
+ */
+export default function DealsPage() {
+  const price = FLAT_MODULE_PRICES[KEY].toLocaleString()
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', color: '#0d0d0d' }}>
+    <div style={{ background: 'var(--color-paper)', color: 'var(--color-ink)' }}>
       <Nav />
 
-      {/* HERO */}
-      <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
-          <div>
-            <div style={eyebrow}>Deals & Investment</div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
-              Not a values question.<br />
-              <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>A valuation question.</span>
-            </h1>
-            <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
-              Enter a target&rsquo;s turnover, balance sheet, headcount and jurisdiction, and see which climate and sustainability regimes it already falls under &mdash; each threshold tested limb by limb, with the figure applied and the provision it comes from. Under five minutes. Create an account and your first target is free.
-            </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
-              <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Screen a target →</a>
-              <a href="/order?modules=deals" style={{ ...btnSecondary, textDecoration: 'none' }}>${dealsPrice} USD/yr</a>
-            </div>
-            <div style={{ marginBottom: '2rem' }}>
-              <a href="/assess" style={{ fontSize: 14, fontWeight: 400, color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Screening your own obligations instead? Take the free assessment →</a>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-              {['SB 253', 'CSRD', 'SECR', 'CS3D', 'Canada S-211', 'IFRS S2', 'TCFD', 'M&A diligence', 'PE / family office'].map(tag => (
-                <span key={tag} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* STAT CARDS — three, stacked. Every figure carries its source in the card body. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-            {[
-              {
-                val: `$${sb253Bn} billion`, unit: 'revenue trigger',
-                label: `SB 253 catches any US company over $${sb253Bn}bn total annual revenue doing business in California — privately held or public.`,
-                source: SB253_STATUTE, color: '#B91C1C', bg: '#FCEBEB',
-              },
-              {
-                val: 'IFRS S2', unit: 'per jurisdiction',
-                label: IFRS_S2_ADOPTION_COUNT,
-                source: IFRS_S2_ADOPTION_SOURCE, color: 'var(--color-brand)', bg: 'var(--color-brand-wash)',
-              },
-              {
-                val: 'Four outcomes', unit: 'every threshold test',
-                label: 'Applies, near-threshold, not applicable, or not assessed. A test we could not complete never comes back clean.',
-                source: null, color: '#0F6E56', bg: '#E1F5EE',
-              },
-            ].map(({ val, unit, label, source, color, bg }) => (
-              <div key={val} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
-                <div style={{ fontSize: 11, fontWeight: 600, color, marginTop: 2, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{unit}</div>
-                <div style={{ fontSize: 12, color: '#555553', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{label}</div>
-                {source && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, fontWeight: 400, lineHeight: 1.4 }}>{source}</div>}
-              </div>
-            ))}
+      {/* ── 1. HERO ── */}
+      <section style={{ borderTop: '4px solid var(--color-module-deals)', background: 'var(--color-module-deals-wash)', padding: '4.5rem 2.5rem' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <p style={moduleEyebrow}>Deals and Investment module</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.1rem, 4vw, 3.1rem)', fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.75rem', maxWidth: '28ch' }}>
+            Evaluate what a target company owes before you buy it, or arrive at your own sale already prepared.
+          </h1>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.05rem, 1.9vw, 1.3rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.4rem' }}>
+            {MODULE_SUBLINE}
+          </p>
+          <p style={{ ...bodyCopy, marginBottom: '2rem' }}>
+            For M&amp;A, family offices and companies getting ready to sell. Which rules apply, from what
+            year, and what they cost to meet. Run it on a target before you buy, or on yourself before you
+            are asked.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
+            <a href={`/order?modules=${KEY}`} style={{ ...btnSecondary, textDecoration: 'none' }}>Order the module, ${price}/yr</a>
           </div>
         </div>
       </section>
 
-      {/* WHAT A SCREEN RETURNS */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>What a screen returns</div>
-          <h2 style={sectionTitle}>Six figures in. A defensible answer out.</h2>
-        </div>
-        <div style={hairlineGrid3}>
-          {[
-            { title: 'Which rules bite, and on which limb.', desc: 'SB 253, CSRD, SECR, CS3D, Canada’s S-211 and the rest, tested against the target’s turnover, balance sheet total and headcount. Every limb is printed with the figure applied, the threshold it met or missed, and the provision it comes from.' },
-            { title: 'What is close, as well as what applies.', desc: 'Targets sitting just under a threshold come back in their own table — the ones that cross it on the growth you are underwriting.' },
-            { title: 'What compliance will cost them.', desc: 'A build cost derived from the target’s own size and number of sites, shown alongside cited consultant benchmarks for the same scope of work.' },
-            { title: 'What the exposure is worth against your price.', desc: 'A band expressed as a percentage of deal value, weighted by sector and by how many regimes bite. Presented as exposure, never as a quote.' },
-            { title: 'What is missing from the data room.', desc: 'Whether the target holds a verified GHG inventory and a current ESG report — the first two things you will ask for, and the basis of the mandate.' },
-            { title: 'Where the sector risk usually sits.', desc: 'The ESG risks typical of the target’s sector, each tied to the regime that governs it and conditioned to the jurisdictions the target is actually established in. Flagged for your attention, not measured.' },
-          ].map(({ title, desc }) => (
-            <div key={title} style={hairlineCell}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
+      {/* ── 2. HOW PEOPLE ARRIVE ── */}
+      <ModuleSection>
+        <ModuleArrivals items={ARRIVALS} />
+      </ModuleSection>
+
+      {/* ── 3. WHAT IT COVERS ── */}
+      <ModuleSection tinted>
+        <h2 style={sectionTitle}>What the module covers</h2>
+        <dl style={{ margin: '2rem 0 0', borderTop: '1px solid var(--color-line-strong)' }}>
+          {COVERS.map(([k, v]) => (
+            <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(12rem, 16rem) 1fr', gap: '1.5rem', padding: '1.1rem 0', borderBottom: '1px solid var(--color-line)' }}>
+              <dt style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink)' }}>{k}</dt>
+              <dd style={{ margin: 0, fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.7 }}>{v}</dd>
             </div>
           ))}
-        </div>
-      </section>
+        </dl>
+      </ModuleSection>
 
-      {/* WHY THE ANSWER HOLDS UP */}
-      <section style={{ padding: '0 2.5rem 5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>Why the answer holds up</div>
-          <h2 style={sectionTitle}>Built to survive the other side&rsquo;s advisor.</h2>
+      {/* ── 4. HOW IT WORKS ── */}
+      <ModuleSection>
+        <h2 style={sectionTitle}>How it works</h2>
+        <div style={{ marginTop: '2rem' }}>
+          <ModuleSpine
+            bring="Turnover, balance sheet, headcount and where the business operates and sells."
+            applies="Each rule's own test, using thresholds kept in one place and updated when the law changes."
+            get="A defensible answer on what applies and from when, in a pack you can put in front of a committee."
+          />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
-          {[
-            { title: 'Size tests are run the way the statute writes them.', desc: 'SECR is a two-of-three test over turnover, balance sheet and headcount — not turnover alone. Each limb is reported separately, so a disagreement is about a figure rather than about an opinion.' },
-            { title: 'Currency never quietly changes the answer.', desc: 'Revenue is converted at a dated ECB reference fixing; the statutory threshold is never restated. The figure on your report still matches the legislation word for word, and the report prints which fixing a borderline call relied on.' },
-            { title: 'A blank never becomes a pass.', desc: 'Where a figure was not supplied, the report says so and names the figure that would settle it. Nothing comes back clean because the question was never asked.' },
-            { title: 'Where a test is incomplete, it says that too.', desc: 'CS3D’s route tests are not exhaustive, and the engine treats a failed size test as unresolved rather than as a clean negative.' },
-          ].map(({ title, desc }) => (
-            <div key={title} style={hairlineCell}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      </ModuleSection>
 
-      {/* ACROSS THE DEAL — Screen / Mandate / Inherit */}
-      <section style={{ padding: '0 2.5rem 5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>Across the deal</div>
-          <h2 style={sectionTitle}>Who pays, and who does the work.</h2>
-        </div>
-        <div style={hairlineGrid3}>
-          {[
-            {
-              stage: 'Before you engage', title: 'Screen',
-              desc: 'Enter revenue, balance sheet, headcount, sites, jurisdiction and sector. Obligations resolve against current thresholds — with what compliance will cost the target and what the exposure means for your price. Anything the screen cannot settle comes back as not assessed, naming the figure it needs.',
-              pays: 'You', effort: 'Under five minutes. Unlimited targets.',
-            },
-            {
-              stage: 'Once you are engaged', title: 'Mandate',
-              desc: 'Hand the target a link to their own results — the thresholds they cross, alongside the risks typical of their sector — and make it a condition of proceeding. They build the inventory on their budget, because they owe it to the regulator whether your deal closes or not.',
-              pays: 'The target', effort: 'Theirs. Independently verifiable.',
-            },
-            {
-              stage: 'After close', title: 'Inherit',
-              desc: 'The baseline built during diligence stays where it was built and becomes the company’s reporting record. The same inventory carries forward — nothing re-collected, nothing rebuilt from scratch.',
-              pays: 'The portfolio company', effort: 'Theirs, as it would be anyway.',
-            },
-          ].map(({ stage, title, desc, pays, effort }) => (
-            <div key={title} style={hairlineCell}>
-              <div style={eyebrow}>{stage}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 10 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400, marginBottom: 16 }}>{desc}</div>
-              <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
-                <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--color-ink-muted)' }}>Who pays:</span> {pays}
-                </div>
-                <div style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>
-                  <span style={{ color: 'var(--color-ink-muted)' }}>Effort:</span> {effort}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ── 5. EVIDENCE ── */}
+      <ModuleSection tinted>
+        <EvidenceSection
+          moduleKey={KEY}
+          workings="Every answer shows you why: which part of the test applied, and the figure that decided it."
+        />
+      </ModuleSection>
 
-      {/* SB 253 M&A CALLOUT */}
-      {/* ⚠️ A SECTION ON THE PAGE, NOT A BAND — see app/components/sectionStyles.ts for why the
-          nested rgba(255,255,255,0.05) card could not be recoloured and had to become a list.
-          Three of this section's text colours were below AA in production: the eyebrow, the list
-          heading and every "scope" line were rgba(255,255,255,0.4), compositing to 3.81:1. */}
-      <section style={ruledSection}>
-        <div style={ruledSectionInner}>
-          <div style={ruledSectionSplit}>
-          <div>
-            <div style={{ ...eyebrow, marginBottom: 8 }}>SB 253 — M&A liability</div>
-            <h2 style={ruledSectionTitle}>
-              Acquiring a California company?<br />You inherit their SB 253 obligations.
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-              A target with California nexus and revenue over ${sb253Bn}bn is a reporting entity in its own right, whether it knows or not, and stays one after you buy it. The screen tests that threshold against the figures you enter and prints the limb, the figure and the provision — so the obligation is priced into your deal rather than discovered after it.
-            </p>
-            {[
-              'SB 253 tested against the target’s own revenue, with the provision cited',
-              'What the inventory will cost them to build, from their size and site count',
-              'The gap list you hand the target as a condition of proceeding',
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-                <span style={{ color: 'var(--color-brand)', flexShrink: 0, marginTop: 2 }}>✓</span>
-                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.5 }}>{item}</span>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div style={listGroup}>Climate diligence frameworks</div>
-            {/* Every row here is a regime the threshold engine actually tests. No urgency ranking:
-                the copy supplies none, and inventing one would rank regimes we have not ranked. */}
-            {/* ⚠️ THE BULLET IS GONE. It was rgba(255,255,255,0.35) — white-alpha, so on a light
-                ground it does not merely lose contrast, it composites to the page and disappears.
-                It carried no information the row did not already carry, and in a ruled list the
-                hairline is what delimits a row. */}
-            {[
-              { fw: 'SB 253', scope: `Tested on revenue over $${sb253Bn}bn with California nexus` },
-              { fw: 'CSRD / ESRS E1', scope: 'EU disclosure obligations, tested limb by limb' },
-              { fw: 'SECR', scope: 'UK two-of-three test on turnover, balance sheet and headcount' },
-              { fw: 'CS3D', scope: 'Post-Omnibus size test, reported as unresolved where the route is not met' },
-              { fw: 'Canada S-211', scope: 'Two-of-three test on assets, revenue and employees' },
-            ].map(({ fw, scope }) => (
-              <div key={fw} style={listRow}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-ink)', marginBottom: 2 }}>{fw}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{scope}</div>
-              </div>
-            ))}
-          </div>
-          </div>
-        </div>
-      </section>
+      {/* ── 6. WHAT THE MODULE PRODUCES ──
+      Absent: there is no sample IC pack in public/samples/ and no preview route for one. */}
 
-      {/* USE CASES */}
-      <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>Use cases</div>
-          <h2 style={sectionTitle}>Built for every deal structure.</h2>
-        </div>
-        <div style={hairlineGrid3}>
-          {[
-            { title: 'Private Equity', desc: 'Screen every target in a competitive process, not just the ones that reach exclusivity. Obligations and their cost land before you commit, and the target carries the work.' },
-            { title: 'Family Office', desc: 'One screen per target, unlimited targets, no advisor engagement to open. Walking away costs you the five minutes it took to look.' },
-            { title: 'Corporate M&A', desc: 'Find out whether a target already falls under SB 253, CSRD or SECR before the integration plan assumes it does not.' },
-            { title: 'Investment Banking', desc: 'Give a credit committee a threshold test with its provision cited, rather than an adjective about ESG risk.' },
-            { title: 'Venture Capital', desc: 'Know which of your growth-stage targets is about to cross a reporting threshold, and how much the crossing costs them.' },
-          ].map(({ title, desc }) => (
-            <div key={title} style={hairlineCell}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
-            </div>
-          ))}
-          {/* ⚠️ THE SIXTH CELL EXISTS TO CLOSE THE ROW, AND IT IS NOT A SIXTH USE CASE.
-              Five cells in a repeat(3,1fr) grid leave the last slot uncovered, and hairlineGrid3
-              paints '#e8e7e4' behind its cells so the 1px `gap` reads as a hairline — so an
-              uncovered slot shows that hairline colour at full cell size: a grey rectangle. The
-              fix is a cell, not a background change; the grey is the seam doing its job.
-              It takes the sunken fill and a brand heading so it reads as the END of the set
-              rather than another structure in it.
-              ⚠️ BUTTON LABEL AND DESTINATION ARE PROVISIONAL pending confirmation.
-              /dashboard/deals is recommended because that route never redirects an unentitled
-              visitor: resolveWizardGate returns { kind: 'open' } for everyone except a signed-in
-              user who has ALREADY saved their one free deal. Sending a first-timer to /pricing
-              would ask them to buy what they can have free. */}
-          <div style={{ ...hairlineCell, background: 'var(--color-sunken)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-brand)', marginBottom: 8 }}>Another structure?</div>
-            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65, fontWeight: 400, marginBottom: 16 }}>Every screen runs the same threshold test, whatever the deal shape. Self-directed and done in five minutes.</div>
-            <a href="/dashboard/deals" style={{ ...btnPrimary, fontSize: 13, padding: '9px 18px', textDecoration: 'none', marginTop: 'auto' }}>Screen a target</a>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section style={{ padding: '6rem 2.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 400, maxWidth: 680, margin: '0 auto 1.25rem', lineHeight: 1.2 }}>
-          Your first target is <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>free.</span>
-        </h2>
-        <p style={{ fontSize: 15, color: '#555553', maxWidth: 520, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
-          Create an account and screen one — the complete report, every limb tested, nothing held back and no card. The subscription is for when you have a pipeline rather than a deal.
+      {/* ── 7. WHAT IT SATISFIES ──
+      ⚠️ EXACTLY THE FIVE REGIMES THRESHOLD_TESTS HOLDS. IFRS S2 was in this row and is not a
+      threshold-gated regime, so listing it implied a test that does not exist; Canada S-211 and CS3D are
+      tested and were missing. Naming what the engine does not do is the more expensive half of the error. */}
+      <ModuleSection>
+        <h2 style={sectionTitle}>What it satisfies</h2>
+        <p style={{ ...bodyCopy, margin: '1rem 0 1.75rem' }}>
+          The regimes the threshold engine tests. Each is described, sourced and mapped to a module on the
+          regulations page.
         </p>
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Screen your first target →</a>
-        </div>
-        <div style={{ marginTop: '1.5rem' }}>
-          <a href="/advisory" style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-ink-muted)', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
-        </div>
-      </section>
+        <FrameworkChips names={FRAMEWORKS} />
+      </ModuleSection>
 
-      {/* FOOTER */}
+      {/* ── 8. PRICING ── */}
+      <ModuleSection tinted>
+        <p style={moduleEyebrow}>Pricing</p>
+        <h2 style={sectionTitle}>One flat annual price.</h2>
+        <p style={{ ...bodyCopy, marginTop: '1rem' }}>
+          Screen as many targets as you like. Add modules and the multi-module discount applies
+          automatically: two modules −10%, three or more −20%.
+        </p>
+        <div style={{ maxWidth: 420, marginTop: '2.5rem' }}>
+          <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-deals)', borderRadius: 6, padding: '2rem' }}>
+            <div style={{ ...moduleEyebrow, marginBottom: 8 }}>Deals and Investment</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: 'var(--color-ink)' }}>
+              ${price}
+              <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-ink-muted)' }}> / reporting year</span>
+            </div>
+            <div style={{ height: 1, background: 'var(--color-line)', margin: '1.25rem 0' }} />
+            {[
+              'Threshold testing across five regimes, each limb separately',
+              'Near-threshold flagging where a marginal figure decides the answer',
+              'An indicative cost of meeting what applies',
+              'An investment committee pack',
+              'A pipeline export for a portfolio',
+            ].map(f => (
+              <div key={f} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <span style={{ color: 'var(--color-state-ok)', flexShrink: 0 }}>✓</span>
+                <span style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55 }}>{f}</span>
+              </div>
+            ))}
+            <a href={`/order?modules=${KEY}`} style={{ ...btnPrimary, textDecoration: 'none', display: 'block', textAlign: 'center', marginTop: '1.5rem' }}>
+              Order the module
+            </a>
+          </div>
+        </div>
+      </ModuleSection>
+
+      {/* ── 9. THE QUESTIONS ── */}
+      <ModuleSection>
+        <ModuleFaq items={FAQ} />
+      </ModuleSection>
+
+      {/* ── 10. CLOSING BAND ── */}
+      <ClosingBand
+        heading="Not sure what a target owes?"
+        body="Three questions, no account needed. The free assessment lists the regulations a company is likely to face, country by country."
+        primary={{ href: '/assess', label: 'Start the free assessment' }}
+        secondary={{ href: '/advisory', label: 'Talk to us' }}
+      />
+      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
+
       <Footer />
-
-      <style>{`* { box-sizing: border-box; margin: 0; padding: 0; }`}</style>
     </div>
   )
 }
 
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
-// The three-column hairline grid used on /cyber and /climate-risk — 1px gaps over a #e8e7e4 ground
-// so the cell backgrounds draw the rules. Cells are plain white with 2rem padding.
-const hairlineGrid3: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }
-const hairlineCell: React.CSSProperties = { background: '#fff', padding: '2rem' }
+// ── DATA ──────────────────────────────────────────────────────────────────────────────────────────
+const ARRIVALS = [
+  { title: 'You are buying',
+    body: 'Diligence has reached sustainability and nobody can say what the target owes.' },
+  { title: 'You are selling',
+    body: 'You would rather find the obligations yourself than have a buyer find them.' },
+  { title: 'You hold a portfolio',
+    body: 'Knowing which companies in it have reporting obligations, under which rules, and from when, is now part of managing it.' },
+] as const
+
+/**
+ * ⚠️ THE QUALIFIER ON THE FIRST ROW IS SCOPED PER REGIME, NOT APPLIED TO ALL FIVE. An earlier draft said
+ * the model states unrun parts of "a test", which reads as all of them. Measured from THRESHOLD_TESTS:
+ *   exhaustive: false          CS3D only
+ *   lookbackModelled: false    CS3D and Canada S-211
+ *   comparison 'gte'           CSRD only; the other four use 'gt'
+ * A qualifier that over-applies is its own small over-claim, in the opposite direction, and on a page
+ * about defensibility it costs more than it saves.
+ *
+ * ⚠️ THE COST ROW NAMES WHOSE COST IT IS. CONSULTANT_RANGES holds what the equivalent workstreams cost to
+ * buy elsewhere, with its own sourcing note ending "Indicative benchmarks, not quotes — refresh
+ * periodically". Beside a pricing section, "a cost estimate" would read as ThemisIQ's fee, which is the
+ * opposite of what that constant holds.
+ *
+ * ⚠️ "CONVERTED AT A DATED RATE THAT IS CITED ON THE ANSWER", NOT "currency conversion". FX_SOURCE names
+ * the ECB reference-rate PDF and FX_AS_OF its date, and the report carries both. The dating is the claim.
+ */
+const COVERS = [
+  ['Threshold testing', 'Across SB 253, SECR, Canada S-211, CSRD and CS3D, each limb tested separately. Where a regime has routes the model does not run, or reads one financial year where the law asks for two, the answer says so rather than letting you assume they passed.'],
+  ['Borderline companies', `A figure within ${NEAR_BAND_PCT} of a limb is flagged rather than guessed, and currency is converted at a dated rate that is cited on the answer.`],
+  ['Indicative cost', 'An indicative cost of meeting what applies, benchmarked against what the equivalent consultant workstreams cost, refreshed rather than quoted.'],
+  ['Committee output', 'An investment committee pack, and a pipeline export for a portfolio.'],
+] as const
+
+/** Exactly the keys of THRESHOLD_TESTS. Five, all active. */
+const FRAMEWORKS = ['SB 253', 'SECR', 'Canada S-211', 'CSRD', 'CS3D'] as const
+
+/**
+ * ⚠️ NO ANSWER HERE MAY IMPLY THAT A NOT-MET IS A CLEARANCE. Two places could be misread and both say it
+ * outright: the near-threshold extra, for CS3D's unmodelled routes, and the non-EU answer, which says a
+ * non-EU target is "neither cleared nor resolved". lib/deals/assessment.ts is explicit that
+ * 'not-applicable' is "a false negative, the worse error in diligence", and this page inherits that.
+ *
+ * ⚠️ NO DURATION IS CLAIMED IN THE FIRST ANSWER. There is no constant for one and none was invented. The
+ * list of inputs carries the sense of "short" without asserting a number, the same technique as GHG's
+ * "a handful of short questions".
+ *
+ * ⚠️ THE THIRD ANSWER DESCRIBES A USE, NOT A MODE. There is no self-assessment feature: the form is
+ * target-shaped and the engine does not distinguish a target from the entrant. Wording that implied a
+ * mode would be promising a screen that does not exist.
+ */
+const FAQ: readonly Faq[] = [
+  { q: 'How long does a screen take?',
+    a: 'As long as it takes to enter a handful of figures about the company: turnover, total assets, headcount, sector, primary jurisdiction, deal value, location count and currency. The answer comes back from those, so there is nothing to send away and nothing to wait for. What takes longer is finding the figures, and where one is missing the screen names it rather than proceeding without it.' },
+  { q: 'What if the target is close to a threshold?',
+    a: `It is flagged rather than answered. A figure within ${NEAR_BAND_PCT} of a limb's own threshold is marked marginal, and the framework is marked near-threshold only where that marginal limb is the one deciding the outcome, so a borderline figure that could not change the answer does not raise a false alarm. The boundary is inclusive: exactly at the band counts as marginal.`,
+    extra: [
+      'A screen also states the parts of a test it did not run, rather than letting you assume they passed. Four it will tell you about:',
+      'CS3D scope. It tests the employee and turnover route only, so a company below those limbs is outside that route rather than outside the Directive. It also does not apply the exclusions that remove funds from scope regardless of size.',
+      'Two-year lookback. For CS3D and Canada S-211 it reads one financial year where the law asks for two consecutive years, so a company that crossed once is reported as crossing.',
+      'SB 253 measure. California measures gross receipts with no deduction for cost of goods sold. The figure you enter is revenue, which is materially smaller for a distributor.',
+      `Currency. Converted at the European Central Bank reference rate for ${FX_AS_OF}, cited on the answer rather than applied silently.`,
+    ] },
+  { q: 'Can we run this on our own company?',
+    a: 'Yes, and it is the same screen. The test does not care whose figures they are, so entering your own gives you the answer a buyer would get before they ask for it. That is the point of running it while you are preparing to sell rather than after somebody else has found something.' },
+  { q: 'Does it cover non-EU targets?',
+    a: 'Yes, and the useful part of the answer is where it stops. SB 253, SECR and Canada S-211 are tested wherever the company sits, because their tests turn on figures the screen collects. For CSRD and CS3D a non-EU target is neither cleared nor resolved: both measure turnover generated in the European Union, the screen collects worldwide revenue, and no conversion turns one into the other, so the answer abstains and says which figure it would need. In diligence a false negative is the worse error, because a buyer told a statute does not apply stops looking.' },
+]
