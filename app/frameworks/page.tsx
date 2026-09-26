@@ -94,7 +94,15 @@ const groups: Group[] = [
     items: [
       { name: 'EU CBAM', body: 'Regulation (EU) 2023/956 — the Carbon Border Adjustment Mechanism. Embedded emissions for goods entering the EU, declared by the importer, who needs the figures from the producer.', maps: 'Installation-level direct and indirect emissions with an Annex IV summary and a verifier portal.', href: CBAM_REGULATION_URL, covers: [{ href: '/cbam' }] },
       { name: 'CBAM Annex IV', body: 'The reporting format for specific embedded emissions per good.', maps: 'Generated from your installation data and exported to XLSX.', href: CBAM_REGULATION_URL, covers: [{ href: '/cbam' }] },
-      { name: 'CBAM implementing regulations', body: 'The sector rules and default values behind steel, aluminium, cement and fertiliser.', maps: 'Per-country sector defaults and the boundary guidance applied to your installations.', href: CBAM_COMMISSION_URL, covers: [{ href: '/cbam' }] },
+            // ⚠️ IRON AND STEEL, AND ALUMINIUM. NOT FOUR SECTORS. This read "steel, aluminium, cement and
+      // fertiliser" until 25 Sep 2026, which claimed coverage the product does not have: cbam_cn_map and
+      // cbam_goods_categories are seeded by 20260716_cbam_reference.sql (CN chapters 72 and 73) and
+      // 20260727_cbam_aluminium_seed.sql (Ch.76), and nothing else. Cement, fertilisers and hydrogen
+      // appear in the migrations ONLY in comments naming sectors a column does not apply to.
+      //   app/cbam/page.tsx and app/methodology/page.tsx both already said this correctly — "available
+      // now … in active development" — so this card was the single surface out of step, on the page
+      // whose whole job is to be checkable.
+      { name: 'CBAM implementing regulations', body: 'The sector rules and default values behind iron and steel, and aluminium.', maps: 'Per-country sector defaults and the boundary guidance applied to your installations. Cement, fertilisers and hydrogen are in active development.', href: CBAM_COMMISSION_URL, covers: [{ href: '/cbam' }] },
     ],
   },
   {

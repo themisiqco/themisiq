@@ -7,7 +7,8 @@ import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
-  ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection, bodyCopy, moduleEyebrow,
+  ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection, ModuleOutputs,
+  bodyCopy, moduleEyebrow, type ModuleOutput,
 } from '@/app/components/modulePage'
 
 const KEY = 'climate-risk' as const
@@ -123,27 +124,14 @@ export default function ClimateRiskPage() {
         />
       </ModuleSection>
 
-      {/* ── 6. WHAT THE ASSESSMENT PRODUCES ──
-      ⚠️ THE SECTION IS ABSENT WHERE A MODULE HAS NO SAMPLE, never present and empty. Both files below
-      are in public/samples/. A "coming soon" tile on a page selling a report is worse than no tile. */}
+      {/* ── 6. WHAT THE MODULE PRODUCES ──
+      Shared with app/cbam/page.tsx via ModuleOutputs. Both files here are in public/samples/; CBAM's
+      output is a live page instead, which is why `kind` exists. */}
       <ModuleSection>
-        <h2 style={sectionTitle}>What the assessment produces</h2>
-        <p style={{ ...bodyCopy, marginTop: '1rem' }}>
-          Two reports from one assessment, both generated from your own answers. These are real outputs
-          for a fictional company, not mock-ups.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
-          {SAMPLES.map(s => (
-            <div key={s.file} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25 }}>{s.title}</div>
-              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{s.body}</div>
-              <a href={s.file} target="_blank" rel="noopener noreferrer"
-                style={{ ...btnSecondary, textDecoration: 'none', marginTop: 'auto', textAlign: 'center' }}>
-                Read the sample
-              </a>
-            </div>
-          ))}
-        </div>
+        <ModuleOutputs
+          intro="Two reports from one assessment, both generated from your own answers. These are real outputs for a fictional company, not mock-ups."
+          outputs={OUTPUTS}
+        />
       </ModuleSection>
 
       {/* ── 7. WHAT IT SATISFIES ── */}
@@ -259,13 +247,13 @@ const COVERS = [
   ['Scenario analysis', 'Several futures rather than one, with the assumptions recorded.'],
 ] as const
 
-/** Both files are in public/samples/. A module with no sample omits section 6 entirely. */
-const SAMPLES = [
-  { title: 'Climate resilience report', file: '/samples/magnetic-industrial-s2-climate-resilience.pdf',
+/** Both files are in public/samples/. A module with no output omits the section entirely. */
+const OUTPUTS: readonly ModuleOutput[] = [
+  { kind: 'document', title: 'Climate resilience report', href: '/samples/magnetic-industrial-s2-climate-resilience.pdf',
     body: 'Physical and transition risk across the scenario range, with the resilience conclusion and the basis for each classification.' },
-  { title: 'Double materiality screening report', file: '/samples/magnetic-industrial-csrd-double-materiality.pdf',
+  { kind: 'document', title: 'Double materiality screening report', href: '/samples/magnetic-industrial-csrd-double-materiality.pdf',
     body: 'The ten ESRS topics scored on both axes, with the matrix and the per-topic reasoning.' },
-] as const
+]
 
 const FRAMEWORKS = ['SB 261', 'IFRS S2', 'TCFD', 'ESRS E1'] as const
 

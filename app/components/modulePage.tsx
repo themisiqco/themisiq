@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { ModuleKey } from '@/lib/pricing'
 import { evidenceClaim } from '@/lib/modulePages'
-import { btnOnBand, btnOnBandOutline } from './buttonStyles'
+import { btnSecondary, btnOnBand, btnOnBandOutline } from './buttonStyles'
 import { sectionTitle } from './headingStyles'
 
 /**
@@ -84,7 +84,46 @@ export function EvidenceSection({ moduleKey, workings, heading = 'How you stand 
   )
 }
 
-/* ── 4. The closing band ─────────────────────────────────────────────────────────────────────────── */
+/* ── 4. What the module produces ─────────────────────────────────────────────────────────────────── */
+
+/**
+ * The outputs section. ⚠️ EXTRACTED ON THE SECOND PAGE, WHICH IS WHEN IT EARNED IT — and the second
+ * page is also what widened it. Climate Risk's outputs are two PDFs in public/samples/; CBAM's is a
+ * live page at /cbam/preview and there is no CBAM PDF. Built for Climate Risk alone this would have
+ * taken a file path and forced CBAM to invent a document, which is the failure mode the homepage's
+ * broken-image comment describes: a placeholder is indistinguishable from a finished thing.
+ *
+ * ⚠️ THE SECTION IS ABSENT WHERE A MODULE HAS NO OUTPUT TO SHOW, never present and empty. A page
+ * selling a report with a "coming soon" tile on it is worse than one that does not raise the subject.
+ *
+ * `kind` drives the label and the target, because the two artefacts are not the same promise: a
+ * document is a fixed artefact a reader keeps, a page is something they walk through.
+ */
+export type ModuleOutput = { title: string; body: string; href: string; kind: 'document' | 'page' }
+
+export function ModuleOutputs({ intro, outputs }: { intro: string; outputs: readonly ModuleOutput[] }) {
+  return (
+    <>
+      <h2 style={sectionTitle}>What the module produces</h2>
+      <p style={{ ...bodyCopy, marginTop: '1rem' }}>{intro}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
+        {outputs.map(o => (
+          <div key={o.href} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25 }}>{o.title}</div>
+            <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.65 }}>{o.body}</div>
+            <a href={o.href}
+              {...(o.kind === 'document' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              style={{ ...btnSecondary, textDecoration: 'none', marginTop: 'auto', textAlign: 'center' }}>
+              {o.kind === 'document' ? 'Read the sample' : 'Open the preview'}
+            </a>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+/* ── 5. The closing band ─────────────────────────────────────────────────────────────────────────── */
 
 /**
  * ⚠️ SHARED BECAUSE TWO BANDS ALREADY DRIFTED ONCE. app/page.tsx's hero and closing band are both

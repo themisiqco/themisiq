@@ -40,7 +40,7 @@ const PAGE_BY_MODULE: Record<ModuleKey, string> = {
  * A converted page that does NOT import MODULE_SUBLINE fails, and an unconverted page that somehow
  * imports it fails too — so the list cannot quietly fall behind reality in either direction.
  */
-const CONVERTED: ModuleKey[] = ['climate-risk']
+const CONVERTED: ModuleKey[] = ['cbam', 'climate-risk']
 
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
