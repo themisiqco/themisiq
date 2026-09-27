@@ -80,15 +80,23 @@ const CONTROLS = [
   { id: 'train2', domain: 'Training & Awareness', title: 'Phishing simulation', desc: 'Regular phishing simulation exercises with targeted follow-up training', nis2: false, dora: false, sec: false, iso: true, nist: true, weight: 1 },
 ]
 
+// ⚠️ FOUR ACCENTS, BUT THIS IS AN ORDERED SCALE, NOT FOUR CATEGORIES. Every value here is byte-identical
+// to what it replaced (26 Sep 2026), so nothing moved on screen — the change is that the family now says
+// "category" instead of "state", which is closer to the truth but still not right. A maturity rung is a
+// position on an axis, so the real home is --color-scale-*, and that family CANNOT express this yet:
+// --color-scale-high is undeclarable until the "one worst colour or two" question in docs/backlog.md is
+// settled, because the platform has two values for "worst" 1.09:1 apart. `partial` also held
+// var(--color-state-warn) rather than a literal, which is the same category/state confusion one level down.
+// Do not "finish" this by inventing a fourth scale member; finish it by settling the scale.
 const MATURITY_CONFIG: Record<Maturity, { label: string; score: number; color: string; bg: string }> = {
-  none:        { label: 'Not implemented', score: 0, color: '#B91C1C', bg: '#FCEBEB' },
-  partial:     { label: 'Partially implemented', score: 1, color: 'var(--color-state-warn)', bg: '#FEF3E2' },
-  implemented: { label: 'Fully implemented', score: 2, color: '#0F6E56', bg: '#E1F5EE' },
-  optimised:   { label: 'Optimised & tested', score: 3, color: '#0C447C', bg: '#E6F1FB' },
+  none:        { label: 'Not implemented', score: 0, color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-wash)' },
+  partial:     { label: 'Partially implemented', score: 1, color: 'var(--color-accent-amber)', bg: 'var(--color-accent-amber-wash)' },
+  implemented: { label: 'Fully implemented', score: 2, color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-wash)' },
+  optimised:   { label: 'Optimised & tested', score: 3, color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-wash)' },
 }
 
 const FRAMEWORK_CONFIG: Record<Framework, { label: string; color: string; deadline: string }> = {
-  nis2:    { label: 'EU NIS2', color: '#B91C1C', deadline: 'Active Oct 2024' },
+  nis2:    { label: 'EU NIS2', color: 'var(--color-accent-red)', deadline: 'Active Oct 2024' },
   // ⚠️ DORA IS THE ONE ROW IN THIS MAP THAT CANNOT TAKE AN EXISTING ACCENT. Four of the six were already
   // spoken for by its siblings here (red NIS2, blue SEC, green ISO, amber NIST), --color-accent-magenta is
   // 6.8° and 1.05:1 from --color-state-info, and --color-module-cyber-ink would make one of five categories
@@ -97,9 +105,9 @@ const FRAMEWORK_CONFIG: Record<Framework, { label: string; color: string; deadli
   // ⚠️ SEC BELOW IS accent-blue, 32.4° AWAY. These two are adjacent in the rendered map, so if they ever
   // read as one blue it is this pair to measure, not this comment to trust.
   dora:    { label: 'EU DORA', color: 'var(--color-accent-indigo)', deadline: 'Active Jan 2025' },
-  sec:     { label: 'SEC Cyber', color: '#0C447C', deadline: 'Active Dec 2023' },
-  iso27001:{ label: 'ISO 27001', color: '#0F6E56', deadline: 'Ongoing' },
-  nist:    { label: 'NIST CSF 2.0', color: 'var(--color-state-warn)', deadline: 'Ongoing' },
+  sec:     { label: 'SEC Cyber', color: 'var(--color-accent-blue)', deadline: 'Active Dec 2023' },
+  iso27001:{ label: 'ISO 27001', color: 'var(--color-accent-green)', deadline: 'Ongoing' },
+  nist:    { label: 'NIST CSF 2.0', color: 'var(--color-accent-amber)', deadline: 'Ongoing' },
 }
 
 const DOMAINS = [...new Set(CONTROLS.map(c => c.domain))]
@@ -209,6 +217,18 @@ export default function CyberDashboard() {
   const { score, maxScore, pct, gaps } = calcScore(inventory.responses, inventory.frameworks)
   const top5 = getTop5(gaps, inventory.frameworks)
 
+  // ⚠️ HELD ON PURPOSE, 26 SEP 2026, WHILE EVERY OTHER COLOUR ON THIS PAGE MOVED TO A TOKEN. This is a
+  // three-rung ORDERED SCALE — good / developing / at-risk — and no token family can express it yet.
+  // --color-scale-* has only `mid` declared: --color-scale-high CANNOT be added without moving a pixel,
+  // because the platform holds TWO values for "worst" (#B91C1C on the risk severity and persistence
+  // scales, #A32D2D on the materiality matrix) which are 1.09:1 apart, so naming either renames one
+  // scale's high and MOVES the other's. That is the open "one worst colour or two" decision in
+  // docs/backlog.md, and it is a decision about the platform, not about this page.
+  // ⚠️ DO NOT TOKENISE THIS TO --color-accent-* OR --color-state-* TO TIDY IT. An accent says "category"
+  // and a state says "claim about the content"; a rung is neither, and either would be a third wrong
+  // answer that looks finished. The middle rung already reads var(--color-state-warn), which is that
+  // mistake in miniature and is left exactly as found. Three sites share this: scoreColor here, the
+  // per-domain `color` and `statusColor` below. Change all three together or none.
   const scoreColor = pct >= 75 ? '#0F6E56' : pct >= 50 ? 'var(--color-state-warn)' : '#B91C1C'
   const scoreLabel = pct >= 75 ? 'Good' : pct >= 50 ? 'Developing' : pct >= 25 ? 'At Risk' : 'Critical Gaps'
 
@@ -351,7 +371,7 @@ export default function CyberDashboard() {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{control.title}</span>
-                    {control.weight === 3 && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FCEBEB', color: '#B91C1C' }}>HIGH PRIORITY</span>}
+                    {control.weight === 3 && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: 'var(--color-accent-red-wash)', color: 'var(--color-accent-red)' }}>HIGH PRIORITY</span>}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {(Object.keys(FRAMEWORK_CONFIG) as Framework[]).filter(f => inventory.frameworks.includes(f) && control[f as keyof typeof control]).map(f => (
                         <span key={f} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>{FRAMEWORK_CONFIG[f].label}</span>
@@ -409,6 +429,7 @@ export default function CyberDashboard() {
           const domControls = CONTROLS.filter(c => c.domain === domain && inventory.frameworks.some(f => c[f as keyof typeof c]))
           const domGaps = domControls.filter(c => !inventory.responses[c.id] || inventory.responses[c.id] === 'none' || inventory.responses[c.id] === 'partial').length
           const domPct = domControls.length > 0 ? Math.round(((domControls.length - domGaps) / domControls.length) * 100) : 100
+          // Held with scoreColor above — the same three-rung scale, the same reason. See that comment.
           const color = domPct >= 75 ? '#0F6E56' : domPct >= 50 ? 'var(--color-state-warn)' : '#B91C1C'
           return (
             <div key={domain} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem' }}>
@@ -418,7 +439,7 @@ export default function CyberDashboard() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 11, color }}>{domPct}%</span>
-                {domGaps > 0 && <span style={{ fontSize: 10, color: '#B91C1C' }}>{domGaps} gap{domGaps > 1 ? 's' : ''}</span>}
+                {domGaps > 0 && <span style={{ fontSize: 10, color: 'var(--color-accent-red)' }}>{domGaps} gap{domGaps > 1 ? 's' : ''}</span>}
               </div>
             </div>
           )
@@ -434,6 +455,7 @@ export default function CyberDashboard() {
           const fwControls = CONTROLS.filter(c => c[fw as keyof typeof c] && inventory.frameworks.includes(fw))
           const fwGaps = fwControls.filter(c => !inventory.responses[c.id] || inventory.responses[c.id] === 'none').length
           const status = fwGaps === 0 ? 'Compliant' : fwGaps <= 2 ? 'Near compliant' : 'Gaps identified'
+          // Held with scoreColor above — the same three-rung scale, the same reason. See that comment.
           const statusColor = fwGaps === 0 ? '#0F6E56' : fwGaps <= 2 ? 'var(--color-state-warn)' : '#B91C1C'
           return (
             <div key={fw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '0.5px solid #e8e7e4' }}>
@@ -458,9 +480,9 @@ export default function CyberDashboard() {
       <p style={sectionSub}>Based on your gap assessment, these are the highest-priority controls to implement first — ranked by regulatory impact and risk weight.</p>
 
       {top5.length === 0 ? (
-        <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 12, padding: '1.5rem', textAlign: 'center' }}>
+        <div style={{ background: 'var(--color-accent-green-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-green) 20%, transparent)', borderRadius: 12, padding: '1.5rem', textAlign: 'center' }}>
           <div style={{ fontSize: 20, marginBottom: 8 }}>✓</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>No critical gaps identified</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-accent-green)', marginBottom: 4 }}>No critical gaps identified</div>
           <div style={{ fontSize: 13, color: '#555553' }}>Your cyber governance programme appears strong. Continue to test and optimise.</div>
         </div>
       ) : (
@@ -628,9 +650,9 @@ export default function CyberDashboard() {
                 </div>
               </div>
               {gaps.length > 0 && (
-                <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 12, padding: '1rem', marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#B91C1C', marginBottom: 4 }}>⚠ {gaps.length} gap{gaps.length > 1 ? 's' : ''} identified</div>
-                  <div style={{ fontSize: 11, color: '#B91C1C', lineHeight: 1.6 }}>Go to Step 4 to see your top 5 remediation priorities</div>
+                <div style={{ background: 'var(--color-accent-red-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-red) 20%, transparent)', borderRadius: 12, padding: '1rem', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent-red)', marginBottom: 4 }}>⚠ {gaps.length} gap{gaps.length > 1 ? 's' : ''} identified</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-accent-red)', lineHeight: 1.6 }}>Go to Step 4 to see your top 5 remediation priorities</div>
                 </div>
               )}
               <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem' }}>
