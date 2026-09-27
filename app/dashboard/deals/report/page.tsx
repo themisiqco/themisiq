@@ -49,11 +49,12 @@ import {
   nearThresholdNoneNote, obligationPriceLabel, resolveFieldsPrompt,
   FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
   type FrameworkApplicability, type ResolvedRisk,
+  CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
 } from '../../../../lib/deals/assessment'
 import {
   dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
   buildLimbRows, buildFxBasisRows, limbValueDisplay, limbThresholdDisplay,
-  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure, cs3dNoteReport,
+  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure, cs3dNoteReport, NOT_PROVIDED,
   resolveCanadaS211, canadaS211NoteReport,
 } from '../../../../lib/deals/reportModel'
 
@@ -73,6 +74,9 @@ type DealRow = {
   location_count: number | null
   employee_count?: number | null
   total_assets?: number | null
+  // Optional and tri-state, exactly as the wizard stores it: a report of a deal saved before the field
+  // existed reads `undefined`, which must behave as "not answered" and never as "not listed".
+  listed_ca_exchange?: boolean | null
   has_ghg_data: boolean | null
   has_esg_report: boolean | null
   created_at: string
@@ -91,8 +95,8 @@ const SEV = {
 // greyscale print.
 const STATE = {
   applies:      { label: 'APPLIES', color: '#0F6E56', bg: '#E1F5EE', border: 'rgba(15,110,86,0.35)' },
-  verify:       { label: 'APPLIES — VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
-  nearBelow:    { label: 'NEAR THRESHOLD — VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  verify:       { label: 'APPLIES: VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  nearBelow:    { label: 'NEAR THRESHOLD: VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
   notAssessed:  { label: 'NOT ASSESSED', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
 } as const
 
@@ -255,7 +259,7 @@ function DealsReportInner() {
   if (gate.kind === 'paywalled') return (
     <PaywallCard
       title="Unlock the Deals module"
-      body="Screening one target is free. This report belongs to another one — unlock Deals to open it, keep a pipeline of targets, and take away the diligence report, the Excel export and the shareable assessment."
+      body="Screening one target is free. This report belongs to another one. Unlock Deals to open it, keep a pipeline of targets, and take away the diligence report, the Excel export and the shareable assessment."
       href="/pricing?modules=deals"
     />
   )
@@ -377,7 +381,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
   const obligations = getObligations(locationCount, frameworks, sector)
   const complianceCost = dealValue > 0 ? getComplianceCost(dealValue, sector, frameworks) : null
   // In a printed document "Enter locations →" would instruct a reader who has nothing to click.
-  const themisIq = themisIqFigure(obligations, 'Custom quote — location count not provided')
+  const themisIq = themisIqFigure(obligations, 'Custom quote: location count not provided')
 
   const consultantRange = `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
   const activeTests = Object.values(THRESHOLD_TESTS).filter(isTestActive)
@@ -450,10 +454,10 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
               Sector and jurisdiction are not both set on this deal, so nothing has been evaluated. An empty list here is <strong style={{ fontWeight: 600 }}>not</strong> a finding that no framework applies.
             </NotAssessed>
           ) : view.frameworks === 'assessed-none' ? (
-            <p style={p}>None — no framework was triggered for this jurisdiction, sector and size.</p>
+            <p style={p}>None. No framework was triggered for this jurisdiction, sector and size.</p>
           ) : (
             <>
-              <p style={note}>Determined from the target&rsquo;s jurisdiction, sector and — where a statute imposes one — its statutory size test. A framework listed here applies on the figures provided.</p>
+              <p style={note}>Determined from the target&rsquo;s jurisdiction, sector and, where a statute imposes one, its statutory size test. A framework listed here applies on the figures provided.</p>
               <table style={tbl}>
                 <thead>
                   <tr style={trh}>
@@ -465,14 +469,21 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                   {frameworks.map(fw => {
                     const near = nearByFramework.get(fw)
                     const citation = citationFor(fw)
+                    const row = applicability.find(f => f.framework === fw)
                     return (
                       <tr key={fw} style={tr}>
                         <td style={td}>
                           <div style={{ fontWeight: 500 }}>{fw}</div>
                           {citation && <p style={cite}>{citation}</p>}
                           {near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{nearSentence(near)}</p>}
+                          {/* ⚠️ A ROW THAT APPLIES AND STILL NEEDS CHECKING. `verify` is set where the
+                              engine settled applicability on one route while a condition it never asked
+                              about remains open — today, Canada S-211 reached by a stock-exchange listing,
+                              where the reporting duty also turns on goods. Same amber treatment a
+                              near-threshold row gets, because the reader's job is the same. */}
+                          {row?.verify && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{row.verify}</p>}
                         </td>
-                        <td style={td}><Chip s={near ? STATE.verify : STATE.applies} /></td>
+                        <td style={td}><Chip s={near || row?.verify ? STATE.verify : STATE.applies} /></td>
                       </tr>
                     )
                   })}
@@ -481,7 +492,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
               {/* Partial assessment: the list above stands, but naming what was withheld stops a
                   reader inferring that the missing statutes were considered and excluded. */}
               {view.notAssessed.length > 0 && (
-                <NotAssessed title={`PARTIAL — ${view.notAssessed.join(', ')} ${partialHeadingPhrase(view)}`}>
+                <NotAssessed title={`PARTIAL: ${view.notAssessed.join(', ')} ${partialHeadingPhrase(view)}`}>
                   {/* Title keeps the UNION — "was anything withheld" is the only claim it makes, and
                       it must name everything. The BODY explains WHY, which differs per population and
                       cannot be said of both: one had a limb it could not settle, the other was fully
@@ -498,10 +509,10 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         <section className="page" style={{ marginTop: 40 }}>
           <H>Near-threshold frameworks</H>
           <p style={note}>
-            Raised only where a <strong style={{ fontWeight: 600 }}>marginal limb is decisive</strong> for the outcome — a limb within {NEAR_PCT} of its figure that, if it moved, would change whether the test is met. The legal answer is unchanged: a framework that applies still applies, and one that does not still does not.
+            Raised only where a <strong style={{ fontWeight: 600 }}>borderline figure decides the outcome</strong>: a figure within {NEAR_PCT} of the trigger that, if it moved, would change whether the test is met. The legal answer is unchanged: a framework that applies still applies, and one that does not still does not.
           </p>
           {view.nearThreshold === 'not-assessed' ? (
-            <NotAssessed title="NEAR-THRESHOLD — NOT ASSESSED">{notAssessedNote}</NotAssessed>
+            <NotAssessed title="NEAR-THRESHOLD: NOT ASSESSED">{notAssessedNote}</NotAssessed>
           ) : view.nearThreshold === 'assessed-none' ? (
             <p style={p}>{nearThresholdNoneNote()}</p>
           ) : (
@@ -509,8 +520,8 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
               <thead>
                 <tr style={trh}>
                   <th style={th}>Framework</th>
-                  <th style={th}>Limbs met</th>
-                  <th style={th}>Decisive limb</th>
+                  <th style={th}>Tests met</th>
+                  <th style={th}>Deciding figure</th>
                   <th style={th}>Value applied</th>
                   <th style={th}>Threshold</th>
                   <th style={{ ...th, width: 74 }}>Side</th>
@@ -525,7 +536,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                         <div style={{ fontWeight: 500 }}>{f.framework}</div>
                         <div style={{ marginTop: 4 }}><Chip s={f.applies ? STATE.verify : STATE.nearBelow} /></div>
                       </td>
-                      <td style={td}>{f.test ? `${f.test.metCount} of ${f.test.requires}` : '—'}</td>
+                      <td style={td}>{f.test ? `${f.test.metCount} of ${f.test.requires}` : NOT_PROVIDED}</td>
                       <td style={td}>{dec.map(l => l.limb.measure.replace(/_/g, ' ')).join('; ')}</td>
                       <td style={td}>{dec.map(limbValueDisplay).join('; ')}</td>
                       <td style={td}>{dec.map(limbThresholdDisplay).join('; ')}</td>
@@ -551,7 +562,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
 
         {/* 4 ── THRESHOLD LIMBS APPLIED */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>Threshold limbs applied</H>
+          <H>Size tests applied</H>
           {limbRows.length === 0 ? (
             <p style={p}>No size-gated framework is in scope for this jurisdiction.</p>
           ) : (
@@ -563,7 +574,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                 <thead>
                   <tr style={trh}>
                     <th style={th}>Framework</th>
-                    <th style={th}>Limb</th>
+                    <th style={th}>Figure tested</th>
                     <th style={th}>Measure required</th>
                     <th style={th}>Value applied</th>
                     <th style={th}>Threshold</th>
@@ -586,9 +597,20 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                   ))}
                 </tbody>
               </table>
+              {/* ⚠️ A STANDING LIMITATION, IN THE SAME REGISTER AS THE TWO-YEAR CHECK BELOW, and not a
+                  framework row: that version was measured and withdrawn on 26 Sep 2026 because it landed
+                  on every deal. Gated so it appears only where it is true and unresolved — not for a
+                  Canadian target, whose size test DID run, and not for a listed Yes, which settles
+                  applicability and carries its own VERIFY note. The heading is inside the constant, which
+                  is why this is the one register entry whose title is split from its body. */}
+              {showCanadaS211JurisdictionCaveat(deal.jurisdiction ?? '', deal.listed_ca_exchange) && (
+                <NotAssessed title={CANADA_S211_JURISDICTION_CAVEAT.split(':')[0].toUpperCase()}>
+                  {CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)}
+                </NotAssessed>
+              )}
               {activeTests.filter(t => !t.lookbackModelled).map(t => (
-                <NotAssessed key={t.framework} title={`LOOKBACK NOT MODELLED — ${t.framework}`}>
-                  The statute measures over {t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a limb in the prior year and has since dipped is <strong style={{ fontWeight: 600 }}>under-called</strong> — such a target surfaces above as a marginal below-side limb.
+                <NotAssessed key={t.framework} title={`TWO-YEAR CHECK NOT RUN: ${t.framework}`}>
+                  The statute measures over {t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a test in the prior year and has since dipped is <strong style={{ fontWeight: 600 }}>under-called</strong>. Such a target surfaces above as a borderline figure just below the trigger.
                 </NotAssessed>
               ))}
             </>
@@ -668,12 +690,12 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           </p>
           <div style={{ display: 'flex', gap: 14, marginBottom: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
             <div style={{ flex: '1.6 1 300px', border: '1px solid #0d0d0d', borderRadius: 10, padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>Traditional consultant — first year</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>Traditional consultant, first year</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.85rem', fontWeight: 400, lineHeight: 1.15 }}>{consultantRange}</div>
               <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>Indicative market range, scaled per obligation for this target&rsquo;s sector and site count.</div>
             </div>
             <div style={{ flex: '1 1 220px', border: '1px solid #e8e7e4', borderRadius: 10, padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>ThemisIQ — scope-matched modules</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>ThemisIQ, scope-matched modules</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.15, color: '#555553' }}>{themisIq}</div>
               <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>One available route, priced for the modules this scope requires.</div>
             </div>
@@ -711,7 +733,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           <table style={tbl}>
             <thead>
               <tr style={trh}>
-                <th style={th}>Also recommended — not in the ThemisIQ total</th>
+                <th style={th}>Also recommended, not in the ThemisIQ total</th>
                 <th style={{ ...th, width: 190 }}>ThemisIQ</th>
                 <th style={{ ...th, width: 140 }}>Consultant (reference)</th>
               </tr>
@@ -731,7 +753,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
             <table style={tbl}>
               <thead>
                 <tr style={trh}>
-                  <th style={th}>Flagged — separate specialist, in neither total</th>
+                  <th style={th}>Flagged: separate specialist, in neither total</th>
                   <th style={{ ...th, width: 190 }}>ThemisIQ</th>
                   <th style={{ ...th, width: 140 }}>Consultant (reference)</th>
                 </tr>
@@ -778,11 +800,11 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
             <tbody>
               <tr style={tr}>
                 <td style={td}>GHG inventory / emissions data</td>
-                <td style={{ ...td, fontWeight: 500, color: deal.has_ghg_data ? '#0F6E56' : '#B91C1C' }}>{deal.has_ghg_data ? 'Available' : 'MISSING — request from target'}</td>
+                <td style={{ ...td, fontWeight: 500, color: deal.has_ghg_data ? '#0F6E56' : '#B91C1C' }}>{deal.has_ghg_data ? 'Available' : 'MISSING: request from target'}</td>
               </tr>
               <tr style={tr}>
                 <td style={td}>ESG report or sustainability disclosure</td>
-                <td style={{ ...td, fontWeight: 500, color: deal.has_esg_report ? '#0F6E56' : '#B91C1C' }}>{deal.has_esg_report ? 'Available' : 'MISSING — request from target'}</td>
+                <td style={{ ...td, fontWeight: 500, color: deal.has_esg_report ? '#0F6E56' : '#B91C1C' }}>{deal.has_esg_report ? 'Available' : 'MISSING: request from target'}</td>
               </tr>
             </tbody>
           </table>
@@ -877,7 +899,7 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center', lineHeight: 1.7 }}>
           ThemisIQ Compliance Inc. · www.themisiq.co · Reference {reference} · Generated {reportDate}
           <br />
-          This assessment reflects the figures held for this deal on {reportDate}. It is derived at generation, not stored — a report generated on another date may differ.
+          This assessment reflects the figures held for this deal on {reportDate}. It is derived at generation, not stored, so a report generated on another date may differ.
         </div>
       </div>
 

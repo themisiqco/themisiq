@@ -23,12 +23,13 @@ import {
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
   CANADA_S211_LISTING_QUESTION, CANADA_S211_LISTING_HINT,
+  CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
 } from '../../../lib/deals/assessment'
 // Presentation model shared with app/dashboard/deals/report/page.tsx. These wizard screens and the
 // printed report phrase one assessment the same way — neither re-derives it, so they cannot state
 // different figures or cite different regimes for one deal.
 import {
-  DEAL_TYPES, spellMagnitude, NEAR_PCT, nearSentence,
+  DEAL_TYPES, dealTypeShort, NOT_PROVIDED, spellMagnitude, NEAR_PCT, nearSentence,
   resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf, cs3dNoteWizard,
   resolveCanadaS211, canadaS211NoteWizard,
 } from '../../../lib/deals/reportModel'
@@ -516,7 +517,7 @@ function DealsDashboardInner() {
       if (!data || data.length === 0) {
         // Zero rows means the row did not qualify, so no link was created. Say what to do.
         setShareError(deal.sector
-          ? 'This deal has no sector saved yet — the sector you have chosen has not been saved. Use Save deal at the bottom of the page, then try again.'
+          ? 'This deal has no sector saved yet. The sector you have chosen has not been saved. Use Save deal at the bottom of the page, then try again.'
           : 'This deal has no sector, so the link would open to an empty assessment. Add one in Deal setup, save the deal, then try again.')
         return
       }
@@ -576,7 +577,7 @@ function DealsDashboardInner() {
     <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' as const, marginBottom: 20 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>Sign in to see your results</div>
       <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, maxWidth: 460, margin: '0 auto 18px' }}>
-        Screening one target is free. Everything you have entered is kept — signing in brings you
+        Screening one target is free. Everything you have entered is kept, and signing in brings you
         straight back to this deal with the figures still in place.
       </div>
       <button onClick={signInForResults} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
@@ -610,8 +611,8 @@ function DealsDashboardInner() {
               1000x entry error changes which statutes are cited — it has to be visible at input time. */}
           <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: deal.revenue > 0 ? '#0d0d0d' : 'var(--color-ink-muted)' }}>
             {deal.revenue > 0
-              ? <>Reading this as <strong style={{ fontWeight: 600 }}>{deal.currency} {deal.revenue.toLocaleString()}</strong> — {spellMagnitude(deal.revenue)}.</>
-              : <>Enter the full amount in whole {deal.currency} — 2000000 for two million, not 2 or 2000.</>}
+              ? <>Reading this as <strong style={{ fontWeight: 600 }}>{deal.currency} {deal.revenue.toLocaleString()}</strong>: {spellMagnitude(deal.revenue)}.</>
+              : <>Enter the full amount in whole {deal.currency}: 2000000 for two million, not 2 or 2000.</>}
           </div>
         </div>
         <div>
@@ -636,7 +637,7 @@ function DealsDashboardInner() {
           <input style={inputStyle} type="number" value={deal.employee_count ?? ''} placeholder="Leave blank if unknown"
             onChange={e => update('employee_count', e.target.value === '' ? null : Number(e.target.value))} />
           <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
-            {deal.employee_count == null ? 'Undeclared — limbs needing headcount cannot be assessed.' : `Declared: ${deal.employee_count.toLocaleString()}.`}
+            {deal.employee_count == null ? 'Leave blank if unknown. Tests that need employee numbers will be marked not assessed.' : `Using ${deal.employee_count.toLocaleString()} employees.`}
           </div>
         </div>
         <div>
@@ -644,18 +645,19 @@ function DealsDashboardInner() {
           <input style={inputStyle} type="number" value={deal.total_assets ?? ''} placeholder="Leave blank if unknown"
             onChange={e => update('total_assets', e.target.value === '' ? null : Number(e.target.value))} />
           <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
-            {deal.total_assets == null ? 'Undeclared — limbs needing total assets cannot be assessed.' : `Declared: ${deal.currency} ${deal.total_assets.toLocaleString()} — ${spellMagnitude(deal.total_assets)}.`}
+            {deal.total_assets == null ? 'Leave blank if unknown. Tests that need total assets will be marked not assessed.' : `Using ${deal.currency} ${deal.total_assets.toLocaleString()}: ${spellMagnitude(deal.total_assets)}.`}
           </div>
         </div>
-        {/* ⚠️ SHOWN FOR CANADA ONLY, because s.2(a) is a Canadian-exchange test and the question is
-            meaningless anywhere else. A form that asks everyone reads as though the answer mattered
-            everywhere, and this one changes exactly one framework.
-            ⚠️ THREE STATES, AND "NOT SURE" IS THE DEFAULT. null leaves the listing route untaken and lets
-            the size test answer as far as it can — which is never a confident negative, because the test
-            is non-exhaustive, so an unanswered question can only ever withhold. Answering "No" behaves
-            identically today and is offered so a user who KNOWS can say so. */}
-        {deal.jurisdiction === 'Canada' && (
-          <div>
+        {/* ⚠️ SHOWN FOR EVERY JURISDICTION, AND IT WAS CANADA-ONLY FOR ONE COMMIT. s.2(a) reaches an
+            entity listed on a Canadian stock exchange wherever it is established, so gating the question
+            on jurisdiction === 'Canada' was the same defect one layer up from the routing: a
+            US-established TSX-listed target could not be told about, because it was never asked.
+            ⚠️ THREE STATES, AND "NOT SURE" IS THE DEFAULT. Yes applies the framework with a VERIFY note,
+            because a listing settles the entity limb and not the reporting duty. No and Not sure behave
+            identically today and both withhold rather than exclude: on a Canadian target through the
+            non-exhaustive size test, and elsewhere through the standing jurisdiction caveat below. "No" is
+            offered so a user who KNOWS can say so, not because it changes the outcome. */}
+        <div>
             <label style={labelStyle}>{CANADA_S211_LISTING_QUESTION}</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {([['Yes', true], ['No', false], ['Not sure', null]] as const).map(([lbl, val]) => (
@@ -671,8 +673,7 @@ function DealsDashboardInner() {
             <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
               {CANADA_S211_LISTING_HINT}
             </div>
-          </div>
-        )}
+        </div>
         <div>
           <label style={labelStyle}>Number of locations / sites</label>
           <input style={inputStyle} type="number" value={deal.location_count || ''} onChange={e => update('location_count', Number(e.target.value))} placeholder="0" />
@@ -730,32 +731,48 @@ function DealsDashboardInner() {
           {s211Note.body ? ` ${s211Note.body}.` : ''}
         </div>
       )}
+      {/* ⚠️ THE STANDING JURISDICTION LIMITATION, IN STEP 1 AND NOT STEP 2. The report keeps this in its
+          limitations register beside TWO-YEAR CHECK NOT RUN; on this screen the equivalent register is
+          here in step 1, next to PARTIAL and NEAR-THRESHOLD. Step 2 is "Material ESG findings" and has no
+          limitations register of its own, so putting it there would have introduced one.
+          Gated identically to the report, through the same predicate, so the two surfaces cannot disagree
+          about when it applies: not Canada, and not a listed Yes. */}
+      {showCanadaS211JurisdictionCaveat(deal.jurisdiction, deal.listed_ca_exchange) && (
+        <div style={{ background: 'var(--color-accent-amber-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-amber) 20%, transparent)', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 12, fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
+          <strong style={{ fontWeight: 600 }}>{CANADA_S211_JURISDICTION_CAVEAT.split(':')[0]}:</strong>
+          {CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 1)}
+        </div>
+      )}
       {frameworksState === 'not-assessed' && (!view.evaluated || view.unevaluated.length > 0) ? (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {view.evaluated
-              ? <>Size test incomplete for {view.unevaluated.join(', ')} — <strong style={{ fontWeight: 600 }}>not evaluated</strong>, which is not a finding that none apply. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
-              : <>Enter sector and jurisdiction in Deal setup. Nothing has been evaluated yet — an empty list here is not a finding that no frameworks apply.</>}
+              ? <>Size test incomplete for {view.unevaluated.join(', ')}: <strong style={{ fontWeight: 600 }}>not evaluated</strong>, which is not a finding that none apply. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
+              : <>Enter sector and jurisdiction in Deal setup. Nothing has been evaluated yet, and an empty list here is not a finding that no frameworks apply.</>}
           </div>
         </div>
       ) : frameworksState === 'assessed-none' ? (
         <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-          <strong style={{ fontWeight: 600 }}>None.</strong> Assessed against this jurisdiction, sector and revenue — no framework was triggered.
+          <strong style={{ fontWeight: 600 }}>None.</strong> Assessed against this jurisdiction, sector and revenue, and no framework was triggered.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
           {frameworks.map(fw => {
             const near = nearByFramework.get(fw)
+            const row = applicability.find(f => f.framework === fw)
             return (
               <div key={fw} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 16px', background: '#fff', border: `1px solid ${near ? 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' : '#e8e7e4'}`, borderRadius: 10 }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{fw}</div>
                   {near && <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.55, marginTop: 5 }}>{nearSentence(near)}</div>}
+                  {/* Applies, with a condition this assessment never asked about — see `verify` in
+                      lib/deals/assessment.ts. Same amber line a near-threshold row gets. */}
+                  {row?.verify && <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.55, marginTop: 5 }}>{row.verify}</div>}
                 </div>
                 {/* APPLIES is retained alongside VERIFY — near-ness annotates the finding, it does not soften it. */}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  {near && <span style={verifyChip}>VERIFY</span>}
+                  {(near || row?.verify) && <span style={verifyChip}>VERIFY</span>}
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>APPLIES</span>
                 </div>
               </div>
@@ -768,7 +785,7 @@ function DealsDashboardInner() {
           trigger was withheld. Naming it stops the reader inferring it was considered and excluded. */}
       {frameworksState === 'assessed-findings' && view.notAssessed.length > 0 && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} {partialHeadingPhrase(view)}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL: {view.notAssessed.join(', ')} {partialHeadingPhrase(view)}</div>
           {/* Heading keeps the UNION — it only claims something was withheld, and must name all of it.
               The body explains WHY, which is population-specific and cannot be said of both. */}
           {view.unevaluated.length > 0 && (
@@ -787,11 +804,11 @@ function DealsDashboardInner() {
           misdescribes — a routeNotMet framework had every limb evaluated. */}
       {nearState === 'not-assessed' && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD — NOT ASSESSED</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 4 }}>NEAR-THRESHOLD: NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {view.evaluated
-              ? <>No proximity check was run — the {view.unevaluated.join(' / ')} size test{view.unevaluated.length === 1 ? '' : 's'} could not be completed. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
-              : <>No proximity check was run — sector and jurisdiction are not set.</>}
+              ? <>No proximity check was run: the {view.unevaluated.join(' / ')} size test{view.unevaluated.length === 1 ? '' : 's'} could not be completed. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}</>
+              : <>No proximity check was run: sector and jurisdiction are not set.</>}
           </div>
         </div>
       )}
@@ -800,9 +817,9 @@ function DealsDashboardInner() {
           learns the deal sits just under a trigger, without implying it has crossed it. */}
       {nearBelow.length > 0 && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>Approaching a reporting threshold — verify</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>Approaching a reporting threshold: verify</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 10 }}>
-            The following do <strong style={{ fontWeight: 600 }}>not</strong> apply on the figures entered. Each has a limb within {NEAR_PCT} of its statutory trigger, so the answer turns on how that figure is measured and on reporting-entity scope — confirm before ruling them out.
+            The following do <strong style={{ fontWeight: 600 }}>not</strong> apply on the figures entered. Each has a figure within {NEAR_PCT} of its statutory trigger, so the answer turns on how that figure is measured and on reporting-entity scope. Confirm before ruling them out.
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {nearBelow.map(f => (
@@ -984,7 +1001,7 @@ function DealsDashboardInner() {
     return (
     <div>
       <h2 style={sectionHead}>Compliance cost estimate</h2>
-      <p style={sectionSub}>Estimated cost to bring {deal.target_name || 'the target'} into ESG compliance — for your IC memo and deal valuation adjustment.</p>
+      <p style={sectionSub}>Estimated cost to bring {deal.target_name || 'the target'} into ESG compliance, for your IC memo and deal valuation adjustment.</p>
 
       {!complianceCost ? (
         <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
@@ -995,7 +1012,7 @@ function DealsDashboardInner() {
           {/* Black hero — consultant vs ThemisIQ, summed over the INCLUDED obligations only */}
           <div className="tq-summary" data-module="deals" style={{ marginBottom: 20 }}>
             <div style={{ flex: 1, padding: '20px 24px' }}>
-            <div className="tq-summary-label" style={{ marginBottom: 16 }}>Estimated ESG compliance cost — {deal.target_name || 'Target'}</div>
+            <div className="tq-summary-label" style={{ marginBottom: 16 }}>Estimated ESG compliance cost: {deal.target_name || 'Target'}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>Traditional consultant</div>
@@ -1009,11 +1026,11 @@ function DealsDashboardInner() {
               </div>
             </div>
             <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-line)', fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
-              Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours — the platform handles those directly, without cutting the deliverable.
+              Priced like sustainability software, scoped like a consultant&rsquo;s engagement. The difference is automation, not depth: traditional fees are dominated by manual data-collection and review hours, and the platform handles those directly, without cutting the deliverable.
             </div>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: -8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
+          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: -8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity. Indicative, not a quote.</div>
 
           {/* Pipeline-ROI scenario — DASHBOARD ONLY (not shared into the public /deals/[token] page:
               wrong audience). Reuses the already-computed consultant range × DEFAULT_PIPELINE_TARGETS
@@ -1021,7 +1038,7 @@ function DealsDashboardInner() {
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-brand)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Across your pipeline</div>
             {obligations.locationUnset ? (
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Enter a location count to see your annual ThemisIQ price — one subscription covers your whole screening pipeline, not one deal.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Enter a location count to see your annual ThemisIQ price. One subscription covers your whole screening pipeline, not one deal.</div>
             ) : (
               <>
                 <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
@@ -1082,14 +1099,14 @@ function DealsDashboardInner() {
               ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~{deal.currency} {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess.
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 4 }}>
-              {deal.sector || '—'}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative exposure, not a cost · requires specialist confirmation.
+              {deal.sector || NOT_PROVIDED}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative exposure, not a cost · requires specialist confirmation.
             </div>
           </div>
 
           <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>Deal structuring note</div>
             <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-              Consider including ESG compliance costs in purchase price adjustment mechanics, or structuring an escrow/holdback for regulatory compliance. ThemisIQ Advisory can provide a detailed compliance roadmap for IC approval. If the deal proceeds, ThemisIQ can complete the target&rsquo;s compliance work directly — share this assessment with the target from the Export step.
+              Consider including ESG compliance costs in purchase price adjustment mechanics, or structuring an escrow/holdback for regulatory compliance. ThemisIQ Advisory can provide a detailed compliance roadmap for IC approval. If the deal proceeds, ThemisIQ can complete the target&rsquo;s compliance work directly. Share this assessment with the target from the Export step.
             </div>
           </div>
         </>
@@ -1108,7 +1125,7 @@ function DealsDashboardInner() {
         <div className="tq-summary-label" style={{ marginBottom: 12 }}>Report summary</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
-            { label: 'Target', val: deal.target_name || '—' },
+            { label: 'Target', val: deal.target_name || NOT_PROVIDED },
             { label: 'ESG risks', val: risks.length, urgent: criticalRisks.length > 0 },
             // A bare "0" in 1.6rem Georgia reads as an assessed count. Only render a number
             // when something was actually assessed.
@@ -1133,9 +1150,9 @@ function DealsDashboardInner() {
           downloadable — it is still useful — but the reader is told which frameworks it withheld. */}
       {view.notAssessed.length > 0 && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '1rem', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL — {view.notAssessed.join(', ')} NOT ASSESSED</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 4 }}>PARTIAL: {view.notAssessed.join(', ')} NOT ASSESSED</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
-            Frameworks determinable from jurisdiction and sector <strong style={{ fontWeight: 600 }}>have</strong> been assessed and appear in this report. {view.notAssessed.join(' and ')} {view.notAssessed.length === 1 ? 'is' : 'are'} marked <strong style={{ fontWeight: 600 }}>NOT ASSESSED</strong> — that is not a finding that {view.notAssessed.length === 1 ? 'it does' : 'they do'} not apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
+            Frameworks determinable from jurisdiction and sector <strong style={{ fontWeight: 600 }}>have</strong> been assessed and appear in this report. {view.notAssessed.join(' and ')} {view.notAssessed.length === 1 ? 'is' : 'are'} marked <strong style={{ fontWeight: 600 }}>NOT ASSESSED</strong>, and that is not a finding that {view.notAssessed.length === 1 ? 'it does' : 'they do'} not apply. {resolveFieldsPrompt(view.fieldsToResolve, view.notAssessed)}
           </div>
         </div>
       )}
@@ -1171,7 +1188,7 @@ function DealsDashboardInner() {
           <div style={{ marginTop: 24, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d', marginBottom: 4 }}>Share with target company</div>
             <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 14 }}>
-              Share this assessment with the target company. They&rsquo;ll see the compliance findings and cost estimate — not your deal economics.
+              Share this assessment with the target company. They&rsquo;ll see the compliance findings and cost estimate, not your deal economics.
             </div>
             {shareError && (
               <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '0.85rem 1rem', fontSize: 12, color: '#B91C1C', lineHeight: 1.6, marginBottom: 12 }}>
@@ -1188,7 +1205,7 @@ function DealsDashboardInner() {
               <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>Save the deal to generate a shareable link.</div>
             ) : shareEnabled ? (
               <>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 12 }}>🟢 Link active — anyone with this URL can view this assessment.</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0F6E56', marginBottom: 12 }}>🟢 Link active. Anyone with this URL can view this assessment.</div>
                 {/* A live link on a deal that fails the create-gate is the urgent case: someone is
                     reading an empty assessment right now, and only the owner can stop it. */}
                 {shareBlockers.length > 0 && (
@@ -1216,7 +1233,7 @@ function DealsDashboardInner() {
                   {deal.sector ? 'Save the deal first' : 'Add a sector first'}
                 </div>
                 {deal.sector ? (
-                  <>The link shows the saved version of this deal, and the sector you have chosen has not been saved yet —
+                  <>The link shows the saved version of this deal, and the sector you have chosen has not been saved yet, so
                   so the target would open the link to an empty assessment. Use <strong style={{ fontWeight: 600 }}>Save deal</strong> at the bottom of the page.</>
                 ) : (
                   <>Without a sector there are no reporting rules or risk findings to show, so the target would open
@@ -1226,7 +1243,7 @@ function DealsDashboardInner() {
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 12 }}>🔒 Not shared — only you can see this assessment.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginBottom: 12 }}>🔒 Not shared. Only you can see this assessment.</div>
                 <button onClick={() => toggleShare(true)} disabled={shareSaving} style={{ fontSize: 13, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: shareSaving ? 'not-allowed' : 'pointer' }}>{shareSaving ? 'Generating…' : 'Generate share link'}</button>
               </>
             )}
@@ -1299,13 +1316,13 @@ function DealsDashboardInner() {
           <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>
             {gate.reason === 'free-deal-used' ? (
               <>
-                Screening one target is free. To screen another — and to keep a pipeline of them, with the
-                diligence report, the Excel export and the shareable assessment — unlock the Deals module.
+                Screening one target is free. To screen another, and to keep a pipeline of them, with the
+                diligence report, the Excel export and the shareable assessment, unlock the Deals module.
               </>
             ) : gate.reason === 'expired' ? (
               'Your saved targets are still here and you can keep working on them. Renewing lets you screen new targets again.'
             ) : (
-              'Something went wrong reading your subscription, so we have not loaded the screen rather than guess what you have. Reload the page — if it happens again, email hello@themisiq.co and we will sort it out.'
+              'Something went wrong reading your subscription, so we have not loaded the screen rather than guess what you have. Reload the page. If it happens again, email hello@themisiq.co and we will sort it out.'
             )}
           </div>
           {/* ⚠️ THIS LINK IS THE ONLY ROUTE BACK TO THEIR SAVED DEAL. DO NOT REMOVE IT AS
@@ -1323,7 +1340,7 @@ function DealsDashboardInner() {
               second read of the raw state here is exactly the drift the extraction removed. */}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <a href={`/dashboard/deals?id=${gate.dealId}`} style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: '#fff', color: '#0d0d0d', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
-              Open your saved deal — {gate.dealName} →
+              Open your saved deal: {gate.dealName} →
             </a>
             {/* ⚠️ NO COMMERCIAL CTA ON THE 'unknown' BRANCH, AND THIS IS THE SAME REFUSAL
                 resolveReportGate MAKES BY COLLAPSING 'unknown' TO upsell: 'none'. The entitlement
@@ -1402,9 +1419,9 @@ function DealsDashboardInner() {
                 <div className="tq-summary-label" style={{ marginBottom: 12 }}>Deal summary</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
-                    { label: 'Target', val: deal.target_name || '—' },
-                    { label: 'Sector', val: deal.sector || '—' },
-                    { label: 'Deal type', val: DEAL_TYPES.find(d => d.id === deal.deal_type)?.label.split(' —')[0] || '—' },
+                    { label: 'Target', val: deal.target_name || NOT_PROVIDED },
+                    { label: 'Sector', val: deal.sector || NOT_PROVIDED },
+                    { label: 'Deal type', val: dealTypeShort(deal.deal_type) },
                     { label: 'Critical risks', val: criticalRisks.length, urgent: criticalRisks.length > 0 },
                     { label: 'Frameworks', val: view.evaluated ? frameworks.length : 'Not assessed' },
                     { label: 'ThemisIQ est.', val: themisIqFigure },

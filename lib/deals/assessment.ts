@@ -545,6 +545,36 @@ export type ThresholdTest = {
 export const CANADA_S211_ROUTE_NOT_MET_REASON =
   'below the size route assessed here; the Act also reaches any entity listed on a Canadian stock exchange, at any size, and anything prescribed by regulation, neither of which this route tests.'
 
+// ⚠️ THE LISTING ROUTE APPLIES, BUT NOT UNCONDITIONALLY, AND THIS IS WHY IT CARRIES A VERIFY NOTE.
+// s.2 makes a listed company an "entity". The REPORTING DUTY is a separate question: it also turns on
+// producing, selling or distributing goods, or importing goods into Canada. This assessment collects
+// sector and revenue and asks nothing about goods, so a listing establishes the entity limb and not the
+// duty. Reporting a bare APPLIES would state as settled something the form never asked about.
+export const CANADA_S211_LISTING_VERIFY =
+  'a Canadian listing makes the company an entity under s.2, but the reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada; this assessment does not ask about goods, so confirm that before relying on this'
+
+// ⚠️ A STANDING LIMITATION, NOT A FRAMEWORK ROW, AND THE DIFFERENCE WAS MEASURED. A
+// canadaS211NonCaAbstention() pushing a not-assessed row for every non-Canada jurisdiction was written
+// on 26 Sep 2026 and withdrawn the same day: it put a withheld S-211 row on EVERY DEAL and failed 13
+// tests, including "a fully-declared UK deal withholds nothing". A UK technology deal would have carried
+// "PARTIAL: Canada S-211 NOT ASSESSED" in its report. The precedent it was modelled on is also narrower
+// than it looks — cs3dNonEuAbstention() fires for jurisdiction === 'Global' alone, not for every non-EU
+// jurisdiction. So the limitation is stated ONCE, in the register that already holds TWO-YEAR CHECK NOT
+// RUN, where a reader looks for what an assessment did not reach.
+//
+// CARRIES ITS OWN HEADING, unlike the reason constants: it is not fed to resolveRegime, so nothing
+// prepends a heading or strips a trailing period for it. Full stops included for that reason.
+export const CANADA_S211_JURISDICTION_CAVEAT =
+  'Canada S-211 not fully assessed: the Act can also apply to a company doing business in Canada, wherever it is based. This assessment records one primary jurisdiction, so Canadian operations are not established here.'
+
+// ⚠️ SHOWN ONLY WHERE IT IS TRUE AND UNRESOLVED. Not Canada, because a Canadian target runs the size
+// test and the caveat would be describing a route that WAS reached; and not a listed Yes, because that
+// settles applicability outright and carries its own VERIFY note about goods. A caveat on a deal it does
+// not apply to is the noise that made the framework-row version wrong.
+export const showCanadaS211JurisdictionCaveat = (
+  jurisdiction: string, listedCaExchange?: boolean | null,
+): boolean => jurisdiction !== 'Canada' && listedCaExchange !== true
+
 // ⚠️ NO `reason` ON THE LISTING ROUTE'S ROW, AND THAT IS DELIBERATE RATHER THAN AN OMISSION. A sentence
 // naming the route was drafted and dropped on 26 Sep 2026: `FrameworkApplicability.reason` is documented
 // as "why the framework's applicability could not be ESTABLISHED from the modelled test", and
@@ -559,7 +589,7 @@ export const CANADA_S211_ROUTE_NOT_MET_REASON =
 // as far as it can, which is never a confident negative because the test is non-exhaustive.
 export const CANADA_S211_LISTING_QUESTION = 'Is the target listed on a Canadian stock exchange?'
 export const CANADA_S211_LISTING_HINT =
-  'A listing brings a company within the Act whatever its size. If you are not sure, choose Not sure and the size test is used instead.'
+  "A listing can bring a company within Canada's forced labour reporting Act whatever its size or where it is based. If you are not sure, choose Not sure."
 
 export const CS3D_ROUTE_NOT_MET_REASON =
   'below the size route assessed here; CS3D can also reach companies through group parentage and through franchising or licensing arrangements, which this assessment does not model'
@@ -1071,6 +1101,13 @@ export type FrameworkApplicability = {
   applies: boolean
   status: FrameworkStatus
   side?: 'above' | 'below'          // set only when status === 'near-threshold'
+  // ⚠️ APPLIES, WITH A CONDITION THIS ASSESSMENT DID NOT TEST. Set only alongside `applies: true`, and
+  // NOT a fifth FrameworkStatus: the union is switched over exhaustively in several places, and a new
+  // member there would be a build-wide change to express one row's caveat. A consumer renders the same
+  // "verify" treatment a near-threshold row gets, because the reader's job is the same — check something
+  // before relying on it. DISTINCT FROM `reason`, which means the opposite: reason withholds, verify
+  // asserts and qualifies.
+  verify?: string
   test?: ThresholdOutcome           // per-limb detail behind the decision
   // Why the framework's applicability could not be ESTABLISHED FROM THE MODELLED TEST. That covers an
   // abstention no size test can answer (no EU-footprint field, no entity-type field) AND a
@@ -1224,15 +1261,25 @@ export const getFrameworkApplicability = (
   // already the place where non-size routing lives.
   // ⚠️ AND A FALSE OR ABSENT ANSWER STILL DOES NOT PRODUCE A NEGATIVE. The size test is non-exhaustive,
   // so failing it yields 'not-assessed'. That is what makes "Not sure" safe to offer.
-  if (jurisdiction === 'Canada') {
-    if (size.listed_ca_exchange === true) {
-      // No `reason`: see the note beside CANADA_S211_ROUTE_NOT_MET_REASON. This row APPLIES, and `reason`
-      // means the opposite. The listing is the route; the row says so by applying while the limbs do not.
-      out.push({ framework: 'Canada S-211', applies: true, status: 'applies' })
-    } else {
-      plain('Canada S-211')
-    }
+  // ⚠️ THE LISTING CHECK RUNS FIRST AND OUTSIDE THE JURISDICTION GATE, WHICH IS UNIQUE IN THIS FUNCTION.
+  // s.2(a) reaches an entity listed on a Canadian stock exchange WHEREVER IT IS ESTABLISHED, so gating it
+  // on jurisdiction === 'Canada' is what made a US-established TSX-listed target unreachable: no row was
+  // created at all, so there was nothing to withhold and nothing to narrate. Every other framework here
+  // is routed by jurisdiction or sector; this one is routed by an answer.
+  // No `reason` on this row: see the note beside CANADA_S211_ROUTE_NOT_MET_REASON. `reason` means the
+  // applicability could not be established, and this row establishes it. `verify` is the field that
+  // qualifies a settled row.
+  if (size.listed_ca_exchange === true) {
+    out.push({ framework: 'Canada S-211', applies: true, status: 'applies', verify: CANADA_S211_LISTING_VERIFY })
+  } else if (jurisdiction === 'Canada') {
+    plain('Canada S-211')
   }
+  // ⚠️ NO ROW FOR A NON-CANADIAN TARGET, AND THAT IS THE DECISION RATHER THAN THE GAP. The Act can reach
+  // a company doing business in Canada wherever it is based, which this assessment cannot establish from a
+  // single primary jurisdiction. Stating that as a withheld FRAMEWORK ROW was tried and withdrawn on
+  // 26 Sep 2026 — it landed on every deal and failed 13 tests. It is stated once instead, as a standing
+  // limitation: CANADA_S211_JURISDICTION_CAVEAT, gated by showCanadaS211JurisdictionCaveat, rendered in
+  // the report's limitations register and the wizard's step 2.
 
   // Investor baseline (expected regardless of jurisdiction)
   plain('IFRS S2')

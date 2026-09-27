@@ -27,14 +27,25 @@ import {
 } from './assessment'
 
 // ─── Deal types ───────────────────────────────────────────────────────────────
+// ⚠️ `short` IS AN EXPLICIT FIELD, NOT A SUBSTRING OF `label`. The deal summary used to derive it with
+// `label.split(' —')[0]`, which worked only because 'M&A — Acquisition' was the one label containing an
+// em dash: every other label has no ' —' and so came back whole, which is the intended result by
+// accident rather than by rule. That made the punctuation load-bearing — rewriting one dash would have
+// silently started printing 'M&A: Acquisition' in a cell sized for 'M&A' — so the field is declared.
+// Added 26 Sep 2026, immediately before the em-dash sweep that would have broken it.
 export const DEAL_TYPES = [
-  { id: 'ma', label: 'M&A — Acquisition', desc: 'Full acquisition of target company' },
-  { id: 'pe', label: 'PE / Growth Equity', desc: 'Majority or minority stake investment' },
-  { id: 'vc', label: 'Venture Capital', desc: 'Early or growth stage investment' },
-  { id: 'lending', label: 'Lending / Credit', desc: 'Debt financing or credit facility' },
-  { id: 'lp', label: 'LP / Fund Investment', desc: 'Investment into a fund or GP' },
+  { id: 'ma', label: 'M&A: Acquisition', short: 'M&A', desc: 'Full acquisition of target company' },
+  { id: 'pe', label: 'PE / Growth Equity', short: 'PE / Growth Equity', desc: 'Majority or minority stake investment' },
+  { id: 'vc', label: 'Venture Capital', short: 'Venture Capital', desc: 'Early or growth stage investment' },
+  { id: 'lending', label: 'Lending / Credit', short: 'Lending / Credit', desc: 'Debt financing or credit facility' },
+  { id: 'lp', label: 'LP / Fund Investment', short: 'LP / Fund Investment', desc: 'Investment into a fund or GP' },
 ]
-export const dealTypeLabel = (id: string): string => DEAL_TYPES.find(d => d.id === id)?.label || '—'
+// ⚠️ 'Not provided', NOT '—'. An em dash as an empty-value glyph reads as typography to a designer and
+// as a missing value to nobody else; in a document an external deal team reads, the words are the answer.
+// Six of these were replaced across the wizard and the report on 26 Sep 2026.
+export const NOT_PROVIDED = 'Not provided'
+export const dealTypeLabel = (id: string): string => DEAL_TYPES.find(d => d.id === id)?.label || NOT_PROVIDED
+export const dealTypeShort = (id: string): string => DEAL_TYPES.find(d => d.id === id)?.short || NOT_PROVIDED
 
 // ─── Revenue magnitude echo ───────────────────────────────────────────────────
 // Revenue is stored in WHOLE currency units, but it is entered in a bare number field with no unit

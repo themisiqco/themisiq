@@ -5,6 +5,7 @@ import {
   validateThresholdTests, type ThresholdTest,
   CSRD_NON_EU_REASON, csrdNonEuAbstention, CS3D_PENDING_REASON, cs3dPendingAbstention,
   CS3D_ROUTE_NOT_MET_REASON, CANADA_S211_ROUTE_NOT_MET_REASON,
+  CANADA_S211_LISTING_VERIFY, CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedNote, partiallyAssessedNote, routeNotMetNote,
   partialHeadingPhrase,
@@ -13,7 +14,10 @@ import {
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
 import { REGIME_COLUMNS } from './exportPipelineXlsx'
-import { resolveCs3d, resolveCanadaS211, canadaS211NoteReport } from './reportModel'
+import {
+  resolveCs3d, resolveCanadaS211, canadaS211NoteReport,
+  DEAL_TYPES, dealTypeShort, dealTypeLabel,
+} from './reportModel'
 
 // Tests assert the CONTRACT, never the current FX rates: cross-currency inputs are derived from
 // USD_PER_UNIT at runtime, so refreshing the dated rate table cannot turn them red.
@@ -1181,6 +1185,25 @@ describe('every jurisdiction the wizard offers is one the engine knows', () => {
   })
 })
 
+describe('the deal-type summary shows the short label, without parsing punctuation', () => {
+  // ⚠️ WAS `label.split(' \u2014')[0]`, WHICH WORKED BY ACCIDENT. Only 'M&A \u2014 Acquisition' contained an em
+  // dash, so every other label came back whole — the intended result, by coincidence rather than by rule.
+  // That made the punctuation load-bearing: the em-dash sweep of 26 Sep 2026 would have started printing
+  // the full 'M&A: Acquisition' in a cell sized for 'M&A', silently.
+  it('every deal type has a short label, and M&A is shortened', () => {
+    expect(dealTypeShort('ma')).toBe('M&A')
+    for (const dt of DEAL_TYPES) {
+      expect(dealTypeShort(dt.id), `${dt.id} must have a short label`).toBe(dt.short)
+      expect(dt.short.length, `${dt.id} short label must not be empty`).toBeGreaterThan(0)
+      expect(dt.short, `${dt.id} short label must not contain an em dash`).not.toContain('\u2014')
+    }
+  })
+  it('an unknown id reads as words, not as a dash', () => {
+    expect(dealTypeShort('nope')).toBe('Not provided')
+    expect(dealTypeLabel('nope')).toBe('Not provided')
+  })
+})
+
 describe('Canada S-211 reaches an entity by listing OR by size, and never confidently misses', () => {
   // ⚠️ THE DEFECT THESE PIN, in the words of the statute: s.2 "entity" is met by (a) a listing on a
   // Canadian stock exchange, at ANY size, (b) a Canadian presence meeting at least two of CAD 20m assets,
@@ -1249,6 +1272,73 @@ describe('Canada S-211 reaches an entity by listing OR by size, and never confid
       { total_assets: 500_000, employee_count: 10, listed_ca_exchange: true })
     const fw = app.filter(f => f.applies).map(f => f.framework)
     expect(canadaS211NoteReport(resolveCanadaS211(fw, app))).toBeNull()
+  })
+
+  it('a listed target OUTSIDE Canada applies, with a verify note rather than a bare applies', () => {
+    // ⚠️ THE JURISDICTION GAP THIS CLOSES. s.2(a) reaches an entity listed on a Canadian exchange wherever
+    // it is established, and the routing gated on jurisdiction === 'Canada', so a US-established
+    // TSX-listed target produced NO ROW AT ALL: nothing to withhold and nothing to narrate.
+    const row = find(getFrameworkApplicability('USA', 1_000_000, 'Technology', 'ma', 'USD',
+      { total_assets: 500_000, employee_count: 10, listed_ca_exchange: true }), S211)!
+    expect(row.applies).toBe(true)
+    expect(row.status).toBe('applies')
+    // ⚠️ VERIFY, NOT A BARE APPLIES. A listing settles the s.2 "entity" limb; the reporting duty also
+    // turns on goods, which this assessment never asks about. `verify` qualifies a settled row; `reason`
+    // would claim it was not settled.
+    expect(row.verify, 'an applies-on-one-route row must say what is still open').toBe(CANADA_S211_LISTING_VERIFY)
+    expect(row.verify).toContain('goods')
+    expect(row.reason, 'verify and reason are opposites and must not both be set').toBeUndefined()
+  })
+
+  // ⚠️ NO FRAMEWORK ROW OUTSIDE CANADA, BY DECISION, AND THE CAVEAT IS WHERE THE CLAIM LIVES INSTEAD.
+  // A not-assessed row for every non-Canada jurisdiction was tried on 26 Sep 2026 and withdrawn: it landed
+  // on every deal and failed 13 tests. So this pins BOTH halves — no row, and a caveat that fires exactly
+  // where the row would have been right.
+  it('an unlisted target outside Canada produces no row, and the standing caveat covers it', () => {
+    for (const listed of [false, null, undefined]) {
+      const row = find(getFrameworkApplicability('USA', 900_000_000, 'Technology', 'ma', 'USD',
+        { total_assets: 9e8, employee_count: 5000, listed_ca_exchange: listed }), S211)
+      expect(row, `listed=${String(listed)}: no S-211 row outside Canada without a Yes`).toBeUndefined()
+      expect(showCanadaS211JurisdictionCaveat('USA', listed),
+        `listed=${String(listed)}: the caveat must cover what the row does not`).toBe(true)
+    }
+  })
+
+  it('the caveat fires only where it is true and unresolved', () => {
+    // Not for a listed Yes: applicability is settled and its own VERIFY note covers the goods condition.
+    expect(showCanadaS211JurisdictionCaveat('USA', true)).toBe(false)
+    // Not for Canada: the size test DID run, so a caveat would describe a route that was reached.
+    for (const listed of [true, false, null, undefined]) {
+      expect(showCanadaS211JurisdictionCaveat('Canada', listed),
+        `Canada listed=${String(listed)} must not show the caveat`).toBe(false)
+    }
+    // Every other jurisdiction, unanswered or No.
+    for (const j of ['USA', 'European Union', 'UK', 'Australia', 'Global', 'Other']) {
+      expect(showCanadaS211JurisdictionCaveat(j, false), `${j} + No`).toBe(true)
+      expect(showCanadaS211JurisdictionCaveat(j, null), `${j} + Not sure`).toBe(true)
+    }
+  })
+
+  it('the caveat carries its own heading, because nothing prepends one', () => {
+    // Unlike the reason constants it is not fed to resolveRegime, so no render site supplies a heading or
+    // strips a trailing period. Both are inside the string, and the render splits on the first colon.
+    expect(CANADA_S211_JURISDICTION_CAVEAT.startsWith('Canada S-211 not fully assessed:')).toBe(true)
+    expect(CANADA_S211_JURISDICTION_CAVEAT.endsWith('.')).toBe(true)
+    expect(CANADA_S211_JURISDICTION_CAVEAT).not.toContain('\u2014')
+  })
+
+  it('Canada behaviour is unchanged by the listing route moving outside the gate', () => {
+    // The three Canada outcomes pinned above still hold, and the reason on a failed size test is the
+    // ROUTE reason rather than the jurisdiction one — the two must not be confused.
+    const twoOfThree = find(getFrameworkApplicability('Canada', 50_000_000, 'Technology', 'ma', 'CAD',
+      { total_assets: 25_000_000, employee_count: 10, listed_ca_exchange: false }), S211)!
+    expect(twoOfThree.applies).toBe(true)
+    expect(twoOfThree.verify, 'the size route needs no verify note').toBeUndefined()
+    const oneOfThree = find(getFrameworkApplicability('Canada', 50_000_000, 'Technology', 'ma', 'CAD',
+      { total_assets: 1_000_000, employee_count: 10, listed_ca_exchange: false }), S211)!
+    expect(oneOfThree.status).toBe('not-assessed')
+    expect(oneOfThree.reason).toBe(CANADA_S211_ROUTE_NOT_MET_REASON)
+    expect(oneOfThree.reason).not.toBe(CANADA_S211_LISTING_VERIFY)
   })
 
   it('the employees limb states the statutory measure, as the other three tests do', () => {
