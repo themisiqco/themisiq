@@ -47,7 +47,8 @@ import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDis
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
 import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
-  workingsFactorSourceCell } from '../../../lib/ghg/workingsCells'
+  workingsFactorSourceCell, RESULT_DP, INTENSITY_DP, CSV_DP, CSV_INTENSITY_DP,
+  NOT_QUANTIFIED } from '../../../lib/ghg/workingsCells'
 import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
@@ -2865,10 +2866,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         ['Company', inventory.company_name || '—'],
                         ['Reporting year', String(inventory.reporting_year)],
                         ['GWP basis', `IPCC ${fw.gwp}`],
-                        ['Scope 1 total', `${totals.s1_total.toFixed(4)} tCO₂e`],
-                        ['Scope 2 (location)', `${totals.s2_location.toFixed(4)} tCO₂e`],
-                        ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 (market)', `${totals.s2_market.toFixed(4)} tCO₂e`]] : []),
-                        ...(rev > 0 ? [['S1 intensity', `${(totals.s1_total/rev).toFixed(6)} tCO₂e/$M`]] : []),
+                        ['Scope 1 total', `${totals.s1_total.toFixed(RESULT_DP)} tCO₂e`],
+                        ['Scope 2 (location)', `${totals.s2_location.toFixed(RESULT_DP)} tCO₂e`],
+                        ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 (market)', `${totals.s2_market.toFixed(RESULT_DP)} tCO₂e`]] : []),
+                        ...(rev > 0 ? [['S1 intensity', `${(totals.s1_total/rev).toFixed(INTENSITY_DP)} tCO₂e/$M`]] : []),
                         ...(emp > 0 && fw.id === 'ecovadis' ? [['S1 per employee', `${(totals.s1_total/emp*1000).toFixed(2)} kgCO₂e`]] : []),
                         ['Deadline', fw.deadline],
                       ].map(([label, val]) => (
@@ -3016,17 +3017,23 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['Locations', inventory.locations.length],
       [''],
       ['RESULTS'],
-      ['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(4)],
-      ['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(4)],
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (tCO₂e)', totals.s2_market.toFixed(4)]] : []),
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂) — reported separately', totals.biogenic.toFixed(4)]] : []),
+      // ⚠️ CSV_DP, IN EVERY FIGURE BELOW, AND THE SAME PRECISION IN THE LOCATION BREAKDOWN. A verifier
+      // recomputes from this file: at 4 decimals the breakdown rows did not sum to these totals, because
+      // each location was rounded and the total was not. Six decimals is one gram — finer than any factor
+      // in the tables justifies — and it keeps binary-float artefacts out of the file, which a raw value
+      // does not (1.6215995 prints as 1.6215995000000001). The on-screen preview above rounds for reading
+      // instead (RESULT_DP). Both halves asserted in lib/ghg/exportPrecision.test.ts.
+      ['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(CSV_DP)],
+      ['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(CSV_DP)],
+      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (tCO₂e)', totals.s2_market.toFixed(CSV_DP)]] : []),
+      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂) — reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
       // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
-      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3 — electricity T&D (tCO₂e)', totals.s3_td.toFixed(4)]] : []),
+      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3 — electricity T&D (tCO₂e)', totals.s3_td.toFixed(CSV_DP)]] : []),
       ...(fw.id === 'cdp' ? [
         [`Prior year Scope 1 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s1],
         [`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s2],
       ] : []),
-      ...(rev > 0 ? [['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(6)]] : []),
+      ...(rev > 0 ? [['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(CSV_INTENSITY_DP)]] : []),
       // ⚠️ DIRECTLY UNDER THE FIGURES, AND IN EVERY FRAMEWORK'S FILE. The refusal appeared only in
       // the LOCATION BREAKDOWN, far below: a reader who took the RESULTS block at face value, which
       // is what a results block is for, saw a Scope 1, a Scope 2 and an intensity with nothing
@@ -3071,7 +3078,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ...inventory.locations.map(loc => {
         const blocked = unpriceableById.get(loc.id)
         if (blocked) {
-          return [loc.name, loc.grid_region, '—', '—',
+          // ⚠️ 'Not quantified', THE SAME WORDS THE WORKINGS TABLE USES FOR THIS LOCATION'S RESULT.
+          // Nothing was calculated for it, so there is no figure to round or to withhold: the two are
+          // different facts and the export must not render them alike. Not 'Not provided' — the
+          // operator may well have provided the data; it is our calculation that does not exist.
+          return [loc.name, loc.grid_region, NOT_QUANTIFIED, NOT_QUANTIFIED,
             blocked.kind === 'country'
               // ⚠️ NO "EXCLUDED FROM TOTALS" PREFIX ON A REFUSAL ROW. The sentence already ends
               // "Nothing from this location is included in any total on this report", and the GWP
@@ -3080,7 +3091,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               : `EXCLUDED FROM TOTALS — ${unpriceableMessage(blocked, locationHasEnteredFigures(loc))} No figure for this location is included in any total on this report.`]
         }
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
-        return [loc.name, loc.grid_region, c.s1_total.toFixed(4), c.s2_location.toFixed(4), '']
+        return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), '']
       }),
       [''],
       ['DISCLAIMER'],

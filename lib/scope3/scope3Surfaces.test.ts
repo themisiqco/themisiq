@@ -7,6 +7,7 @@ import { scope3MethodDescription, scope3MethodFor, type Scope3Method } from './c
 import { methodologyHierarchyLines, assistantScope3Basis, assistantScope3GwpClause, enteredFigureSentence } from './methodSummary'
 import { KNOWN_EMISSIONS_PLACEHOLDER } from './formCopy'
 import { CSV_BOM } from '../csv'
+import { CSV_DP } from '../ghg/workingsCells'
 import { SCOPE3_FIXTURE_CAT_DATA, SCOPE3_FIXTURE_META, SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 
 // ── THE SCOPE 3 SURFACE SNAPSHOT ─────────────────────────────────────────────────────────────────
@@ -279,6 +280,52 @@ describe('Scope 3 surfaces', () => {
     // Category 3, and the strings that cover several categories at once.
     compare('cat3', now.cat3 as Record<string, unknown>, snap.cat3, DELIBERATE)
     compare('shared', now.shared as Record<string, unknown>, snap.shared, DELIBERATE)
+  })
+
+  it('S3 the CSV\'s per-category rows add up to the total it states', async () => {
+    // ⚠️ READ OFF THE ACTUAL FILE, not recomputed from the same functions that wrote it. The Blob stub
+    // captures what a customer downloads, so this is the addition a verifier would do by hand.
+    //
+    // It could not have passed before 28 Sep 2026: every emissions cell was written at two decimals and
+    // the total was not, so the columns disagreed with the figure above them by up to half a kilo per
+    // category. Both are written at CSV_DP now — six decimals, one gram — so the only slack left is that
+    // rounding: half a unit in the last place per row, plus one for the independently rounded total.
+    const now = await capture() as {
+      shared: { csv_other_rows: string[][]; total_scope3_mt: number }
+      cat3: { csv_rows: string[][] }
+      others: Record<string, { csv_rows: string[][] }>
+    }
+    const all = [
+      ...now.shared.csv_other_rows,
+      ...now.cat3.csv_rows,
+      ...Object.values(now.others).flatMap(o => o.csv_rows),
+    ]
+    // Columns: Category · Name · mt CO2e · Method · Confidence · Status · In total · Exclusion justification
+    // ⚠️ THE CATEGORY TABLE, NOT EVERY ROW BEGINNING "Cat N". The file has three such sections — the
+    // table, the METHODOLOGY NOTE block and the estimate basis — so the table is identified by its shape:
+    // eight columns, the seventh of which is the Yes/No 'In total' flag.
+    const catRows = all.filter(r => /^Cat \d+$/.test(r[0] ?? '') && r.length === 8 && /^(Yes|No)$/.test(r[6] ?? ''))
+    expect(catRows.length, 'every category has a row in the table').toBe(15)
+    const inTotal = catRows.filter(r => r[6] === 'Yes')
+    expect(inTotal.length, 'the fixture must have priced categories, or this asserts nothing')
+      .toBeGreaterThan(0)
+    for (const r of inTotal) {
+      expect(Number.isFinite(Number(r[2])), `${r[0]} is in the total but its cell is not a number: ${r[2]}`)
+        .toBe(true)
+    }
+    const summed = inTotal.reduce((t, r) => t + Number(r[2]), 0)
+    // The stated total, from the header row the same file carries.
+    const totalRow = now.shared.csv_other_rows.find(r => r[0] === 'Total Scope 3')
+    expect(totalRow, "the CSV states a 'Total Scope 3'").toBeDefined()
+    const stated = Number(String(totalRow![1]).replace(' mt CO2e', ''))
+    const bound = (inTotal.length + 1) * 0.5 * 10 ** -CSV_DP
+    expect(Math.abs(summed - stated), `the categories sum to ${summed}, the file states ${stated}`)
+      .toBeLessThanOrEqual(bound)
+    // Every cell is a fixed six-decimal string, not a float's own rendering.
+    for (const r of inTotal) {
+      expect(r[2], `${r[0]} is not written at CSV_DP`).toMatch(/^-?\d+\.\d{6}$/)
+    }
+    expect(stated).toBeCloseTo(now.shared.total_scope3_mt, 6)
   })
 
   it('S2 every captured sentence is a string: the capture is a string of code, and tsc cannot check it', () => {

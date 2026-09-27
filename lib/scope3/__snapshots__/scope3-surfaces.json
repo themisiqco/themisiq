@@ -51,7 +51,7 @@
    ],
    [
     "Total Scope 3",
-    "7372.44 mt CO2e"
+    "7372.436919 mt CO2e"
    ],
    [
     "Excluded from total",
@@ -149,7 +149,7 @@
    [
     "Cat 3",
     "Fuel & energy related",
-    "19.57",
+    "19.572330",
     "Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0.",
     "Activity data",
     "Relevant, calculated",
@@ -369,7 +369,7 @@
     [
      "Cat 1",
      "Purchased goods & services",
-     "1234.00",
+     "1234.000000",
      "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
      "Primary data",
      "Relevant, calculated",
@@ -421,7 +421,7 @@
     [
      "Cat 2",
      "Capital goods",
-     "88.00",
+     "88.000000",
      "Spend-based, priced from EXIOBASE 3 version 3.8.2 (EXIOBASE consortium, licensed CC BY-SA 4.0) through the active factor edition, using the factor recorded for that category (an EXIOBASE industry or product, whichever the category is priced against) in the EXIOBASE region the inventory's country of supply belongs to.",
      "Primary data",
      "Relevant, calculated",
@@ -543,7 +543,7 @@
     [
      "Cat 5",
      "Waste generated in operations",
-     "2.54",
+     "2.542293",
      "Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e per tonne published for that pair in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). Only the routes published for a material are offered; re-use is not a disposal route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
      "Activity data",
      "Relevant, calculated",
@@ -661,7 +661,7 @@
     [
      "Cat 6",
      "Business travel",
-     "1.62",
+     "1.621600",
      "Activity-based, per flight leg and rail journey: passenger-km (the direct one-way distance times the passengers or trips) multiplied by the kg CO2e per passenger-km published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- air and Business travel- land sheets, AR5 GWPs), with well-to-tank emissions from the matching well-to-tank sheets added. Each flight leg takes one of the sheet's categories: domestic when both ends are in the UK; the haul the Haul definition sheet gives the other end when one end is; and, when neither end is, domestic under 482.8032 km, short-haul from 482.8032 km to under 3,701.4912 km and long-haul from 3,701.4912 km, which departs from the sheet's guidance to use its international average for flights between non-UK countries (Business travel- air A56) and follows the distance bands of the US EPA GHG Emission Factors Hub (2025), cited as the precedent for banding only, with no EPA figure used. Radiative forcing is included unless the inventory turns it off, using DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11), and the setting is recorded with each inventory. The sheet's flight factors include a distance uplift of 8% for indirect routing (Business travel- air A49), so each leg's distance is the direct distance with no uplift added. They are for direct (non-stop) flights (Business travel- air A53), so a journey with a stop is entered as one leg per flight. Rail journeys are priced from the sheet's rail factors and their well-to-tank factors, which are UK figures; for a journey outside the UK they are used as a stand-in, and the journey is flagged. Hotel stays are not included: they are optional under the GHG Protocol Scope 3 Standard, and the licence for the published hotel factors has not been confirmed. Contains public sector information licensed under the Open Government Licence v3.0.",
      "Activity data",
      "Relevant, calculated",
@@ -803,7 +803,7 @@
     [
      "Cat 7",
      "Employee commuting",
-     "21.08",
+     "21.077527",
      "Activity-based, per group of employees who commute the same way: employees times the one-way distance times 2, times the days commuted per week, times the weeks per year, multiplied by the kg CO2e published in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Business travel- land sheet, AR5 GWPs) with well-to-tank emissions from the matching sheet added. Car and motorbike factors are per vehicle-km and are divided by the occupancy the customer enters; walking and cycling count as zero. These are UK factors. For a group commuting outside the UK they are used as a stand-in, and the row is flagged. Homeworking is optional under the GHG Protocol Scope 3 Standard (p. 46). Where entered, it is priced from the Homeworking sheet’s combined office equipment and heating factor per FTE working hour (Homeworking C24), for employees in the UK only: the factor is a UK average (Homeworking A11), mostly heating, with no cooling component. The workbook does not state whether it counts only the additional energy of working from home, which the GHG Protocol’s Technical Guidance asks for (p. 90). Contains public sector information licensed under the Open Government Licence v3.0.",
      "Activity data",
      "Relevant, calculated",
@@ -1112,7 +1112,7 @@
     [
      "Cat 12",
      "End-of-life treatment",
-     "5.62",
+     "5.623169",
      "Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split by the customer across the treatment routes the sheet publishes for that material, each route's tonnes multiplied by the kg CO2e per tonne published for that material and route in UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, Waste disposal sheet, AR5 GWPs). This is finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 Emissions, which applies one average factor per treatment method. The split and its source are the customer's assumption. The figure is the expected end-of-life emissions of all products sold in the reporting year, most of which have not yet occurred. These are UK factors, applied wherever the products are sold. Re-use is not a treatment route and has no factor. Contains public sector information licensed under the Open Government Licence v3.0.",
      "Activity data",
      "Relevant, calculated",
@@ -1353,7 +1353,7 @@
     [
      "Cat 15",
      "Investments",
-     "6000.00",
+     "6000.000000",
      "PCAF-aligned financed emissions. A known total, where entered, replaces the holding-level figures. Otherwise each holding's figure is the investee's emissions as entered by the customer, multiplied by the outstanding amount over the value its PCAF asset class attributes on, capped at 100%. Investee emissions are used on whatever GWP basis each investee reported, not re-based, and ThemisIQ does not record which basis that was. A holding missing its emissions, outstanding amount or attribution value withholds the category figure. A portfolio value multiplied by a spend factor does not measure emissions, so ThemisIQ does not estimate this category that way.",
      "Primary data",
      "Relevant, calculated",
@@ -1370,13 +1370,13 @@
      "Cat 15",
      "Holding 1",
      "Listed equity & corporate bonds",
-     "Outstanding 1000000 USD over enterprise value incl. cash (evic) 10000000 USD = attribution factor 10.00%. Investee emissions 50000 tCO2e (reported, verified), PCAF data quality 1. Financed emissions 5000.00 tCO2e."
+     "Outstanding 1000000 USD over enterprise value incl. cash (evic) 10000000 USD = attribution factor 10.000000%. Investee emissions 50000 tCO2e (reported, verified), PCAF data quality 1. Financed emissions 5000.000000 tCO2e."
     ],
     [
      "Cat 15",
      "Holding 2",
      "Business loans & unlisted equity",
-     "Outstanding 2000000 USD over total equity + debt 40000000 USD = attribution factor 5.00%. Investee emissions 20000 tCO2e (reported, unverified), PCAF data quality 2. Financed emissions 1000.00 tCO2e."
+     "Outstanding 2000000 USD over total equity + debt 40000000 USD = attribution factor 5.000000%. Investee emissions 20000 tCO2e (reported, unverified), PCAF data quality 2. Financed emissions 1000.000000 tCO2e."
     ],
     [
      "Cat 15",

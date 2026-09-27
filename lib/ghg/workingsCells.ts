@@ -56,6 +56,42 @@ export const NOT_QUANTIFIED = 'Not quantified'
  */
 export const RESULT_DP = 3
 
+/**
+ * Decimals for an intensity figure ON SCREEN: tCO₂e per $M of revenue, which for a small company can
+ * sit below 1, so RESULT_DP would round a real figure to 0.000. Named rather than inline because it is a
+ * DIFFERENT precision from RESULT_DP on purpose and someone will otherwise "align" the two.
+ *
+ * ⚠️ NOT THE ASSURANCE PDF'S. That document prints intensity at 4 decimals beside its totals at 3, which
+ * is a deliberate and separate decision recorded at lib/assurancePdf.ts. And NOT AN EXPORT'S: a CSV
+ * writes the unrounded quotient, because a verifier recomputes it.
+ */
+export const INTENSITY_DP = 6
+
+/**
+ * Decimals for a tCO₂e figure written to a CSV: six, which is one gram.
+ *
+ * ⚠️ NOT A RAW FLOAT, AND NOT FOR READABILITY. Writing the number itself puts IEEE-754 artefacts into a
+ * verifier's file — 1.6215995 computes and prints as 1.6215995000000001, and a cell like that invites the
+ * reader to ask what the platform is doing rather than what the figure is. Six decimals is finer than any
+ * emission factor in the tables justifies, so nothing meaningful is lost, and every cell is then a fixed
+ * decimal string a spreadsheet parses identically.
+ *
+ * ⚠️ IT IS STILL ROUNDING, so the reconciliation has a tolerance rather than an equality: summing n rows
+ * each rounded to six decimals can differ from the rounded total by up to (n + 1) × 0.5e-6. That bound is
+ * asserted in lib/ghg/exportPrecision.test.ts and in the Scope 3 harness's S3, which reads the real file.
+ */
+export const CSV_DP = 6
+
+/**
+ * Decimals for an INTENSITY written to a CSV: nine.
+ *
+ * ⚠️ AN INTENSITY IS A QUOTIENT, so its magnitude ranges far wider than a tonnage. tCO₂e per $M of revenue
+ * for a small emitter with material revenue can sit below 1e-6 — 0.001 t against $1,000M is exactly 1e-6 —
+ * where CSV_DP would leave a single significant digit or none at all. Nine decimals keeps three
+ * significant figures at that magnitude while still writing a fixed decimal string.
+ */
+export const CSV_INTENSITY_DP = 9
+
 export interface WorkingsActivityCellRow {
   activity_data?: number | null
   activity_unit?: string | null

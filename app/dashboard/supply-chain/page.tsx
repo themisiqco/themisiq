@@ -6,6 +6,7 @@ import Nav from '../../components/Nav'
 import Papa from 'papaparse'
 import { supabase } from '../../../lib/supabase'
 import { csvBlob } from '../../../lib/csv'
+import { CSV_DP } from '../../../lib/ghg/workingsCells'
 import { useEntitlementAccess } from '../../../lib/useEntitlement'
 import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../lib/drafts'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
@@ -550,7 +551,9 @@ function SupplyChainDashboardInner() {
       ['Total Annual Spend', `${inventory.currency} ${totalSpend.toLocaleString()}`],
       ['Total Scope 3 Cat.1 (estimated)', totalScope3 === null
         ? `Not available — ${unpricedCount} of ${inventory.suppliers.length} suppliers have no spend factor for their sector`
-        : `${totalScope3.toFixed(2)} mt CO2e`],
+        // CSV_DP: the per-supplier rows below sum to this cell to within their own rounding, and a
+        // coarser precision (this was 2 decimals) breaks the addition outright.
+        : `${totalScope3.toFixed(CSV_DP)} mt CO2e`],
       [''],
       ['SUPPLIER RISK REGISTER'],
       ['Supplier', 'Country', 'Sector', 'Tier', 'Annual Spend', 'Risk Level', 'Risk Score', 'Scope 3 (mt CO2e)', 'Risk Factors', 'Assessment Required'],
@@ -558,7 +561,7 @@ function SupplyChainDashboardInner() {
         s.name, s.country, `${industryName(s.sector)} (${s.sector})`, s.tier,
         `${s.currency} ${s.annual_spend.toLocaleString()}`,
         RISK_CONFIG[s.risk_level].label, s.risk_score,
-        s.scope3_emissions === null ? 'not available' : s.scope3_emissions.toFixed(2),
+        s.scope3_emissions === null ? 'not available' : s.scope3_emissions.toFixed(CSV_DP),
         s.risk_factors.join(' | '),
         !s.has_assessment && (s.risk_level === 'critical' || s.risk_level === 'high') ? 'YES' : 'No',
       ]),

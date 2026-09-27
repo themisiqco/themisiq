@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
 import { csvBlob } from '../../../lib/csv'
+import { CSV_DP } from '../../../lib/ghg/workingsCells'
 import { useEntitlementState } from '../../../lib/useEntitlement'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
@@ -2927,10 +2928,10 @@ export default function Scope3Dashboard() {
           const cls = PCAF_ASSET_CLASSES.find(c => c.value === h.assetClass)
           out.push(['Cat 15', `Holding ${i + 1}`, cls?.label ?? h.assetClass,
             `Outstanding ${row?.outstandingAmount ?? ''} ${currency} over ${cls?.denominatorLabel.toLowerCase() ?? 'denominator'} ` +
-            `${row?.denominator ?? ''} ${currency} = attribution factor ${(h.attributionFactor * 100).toFixed(2)}%` +
+            `${row?.denominator ?? ''} ${currency} = attribution factor ${(h.attributionFactor * 100).toFixed(CSV_DP)}%` +
             `${h.capped ? ' (CAPPED at 100%: the outstanding amount exceeds the value it is divided by, so check both figures)' : ''}. ` +
             `Investee emissions ${row?.emissions.reportedEmissions ?? ''} tCO2e (${h.basis}), PCAF data quality ${h.dqScore}. ` +
-            `Financed emissions ${h.financedEmissions.toFixed(2)} tCO2e.`])
+            `Financed emissions ${h.financedEmissions.toFixed(CSV_DP)} tCO2e.`])
         })
       } else {
         out.push(['Cat 15', 'Basis', 'Not calculated', f.reason])
@@ -2965,7 +2966,12 @@ export default function Scope3Dashboard() {
       // sector the figures came from, which it has not been since the Cat 1 fallback was removed.
       ['Company sector', sectorLabel(sector)],
       ['Reporting year', reportingYear],
-      ['Total Scope 3', `${totalScope3.toFixed(2)} mt CO2e`],
+      // ⚠️ CSV_DP (six decimals, one gram), AND THE SAME PRECISION ON EVERY CATEGORY ROW BELOW. At 2
+      // decimals a verifier adding up the categories reached a different total from the one stated here;
+      // at raw float precision the cells carry IEEE-754 artefacts. The screen rounds for reading instead.
+      // S3 in lib/scope3/scope3Surfaces.test.ts adds the 'In total' rows up from the real file and allows
+      // only the (n + 1) × 0.5e-6 that this rounding can introduce.
+      ['Total Scope 3', `${totalScope3.toFixed(CSV_DP)} mt CO2e`],
       ...(unpricedCats.length > 0
         ? [['Excluded from total', `${unpricedCats.map(c => `Cat ${c.num} ${c.name}: ${unpricedReason(c.id, 'export')}`).join(' ')} Left out of the total rather than counted as zero.`]]
         : []),
@@ -2999,7 +3005,7 @@ export default function Scope3Dashboard() {
         return [
           `Cat ${c.num}`,
           c.name,
-          priced ? getCatEmissions(c.id).toFixed(2) : (unpricedCatIds.has(c.id) ? 'not priced' : '—'),
+          priced ? getCatEmissions(c.id).toFixed(CSV_DP) : (unpricedCatIds.has(c.id) ? 'not priced' : '—'),
           st.calculated ? scope3MethodDescription(scope3MethodFor(c.id)) : '—',
           st.calculated ? confidenceConfig[getConfidence(c.id)].label : '—',
           st.label,
