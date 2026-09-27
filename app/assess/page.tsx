@@ -1,6 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+// RELATIVE, NOT '@/lib/...'. tsconfig resolves the alias and vitest does not, so an aliased import
+// here typechecks clean and then fails app/assess/obligations.test.ts at import time. Every other
+// import in this file is relative for the same reason.
+import { ASSESSMENT_HONEYPOT_FIELD } from '../../lib/assessmentSubmitGuard'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
@@ -581,7 +585,8 @@ export default function AssessPage() {
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<Answers>(EMPTY_ANSWERS)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [email, setEmail] = useState({ first: '', last: '', emailAddr: '', company: '', role: '' })
+  // `website` IS THE HONEYPOT, not a field anyone is asked for. See lib/assessmentSubmitGuard.ts.
+  const [email, setEmail] = useState({ first: '', last: '', emailAddr: '', company: '', role: '', website: '' })
 
   const goNext = () => setStep(s => s + 1)
   const goBack = () => setStep(s => s - 1)
@@ -609,7 +614,7 @@ export default function AssessPage() {
       await fetch('/api/assessment/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role }, obligations, profile: answerProfile() }),
+        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role, [ASSESSMENT_HONEYPOT_FIELD]: email.website }, obligations, profile: answerProfile() }),
       })
     } catch (e) {
       console.error('Email send failed:', e)
@@ -824,6 +829,17 @@ export default function AssessPage() {
           <input value={email.emailAddr} onChange={e => setEmail(v => ({...v, emailAddr: e.target.value}))} placeholder="Work email address" type="email" style={inputStyle} />
           <input value={email.company} onChange={e => setEmail(v => ({...v, company: e.target.value}))} placeholder="Company name" style={inputStyle} />
           <input value={email.role} onChange={e => setEmail(v => ({...v, role: e.target.value}))} placeholder="Your role (e.g. CFO, Head of Sustainability)" style={inputStyle} />
+          {/* ⚠️ THE HONEYPOT. NOT display:none AND NOT hidden — a bot that respects either skips it, and
+              a field nothing ever fills catches nothing. It is taken out of the layout and out of the
+              tab order instead, so a person never sees it or reaches it, while a form-filling bot that
+              reads the DOM completes it like any other text input. `website` is deliberately a plausible
+              name: see lib/assessmentSubmitGuard.ts, which the route reads the same constant from.
+              aria-hidden and tabIndex -1 keep it out of a screen reader's path, so this is invisible to
+              assistive technology as well as to sighted users — a honeypot that a screen-reader user
+              fills in is a trap for the wrong person. */}
+          <input value={email.website} onChange={e => setEmail(v => ({...v, website: e.target.value}))}
+            name={ASSESSMENT_HONEYPOT_FIELD} tabIndex={-1} aria-hidden="true" autoComplete="off"
+            style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
           {/* setStep(RESULTS_STEP), never a literal. This was `setStep(8)`, which meant 'results'
               only while the email gate sat at a hardcoded step 7 and made questions[7] unreachable.
               Once the array grew and supply_chain became a live question, 8 was the index of

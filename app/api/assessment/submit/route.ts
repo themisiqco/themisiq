@@ -6,6 +6,12 @@ import { disclaimerParas } from '../../../../lib/disclaimer'
 // price from the same accessors /assess renders, so the two cannot quote different figures.
 import { OBLIGATIONS, obligationHref, obligationPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
 import { BRAND, INK_MUTED, ACCENT, STATE_ERROR, STATE_WARN, STATE_INFO, STATE_INFO_WASH } from '@/lib/brand'
+import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
+import {
+  ASSESSMENT_IP_BUCKET, ASSESSMENT_IP_LIMIT, ASSESSMENT_IP_WINDOW_MS,
+  ASSESSMENT_EMAIL_BUCKET, ASSESSMENT_EMAIL_LIMIT, ASSESSMENT_EMAIL_WINDOW_MS,
+  ASSESSMENT_HONEYPOT_FIELD, isHoneypotTripped, recipientKey,
+} from '../../../../lib/assessmentSubmitGuard'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -70,6 +76,55 @@ export async function POST(req: NextRequest) {
 
     if (!lead?.email || !lead.email.includes('@')) {
       return NextResponse.json({ error: 'Invalid email' }, { status: 400 })
+    }
+
+    // ── ABUSE GUARD ─────────────────────────────────────────────────────────────────────────────
+    //
+    // ⚠️ EVERY REJECTION BELOW RETURNS THE ORDINARY SUCCESS RESPONSE, AND THAT IS THE POINT. A
+    // distinct status or message turns this endpoint into an oracle: a caller could binary-search the
+    // limits, learn which addresses have already been used, and tune around both. Silence costs a
+    // legitimate visitor nothing, because the client at app/assess/page.tsx:609 awaits the fetch and
+    // reads neither the status nor the body — it shows its own confirmation either way.
+    //
+    // ⚠️ THE RESPONSE OMITS `id`, WHICH THE SUCCESS PATH CARRIES. That id is RESEND'S MESSAGE ID, and
+    // no email was sent, so there is no honest value for it. Inventing one would be fabricating a
+    // provider receipt. The client reads neither field; a future consumer that needs to distinguish
+    // them should be given a channel that is not this response.
+    const silentOk = () => NextResponse.json({ success: true })
+
+    // ⚠️ THE HONEYPOT IS CHECKED FIRST, BEFORE THE LIMITER, SO A BOT CANNOT FILL `rate_limits`. Every
+    // allowed limiter call INSERTS a row; running the limiter on traffic already known to be a bot
+    // would let a loop write unbounded rows through the service-role client, which is a second abuse
+    // vector opened by the fix for the first.
+    if (isHoneypotTripped((lead as Record<string, unknown>)[ASSESSMENT_HONEYPOT_FIELD])) {
+      console.warn('[assessment/submit] honeypot tripped, dropping submission')
+      return silentOk()
+    }
+
+    const ip = ipFromHeaders(req)
+
+    // Per IP, hourly. `email: null` so this call evaluates the IP axis alone — see the note on the
+    // two windows in lib/assessmentSubmitGuard.ts.
+    const ipRl = await checkAndRecordRateLimit({
+      bucket: ASSESSMENT_IP_BUCKET, ip, email: null,
+      ipLimit: ASSESSMENT_IP_LIMIT, emailLimit: ASSESSMENT_IP_LIMIT,
+      windowMs: ASSESSMENT_IP_WINDOW_MS,
+    })
+    if (!ipRl.ok) {
+      console.warn('[assessment/submit] IP limit reached, dropping submission')
+      return silentOk()
+    }
+
+    // Per recipient, daily. Stops one address being mailed repeatedly from many addresses, which the
+    // IP limit alone does not reach.
+    const emailRl = await checkAndRecordRateLimit({
+      bucket: ASSESSMENT_EMAIL_BUCKET, ip: null, email: recipientKey(lead.email),
+      ipLimit: ASSESSMENT_EMAIL_LIMIT, emailLimit: ASSESSMENT_EMAIL_LIMIT,
+      windowMs: ASSESSMENT_EMAIL_WINDOW_MS,
+    })
+    if (!emailRl.ok) {
+      console.warn('[assessment/submit] recipient limit reached, dropping submission')
+      return silentOk()
     }
 
     // ── LEAD FIELDS — company, first, last and role are OPTIONAL BY DESIGN ──────
