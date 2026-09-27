@@ -49,6 +49,13 @@ export const NOT_APPLICABLE = 'Not applicable'
  */
 export const NOT_QUANTIFIED = 'Not quantified'
 
+/**
+ * Decimals for a tCO₂e figure in the workings table: 0.001 t is 1 kg, which is finer than any emission
+ * factor in the tables justifies. The verifier page already used this for its headline totals, so this
+ * is the operator's table adopting the verifier's precision rather than a new choice.
+ */
+export const RESULT_DP = 3
+
 export interface WorkingsActivityCellRow {
   activity_data?: number | null
   activity_unit?: string | null
@@ -102,15 +109,18 @@ export function workingsScope2MethodCell(r: WorkingsFactorCellRow): string {
  * all, on a row the totals omit. Both surfaces printed the same glyph for null as they printed for an
  * inapplicable vintage, so a verifier could not tell an unquantified row from an inapplicable column.
  *
- * ⚠️ THE TWO SURFACES DISAGREE ON PRECISION, AND THAT IS WHY `dp` IS A PARAMETER RATHER THAN A CONSTANT.
- * The operator's workings table prints four decimals; the verifier page prints three, there and in its
- * headline Scope 1 and Scope 2 figures. So the same row reads 1.2345 on one surface and 1.235 on the
- * other — consistent rounding, not a contradiction, but not the same string either. Unifying them is a
- * decision about a verifier-facing figure and not part of a commit about wording, so what is shared here
- * is the MEANING (and the null case), with the divergence stated once instead of hidden in two files.
+ * ⚠️ THREE DECIMALS, ON BOTH SURFACES, AND NOT A PARAMETER. The operator's workings table printed four
+ * and the verifier page three — there and in its headline Scope 1 and Scope 2 figures — so one row read
+ * 1.2345 to the operator and 1.235 to the verifier. Consistent rounding, but not the same string, and a
+ * verifier cross-checking a figure against the operator's screen had to reason about which was which.
+ * Three is now the ONLY precision: a `dp` argument would let the next caller reintroduce the divergence
+ * silently, which is exactly how it arose. Decided 28 Sep 2026.
+ *
+ * ⚠️ DISPLAY ONLY. The stored and computed value keeps full precision; nothing derives a total from this
+ * string. Exports must write the unrounded number — see the export survey in the same commit.
  */
-export function workingsResultCell(r: { result_tco2e?: number | null }, dp = 4): string {
-  return r.result_tco2e == null ? NOT_QUANTIFIED : r.result_tco2e.toFixed(dp)
+export function workingsResultCell(r: { result_tco2e?: number | null }): string {
+  return r.result_tco2e == null ? NOT_QUANTIFIED : r.result_tco2e.toFixed(RESULT_DP)
 }
 
 /**

@@ -5,7 +5,7 @@ import { buildWorkings, emptyLocation, type Location } from './engine'
 import {
   workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
   workingsFactorSourceCell,
-  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS,
+  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS, RESULT_DP,
 } from './workingsCells'
 import { NOT_PROVIDED } from '../notProvided'
 import { stripTsComments } from '../testing/stripComments'
@@ -117,11 +117,15 @@ describe('workings cell rendering', () => {
       .toBe(NOT_QUANTIFIED)
     expect(workingsResultCell({}), 'an absent field is the same absence').toBe(NOT_QUANTIFIED)
     expect(workingsResultCell({ result_tco2e: 0 }), 'an attested zero IS a claim and prints as one')
-      .toBe('0.0000')
-    expect(workingsResultCell({ result_tco2e: 1.23456 })).toBe('1.2346')
-    // The verifier page prints three decimals, there and in its headline totals. Stated, not shared.
-    expect(workingsResultCell({ result_tco2e: 1.23456 }, 3)).toBe('1.235')
-    expect(workingsResultCell({ result_tco2e: null }, 3)).toBe(NOT_QUANTIFIED)
+      .toBe('0.000')
+    expect(workingsResultCell({ result_tco2e: 1.23456 })).toBe('1.235')
+    expect(RESULT_DP, 'three decimals, the verifier page\'s precision, on both surfaces').toBe(3)
+    // ⚠️ NO PER-CALL PRECISION. The two surfaces printed 4 and 3 until 28 Sep 2026; an argument here is
+    // how that happened, so the helper takes one parameter and neither page may pass a second.
+    expect(workingsResultCell.length, 'workingsResultCell must take the row and nothing else').toBe(1)
+    for (const rel of [OPERATOR, VERIFIER]) {
+      expect(src(rel), `${rel} passes its own precision`).not.toMatch(/workingsResultCell\([rw],/)
+    }
   })
 
   it('the Factor source column tells a missing citation from an inapplicable one', () => {

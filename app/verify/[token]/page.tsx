@@ -1167,7 +1167,7 @@ export default function VerifierPage() {
                         <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{w.quantification_method}</div>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap' }}>{workingsResultCell(w, 3)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap' }}>{workingsResultCell(w)}</td>
                   </tr>
                 ))}
               </tbody>
