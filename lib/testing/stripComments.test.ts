@@ -87,6 +87,47 @@ describe('stripTsComments removes spans, not lines', () => {
     expect(got).toContain('replace(')
   })
 
+  it('a QUOTE inside a regex does not open a string, which is what inflated three budgets', () => {
+    // ⚠️ THE EXACT SHAPE THAT WENT WRONG. `replace(/"/g, '""')` is the ordinary way to escape a CSV cell.
+    // Read without regex tracking, that `"` opened a string literal that never closed, so every comment
+    // after it in the file was treated as code — and the em-dash ratchet counted their em dashes as
+    // rendered copy. app/dashboard/scope3/page.tsx carried a budget of 34 whose true figure was zero.
+    const src = [
+      `const cell = (v) => \`"\${String(v).replace(/"/g, '""')}"\``,
+      '// a comment with an em dash — it must be blanked',
+      'const after = 2',
+    ].join('\n')
+    const got = stripTsComments(src)
+    expect(got.split('\n')[1].trim(), 'the comment after the regex').toBe('')
+    expect(got).not.toContain('em dash')
+    expect(got).toContain('const after = 2')
+    expect(got).toContain("replace(/\"/g")
+  })
+
+  it('a regex is only read where an expression may start, so .tsx survives', () => {
+    // `</div>` and `{...} />` are the two shapes a permissive rule would swallow whole.
+    const jsx = [
+      'const el = <div className={cx}>',
+      '  <Icon name={n} />',
+      '  {/* a comment with an em dash — blanked */}',
+      '</div>',
+      'const after = 3',
+    ].join('\n')
+    const got = stripTsComments(jsx)
+    expect(got).toContain('</div>')
+    expect(got).toContain('<Icon name={n} />')
+    expect(got).not.toContain('em dash')
+    expect(got).toContain('const after = 3')
+    // An arrow's `>` IS such a place, which is how a regex predicate parses.
+    const arrow = "const t = (x) => /^a—b$/.test(x)\n// trailing em dash — blanked"
+    const out = stripTsComments(arrow)
+    expect(out).toContain('/^a—b$/.test(x)')
+    expect(out.split('\n')[1].trim()).toBe('')
+    // Division is not a regex: the dash in the comment after it is still blanked.
+    const div = 'const r = (a + b) / c / d\n// an em dash — blanked'
+    expect(stripTsComments(div).split('\n')[1].trim()).toBe('')
+  })
+
   it('commentOnlyLines reports 1-based lines that are wholly comment', () => {
     const src = ['const a = 1', '// two', '/* three', '   four */', 'const b = 2 // trailing'].join('\n')
     expect([...commentOnlyLines(src)].sort((x, y) => x - y)).toEqual([2, 3, 4])

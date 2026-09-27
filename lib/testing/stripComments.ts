@@ -55,6 +55,51 @@ type Ctx =
  * Comments replaced by spaces, everything else byte-identical. Newlines are always preserved, including
  * those inside a block comment, so `split('\n')` on the result lines up with the original.
  */
+/**
+ * ⚠️ REGEX LITERALS ARE TRACKED, AND THE COST OF NOT TRACKING THEM WAS THREE WRONG NUMBERS. A regex may
+ * contain a quote — `replace(/"/g, '""')` is the ordinary way to escape a CSV cell — and without this the
+ * scanner read that `"` as the start of a string literal that never closed, so every comment after it in
+ * the file was counted as code. The em-dash ratchet carried inflated budgets for
+ * app/dashboard/ghg/page.tsx and app/dashboard/supply-chain/portal/[id]/page.tsx, and a budget of 34 for
+ * app/dashboard/scope3/page.tsx whose true figure was ZERO — which scope3Copy.test.ts, which parses with
+ * TypeScript instead, had been asserting all along. Two guards disagreed for weeks and the parser was
+ * right.
+ *
+ * ⚠️ A `/` IS ONLY A REGEX WHERE AN EXPRESSION MAY START, and in .tsx the exceptions matter more than the
+ * rule. `</div>` and `{...} />` are everywhere, so `<` and `}` are NOT treated as places a regex may
+ * begin; `>` is only such a place when it closes an arrow (`=>`), which is how `x => /re/.test(x)` works.
+ * Getting this wrong in the permissive direction would swallow whole JSX subtrees.
+ *
+ * ⚠️ AND A MISREAD COSTS ONE CHARACTER, NOT THE FILE. A regex literal cannot span a line, so the scan
+ * gives up at a newline and the `/` is then treated as ordinary punctuation — the same recovery the
+ * unterminated-quote branch uses, and the reason a heuristic is safe here at all.
+ */
+const REGEX_MAY_START_AFTER = new Set(['(', ',', '=', ':', '[', '!', '&', '|', '?', ';', '+', '-', '*', '%', '^', '~'])
+const REGEX_MAY_START_AFTER_WORD = new Set([
+  'return', 'typeof', 'instanceof', 'in', 'of', 'case', 'new', 'delete', 'void', 'do', 'else', 'yield',
+  'await', 'throw',
+])
+
+/** The end of the regex literal beginning at `i`, flags included, or null if that is not what this is. */
+function regexEnd(src: string, i: number): number | null {
+  let j = i + 1
+  let inClass = false
+  while (j < src.length) {
+    const c = src[j]
+    if (c === '\\') { j += 2; continue }
+    if (c === '\n') return null          // a regex literal cannot span a line: this was division
+    if (c === '[') { inClass = true; j++; continue }
+    if (c === ']') { inClass = false; j++; continue }
+    if (c === '/' && !inClass) {
+      j++
+      while (j < src.length && /[a-z]/i.test(src[j])) j++
+      return j
+    }
+    j++
+  }
+  return null
+}
+
 export function stripTsComments(src: string): string {
   const out = src.split('')
   const stack: Ctx[] = [{ k: 'code', braces: 0 }]
@@ -76,6 +121,29 @@ export function stripTsComments(src: string): string {
         blank(i++); blank(i++)
         while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) blank(i++)
         if (i < src.length) { blank(i++); blank(i++) }
+        continue
+      }
+      if (c === '/') {
+        // Everything before i is final in `out`, and comments there are already spaces, so walking back
+        // over whitespace lands on the last significant character without re-scanning for comments.
+        let b = i - 1
+        while (b >= 0 && (out[b] === ' ' || out[b] === '\n' || out[b] === '\t' || out[b] === '\r')) b--
+        const prev = b >= 0 ? out[b] : undefined
+        let word = ''
+        if (prev !== undefined && /[A-Za-z_$]/.test(prev)) {
+          let w = b
+          while (w >= 0 && /[A-Za-z0-9_$]/.test(out[w])) w--
+          word = out.slice(w + 1, b + 1).join('')
+        }
+        const mayStart = prev === undefined
+          || REGEX_MAY_START_AFTER.has(prev)
+          || (prev === '>' && b >= 1 && out[b - 1] === '=')
+          || REGEX_MAY_START_AFTER_WORD.has(word)
+        if (mayStart) {
+          const end = regexEnd(src, i)
+          if (end !== null) { i = end; continue }
+        }
+        i++
         continue
       }
       if (c === "'") { stack.push({ k: 'single' }); i++; continue }

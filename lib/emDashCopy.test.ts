@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { stripTsComments } from './testing/stripComments'
+import ts from 'typescript'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THE EM-DASH RATCHET.
@@ -26,59 +26,103 @@ const ROOT = join(__dirname, '..')
 const DASH = '—'
 
 /**
- * A string literal that OPENS with an em dash is a QUOTED BULLET, not our punctuation.
+ * A whole string literal that OPENS with an em dash is a QUOTED BULLET, not our punctuation.
  *
  * ⚠️ THIS IS THE ONE PERMANENT EXEMPTION THAT IS SHAPE-BASED RATHER THAN LOCATION-BASED, and it earns it.
- * lib/cbam/boundaries.ts reproduces Annex II to Regulation (EU) 2023/956 verbatim, and the Regulation's own
- * text uses an em dash to open each listed process: "— all processes emitting CO2 from process materials…".
- * Changing it would misquote the instrument. 37 of that file's 54 are these; the other 17 are our own prose
- * and are in the budget below.
+ * lib/cbam/boundaries.ts reproduces Annex II to Regulation (EU) 2023/956 verbatim, and the Regulation's
+ * own text uses an em dash to open each listed process: "— all processes emitting CO2 from process
+ * materials…". Changing it would misquote the instrument.
+ *
+ * ⚠️ IT USED TO BE THE REGEX /['"`]\s*—/ AGAINST COMMENT-STRIPPED TEXT, AND THAT MATCHED FAR MORE THAN
+ * ANNEX II. A quote character followed by an em dash occurs wherever a dash follows a closing quote in
+ * prose, and — the expensive part — it matched every `'—'` empty-value glyph in the tree, so the ratchet
+ * could not see a single one of them. Fourteen in lib/ghg/engine.ts alone were invisible to it.
+ *
+ * ⚠️ AND IT IS NOW SCOPED TO THE FILE, BECAUSE THE SHAPE ALONE IS NOT THE THING. Ten literals elsewhere
+ * open with an em dash and are OUR prose, appended to another string at render time: "— not answered",
+ * "— no reason recorded", "— excluded from all totals". A shape-only rule exempted all ten. They are
+ * counted now, which is why four budgets went up in the rebaseline.
  */
-const QUOTED_BULLET = new RegExp(`['"\`]\\s*${DASH}`, 'g')
+const ANNEX_II_FILE = 'lib/cbam/boundaries.ts'
+const quotedBullet = (rel: string, p: Piece): boolean =>
+  rel === ANNEX_II_FILE && p.whole && /^\s*—/.test(p.text) && p.text.trim() !== DASH
 
 /**
- * Publisher citation strings, exempt by LOCATION because the whole object is one kind of thing.
- *
- * ⚠️ SCOPED TO THE OBJECT, NOT THE FILE, WHICH IS THE POINT. lib/ghg/engine.ts has 87 rendered em dashes
- * and only 10 are inside EF_SOURCES. The other 77 include eGRID subregion labels, framework chip titles,
- * validation warnings, unit-conversion notes and — worth its own fix — 14 uses of the em dash as an
- * EMPTY-VALUE GLYPH in exported workings rows, which is the "Not provided" case already settled on the
- * Deals pipeline export. Exempting the file would have hidden all of that.
+ * A whole literal that IS the em dash is an empty-value glyph: a CSV's blank cell, or "no value" on
+ * screen. Counted separately from prose because it is a different fix — the vocabulary in
+ * lib/ghg/workingsCells.ts — and because a punctuation sweep must not be able to "fix" one by deleting it.
  */
-const EF_SOURCES_OBJECT = { file: 'lib/ghg/engine.ts', declaration: /const EF_SOURCES\s*=\s*\{/ }
+const emptyValueGlyph = (p: Piece): boolean => p.whole && p.text.trim() === DASH
 
-/** The brace-matched line range of a declaration, so the exemption follows the object if it moves. */
-function objectRange(src: string, declaration: RegExp): [number, number] | null {
-  const m = declaration.exec(src)
-  if (!m) return null
-  const open = src.indexOf('{', m.index)
-  let depth = 0
-  for (let j = open; j < src.length; j++) {
-    if (src[j] === '{') depth++
-    else if (src[j] === '}') {
-      depth--
-      if (depth === 0) {
-        const line = (s: string) => s.split('\n').length
-        return [line(src.slice(0, open)), line(src.slice(0, j))]
-      }
+const EF_SOURCES_OBJECT = { file: 'lib/ghg/engine.ts', name: 'EF_SOURCES' }
+
+/**
+ * ⚠️ READ WITH THE TYPESCRIPT PARSER, NOT BY LINE, which is the whole of this commit. Only what a customer
+ * can see is text: string literals, template pieces and JSX text. A comment is none of those, so nothing
+ * has to be stripped and no scanner has to be trusted — the approach lib/scope3/scope3Copy.test.ts has
+ * used since it was written, and which was right about app/dashboard/scope3/page.tsx when this file was
+ * wrong about it.
+ */
+interface Piece { where: string; text: string; whole: boolean; pos: number }
+
+/**
+ * ⚠️ AN ENTITY IN JSX TEXT IS AN EM DASH TO THE CUSTOMER, AND NEITHER COUNTER SAW ONE. `&mdash;` in JSX
+ * text renders as —; 76 lines of this tree use it, including app/materiality/page.tsx, which was swept in
+ * group 3 and read as clean afterwards. Decoded HERE and only for JsxText: inside a string literal
+ * `&mdash;` renders as the six literal characters, so decoding it there would invent a dash that no
+ * customer sees.
+ */
+const decodeJsxEntities = (t: string): string =>
+  t.replace(/&mdash;/g, DASH).replace(/&#8212;/g, DASH).replace(/&#x2014;/gi, DASH)
+
+function pieces(rel: string): Piece[] {
+  const src = readFileSync(join(ROOT, rel), 'utf8')
+  const sf = ts.createSourceFile(rel, src, ts.ScriptTarget.Latest, true,
+    rel.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const out: Piece[] = []
+  const visit = (n: ts.Node) => {
+    let text: string | null = null
+    let whole = false
+    if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) { text = n.text; whole = true }
+    else if (ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) text = n.text
+    else if (ts.isJsxText(n)) text = decodeJsxEntities(n.text)
+    if (text !== null) {
+      out.push({ where: `${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`, text, whole, pos: n.getStart() })
     }
+    ts.forEachChild(n, visit)
   }
-  return null
+  visit(sf)
+  return out
 }
 
-/** Em dashes in RENDERED copy: comments stripped, permanent exemptions removed. */
+/** The character range of a top-level declaration, so a location-based exemption follows it if it moves. */
+function declarationRange(rel: string, name: string): [number, number] | null {
+  const src = readFileSync(join(ROOT, rel), 'utf8')
+  const sf = ts.createSourceFile(rel, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  let found: [number, number] | null = null
+  const visit = (n: ts.Node) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === name) {
+      found = [n.getStart(), n.getEnd()]
+      return
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return found
+}
+
+/**
+ * Em dashes in RENDERED copy: prose only. Whole-literal glyphs, Annex II bullets and the EF_SOURCES
+ * citations are each excluded for their own stated reason, and every exclusion is asserted live below.
+ */
 export function renderedDashes(file: string): number {
-  const src = stripTsComments(readFileSync(join(ROOT, file), 'utf8'))
-  const lines = src.split('\n')
-  const ef = file === EF_SOURCES_OBJECT.file ? objectRange(src, EF_SOURCES_OBJECT.declaration) : null
-  let n = 0
-  lines.forEach((line, i) => {
-    const count = (line.match(new RegExp(DASH, 'g')) ?? []).length
-    if (!count) return
-    if (ef && i + 1 >= ef[0] && i + 1 <= ef[1]) return
-    n += Math.max(0, count - (line.match(QUOTED_BULLET) ?? []).length)
-  })
-  return n
+  const ef = file === EF_SOURCES_OBJECT.file
+    ? declarationRange(file, EF_SOURCES_OBJECT.name)
+    : null
+  return pieces(file)
+    .filter(p => !(ef && p.pos >= ef[0] && p.pos <= ef[1]))
+    .filter(p => !quotedBullet(file, p) && !emptyValueGlyph(p))
+    .reduce((n, p) => n + (p.text.match(new RegExp(DASH, 'g')) ?? []).length, 0)
 }
 
 /**
@@ -106,62 +150,77 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
  * The remaining sweep, file by file, with the count each one still carries.
  *
  * LOWER A NUMBER WHEN YOU SWEEP A FILE. Remove the line when it reaches zero.
+ *
+ * ⚠️ REBASELINED 28 SEP 2026 AND THE TOTAL WENT UP: 1,012 across 80 files became 1,128 across 83. NOT ONE
+ * EM DASH WAS ADDED. Reading the text with the TypeScript parser instead of matching bytes on
+ * comment-stripped lines found two populations the old counter could not see:
+ *
+ *   · `\u2014` WRITTEN AS AN ESCAPE. app/security/page.tsx spells every one of its dashes that way, so it
+ *     read as clean through the group-2 sweep and is listed here at 7. Also app/dashboard/ghg/page.tsx
+ *     and app/calculate-emissions/page.tsx.
+ *   · `&mdash;` IN JSX TEXT, which renders as an em dash. 76 lines use it. app/materiality/page.tsx was
+ *     swept in group 3 and still has 16; app/calculate-emissions/page.tsx went from 1 to 62, almost all
+ *     of them entities.
+ *
+ * Both were invisible to a byte match and are counted now, which is the point of the change. A file whose
+ * number rose gained nothing: it was always wrong.
  */
+/**
+ * Whole-literal '—' empty-value glyphs left in the tree, counted 28 Sep 2026.
+ *
+ * ⚠️ AN EQUALITY, NOT A CEILING, AND IT SHOULD ONLY EVER FALL. The old QUOTED_BULLET exempted every one of
+ * these, so the ratchet could not see them at all; the GHG workings table's 24 were found by reading the
+ * code rather than by any guard. Their fix is a VOCABULARY — 'Not provided', 'Not applicable',
+ * 'Not quantified' in lib/ghg/workingsCells.ts — not a punctuation edit, which is why they are counted
+ * apart from the sweep budget. Lower this when a surface adopts the words.
+ */
+const GLYPH_COUNT = 73
+
 const SWEEP_BUDGET: Record<string, number> = {
+  'app/advisory/page.tsx': 1,
   'app/assess/page.tsx': 50,
-  // ⚠️ ITS ONE REMAINING DASH IS NOT COPY, AND THE BUDGET KEEPS IT ANYWAY. app/calculate-emissions
-  // holds a CSS comment inside a <style> template literal, explaining why two retired gradient stops
-  // were deleted. stripTsComments does not strip CSS comments inside a template literal — correctly,
-  // since it tracks template literals as strings — so it counts. It is shipped to the browser and read
-  // by nobody. Left at 1 rather than teaching the stripper about nested CSS comments, or deleting a
-  // useful note to satisfy a counter.
-  'app/calculate-emissions/page.tsx': 1,
+  'app/calculate-emissions/page.tsx': 62,
   'app/dashboard/ai-governance/page.tsx': 21,
   'app/dashboard/cbam/disclosures/page.tsx': 14,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
-  'app/dashboard/cbam/report/page.tsx': 11,
+  'app/dashboard/cbam/report/page.tsx': 12,
   'app/dashboard/cbam/setup/page.tsx': 81,
-  'app/dashboard/climate-risk/page.tsx': 33,
+  'app/dashboard/climate-risk/page.tsx': 35,
   'app/dashboard/climate-risk/report/page.tsx': 16,
   'app/dashboard/cyber/page.tsx': 6,
   'app/dashboard/deals/report/page.tsx': 2,
-  // ⚠️ 123 → 104 AND SCOPE 3 → GONE WITH NO COPY EDIT, 28 Sep 2026. Both numbers were phantoms:
-  // these pages held `replace(/"/g, '""')` for their CSV exports, stripComments does not track regex
-  // literals, so the quote inside the regex opened a string in its model that never closed and every
-  // comment after it counted as rendered copy. lib/csv.ts replaced those expressions and the counts
-  // fell. Scope 3's real figure is ZERO, which scope3Copy.test.ts SC1 has asserted independently all
-  // along — the two guards disagreed and the parser-based one was right. Fixing the stripper is the
-  // ratchet commit's job.
-  'app/dashboard/ghg/page.tsx': 104,
+  'app/dashboard/ghg/page.tsx': 111,
   'app/dashboard/ghg/trends/page.tsx': 8,
   'app/dashboard/materiality/assessment/AssessmentForm.tsx': 12,
   'app/dashboard/materiality/assessment/new/page.tsx': 3,
-  'app/dashboard/materiality/report/page.tsx': 26,
+  'app/dashboard/materiality/report/page.tsx': 27,
   'app/dashboard/materiality/survey/[id]/page.tsx': 4,
   'app/dashboard/materiality/survey/[id]/respondents/import/page.tsx': 12,
-  'app/dashboard/materiality/survey/[id]/respondents/page.tsx': 7,
+  'app/dashboard/materiality/survey/[id]/respondents/page.tsx': 8,
   'app/dashboard/materiality/survey/[id]/respondents/template/route.ts': 1,
-  'app/dashboard/materiality/survey/[id]/results/page.tsx': 21,
+  'app/dashboard/materiality/survey/[id]/results/page.tsx': 25,
   'app/dashboard/materiality/survey/[id]/scope/page.tsx': 4,
   'app/dashboard/materiality/survey/page.tsx': 8,
-  'app/dashboard/materiality/worksheet/[id]/determinations/page.tsx': 10,
+  'app/dashboard/materiality/worksheet/[id]/determinations/page.tsx': 14,
   'app/dashboard/materiality/worksheet/[id]/determine/page.tsx': 11,
   'app/dashboard/materiality/worksheet/[id]/iro-1/page.tsx': 2,
-  'app/dashboard/materiality/worksheet/[id]/page.tsx': 17,
+  'app/dashboard/materiality/worksheet/[id]/page.tsx': 18,
   'app/dashboard/materiality/worksheet/[id]/register/page.tsx': 1,
   'app/dashboard/materiality/worksheet/page.tsx': 3,
   'app/dashboard/page.tsx': 1,
-  'app/dashboard/people/page.tsx': 12,
+  'app/dashboard/people/page.tsx': 13,
   'app/dashboard/reports/page.tsx': 1,
-  'app/dashboard/sbti/page.tsx': 11,
+  'app/dashboard/sbti/page.tsx': 12,
   'app/dashboard/stakeholder/[id]/report/page.tsx': 4,
   'app/dashboard/supply-chain/page.tsx': 63,
-  'app/dashboard/supply-chain/portal/[id]/page.tsx': 1,
+  'app/dashboard/supply-chain/portal/[id]/page.tsx': 2,
   'app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx': 4,
   'app/dashboard/supply-chain/portal/page.tsx': 1,
   'app/deals/[token]/page.tsx': 6,
   'app/impact/[token]/page.tsx': 11,
+  'app/materiality/page.tsx': 16,
   'app/order/page.tsx': 1,
+  'app/security/page.tsx': 7,
   'app/supplier/[token]/page.tsx': 1,
   'app/survey/[token]/page.tsx': 11,
   'app/verify-cbam/[token]/page.tsx': 19,
@@ -172,19 +231,19 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/cbam/cn.ts': 1,
   'lib/cbam/readiness.ts': 20,
   'lib/cbam/report/build.ts': 7,
-  'lib/cbam/sefa.ts': 3,
+  'lib/cbam/sefa.ts': 4,
   'lib/cbam/sefaCompute.ts': 1,
   'lib/emissionFactors/spend.ts': 1,
   'lib/emissionFactors/spendAdjustment.ts': 1,
-  'lib/flag/estimate.ts': 7,
+  'lib/flag/estimate.ts': 9,
   'lib/ghg/comparability.ts': 1,
   'lib/ghg/conciergeDocTypes.ts': 2,
-  'lib/ghg/engine.ts': 62,
+  'lib/ghg/engine.ts': 64,
   'lib/ghg/factorEditions.ts': 2,
   'lib/ghg/loadSeries.ts': 1,
-  'lib/ghg/series.ts': 3,
+  'lib/ghg/series.ts': 4,
   'lib/ifrsS2.ts': 1,
-  'lib/materiality.ts': 7,
+  'lib/materiality.ts': 8,
   'lib/materiality/boardReport.ts': 17,
   'lib/materiality/boardReportPdf.ts': 6,
   'lib/materiality/impactContext.ts': 5,
@@ -279,14 +338,36 @@ describe('no em dash reaches customer-facing copy, and the remaining budget only
     }
   })
 
-  it('the permanent exemptions are real: both still match something', () => {
-    // A shape-based exemption that matches nothing is a rule nobody is relying on, and it would hide the
-    // day the quoted text was reworded. Both are asserted to be load-bearing.
-    const boundaries = stripTsComments(readFileSync(join(ROOT, 'lib/cbam/boundaries.ts'), 'utf8'))
-    expect((boundaries.match(QUOTED_BULLET) ?? []).length,
-      'Annex II bullet quotations have gone from lib/cbam/boundaries.ts').toBeGreaterThan(0)
-    const engine = stripTsComments(readFileSync(join(ROOT, EF_SOURCES_OBJECT.file), 'utf8'))
-    expect(objectRange(engine, EF_SOURCES_OBJECT.declaration),
-      'EF_SOURCES is no longer a brace-matchable object literal').not.toBeNull()
+  it('the permanent exemptions are real, and neither reaches further than its reason', () => {
+    // An exemption that matches nothing is a rule nobody relies on, and it would hide the day the quoted
+    // text was reworded. An exemption that matches everywhere is worse: that is what the old
+    // /['"`]\\s*—/ did.
+    const bullets = pieces(ANNEX_II_FILE).filter(p => quotedBullet(ANNEX_II_FILE, p))
+    expect(bullets.length, `Annex II bullet quotations have gone from ${ANNEX_II_FILE}`).toBeGreaterThan(0)
+
+    // ⚠️ OUR OWN DASH-OPENING PROSE IS COUNTED, NOT EXEMPTED, which is what scoping the rule to one file
+    // buys. These are appended to another string at render time, so they look like bullets and are not.
+    const ours = sourceFiles()
+      .filter(f => f !== ANNEX_II_FILE)
+      .flatMap(f => pieces(f).filter(p => p.whole && /^\s*—/.test(p.text) && p.text.trim() !== DASH)
+        .map(p => p.where))
+    expect(ours.length, 'if this reaches zero, delete the scoping note above').toBeGreaterThan(0)
+    for (const where of ours) {
+      const file = where.slice(0, where.lastIndexOf(':'))
+      expect(SWEEP_BUDGET[file], `${where} opens with an em dash and its file has no budget`)
+        .toBeGreaterThan(0)
+    }
+
+    expect(declarationRange(EF_SOURCES_OBJECT.file, EF_SOURCES_OBJECT.name),
+      'EF_SOURCES is no longer a top-level declaration the parser can find').not.toBeNull()
+  })
+
+  it('the empty-value glyph is counted separately, not swept', () => {
+    // ⚠️ THE OLD EXEMPTION HID THESE, WHICH IS WHY THEY ARE ASSERTED RATHER THAN MERELY EXCLUDED. A whole
+    // literal that IS an em dash is a blank cell, and its fix is the vocabulary in
+    // lib/ghg/workingsCells.ts — not a punctuation edit. Counting them here keeps the number visible.
+    const glyphs = sourceFiles().flatMap(f => pieces(f).filter(emptyValueGlyph).map(p => p.where))
+    expect(glyphs.length, `empty-value glyphs left in the tree:\n  ${glyphs.join('\n  ')}`)
+      .toBe(GLYPH_COUNT)
   })
 })
