@@ -331,7 +331,11 @@ function PricingPageInner() {
 
   const s: Record<string, React.CSSProperties> = {
     page: { fontFamily: 'system-ui, sans-serif', background: '#f8f7f5', minHeight: '100vh' },
-    nav: { background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 100 },
+    // ⚠️ minHeight AND flexWrap, NOT height. The CTA beside the breadcrumb carries whiteSpace:
+    // 'nowrap' from primaryBtn, so it could not shrink and could not wrap, and the bar ran to 389px at
+    // 320px. A fixed height would clip the second row, so the height became a minimum. One row of
+    // content is ~34px tall, so at every width that already fitted the bar is still 56px and unchanged.
+    nav: { background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '8px 2rem', minHeight: 56, flexWrap: 'wrap' as const, gap: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky' as const, top: 0, zIndex: 100 },
     wrap: { maxWidth: 860, margin: '0 auto', padding: '3rem 2rem' },
     // Hero
     heroLabel: { display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-brand)', border: '1px solid var(--color-band-line)', borderRadius: 99, padding: '4px 14px', marginBottom: 14 },
@@ -523,7 +527,7 @@ function PricingPageInner() {
         {NEW_PRICING_ACTIVE && (
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 24 }}>
             <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 260 }}>
+              <div style={{ flex: 1, minWidth: 'min(260px, 100%)' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
@@ -605,7 +609,7 @@ function PricingPageInner() {
                         const cap = alw == null ? 'unlimited locations' : `≤${alw} locations`
                         const active = tier === t
                         return (
-                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
+                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 'min(130px, 100%)', textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
                             <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
                             <div style={{ fontSize: 12, marginTop: 2 }}>{tp == null ? 'Contact us' : `$${tp.toLocaleString()}/yr`}</div>
                             <div style={{ fontSize: 9, color: 'var(--color-ink-2)', marginTop: 2 }}>{cap}</div>

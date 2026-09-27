@@ -218,7 +218,7 @@ export default function Page() {
           for fifteen. Add modules and the multi-module discount applies automatically: two modules −10%,
           three or more −20%.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
           {/* ⚠️ TIERS AND ALLOWANCES ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. advisory has
               priceUSD null and locationAllowance null, which mean "contact us" and "uncapped" — not
               zero and not missing. allowanceLabel is the only place that decides how a null reads. */}

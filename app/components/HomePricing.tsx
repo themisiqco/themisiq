@@ -161,7 +161,7 @@ export default function HomePricing() {
                         const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
                         const active = tier === t
                         return (
-                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 130, textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
+                          <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 'min(130px, 100%)', textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
                             <div style={{ fontSize: 11, fontWeight: 700 }}>{label}</div>
                             <div style={{ fontSize: 12, marginTop: 2 }}>{tp == null ? 'Contact us' : `$${tp.toLocaleString()}/yr`}</div>
                           </button>
@@ -208,7 +208,7 @@ export default function HomePricing() {
         {/* Discount bands — same cards, same wording, as /pricing. Not products: Core / Growth /
             Platform named three tiers nobody can buy, and "Platform" read as the Full Platform
             bundle removed on 23 Jul 2026. Figures use the same − (U+2212) as the hero above. */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(13rem, 100%), 1fr))', gap: 8, marginBottom: 16 }}>
           {[
             { label: 'Full price', sub: '1 module', active: count === 1 },
             { label: '−10%', sub: '2 modules', active: count === 2 },

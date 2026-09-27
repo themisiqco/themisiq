@@ -718,7 +718,7 @@ export default function AssessPage() {
           <div style={{ fontSize: 13, color: '#0C447C', lineHeight: 1.55 }}>
             We&apos;ve emailed a copy of your Compliance Obligation Map to <strong>{email.emailAddr || 'your inbox'}</strong>. If you don&apos;t see it within a few minutes, please check your spam or junk folder — and mark it &ldquo;not spam&rdquo; so future updates reach you.
           </div>
-        </div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: '1.5rem' }}>
+        </div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(11rem, 100%), 1fr))', gap: 8, marginBottom: '1.5rem' }}>
           {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: 'var(--color-state-warn)' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
             <div key={label} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>

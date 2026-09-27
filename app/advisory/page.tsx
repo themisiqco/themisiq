@@ -49,7 +49,7 @@ export default function AdvisoryPage() {
             <a href={CALENDLY} style={{ ...btnPrimary, textDecoration: 'none' }}>Book a 30-minute complimentary call</a>
             <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>See where you stand &mdash; free assessment</a>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, maxWidth: 680 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(11rem, 100%), 1fr))', gap: 16, maxWidth: 680 }}>
             {[
               ['30 minutes', 'Complimentary first call'],
               ['Fixed scope', 'Fixed fee, agreed before we start'],
@@ -88,14 +88,29 @@ export default function AdvisoryPage() {
             <p style={sectionSub}>Each engagement is bounded by the module it sits on, which is why the fee can be fixed before we start.</p>
           </div>
           {/* Hairline grid: 1px gaps over a grey ground, the same construction the page already
-              uses for two-column comparisons. Header row first, then one row per module. */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 0.85fr) minmax(240px, 1.35fr) minmax(240px, 1.5fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
+              uses for two-column comparisons. Header row first, then one row per module.
+              ⚠️ A SCROLLER, NOT A STACK, AND THE HEADER ROW IS WHY. This is the one grid on a
+              customer-facing page that is a real THREE-COLUMN TABLE rather than a list of cards: a
+              header row, then one row per module. Collapsing it to a single column on a narrow screen
+              would put all three headings above all the data and break the correspondence that makes it
+              readable. Its natural width is 660px, which no phone has, so the wrapper scrolls instead and
+              the DOCUMENT does not: overflow-x on a width-constrained parent contains the overrun.
+              ⚠️ THE 240px FLOORS INSIDE ARE DELIBERATE AND MUST NOT TAKE min(…, 100%). They were briefly
+              given it on 26 Sep 2026 in a sweep of bare floors, which was wrong here: inside a scroller a
+              fixed floor is what DEFINES the table's readable width, and letting it collapse would give
+              back the squeeze the scroller exists to prevent.
+              Verified against the other grids converted that day — security's four incident steps,
+              assess's three stat tiles, HomePricing's three discount tiles and materiality's three
+              blocks are all card LISTS, where stacking is right. This is the only table. */}
+          <div style={{ overflowX: 'auto' }}>
+            <div style={{ minWidth: 660, display: 'grid', gridTemplateColumns: 'minmax(150px, 0.85fr) minmax(240px, 1.35fr) minmax(240px, 1.5fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
             {['Module', 'The question the platform can’t answer alone', 'Custom advisory engagement'].map((h) => (
               <div key={h} style={{ background: '#fff', padding: '1rem 1.25rem', fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>{h}</div>
             ))}
             {BY_MODULE.map(([mod, question, engagement]) => (
               <Row key={mod} mod={mod} question={question} engagement={engagement} />
             ))}
+            </div>
           </div>
         </div>
       </section>
@@ -105,7 +120,7 @@ export default function AdvisoryPage() {
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
           <h2 style={sectionTitle}>Three things that aren&rsquo;t module-specific.</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 12 }}>
           {CROSS_MODULE.map(([title, desc]) => (
             <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', display: 'flex', flexDirection: 'column' as const, gap: '0.75rem' }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{title}</div>

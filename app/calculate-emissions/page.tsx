@@ -276,7 +276,7 @@ const STYLES = `
   .tiq .triggers{background:var(--surface); padding:60px 0;}
   .tiq .triggers h2{font-size:clamp(24px,3vw,30px); max-width:24ch;}
   .tiq .triggers .lede{font-size:16px; color:var(--mid); margin-top:14px; max-width:60ch;}
-  .tiq .trigger-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(216px,1fr)); gap:16px; margin-top:36px;}
+  .tiq .trigger-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(216px, 100%),1fr)); gap:16px; margin-top:36px;}
   .tiq .trigger-card{
     background:#fff; border:0.5px solid var(--border); border-radius:14px; padding:24px;
   }
@@ -337,7 +337,7 @@ const STYLES = `
   /* support tiers */
   .tiq .support{background:var(--surface); padding:72px 0;}
   .tiq .support h2{font-size:clamp(26px,3.4vw,36px);}
-  .tiq .tier-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(216px,1fr)); gap:16px; margin-top:40px;}
+  .tiq .tier-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(216px, 100%),1fr)); gap:16px; margin-top:40px;}
   .tiq .tier{
     background:#fff; border:0.5px solid var(--border); border-radius:14px;
     padding:26px; display:flex; flex-direction:column;

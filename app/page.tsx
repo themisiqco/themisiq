@@ -129,7 +129,7 @@ export default function Home() {
             It now reaches companies that never thought of themselves as regulated. A few of the situations we see most:
           </p>
           {/* Offset grid: every second card drops, so the row reads as an essay rather than a table. */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: '1.5rem', alignItems: 'start' }}>
             {ESSAY.map((e, i) => (
               <figure key={e.who} style={{ margin: 0, marginTop: i % 2 === 1 ? '2.5rem' : 0 }}>
                 <Image src={e.src} alt={e.alt} width={e.w} height={e.h}

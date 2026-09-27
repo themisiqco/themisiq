@@ -80,7 +80,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={eyebrow}>Infrastructure</div>
           <h2 style={sectionTitle}>Where your data lives.</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginTop: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 12, marginTop: '1.5rem' }}>
             {[
               { title: 'Database — Supabase (AWS)', via: 'Supabase', status: null, body: 'All customer platform data stored in Supabase on AWS infrastructure. Supabase holds SOC 2 Type II and ISO 27001 certifications. US-East region by default.' },
               { title: 'Application — Vercel', via: 'Vercel', status: null, body: 'ThemisIQ application hosted on Vercel with global CDN. Vercel holds SOC 2 Type II certification. HTTPS enforced on all endpoints; HSTS enabled.' },
@@ -167,7 +167,7 @@ export default function Page() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={eyebrow}>Incident response</div>
           <h2 style={sectionTitle}>What happens if something goes wrong.</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginTop: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(11rem, 100%), 1fr))', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginTop: '1.5rem' }}>
             {[
               { step: '01', title: 'Detect', body: 'Detection is by notification from the providers that run our infrastructure \u2014 Supabase, Vercel, GitHub and Stripe \u2014 and by reports to security@themisiq.co, which is monitored with push notification. Automated alerting on our own systems is not configured.' },
               { step: '02', title: 'Contain', body: 'P1 incidents are contained within 1 hour of detection. Affected systems are isolated immediately.' },

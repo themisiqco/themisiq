@@ -176,7 +176,11 @@ export default function Page() {
           DOUBLE materiality assessment has exactly two halves by definition, however many
           modules deliver them, so the figure cannot rot. */}
       <section style={{ padding: '0 2.5rem 4rem', maxWidth: 1100, margin: '0 auto', borderBottom: '0.5px solid #e8e7e4' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        {/* ⚠️ auto-fit, NOT repeat(3, 1fr). A fixed three-column grid cannot reach 320px: each `1fr`
+            track's automatic minimum is min-content, so at 72px per column the cards took their longest
+            word instead and the row overflowed to 424px. The three still read as a row from about 500px
+            up; below that they stack rather than overflow. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr))', gap: 12 }}>
           {[
             // Ground and edge match diagram 2's Environment / Social / Governance containers
             // exactly — same alphas, same strokes. The deepest is the linked card: weight is how
@@ -298,7 +302,9 @@ export default function Page() {
             IFRS S2 alone, you need Climate Risk and not this.
           </p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+        {/* auto-fit for the same reason as the tiles above. Measured right edge at 320px before this:
+            368px. Two side by side from about 610px up. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(17rem, 100%), 1fr))', gap: 16 }}>
           {/* ⚠️ NOT A LINK, AND THE MARKER IS THE POINT. A card linking to the page it sits on is a
               dead click; "you are here" is what tells a reader they have already arrived, which is
               the whole job of a guardrail. */}
@@ -716,5 +722,13 @@ const cellTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, color: '
 const cellBody: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, margin: 0 }
 // Two-column variant of the hairline grid used on /deals and /climate-risk — 1px gaps over a
 // #e8e7e4 ground so the cell backgrounds draw the rules.
-const hairlineGrid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }
+// ⚠️ auto-fit, NOT repeat(2,1fr) — the "Stakeholder engagement, handled." row overflowed to 347px at
+// 320px. Stacking keeps the hairline working: the 1px gap shows the ground between rows just as it did
+// between columns.
+// ⚠️ SEPARATELY, AND NOT FIXED HERE: this is the FAKED CELL BORDER. `gap: 1` over a background makes the
+// GAP the border, so nothing draws a line and the seam cannot be recoloured or given a radius. The same
+// pattern was replaced with real 1px borders on app/cyber/page.tsx; /deals and /climate-risk carry their
+// own copies of this const and are unchanged. Doing it here would change how three pages look, which is a
+// design change rather than an overflow fix.
+const hairlineGrid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(17rem, 100%), 1fr))', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }
 const hairlineCell: React.CSSProperties = { background: '#fff', padding: '2rem' }
