@@ -1731,7 +1731,7 @@ info token, and that is its own small triage rather than a find-and-replace.
 
 ---
 
-## Retire the 32 remaining `#7425E3` literals, now that Cyber owns violet
+## Retire the 31 remaining `#7425E3` literals, now that Cyber owns violet
 
 Logged 26 Sep 2026, as a consequence of the Cyber decision. **A separate task; nothing changed now.**
 
@@ -1751,8 +1751,11 @@ have outlived a sweep that thought it was complete. **Which is the failure mode 
 line describes.** Re-swept 26 Sep 2026 by stripping comment spans first, which is what separates a live
 use from a note about one.
 
-**WHERE THE 32 COMES FROM, so the count is not recomputed differently next time:** 18 live uses across
-11 application files, plus 14 in 6 transactional email templates. The templates are the deliberately
+**WHERE THE 31 COMES FROM, so the count is not recomputed differently next time:** 17 live uses across
+10 application files, plus 14 in 6 transactional email templates. (18 across 11 until 26 Sep 2026, when
+`app/dashboard/cyber/page.tsx:82` took `--color-accent-indigo` and left this list. **That is one down by
+the method this task prescribes** — a replacement chosen and measured first, the literal removed second —
+and it is the only one of the 32 retired so far.) The templates are the deliberately
 unmigrated gradient that `CLAUDE.md` records under **Brand constants**, so they are in the 32 but are
 NOT part of this task. A further 5 files mention the value in comments ONLY — `app/styles/themisiq-tokens.css`,
 `lib/brand.ts`, `lib/ghg/engine.ts`, `lib/pdf/palette.test.ts` and the two `app/dashboard/cbam/` files —
@@ -1767,7 +1770,6 @@ thirteen files.
 | `app/trust/page.tsx` | `:24`, `:30` | two of the six card accents |
 | `app/dashboard/climate-risk/page.tsx` | `:273` | the legend `<circle fill>` for one scenario |
 | `app/dashboard/climate-risk/report/page.tsx` | `:231` | the same legend circle, duplicated into the report view — change both or the report diverges from the page it reports on |
-| `app/dashboard/cyber/page.tsx` | `:82` | the DORA row of `FRAMEWORK_CONFIG`. See the note below: this one CANNOT take the obvious replacement |
 | `app/dashboard/page.tsx` | `:202` | the `professional` plan chip, `color` plus `bg: '#EDE9FE'` |
 | `app/dashboard/reports/page.tsx` | `:79` | the `resilience` analysis-type chip, same `#EDE9FE` pairing |
 | `app/dashboard/supply-chain/portal/page.tsx` | `:28` | the EcoVadis swatch |
@@ -1777,13 +1779,24 @@ thirteen files.
 `app/dashboard/reports/page.tsx:79`. It is the violet's wash and appears in no token. Retiring the colour
 without its ground leaves a replacement sitting on a violet tint.
 
-⚠️ **THE CYBER DORA ROW CANNOT BECOME `--color-accent-magenta`.** That was proposed on 26 Sep 2026 and
-withdrawn the same day: `#AF3790` is **6.8° and 1.05:1 from `--color-state-info` `#B5179E`**, which is the
-precise collision the three-commit colourway sequence was ordered to avoid. **The separation assertion in
-`lib/tokenContrast.test.ts` does not catch it**, because its `FOREGROUND` pattern admits only
-`--color-module-*` and `--color-state-*`. Nor can the row take `--color-module-cyber-ink`: DORA is one of
-five category colours read side by side inside the Cyber module, so the module's own identity colour would
-make one row read as the module. A new accent hue is needed, and it is being chosen separately.
+✅ **THE CYBER DORA ROW IS DONE, 26 SEP 2026, AND HOW IT WENT WRONG FIRST IS THE USEFUL PART.**
+`--color-accent-magenta` was proposed and withdrawn the same day: `#AF3790` is **6.8° and 1.05:1 from
+`--color-state-info` `#B5179E`**, the precise collision the three-commit colourway sequence was ordered to
+avoid. **The separation assertion in `lib/tokenContrast.test.ts` did not catch it**, because its
+`FOREGROUND` pattern admits only `--color-module-*` and `--color-state-*` — which is the entry below.
+`--color-module-cyber-ink` was rejected too, on meaning: DORA is one of five category colours read side by
+side inside the Cyber module, so the module's own identity colour would make one row read as the module.
+It took a NEW accent, `--color-accent-indigo` `#332F92` / `#EAE9F5`, measured against the full foreground
+set rather than picked. Full derivation beside the token in `app/styles/themisiq-tokens.css`.
+
+**THE LESSON FOR THE OTHER 31, and it is not the one this task assumed.** The entry above opens by saying
+the violet family "can point at the Cyber tokens" now that Cyber owns 270°. **The DORA row is the first
+site tried, and it could not.** A module token is available for a MODULE surface; it is not available for a
+category that happens to sit inside that module. So expect the remaining sites to split: the two
+climate-risk legend circles, the three SBTi chart lines and `ghg/trends` are chart series inside one module
+and may well take a module token, while `lib/supply-chain/templates.ts`, `app/trust/page.tsx`, the portal
+swatch and the two plan/analysis chips are CATEGORY sets and will need accents. **Check which of the two a
+site is before assuming the Cyber tokens answer it.**
 
 ⚠️ **THE LADDER IS THE HARD PART AND MUST NOT BE FLATTENED.** `app/materiality/page.tsx` documents it as
 information design, where "colour carries meaning — container weight, lens against ground, a five-step
@@ -1845,6 +1858,11 @@ pairs, of which three are deliberate aliases and three are real.** The third rea
 | `--color-accent-amber` vs `--color-state-warn` | 1.00:1 at 0.0° | alias |
 | `--color-accent-green` vs `--color-state-ok` | 1.00:1 at 0.0° | alias |
 | `--color-accent-red` vs `--color-state-error` | 1.00:1 at 0.0° | alias |
+
+**RE-MEASURED AFTER `--color-accent-indigo` WAS ADDED, same day: still six.** Indigo `#332F92` adds no
+pair. Its closest neighbour anywhere in the widened set is `--color-module-deals-ink` `#5262CF` at 10.1°,
+which clears on the ratio arm at 2.04:1 — 0.54 over the gate. So the seventh accent was chosen against the
+rule the family does not yet enforce, which is the case for enforcing it.
 
 ⚠️ **THE `accent-blue` / `module-climate` PAIR IS THE ARGUMENT FOR DOING THIS.** It is the same failure as
 the `state-info` one that the three-commit sequence was built to fix — a category blue 4.3° from the Climate

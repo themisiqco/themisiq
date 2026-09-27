@@ -116,21 +116,29 @@ export const SCALE_GAP_WASH = '#FDF6EC'
 /**
  * Telling one category from another: framework chips, questionnaire sections, card accents, swatches.
  *
- * ⚠️ NO SEMANTICS. Named by hue because these mean nothing. Three of the six share a value with a state
- * token (green/ok, blue/info, red/error) and one with a module hue's colour (amber, #A94E0D, though not
- * its wash). Before 25 Sep 2026 they WERE those tokens, so a category accent and a state claim were one
- * value and neither could move without the other.
+ * ⚠️ NO SEMANTICS. Named by hue because these mean nothing. Three of the SEVEN share a value with a state
+ * token (green/ok, red/error, and amber with state-warn though not its wash) and one with a module hue's
+ * colour. Before 25 Sep 2026 they WERE those tokens, so a category accent and a state claim were one value
+ * and neither could move without the other. `blue` no longer shares with state-info: that moved to #B5179E
+ * on 26 Sep 2026 when Climate Risk took blue, and the split is the whole point of two families.
+ *
+ * ⚠️ `indigo` IS THE ONE MEMBER NOT BORROWED FROM SOMEWHERE. Added 26 Sep 2026 for the Cyber dashboard's
+ * DORA framework row, chosen against a measured set rather than picked. Its full derivation, both
+ * adjacencies and the two rejected alternatives are in app/styles/themisiq-tokens.css beside the token;
+ * do not re-decide it from here.
  *
  * ⚠️⚠️ LOAD-BEARING. Read lib/ghg/engine.ts:1508-1526 before changing one: a framework colour is chosen
  * against the other five by HUE SEPARATION, and two candidates have already been measured and reversed.
  * The token layer's own comment carries the full account.
  *
- * ⚠️ #7425e3, the retired brand violet, is NOT a member. It has 32 live uses across 22 files including
- * six email routes; adopting it here would make it permanent. That belongs to the palette swap.
+ * ⚠️ #7425e3, the retired brand violet, is NOT a member. It has 31 live uses across 21 files including
+ * six email routes; adopting it here would make it permanent. That belongs to the palette swap. (32 across
+ * 22 until the DORA row took `indigo`.)
  */
 export const ACCENT = {
   green:   { color: '#0F6E56', wash: '#E1F5EE' },  // hue 162
   blue:    { color: '#0C447C', wash: '#E6F1FB' },  // hue 210
+  indigo:  { color: '#332F92', wash: '#EAE9F5' },  // hue 242 — 10.1° from MODULE.deals.ink, see the token
   red:     { color: '#B91C1C', wash: '#FCEBEB' },  // hue   0
   amber:   { color: '#A94E0D', wash: '#FEF3E2' },  // hue  24
   magenta: { color: '#AF3790', wash: '#F9E6F2' },  // hue 313

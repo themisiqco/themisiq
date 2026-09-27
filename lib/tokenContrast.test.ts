@@ -258,8 +258,11 @@ describe('app/styles/themisiq-tokens.css is legible against itself', () => {
     expect(bad, bad.length === 0 ? '' :
       `body text below WCAG AA ${AA}:1 on a ground it lands on:\n  ${bad.join('\n  ')}\n\n` +
       'Either the text colour darkens or the wash lightens. The tightest pairing in the layer is ' +
-      '--color-ink-muted on --color-module-ai-wash (4.82:1 on 25 Sep 2026, 0.32 of headroom), so a ' +
-      'wash darkened even slightly is the likely cause.').toEqual([])
+      '--color-ink-muted on --color-accent-indigo-wash (4.80:1 on 26 Sep 2026, 0.30 of headroom), so a ' +
+      'wash darkened even slightly is the likely cause. That pairing moved when the indigo accent was ' +
+      'added; the previous holder was --color-state-error-wash at 4.83, and the figure named here before ' +
+      'was --color-module-ai-wash at 4.82, which measures 4.97 today. A hand-written tightest is itself ' +
+      'a thing that goes stale, so recompute it rather than trusting this sentence.').toEqual([])
   })
 
   it('every -ink COMPANION clears AA on paper and on its own wash', () => {

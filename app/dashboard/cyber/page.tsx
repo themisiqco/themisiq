@@ -89,7 +89,14 @@ const MATURITY_CONFIG: Record<Maturity, { label: string; score: number; color: s
 
 const FRAMEWORK_CONFIG: Record<Framework, { label: string; color: string; deadline: string }> = {
   nis2:    { label: 'EU NIS2', color: '#B91C1C', deadline: 'Active Oct 2024' },
-  dora:    { label: 'EU DORA', color: '#7425e3', deadline: 'Active Jan 2025' },
+  // ⚠️ DORA IS THE ONE ROW IN THIS MAP THAT CANNOT TAKE AN EXISTING ACCENT. Four of the six were already
+  // spoken for by its siblings here (red NIS2, blue SEC, green ISO, amber NIST), --color-accent-magenta is
+  // 6.8° and 1.05:1 from --color-state-info, and --color-module-cyber-ink would make one of five categories
+  // read as the module they all sit inside. So --color-accent-indigo was declared for it; the derivation is
+  // in app/styles/themisiq-tokens.css beside the token. It held the retired brand violet until 26 Sep 2026.
+  // ⚠️ SEC BELOW IS accent-blue, 32.4° AWAY. These two are adjacent in the rendered map, so if they ever
+  // read as one blue it is this pair to measure, not this comment to trust.
+  dora:    { label: 'EU DORA', color: 'var(--color-accent-indigo)', deadline: 'Active Jan 2025' },
   sec:     { label: 'SEC Cyber', color: '#0C447C', deadline: 'Active Dec 2023' },
   iso27001:{ label: 'ISO 27001', color: '#0F6E56', deadline: 'Ongoing' },
   nist:    { label: 'NIST CSF 2.0', color: 'var(--color-state-warn)', deadline: 'Ongoing' },

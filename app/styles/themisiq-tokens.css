@@ -160,14 +160,47 @@
      "EU framework, so use the EU-ish blue" is the reasoning that produced that collision. Thematic fit
      says nothing about whether two cards can be told apart.
 
-     ⚠️ THE RETIRED VIOLET #7425e3 IS DELIBERATELY NOT A MEMBER. It has 32 live uses across 22 files,
-     six of them email routes, and declaring it here would adopt it as a permanent accent. That is a
+     ⚠️ THE RETIRED VIOLET #7425e3 IS DELIBERATELY NOT A MEMBER. It has 31 live uses across 21 files,
+     six of them email routes, and declaring it here would adopt it as a permanent accent. (32 across 22
+     until 26 Sep 2026, when the Cyber DORA row took --color-accent-indigo. That is the pattern the family
+     exists for: a replacement is chosen and measured, and the literal leaves. Note that a file-level
+     `grep -l` for the value counts five more files that mention it in COMMENTS only, including this one.) That is a
      decision for the palette swap, when there is a replacement to put in its place, not for a cleanup.
      Until then those sites keep their literal. See docs/backlog.md. */
   --color-accent-green:        #0F6E56; /* hue 162 */
   --color-accent-green-wash:   #E1F5EE;
   --color-accent-blue:         #0C447C; /* hue 210 */
   --color-accent-blue-wash:    #E6F1FB;
+  /* ⚠️ INDIGO IS THE SEVENTH MEMBER AND THE ONLY ONE CHOSEN AGAINST A MEASURED SET RATHER THAN BORROWED.
+     Added 26 Sep 2026 for the Cyber dashboard's DORA framework row, which held the retired brand violet.
+     8.90:1 on its own wash, 10.70:1 on --color-paper, 10.06:1 on --color-ground, 9.99:1 on the Cyber
+     dashboard's own #f8f7f5 ground. It is used as TEXT, not only as a fill, which is why all four are
+     quoted.
+     TWO ADJACENCIES, BOTH RECORDED BECAUSE BOTH WILL LOOK LIKE OVERSIGHTS LATER:
+       --color-module-deals-ink #5262CF   10.1°, 2.04:1  ⚠️ the close one. It clears the two-part rule on
+         the RATIO arm alone, with 0.54 over the 1.5 gate — same hue, different lightness. Nothing places
+         them side by side today (one is a category accent, the other a module companion), but a
+         cross-module surface that did would be showing one hue twice. Check this pair first if either
+         value moves.
+       --color-accent-blue      #0C447C   32.4°, 1.09:1     clear on hue, and these two DO sit together:
+         SEC Cyber is drawn in accent-blue and DORA in indigo, adjacent in the same five-row map.
+     WHY NOT AN EXISTING MEMBER. Four of the six were already taken by the sibling framework rows in that
+     map (red NIS2, blue SEC, green ISO, amber NIST). --color-accent-magenta #AF3790 was proposed and
+     WITHDRAWN THE SAME DAY: it is 6.8° and 1.05:1 from --color-state-info #B5179E, which is the precise
+     collision the three-commit colourway sequence was ordered to avoid. --color-accent-neutral is a grey
+     and means "no category". And --color-module-cyber-ink was rejected on meaning rather than arithmetic:
+     DORA is one of five categories read side by side INSIDE the Cyber module, so the module's own identity
+     colour would make one row read as the module.
+     ⚠️ ADDING A MEMBER RAISES THE BAR FOR THE NEXT ONE. The rule in lib/ghg/engine.ts:1508-1526 is that a
+     framework colour is chosen against the OTHERS by hue separation; that set is now six chromatic members,
+     not five. Indigo itself is NOT one of the engine's six framework chips and adds nothing there.
+     ⚠️ THE WASH IS THE DEEPEST IN THE LAYER ON BOTH MEASURES, deliberately, to sit in the family's band
+     rather than beside it: 1.202:1 against paper (the 1.25 tint ceiling, 0.048 of headroom) and 4.80:1 for
+     --color-ink-muted (AA 4.5, 0.30 of headroom). Both are the tightest of any wash — the previous holder
+     was --color-state-error-wash at 1.196 and 4.825 — so a wash DARKENED anywhere in the layer now has a
+     shorter fall, and lib/tokenContrast.test.ts names this pairing in its failure message for that reason. */
+  --color-accent-indigo:       #332F92; /* hue 242 */
+  --color-accent-indigo-wash:  #EAE9F5;
   --color-accent-red:          #B91C1C; /* hue   0 */
   --color-accent-red-wash:     #FCEBEB;
   --color-accent-amber:        #A94E0D; /* hue  24 */
