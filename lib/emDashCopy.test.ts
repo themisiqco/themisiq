@@ -125,7 +125,14 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/climate-risk/report/page.tsx': 16,
   'app/dashboard/cyber/page.tsx': 6,
   'app/dashboard/deals/report/page.tsx': 2,
-  'app/dashboard/ghg/page.tsx': 123,
+  // ⚠️ 123 → 104 AND SCOPE 3 → GONE WITH NO COPY EDIT, 28 Sep 2026. Both numbers were phantoms:
+  // these pages held `replace(/"/g, '""')` for their CSV exports, stripComments does not track regex
+  // literals, so the quote inside the regex opened a string in its model that never closed and every
+  // comment after it counted as rendered copy. lib/csv.ts replaced those expressions and the counts
+  // fell. Scope 3's real figure is ZERO, which scope3Copy.test.ts SC1 has asserted independently all
+  // along — the two guards disagreed and the parser-based one was right. Fixing the stripper is the
+  // ratchet commit's job.
+  'app/dashboard/ghg/page.tsx': 104,
   'app/dashboard/ghg/trends/page.tsx': 8,
   'app/dashboard/materiality/assessment/AssessmentForm.tsx': 12,
   'app/dashboard/materiality/assessment/new/page.tsx': 3,
@@ -147,10 +154,9 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/people/page.tsx': 12,
   'app/dashboard/reports/page.tsx': 1,
   'app/dashboard/sbti/page.tsx': 11,
-  'app/dashboard/scope3/page.tsx': 34,
   'app/dashboard/stakeholder/[id]/report/page.tsx': 4,
   'app/dashboard/supply-chain/page.tsx': 63,
-  'app/dashboard/supply-chain/portal/[id]/page.tsx': 2,
+  'app/dashboard/supply-chain/portal/[id]/page.tsx': 1,
   'app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx': 4,
   'app/dashboard/supply-chain/portal/page.tsx': 1,
   'app/deals/[token]/page.tsx': 6,
