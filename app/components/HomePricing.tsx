@@ -107,7 +107,11 @@ export default function HomePricing() {
         {NEW_PRICING_ACTIVE && (
           <div style={{ background: GRAD, borderRadius: 14, padding: 1, marginBottom: 16 }}>
             <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 260 }}>
+              {/* minWidth: 'min(260px, 100%)', not 260. A bare 260px floor cannot be met at 320px —
+                  40px section padding + 1px gradient edge + 24px band padding leaves 190px, so the child
+                  held its 260 and the block ended at 326px. min() lets the floor stand down when the
+                  container is narrower than it. */}
+              <div style={{ flex: 1, minWidth: 'min(260px, 100%)' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>

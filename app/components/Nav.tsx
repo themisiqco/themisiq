@@ -187,7 +187,15 @@ export default function Nav() {
           {!isAuthed && (
             <a href="/pricing" style={primaryBtn} className="desktop-only">Build your platform →</a>
           )}
-          <a href="/pricing" style={primaryBtn} className="mobile-only">Build your platform →</a>
+          {/* ⚠️ HIDDEN BELOW 400px, NOT SHRUNK, AND NOTHING IS LOST BY IT. At 320px the bar cannot hold
+              the logo, this button and the hamburger: measured 26 Sep 2026, this button's container ended
+              at 371px against a 320px viewport. The MOBILE MENU below already carries the same
+              "Build your platform →" as a full-width button, so below 400px this is a DUPLICATE of an
+              action that is still one tap away, and removing a duplicate beats shrinking the wordmark.
+              ⚠️ DO NOT SOLVE THIS BY REDUCING ThemisIQLogo's `size`. `size` is a FONT-SIZE and the mark's
+              cap height is ~0.72 of it, so shrinking it to fit is how the lockup ends up below the 18
+              minimum the logo file sets for the full lockup. */}
+          <a href="/pricing" style={primaryBtn} className="mobile-only nav-cta">Build your platform →</a>
 
           {/* HAMBURGER */}
           <button
@@ -275,6 +283,11 @@ export default function Nav() {
         }
         @media (min-width: 1101px) {
           .mobile-only { display: none !important; }
+        }
+        /* The narrow-phone case. No overlap with .mobile-only above: that hides at 1101px and wider,
+           this hides at 400px and narrower, so neither ever has to win over the other. */
+        @media (max-width: 400px) {
+          .nav-cta { display: none !important; }
         }
       `}</style>
     </>

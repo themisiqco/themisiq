@@ -680,6 +680,20 @@ h3 { font-size: var(--text-xl); }
   .tq-footer-legal { flex-wrap: wrap; gap: 10px; justify-content: flex-start; }
 }
 
+/* The module pages' "What the module covers" rows: a label column beside its value.
+   `minmax(12rem, 16rem) 1fr` cannot reach 320px. The label floor is 192px and the gap is 24px, so of
+   the 240px a 320px viewport leaves after the section's padding there are 24px for the value — and a
+   `1fr` track's automatic minimum is min-content, so the value takes its longest word instead and the
+   row overflows. Measured right edges before this rule, on /cyber and /people: 333px to 340px. It did
+   NOT overflow the document at 375px, which is why this survived that round: at 375px the same overrun
+   fits inside the padding.
+   Stacked below 560px, where the value column would otherwise fall under about 264px. The two tracks
+   were declared inline on EIGHT pages before this; they are declared once here now. */
+.tq-covers-row { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; gap: 1.5rem; }
+@media (max-width: 560px) {
+  .tq-covers-row { grid-template-columns: 1fr; gap: 0.35rem; }
+}
+
 /* ⚠️ THE GRADATION GROUND, AND THIS IS A CONTRAST FIX RATHER THAN A LAYOUT ONE.
    --gradation-ink-safe holds ink to the light 60% of the band, which works only
    while the text column IS 60%. Both grounds set `min-width: min(100%, 34rem)`

@@ -117,7 +117,7 @@ export default function Page() {
             ['Scope 3', scope3ScopeClaim()],
             ['Monthly and annual', 'Monthly from evidenced data only, annual from evidenced plus estimated, with billing periods prorated rather than rounded.'],
           ].map(([k, v]) => (
-            <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(12rem, 16rem) 1fr', gap: '1.5rem', padding: '1.1rem 0', borderBottom: '1px solid var(--color-line)' }}>
+            <div key={k} className="tq-covers-row" style={{ padding: '1.1rem 0', borderBottom: '1px solid var(--color-line)' }}>
               <dt style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink)' }}>{k}</dt>
               <dd style={{ margin: 0, fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.7 }}>{v}</dd>
             </div>
