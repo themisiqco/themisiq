@@ -47,11 +47,11 @@ const PAGE_BY_MODULE: Record<ModuleKey, string> = {
  * of the layout. What this list tracks is the SHARED CLAIMS, which is what the test below actually checks,
  * and the old wording would have made adding that key assert something untrue.
  */
-const CONVERTED: ModuleKey[] = ['ai-governance', 'cbam', 'climate-risk', 'deals', 'double-materiality', 'ghg', 'people', 'supply-chain']
+const CONVERTED: ModuleKey[] = ['ai-governance', 'cbam', 'climate-risk', 'cyber', 'deals', 'double-materiality', 'ghg', 'people', 'supply-chain']
 
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
-describe('the shared module-page claims cannot drift across seven pages', () => {
+describe('the shared module-page claims cannot drift across the module pages', () => {
   it('every module key has a marketing page, and every page exists', () => {
     const keys = MODULES.map(m => m.key).sort()
     expect(Object.keys(PAGE_BY_MODULE).sort(), 'PAGE_BY_MODULE has drifted from MODULES in lib/pricing.ts')
@@ -65,7 +65,9 @@ describe('the shared module-page claims cannot drift across seven pages', () => 
     expect(MODULE_SUBLINE).toBe('Self-guided, or with advisors at the ready.')
     // ⚠️ "human" IS RESERVED FOR DESCRIBING A PERSON. "human-led", "human-in-the-loop" and
     // "human-powered" are product claims wearing a person's clothes, and this is the sub-line that
-    // appears on all seven pages, so it is the worst place for one.
+    // appears on EVERY module page, so it is the worst place for one. It read "all seven pages" until
+    // 26 Sep 2026, when Cyber made it every key in MODULES; a count in a comment beside a list that
+    // the test derives is a count that only ever goes stale.
     expect(MODULE_SUBLINE.toLowerCase()).not.toContain('human')
     expect(MODULE_SUBLINE).not.toContain('—')
   })
