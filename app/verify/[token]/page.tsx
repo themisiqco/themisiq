@@ -8,7 +8,8 @@ import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
 import type { CountryRefusal } from '../../../lib/ghg/engine'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
-import { workingsActivityCell } from '../../../lib/ghg/workingsCells'
+import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
+  workingsFactorSourceCell, COVERAGE_ROW_BASIS } from '../../../lib/ghg/workingsCells'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
@@ -268,12 +269,11 @@ const boundaryLabel = (b: string) =>
 // estimation note is a published factor. Dropping it would be worse: it is a required disclosure
 // under ISO 14064-3 6.1.3.6.3, and coverage rows set no `note`, so nothing else on this page carries
 // it. So it moves to the activity-data cell, where free-text row notes already render, and the
-// Factor source cell says '—' because that row cites no factor.
-const COVERAGE_ROW = 'coverage_resolution'
+// Factor source cell says the column does not apply to that row.
+const COVERAGE_ROW = COVERAGE_ROW_BASIS
 
-/** The citation for the Factor source column. '—' where the row cites no factor at all. */
-const factorSourceOf = (w: WorkingRow): string =>
-  w.gwp_basis === COVERAGE_ROW ? '—' : (w.ef_source || '—')
+/** The citation for the Factor source column, via the helper both surfaces' cells go through. */
+const factorSourceOf = (w: WorkingRow): string => workingsFactorSourceCell(w)
 
 /** The free text that belongs beside the activity figure — including a coverage row's explanation. */
 const rowNoteOf = (w: WorkingRow): string | undefined =>
@@ -1159,15 +1159,15 @@ export default function VerifierPage() {
                         under a heading that said GWP, which told a verifier a Scope 2 method was a GWP
                         set; and the factor's year was inside the Source label where it read as the
                         reporting year. Both are structured fields on the row, so both get a column. */}
-                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.factor_vintage || '—'}</td>
-                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{w.scope2_method || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{workingsVintageCell(w)}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{workingsScope2MethodCell(w)}</td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>
                       <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{w.gwp_basis}</div>
                       {w.quantification_method && (
                         <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{w.quantification_method}</div>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap' }}>{w.result_tco2e == null ? '—' : w.result_tco2e.toFixed(3)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap' }}>{workingsResultCell(w, 3)}</td>
                   </tr>
                 ))}
               </tbody>

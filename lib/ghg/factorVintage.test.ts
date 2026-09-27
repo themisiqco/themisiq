@@ -11,12 +11,14 @@ import { buildFactorEditions } from './factorEditions'
 // ── THE VINTAGE COLUMN WAS HALF EMPTY, AND THE EMPTY HALF LOOKED LIKE AN ABSENCE OF FACTS ────────
 //
 // The workings table (app/dashboard/ghg/page.tsx) and the verifier page (app/verify/[token]) both
-// render `w.factor_vintage || '—'`. Grid, T&D and residual rows filled it; EVERY COMBUSTION AND STEAM
-// ROW rendered '—'. Seen live on 14 Aug 2026 on a US steam row and a US propane row.
+// rendered `w.factor_vintage || '—'` — since 28 Sep 2026, workingsVintageCell, which says "Not
+// applicable". Grid, T&D and residual rows filled the field; EVERY COMBUSTION AND STEAM ROW fell back.
+// Seen live on 14 Aug 2026 on a US steam row and a US propane row.
 //
-// ⚠️ '—' IS NOT A BLANK, IT IS A CLAIM, and it was the wrong one. In a column headed by an edition, a
-// dash reads as "no published edition applies to this line" — which is TRUE of a supplier-specific
-// steam figure and FALSE of a propane row priced by EPA's 2024 workbook. The two cases rendered
+// ⚠️ AN EMPTY VINTAGE IS NOT A BLANK, IT IS A CLAIM, and it was the wrong one. In a column headed by an
+// edition it reads as "no published edition applies to this line" — TRUE of a supplier-specific steam
+// figure and FALSE of a propane row priced by EPA's 2024 workbook. The words now say exactly that, which
+// makes the wrong case louder rather than quieter: this test is still what catches it. The two cases rendered
 // identically, so the one honest dash in the table was indistinguishable from six dishonest ones.
 //
 // THE INFORMATION WAS NEVER MISSING — that is what makes this a pass-through fix rather than a

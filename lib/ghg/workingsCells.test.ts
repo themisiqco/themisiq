@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildWorkings, emptyLocation, type Location } from './engine'
-import { workingsActivityCell, ALL_LOCATIONS } from './workingsCells'
+import {
+  workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
+  workingsFactorSourceCell,
+  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS,
+} from './workingsCells'
 import { NOT_PROVIDED } from '../notProvided'
 import { stripTsComments } from '../testing/stripComments'
 
@@ -28,16 +32,13 @@ const VERIFIER = 'app/verify/[token]/page.tsx'
 const src = (rel: string) => stripTsComments(readFileSync(join(ROOT, rel), 'utf8'))
 
 /**
- * ⚠️ THE ONLY EM DASHES A WORKINGS CELL MAY STILL RENDER, and they are a to-do, not a settled choice.
- * Each means "inapplicable" or "not quantified" rather than "absent", which is a vocabulary decision
- * nobody has taken. They are listed rather than banned so that the choice stays visible, and they
- * must appear IDENTICALLY on both surfaces — which is what the last test checks.
+ * ⚠️ EMPTY, AND IT MUST STAY EMPTY. It held three entries until 28 Sep 2026: the Factor vintage and
+ * Scope 2 method cells (`|| '—'`) and the Result cell (`== null ? '—'`). Each was a glyph standing for a
+ * DIFFERENT fact — inapplicable, and not quantified — which is why they could not be swept as one word
+ * and were held here until the vocabulary was decided. No workings cell renders a glyph now; a new entry
+ * in this list is a claim that some cell should, and needs the reason written beside it.
  */
-const ALLOWED_GLYPH_CELLS = [
-  "{r.factor_vintage || '—'}",
-  "{r.scope2_method || '—'}",
-  "{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}",
-]
+const ALLOWED_GLYPH_CELLS: string[] = []
 
 /**
  * The table's TOTAL footer, which is not a row cell: one is prose and one is the same null-result
@@ -68,10 +69,10 @@ describe('workings cell rendering', () => {
     // A row that reports a quantity nothing could price keeps both.
     expect(workingsActivityCell({ activity_data: 1000, activity_unit: 'gj', result_tco2e: null }))
       .toBe('1,000 gj')
-    // ⚠️ NULL STILL RETURNS THE GLYPH. A coverage-resolution row has no quantity to report, which is
-    // not the same absence as a missing one. Change this only with the vocabulary decision above.
+    // A coverage-resolution row has no quantity to report, which is not the same absence as a missing
+    // one: it records a decision, so the column does not apply to it.
     expect(workingsActivityCell({ activity_data: null, activity_unit: 'gap', result_tco2e: null }))
-      .toBe('—')
+      .toBe(NOT_APPLICABLE)
   })
 
   it('the engine fills every cell a declaration row renders', () => {
@@ -100,10 +101,49 @@ describe('workings cell rendering', () => {
     expect(cov[0].location).not.toContain('—')
   })
 
+  it('an inapplicable column says so, and is not confused with an absent value', () => {
+    expect(workingsVintageCell({ factor_vintage: 'US EPA 2025' })).toBe('US EPA 2025')
+    expect(workingsVintageCell({})).toBe(NOT_APPLICABLE)
+    expect(workingsVintageCell({ factor_vintage: null })).toBe(NOT_APPLICABLE)
+    expect(workingsScope2MethodCell({ scope2_method: 'market-based' })).toBe('market-based')
+    expect(workingsScope2MethodCell({}), 'every Scope 1 and Scope 3 row').toBe(NOT_APPLICABLE)
+    // ⚠️ THE THREE WORDS ARE THREE DIFFERENT FACTS. A cell that reads the same for all of them is the
+    // defect this vocabulary replaced.
+    expect(new Set([NOT_APPLICABLE, NOT_QUANTIFIED, 'Not provided']).size).toBe(3)
+  })
+
+  it('an unquantified result never reads like a figure, and zero still does', () => {
+    expect(workingsResultCell({ result_tco2e: null }), 'no calculation, on a row the totals omit')
+      .toBe(NOT_QUANTIFIED)
+    expect(workingsResultCell({}), 'an absent field is the same absence').toBe(NOT_QUANTIFIED)
+    expect(workingsResultCell({ result_tco2e: 0 }), 'an attested zero IS a claim and prints as one')
+      .toBe('0.0000')
+    expect(workingsResultCell({ result_tco2e: 1.23456 })).toBe('1.2346')
+    // The verifier page prints three decimals, there and in its headline totals. Stated, not shared.
+    expect(workingsResultCell({ result_tco2e: 1.23456 }, 3)).toBe('1.235')
+    expect(workingsResultCell({ result_tco2e: null }, 3)).toBe(NOT_QUANTIFIED)
+  })
+
+  it('the Factor source column tells a missing citation from an inapplicable one', () => {
+    expect(workingsFactorSourceCell({ gwp_basis: 'AR6', ef_source: 'US EPA (2025) Hub, Table 1' }))
+      .toBe('US EPA (2025) Hub, Table 1')
+    // A coverage row's ef_source holds the adjustment explanation, which the verifier page renders
+    // beside the figure instead. This column does not apply to it.
+    expect(workingsFactorSourceCell({ gwp_basis: COVERAGE_ROW_BASIS, ef_source: 'Estimated by scaling ×12/2' }))
+      .toBe(NOT_APPLICABLE)
+    expect(workingsFactorSourceCell({ gwp_basis: 'declaration', ef_source: '' }), 'a citation nobody wrote')
+      .toBe(NOT_PROVIDED)
+  })
+
   it('both surfaces render the activity cell through the one function', () => {
     for (const rel of [OPERATOR, VERIFIER]) {
-      expect(src(rel), rel).toMatch(/import \{ workingsActivityCell \} from '[^']*lib\/ghg\/workingsCells'/)
-      expect(src(rel), rel).toMatch(/workingsActivityCell\([rw]\)/)
+      expect(src(rel), `${rel} must import the cell helpers`)
+        .toMatch(/from '[^']*lib\/ghg\/workingsCells'/)
+      for (const fn of ['workingsActivityCell', 'workingsVintageCell', 'workingsScope2MethodCell',
+                        'workingsResultCell', 'workingsFactorSourceCell']) {
+        expect(src(rel), `${rel} does not render its cells through ${fn}`)
+          .toMatch(new RegExp(`${fn}\\([rw]`))
+      }
     }
     // And neither still builds the cell by hand.
     for (const rel of [OPERATOR, VERIFIER]) {
@@ -126,10 +166,13 @@ describe('workings cell rendering', () => {
     for (const a of ALLOWED_GLYPH_CELLS) {
       expect(dashed.some(c => c.startsWith(a)), `${a} is no longer rendered: remove it from the list`).toBe(true)
     }
-    // The same three expressions, and only those, on the verifier page.
+    // The verifier page too, but by SHAPE rather than by cell: its Source cell carries the badge
+    // sentences, which are prose and contain em dashes legitimately. What must not come back are the
+    // three empty-value forms the helpers replaced.
     const verifier = src(VERIFIER)
-    for (const shape of ["factor_vintage || '—'", "scope2_method || '—'"]) {
-      expect(verifier, `${VERIFIER} must render ${shape} exactly as the operator page does`).toContain(shape)
+    for (const shape of ["|| '—'", "? '—'", '>—<']) {
+      expect(verifier.includes(shape), `${VERIFIER} renders ${shape} in a cell again`).toBe(false)
     }
+
   })
 })

@@ -32,6 +32,23 @@ import { NOT_PROVIDED } from '../notProvided'
  */
 export const ALL_LOCATIONS = 'All locations'
 
+/**
+ * A column that does not apply to this row. NOT the same absence as NOT_PROVIDED, and the distinction
+ * is the one lib/ghg/factorVintage.test.ts was written about: in a column headed by an edition, an
+ * empty cell reads as "no published edition applies to this line", which is TRUE of a supplier-specific
+ * steam figure and would be FALSE of a propane row priced from EPA's workbook. 'Not provided' would
+ * instead say someone failed to supply it.
+ */
+export const NOT_APPLICABLE = 'Not applicable'
+
+/**
+ * A row whose emissions were not calculated. result_tco2e null is an ABSENCE OF A FIGURE, never a
+ * figure of zero — the engine is explicit that 0 is a claim and null is not one — so the cell must say
+ * which of the two it is holding. 'Not provided' would be wrong twice over: the data may well have been
+ * provided, and what is missing is our own calculation, not the customer's input.
+ */
+export const NOT_QUANTIFIED = 'Not quantified'
+
 export interface WorkingsActivityCellRow {
   activity_data?: number | null
   activity_unit?: string | null
@@ -41,20 +58,82 @@ export interface WorkingsActivityCellRow {
 /**
  * What the Activity data column shows for one workings row.
  *
- * ⚠️ THE NULL CASE STILL RETURNS AN EM DASH, DELIBERATELY AND PENDING ONE DECISION. A null
- * activity_data is a coverage-resolution row: not a missing quantity but an inapplicable one, so
- * 'Not provided' would name the wrong absence. The same open question governs the Factor vintage,
- * Scope 2 method and Result cells, which both surfaces still render with `|| '—'` and
- * `== null ? '—'`. They want ONE vocabulary decided together ('Not applicable', 'Not quantified'),
- * not four guesses; until then the glyph is identical on both surfaces, which is what this module
- * guarantees.
+ * ⚠️ A NULL activity_data IS 'Not applicable', NOT 'Not provided'. It means a coverage-resolution row,
+ * which records a decision rather than a measurement: there is no quantity to be missing. This was the
+ * fourth of the four glyphs held on 27 Sep 2026 pending one vocabulary, decided 28 Sep 2026 with the
+ * Factor vintage, Scope 2 method and Result cells below.
  */
 export function workingsActivityCell(r: WorkingsActivityCellRow): string {
   const data = r.activity_data ?? null
-  if (data === null) return '—'
+  if (data === null) return NOT_APPLICABLE
   // No unit, or the words that say the unit is absent: there is no quantity to qualify.
   if (!r.activity_unit || r.activity_unit === NOT_PROVIDED) {
     return r.result_tco2e == null ? NOT_PROVIDED : data.toLocaleString()
   }
   return `${data.toLocaleString()} ${r.activity_unit}`
+}
+
+export interface WorkingsFactorCellRow {
+  factor_vintage?: string | null
+  scope2_method?: string | null
+}
+
+/**
+ * The Factor vintage column: the edition the row's factor comes from, or that none applies.
+ *
+ * ⚠️ NOT EVERY EMPTY VINTAGE IS HONEST, which is why this says "not applicable" and not "unknown". A
+ * refrigerant row is priced from a GWP set with no published edition year and a supplier-specific steam
+ * figure cites no publisher at all — both genuinely inapplicable. A combustion row with no vintage is a
+ * DEFECT, and factorVintage.test.ts is what catches it; this cell must not be the thing that hides it.
+ */
+export function workingsVintageCell(r: WorkingsFactorCellRow): string {
+  return r.factor_vintage || NOT_APPLICABLE
+}
+
+/** The Scope 2 method column. Every Scope 1 and Scope 3 row is inapplicable here, not incomplete. */
+export function workingsScope2MethodCell(r: WorkingsFactorCellRow): string {
+  return r.scope2_method || NOT_APPLICABLE
+}
+
+/**
+ * The Result column.
+ *
+ * ⚠️ 0 AND null MUST NOT RENDER ALIKE. 0 is an attested claim of no emissions; null is no calculation at
+ * all, on a row the totals omit. Both surfaces printed the same glyph for null as they printed for an
+ * inapplicable vintage, so a verifier could not tell an unquantified row from an inapplicable column.
+ *
+ * ⚠️ THE TWO SURFACES DISAGREE ON PRECISION, AND THAT IS WHY `dp` IS A PARAMETER RATHER THAN A CONSTANT.
+ * The operator's workings table prints four decimals; the verifier page prints three, there and in its
+ * headline Scope 1 and Scope 2 figures. So the same row reads 1.2345 on one surface and 1.235 on the
+ * other — consistent rounding, not a contradiction, but not the same string either. Unifying them is a
+ * decision about a verifier-facing figure and not part of a commit about wording, so what is shared here
+ * is the MEANING (and the null case), with the divergence stated once instead of hidden in two files.
+ */
+export function workingsResultCell(r: { result_tco2e?: number | null }, dp = 4): string {
+  return r.result_tco2e == null ? NOT_QUANTIFIED : r.result_tco2e.toFixed(dp)
+}
+
+/**
+ * The `gwp_basis` a coverage-resolution row carries. Written as a literal by buildWorkings, named here
+ * because two display decisions turn on it: the Factor source cell below, and the verifier page's
+ * rowNoteOf, which moves that row's explanation to the activity cell.
+ */
+export const COVERAGE_ROW_BASIS = 'coverage_resolution'
+
+/**
+ * The Factor source column: the row's citation.
+ *
+ * ⚠️ A COVERAGE-RESOLUTION ROW CITES NO FACTOR, and its ef_source holds the operator's explanation of an
+ * adjustment instead. Rendering that under a heading reading "Factor source" would tell a verifier an
+ * estimation note is a published factor, so the verifier page moves the text to the activity cell and
+ * this column says the heading does not apply to the row.
+ *
+ * ⚠️ AN EMPTY ef_source IS 'Not provided', NOT 'Not applicable'. Every priced row has a citation and the
+ * declaration rows are given NOT_PROVIDED by the engine, so reaching this fallback means a stored row
+ * whose citation was never written — a missing value, which is a different thing from one that does not
+ * apply, and the words must not flatten the two.
+ */
+export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: string | null }): string {
+  if (r.gwp_basis === COVERAGE_ROW_BASIS) return NOT_APPLICABLE
+  return r.ef_source || NOT_PROVIDED
 }

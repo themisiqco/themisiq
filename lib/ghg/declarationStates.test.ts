@@ -193,7 +193,8 @@ describe('every declaration state the engine emits is named by both surfaces', (
       `THE OPERATOR DASHBOARD HAS NO RENDER BRANCH FOR A STATE THE ENGINE EMITS.` +
       fix(missing, `the 'r.declaration === …' branches in ${DASHBOARD}`,
         `add an early-return row before the 'undeclared' branch: amber (#FEF3E2 / var(--color-module-climate)), r.note in\n` +
-        `the note cell, '—' in the result cell. This surface has no badges, so the engine's own note\n` +
+        `the note cell, and the lib/ghg/workingsCells helpers in the value cells — workingsResultCell\n` +
+        `prints 'Not quantified' for the null result, and must not be replaced by a literal. This surface has no badges, so the engine's own note\n` +
         `does that work — which is what keeps the two pages saying the same thing about the same row.\n\n` +
         `WITHOUT A BRANCH the row falls through to the normal fuel row. It does not crash and the note\n` +
         `still renders, which is worse than a crash: it looks fine, sitting unhighlighted among priced\n` +

@@ -46,7 +46,8 @@ import { disclaimerParas } from '../../../lib/disclaimer'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
-import { workingsActivityCell } from '../../../lib/ghg/workingsCells'
+import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
+  workingsFactorSourceCell } from '../../../lib/ghg/workingsCells'
 import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
@@ -452,10 +453,10 @@ function excludedRow(r: WorkingsRowCells, ri: number) {
     <td style={{ ...wTd, ...amber }}>{workingsActivityCell(r)}</td>
     <td style={{ ...wTd, ...amber }}>{r.emission_factor_display}</td>
     <td style={{ ...wTd, ...amber }}>{r.note}</td>
-    <td style={{ ...wTd, ...amber }}>{r.factor_vintage || '—'}</td>
-    <td style={{ ...wTd, ...amber }}>{r.scope2_method || '—'}</td>
+    <td style={{ ...wTd, ...amber }}>{workingsVintageCell(r)}</td>
+    <td style={{ ...wTd, ...amber }}>{workingsScope2MethodCell(r)}</td>
     <td style={{ ...wTd, ...amber }}>{r.gwp_basis}</td>
-    <td style={{ ...wTd, ...amber, fontWeight: 600 }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+    <td style={{ ...wTd, ...amber, fontWeight: 600 }}>{workingsResultCell(r)}</td>
   </tr>
 }
 
@@ -2597,10 +2598,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsActivityCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.emission_factor_display}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.factor_vintage || '—'}</td>
-                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.scope2_method || '—'}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsVintageCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: 'var(--color-ink-muted)', fontWeight: 600 }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)', fontWeight: 600 }}>{workingsResultCell(r)}</td>
                               </tr>
                             }
                             // Same treatment as 'undeclared', and for the same reason: the location
@@ -2620,10 +2621,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.factor_vintage || '—'}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.scope2_method || '—'}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{workingsResultCell(r)}</td>
                               </tr>
                             }
                             // The operator confirmed the stream is here and gave no figure. Same amber as
@@ -2640,10 +2641,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.factor_vintage || '—'}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.scope2_method || '—'}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{workingsResultCell(r)}</td>
                               </tr>
                             }
                             // ── NO PUBLISHED FACTOR ──────────────────────────────────────────────
@@ -2663,10 +2664,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                       the EU entry, which never claims one. */}
                                   {r.quantification_method && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
                                 </td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.factor_vintage || '—'}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.scope2_method || '—'}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{workingsResultCell(r)}</td>
                               </tr>
                             }
                             if (r.declaration === 'undeclared') {
@@ -2675,10 +2676,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.note}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.factor_vintage || '—'}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.scope2_method || '—'}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{workingsResultCell(r)}</td>
                               </tr>
                             }
                             const s2 = r.scope === 2
@@ -2699,9 +2700,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                 {r.note && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}
                               </td>
                               <td style={wTd}>{r.emission_factor_display}</td>
-                              <td style={wTd}>{r.ef_source}</td>
-                              <td style={wTd}>{r.factor_vintage || '—'}</td>
-                              <td style={wTd}>{r.scope2_method || '—'}</td>
+                              <td style={wTd}>{workingsFactorSourceCell(r)}</td>
+                              <td style={wTd}>{workingsVintageCell(r)}</td>
+                              <td style={wTd}>{workingsScope2MethodCell(r)}</td>
                               <td style={wTd}>
                                 {r.gwp_basis}
                                 {r.quantification_method && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
@@ -2712,7 +2713,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                                   a printed or photocopied workings table. The colour stays as emphasis;
                                   the label is what carries the fact. */}
                               <td style={{ ...wTd, fontWeight: 600, color: s2 ? '#0F6E56' : 'var(--color-brand)' }}>
-                                {r.result_tco2e == null ? '—' : r.result_tco2e.toFixed(4)}
+                                {workingsResultCell(r)}
                                 <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', marginLeft: 6 }}>S{r.scope}</span>
                               </td>
                             </tr>
