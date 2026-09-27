@@ -11,13 +11,13 @@ const PRINCIPLES = [
     title: 'Your data belongs to you',
     color: '#0F6E56',
     bg: '#E1F5EE',
-    content: 'Everything you enter into ThemisIQ — your emissions data, workforce figures, supplier information, AI systems, financial data — belongs to you. We are custodians of your data, not owners. You can export or correct it at any time, and ask us to delete it.',
+    content: 'Everything you enter into ThemisIQ (your emissions data, workforce figures, supplier information, AI systems, financial data) belongs to you. We are custodians of your data, not owners. You can export or correct it at any time, and ask us to delete it.',
   },
   {
     title: 'We never sell or share your data',
     color: '#0C447C',
     bg: '#E6F1FB',
-    content: 'ThemisIQ does not sell, rent, share, or license your data to any third party — ever. Your compliance data is not used for benchmarking products sold to others, not shared with industry bodies, and not disclosed to regulators on your behalf without your explicit instruction.',
+    content: 'ThemisIQ does not sell, rent, share, or license your data to any third party, ever. Your compliance data is not used for benchmarking products sold to others, not shared with industry bodies, and not disclosed to regulators on your behalf without your explicit instruction.',
   },
   {
     title: 'Where we use AI',
@@ -51,9 +51,9 @@ const DATA_SECTIONS = [
   {
     title: 'What we collect',
     items: [
-      { label: 'Account data', detail: 'Name, email address, company name, role — used to create and manage your account.' },
-      { label: 'Compliance data', detail: 'GHG emissions figures, workforce data, supplier information, AI system descriptions, and other data you enter into ThemisIQ wizards — used solely to generate your compliance outputs.' },
-      { label: 'Usage data', detail: 'Which features you use, when you log in, which modules you access — used to improve the platform and provide support.' },
+      { label: 'Account data', detail: 'Name, email address, company name, role. We use these to create and manage your account.' },
+      { label: 'Compliance data', detail: 'GHG emissions figures, workforce data, supplier information, AI system descriptions, and other data you enter into ThemisIQ wizards. We use it only to generate your compliance outputs.' },
+      { label: 'Usage data', detail: 'Which features you use, when you log in, which modules you access. We use it to improve the platform and provide support.' },
       { label: 'Payment data', detail: 'Payment is processed by Stripe. ThemisIQ does not store credit card numbers or bank account details.' },
     ],
   },
@@ -79,7 +79,7 @@ const DATA_SECTIONS = [
       { label: 'Access', detail: 'Email privacy@themisiq.co to request a copy of all data ThemisIQ holds about you. We provide it within 30 days.' },
       { label: 'Correction', detail: 'You can correct any inaccurate data directly in the platform or by contacting us.' },
       { label: 'Deletion', detail: 'To delete your account and all associated compliance data, email privacy@themisiq.co. We complete the deletion within 30 days and confirm in writing when it is done.' },
-      { label: 'Portability', detail: 'All compliance outputs are available as CSV exports — your data is never locked in a proprietary format.' },
+      { label: 'Portability', detail: 'All compliance outputs are available as CSV exports, so your data is never locked in a proprietary format.' },
       { label: 'Objection', detail: 'You can object to any processing of your data that is not strictly necessary to provide the service.' },
     ],
   },
@@ -107,7 +107,7 @@ export default function TrustPage() {
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Here is exactly how we earn it.</em>
           </h1>
           <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 400, marginBottom: '1.5rem' }}>
-            You are entering sensitive compliance data into ThemisIQ — emissions figures, workforce data, supplier relationships, AI systems. We take that responsibility seriously. This page explains exactly what we do with your data, what we never do, and what rights you have.
+            You are entering sensitive compliance data into ThemisIQ: emissions figures, workforce data, supplier relationships, AI systems. We take that responsibility seriously. This page explains exactly what we do with your data, what we never do, and what rights you have.
           </p>
           <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>
             Questions? Contact us at <a href="mailto:privacy@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>privacy@themisiq.co</a>
@@ -177,19 +177,19 @@ export default function TrustPage() {
               step: if a target date moves on /security, it moves here. */}
           <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-state-warn)', '--tq-state-wash': '#FEF3E2', marginBottom: '1.25rem' } as React.CSSProperties}>
             <div className="tq-callout-heading">ThemisIQ holds neither SOC 2 nor ISO 27001 today</div>
-            <div className="tq-callout-text">The certifications named below are held by our subprocessors, not by ThemisIQ. Our own SOC 2 Type I, SOC 2 Type II and ISO 27001:2022 are in progress — <a href="/security" style={{ color: 'var(--color-brand)' }}>current status and target dates</a>.</div>
+            <div className="tq-callout-text">The certifications named below are held by our subprocessors, not by ThemisIQ. Our own SOC 2 Type I, SOC 2 Type II and ISO 27001:2022 are in progress: <a href="/security" style={{ color: 'var(--color-brand)' }}>current status and target dates</a>.</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             {[
-              { label: 'Hosting', val: 'Supabase on AWS (us-east-1) — Supabase holds SOC 2 Type II certification' },
+              { label: 'Hosting', val: 'Supabase on AWS (us-east-1): Supabase holds SOC 2 Type II certification' },
               { label: 'Encryption in transit', val: 'TLS 1.2+ on all connections' },
               { label: 'Encryption at rest', val: 'AES-256 on all stored data' },
               { label: 'Authentication', val: 'Supabase Auth with email verification · MFA available' },
-              { label: 'Access control', val: 'Row-level security — data isolated at database level' },
-              { label: 'Payment processing', val: 'Stripe — Stripe holds PCI DSS Level 1 certification' },
-              { label: 'Email', val: 'Resend — Resend holds SOC 2 Type II certification' },
-              { label: 'Frontend', val: 'Vercel — Vercel holds SOC 2 Type II certification' },
-              { label: 'AI provider', val: 'Anthropic — Concierge document reading and the GHG guide only' },
+              { label: 'Access control', val: 'Row-level security: data isolated at database level' },
+              { label: 'Payment processing', val: 'Stripe: Stripe holds PCI DSS Level 1 certification' },
+              { label: 'Email', val: 'Resend: Resend holds SOC 2 Type II certification' },
+              { label: 'Frontend', val: 'Vercel: Vercel holds SOC 2 Type II certification' },
+              { label: 'AI provider', val: 'Anthropic: Concierge document reading and the GHG guide only' },
             ].map(({ label, val }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>

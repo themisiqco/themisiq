@@ -415,9 +415,10 @@ without the process around it · **NOT YET** — aspirational, needs a qualifier
 > table, with the position stated in the card body.
 >
 > ⚠️ **REVISIT DATE — this qualifier is temporary and expires.**
-> Revisit **on the day the Supabase Pro upgrade completes**, and in any case **by 30 September 2026**.
-> That date is derived from the September launch named in `backup-record.md` §6, not from a
-> commitment recorded anywhere — adjust it if the launch moves. Two things must happen at that point,
+> Revisit **on the day the Supabase Pro upgrade completes**, and in any case **by 1 November 2026, the
+> commercial launch date**.
+> Moved on 27 Sep 2026 when launch was set for 1 November 2026; adjust again if launch moves.
+> Two things must happen at that point,
 > and the first without the second leaves the page wrong again in the other direction:
 >   1. replace the qualified copy with the measured figures, and
 >   2. **test a restore first** — until then, RTO and RPO are targets, not capabilities. §6:

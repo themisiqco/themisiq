@@ -34,7 +34,7 @@ export default function Page() {
             <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>ThemisIQ</span>
           </h1>
           <p style={{ fontSize: 16, color: 'var(--color-ink-2)', lineHeight: 1.75, fontWeight: 400, marginBottom: '2.5rem', maxWidth: 560 }}>
-            ThemisIQ processes your most sensitive compliance data — GHG inventories, workforce metrics, supply chain records, and cyber risk registers. We take security seriously, not as a checkbox, but as a foundational design requirement.
+            ThemisIQ processes your most sensitive compliance data: GHG inventories, workforce metrics, supply chain records, and cyber risk registers. We take security seriously, not as a checkbox, but as a foundational design requirement.
           </p>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const }}>
             {/* ⚠️ A CHIP SET, NOT A RULED LIST. The nested card on the other four sections became
@@ -57,12 +57,12 @@ export default function Page() {
         <h2 style={sectionTitle}>Our security posture.</h2>
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 0, border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginTop: '1.5rem' }}>
           {[
-            { name: 'SOC 2 Type I', status: 'In progress', badge: 'amber', detail: 'Target: Q4 2026 — gap assessment in progress' },
-            { name: 'SOC 2 Type II', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027 — dependent on Type I completion' },
-            { name: 'ISO 27001:2022', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027 — controls mapped, ISMS design phase' },
+            { name: 'SOC 2 Type I', status: 'In progress', badge: 'amber', detail: 'Target: Q4 2026. Gap assessment in progress' },
+            { name: 'SOC 2 Type II', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027. Dependent on Type I completion' },
+            { name: 'ISO 27001:2022', status: 'In progress', badge: 'amber', detail: 'Target: Q2 2027. Controls mapped, ISMS design phase' },
             { name: 'PIPEDA & Law 25 (Québec)', status: 'Compliant', badge: 'green', detail: 'DPA templates complete · privacy breach procedures in place' },
-            { name: 'GDPR / UK GDPR — data processor', status: 'Compliant', badge: 'green', detail: 'Standard Contractual Clauses (SCCs) in place · DPA available on request' },
-            { name: 'PCI DSS', status: 'Via Stripe', badge: 'green', detail: 'Payment processing via Stripe (PCI DSS Level 1) — ThemisIQ never stores card data' },
+            { name: 'GDPR / UK GDPR: data processor', status: 'Compliant', badge: 'green', detail: 'Standard Contractual Clauses (SCCs) in place · DPA available on request' },
+            { name: 'PCI DSS', status: 'Via Stripe', badge: 'green', detail: 'Payment processing via Stripe (PCI DSS Level 1), and ThemisIQ never stores card data' },
           ].map(({ name, status, badge, detail }, i) => (
             <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', background: i % 2 === 0 ? '#fff' : '#f8f7f5', borderBottom: '0.5px solid #e8e7e4' }}>
               <div style={{ flex: 1 }}>
@@ -82,14 +82,14 @@ export default function Page() {
           <h2 style={sectionTitle}>Where your data lives.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: 12, marginTop: '1.5rem' }}>
             {[
-              { title: 'Database — Supabase (AWS)', via: 'Supabase', status: null, body: 'All customer platform data stored in Supabase on AWS infrastructure. Supabase holds SOC 2 Type II and ISO 27001 certifications. US-East region by default.' },
-              { title: 'Application — Vercel', via: 'Vercel', status: null, body: 'ThemisIQ application hosted on Vercel with global CDN. Vercel holds SOC 2 Type II certification. HTTPS enforced on all endpoints; HSTS enabled.' },
-              { title: 'Payments — Stripe', via: 'Stripe', status: null, body: 'All payment processing handled by Stripe, PCI DSS Level 1 certified. ThemisIQ never stores, processes, or transmits card numbers.' },
+              { title: 'Database: Supabase (AWS)', via: 'Supabase', status: null, body: 'All customer platform data stored in Supabase on AWS infrastructure. Supabase holds SOC 2 Type II and ISO 27001 certifications. US-East region by default.' },
+              { title: 'Application: Vercel', via: 'Vercel', status: null, body: 'ThemisIQ application hosted on Vercel with global CDN. Vercel holds SOC 2 Type II certification. HTTPS enforced on all endpoints; HSTS enabled.' },
+              { title: 'Payments: Stripe', via: 'Stripe', status: null, body: 'All payment processing handled by Stripe, PCI DSS Level 1 certified. ThemisIQ never stores, processes, or transmits card numbers.' },
               // via: null, for the reason the badge comment below gives — this card names no
               // third-party certification, so there is nothing to attribute. It names a data
               // flow, which is what a reader looking for subprocessors came here to find.
-              { title: 'AI processing — Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Concierge add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI — framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
-              { title: 'Backups — manual snapshots today', via: null, status: 'In progress', body: 'Supabase Free provides no point-in-time recovery. Backups today are manual pg_dump snapshots, held in two locations and verified by SHA-256 checksum. Continuous PITR arrives with the Supabase Pro upgrade — target September 2026. Retention window, cross-region replication and RTO/RPO figures will be stated here once Pro is live and a restore has been tested.' },
+              { title: 'AI processing: Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Concierge add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI: framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
+              { title: 'Backups: manual snapshots today', via: null, status: 'In progress', body: 'Supabase Free provides no point-in-time recovery. Backups today are manual pg_dump snapshots, held in two locations and verified by SHA-256 checksum. Continuous PITR arrives with the Supabase Pro upgrade, targeted before commercial launch on 1 November 2026. Retention window, cross-region replication and RTO/RPO figures will be stated here once Pro is live and a restore has been tested.' },
             ].map(({ title, via, status, body }) => (
               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', position: 'relative' as const, overflow: 'hidden' }}>
                 <div style={{ position: 'absolute' as const, top: 0, left: 0, right: 0, height: 3, background: 'var(--color-brand)' }} />
@@ -199,7 +199,7 @@ export default function Page() {
               <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '0.5px solid #e8e7e4' }}>
                 <span style={{ color: '#0F6E56', flexShrink: 0, fontWeight: 600, marginTop: 1 }}>✓</span>
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{title} — </span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{title}: </span>
                   <span style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>{body}</span>
                 </div>
               </div>
@@ -216,7 +216,7 @@ export default function Page() {
                 contact blocks converted in task 26, so it takes the same brand note state. The
                 green callout below it is a different register: an assurance kept, not a contact. */}
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)', marginBottom: '1rem' } as React.CSSProperties}>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Security team — ThemisIQ Compliance Inc.</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Security team: ThemisIQ Compliance Inc.</div>
               <div className="tq-callout-text" style={{ marginBottom: 4 }}>Email: <a href="mailto:security@themisiq.co" style={{ color: 'var(--color-brand)' }}>security@themisiq.co</a></div>
               <div className="tq-callout-text" style={{ marginBottom: 4 }}>Response time: 24 hours for all security reports</div>
               <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 8, fontStyle: 'italic' }}>We do not pursue legal action against researchers acting in good faith.</div>
