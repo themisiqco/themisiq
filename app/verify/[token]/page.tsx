@@ -8,6 +8,7 @@ import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
 import type { CountryRefusal } from '../../../lib/ghg/engine'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
+import { workingsActivityCell } from '../../../lib/ghg/workingsCells'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
@@ -1124,10 +1125,13 @@ export default function VerifierPage() {
                     </td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.scope}</td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>
-                      {/* '—' for null, as the wizard's own workings table renders it. Coverage
-                          resolution rows carry no activity figure — they record a decision, not a
-                          measurement. */}
-                      <span style={{ whiteSpace: 'nowrap' }}>{w.activity_data == null ? '—' : `${w.activity_data.toLocaleString()} ${w.activity_unit}`}</span>
+                      {/* ⚠️ THE SAME FUNCTION THE WIZARD'S WORKINGS TABLE CALLS, so the two surfaces
+                          cannot describe one row's quantity differently. It prints the unit only where
+                          there is a quantity to qualify: a declaration or exclusion row carries
+                          activity_data 0 as a placeholder, and "0 Not provided" would read as a
+                          measured zero in an unnamed unit. Coverage resolution rows carry no figure at
+                          all — they record a decision, not a measurement. */}
+                      <span style={{ whiteSpace: 'nowrap' }}>{workingsActivityCell(w)}</span>
                       {/* Without this a verifier reads a gallons figure against an inventory the
                           operator entered in litres, with nothing joining them — and unlike the
                           wizard's reader, a verifier has no input form to reconcile it against.

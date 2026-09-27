@@ -19,6 +19,10 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
 import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ } from '../unitConversions'
+// The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
+// glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
+import { NOT_PROVIDED } from '../notProvided'
+import { ALL_LOCATIONS } from './workingsCells'
 // Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
 // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
 // shape stays in one place. See lib/ghg/comparability.ts.
@@ -3145,8 +3149,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const blocked = unpriceableReason(loc, gwpVersion, year)
     if (blocked) {
       const base = { location: loc.name || 'Location', source: 'All streams at this location', scope: 0,
-        activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—',
-        ef_source: '—', gwp_basis: 'excluded', result_tco2e: null, entry_method: 'excluded' } as const
+        activity_data: 0, activity_unit: NOT_PROVIDED, emission_factor: NOT_PROVIDED, emission_factor_display: NOT_PROVIDED,
+        ef_source: NOT_PROVIDED, gwp_basis: 'excluded', result_tco2e: null, entry_method: 'excluded' } as const
       if (blocked.kind === 'country') {
         // ⚠️ THE DECLARATION IS THE STATE'S OWN LITERAL, NOT 'unpriceable' WITH A PAYLOAD.
         // lib/ghg/declarationStates.test.ts reads this file and the two pages from disk and fails
@@ -3285,7 +3289,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
         const absent = entry === null || entry.kind === 'published' ? null : entry
         rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2,
           activity_data: loc.purchased_steam_mmbtu, activity_unit: loc.purchased_steam_unit ?? 'mmbtu',
-          emission_factor: '—', emission_factor_display: '—', ef_source: '—', scope2_method: '—',
+          emission_factor: NOT_PROVIDED, emission_factor_display: NOT_PROVIDED, ef_source: NOT_PROVIDED, scope2_method: NOT_PROVIDED,
           gwp_basis: 'declaration', result_tco2e: null,
           declaration: 'no_published_factor', entry_method: 'no-published-factor',
           // The two absence kinds produce DIFFERENT prose. 'unpublished' may say a search was done and
@@ -3340,8 +3344,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const meta = STREAM_META[s]
       const at = attestedAt.get(s)
       const base = { location: loc.name || 'Location', stream: s, source: meta.name, scope: meta.scope,
-        activity_data: 0, activity_unit: '—', emission_factor: '—', emission_factor_display: '—',
-        ef_source: '—', gwp_basis: 'declaration' }
+        activity_data: 0, activity_unit: NOT_PROVIDED, emission_factor: NOT_PROVIDED, emission_factor_display: NOT_PROVIDED,
+        ef_source: NOT_PROVIDED, gwp_basis: 'declaration' }
       // DECLARED-BUT-UNQUANTIFIED IS CHECKED BEFORE THE ATTESTATION, and the order is the point. If a
       // location both says it uses a stream and attests the stream is absent, those two answers
       // contradict each other, and the row must show the one a verifier needs to resolve. "We use gas
@@ -3365,7 +3369,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // Method string comes from the SAME resolutionMethod() that fills AppliedField.adjustment.method,
     // so the audit row and the figure's provenance stamp can never claim different things.
     rows.push({
-      location: '—',
+      location: ALL_LOCATIONS,
       source: `Coverage resolution: ${r.fuelType || 'fuel'}`,
       scope: 0,
       activity_data: null,
@@ -3379,7 +3383,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   }
   // Rows with no gas split (electricity, refrigerant, steam, market-based, T&D, coverage resolutions)
   // have no combined-factor form — their emission_factor IS already the display string. Declaration
-  // rows set their own '—'. Fill the rest so every row carries a display field for the workings table.
+  // rows set their own NOT_PROVIDED. Fill the rest so every row carries a display field for the table.
   for (const r of rows) if (r.emission_factor_display === undefined) r.emission_factor_display = r.emission_factor
   return rows
 }

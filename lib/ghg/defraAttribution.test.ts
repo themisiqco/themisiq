@@ -6,6 +6,7 @@ import {
   sourceAttributionsFor, sourceAttributionsForLocations,
 } from './engine'
 import type { Location } from './engine'
+import { NOT_PROVIDED } from '../notProvided'
 
 // ⚠️ OGL v3.0's rights END AUTOMATICALLY if the source is not acknowledged. These tests pin the required
 // wording, that every DEFRA citation form triggers it, that no other publisher is attributed on a licence
@@ -45,7 +46,8 @@ describe('DEFRA/DESNZ licence attribution', () => {
       .filter(([k]) => !['combustion_uk', 'steam_uk', 'electricity_uk', 'electricity'].includes(k))
       .map(([, v]) => v)
     expect(sourceAttributionsFor(others)).toEqual([])
-    expect(sourceAttributionsFor([null, undefined, '', '—'])).toEqual([])
+    // NOT_PROVIDED is the workings rows' empty-value words since 27 Sep 2026; it names no publisher either.
+    expect(sourceAttributionsFor([null, undefined, '', '—', NOT_PROVIDED])).toEqual([])
   })
 
   it('A4 a UK inventory is attributed from its locations and from its workings rows; a US one is not', () => {

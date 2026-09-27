@@ -25,6 +25,7 @@ import {
   FIELD_LABELS, FIELD_FORM_LABELS,
   type FrameworkApplicability, type LimbResult, type DealCurrency, type Obligations,
 } from './assessment'
+import { NOT_PROVIDED } from '../notProvided'
 
 // ─── Deal types ───────────────────────────────────────────────────────────────
 // ⚠️ `short` IS AN EXPLICIT FIELD, NOT A SUBSTRING OF `label`. The deal summary used to derive it with
@@ -40,10 +41,10 @@ export const DEAL_TYPES = [
   { id: 'lending', label: 'Lending / Credit', short: 'Lending / Credit', desc: 'Debt financing or credit facility' },
   { id: 'lp', label: 'LP / Fund Investment', short: 'LP / Fund Investment', desc: 'Investment into a fund or GP' },
 ]
-// ⚠️ 'Not provided', NOT '—'. An em dash as an empty-value glyph reads as typography to a designer and
-// as a missing value to nobody else; in a document an external deal team reads, the words are the answer.
-// Six of these were replaced across the wizard and the report on 26 Sep 2026.
-export const NOT_PROVIDED = 'Not provided'
+// ⚠️ 'Not provided', NOT '—'. Six of these were replaced across the Deals wizard and report on
+// 26 Sep 2026. The string itself now lives in lib/notProvided.ts, because the GHG workings rows read it
+// too; it is re-exported here so every importer of this module keeps working unchanged.
+export { NOT_PROVIDED } from '../notProvided'
 export const dealTypeLabel = (id: string): string => DEAL_TYPES.find(d => d.id === id)?.label || NOT_PROVIDED
 export const dealTypeShort = (id: string): string => DEAL_TYPES.find(d => d.id === id)?.short || NOT_PROVIDED
 

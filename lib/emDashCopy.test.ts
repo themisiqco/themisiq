@@ -125,7 +125,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/climate-risk/report/page.tsx': 16,
   'app/dashboard/cyber/page.tsx': 6,
   'app/dashboard/deals/report/page.tsx': 2,
-  'app/dashboard/ghg/page.tsx': 151,
+  'app/dashboard/ghg/page.tsx': 123,
   'app/dashboard/ghg/trends/page.tsx': 8,
   'app/dashboard/materiality/assessment/AssessmentForm.tsx': 12,
   'app/dashboard/materiality/assessment/new/page.tsx': 3,

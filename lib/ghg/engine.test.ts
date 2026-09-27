@@ -30,6 +30,7 @@ import {
   type DeclarableStream,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
@@ -2226,8 +2227,8 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
       const row = steamRow(l);
       expect(row.declaration, `${country}`).toBe('no_published_factor');
       expect(row.result_tco2e, `${country}: null, never 0 — 0 is a claim of no emissions`).toBeNull();
-      expect(row.emission_factor, `${country}: no factor may be shown`).toBe('—');
-      expect(row.ef_source, `${country}: no citation, because nothing priced it`).toBe('—');
+      expect(row.emission_factor, `${country}: no factor may be shown`).toBe(NOT_PROVIDED);
+      expect(row.ef_source, `${country}: no citation, because nothing priced it`).toBe(NOT_PROVIDED);
       // The reported quantity IS carried — "you told us 1000 GJ and we could not price it".
       expect(row.activity_data, `${country}`).toBe(1000);
       expect(row.activity_unit, `${country}`).toBe('gj');
