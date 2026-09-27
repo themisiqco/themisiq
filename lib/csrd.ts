@@ -53,7 +53,7 @@ export const CSRD_SHORT = 'EU law · double materiality required'
 // exactly the reader this sentence exists for.
 export const CSRD_EU_SCOPE_SENTENCE =
   'EU companies are in scope with more than 1,000 employees and more than €450 million in net '
-  + 'turnover — both, not either.'
+  + 'turnover: both, not either.'
 
 // ⚠️ THE YEARS AS NUMBERS, BECAUSE PROSE CANNOT BE READ BY A PAGE THAT NEEDS ONE FIGURE.
 // CSRD_FIRST_REPORT_SENTENCE below is now DERIVED from these, so the sentence and any page
@@ -86,7 +86,7 @@ export const CSRD_LISTED_SME_SENTENCE =
 // figures, and the rules are not final. A sentence that stated this crisply would be stating more
 // than is known.
 export const CSRD_NON_EU_SENTENCE =
-  'Non-EU companies are caught on EU footprint rather than global size — broadly, more than €450 '
+  'Non-EU companies are caught on EU footprint rather than global size: broadly, more than €450 '
   + 'million of net turnover generated in the EU, plus an EU subsidiary or branch above a threshold '
   + 'of its own. Timing runs later and the rules are still being finalised.'
 
@@ -154,5 +154,5 @@ export const ESRS_TOPIC_COUNT_AS_OF = 'as at September 2026'
 // both when either changes.
 
 export const ESRS_TEN_TOPICS_SENTENCE =
-  'ESRS Set 1 organises those topics into ten topical standards — E1–E5 environmental, S1–S4 '
+  'ESRS Set 1 organises those topics into ten topical standards: E1–E5 environmental, S1–S4 '
   + 'social, and G1 governance.'

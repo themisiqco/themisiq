@@ -277,7 +277,7 @@ export default function Page() {
               <text x="340" y="216" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="400" fill={PURPLE_MID}>CSRD · ESRS</text>
               <text x="340" y="234" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="400" fill={PURPLE_MID}>Both modules</text>
             </g>
-            <text x="340" y="378" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="400" fill={MUTED}>Each circle is a ThemisIQ module. Buy either on its own — CSRD reporting needs both.</text>
+            <text x="340" y="378" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="400" fill={MUTED}>Each circle is a ThemisIQ module. Buy either on its own, but CSRD reporting needs both.</text>
           </svg>
         </div>
       </section>
