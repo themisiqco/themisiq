@@ -103,8 +103,8 @@ export const nearSentence = (f: FrameworkApplicability): string => {
   const which = decisive.map(l => `${l.limb.measure.replace(/_/g, ' ')} (${limbValueDisplay(l)} vs ${limbThresholdDisplay(l)})`).join('; ')
   const test = `${t.metCount} of ${t.requires} limb${t.requires === 1 ? '' : 's'} met`
   return f.applies
-    ? `Applies — ${test}. Decisive limb is marginal: ${which}, inside the ${NEAR_PCT} band. If that limb moved, the test would no longer be met. Verify the measure and reporting-entity scope; this does not weaken the obligation.`
-    : `Does not apply on the figures entered — ${test}. A marginal limb could change that: ${which}, inside the ${NEAR_PCT} band. Verify before ruling it out.`
+    ? `Applies: ${test}. The deciding figure is borderline: ${which}, inside the ${NEAR_PCT} band. If that limb moved, the test would no longer be met. Verify the measure and reporting-entity scope; this does not weaken the obligation.`
+    : `Does not apply on the figures entered: ${test}. A borderline figure could change that: ${which}, inside the ${NEAR_PCT} band. Verify before ruling it out.`
 }
 
 // ─── Threshold limb rows ──────────────────────────────────────────────────────
@@ -142,8 +142,8 @@ export const buildLimbRows = (applicability: FrameworkApplicability[]): LimbRow[
         marginal,
         state: l.state,
         basisOfValue: l.state === 'not-assessed'
-          ? `Not provided — enter ${FIELD_LABELS[l.limb.source]}`
-          : `${FIELD_FORM_LABELS[l.limb.source]}${l.limb.exactMeasure ? '' : ` — PROXY. ${l.limb.measureNote ?? ''}`}`,
+          ? `Not provided. Enter ${FIELD_LABELS[l.limb.source]}`
+          : `${FIELD_FORM_LABELS[l.limb.source]}${l.limb.exactMeasure ? '' : `: PROXY. ${l.limb.measureNote ?? ''}`}`,
         isProxy: l.state !== 'not-assessed' && !l.limb.exactMeasure,
       }
     }))
@@ -176,10 +176,10 @@ export const buildFxBasisRows = (currency: string, applicability: FrameworkAppli
 
   const dealCur = currency
   if (!isDealCurrency(dealCur))
-    return [['Rate applied', `UNAVAILABLE — no published rate is held for ${dealCur}. Money limbs were not evaluated, so no framework was asserted or ruled out on a converted figure.`]]
+    return [['Rate applied', `UNAVAILABLE: no published rate is held for ${dealCur}. Money limbs were not evaluated, so no framework was asserted or ruled out on a converted figure.`]]
   const uses = [...thresholdCurrencyUse.entries()]
   if (uses.length === 0)
-    return [['Conversion applied', 'None — no size-gated framework with a money limb is in scope for this jurisdiction.']]
+    return [['Conversion applied', 'None. No size-gated framework with a money figure is in scope for this jurisdiction.']]
 
   // EUR has NO transcribed figure. It is the base the source quotes everything against, and
   // UNITS_PER_EUR.EUR is 1 by definition — calling that "transcribed verbatim" would attribute a
@@ -187,7 +187,7 @@ export const buildFxBasisRows = (currency: string, applicability: FrameworkAppli
   // block exists to prevent. So EUR never gets a published-rate row.
   const published = (c: DealCurrency): string[][] =>
     c === 'EUR' ? []
-      : [[`Published rate — ${c}`, `${c} ${UNITS_PER_EUR[c]} per EUR — transcribed verbatim from the source above`]]
+      : [[`Published rate: ${c}`, `${c} ${UNITS_PER_EUR[c]} per EUR, transcribed verbatim from the source above`]]
 
   const rows: string[][] = []
   const shown = new Set<DealCurrency>()
@@ -210,12 +210,12 @@ export const buildFxBasisRows = (currency: string, applicability: FrameworkAppli
     // source figure that was never printed because it does not exist.
     const how =
       dealCur === 'EUR'
-        ? `this IS the published ${tc} figure above, applied directly — the source quotes every rate as units per 1 EUR, so a EUR-denominated deal needs no derivation`
+        ? `this IS the published ${tc} figure above, applied directly, because the source quotes every rate as units per 1 EUR, so a EUR-denominated deal needs no derivation`
       : tc === 'EUR'
-        ? `DERIVED, not published: 1 ÷ ${UNITS_PER_EUR[dealCur]} — EUR is the base the source quotes against, so it carries no figure of its own`
+        ? `DERIVED, not published: 1 ÷ ${UNITS_PER_EUR[dealCur]}. EUR is the base the source quotes against, so it carries no figure of its own`
         : `DERIVED, not published: ${UNITS_PER_EUR[tc]} ÷ ${UNITS_PER_EUR[dealCur]}, computed from the two transcribed figures above`
     rows.push([`Conversion ${dealCur} → ${tc} (${scope})`,
-      `1 ${dealCur} = ${rate} ${tc} — ${how}. Shown to ${FX_DISPLAY_DP} dp; the comparison itself uses full precision.`])
+      `1 ${dealCur} = ${rate} ${tc}. ${how}. Shown to ${FX_DISPLAY_DP} dp; the comparison itself uses full precision.`])
   }
   return rows
 }
@@ -328,7 +328,7 @@ export const resolveRegime = (
   if (row?.status === 'not-assessed') {
     // Withheld with no reason of its own ⇒ name the field(s) that would settle it, where any would.
     const prompt = resolveFieldsPrompt(row.test?.fieldsToResolve ?? [], [fw])
-    return { state: 'conditional', reason: `size test incomplete${prompt ? ` — ${prompt}` : ''}` }
+    return { state: 'conditional', reason: `size test incomplete${prompt ? `: ${prompt}` : ''}` }
   }
   if (row?.status === 'not-applicable') return { state: 'not-applicable' }
   // No row at all ⇒ CS3D was never in scope for this jurisdiction. CHECKED rather than assumed: this

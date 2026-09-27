@@ -13,6 +13,14 @@
 // shape for the same job is how two flows come to lose data differently.
 //
 // ⚠️ NOT localStorage, AND NOT A URL PARAMETER.
+//   · RECONSIDERED 26 SEP 2026 AND KEPT. Opening steps 2 and 3 to signed-out visitors (option B) removes
+//     the /login round trip that used to be the only way to see results, so a visitor now has no reason to
+//     bounce — and closing the tab loses the draft. Moving to lib/drafts.ts's localStorage with its 2-hour
+//     anonymous TTL was proposed and REJECTED: the payload is a named acquisition target with its revenue,
+//     deal value, headcount and balance-sheet total, and that is the class of material a browser should not
+//     sit on after the tab is gone. The other four tools accept that trade for salary bands and supplier
+//     spend; this one does not. The cost is a lost draft, which is recoverable by retyping; the cost the
+//     other way is M&A diligence data persisting on a shared machine.
 //   · sessionStorage dies with the tab, which is the right lifetime for an unsaved draft — a deal
 //     someone abandoned should not reappear a week later in a form they opened for another target.
 //   · A URL parameter would put the target's name, revenue, headcount and balance-sheet total into

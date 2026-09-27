@@ -135,6 +135,18 @@ export default function SbtiDashboard() {
   // Gated on the GHG entitlement — SBTi is part of the GHG module (same precedent
   // as the Scope 3 Calculator, which is also unlocked by 'ghg').
   const { isPaid, loading: entLoading } = useEntitlementState('ghg')
+  // ⚠️ SESSION IS READ SEPARATELY BECAUSE useEntitlementState DOES NOT EXPOSE IT, and without it the
+  // !isPaid branch below cannot tell a signed-out visitor from a signed-in one who has not bought GHG.
+  // It told both to buy the module. null = not yet known, and the render waits rather than guessing:
+  // showing a purchase wall to someone who only needs to sign in is the error being fixed.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) setSignedIn(!!session)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   // ─── Wizard shell (GHG STEPS pattern) ───────────────────────────────────────
   const STEPS = ['Company profile', 'Standard & scope', 'Near-term targets', 'Net-zero targets']
@@ -773,6 +785,43 @@ export default function SbtiDashboard() {
     return (
       <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
         SBTi Targets...
+      </div>
+    )
+  }
+
+  // ⚠️ SIGNED OUT GETS AN EXPLANATION, NOT A PRICE. Until 26 Sep 2026 both populations hit the
+  // PaywallCard below, so a visitor who had never signed in was told to unlock the GHG module — a
+  // purchase prompt at the entrance, before they had seen anything, and the wrong first step besides: an
+  // account comes before a purchase. This module genuinely cannot show results to a signed-out visitor,
+  // unlike the screening tools, because it reads a SAVED INVENTORY rather than a form — so the honest
+  // answer is to say that, not to withhold silently or to ask for money.
+  if (signedIn === null || entLoading) {
+    return (
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
+        SBTi Targets...
+      </div>
+    )
+  }
+
+  if (!signedIn) {
+    return (
+      <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#fff', minHeight: '100vh', color: '#0d0d0d' }}>
+        <Nav />
+        <div style={{ maxWidth: 620, margin: '0 auto', padding: '4rem 2rem 6rem' }}>
+          <div style={{ width: 40, height: 3, background: GRAD, borderRadius: 2, marginBottom: 18 }} />
+          <h1 style={sectionHead}>Science-based targets, built on your GHG inventory</h1>
+          <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, marginTop: '0.75rem' }}>
+            This module sets and tracks emissions reduction targets under the SBTi Corporate Net-Zero
+            Standard. It works from an inventory you have already built, so it needs a free account
+            before there is anything to show.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
+            <a href={`/login?next=${encodeURIComponent('/dashboard/sbti')}`}
+              style={{ ...btnPrimary, padding: '11px 24px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Sign in</a>
+            <a href="/climate-ghg"
+              style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>See how targets are set</a>
+          </div>
+        </div>
       </div>
     )
   }

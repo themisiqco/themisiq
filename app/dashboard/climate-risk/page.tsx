@@ -291,6 +291,15 @@ export default function MaterialityWizard() {
   const { isPaid, loading: entLoading } = useEntitlementState('climate-risk')
   const [mode, setMode] = useState<Mode | null>(null)
   const [step, setStep] = useState(0)
+  // ⚠️ SESSION READ FOR ONE NOTICE. /api/materiality and /api/materiality/resilience both require a
+  // bearer token, so this module cannot show a signed-out visitor any result. The notice below says so
+  // up front; null = not yet known, and the notice stays hidden until it is.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => { if (!cancelled) setSignedIn(!!session) })
+    return () => { cancelled = true }
+  }, [])
   // Which ESRS version this assessment is prepared under. NULL is a REAL state — "not stated" —
   // and is the default on purpose: Art. 2(2) of Del. Reg. C(2026) 5010 requires the undertaking to
   // STATE which version it applied, so an assumed one would be a false statement about which law
@@ -588,6 +597,18 @@ export default function MaterialityWizard() {
   // ─── Input step renderers ───────────────────────────────────────────────────
   const renderIndustry = () => (
     <div>
+      {/* ⚠️ SAID BEFORE THEY START, NOT AFTER THEY FINISH. /api/materiality and
+          /api/materiality/resilience both require a bearer token, so a signed-out visitor used to fill
+          this whole form and meet "Please sign in to run an assessment" at the moment of submitting.
+          Stating it up front costs a sentence and saves the work.
+          ⚠️ `signedIn === false`, NOT `!signedIn`: null means the session is not yet known, and `!null`
+          is true, so the loose test would flash the notice at a signed-in user on first paint. */}
+      {signedIn === false && (
+        <div style={{ background: 'var(--color-accent-amber-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-amber) 20%, transparent)', borderRadius: 10, padding: '0.9rem 1.1rem', marginBottom: 18, fontSize: 12.5, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
+          Results are calculated on our servers, so you will need a free account to see them. You can{' '}
+          <a href={`/login?next=${encodeURIComponent('/dashboard/climate-risk')}`} style={{ color: 'var(--color-brand)', fontWeight: 500 }}>sign in now</a>{' '}or when you finish entering.
+        </div>
+      )}
       <h2 style={sectionHead}>Your industry</h2>
       <p style={sectionSub}>Determines your sensitivity to each climate hazard and your baseline relevance across sustainability topics.</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>

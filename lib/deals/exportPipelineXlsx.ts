@@ -67,7 +67,7 @@ export const REGIME_COLUMNS = [
 
 // Plain-language deal-type labels. Falls back to the stored code rather than blanking it.
 const DEAL_TYPE_LABELS: Record<string, string> = {
-  ma: 'M&A — acquisition',
+  ma: 'M&A: acquisition',
   pe: 'PE / growth equity',
   vc: 'Venture capital',
   lending: 'Lending / credit',
@@ -105,9 +105,9 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // Regimes — the pivotable block
     ...REGIME_COLUMNS.map(String), 'Other rules',
     // Near threshold
-    'Near a threshold — rule', 'Near a threshold — side',
+    'Near a threshold: rule', 'Near a threshold: side',
     // Not assessed
-    'Could not assess — rule', 'Could not assess — figures needed',
+    'Could not assess: rule', 'Could not assess: figures needed',
     // Cost. The exposure band is a share of DEAL VALUE, so it inherits the target's currency.
     // The ThemisIQ estimate comes from the price list and is genuinely USD.
     'Exposure low (target currency)', 'Exposure high (target currency)',
@@ -117,7 +117,7 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // belong in a row meant for pivoting; they are in the per-deal report.
     'Critical risks', 'High risks', 'Medium risks',
     // Counted and named apart from the three above — see the countBy comment in the row builder.
-    'Conditional risks', 'Conditional risks — regimes',
+    'Conditional risks', 'Conditional risks: regimes',
     // Data room
     'GHG data available', 'ESG report available',
   ]
@@ -259,20 +259,20 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
 
   // ── Sheet 2: About this export ──────────────────────────────────────
   const about: Cell[][] = [
-    ['ThemisIQ — deal pipeline export'],
+    ['ThemisIQ: deal pipeline export'],
     [],
     ['Generated', generatedAt.toISOString()],
     ['Targets in this file', deals.length],
     [],
     ['How the figures were worked out',
-      'Fresh at export, from each target’s current record — not copied from the rules saved with it. ' +
+      'Fresh at export, from each target’s current record, not copied from the rules saved with it. ' +
       'Opening a target in ThemisIQ will show the same answer. A rules list saved earlier may differ if the ' +
       'target’s figures or the rules themselves have changed since.'],
     [],
     ['Empty cells', 'There are none. Where something is absent the cell says why.'],
     ['NOT PROVIDED', 'This figure was never entered for the target.'],
     ['NOT ASSESSED',
-      'The rule was not evaluated — usually because a size figure it depends on is missing. ' +
+      'The rule was not evaluated, usually because a size figure it depends on is missing. ' +
       'It is NOT a finding that the rule does not apply. The "figures needed" column says what would settle it.'],
     ['QUOTE REQUIRED', 'Above the self-serve range; priced on request rather than from the price list.'],
     ['LOCATIONS NOT PROVIDED', 'The number of sites has not been entered, so no price band can be chosen.'],
@@ -281,7 +281,7 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     ['A caution on currency',
       'Revenue, deal value, balance-sheet total and the exposure band are each in the TARGET’S OWN currency, ' +
       'shown in the Currency column, and that differs from row to row. Adding those columns across targets in ' +
-      'different currencies gives a number that means nothing. The ThemisIQ estimate is the exception — it is ' +
+      'different currencies gives a number that means nothing. The ThemisIQ estimate is the exception: it is ' +
       'always USD.'],
     [],
     ['Share of deal value',

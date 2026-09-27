@@ -38,21 +38,48 @@ const wizard = (
 
 describe('W. the wizard gate', () => {
   // ── STATE 1: SIGNED OUT ────────────────────────────────────────────────────────────────────
-  it('W1 signed out — the form is open and the results are NOT', () => {
-    // THE CHANGE THIS FILE EXISTS FOR. A signed-out visitor could previously run a full screen and
-    // read every finding without an account: `walled` was false for them (nothing saved), and
-    // nothing else gated the render. The form stays open — the engine is pure and client-side and
-    // always has been — but the deliverable is now behind a session.
+  it('W1 signed out — screening and findings are shown, the cost estimate is NOT', () => {
+    // ⚠️ THIS ASSERTION HAS NOW BEEN THREE THINGS, AND THE HISTORY IS THE POINT.
+    //   before 291bd3c   a signed-out visitor ran a full screen and read every finding, including the
+    //                    cost estimate, with no account. Nothing gated the render at all.
+    //   291bd3c          ALL findings withheld: results: 'hidden'. The reasoning was that the five
+    //                    findings blocks are the deliverable and the free tier trades them for an
+    //                    account.
+    //   26 Sep 2026      results: 'partial'. Withholding the screening meant a visitor could not see
+    //                    that the tool does anything, so the screening (step 2) and the risk findings
+    //                    (step 3) are shown as proof, and the COST ESTIMATE (step 4) plus saving are
+    //                    what the account buys. The report export stays behind the module.
+    // The middle state is the one this line replaces; 'hidden' is still in the union and nothing
+    // returns it.
     const g = wizard('none', 'anon', none)
-    expect(g).toEqual({ kind: 'open', results: 'hidden' })
+    expect(g).toEqual({ kind: 'open', results: 'partial' })
   })
 
   it('W2 signed out with a saved deal is NOT a state the wall can reach', () => {
     // Defensive: `savedDeal` resolves to 'none' for a session-less visitor because the lookup is
     // owner-scoped and never runs. If some future load path ever hands this combination in, the
-    // visitor must still be asked to sign in rather than shown someone's deal name in a wall.
+    // visitor must still get the anon treatment rather than be shown someone's deal name in a wall.
     const g = wizard('none', 'anon', saved())
-    expect(g).toEqual({ kind: 'open', results: 'hidden' })
+    expect(g).toEqual({ kind: 'open', results: 'partial' })
+  })
+
+  it('W1b nothing returns results: \'hidden\' any more, across every input combination', () => {
+    // ⚠️ THE UNION STILL CARRIES 'hidden' AND NOTHING PRODUCES IT. That is deliberate — see the note on
+    // WizardGate — but an unreachable member is exactly the kind of thing that gets "restored" by
+    // someone reading the type and assuming a branch is missing. This pins that its absence is the
+    // decision, so reintroducing it fails here and has to be argued for.
+    for (const access of ACCESSES) {
+      for (const session of SESSIONS) {
+        for (const sd of [none, saved(), loadingDeal]) {
+          for (const idParam of [null, 'd7']) {
+            const g = wizard(access, session, sd, idParam)
+            if (g.kind === 'open') {
+              expect(g.results, `${access}/${session} must not be hidden`).not.toBe('hidden')
+            }
+          }
+        }
+      }
+    }
   })
 
   // ── STATE 2: SIGNED IN, NO ENTITLEMENT, NOTHING SAVED ──────────────────────────────────────
@@ -342,6 +369,17 @@ describe('S. the surfaces defer to the resolver', () => {
     expect(block, '/order was considered and rejected — one commercial route out of this module').not.toContain('/order')
   })
 
+  /** STEP_NAMES as the wizard declares it, so the assertion below is keyed on the label a user sees. */
+  const stepNames = (): string[] => {
+    const m = read(WIZARD).match(/const STEP_NAMES = \[([^\]]*)\]/)
+    expect(m, 'STEP_NAMES not found in the wizard').toBeTruthy()
+    return [...m![1].matchAll(/'([^']+)'/g)].map(x => x[1])
+  }
+
+  /** Each step's `needs`, in table order. */
+  const tableNeeds = (table: string): string[] =>
+    [...table.matchAll(/render: renderStep\d, needs: '([a-z]+)'/g)].map(x => x[1])
+
   it('S6 the wizard actually GATES on the resolver, not just calls it', () => {
     // ⚠️ FOUND BY MUTATION, AND IT IS THE GAP THIS WHOLE FILE COULD OTHERWISE HAVE. Replacing the
     // wizard's `resultsShown` with a literal `true` left all thirty-one other tests green: the
@@ -350,21 +388,34 @@ describe('S. the surfaces defer to the resolver', () => {
     // with no DOM harness the call site can only be checked textually.
     const src = read(WIZARD)
 
-    // Derived FROM the gate, not hardcoded. Catches `= true`, `= false`, and any constant.
+    // ⚠️ TWO DERIVATIONS NOW, AND BOTH ARE PINNED. The gate went three-state on 26 Sep 2026, so one
+    // boolean could no longer express it: `resultsShown` governs the screening and the findings,
+    // `costShown` governs the cost estimate alone. Pinning both is what keeps the mutation this test was
+    // written for — replacing either with a literal — from passing.
     expect(src, 'resultsShown must derive from the gate')
-      .toContain("const resultsShown = gate.kind !== 'open' || gate.results === 'shown'")
+      .toContain("const resultsShown = gate.kind !== 'open' || gate.results !== 'hidden'")
+    expect(src, 'costShown must derive from the gate')
+      .toContain("const costShown = gate.kind !== 'open' || gate.results === 'shown'")
+    // ⚠️ AND THEY MUST NOT BE THE SAME EXPRESSION. Deriving both from `=== 'shown'` would silently
+    // restore the all-or-nothing gate while leaving every other assertion here green.
+    expect(src.includes("const resultsShown = gate.kind !== 'open' || gate.results === 'shown'"),
+      'resultsShown must not collapse back onto costShown').toBe(false)
 
-    // And the three render sites that consume it. Named individually rather than counted, so a
-    // failure says WHICH block stopped being gated.
+    // And the render sites that consume them. Named individually rather than counted, so a failure says
+    // WHICH block stopped being gated.
     expect(src, 'step 1 findings must be withheld').toContain('{resultsShown && <>')
     expect(src, 'the sign-in prompt must replace them').toContain('{!resultsShown && signInPrompt()}')
     expect(src, 'the data-room GAPS panel is a finding')
       .toContain('{resultsShown && (!deal.has_ghg_data || !deal.has_esg_report) && (')
-    expect(src, 'steps 2-4 are findings end to end')
-      .toContain('steps[step].findingsOnly && !resultsShown ? signInPrompt() : steps[step].render()')
+    expect(src, 'steps 2 and 3 read resultsShown, step 4 reads costShown')
+      .toContain("steps[step].needs === 'results' && !resultsShown ? signInPrompt()")
+    expect(src, 'the cost step gets its OWN prompt, not the results one')
+      .toContain("steps[step].needs === 'cost' && !costShown ? costSignInPrompt()")
 
-    // The step table is where a sixth step has to be registered, and `findingsOnly` is required by
-    // its type — so a new step cannot default quietly into being ungated.
+    // The step table is where a sixth step has to be registered, and `needs` is required by its type —
+    // so a new step cannot default quietly into being ungated. It replaced a boolean `findingsOnly` when
+    // the gate went three-state: a boolean could only say withheld or not, which is what made the old
+    // all-or-nothing gate the easy thing to write.
     //
     // ⚠️ THE END ANCHOR IS THE ARRAY'S CLOSING BRACKET, NOT THE FIRST ']'. The first draft sliced to
     // indexOf(']'), which landed inside the TYPE ANNOTATION — `{ … }[]` — and measured an empty
@@ -375,11 +426,43 @@ describe('S. the surfaces defer to the resolver', () => {
     const end = src.indexOf('\n  ]', start)
     expect(end, 'the step table is not closed where expected').toBeGreaterThan(start)
     const table = src.slice(start, end)
-    expect(table, 'step 0 is pure input').toContain('render: renderStep0, findingsOnly: false')
-    expect(table, 'step 1 is mixed and gates internally').toContain('render: renderStep1, findingsOnly: false')
-    for (const s of ['renderStep2', 'renderStep3', 'renderStep4']) {
-      expect(table, `${s} is findings-only`).toContain(`render: ${s}, findingsOnly: true`)
+    expect(table, 'step 0 is pure input').toContain("render: renderStep0, needs: 'nothing'")
+    expect(table, 'step 1 is mixed and gates internally').toContain("render: renderStep1, needs: 'nothing'")
+    // ⚠️ STEPS 2 AND 3 NEED 'results', STEP 4 NEEDS 'cost', AND THE SPLIT IS THE DECISION OF
+    // 26 Sep 2026. All three were findingsOnly: true under 291bd3c. Asserted per step rather than in a
+    // loop, because the whole point is that they are no longer the same.
+    // ⚠️ DERIVED FROM STEP_NAMES, NOT FROM POSITION, BECAUSE POSITION IS EXACTLY WHAT WENT WRONG.
+    // renderStepN is zero-indexed and the tab labels are one-based, so the tab reading "4. Cost Estimate"
+    // is INDEX 3. The first version of this table read the numbers off the labels and gave index 3
+    // 'results' — which a signed-out visitor has — so the full cost estimate rendered to anon, including
+    // the consultant range and the ThemisIQ figure. Found in a browser on 26 Sep 2026; no test here saw
+    // it, because every assertion named renderStepN and agreed with the mistake.
+    //
+    // So the mapping is asserted BY LABEL: whatever index carries 'Cost Estimate' must need 'cost'. An
+    // off-by-one now fails here rather than shipping.
+    const names = stepNames()
+    const needsByIndex = tableNeeds(table)
+    expect(needsByIndex.length, 'one `needs` per step in STEP_NAMES').toBe(names.length)
+    const EXPECTED_BY_LABEL: Record<string, 'nothing' | 'results' | 'cost'> = {
+      'Deal Setup': 'nothing',      // pure input
+      'ESG Screening': 'nothing',   // MIXED: gates its own findings block internally
+      'Risk Findings': 'results',   // shown without an account
+      'Cost Estimate': 'cost',      // an account buys it
+      'Report': 'cost',             // an account to reach it; the module to export it
     }
+    names.forEach((label, i) => {
+      expect(EXPECTED_BY_LABEL[label], `STEP_NAMES gained '${label}' with no gating decision`).toBeDefined()
+      expect(needsByIndex[i], `'${label}' (index ${i}) must need '${EXPECTED_BY_LABEL[label]}'`)
+        .toBe(EXPECTED_BY_LABEL[label])
+    })
+    // No step may claim 'nothing' beyond the two input steps: that is how a findings step would become
+    // ungated by omission rather than by decision.
+    // ⚠️ ANCHORED ON `render: renderStepN`, NOT ON `needs: 'nothing'` ALONE. The slice begins at the
+    // TYPE ANNOTATION, which contains the string `needs: 'nothing' | 'results' | 'cost'` — so the bare
+    // pattern counted three and failed against a correct table. The same shape as every other
+    // count-a-substring mistake in this repo: match the construct, not a word inside it.
+    const ungated = table.match(/render: renderStep\d, needs: 'nothing'/g) ?? []
+    expect(ungated.length, 'only steps 0 and 1 are ungated').toBe(2)
   })
 
   it('S7 no draft copy can ship as final — the placeholders are gone and must stay gone', () => {

@@ -83,7 +83,7 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
     { risk: 'Embodied carbon in portfolio', severity: 'high', framework: 'CSRD / CRREM', detail: 'Building portfolios face stranding risk against decarbonisation pathways. CRREM analysis is the standard way to test it.',
       conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU property holdings.', nexus: 'CRREM’s EU pathways apply to assets held in EU markets; assets elsewhere are tested against the pathway for their own market.', unresolved: 'whether you hold EU property', consequence: 'EU carbon reduction pathways apply to the EU-held portion of the portfolio.' } },
     { risk: 'Energy efficiency compliance', severity: 'high', framework: 'EU EPC / MEES', detail: 'Building portfolios carry regulatory exposure where minimum energy-performance ratings apply, and non-compliant assets can become unlettable.',
-      conditional: { establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK property holdings.', nexus: 'Both regimes attach to the property, not to the owner — a company established elsewhere is reached through the assets it holds in those markets.', unresolved: 'whether you hold EU or UK property', consequence: 'The EU Energy Performance of Buildings Directive and UK MEES require minimum EPC ratings. Non-compliant assets face rental prohibition.' } },
+      conditional: { establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK property holdings.', nexus: 'Both regimes attach to the property, not to the owner, and a company established elsewhere is reached through the assets it holds in those markets.', unresolved: 'whether you hold EU or UK property', consequence: 'The EU Energy Performance of Buildings Directive and UK MEES require minimum EPC ratings. Non-compliant assets face rental prohibition.' } },
     { risk: 'Physical flood and heat risk', severity: 'critical', framework: 'TCFD / IFRS S2', detail: 'Real estate assets face material physical climate risk. Asset-level flood mapping and heat stress analysis required.' },
   ],
   'Technology': [
@@ -104,21 +104,21 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   'Industrials & Manufacturing': [
     { risk: 'Scope 1 process emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Industrial manufacturing typically carries significant Scope 1 process emissions requiring full GHG inventory.' },
     { risk: 'Carbon border adjustment exposure', severity: 'high', framework: 'EU CBAM', detail: 'Iron and steel, cement, aluminium, fertilisers, hydrogen and electricity carry a carbon-border cost when they enter the EU.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU — it reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether goods you produce enter the EU', consequence: 'The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' } },
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether goods you produce enter the EU', consequence: 'The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' } },
     { risk: 'Chemical and hazardous materials', severity: 'high', framework: 'REACH / CSRD', detail: 'Industrial operations may carry significant environmental liability from chemical usage and historical contamination.',
       conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'REACH attaches to substances manufactured in or imported into the EU, so a manufacturer established elsewhere is reached through what it ships there.', unresolved: 'whether your substances or articles enter the EU' } },
   ],
   'Consumer & Retail': [
     { risk: 'Scope 3 Cat.1 supplier emissions', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Consumer goods companies typically carry 70-90% of emissions in Scope 3 Cat.1. Supplier engagement programme needed.' },
     { risk: 'Deforestation exposure', severity: 'high', framework: 'EU EUDR', detail: 'Consumer goods with exposure to cattle, soy, palm oil, cocoa, coffee, wood or rubber carry deforestation risk in their sourcing.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it — a company incorporated elsewhere is reached through that placement.', unresolved: 'whether your goods reach the EU market', consequence: 'The EU Deforestation Regulation applies to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' } },
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it. A company incorporated elsewhere is reached through that placement.', unresolved: 'whether your goods reach the EU market', consequence: 'The EU Deforestation Regulation applies to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' } },
     { risk: 'Labour rights in supply chain', severity: 'high', framework: 'CS3D / Modern Slavery', detail: 'Consumer goods supply chains carry significant forced labour and child labour risk in sourcing countries.',
       conditional: { establishedIn: ['UK', 'Australia'], label: 'Conditioned on UK or Australian turnover.', nexus: 'The UK and Australian Modern Slavery Acts attach to carrying on business in those markets above a turnover threshold, wherever the company is incorporated.', unresolved: 'whether you carry on business there above the threshold' } },
   ],
   'Agriculture & Food': [
     { risk: 'Land use change emissions', severity: 'critical', framework: 'GHG Protocol / SB 253', detail: 'Agricultural operations may carry significant land use change (LUC) emissions requiring scope 3 Cat.11 assessment.' },
     { risk: 'Deforestation and biodiversity', severity: 'critical', framework: 'EU EUDR / TNFD', detail: 'Agricultural supply chains carry deforestation and nature-related risk, and TNFD nature disclosure expectations are emerging across markets.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it — a company incorporated elsewhere is reached through that placement.', unresolved: 'whether your commodities reach the EU market', consequence: 'The EU Deforestation Regulation applies to the listed commodities placed on the EU market.' } },
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it. A company incorporated elsewhere is reached through that placement.', unresolved: 'whether your commodities reach the EU market', consequence: 'The EU Deforestation Regulation applies to the listed commodities placed on the EU market.' } },
     { risk: 'Water risk', severity: 'high', framework: 'CSRD / CDP Water', detail: 'Agricultural operations in water-stressed regions face material operational and regulatory risk.' },
   ],
   'Transport & Logistics': [
@@ -135,13 +135,13 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
     // compliance", which states an instrument that binds nobody as a legal obligation. That is a
     // different defect from the jurisdictional ones around it — no nexus would have made it true —
     // so it is corrected in the text rather than conditioned.
-    { risk: 'Conflict minerals and HRDD', severity: 'high', framework: 'CS3D / OECD DDG', detail: 'Mining operations in conflict-affected and high-risk areas carry sourcing risk that buyers and downstream customers expect to see addressed. The OECD Due Diligence Guidance is the reference framework for that work — it is voluntary guidance rather than a legal obligation in itself, though a binding due-diligence duty such as CS3D may require equivalent steps.' },
+    { risk: 'Conflict minerals and HRDD', severity: 'high', framework: 'CS3D / OECD DDG', detail: 'Mining operations in conflict-affected and high-risk areas carry sourcing risk that buyers and downstream customers expect to see addressed. The OECD Due Diligence Guidance is the reference framework for that work. It is voluntary guidance rather than a legal obligation in itself, though a binding due-diligence duty such as CS3D may require equivalent steps.' },
   ],
   'Construction & Materials': [
     { risk: 'Embodied carbon in products', severity: 'high', framework: 'CSRD / EU Taxonomy', detail: 'Cement and steel production carry significant process emissions.',
       conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'The EU Taxonomy is reported by entities already inside CSRD or SFDR scope, so it reaches a company through one of those obligations rather than directly.', unresolved: 'whether an EU reporting obligation reaches you', consequence: 'EU Taxonomy alignment assessment required.' } },
     { risk: 'EU CBAM exposure', severity: 'high', framework: 'EU CBAM', detail: 'Cement, steel and aluminium carry a carbon-border cost when they enter the EU.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU — it reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether materials you produce enter the EU', consequence: 'The EU Carbon Border Adjustment Mechanism definitive period began in 2026.' } },
+      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether materials you produce enter the EU', consequence: 'The EU Carbon Border Adjustment Mechanism definitive period began in 2026.' } },
     { risk: 'Site biodiversity and land use', severity: 'medium', framework: 'CSRD / TNFD', detail: 'Construction projects face emerging biodiversity disclosure requirements under TNFD.',
       conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS E4 is a CSRD standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you', consequence: 'CSRD ESRS E4 adds a biodiversity disclosure requirement for companies in CSRD scope.' } },
   ],
@@ -381,7 +381,7 @@ export function getObligations(locationCount: number, frameworks: string[], sect
   // Recommended (NOT summed) — Climate Risk is always relevant (IFRS S2 / TCFD always emitted).
   // Consultant range scales by location only, not sector.
   const recommended: ObligationTier[] = [
-    tier({ label: 'Climate risk assessment — physical & transition (IFRS S2 / TCFD)', short: 'climate risk', pricing: priced(FLAT_MODULE_PRICES['climate-risk']),
+    tier({ label: 'Climate risk assessment: physical and transition (IFRS S2 / TCFD)', short: 'climate risk', pricing: priced(FLAT_MODULE_PRICES['climate-risk']),
       consultantLow: roundK(CONSULTANT_RANGES.climateRisk.low * loc),
       consultantHigh: roundK(CONSULTANT_RANGES.climateRisk.high * loc) }),
   ]
@@ -604,7 +604,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
       measure: 'turnover', amount: 1_000_000_000, unit: { unit: 'currency', currency: 'USD' },
       source: 'revenue', exactMeasure: false, comparison: 'gt',
       basis: 'Total annual revenues over USD 1,000,000,000, entity doing business in California.',
-      measureNote: 'California measures worldwide GROSS RECEIPTS with no deduction for cost of goods sold — materially larger than net turnover for a distributor. The figure applied is the deal’s single revenue input, not separately collected on a gross-receipts basis.',
+      measureNote: 'California measures worldwide GROSS RECEIPTS with no deduction for cost of goods sold, materially larger than net turnover for a distributor. The figure applied is the deal’s single revenue input, not separately collected on a gross-receipts basis.',
     }],
   },
   'SECR': {
@@ -651,11 +651,11 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
       { measure: 'balance_sheet_total', amount: 20_000_000, unit: { unit: 'currency', currency: 'CAD' },
         source: 'total_assets', exactMeasure: false, comparison: 'gte',
         basis: 'At least CAD 20,000,000 in assets, in either of the two most recent financial years.',
-        measureNote: 'Assets per consolidated financial statements. LOOKBACK NOT MODELLED — most recent year only.' },
+        measureNote: 'Assets per consolidated financial statements. LOOKBACK NOT MODELLED: most recent year only.' },
       { measure: 'turnover', amount: 40_000_000, unit: { unit: 'currency', currency: 'CAD' },
         source: 'revenue', exactMeasure: false, comparison: 'gte',
         basis: 'At least CAD 40,000,000 in revenue, in either of the two most recent financial years.',
-        measureNote: 'Revenue per consolidated financial statements. LOOKBACK NOT MODELLED — most recent year only.' },
+        measureNote: 'Revenue per consolidated financial statements. LOOKBACK NOT MODELLED: most recent year only.' },
       { measure: 'employees', amount: 250, unit: { unit: 'count' },
         source: 'employee_count', exactMeasure: false, comparison: 'gte',
         basis: 'An average of at least 250 employees, in either of the two most recent financial years.',
@@ -663,7 +663,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
         // the financial year; the note read "Employees of the entity", which describes a point count and
         // made S-211 the one employees limb in this file not stating the measure. SECR, CSRD and CS3D all
         // already did. Same shape as theirs: name the statutory measure, then name what is applied.
-        measureNote: 'The Act measures an AVERAGE number of employees over the financial year. The figure applied is the deal’s single point figure. LOOKBACK NOT MODELLED — most recent year only.' },
+        measureNote: 'The Act measures an AVERAGE number of employees over the financial year. The figure applied is the deal’s single point figure. LOOKBACK NOT MODELLED: most recent year only.' },
     ],
   },
   // POST-OMNIBUS. Directive (EU) 2026/470 (Omnibus I), OJ 26 Feb 2026, in force 18 Mar 2026,
@@ -680,7 +680,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
     framework: 'CSRD',
     requires: 2, semantics: 'and',
     lookback: 'most-recent-fy', lookbackModelled: true,
-    citation: 'Accounting Directive as amended by Directive (EU) 2026/470 (Omnibus I), arts. 19a/29a — >1,000 employees and >EUR 450m net turnover',
+    citation: 'Accounting Directive as amended by Directive (EU) 2026/470 (Omnibus I), arts. 19a/29a: >1,000 employees and >EUR 450m net turnover',
     limbs: [
       { measure: 'employees', amount: 1_000, unit: { unit: 'count' },
         source: 'employee_count', exactMeasure: false, comparison: 'gt',
@@ -722,7 +722,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
     // failing them cannot resolve 'not-applicable'. See evaluateTest's status mapping.
     exhaustive: false,
     routeNotMetReason: CS3D_ROUTE_NOT_MET_REASON,
-    citation: 'Directive (EU) 2024/1760 as amended by Directive (EU) 2026/470 (Omnibus I), art. 2(1)(a) — >5,000 employees and >EUR 1.5bn net worldwide turnover',
+    citation: 'Directive (EU) 2024/1760 as amended by Directive (EU) 2026/470 (Omnibus I), art. 2(1)(a): >5,000 employees and >EUR 1.5bn net worldwide turnover',
     limbs: [
       { measure: 'employees', amount: 5_000, unit: { unit: 'count' },
         source: 'employee_count', exactMeasure: false, comparison: 'gt',
@@ -931,7 +931,7 @@ export const notAssessedNote = (
   frameworks: string[] = Object.keys(THRESHOLD_TESTS).filter(k => isTestActive(THRESHOLD_TESTS[k])),
   fields: LimbSource[],
 ): string =>
-  `NOT ASSESSED — size test incomplete for ${frameworks.join(', ')}. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
+  `NOT ASSESSED: size test incomplete for ${frameworks.join(', ')}. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
 
 // THE UNEVALUATED-POPULATION NOTE. Used where a list DID resolve but a size test could not be
 // completed — the caveat must not read as a finding. Its claim ("could not be completed", "not
@@ -946,7 +946,7 @@ export const notAssessedNote = (
 // today; when a second non-exhaustive test lands, they will, and each keeps its own sentence.
 export const partiallyAssessedNote = (frameworks: string[], fields: LimbSource[]): string => {
   const one = frameworks.length === 1
-  return `Determined from jurisdiction and sector. NOT ASSESSED: ${frameworks.join(', ')} — the size test could not be completed, so ${one ? 'this trigger was' : 'these triggers were'} not evaluated. This is not a finding that ${one ? 'it does' : 'they do'} not apply. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
+  return `Determined from jurisdiction and sector. NOT ASSESSED: ${frameworks.join(', ')}: the size test could not be completed, so ${one ? 'this trigger was' : 'these triggers were'} not evaluated. This is not a finding that ${one ? 'it does' : 'they do'} not apply. ${resolveFieldsPrompt(fields, frameworks)}`.trim()
 }
 
 // THE ROUTENOTMET-POPULATION NOTE. Its counterpart above, for the other half of the partition: the
@@ -977,13 +977,13 @@ export const partialHeadingPhrase = (
 
 export const routeNotMetNote = (frameworks: string[]): string => {
   const one = frameworks.length === 1
-  return `Determined from jurisdiction and sector. NOT RESOLVED: ${frameworks.join(', ')} — tested against company size, and the target is below that threshold. ${one ? 'It can' : 'They can'} also apply through a parent company, or through franchising or licensing arrangements — neither of which this assessment checks. This is not a finding that ${one ? 'it does' : 'they do'} not apply.`
+  return `Determined from jurisdiction and sector. NOT RESOLVED: ${frameworks.join(', ')}, tested against company size, and the target is below that threshold. ${one ? 'It can' : 'They can'} also apply through a parent company, or through franchising or licensing arrangements, neither of which this assessment checks. This is not a finding that ${one ? 'it does' : 'they do'} not apply.`
 }
 // The near check runs over EVERY limb — turnover, balance-sheet total and headcount — so this must
 // not name revenue. Saying "revenue" describes the old single-limb model and would understate what
 // was checked: a deal whose headcount sits 2% under 250 has a near limb and no near revenue.
 export const nearThresholdNoneNote = (): string =>
-  `None — no limb sits within ${NEAR_BAND_PCT} of its threshold.`
+  `None. No figure sits within ${NEAR_BAND_PCT} of its threshold.`
 
 // ─── Limb + outcome evaluation ──────────────────────────────────────────────────
 // The size figures a test draws on. `revenue` keeps the legacy rule (the form coerces blank to 0,

@@ -230,6 +230,16 @@ function nullify(s: string): string | null {
 
 export default function CbamSetupPage() {
   const { isPaid, loading: entLoading } = useEntitlementState('cbam')
+  // ⚠️ SESSION READ SEPARATELY, AND TWO THINGS NOW DEPEND ON IT. useEntitlementState does not expose it,
+  // so without this neither the notice below nor the !isPaid branch can tell a signed-out visitor from a
+  // signed-in one without CBAM. The !isPaid branch told both to buy the module, which is the bug found in
+  // a browser on 26 Sep 2026.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => { if (!cancelled) setSignedIn(!!session) })
+    return () => { cancelled = true }
+  }, [])
 
   const [step, setStep] = useState<Step>(1)
 
@@ -1304,6 +1314,37 @@ export default function CbamSetupPage() {
     )
   }
 
+  // ⚠️ SIGNED OUT GETS A SIGN-IN ROUTE, NOT A PRICE. Until 26 Sep 2026 every visitor without an
+  // entitlement hit the paywall below, so someone who had never signed in was told "CBAM is a paid
+  // module" and offered Unlock — a purchase prompt at the entrance, and the wrong first step besides: an
+  // account comes before a purchase. Same defect as /dashboard/sbti had, found in a browser on the same
+  // day. Signed in without CBAM still gets the paywall, which is correct for them.
+  if (signedIn === null || entLoading) {
+    return (
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
+        CBAM...
+      </div>
+    )
+  }
+
+  if (!signedIn) {
+    return (
+      <div style={{ maxWidth: 620, margin: '0 auto', padding: '3.5rem 2rem 6rem' }}>
+        <div style={sectionHead}>CBAM readiness</div>
+        <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, marginTop: '0.75rem' }}>
+          Embedded emissions are calculated on our servers and your installations are saved to your
+          account, so CBAM needs a free account. Sign in to set up your operator profile.
+        </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
+          <a href={`/login?next=${encodeURIComponent('/dashboard/cbam/setup')}`}
+            style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Sign in</a>
+          <a href="/cbam"
+            style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>How CBAM reporting works</a>
+        </div>
+      </div>
+    )
+  }
+
   if (!isPaid) {
     return (
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>
@@ -1347,6 +1388,14 @@ export default function CbamSetupPage() {
       <div style={sectionSub}>
         Enter the identity data behind your Annex IV §1.2 report. Steps run in dependency order — you cannot create a process without an installation. Everything saves incomplete; the report shows any gaps honestly rather than blocking you here.
       </div>
+
+      {/* ⚠️ NO SIGNED-OUT NOTICE HERE, AND IT WAS TRIED. A notice reading "you will need a free account"
+          was added above this on 26 Sep 2026 and removed the same day: this page returns its signed-out
+          branch before the form renders at all, so `signedIn === false` is provably false by the time
+          control reaches here — tsc said so, with "types 'true' and 'false' have no overlap". The sentence
+          now lives on the signed-out page instead, which is the only thing a signed-out visitor sees.
+          Contrast /dashboard/climate-risk, where the form IS reachable without a session and the notice
+          therefore earns its place. */}
 
       {/* ── Company selector (only when there is more than one) ── */}
       {companies.length > 1 ? (

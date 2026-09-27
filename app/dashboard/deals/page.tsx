@@ -538,17 +538,28 @@ function DealsDashboardInner() {
   // `resultsShown` and they are declared above those returns. One call, one answer, read by both.
   const gate = resolveWizardGate({ access, session: sessionState, savedDeal, dealIdParam })
 
-  // ⚠️ THE FORM IS OPEN TO A SIGNED-OUT VISITOR; THE FINDINGS ARE NOT.
+  // ⚠️ THE FORM AND THE SCREENING ARE OPEN TO A SIGNED-OUT VISITOR; THE COST ESTIMATE IS NOT.
   //
-  // The screening engine is pure and client-side and stays that way — this is a RENDER gate, not a
-  // move to the server, and anyone reading the bundle can still run the maths. What it protects is
-  // not the algorithm, it is the deliverable: the frameworks table, the near-threshold panels, the
-  // data-room gaps, the risk findings and the cost estimate are the product, and they are what the
-  // free tier trades for an account.
+  // The screening engine is pure and client-side and stays that way — this is a RENDER gate, not a move
+  // to the server, and anyone reading the bundle can still run the maths. What it gates is the
+  // deliverable, and WHICH PARTS COUNT AS THAT CHANGED ON 26 SEP 2026.
   //
-  // ⚠️ 'hidden' IS NOT 'not yet known'. gate.kind is 'open' by the time any step renders — the two
-  // other arms return early below — so this reads a decided answer, never a default.
-  const resultsShown = gate.kind !== 'open' || gate.results === 'shown'
+  // 291bd3c withheld all of it: "the frameworks table, the near-threshold panels, the data-room gaps,
+  // the risk findings and the cost estimate are the product, and they are what the free tier trades for
+  // an account." The trade is now split, because withholding the screening meant a visitor could not see
+  // that the tool does anything:
+  //   shown without an account   the framework screening (step 2) and the risk findings (step 3)
+  //   an account buys            the cost estimate (step 4), and saving the target
+  //   the module buys            the report export, the Excel pipeline, the shareable assessment
+  //
+  // ⚠️ TWO FLAGS NOW, NOT ONE, AND THEY ARE NOT INTERCHANGEABLE. `resultsShown` governs steps 2 and 3;
+  // `costShown` governs step 4 alone. A single boolean is what made the old all-or-nothing gate the
+  // easy thing to write.
+  //
+  // ⚠️ NEITHER IS 'not yet known'. gate.kind is 'open' by the time any step renders — the two other arms
+  // return early below — so both read a decided answer, never a default.
+  const resultsShown = gate.kind !== 'open' || gate.results !== 'hidden'
+  const costShown = gate.kind !== 'open' || gate.results === 'shown'
 
   // "Does this account hold a Deals row at all" — the TERM-BLIND question, and the only place it is
   // still asked. It gates feature visibility in step 4 (the report link, the share controls), never
@@ -582,6 +593,23 @@ function DealsDashboardInner() {
       </div>
       <button onClick={signInForResults} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
         Sign in to see your results →
+      </button>
+    </div>
+  )
+
+  // ⚠️ A SECOND PROMPT, AND IT MUST NOT BE THE FIRST ONE REUSED. This one appears in place of the COST
+  // ESTIMATE, where the visitor has already SEEN the screening and the findings on the two steps before
+  // it — so "Sign in to see your results" would be plainly false, and a prompt that misdescribes what is
+  // behind it is worse than no prompt. It names what signing in adds, and repeats the free-tier promise
+  // because that is the sentence that makes the ask reasonable.
+  const costSignInPrompt = () => (
+    <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' as const, marginBottom: 20 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 8 }}>Sign in to see the cost estimate and save this target</div>
+      <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, maxWidth: 460, margin: '0 auto 18px' }}>
+        Screening one target is free, and your figures stay in place.
+      </div>
+      <button onClick={signInForResults} style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>
+        Sign in →
       </button>
     </div>
   )
@@ -1278,12 +1306,24 @@ function DealsDashboardInner() {
   // type, so a sixth step cannot be added without someone answering the question — the alternative
   // (a list of indices, or a wrapper applied to some entries) lets a new step default quietly into
   // being ungated, which is the failure this shape exists to make impossible.
-  const steps: { render: () => React.ReactElement; findingsOnly: boolean }[] = [
-    { render: renderStep0, findingsOnly: false },   // pure input — never withheld
-    { render: renderStep1, findingsOnly: false },   // MIXED: gated inside its own renderer
-    { render: renderStep2, findingsOnly: true },
-    { render: renderStep3, findingsOnly: true },
-    { render: renderStep4, findingsOnly: true },
+  // ⚠️ `needs` REPLACES A BOOLEAN `findingsOnly`, because the gate is no longer all-or-nothing. Each step
+  // declares WHAT it needs, and the render site below reads the matching flag. A boolean could only
+  // express "withheld or not", which is why the old gate withheld the screening along with the cost.
+  //   'nothing'  pure input, or a step that gates parts of itself internally
+  //   'results'  the framework screening and the risk findings — shown to anyone since 26 Sep 2026
+  //   'cost'     the cost estimate — an account
+  const steps: { render: () => React.ReactElement; needs: 'nothing' | 'results' | 'cost' }[] = [
+    { render: renderStep0, needs: 'nothing' },   // pure input — never withheld
+    { render: renderStep1, needs: 'nothing' },   // MIXED: gated inside its own renderer
+    // ⚠️ renderStepN IS ZERO-INDEXED AND THE TAB LABELS ARE ONE-BASED, WHICH IS HOW THIS WAS WRONG. The
+    // tab reading "4. Cost Estimate" is INDEX 3, so renderStep3 is the cost estimate and renderStep4 is the
+    // report. The first version of this table read the numbers off the tab labels and gave index 3
+    // 'results' — which a signed-out visitor has — so anon saw the full cost estimate. Found in a browser
+    // on 26 Sep 2026; no test saw it, because every assertion named renderStepN and agreed with the
+    // mistake. lib/deals/gates.test.ts now derives each step's requirement from its STEP_NAMES LABEL.
+    { render: renderStep2, needs: 'results' },   // 'Risk Findings'  — shown without an account
+    { render: renderStep3, needs: 'cost' },      // 'Cost Estimate'  — an account buys it
+    { render: renderStep4, needs: 'cost' },      // 'Report'         — an account to reach, the module to export
   ]
 
   // ── RENDERING THE GATE DECIDED ABOVE. NOTHING HERE RE-DERIVES IT. ──────────────────────────
@@ -1405,7 +1445,9 @@ function DealsDashboardInner() {
                 route into a step. `findingsOnly` is the step's own declaration; `resultsShown` is
                 the resolver's answer. Step 1 declares false and gates internally — it holds the
                 only inputs that share a screen with findings. */}
-            {steps[step].findingsOnly && !resultsShown ? signInPrompt() : steps[step].render()}
+            {steps[step].needs === 'results' && !resultsShown ? signInPrompt()
+              : steps[step].needs === 'cost' && !costShown ? costSignInPrompt()
+              : steps[step].render()}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4' }}>
               <button onClick={() => setStep(s => Math.max(0, s - 1))} style={{ ...(step === 0 ? btnStepDisabled : btnStep) }}>← Back</button>
               <button onClick={handleSave} disabled={saving} style={{ fontSize: 13, fontWeight: saved ? 500 : 600, padding: '9px 20px', borderRadius: 8, background: saved ? '#E1F5EE' : GRAD, border: saved ? '1px solid #0F6E56' : 'none', color: saved ? '#0F6E56' : '#0d0d0d', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving…' : saved ? '✓ Saved' : 'Save deal'}</button>
@@ -1424,8 +1466,13 @@ function DealsDashboardInner() {
                     { label: 'Deal type', val: dealTypeShort(deal.deal_type) },
                     { label: 'Critical risks', val: criticalRisks.length, urgent: criticalRisks.length > 0 },
                     { label: 'Frameworks', val: view.evaluated ? frameworks.length : 'Not assessed' },
-                    { label: 'ThemisIQ est.', val: themisIqFigure },
-                  ].map(({ label, val, urgent }) => (
+                    // ⚠️ DROPPED WHEN THE COST STEP IS WITHHELD, AND IT WAS NOT. This sidebar was gated
+                    // only on `step < 4`, so a logged-out visitor read `ThemisIQ est.` here on every step
+                    // while the cost STEP itself showed a sign-in prompt. A gate the sidebar does not share
+                    // is not a gate. Target, sector, deal type, critical risks and framework count stay:
+                    // those are the screening and findings anon is shown by decision.
+                    ...(costShown ? [{ label: 'ThemisIQ est.', val: themisIqFigure }] : []),
+                  ].map(({ label, val, urgent }: { label: string; val: React.ReactNode; urgent?: boolean }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
                       <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>

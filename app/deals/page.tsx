@@ -237,6 +237,10 @@ const FRAMEWORKS = ['SB 253', 'SECR', 'Canada S-211', 'CSRD', 'CS3D'] as const
  * mode would be promising a screen that does not exist.
  */
 const FAQ: readonly Faq[] = [
+  // Added 26 Sep 2026 with option B. The page previously said nothing about what a visitor gets without an
+  // account, and the only "no account needed" claim on it is about /assess, not this wizard.
+  { q: 'Do I need an account to screen a target?',
+    a: 'No. You can screen a target and see which frameworks apply and the main risk findings without an account. Sign in to see the cost estimate and save the target. Downloading the report needs the module.' },
   { q: 'How long does a screen take?',
     a: 'As long as it takes to enter a handful of figures about the company: turnover, total assets, headcount, sector, primary jurisdiction, deal value, location count and currency. The answer comes back from those, so there is nothing to send away and nothing to wait for. What takes longer is finding the figures, and where one is missing the screen names it rather than proceeding without it.' },
   { q: 'What if the target is close to a threshold?',

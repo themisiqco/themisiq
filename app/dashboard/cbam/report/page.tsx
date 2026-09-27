@@ -129,6 +129,14 @@ function AbsentPart2({ what }: { what: string }) {
 
 export default function CbamReportPage() {
   const { isPaid, loading: entLoading } = useEntitlementState('cbam')
+  // ⚠️ SESSION READ SEPARATELY. useEntitlementState does not expose it, and without it the !isPaid branch
+  // cannot tell a signed-out visitor from a signed-in one without CBAM. It told both to buy the module.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => { if (!cancelled) setSignedIn(!!session) })
+    return () => { cancelled = true }
+  }, [])
 
   const [loadingInstallations, setLoadingInstallations] = useState(true)
   const [installations, setInstallations] = useState<{ id: string; name: string; country: string; company_id: string }[]>([])
@@ -228,6 +236,37 @@ export default function CbamReportPage() {
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '3rem 2rem' }}>
         <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-ink-muted)' }}>CBAM §1.2 summary report...</div>
+      </div>
+    )
+  }
+
+  // ⚠️ SIGNED OUT GETS A SIGN-IN ROUTE, NOT A PRICE. Until 26 Sep 2026 every visitor without an
+  // entitlement hit the paywall below, so someone who had never signed in was told "CBAM is a paid
+  // module" and offered Unlock — a purchase prompt at the entrance, and the wrong first step besides: an
+  // account comes before a purchase. Same defect as /dashboard/sbti had, found in a browser on the same
+  // day. Signed in without CBAM still gets the paywall, which is correct for them.
+  if (signedIn === null || entLoading) {
+    return (
+      <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>
+        CBAM...
+      </div>
+    )
+  }
+
+  if (!signedIn) {
+    return (
+      <div style={{ maxWidth: 620, margin: '0 auto', padding: '3.5rem 2rem 6rem' }}>
+        <div style={sectionHead}>CBAM readiness</div>
+        <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, marginTop: '0.75rem' }}>
+          Embedded emissions are calculated on our servers and your installations are saved to your
+          account, so CBAM needs a free account. Sign in to set up your operator profile.
+        </p>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
+          <a href={`/login?next=${encodeURIComponent('/dashboard/cbam/report')}`}
+            style={{ fontSize: 13, fontWeight: 600, padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Sign in</a>
+          <a href="/cbam"
+            style={{ fontSize: 13, fontWeight: 500, padding: '11px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>How CBAM reporting works</a>
+        </div>
       </div>
     )
   }

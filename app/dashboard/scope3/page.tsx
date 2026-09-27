@@ -1107,6 +1107,14 @@ interface CategoryData {
 
 export default function Scope3Dashboard() {
   const { isPaid, loading: entLoading } = useEntitlementState('ghg')
+  // ⚠️ SESSION READ FOR THE NOTICE ON STEP 0. useEntitlementState does not expose it, and the notice must
+  // tell a signed-out visitor apart from a signed-in one without GHG — the second already sees a paywall.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data: { session } }) => { if (!cancelled) setSignedIn(!!session) })
+    return () => { cancelled = true }
+  }, [])
   const [step, setStep] = useState(0)
   const [company, setCompany] = useState('')
   const [sector, setSector] = useState('')
@@ -3098,6 +3106,16 @@ export default function Scope3Dashboard() {
     <div>
       <h2 style={sectionHead}>Company setup</h2>
       <p style={sectionSub}>Tell us about your organisation.</p>
+      {/* ⚠️ NO SIGNED-OUT NOTICE HERE, AND IT WAS TRIED. A notice naming the server-priced categories was
+          added on 26 Sep 2026 and removed the same day: a signed-out visitor never reaches this form. They
+          land on the "You need a saved GHG inventory first" screen below, because Scope 3 links to a saved
+          inventory and there is nothing to link to without an account. Same shape as the CBAM notice
+          removed on the same day, and for the same reason — the sentence has to live where the visitor
+          actually arrives. It is on that entry screen instead.
+          Kept for the record: what needs the server here is /api/scope3/spend-factor, pricing Cats 1, 2 and
+          4 only, and the supplier-portal pull. Cats 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 and 15 are
+          computed in the browser from lib/scope3/* and lib/pcaf. */}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Company name</label>
@@ -4456,6 +4474,21 @@ export default function Scope3Dashboard() {
             ) : (
               <>
                 <p style={sectionSub}>You need a saved GHG inventory first. The Scope 3 calculator links to a GHG inventory so your company and reporting year stay consistent across both records.</p>
+                {/* ⚠️ THE ONE SENTENCE A SIGNED-OUT VISITOR NEEDS, AND IT IS HERE BECAUSE THIS IS WHERE THEY
+                    LAND. The notice drafted for step 0 was unreachable — see the note at renderStep0.
+                    ⚠️ THE APPROVED COPY HAD A SECOND SENTENCE AND IT WAS DROPPED, BECAUSE IT WAS FALSE.
+                    "You can start the inventory now and sign in when you save it" — a signed-out visitor CAN
+                    start /dashboard/ghg, but Save does not ask them to sign in: handleSave reads the session
+                    and `if (!session) return`, silently, with only setIsSaving(false) in its finally. The
+                    button flickers and nothing else happens. Four other failure paths in that function
+                    alert; this one does not. Promising a sign-in prompt that does not exist would send them
+                    to look for it. Logged on 26 Sep 2026 as its own defect.
+                    ⚠️ `signedIn === false`, NOT `!signedIn`: null means not yet known and `!null` is true. */}
+                {signedIn === false && (
+                  <p style={{ ...sectionSub, color: 'var(--color-ink-2)', marginTop: '0.75rem' }}>
+                    Scope 3 builds on a saved GHG inventory, so it needs a free account.
+                  </p>
+                )}
                 <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Create a GHG inventory →</a>
               </>
             )}

@@ -72,15 +72,27 @@ export type WallReason = 'free-deal-used' | 'expired' | 'unknown'
 
 // ── THE WIZARD GATE ─────────────────────────────────────────────────────────────────────────────
 //
-// `results` IS A SEPARATE AXIS FROM `walled`, not a third wall state. A signed-out visitor may open
-// the wizard and fill it in — the screening engine is pure and client-side and always has been — but
-// must not READ the frameworks table, the near-threshold table, the threshold-limb table, the cost
-// estimate or the data-room gaps until there is a session. The form is not the deliverable; those
-// five blocks are.
+// `results` IS A SEPARATE AXIS FROM `walled`, not a third wall state. A signed-out visitor may open the
+// wizard and fill it in — the screening engine is pure and client-side and always has been.
+//
+// ⚠️ THREE STATES, AND THE MIDDLE ONE REPLACES A DECISION MADE IN 291bd3c. That commit withheld ALL
+// findings from a signed-out visitor, on the reasoning that "the form is not the deliverable; those five
+// blocks are" — the frameworks table, the near-threshold tables, the threshold-limb table, the cost
+// estimate and the data-room gaps, traded as a whole for an account.
+//
+// THAT TRADE IS NOW SPLIT, and the split is the product decision rather than a refinement of it:
+//   SHOWN AS PROOF        the framework screening and the risk findings. A visitor sees which regimes
+//                         reach a target and what the material findings are, without an account, because
+//                         that is what demonstrates the tool does anything at all.
+//   WHAT AN ACCOUNT BUYS  the cost estimate, and saving the target.
+//   WHAT THE MODULE BUYS  the report export, the Excel pipeline and the shareable assessment.
+//
+// So 'partial' means: steps 2 and 3 render, step 4 does not. 'hidden' is retained because a future gate
+// may need it and because the page's two flags are derived from the absence of it; nothing returns it.
 export type WizardGate =
   | { kind: 'loading' }
   | { kind: 'walled'; reason: WallReason; dealId: string; dealName: string }
-  | { kind: 'open'; results: 'shown' | 'hidden' }
+  | { kind: 'open'; results: 'shown' | 'partial' | 'hidden' }
 
 export type WizardGateInput = {
   access: EntitlementAccess
@@ -124,11 +136,14 @@ export function resolveWizardGate(input: WizardGateInput): WizardGate {
   // If that ever changes, an entitled-but-anonymous user should see results, not a sign-in prompt.
   if (isEntitled(access)) return { kind: 'open', results: 'shown' }
 
-  // ── SIGNED OUT: THE FORM IS OPEN, THE RESULTS ARE NOT ────────────────────────────────────────
+  // ── SIGNED OUT: SCREENING AND FINDINGS SHOWN, THE COST ESTIMATE NOT ──────────────────────────
   // Checked BEFORE the wall, because a signed-out visitor has no saved deal for the wall to hand
   // back — `savedDeal` resolves to 'none' for them — so the wall could not fire here anyway. Stated
   // as its own branch so the reason is legible rather than emergent.
-  if (session === 'anon') return { kind: 'open', results: 'hidden' }
+  //
+  // ⚠️ 'partial', NOT 'hidden', AND THIS ONE LINE IS THE CHANGE. It returned 'hidden' from 291bd3c until
+  // 26 Sep 2026. See the note on WizardGate for what moved and why.
+  if (session === 'anon') return { kind: 'open', results: 'partial' }
 
   // ── THE FREE-TIER WALL ───────────────────────────────────────────────────────────────────────
   // `!dealIdParam` IS THE EDIT EXEMPTION, and it is what keeps the client agreeing with the
