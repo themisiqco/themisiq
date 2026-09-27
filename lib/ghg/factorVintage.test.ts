@@ -11,7 +11,7 @@ import { buildFactorEditions } from './factorEditions'
 // ── THE VINTAGE COLUMN WAS HALF EMPTY, AND THE EMPTY HALF LOOKED LIKE AN ABSENCE OF FACTS ────────
 //
 // The workings table (app/dashboard/ghg/page.tsx) and the verifier page (app/verify/[token]) both
-// rendered `w.factor_vintage || '—'` — since 28 Sep 2026, workingsVintageCell, which says "Not
+// rendered `w.factor_vintage || '—'` — since 27 Sep 2026, workingsVintageCell, which says "Not
 // applicable". Grid, T&D and residual rows filled the field; EVERY COMBUSTION AND STEAM ROW fell back.
 // Seen live on 14 Aug 2026 on a US steam row and a US propane row.
 //

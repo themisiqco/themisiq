@@ -103,7 +103,7 @@ export interface WorkingsActivityCellRow {
  *
  * ⚠️ A NULL activity_data IS 'Not applicable', NOT 'Not provided'. It means a coverage-resolution row,
  * which records a decision rather than a measurement: there is no quantity to be missing. This was the
- * fourth of the four glyphs held on 27 Sep 2026 pending one vocabulary, decided 28 Sep 2026 with the
+ * fourth of the four glyphs held on 27 Sep 2026 pending one vocabulary, decided 27 Sep 2026 with the
  * Factor vintage, Scope 2 method and Result cells below.
  */
 export function workingsActivityCell(r: WorkingsActivityCellRow): string {
@@ -150,7 +150,7 @@ export function workingsScope2MethodCell(r: WorkingsFactorCellRow): string {
  * 1.2345 to the operator and 1.235 to the verifier. Consistent rounding, but not the same string, and a
  * verifier cross-checking a figure against the operator's screen had to reason about which was which.
  * Three is now the ONLY precision: a `dp` argument would let the next caller reintroduce the divergence
- * silently, which is exactly how it arose. Decided 28 Sep 2026.
+ * silently, which is exactly how it arose. Decided 27 Sep 2026.
  *
  * ⚠️ DISPLAY ONLY. The stored and computed value keeps full precision; nothing derives a total from this
  * string. Exports must write the unrounded number — see the export survey in the same commit.

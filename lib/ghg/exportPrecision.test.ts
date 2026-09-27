@@ -135,7 +135,7 @@ describe('export precision', () => {
     expect(ghg, 'the export preview rounds for reading').toContain('totals.s1_total.toFixed(RESULT_DP)')
     expect(ghg).toContain('(totals.s1_total/rev).toFixed(INTENSITY_DP)')
     // ⚠️ THE PDF IS THE ONE DOCUMENT THAT ROUNDS, DELIBERATELY. Pinned so that a future sweep of the
-    // CSVs does not take it along: 3 for a total, 4 for an intensity, decided 28 Sep 2026.
+    // CSVs does not take it along: 3 for a total, 4 for an intensity, decided 27 Sep 2026.
     const pdf = src(PDF)
     expect(pdf).toContain('t.s1_total.toFixed(3)')
     expect(pdf).toContain('t.s2_location.toFixed(3)')

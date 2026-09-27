@@ -170,7 +170,7 @@ export function generateAssurancePDF(
       // figures because a verifier recomputes from a spreadsheet; this is a typeset page a person reads,
       // where 12 significant figures in a table cell are noise. Three decimals for a total is 1 kg and
       // matches the verifier page and the workings table (RESULT_DP); four for an intensity, because
-      // tCO₂e per $M can sit below 1. Decided 28 Sep 2026. Do not "align" these with the CSVs.
+      // tCO₂e per $M can sit below 1. Decided 27 Sep 2026. Do not "align" these with the CSVs.
       t.s1_total.toFixed(3),
       t.s2_location.toFixed(3),
       (f.id === 'esrs' || f.id === 'gri') ? t.s2_market.toFixed(3) : '—',

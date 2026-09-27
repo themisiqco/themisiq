@@ -32,7 +32,7 @@ const VERIFIER = 'app/verify/[token]/page.tsx'
 const src = (rel: string) => stripTsComments(readFileSync(join(ROOT, rel), 'utf8'))
 
 /**
- * ⚠️ EMPTY, AND IT MUST STAY EMPTY. It held three entries until 28 Sep 2026: the Factor vintage and
+ * ⚠️ EMPTY, AND IT MUST STAY EMPTY. It held three entries until 27 Sep 2026: the Factor vintage and
  * Scope 2 method cells (`|| '—'`) and the Result cell (`== null ? '—'`). Each was a glyph standing for a
  * DIFFERENT fact — inapplicable, and not quantified — which is why they could not be swept as one word
  * and were held here until the vocabulary was decided. No workings cell renders a glyph now; a new entry
@@ -120,7 +120,7 @@ describe('workings cell rendering', () => {
       .toBe('0.000')
     expect(workingsResultCell({ result_tco2e: 1.23456 })).toBe('1.235')
     expect(RESULT_DP, 'three decimals, the verifier page\'s precision, on both surfaces').toBe(3)
-    // ⚠️ NO PER-CALL PRECISION. The two surfaces printed 4 and 3 until 28 Sep 2026; an argument here is
+    // ⚠️ NO PER-CALL PRECISION. The two surfaces printed 4 and 3 until 27 Sep 2026; an argument here is
     // how that happened, so the helper takes one parameter and neither page may pass a second.
     expect(workingsResultCell.length, 'workingsResultCell must take the row and nothing else').toBe(1)
     for (const rel of [OPERATOR, VERIFIER]) {
@@ -158,7 +158,7 @@ describe('workings cell rendering', () => {
 
   it('the declaration-state note renders with the figure, not under Factor source', () => {
     // ⚠️ POSITIONAL, BECAUSE THE COLUMNS ARE. The note occupied cell 4 in all six row shapes until
-    // 28 Sep 2026, and cell 4's heading reads 'Factor source' — so a sentence saying a stream was never
+    // 27 Sep 2026, and cell 4's heading reads 'Factor source' — so a sentence saying a stream was never
     // quantified sat where a verifier looks for a citation. The verifier page has always put row notes
     // beside the activity figure (rowNoteOf), which is what these six now do.
     const operator = src(OPERATOR)

@@ -163,7 +163,7 @@ async function capture(): Promise<Record<string, unknown>> {
     cap.generateExport()
     await cap.saveScope3()
     // ⚠️ THE BOM IS DROPPED BEFORE PARSING, AND THE SNAPSHOT IS DELIBERATELY UNCHANGED BY IT. The Blob
-    // stub above captures the file's exact contents, and since 28 Sep 2026 every export begins with a
+    // stub above captures the file's exact contents, and since 27 Sep 2026 every export begins with a
     // UTF-8 byte order mark (lib/csv.ts csvBlob) so Excel on Windows decodes accented names correctly.
     // Every real reader skips it: Excel, Sheets, the File API's decode step, and papaparse on string
     // input. Carrying it into the first cell would model a naive reader that does not exist, and would
@@ -286,7 +286,7 @@ describe('Scope 3 surfaces', () => {
     // ⚠️ READ OFF THE ACTUAL FILE, not recomputed from the same functions that wrote it. The Blob stub
     // captures what a customer downloads, so this is the addition a verifier would do by hand.
     //
-    // It could not have passed before 28 Sep 2026: every emissions cell was written at two decimals and
+    // It could not have passed before 27 Sep 2026: every emissions cell was written at two decimals and
     // the total was not, so the columns disagreed with the figure above them by up to half a kilo per
     // category. Both are written at CSV_DP now — six decimals, one gram — so the only slack left is that
     // rounding: half a unit in the last place per row, plus one for the independently rounded total.
