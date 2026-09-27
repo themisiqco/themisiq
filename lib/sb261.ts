@@ -78,4 +78,4 @@ export const SB261_STATUS_SENTENCE =
 // four did — a slot that fit neither existing string, filled in place.
 export const SB261_SHORT = 'SB 261 · enforcement paused'
 
-export const SB261_TABLE_STATUS = 'Enforcement paused — appeal pending, no new date'
+export const SB261_TABLE_STATUS = 'Enforcement paused: appeal pending, no new date'

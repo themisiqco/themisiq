@@ -83,15 +83,15 @@ const groups: Group[] = [
       // ⚠️ SCOPE 1+2 AND SCOPE 3 DO NOT BEGIN IN THE SAME YEAR, and the card said "Scope 1-3" as though
       // they did. SB253_SCOPE3_FROM existed and was unused here. Compressing two deadlines into one is
       // how a reader ends up preparing for the wrong date.
-      { name: 'California SB 253', body: `Climate Corporate Data Accountability Act — mandatory Scope 1 and 2 disclosure, with Scope 3 following from ${SB253_SCOPE3_FROM}. ${SB253_STATUTE}. Reporting has not begun: ${SB253_POSTURE}.`, maps: 'One-click, pre-filled SB 253 emissions export from your GHG inventory.', href: SB253_PROGRAMME_URL, covers: [{ href: '/climate-ghg' }] },
-      { name: 'California SB 261', body: `Climate-Related Financial Risk Act — biennial climate risk reporting aligned to TCFD. ${SB261_CITATION}. ${SB261_TABLE_STATUS}.`, maps: 'TCFD-aligned climate financial-risk report ready for SB 261 filers.', href: SB261_DOCKET_URL, covers: [{ href: '/climate-risk' }] },
+      { name: 'California SB 253', body: `Climate Corporate Data Accountability Act, mandatory Scope 1 and 2 disclosure, with Scope 3 following from ${SB253_SCOPE3_FROM}. ${SB253_STATUTE}. Reporting has not begun: ${SB253_POSTURE}.`, maps: 'One-click, pre-filled SB 253 emissions export from your GHG inventory.', href: SB253_PROGRAMME_URL, covers: [{ href: '/climate-ghg' }] },
+      { name: 'California SB 261', body: `Climate-Related Financial Risk Act, biennial climate risk reporting aligned to TCFD. ${SB261_CITATION}. ${SB261_TABLE_STATUS}.`, maps: 'TCFD-aligned climate financial-risk report ready for SB 261 filers.', href: SB261_DOCKET_URL, covers: [{ href: '/climate-risk' }] },
       { name: 'IFRS S2', body: 'The ISSB global baseline for climate-related financial disclosures.', maps: 'Climate disclosures structured to the IFRS S2 / ISSB requirements.', href: IFRS_S2_STANDARD_URL, covers: [{ href: '/climate-risk' }] },
       { name: 'ESRS E1', body: 'The climate-change standard within the EU\u2019s CSRD reporting framework.', maps: 'ESRS E1 climate datapoints mapped directly from your GHG inventory.', href: EFRAG_HOME_URL, covers: [{ href: '/climate-ghg' }] },
       { name: 'CDP', body: 'The global environmental disclosure system used by investors and buyers.', maps: 'Export-ready answers for CDP Climate, including the C6 emissions module.', href: CDP_URL, covers: [{ href: '/climate-ghg' }] },
       { name: 'TCFD', body: 'The Task Force recommendations now consolidated under the ISSB.', maps: 'Governance, strategy, risk and metrics organized along the four TCFD pillars.', href: TCFD_URL, covers: [{ href: '/climate-risk' }] },
       // SBTi is part of the GHG module rather than a module of its own, and the maps line now says so —
       // the mapping was already /climate-ghg and read as though it might be somewhere else.
-      { name: 'SBTi', body: 'Science Based Targets initiative — corporate emissions-reduction target setting.', maps: 'Part of the GHG module, not a separate one: targets are set and tracked against the inventory you have already built, under the Corporate Net-Zero Standard.', href: SBTI_URL, covers: [{ href: '/climate-ghg' }] },
+      { name: 'SBTi', body: 'Science Based Targets initiative: corporate emissions-reduction target setting.', maps: 'Part of the GHG module, not a separate one: targets are set and tracked against the inventory you have already built, under the Corporate Net-Zero Standard.', href: SBTI_URL, covers: [{ href: '/climate-ghg' }] },
       // ⚠️ GRI 305, NOT "GRI". lib/ghg/engine.ts:1538 names the chip `GRI 305` and cites 305-1, 305-2 and
       // 305-3 by number, so this card is about the emissions standard and not about GRI as a publisher.
       // The People group's 'GRI 400 series' card is the social half and is a different standard set.
@@ -104,7 +104,7 @@ const groups: Group[] = [
     heading: 'Border carbon and trade',
     intro: 'Emissions embedded in goods, declared at the border by the importer.',
     items: [
-      { name: 'EU CBAM', body: 'Regulation (EU) 2023/956 — the Carbon Border Adjustment Mechanism. Embedded emissions for goods entering the EU, declared by the importer, who needs the figures from the producer.', maps: 'Installation-level direct and indirect emissions with an Annex IV summary and a verifier portal.', href: CBAM_REGULATION_URL, covers: [{ href: '/cbam' }] },
+      { name: 'EU CBAM', body: 'Regulation (EU) 2023/956: the Carbon Border Adjustment Mechanism. Embedded emissions for goods entering the EU, declared by the importer, who needs the figures from the producer.', maps: 'Installation-level direct and indirect emissions with an Annex IV summary and a verifier portal.', href: CBAM_REGULATION_URL, covers: [{ href: '/cbam' }] },
       { name: 'CBAM Annex IV', body: 'The reporting format for specific embedded emissions per good.', maps: 'Generated from your installation data and exported to XLSX.', href: CBAM_REGULATION_URL, covers: [{ href: '/cbam' }] },
             // ⚠️ IRON AND STEEL, AND ALUMINIUM. NOT FOUR SECTORS. This read "steel, aluminium, cement and
       // fertiliser" until 25 Sep 2026, which claimed coverage the product does not have: cbam_cn_map and
@@ -135,8 +135,8 @@ const groups: Group[] = [
       // ⚠️ THE OBLIGATION IS THE CUSTOMER'S, NOT THE READER'S, and the body has to say so. A single tier
       // at more than 5,000 employees and EUR 1.5bn catches very few companies; what reaches everyone
       // else is the questionnaire.
-      { name: 'EU CS3D', body: `The Corporate Sustainability Due Diligence Directive on value-chain human rights and environmental impacts. ${CS3D_CITATION}. Since ${CS3D_OMNIBUS_CITATION} there is a single scope tier: an EU company is caught only with ${CS3D_EMPLOYEE_THRESHOLD} and ${CS3D_TURNOVER_THRESHOLD}. Member States transpose by ${CS3D_TRANSPOSITION} and obligations apply from ${CS3D_APPLIES_FROM}. Almost certainly your customer is in scope and you are not — what reaches you is their request.`, maps: 'Structured human rights and environmental questionnaires you answer once and reuse for every customer that asks, plus the same collection from your own suppliers.', href: CS3D_COMMISSION_URL, covers: [{ href: '/supply-chain' }] },
-      { name: 'ESRS S2', body: 'Workers in the value chain — the CSRD standard for upstream/downstream labour impacts.', maps: 'Workers-in-the-value-chain disclosures from your supplier data.', href: EFRAG_HOME_URL, covers: [{ href: '/supply-chain' }] },
+      { name: 'EU CS3D', body: `The Corporate Sustainability Due Diligence Directive on value-chain human rights and environmental impacts. ${CS3D_CITATION}. Since ${CS3D_OMNIBUS_CITATION} there is a single scope tier: an EU company is caught only with ${CS3D_EMPLOYEE_THRESHOLD} and ${CS3D_TURNOVER_THRESHOLD}. Member States transpose by ${CS3D_TRANSPOSITION} and obligations apply from ${CS3D_APPLIES_FROM}. Almost certainly your customer is in scope and you are not. What reaches you is their request.`, maps: 'Structured human rights and environmental questionnaires you answer once and reuse for every customer that asks, plus the same collection from your own suppliers.', href: CS3D_COMMISSION_URL, covers: [{ href: '/supply-chain' }] },
+      { name: 'ESRS S2', body: 'Workers in the value chain: the CSRD standard for upstream/downstream labour impacts.', maps: 'Workers-in-the-value-chain disclosures from your supplier data.', href: EFRAG_HOME_URL, covers: [{ href: '/supply-chain' }] },
       { name: 'EcoVadis', body: 'Business sustainability ratings used across supply chains.', maps: 'Evidence and scoring organized for EcoVadis assessments.', href: ECOVADIS_URL, covers: [{ href: '/supply-chain' }] },
       // ⚠️ ONE OBLIGATION, TWO JURISDICTIONS, ONE href. The Item type carries a single href and the UK
       // section 54 is it; the Australian Act is named in the body and its URL is MODERN_SLAVERY_AU_URL in
@@ -157,10 +157,10 @@ const groups: Group[] = [
       // ⚠️ GRI UNIVERSAL IS NOT A WORKFORCE STANDARD. It pointed at /people, which is true only of the
       // 400 series, listed separately under People and workforce. GRI 1, 2 and 3 are general reporting
       // principles, disclosures and material-topic determination.
-      { name: 'GRI Universal Standards', body: 'GRI 1, 2 and 3 — the reporting principles, general disclosures and material-topic determination underlying every GRI report.', maps: 'General disclosures and material-topic determination generated from your data. The GRI 400 social series is covered separately by People and Workforce.', href: GRI_HOME_URL, covers: [{ href: '/climate-ghg' }] },
+      { name: 'GRI Universal Standards', body: 'GRI 1, 2 and 3: the reporting principles, general disclosures and material-topic determination underlying every GRI report.', maps: 'General disclosures and material-topic determination generated from your data. The GRI 400 social series is covered separately by People and Workforce.', href: GRI_HOME_URL, covers: [{ href: '/climate-ghg' }] },
       // ⚠️ IN THIS GROUP "FOR NOW". ISO 14064-3 is a verification standard rather than a reporting one,
       // and it sits here because the page has no assurance group yet. If one is added, this moves.
-      { name: 'ISO 14064-3', body: 'The international standard for validation and verification of greenhouse gas statements — what an assurance provider works to.', maps: 'The assurance pack and the verifier portal are assembled for ISO 14064-3 engagements.', href: ISO_14064_3_URL, covers: [{ href: '/climate-ghg' }] },
+      { name: 'ISO 14064-3', body: 'The international standard for validation and verification of greenhouse gas statements: what an assurance provider works to.', maps: 'The assurance pack and the verifier portal are assembled for ISO 14064-3 engagements.', href: ISO_14064_3_URL, covers: [{ href: '/climate-ghg' }] },
     ],
   },
   {
@@ -181,7 +181,7 @@ const groups: Group[] = [
     heading: 'People and workforce',
     intro: 'Own-workforce metrics, pay equity and human-capital disclosure.',
     items: [
-      { name: 'ESRS S1', body: 'Own workforce — the CSRD standard covering your direct employees.', maps: 'Headcount, DEI, health & safety and pay metrics mapped to ESRS S1.', href: EFRAG_HOME_URL, covers: [{ href: '/people' }] },
+      { name: 'ESRS S1', body: 'Own workforce: the CSRD standard covering your direct employees.', maps: 'Headcount, DEI, health & safety and pay metrics mapped to ESRS S1.', href: EFRAG_HOME_URL, covers: [{ href: '/people' }] },
       { name: 'GRI 400 series', body: 'GRI social topic standards (401\u2013410) on employment, labour and diversity.', maps: 'Employment, labour-relations and diversity disclosures.', href: GRI_HOME_URL, covers: [{ href: '/people' }] },
       { name: 'Pay Transparency', body: 'Emerging gender pay-gap and pay-data reporting requirements (EU Pay Transparency Directive, CA pay data).', maps: 'Gender pay-gap analysis and California pay-data reporting support.', href: CA_PAY_DATA_URL, covers: [{ href: '/people' }] },
       // ⚠️ THE HUMAN CAPITAL TOPICS, NOT SASB. app/dashboard/people/page.tsx:285 offers exactly one SASB
@@ -253,8 +253,8 @@ export default function Frameworks() {
         <h1 style={h1}>The frameworks we <span style={emBrand}>support</span></h1>
         <p style={lede}>
           ThemisIQ is built on one principle: collect your data once, comply everywhere. The same source
-          data maps across the frameworks below — from California’s SB 253 to the EU’s CSRD, from IFRS S2
-          to the AI and cyber regimes — so you report under each without re-entering anything.
+          data maps across the frameworks below, from California’s SB 253 to the EU’s CSRD and from IFRS S2
+          to the AI and cyber regimes, so you report under each without re-entering anything.
         </p>
       </section>
 
@@ -304,8 +304,8 @@ export default function Frameworks() {
           </h2>
           <p style={{ fontSize: 15, color: '#555553', fontWeight: 400, maxWidth: 620, margin: '0 auto 1rem', lineHeight: 1.7 }}>
             A framework having no card above does not mean your data cannot answer it. Most of these ask
-            for the same underlying figures — an inventory built to the GHG Protocol, a risk assessment
-            under a named scenario, supplier data with its basis recorded — so a questionnaire nobody has
+            for the same underlying figures: an inventory built to the GHG Protocol, a risk assessment
+            under a named scenario, supplier data with its basis recorded. So a questionnaire nobody has
             written a card for is usually answerable from what you have already collected. That is what
             collect once, comply everywhere means in practice.
           </p>

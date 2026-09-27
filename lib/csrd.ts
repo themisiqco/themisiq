@@ -102,7 +102,7 @@ export const CSRD_NON_EU_SENTENCE =
 // revision touches; the Directive's double-materiality requirement was not. Split, so one edit
 // cannot silently move the other. ESRS_TEN_TOPICS_SENTENCE below carries the structural half.
 export const CSRD_DOUBLE_MATERIALITY_SENTENCE =
-  'CSRD requires double materiality — the topics that affect the entity financially, and those the '
+  'CSRD requires double materiality: the topics that affect the entity financially, and those the '
   + 'entity affects.'
 
 // ── ESRS, not CSRD. Kept adjacent because surfaces usually print both, and separate because they
