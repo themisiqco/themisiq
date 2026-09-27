@@ -227,7 +227,7 @@ export default function Frameworks() {
           <div key={group.heading} style={{ marginBottom: '3.5rem' }}>
             <h2 style={groupHeading}>{group.heading}</h2>
             <p style={groupIntro}>{group.intro}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))', gap: '1.25rem' }}>
               {group.items.map(item => (
                 <div key={item.name} style={card}>
                   <div style={fwName}>{item.name}</div>

@@ -97,7 +97,7 @@ export function ModuleArrivals({ items }: { items: readonly { title: string; bod
   return (
     <>
       <h2 style={sectionTitle}>How people arrive here</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
         {items.map(a => (
           <div key={a.title} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25, marginBottom: '0.6rem' }}>{a.title}</div>
@@ -180,7 +180,7 @@ export function ModuleOutputs({ intro, outputs }: { intro: string; outputs: read
     <>
       <h2 style={sectionTitle}>What the module produces</h2>
       <p style={{ ...bodyCopy, marginTop: '1rem' }}>{intro}</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1.25rem', marginTop: '2rem' }}>
         {outputs.map(o => (
           <div key={o.href} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.25 }}>{o.title}</div>
@@ -217,13 +217,17 @@ export function ClosingBand({ heading, body, primary, secondary }: {
   secondary?: { href: string; label: string }
 }) {
   return (
-    <section style={{ background: 'var(--gradation-band)', padding: '2.75rem 2.5rem' }}>
+    <section className="tq-gradation-ground" style={{ padding: '2.75rem 2.5rem' }}>
       <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 28rem)' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.8vw, 2.1rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2 }}>{heading}</h2>
           {body && <p style={{ fontSize: 14, color: 'var(--color-ink)', lineHeight: 1.65, margin: '0.6rem 0 0', maxWidth: '54ch' }}>{body}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
+        {/* ⚠️ NO flexShrink: 0 HERE, AND THAT IS THE FIX RATHER THAN AN OMISSION. flexWrap was already
+            set and could never act: a container that refuses to shrink never becomes narrow enough to
+            force a wrap, so the two buttons stayed on one line and ran off the page. Measured right edge
+            at 375px before this: 403px. */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <a href={primary.href} style={{ ...btnOnBand, textDecoration: 'none' }}>{primary.label}</a>
           {secondary && <a href={secondary.href} style={{ ...btnOnBandOutline, textDecoration: 'none' }}>{secondary.label}</a>}
         </div>

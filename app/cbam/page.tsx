@@ -92,7 +92,7 @@ export default function CbamPage() {
             invented to replace a dot.
             ⚠️ AND THE LAST SENTENCE IS THE POINT OF THE WHOLE BLOCK: "We show you what is live so you
             always know what you are buying." Do not drop it to save a line. */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '2rem', marginTop: '2.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: '2rem', marginTop: '2.5rem' }}>
           <div>
             <p style={{ ...bodyCopy, margin: 0 }}>
               Available now: iron and steel (CN 72 to 73) and aluminium (CN 76). More CBAM sectors,

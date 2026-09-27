@@ -653,6 +653,70 @@ h3 { font-size: var(--text-xl); }
 }
 
 /* ================================================================
+   NARROW VIEWPORTS — the three shared layouts that could not express
+   themselves in an inline style.
+
+   ⚠️ ADDED 26 SEP 2026 AFTER MEASUREMENT ON THE LIVE SITE AT 375px, where
+   document scrollWidth was 528 against a clientWidth of 375. Inline styles
+   cannot carry a media query, which is the only reason these three rules are
+   here rather than beside the markup they govern. Nothing below changes any
+   layout at 901px or wider.
+
+   The breakpoints differ on purpose and are not interchangeable:
+     760px  the footer and its legal row, matching the breakpoint
+            .tq-summary-body and .tq-callout-body already use.
+     900px  the gradation grounds, chosen from the arithmetic below and NOT
+            from the footer's value.
+   ================================================================ */
+
+/* The footer's four columns. `2.2fr 1fr 1fr 1fr` cannot reach 375px: an `fr`
+   track has an automatic minimum of min-content, so the columns refuse to go
+   below their longest link word ("Investment", "Frameworks") and the grid
+   overflows its own container instead of compressing. Measured right edges
+   before this rule: 423px and 528px. One column below 760px. */
+.tq-footer-grid { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr; gap: 3rem; }
+@media (max-width: 760px) {
+  .tq-footer-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .tq-footer-legal { flex-wrap: wrap; gap: 10px; justify-content: flex-start; }
+}
+
+/* ⚠️ THE GRADATION GROUND, AND THIS IS A CONTRAST FIX RATHER THAN A LAYOUT ONE.
+   --gradation-ink-safe holds ink to the light 60% of the band, which works only
+   while the text column IS 60%. Both grounds set `min-width: min(100%, 34rem)`
+   (hero) and `min(100%, 28rem)` (closing band), and MIN-WIDTH BEATS MAX-WIDTH,
+   so below a certain viewport the text spans the full width and runs off the
+   light end of its own safe zone. Measured, --color-ink over the four-stop band
+   at the text column's right edge:
+
+     viewport   text ends at   colour     contrast
+      320px        87.5%       #0066AF     2.95:1
+      375px        89.3%       #0062AF     2.81:1   ← below AA LARGE TEXT (3.0)
+      623px        93.6%       #0059AE     2.53:1   ← the worst point
+      825px        70.6%       #007FB2     4.50:1   ← ink returns to AA body
+      900px        64.9%       #0499AF     5.17:1
+     1440px        51.9%       #36B38B     6.67:1
+
+   So the hero fails from 824px down, and the closing band from 688px down.
+   900px covers both with margin and is why the breakpoint is not 760.
+
+   ⚠️ THE FIX IS THE LIGHT HALF OF THE SAME BAND, NOT A ROTATION, AND NOT A
+   SECOND TEXT COLOUR. The token block above is explicit that two text colours
+   crossing one band is forbidden, and a vertical band was measured and
+   REJECTED: rotating to 180deg only moves the failure from the right edge to
+   the bottom, where ink over #004AAD is 2.16:1 whatever the layout does. The
+   light half is 9.98:1 at its WORST POINT, and that figure holds at every
+   viewport and every content height, because it no longer depends on where the
+   text ends. Same token values, same direction, same one text colour; the band
+   simply stops before its own crossover.
+
+   ⚠️ DO NOT PUT THIS CLASS ON THE 4px RULES. `height: 4px` strips carry no text
+   and must keep all four stops, or the page loses the full gradation entirely. */
+.tq-gradation-ground { background: var(--gradation-band); }
+@media (max-width: 900px) {
+  .tq-gradation-ground { background: linear-gradient(90deg, #FFDE59 0%, #7ED957 100%); }
+}
+
+/* ================================================================
    DISABLED AND INACTIVE STATE — opacity is not a contrast-preserving device.
 
    ⚠️ NEVER opacity ON ANYTHING CONTAINING TEXT.

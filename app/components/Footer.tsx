@@ -7,7 +7,7 @@ import ThemisIQLogo from './ThemisIQLogo'
 export default function Footer() {
   return (
     <footer style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', padding: '3.5rem 2.5rem 2rem' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '2.2fr 1fr 1fr 1fr', gap: '3rem' }}>
+      <div className="tq-footer-grid" style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div>
           <ThemisIQLogo size={30} />
           <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.65, fontWeight: 400, marginTop: '1rem', maxWidth: 270 }}>
@@ -46,7 +46,7 @@ export default function Footer() {
           </div>
         ))}
       </div>
-      <div style={{ maxWidth: 1100, margin: '2.5rem auto 0', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="tq-footer-legal" style={{ maxWidth: 1100, margin: '2.5rem auto 0', paddingTop: '1.5rem', borderTop: '0.5px solid #e8e7e4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>© 2026 ThemisIQ Compliance Inc. · www.themisiq.co · All rights reserved</div>
         <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Compliance Intelligence for Sustainable Business</div>
       </div>

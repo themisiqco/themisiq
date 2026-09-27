@@ -39,10 +39,15 @@ export default function Home() {
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────────────────────────────────────────────────
-      Full-bleed --gradation-band. Copy is held to --gradation-ink-safe, the light 60%: --color-ink
-      clears AA body to 72% of the width and AA large text to 88%, so 60% is the margin. If this ever
-      needs copy on the right, FLIP THE BAND — see the GRADATION block in the token file. */}
-      <section style={{ background: 'var(--gradation-band)', padding: '6rem 2.5rem 5.5rem' }}>
+      Full-bleed, via .tq-gradation-ground rather than the token directly. Copy is held to
+      --gradation-ink-safe, the light 60%: --color-ink clears AA body to 72% of the width and AA large
+      text to 88%, so 60% is the margin. If this ever needs copy on the right, FLIP THE BAND — see the
+      GRADATION block in the token file.
+      ⚠️ THE 60% RULE HOLDS ONLY WHILE THE TEXT COLUMN IS 60%, AND BELOW 825px IT IS NOT. `min-width:
+      min(100%, 34rem)` beats the max-width, so the column spans the full width and the last words land
+      at 2.81:1 at 375px. The class is what fixes it, by dropping the band's dark half below 900px.
+      Measurements and the rejected vertical-band alternative are in the NARROW VIEWPORTS block. */}
+      <section className="tq-gradation-ground" style={{ padding: '6rem 2.5rem 5.5rem' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 34rem)' }}>
             <p style={eyebrowOnBand}>Published methodologies and prices you can trust</p>
@@ -68,7 +73,7 @@ export default function Home() {
 
       {/* ── THE REQUEST ── */}
       <section style={{ padding: '5.5rem 2.5rem', maxWidth: 1180, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '3.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '3.5rem', alignItems: 'center' }}>
           {/* Photograph with the sample panel overlapping its lower right. */}
           <div style={{ position: 'relative', paddingBottom: '3.5rem', paddingRight: '1rem' }}>
             <Image src={PHOTOS.stillLife.src} alt={PHOTOS.stillLife.alt} width={PHOTOS.stillLife.w} height={PHOTOS.stillLife.h}
@@ -157,7 +162,7 @@ export default function Home() {
           <a href="/assess" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap' }}>Unsure where you need to report? →</a>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(250px, 100%), 1fr))', gap: '1.25rem' }}>
           {MODULES_HOME.map(m => (
             <a key={m.name} href={m.href}
               style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: `4px solid var(--color-module-${m.key})`, borderRadius: 6, padding: '1.4rem', textDecoration: 'none', transition: 'background 0.15s' }}
@@ -176,7 +181,7 @@ export default function Home() {
         </div>
 
         {/* Three wider cards on a tinted ground. */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginTop: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1.25rem', marginTop: '1.25rem' }}>
           {WIDER.map(w => (
             <a key={w.title} href={w.href}
               style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', background: 'var(--color-ground)', border: '1px solid var(--color-line)', borderRadius: 6, padding: '1.5rem', textDecoration: 'none', transition: 'background 0.15s' }}
@@ -261,7 +266,7 @@ export default function Home() {
       Same direction as the hero and roughly a third its height, from the same token, so the two cannot
       drift. Copy left inside --gradation-ink-safe; buttons right, which sit past the safe width and are
       therefore ink-filled and ink-outlined rather than relying on the ground behind them. */}
-      <section style={{ background: 'var(--gradation-band)', padding: '2.75rem 2.5rem' }}>
+      <section className="tq-gradation-ground" style={{ padding: '2.75rem 2.5rem' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 28rem)' }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: '0.6rem' }}>
@@ -278,7 +283,8 @@ export default function Home() {
               {SB253_SHORT}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', flexShrink: 0 }}>
+          {/* No flexShrink: 0 — see the note in ClosingBand. It defeated flexWrap and overflowed at 375px. */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <a href="/assess" style={{ ...btnOnBand, textDecoration: 'none' }}>Start the free assessment</a>
             <a href="/advisory" style={{ ...btnOnBandOutline, textDecoration: 'none' }}>Talk to us</a>
           </div>
