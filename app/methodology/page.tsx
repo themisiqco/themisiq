@@ -42,14 +42,14 @@ function SectionContent({ content }: { content: string | string[] }) {
 
 const METHODOLOGIES = [
   {
-    module: 'GHG Inventory — Scope 1 & 2',
+    module: 'GHG Inventory: Scope 1 & 2',
     color: '#0F6E56',
     bg: '#E1F5EE',
     standard: 'GHG Protocol Corporate Accounting and Reporting Standard',
     sections: [
       {
         title: 'Primary standard',
-        content: 'ThemisIQ follows the GHG Protocol Corporate Accounting and Reporting Standard — the most widely used GHG accounting framework globally, required by SB 253, CDP, ESRS E1, GRI 305, and IFRS S2.',
+        content: 'ThemisIQ follows the GHG Protocol Corporate Accounting and Reporting Standard, the most widely used GHG accounting framework globally, required by SB 253, CDP, ESRS E1, GRI 305, and IFRS S2.',
       },
       {
         title: 'Global Warming Potentials (GWP)',
@@ -60,19 +60,19 @@ const METHODOLOGIES = [
         // were not updated. The change is stated rather than the exception deleted, so a reader who knew
         // SB 253 was different learns that it no longer is. lib/publisherClaims.test.ts P4 now checks every
         // framework named beside a GWP set against FRAMEWORKS.
-        content: 'ThemisIQ applies IPCC Sixth Assessment Report (AR6) 100-year GWP values — the latest published IPCC set — for every framework it exports: SB 253, CDP, ESRS E1, GRI 305, EcoVadis and IFRS S2. SB 253 was reported on IPCC AR4 values until June 2026, for consistency with CARB\'s AB 32 / Mandatory Reporting Regulation program; since then it uses AR6 like the other frameworks. AR6 distinguishes fossil from non-fossil (biogenic) methane (fossil CH₄ GWP 29.8, non-fossil 27.0, N₂O 273). Where a publisher issues factors with the gases already combined on its own GWP basis — DEFRA/DESNZ, DCCEEW and NZ MfE — those factors are applied as published and the workings row says so. The GWP basis is stamped on every export.',
+        content: 'ThemisIQ applies IPCC Sixth Assessment Report (AR6) 100-year GWP values, the latest published IPCC set, for every framework it exports: SB 253, CDP, ESRS E1, GRI 305, EcoVadis and IFRS S2. SB 253 was reported on IPCC AR4 values until June 2026, for consistency with CARB\'s AB 32 / Mandatory Reporting Regulation program; since then it uses AR6 like the other frameworks. AR6 distinguishes fossil from non-fossil (biogenic) methane (fossil CH₄ GWP 29.8, non-fossil 27.0, N₂O 273). Where a publisher issues factors with the gases already combined on its own GWP basis (DEFRA/DESNZ, DCCEEW and NZ MfE), those factors are applied as published and the workings row says so. The GWP basis is stamped on every export.',
       },
       {
         title: 'Emission factors',
-        content: `Combustion factors are country-matched: US locations use US EPA (2024) factors, Canadian locations use Environment and Climate Change Canada (ECCC) "Emission factors and reference values" v3.0, UK locations use UK DEFRA/DESNZ (2026) Greenhouse Gas Conversion Factors for Company Reporting, and EU member-state locations use the EU Monitoring and Reporting Regulation (Commission Implementing Regulation (EU) 2018/2066), Annex VI Table 1, which carries the IPCC (2006 Guidelines, Vol. 2) Tier 1 defaults as directly applicable EU law. For Canadian locations, natural gas CO₂ is applied per province (ECCC marketable values) and reported in m³ or Mcf. For UK locations, factors follow the DEFRA published basis — natural gas reported in kWh on a gross calorific value basis — so reported combustion figures reconcile directly to DEFRA for SECR assurance; because DEFRA factors embed a fixed GWP basis, UK combustion figures are reported on that basis rather than the user-selected AR4/AR5 set. For EU locations, note that both cited sources publish on a MASS basis — emission factors per terajoule and net calorific values per gigagram of fuel — whereas EU customers record consumption by volume. ThemisIQ therefore converts these factors to a per-litre and per-m³ basis using fuel densities, and those densities are published by neither source. Where a European specification bounds the value we state it as a bound rather than a citation: the diesel density falls within the EN 590 range for automotive diesel sold in the EU (0.820–0.845 kg/L at 15 °C), at its conservative upper end, and the petrol density within the EN 228 range (0.720–0.775 kg/L at 15 °C), near its midpoint. The density used for LPG is not bounded by any European standard we have identified. Every affected calculation row in your workings states the arithmetic applied and says which input is not published by the cited source, so a verifier can see the step rather than infer it. These are also 100% fossil factors and exclude any biofuel-blend adjustment: national blended factors embed the fuel-supply mandate of a single country, which is not an appropriate assumption to apply across 27 member states. Locations outside the US, Canada, UK, and EU fall back to US EPA combustion factors. Electricity factors are location-based and country-matched: eGRID 2023 (US states), ECCC NIR (Canadian provinces), DEFRA 2025 and 2026 (UK, by reporting year), and European Environment Agency 2023 per-country generation intensities (all 27 EU member states). All factors are versioned, country-matched, and cited in exports. ${DEFRA_DESNZ_PUBLICATION.attribution_required}`,
+        content: `Combustion factors are country-matched: US locations use US EPA (2024) factors, Canadian locations use Environment and Climate Change Canada (ECCC) "Emission factors and reference values" v3.0, UK locations use UK DEFRA/DESNZ (2026) Greenhouse Gas Conversion Factors for Company Reporting, and EU member-state locations use the EU Monitoring and Reporting Regulation (Commission Implementing Regulation (EU) 2018/2066), Annex VI Table 1, which carries the IPCC (2006 Guidelines, Vol. 2) Tier 1 defaults as directly applicable EU law. For Canadian locations, natural gas CO₂ is applied per province (ECCC marketable values) and reported in m³ or Mcf. For UK locations, factors follow the DEFRA published basis (natural gas reported in kWh on a gross calorific value basis), so reported combustion figures reconcile directly to DEFRA for SECR assurance; because DEFRA factors embed a fixed GWP basis, UK combustion figures are reported on that basis rather than the user-selected AR4/AR5 set. For EU locations, note that both cited sources publish on a MASS basis (emission factors per terajoule and net calorific values per gigagram of fuel), whereas EU customers record consumption by volume. ThemisIQ therefore converts these factors to a per-litre and per-m³ basis using fuel densities, and those densities are published by neither source. Where a European specification bounds the value we state it as a bound rather than a citation: the diesel density falls within the EN 590 range for automotive diesel sold in the EU (0.820–0.845 kg/L at 15 °C), at its conservative upper end, and the petrol density within the EN 228 range (0.720–0.775 kg/L at 15 °C), near its midpoint. The density used for LPG is not bounded by any European standard we have identified. Every affected calculation row in your workings states the arithmetic applied and says which input is not published by the cited source, so a verifier can see the step rather than infer it. These are also 100% fossil factors and exclude any biofuel-blend adjustment: national blended factors embed the fuel-supply mandate of a single country, which is not an appropriate assumption to apply across 27 member states. Locations outside the US, Canada, UK, and EU fall back to US EPA combustion factors. Electricity factors are location-based and country-matched: eGRID 2023 (US states), ECCC NIR (Canadian provinces), DEFRA 2025 and 2026 (UK, by reporting year), and European Environment Agency 2023 per-country generation intensities (all 27 EU member states). All factors are versioned, country-matched, and cited in exports. ${DEFRA_DESNZ_PUBLICATION.attribution_required}`,
       },
       {
         title: 'Scope 2 accounting',
-        content: 'ThemisIQ supports both location-based and market-based Scope 2 accounting, following the GHG Protocol Scope 2 Guidance dual-reporting requirement (ESRS E1 and GRI 305). Location-based figures use grid-average emission factors. Market-based figures apply a residual-mix emission factor to the electricity NOT covered by a contractual instrument (PPAs, RECs, green tariffs) — rather than deducting contracted volumes from the grid average — so emissions attributable to untracked supply are not understated. Residual-mix factors are sourced from the Association of Issuing Bodies (AIB) European Residual Mixes 2024 for EU member states, and from Green-e (2025 residual mix, 2023 data) combined with US EPA eGRID2023 for US locations, keyed by eGRID subregion. For full-disclosure jurisdictions where no residual mix is published (e.g. Austria), the location-based factor is applied with that treatment disclosed. Every market-based factor is vintage-stamped and cited in exports.',
+        content: 'ThemisIQ supports both location-based and market-based Scope 2 accounting, following the GHG Protocol Scope 2 Guidance dual-reporting requirement (ESRS E1 and GRI 305). Location-based figures use grid-average emission factors. Market-based figures apply a residual-mix emission factor to the electricity NOT covered by a contractual instrument (PPAs, RECs, green tariffs). Contracted volumes are not deducted from the grid average, so emissions attributable to untracked supply are not understated. Residual-mix factors are sourced from the Association of Issuing Bodies (AIB) European Residual Mixes 2024 for EU member states, and from Green-e (2025 residual mix, 2023 data) combined with US EPA eGRID2023 for US locations, keyed by eGRID subregion. For full-disclosure jurisdictions where no residual mix is published (e.g. Austria), the location-based factor is applied with that treatment disclosed. Every market-based factor is vintage-stamped and cited in exports.',
       },
       {
         title: 'Assurance readiness',
-        content: 'All calculation workings are documented per emission source with factor citations, unit conversions, and GWP references — aligned with ISO 14064-3 and ISAE 3410 limited assurance requirements.',
+        content: 'All calculation workings are documented per emission source with factor citations, unit conversions, and GWP references, aligned with ISO 14064-3 and ISAE 3410 limited assurance requirements.',
       },
       {
         // The first section on this page whose content is an ARRAY rather than a string. Three
@@ -129,14 +129,14 @@ const METHODOLOGIES = [
     ],
   },
   {
-    module: 'CBAM — Carbon Border Adjustment Mechanism',
+    module: 'CBAM: Carbon Border Adjustment Mechanism',
     color: '#0C447C',
     bg: '#E6F1FB',
     standard: 'Regulation (EU) 2023/956 · IR (EU) 2025/2547 · 2025/2620 · 2025/2621 · 2025/2546 · DR (EU) 2025/2551 (EN ISO/IEC 14065)',
     sections: [
       {
         title: 'What it computes',
-        content: 'CBAM requires an EU importer to declare the embedded emissions of each imported good, under the CBAM Regulation (Regulation (EU) 2023/956). ThemisIQ produces the Specific Embedded Emissions (SEE) — the emissions intensity per tonne of a CBAM good that the importer carries into their annual CBAM declaration. Following the embedded-emissions methodology of Implementing Regulation (EU) 2025/2547, SEE is the sum of direct and indirect embedded emissions divided by the net production of the good, expressed in tonnes of CO₂e per tonne: SEE = (direct embedded emissions + indirect embedded emissions) / net production.',
+        content: 'CBAM requires an EU importer to declare the embedded emissions of each imported good, under the CBAM Regulation (Regulation (EU) 2023/956). ThemisIQ produces the Specific Embedded Emissions (SEE), the emissions intensity per tonne of a CBAM good that the importer carries into their annual CBAM declaration. Following the embedded-emissions methodology of Implementing Regulation (EU) 2025/2547, SEE is the sum of direct and indirect embedded emissions divided by the net production of the good, expressed in tonnes of CO₂e per tonne: SEE = (direct embedded emissions + indirect embedded emissions) / net production.',
       },
       {
         title: 'Direct & indirect emissions',
@@ -144,7 +144,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Data basis',
-        content: 'SEE is computed from installation-level actual data. Where you attach a source document to a figure, that link is carried through to the verifier\'s view. Under Article 7(2) of Regulation (EU) 2023/956, as amended by Regulation (EU) 2025/2083, the importer may declare either verified actual values or the default values published in Implementing Regulation (EU) 2025/2621. Defaults carry a mark-up on top of the country figure — 10% for 2026, 20% for 2027 and 30% from 2028 for iron and steel, aluminium, cement and hydrogen; 1% for fertilisers — accounting for installations whose emissions exceed the average for their producer country.',
+        content: 'SEE is computed from installation-level actual data. Where you attach a source document to a figure, that link is carried through to the verifier\'s view. Under Article 7(2) of Regulation (EU) 2023/956, as amended by Regulation (EU) 2025/2083, the importer may declare either verified actual values or the default values published in Implementing Regulation (EU) 2025/2621. Defaults carry a mark-up on top of the country figure (10% for 2026, 20% for 2027 and 30% from 2028 for iron and steel, aluminium, cement and hydrogen; 1% for fertilisers), accounting for installations whose emissions exceed the average for their producer country.',
       },
       {
         title: 'Free allocation & benchmarks',
@@ -224,7 +224,7 @@ const METHODOLOGIES = [
         // hothouse 1.5/0.5), and selecting one genuinely scales all four transition scores. NGFS
         // supplies the scenario set, its names and its directional logic — not the numbers, and not
         // the sector differentiation.
-        content: 'Transition risk is scored across the four TCFD transition-risk categories: policy and legal, technology, market, and reputation. Each category combines the sector\'s carbon exposure with a per-sector weighting for that category and the selected time horizon; policy and legal is additionally scaled by the policy intensity of the jurisdictions selected, since transition exposure follows which regulatory regimes apply rather than where assets sit. The selected scenario then scales all four — choosing an NGFS pathway (Orderly, Disorderly, Hot House) applies that pathway\'s transition multiplier, so transition pressure rises under rapid or abrupt-policy futures and falls under high-warming ones. The per-sector weightings and the scenario multipliers are ThemisIQ methodological defaults, not values published by NGFS or the IPCC; each report identifies them as platform reference values in its data-lineage and provenance sections.',
+        content: 'Transition risk is scored across the four TCFD transition-risk categories: policy and legal, technology, market, and reputation. Each category combines the sector\'s carbon exposure with a per-sector weighting for that category and the selected time horizon; policy and legal is additionally scaled by the policy intensity of the jurisdictions selected, since transition exposure follows which regulatory regimes apply rather than where assets sit. The selected scenario then scales all four. Choosing an NGFS pathway (Orderly, Disorderly, Hot House) applies that pathway\'s transition multiplier, so transition pressure rises under rapid or abrupt-policy futures and falls under high-warming ones. The per-sector weightings and the scenario multipliers are ThemisIQ methodological defaults, not values published by NGFS or the IPCC; each report identifies them as platform reference values in its data-lineage and provenance sections.',
       },
       {
         title: 'Disclosure alignment',
@@ -240,19 +240,19 @@ const METHODOLOGIES = [
     sections: [
       {
         title: 'Primary standards',
-        content: 'ThemisIQ supports two distinct materiality determination modes kept architecturally separate because they answer fundamentally different questions: IFRS S2 single (financial) materiality — how climate-related risks affect the entity\'s enterprise value, cash flows and access to finance — and CSRD ESRS double materiality, which retains the financial axis and adds impact materiality (how the entity affects people and the environment). Double materiality is operationalised as the union of the two axes: a topic is reportable if material on either.',
+        content: 'ThemisIQ supports two distinct materiality determination modes kept architecturally separate because they answer fundamentally different questions. IFRS S2 single (financial) materiality asks how climate-related risks affect the entity\'s enterprise value, cash flows and access to finance. CSRD ESRS double materiality retains that financial axis and adds impact materiality (how the entity affects people and the environment). Double materiality is operationalised as the union of the two axes: a topic is reportable if material on either.',
       },
       {
         title: 'Risk model',
-        content: 'Material climate risk is modelled as the product of four factors. Physical risk = industry sensitivity × IPCC AR6 regional hazard exposure × scenario severity × time horizon. Transition risk = industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time horizon. Physical and transition geographies are deliberately distinct: physical exposure depends on where assets are; transition exposure depends on which regulatory regimes apply. A risk is flagged only where industry sensitivity intersects with real regional or jurisdictional exposure — preventing common false-positives.',
+        content: 'Material climate risk is modelled as the product of four factors. Physical risk = industry sensitivity × IPCC AR6 regional hazard exposure × scenario severity × time horizon. Transition risk = industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time horizon. Physical and transition geographies are deliberately distinct: physical exposure depends on where assets are; transition exposure depends on which regulatory regimes apply. A risk is flagged only where industry sensitivity intersects with real regional or jurisdictional exposure, preventing common false-positives.',
       },
       {
         title: 'Scenario framework',
-        content: 'Scenarios use two public, widely-adopted sets. IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) provide the warming dimension. NGFS scenarios (Orderly, Disorderly, Hot House) provide a finance-oriented transition dimension. Scenarios carry inverse physical and transition multipliers: high-warming pathways raise physical risk and lower transition pressure; rapid-policy pathways raise transition risk and lower physical pressure. Resilient strategy requires testing across both ends — a disclosable judgment under both IFRS S2 and ESRS.',
+        content: 'Scenarios use two public, widely-adopted sets. IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) provide the warming dimension. NGFS scenarios (Orderly, Disorderly, Hot House) provide a finance-oriented transition dimension. Scenarios carry inverse physical and transition multipliers: high-warming pathways raise physical risk and lower transition pressure; rapid-policy pathways raise transition risk and lower physical pressure. Resilient strategy requires testing across both ends: a disclosable judgment under both IFRS S2 and ESRS.',
       },
       {
         title: 'Geographic and topic frameworks',
-        content: `Physical-risk geography uses the IPCC Sixth Assessment Report (AR6) Working Group I reference regions (Iturbide et al., 2020) — public, climate-science-defined land regions, not country borders. Transition risks use the TCFD four-category classification. The impact-materiality axis (CSRD mode) uses the ${ESRS_TOPIC_COUNT_WORD} ESRS topical standards: E1–E5 environmental, S1–S4 social, G1 governance.`,
+        content: `Physical-risk geography uses the IPCC Sixth Assessment Report (AR6) Working Group I reference regions (Iturbide et al., 2020): public, climate-science-defined land regions, not country borders. Transition risks use the TCFD four-category classification. The impact-materiality axis (CSRD mode) uses the ${ESRS_TOPIC_COUNT_WORD} ESRS topical standards: E1–E5 environmental, S1–S4 social, G1 governance.`,
       },
       {
         title: 'Scoring scheme',
@@ -268,7 +268,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'Full specification',
-        content: 'The complete published methodology specification — framework basis, full risk model, scoring tables, calibration approach, and limitations — is available as a downloadable PDF for advisors, auditors and assurance providers conducting diligence.',
+        content: 'The complete published methodology specification (framework basis, full risk model, scoring tables, calibration approach, and limitations) is available as a downloadable PDF for advisors, auditors and assurance providers conducting diligence.',
         download: { href: '/themisiq-materiality-methodology.pdf', label: 'Download methodology PDF (v1.0)' },
       },
     ],
@@ -305,7 +305,7 @@ const METHODOLOGIES = [
     sections: [
       {
         title: 'Gender pay gap methodology',
-        content: 'ThemisIQ calculates mean and median gender pay gap figures following the EU Pay Transparency Directive (2023/970/EU) methodology — comparing ordinary pay across gender, by job category, and across the organisation. Calculations align with UK Gender Pay Gap Reporting and California Pay Data Reporting requirements.',
+        content: 'ThemisIQ calculates mean and median gender pay gap figures following the EU Pay Transparency Directive (2023/970/EU) methodology, comparing ordinary pay across gender, by job category, and across the organisation. Calculations align with UK Gender Pay Gap Reporting and California Pay Data Reporting requirements.',
       },
       {
         title: 'Disclosure frameworks',
@@ -329,11 +329,11 @@ const METHODOLOGIES = [
       },
       {
         title: 'NIST AI RMF alignment',
-        content: 'Governance controls are cross-referenced to the NIST AI Risk Management Framework (AI RMF 1.0) four functions: GOVERN, MAP, MEASURE, MANAGE — enabling dual EU/US framework compliance.',
+        content: 'Governance controls are cross-referenced to the NIST AI Risk Management Framework (AI RMF 1.0) four functions: GOVERN, MAP, MEASURE, MANAGE. This enables dual EU/US framework compliance.',
       },
       {
         title: 'Regulatory status note',
-        content: 'ThemisIQ monitors EU AI Act implementation guidance and updates its classification logic as Commission guidance evolves. Regulation (EU) 2026/1744 — published in the Official Journal on 24 July 2026 and in force from 27 July 2026 — replaced Article 113(3)(c) of Regulation (EU) 2024/1689, deferring the high-risk obligations. They now apply from 2 December 2027 for stand-alone systems within Article 6(2) and Annex III, and from 2 August 2028 where the AI is a safety component of a product already covered by the EU product-safety instruments listed in Annex I (Article 6(1)). This supersedes the previous dates of 2 August 2026 and 2 August 2027. Nothing else in the application timetable moved: the Article 5 prohibitions have applied since 2 February 2025 (with the prohibitions added by Regulation (EU) 2026/1744 applying from 2 December 2026), general-purpose AI obligations since 2 August 2025, and the Article 50 transparency obligations retain their original schedule.',
+        content: 'ThemisIQ monitors EU AI Act implementation guidance and updates its classification logic as Commission guidance evolves. Regulation (EU) 2026/1744 (published in the Official Journal on 24 July 2026 and in force from 27 July 2026) replaced Article 113(3)(c) of Regulation (EU) 2024/1689, deferring the high-risk obligations. They now apply from 2 December 2027 for stand-alone systems within Article 6(2) and Annex III, and from 2 August 2028 where the AI is a safety component of a product already covered by the EU product-safety instruments listed in Annex I (Article 6(1)). This supersedes the previous dates of 2 August 2026 and 2 August 2027. Nothing else in the application timetable moved: the Article 5 prohibitions have applied since 2 February 2025 (with the prohibitions added by Regulation (EU) 2026/1744 applying from 2 December 2026), general-purpose AI obligations since 2 August 2025, and the Article 50 transparency obligations retain their original schedule.',
       },
     ],
   },
@@ -353,7 +353,7 @@ const METHODOLOGIES = [
       },
       {
         title: 'NIST CSF 2.0 alignment',
-        content: 'All controls are cross-referenced to NIST Cybersecurity Framework 2.0 six functions: GOVERN, IDENTIFY, PROTECT, DETECT, RESPOND, RECOVER — providing a globally recognised control reference.',
+        content: 'All controls are cross-referenced to NIST Cybersecurity Framework 2.0 six functions: GOVERN, IDENTIFY, PROTECT, DETECT, RESPOND, RECOVER. This provides a globally recognised control reference.',
       },
     ],
   },
@@ -365,7 +365,7 @@ const METHODOLOGIES = [
     sections: [
       {
         title: 'ESG risk screening',
-        content: 'Deal-level ESG risk screening combines sector-specific physical and transition climate risks (aligned with TCFD recommendations), regulatory compliance exposure by jurisdiction, and ESG governance factors — producing a weighted risk rating for investment decision support.',
+        content: 'Deal-level ESG risk screening combines sector-specific physical and transition climate risks (aligned with TCFD recommendations), regulatory compliance exposure by jurisdiction, and ESG governance factors, producing a weighted risk rating for investment decision support.',
       },
       {
         title: 'Compliance cost estimation',
@@ -393,7 +393,7 @@ export default function MethodologyPage() {
             <em style={{ background: GRAD, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>classifies and reports.</em>
           </h1>
           <p style={{ fontSize: 16, color: '#555553', maxWidth: 620, lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem' }}>
-            Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don&apos;t invent methodologies — we implement the ones that matter, correctly, and keep them current.
+            Every number ThemisIQ produces is grounded in a recognised international standard or regulatory framework. We don&apos;t invent methodologies. We implement the ones that matter, correctly, and keep them current.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
             {['GHG Protocol', 'IPCC AR6', 'TCFD', 'IFRS S2', 'CSRD ESRS', 'EU AI Act', 'NIST CSF 2.0', 'PCAF-aligned', 'CS3D', 'CBAM'].map(tag => (
@@ -407,7 +407,7 @@ export default function MethodologyPage() {
       <div style={{ background: '#E1F5EE', borderBottom: '0.5px solid rgba(15,110,86,0.2)', padding: '1rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F6E56', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>Emission factors and regulatory mappings are reviewed and updated annually — or immediately when a material regulatory change occurs. Last reviewed: July 2026.</span>
+          <span style={{ fontSize: 13, color: '#0F6E56', fontWeight: 500 }}>Emission factors and regulatory mappings are reviewed and updated annually, or immediately when a material regulatory change occurs. Last reviewed: July 2026.</span>
         </div>
       </div>
 
