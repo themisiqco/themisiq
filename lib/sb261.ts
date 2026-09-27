@@ -65,7 +65,7 @@ export const SB261_DOCKET_URL = 'https://ww2.arb.ca.gov/public-comments/climate-
 // replacement date exists, and what a company can still do — so a reader can judge how much to rely
 // on it rather than being handed the word "paused" and left to guess what it means.
 export const SB261_STATUS_SENTENCE =
-  'On 18 November 2025 the Ninth Circuit granted an injunction pending appeal barring enforcement of SB 261 — Chamber of Commerce v. Sanchez, No. 25-5327 — and declined to extend it to SB 253. The 1 January 2026 deadline is not in effect. The court heard argument on 9 January 2026 and has not ruled. If SB 261 is upheld, CARB has not said when a new deadline would fall. CARB keeps a public docket for companies that choose to file in the meantime.'
+  'On 18 November 2025 the Ninth Circuit granted an injunction pending appeal barring enforcement of SB 261 (Chamber of Commerce v. Sanchez, No. 25-5327) and declined to extend it to SB 253. The 1 January 2026 deadline is not in effect. The court heard argument on 9 January 2026 and has not ruled. If SB 261 is upheld, CARB has not said when a new deadline would fall. CARB keeps a public docket for companies that choose to file in the meantime.'
 
 // THE SAME POSTURE AT TWO WIDTHS, and the two are the whole short-form vocabulary. SB261_SHORT is
 // the chip or tag form, for a slot that must also carry the regime's name. SB261_TABLE_STATUS is
