@@ -153,8 +153,12 @@ describe('supplier questionnaire options', () => {
     // regenerating leaves a pair in db/sql that no longer matches any stored answer, so the backfill
     // silently skips those rows — and a skipped row is indistinguishable from an already-migrated one.
     const dir = join(ROOT, 'db/sql/supplier-options')
-    expect(readdirSync(dir).sort(), 'four files, numbered so the order is the filename')
+    expect(readdirSync(dir).filter(f => f.endsWith('.sql')).sort(),
+      'four files, numbered so the order is the filename')
       .toEqual(['1_preflight.sql', '2_backfill.sql', '3_verify.sql', '9_rollback.sql'])
+    // ⚠️ THE SQL SAYS WHAT TO DO; THE RUN RECORD SAYS WHAT WAS DONE. Asserted present because a generated
+    // file cannot carry execution history — the generator would overwrite it on the next run.
+    expect(readdirSync(dir)).toContain('RUN-RECORD.md')
     const read = (f: string) => readFileSync(join(dir, f), 'utf8')
     const q = (x: string) => `'${x.replace(/'/g, "''")}'`
 
