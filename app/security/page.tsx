@@ -136,7 +136,7 @@ export default function Page() {
               ['Encryption in transit', 'All data transmitted to and from ThemisIQ is encrypted using TLS 1.2 or higher. TLS 1.0 and 1.1 are disabled.'],
               ['Encryption at rest', 'All data at rest is encrypted using AES-256 at the storage layer via AWS-managed encryption keys.'],
               ['Account isolation', 'Your data is isolated at the database level. Row-Level Security is enabled on every table and scoped to the authenticated user, so one account cannot read another account\u2019s rows. A small number of server-side operations run with elevated database privileges; these are limited to named API routes and are not reachable from the browser.'],
-              ['Audit trail \u2014 GHG, CBAM and concierge', 'Every change to your GHG inventory, CBAM disclosure and concierge bill-extraction data is written to an audit log by a database trigger, not by the application, so the entry is recorded even if the application is bypassed. Seven tables carry the trigger: the GHG inventory and entry tables, two CBAM disclosure tables, and the three concierge job, document and proposal tables. The log is append-only: no update or delete permission on it is granted to any signed-in account. Other modules are not yet covered.'],
+              ['Audit trail: GHG, CBAM and concierge', 'Every change to your GHG inventory, CBAM disclosure and concierge bill-extraction data is written to an audit log by a database trigger, not by the application, so the entry is recorded even if the application is bypassed. Seven tables carry the trigger: the GHG inventory and entry tables, two CBAM disclosure tables, and the three concierge job, document and proposal tables. The log is append-only: no update or delete permission on it is granted to any signed-in account. Other modules are not yet covered.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
@@ -149,9 +149,9 @@ export default function Page() {
             <div style={eyebrow}>Access control</div>
             <h2 style={sectionTitle}>Who can access your data.</h2>
             {[
-              ['Account-level access', 'Your data belongs to the account that created it, and access is per account \u2014 signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organisation.'],
+              ['Account-level access', 'Your data belongs to the account that created it, and access is per account: signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organisation.'],
               ['Who operates ThemisIQ', `ThemisIQ is operated by its founder, with one named deputy for continuity. Production access is held by those two accounts and no others. ${ACCESS_NO_STANDING}`],
-              ['Multi-factor authentication', 'Every account with production access \u2014 Supabase, Vercel and GitHub \u2014 has multi-factor authentication enrolled via authenticator app. We recommend enabling MFA on your own ThemisIQ account as well.'],
+              ['Multi-factor authentication', 'Every account with production access (Supabase, Vercel and GitHub) has multi-factor authentication enrolled via authenticator app. We recommend enabling MFA on your own ThemisIQ account as well.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
@@ -169,7 +169,7 @@ export default function Page() {
           <h2 style={sectionTitle}>What happens if something goes wrong.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(11rem, 100%), 1fr))', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden', marginTop: '1.5rem' }}>
             {[
-              { step: '01', title: 'Detect', body: 'Detection is by notification from the providers that run our infrastructure \u2014 Supabase, Vercel, GitHub and Stripe \u2014 and by reports to security@themisiq.co, which is monitored with push notification. Automated alerting on our own systems is not configured.' },
+              { step: '01', title: 'Detect', body: 'Detection is by notification from the providers that run our infrastructure (Supabase, Vercel, GitHub and Stripe) and by reports to security@themisiq.co, which is monitored with push notification. Automated alerting on our own systems is not configured.' },
               { step: '02', title: 'Contain', body: 'P1 incidents are contained within 1 hour of detection. Affected systems are isolated immediately.' },
               { step: '03', title: 'Notify', body: 'You are notified within 24 hours of a confirmed data breach affecting your data. Regulatory notifications within 72 hours.' },
               { step: '04', title: 'Review', body: 'Every P1 and P2 incident has a mandatory post-incident review within 14 days. Findings shared with affected customers on request.' },
@@ -193,7 +193,7 @@ export default function Page() {
             {[
               ['Dependency monitoring', 'Third-party dependencies are monitored continuously by GitHub Dependabot, which raises an alert and opens a pull request with the patched version when a known vulnerability is published. The infrastructure beneath the application is operated by Vercel and Supabase, whose certifications cover it.'],
               ['Patching', 'Dependabot opens a pull request for each patched version automatically. Merging is a manual review step gated on the full test suite passing, so a fix reaches production once it has been reviewed and the build is green. A fixed remediation window is not published.'],
-              ['Build gate', 'Every deploy runs the full test suite and a strict TypeScript check before the application is built \u2014 a failing test or type error stops the deploy.'],
+              ['Build gate', 'Every deploy runs the full test suite and a strict TypeScript check before the application is built. A failing test or type error stops the deploy.'],
               ['Secrets management', 'API keys and credentials are held in environment variables and are never committed to source code. GitHub secret scanning is enabled on the repository and covers the full commit history, not only the files currently checked in.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '0.5px solid #e8e7e4' }}>

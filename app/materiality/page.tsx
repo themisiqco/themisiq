@@ -131,7 +131,7 @@ export default function Page() {
               <span style={{ fontStyle: 'italic', color: HEADLINE_ACCENT }}>Assessment</span>
             </h1>
             <p style={{ fontSize: 17, color: BODY, lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem' }}>
-              The impact half of a double materiality assessment, run by your own team: stakeholder engagement, all {ESRS_TOPIC_COUNT_WORD} ESRS topics determined in both directions, and a record of who decided what. For companies reporting under CSRD &mdash; and for the suppliers their reporting puts questions to.
+              The impact half of a double materiality assessment, run by your own team: stakeholder engagement, all {ESRS_TOPIC_COUNT_WORD} ESRS topics determined in both directions, and a record of who decided what. For companies reporting under CSRD, and for the suppliers their reporting puts questions to.
             </p>
             {/* ⚠️ THE SHARED SUB-LINE, SO THIS PAGE BELONGS TO THE SET WITHOUT BEING RESHAPED BY IT.
                 This page deliberately does NOT take the ten-section module shape: six of its sections are
@@ -148,7 +148,7 @@ export default function Page() {
                 what the price includes is the part a buyer weighs, not the digits. */}
             <div style={{ fontSize: 15, color: BODY, fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>${impactPrice}</span>
-              {' '}USD per year &mdash; 365 days of platform access. No per-seat charges, no separate fee for the survey, no extra cost when you bring colleagues in to help. Add Climate Risk and the multi-module discount applies automatically.
+              {' '}USD per year: 365 days of platform access. No per-seat charges, no separate fee for the survey, no extra cost when you bring colleagues in to help. Add Climate Risk and the multi-module discount applies automatically.
             </div>
             {/* Deliberately the SAME two CTAs as section 10. A visitor who reads the whole page
                 should not have to scroll back up to act on it. */}
@@ -227,7 +227,7 @@ export default function Page() {
             which is body copy, and it sits here because the Venn below illustrates it. */}
         <div style={{ maxWidth: 760, marginBottom: '2.5rem' }}>
           <p style={bodyPara}>
-            A double materiality assessment is how a company works out which sustainability topics actually matter to it &mdash; looked at from two directions. Your impact on the world: where your operations and supply chain cause harm or do good. The world&rsquo;s impact on you: where sustainability issues create financial risk or opportunity. A topic is material if it&rsquo;s significant either way. Both halves together are what makes it double.
+            A double materiality assessment is how a company works out which sustainability topics actually matter to it, looked at from two directions. Your impact on the world: where your operations and supply chain cause harm or do good. The world&rsquo;s impact on you: where sustainability issues create financial risk or opportunity. A topic is material if it&rsquo;s significant either way. Both halves together are what makes it double.
           </p>
           {/* The /climate-risk link is carried by the module name inside the sentence rather
               than by an appended call to action — the copy already names the other half.
@@ -296,7 +296,7 @@ export default function Page() {
           <h2 style={sectionTitle}>Which module do I need?</h2>
           <p style={{ ...bodyPara, marginBottom: 0 }}>
             Double materiality has two halves, and ThemisIQ sells them separately because they are
-            different exercises. This page is the impact half &mdash; how your organisation affects
+            different exercises. This page is the impact half: how your organisation affects
             people and the environment. The financial half, how sustainability issues affect your
             organisation, is Climate Risk. Reporting under CSRD, you need both. Reporting under
             IFRS S2 alone, you need Climate Risk and not this.
@@ -347,7 +347,7 @@ export default function Page() {
         <div style={{ maxWidth: 760 }}>
           <h2 style={sectionTitle}>Does this apply to you, and when?</h2>
           <p style={bodyPara}>
-            If you&rsquo;re in scope for CSRD, it&rsquo;s mandatory and it comes first. CSRD is the EU law setting out who must publish a sustainability report and when; ESRS are the standards defining what goes in it. The law says you must report; the standards say how. Your materiality assessment determines which parts of those standards apply &mdash; so nothing else can be scoped until it&rsquo;s done.
+            If you&rsquo;re in scope for CSRD, it&rsquo;s mandatory and it comes first. CSRD is the EU law setting out who must publish a sustainability report and when; ESRS are the standards defining what goes in it. The law says you must report; the standards say how. Your materiality assessment determines which parts of those standards apply, so nothing else can be scoped until it&rsquo;s done.
           </p>
           <p style={bodyPara}>
             {CSRD_EU_SCOPE_SENTENCE} {CSRD_FIRST_REPORT_SENTENCE} {CSRD_LISTED_SME_SENTENCE}
@@ -356,15 +356,15 @@ export default function Page() {
             {CSRD_NON_EU_SENTENCE} If you&rsquo;re a US or UK group with EU operations, establish which entity holds the obligation before anyone starts work.
           </p>
           <p style={bodyPara}>
-            {CSRD_FIRST_REPORT_PUBLISHED} isn&rsquo;t far away. Your first report covers all of financial year {CSRD_FIRST_REPORT_FY}, so data collection starts in January {CSRD_FIRST_REPORT_FY} &mdash; and the assessment comes first, because it determines what you collect. That makes {CSRD_ASSESSMENT_YEAR} the year it gets done.
+            {CSRD_FIRST_REPORT_PUBLISHED} isn&rsquo;t far away. Your first report covers all of financial year {CSRD_FIRST_REPORT_FY}, so data collection starts in January {CSRD_FIRST_REPORT_FY}, and the assessment comes first, because it determines what you collect. That makes {CSRD_ASSESSMENT_YEAR} the year it gets done.
           </p>
           <p style={bodyPara}>
-            And if you&rsquo;re not in scope, the questions still come &mdash; just from customers, banks and investors rather than a regulator. In-scope companies must report on their value chain, so their suppliers get asked. One assessment, on your schedule, answers every version of that question you&rsquo;ll get this year. The regulation sets the standard; the customers set the timeline.
+            And if you&rsquo;re not in scope, the questions still come, just from customers, banks and investors rather than a regulator. In-scope companies must report on their value chain, so their suppliers get asked. One assessment, on your schedule, answers every version of that question you&rsquo;ll get this year. The regulation sets the standard; the customers set the timeline.
           </p>
           <p style={{ ...bodyPara, marginBottom: 0 }}>
             Not sure where you sit?{' '}
             <a href="/assess" style={{ color: INK, fontWeight: 400, textDecoration: 'underline' }}>Take the free assessment</a>
-            {' '}&mdash; no purchase required.
+            {' '}with no purchase required.
           </p>
         </div>
       </section>
@@ -375,7 +375,7 @@ export default function Page() {
           <div style={{ maxWidth: 760, marginBottom: '2.5rem' }}>
             <h2 style={sectionTitle}>Why ThemisIQ for your Materiality Assessment</h2>
             <p style={{ ...bodyPara, marginBottom: 0 }}>
-              This is serious work and it deserves to be done well &mdash; which usually means an expensive engagement, repeated each year. ThemisIQ makes the same methodology something your own team can run.
+              This is serious work and it deserves to be done well, which usually means an expensive engagement, repeated each year. ThemisIQ makes the same methodology something your own team can run.
             </p>
           </div>
 
@@ -383,19 +383,19 @@ export default function Page() {
             <div style={hairlineCell}>
               <div style={cellTitle}>The reasoning is captured as you go.</div>
               <p style={cellBody}>
-                What separates a strong assessment from a weak one isn&rsquo;t effort &mdash; it&rsquo;s whether you can show how you got there. Every judgement is attributed to the person who made it, with their role. Every threshold and rule is printed in the report. Where your conclusion differs from what stakeholders told you, the difference is recorded and explained, because that&rsquo;s the first thing an assurer asks about.
+                What separates a strong assessment from a weak one isn&rsquo;t effort: it&rsquo;s whether you can show how you got there. Every judgement is attributed to the person who made it, with their role. Every threshold and rule is printed in the report. Where your conclusion differs from what stakeholders told you, the difference is recorded and explained, because that&rsquo;s the first thing an assurer asks about.
               </p>
             </div>
             <div style={hairlineCell}>
               <div style={cellTitle}>Stakeholder engagement, handled.</div>
               <p style={cellBody}>
-                You decide who to ask; ThemisIQ distributes the questionnaire, chases non-responders and analyses the results. It tells you when your invitation list has a gap &mdash; if no group you invited can speak to a topic, that shows with the reason stated rather than as silence you discover at assurance. Responses stay anonymous by a printed rule. Where stakeholders split sharply, it&rsquo;s flagged rather than averaged away, and where your own workforce describes their conditions differently from workers in your supply chain, the two are shown side by side.
+                You decide who to ask; ThemisIQ distributes the questionnaire, chases non-responders and analyses the results. It tells you when your invitation list has a gap: if no group you invited can speak to a topic, that shows with the reason stated rather than as silence you discover at assurance. Responses stay anonymous by a printed rule. Where stakeholders split sharply, it&rsquo;s flagged rather than averaged away, and where your own workforce describes their conditions differently from workers in your supply chain, the two are shown side by side.
               </p>
             </div>
           </div>
 
           <p style={{ ...bodyPara, maxWidth: 760, margin: '2.5rem 0 0' }}>
-            {capitalise(ESRS_TOPIC_COUNT_WORD)} topics, each assessed twice &mdash; once for harm, once for benefit.
+            {capitalise(ESRS_TOPIC_COUNT_WORD)} topics, each assessed twice: once for harm, once for benefit.
           </p>
 
           {/* ═══ 6b · DIAGRAM 2 — THE TEN TOPICS ═══════════════════════════════
@@ -486,7 +486,7 @@ export default function Page() {
             <div style={hairlineCell}>
               <div style={cellTitle}>The right people make the calls.</div>
               <p style={cellBody}>
-                For each topic you decide whether your business is causing harm and whether it&rsquo;s creating benefit, with the stakeholder results on the same screen. You don&rsquo;t have to do it all yourself: assign workforce topics to HR and supply chain topics to procurement, each with a link to their part only. Their name and role appear in the report beside their judgement &mdash; which is what makes a determination defensible. You keep the final say, and any override is recorded with its reason.
+                For each topic you decide whether your business is causing harm and whether it&rsquo;s creating benefit, with the stakeholder results on the same screen. You don&rsquo;t have to do it all yourself: assign workforce topics to HR and supply chain topics to procurement, each with a link to their part only. Their name and role appear in the report beside their judgement, which is what makes a determination defensible. You keep the final say, and any override is recorded with its reason.
               </p>
             </div>
             <div style={hairlineCell}>
@@ -534,7 +534,7 @@ export default function Page() {
         <div style={{ maxWidth: 760 }}>
           <h2 style={sectionTitle}>What you get</h2>
           <p style={bodyPara}>
-            The deliverable is the <strong>Materiality assessment report</strong> &mdash; a board paper written for directors or senior leadership rather than specialists. <strong>No sample is published.</strong> It prints twelve sections, in this order:
+            The deliverable is the <strong>Materiality assessment report</strong>: a board paper written for directors or senior leadership rather than specialists. <strong>No sample is published.</strong> It prints twelve sections, in this order:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '0 0 1.75rem' }}>
             {([
@@ -557,7 +557,7 @@ export default function Page() {
               <div key={h} style={{ display: 'flex', gap: 14, alignItems: 'baseline', fontSize: 15, lineHeight: 1.6 }}>
                 <span style={{ color: MUTED, fontWeight: 400, fontVariantNumeric: 'tabular-nums', minWidth: 18, flexShrink: 0 }}>{i + 1}</span>
                 <span style={{ color: INK, fontWeight: 400 }}>
-                  {h}{gloss && <span style={{ color: MUTED, fontWeight: 400 }}> &mdash; {gloss}</span>}
+                  {h}{gloss && <span style={{ color: MUTED, fontWeight: 400 }}>: {gloss}</span>}
                 </span>
               </div>
             ))}
@@ -590,7 +590,7 @@ export default function Page() {
           <div style={{ maxWidth: 760 }}>
             <h2 style={sectionTitle}>If you already have Climate Risk</h2>
             <p style={bodyPara}>
-              That module screens all {ESRS_TOPIC_COUNT_WORD} topics on both axes, so you already have a first-pass view of where your impacts sit. What it can&rsquo;t do is meet the ESRS requirement that your impact conclusions be informed by the people affected by them &mdash; its own report says so, on the cover.
+              That module screens all {ESRS_TOPIC_COUNT_WORD} topics on both axes, so you already have a first-pass view of where your impacts sit. What it can&rsquo;t do is meet the ESRS requirement that your impact conclusions be informed by the people affected by them. Its own report says so, on the cover.
             </p>
             <p style={{ ...bodyPara, marginBottom: 0 }}>
               This module is what closes that gap: real stakeholder engagement, determinations made by named people, and a record that holds up when someone asks how you got there.

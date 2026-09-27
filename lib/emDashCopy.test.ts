@@ -155,12 +155,15 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
  * EM DASH WAS ADDED. Reading the text with the TypeScript parser instead of matching bytes on
  * comment-stripped lines found two populations the old counter could not see:
  *
- *   · `\u2014` WRITTEN AS AN ESCAPE. app/security/page.tsx spells every one of its dashes that way, so it
- *     read as clean through the group-2 sweep and is listed here at 7. Also app/dashboard/ghg/page.tsx
- *     and app/calculate-emissions/page.tsx.
- *   · `&mdash;` IN JSX TEXT, which renders as an em dash. 76 lines use it. app/materiality/page.tsx was
- *     swept in group 3 and still has 16; app/calculate-emissions/page.tsx went from 1 to 62, almost all
- *     of them entities.
+ *   · `\u2014` WRITTEN AS AN ESCAPE. app/security/page.tsx spelled every one of its dashes that way, so it
+ *     read as clean through the group-2 sweep. Also app/dashboard/ghg/page.tsx, which still does.
+ *   · `&mdash;` IN JSX TEXT, which renders as an em dash. app/materiality/page.tsx was swept in group 3
+ *     and still had 16 of them; app/calculate-emissions/page.tsx went from 1 to 62, almost all entities.
+ *
+ * ⚠️ AND THE FOUR FILES THAT FOUND WERE FINISHED THE SAME DAY: app/security (7), app/materiality (16),
+ * app/advisory (1) and app/calculate-emissions (62) are swept and have left this list. Their entries are
+ * gone, not zeroed — the ratchet's own rule. The two blind spots above are what the guard now sees, which
+ * is why those files could be finished at all.
  *
  * Both were invisible to a byte match and are counted now, which is the point of the change. A file whose
  * number rose gained nothing: it was always wrong.
@@ -177,9 +180,7 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
 const GLYPH_COUNT = 73
 
 const SWEEP_BUDGET: Record<string, number> = {
-  'app/advisory/page.tsx': 1,
   'app/assess/page.tsx': 50,
-  'app/calculate-emissions/page.tsx': 62,
   'app/dashboard/ai-governance/page.tsx': 21,
   'app/dashboard/cbam/disclosures/page.tsx': 14,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
@@ -218,9 +219,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/supply-chain/portal/page.tsx': 1,
   'app/deals/[token]/page.tsx': 6,
   'app/impact/[token]/page.tsx': 11,
-  'app/materiality/page.tsx': 16,
   'app/order/page.tsx': 1,
-  'app/security/page.tsx': 7,
   'app/supplier/[token]/page.tsx': 1,
   'app/survey/[token]/page.tsx': 11,
   'app/verify-cbam/[token]/page.tsx': 19,

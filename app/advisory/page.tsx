@@ -47,7 +47,7 @@ export default function AdvisoryPage() {
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '3rem' }}>
             <a href={CALENDLY} style={{ ...btnPrimary, textDecoration: 'none' }}>Book a 30-minute complimentary call</a>
-            <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>See where you stand &mdash; free assessment</a>
+            <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>See where you stand, free assessment</a>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(11rem, 100%), 1fr))', gap: 16, maxWidth: 680 }}>
             {[
