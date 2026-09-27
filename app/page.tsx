@@ -205,12 +205,15 @@ export default function Home() {
       ⚠️ TWO CHIPS WERE REMOVED ON 25 SEP 2026 AND MUST NOT COME BACK WITHOUT SOMETHING BEHIND THEM.
       "SEC Climate Rule" appeared nowhere in lib/ or app/ — nothing mapped, nothing scored, no export —
       and the rule's own status has never been settled. "RE100" appeared in exactly one place, a pricing
-      bullet. Both claimed coverage the product does not have. Of the nineteen below, nine are entries in
-      OBLIGATIONS (lib/obligations.ts); the other ten are standards the engine or a module cites by name,
+      bullet. Both claimed coverage the product does not have. Of the eighteen below, nine are entries in
+      OBLIGATIONS (lib/obligations.ts); the other nine are standards the engine or a module cites by name,
       each verified in the tree: ESRS/CSRD 26 files in lib/, GHG Protocol 17, SBTi 12 (lib/sbti.ts), TCFD
-      6, GRI 3, and ISO 27001, NIST AI RMF, NIST CSF, ISO 42001 and SASB in the Cyber, AI Governance and
-      People module surfaces, which keep their control sets in app/ rather than lib/. Adding a chip means
-      finding its evidence first. */}
+      6, GRI 3, and ISO 27001, NIST AI RMF, NIST CSF and ISO 42001 in the Cyber and AI Governance module
+      surfaces, which keep their control sets in app/ rather than lib/. Adding a chip means finding its
+      evidence first.
+      ⚠️ SASB WAS THE TENTH AND IS NOW REMOVED, THOUGH ITS EVIDENCE WAS NEVER IN DOUBT — see the note on
+      FRAMEWORKS below. It is live in the People module's picker; what it lacks is an
+      app/frameworks/page.tsx entry, which is a different test and the one this strip now applies. */}
       <section style={{ padding: '4rem 2.5rem', borderTop: '0.5px solid var(--color-line)' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.6vw, 2rem)', fontWeight: 400, color: 'var(--color-ink)', marginBottom: '0.6rem' }}>
@@ -351,7 +354,7 @@ const SAMPLE_RESULTS = [
 const MODULES_HOME = [
   { name: 'GHG Emissions', key: 'ghg', href: '/climate-ghg',
     desc: 'Scope 1, 2 and 3 inventory with an audit trail behind every figure.',
-    chips: ['SB 253', 'GHG Protocol', 'ESRS E1-6'] },
+    chips: ['SB 253', 'GHG Protocol', 'ESRS E1'] },
   { name: 'Climate Risk', key: 'climate', href: '/climate-risk',
     desc: 'Physical and transition risk, scenario analysis, resilience reporting.',
     chips: ['SB 261', 'IFRS S2', 'TCFD'] },
@@ -360,15 +363,15 @@ const MODULES_HOME = [
     chips: ['CS3D', 'EcoVadis', 'Modern Slavery Act', 'ESRS S2'] },
   { name: 'CBAM', key: 'cbam', href: '/cbam',
     desc: 'Embedded emissions for goods entering the EU, installation by installation.',
-    chips: ['(EU) 2023/956', 'Annex IV'] },
+    chips: ['EU CBAM', 'CBAM Annex IV'] },
   { name: 'Deals and Investment', key: 'deals', href: '/deals',
     desc: 'For M&A, family offices and companies getting ready to sell. Which rules apply, from what year, and what they cost to meet. Run it on a target before you buy, or on yourself before you are asked.',
-    chips: ['SB 253', 'SECR', 'CSRD', 'IFRS S2'] },
+    chips: ['SB 253', 'SECR', 'Canada S-211', 'CSRD', 'CS3D'] },
   { name: 'AI Governance', key: 'ai', href: '/ai-governance',
     desc: 'Model inventory, risk register and policy management.',
     chips: ['EU AI Act', 'NIST AI RMF', 'ISO 42001'] },
   { name: 'Cyber Governance', key: 'cyber', href: '/cyber',
-    desc: 'Cyber risk registers, vendor reviews and incident workflows.',
+    desc: 'A gap assessment against NIS2, DORA and the SEC rules, scored across 25 controls.',
     chips: ['NIS2', 'DORA', 'ISO 27001'] },
   { name: 'People and Workforce', key: 'people', href: '/people',
     desc: 'Human capital reporting, pay equity, health and safety.',
@@ -376,7 +379,16 @@ const MODULES_HOME = [
 ] as const
 
 /**
- * Nineteen. Not a count to be printed — see the section comment for why the "30+" stat went — and not a
+ * Eighteen, and it was nineteen until 26 Sep 2026, when 'SASB' came off.
+ * ⚠️ NOT BECAUSE IT IS UNBACKED. It is: app/dashboard/people/page.tsx:285 offers 'SASB Human Capital' as a
+ * selectable framework in the People module. An audit on 26 Sep 2026 reported it as unsupported after
+ * grepping lib/ and app/frameworks/ and not app/dashboard/, and the section comment above had it right all
+ * along. It came off for a narrower reason: every other name on this strip resolves to an
+ * app/frameworks/page.tsx entry, and SASB does not, so it was the one chip promising a description that
+ * page cannot give. It belongs back here the day it has an entry, alongside GRI 305, SEC Cybersecurity
+ * Disclosure Rules and the Modern Slavery Act, which are in the same position.
+ * Not a count to be printed — see the section comment for why the
+ * "30+" stat went — and not a
  * hand-typed list forever: it duplicates names that lib/obligations.ts already holds for nine of them.
  * Deriving the nine from OBLIGATIONS and keeping ten literals would be a smaller lie than this, and is
  * logged rather than done here because it changes what a chip IS.
@@ -384,7 +396,7 @@ const MODULES_HOME = [
 const FRAMEWORKS = [
   'SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis',
   'TCFD', 'GHG Protocol', 'GRI', 'SBTi', 'NIST AI RMF', 'EU AI Act', 'ISO 42001', 'ISO 27001',
-  'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA',
+  'NIST CSF', 'EU Pay Transparency', 'NIS2', 'DORA',
 ] as const
 
 const WIDER = [

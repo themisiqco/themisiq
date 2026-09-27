@@ -15,14 +15,19 @@ export default function Footer() {
           </p>
         </div>
         {[
+          // ⚠️ THE ORDER IS THE HOMEPAGE MODULE GRID'S ORDER (MODULES_HOME in app/page.tsx), and CBAM
+          // was missing from this list entirely while having a card there. Materiality follows the eight
+          // because it has no grid card of its own, and Advisory stays last because it is not a module.
           { heading: 'Products', links: [
             { label: 'Climate · GHG', href: '/climate-ghg' },
             { label: 'Climate · Risk', href: '/climate-risk' },
             { label: 'Supply Chain', href: '/supply-chain' },
+            { label: 'CBAM', href: '/cbam' },
             { label: 'Deals & Investment', href: '/deals' },
             { label: 'AI Governance', href: '/ai-governance' },
-            { label: 'People & Workforce', href: '/people' },
             { label: 'Cyber Governance', href: '/cyber' },
+            { label: 'People & Workforce', href: '/people' },
+            { label: 'Materiality Assessment', href: '/materiality' },
             { label: 'Advisory', href: '/advisory' },
           ] },
           { heading: 'Frameworks', links: [

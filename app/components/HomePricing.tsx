@@ -8,17 +8,17 @@ type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deal
 const GRAD = 'var(--color-brand)'
 
 const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[] = [
-  { id: 'ghg', name: 'Climate — GHG Inventory · Scope 1, 2 & 3', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
-  { id: 'cbam', name: 'CBAM — Carbon Border Adjustment Mechanism', frameworks: 'Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · verification-ready summary for your EU importer', href: '/pricing?modules=cbam' },
-  { id: 'risk', name: 'Climate Risk', frameworks: 'SB 261 · TCFD · IFRS S2 · scenario analysis', href: '/climate-risk' },
+  { id: 'ghg', name: 'Climate · GHG Inventory · Scope 1, 2 & 3', frameworks: 'SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2', href: '/climate-ghg' },
+  { id: 'cbam', name: 'CBAM · Carbon Border Adjustment Mechanism', frameworks: 'EU CBAM · CBAM Annex IV · CBAM implementing regulations', href: '/pricing?modules=cbam' },
+  { id: 'risk', name: 'Climate Risk', frameworks: 'SB 261 · TCFD · IFRS S2', href: '/climate-risk' },
   // ⚠️ id 'impact', NOT the ModuleKey 'double-materiality' — this id IS the LEGACY_PRICING_PAGE_ID shorthand
   // (lib/pricing.ts:77) and is what the cart resolves through. The ModuleKey itself is not a key
   // in that map, so it would be dropped by the .filter(Boolean) at order/page.tsx:75 and the
   // customer would reach an empty order.
-  { id: 'impact', name: 'Materiality Assessment', frameworks: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement · double materiality', href: '/materiality' },
-  { id: 'supply', name: 'Supply Chain', frameworks: 'CS3D · EcoVadis · CDP supplier engagement · Modern Slavery Act', href: '/supply-chain' },
-  { id: 'people', name: 'People & Workforce', frameworks: 'EU Pay Transparency · ESRS S1 · GRI 401–410', href: '/people' },
-  { id: 'deals', name: 'Deals & Investment', frameworks: 'TCFD · SFDR · ILPA · IFC Performance Standards', href: '/deals' },
+  { id: 'impact', name: 'Materiality Assessment', frameworks: 'CSRD and ESRS', href: '/materiality' },
+  { id: 'supply', name: 'Supply Chain', frameworks: 'CS3D · EcoVadis · CDP · Modern Slavery Act · ESRS S2', href: '/supply-chain' },
+  { id: 'people', name: 'People & Workforce', frameworks: 'EU Pay Transparency · ESRS S1 · GRI 400 series', href: '/people' },
+  { id: 'deals', name: 'Deals & Investment', frameworks: 'SB 253 · SECR · Canada S-211 · CSRD · CS3D', href: '/deals' },
   { id: 'ai', name: 'AI Governance', frameworks: 'EU AI Act · NIST AI RMF · ISO 42001', href: '/ai-governance' },
   { id: 'cyber', name: 'Cyber Governance', frameworks: 'NIS2 · DORA · SEC Cyber · ISO 27001 · NIST CSF', href: '/cyber' },
 ]
@@ -88,7 +88,8 @@ export default function HomePricing() {
         <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Pricing</p>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>Simple, honest pricing.</h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400, marginBottom: '0.5rem' }}>
-          Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
+          Whether the request comes from a regulator, a lender, your board or a customer, you pay only for
+          the modules it calls for.
         </p>
         <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: '2rem' }}>All prices in USD</p>
 
@@ -97,8 +98,8 @@ export default function HomePricing() {
           <div style={{ background: '#fff', borderRadius: 11, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: GRAD, animation: 'pulse 2s ease-in-out infinite' }} />
             <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>This pricing section is interactive — </span>
-              <span style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>click a tier card to select your level, then click any module row to add it. Your total updates instantly.</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Build your own estimate: </span>
+              <span style={{ fontSize: 13, color: '#555553', fontWeight: 400 }}>pick a tier, then click any module to add it. The total updates as you go.</span>
             </div>
           </div>
         </div>
@@ -113,7 +114,7 @@ export default function HomePricing() {
                   container is narrower than it. */}
               <div style={{ flex: 1, minWidth: 'min(260px, 100%)' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
-                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow. Each one is a complete, standalone deliverable rather than a partial view that only works when you buy the set.</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -180,7 +181,7 @@ export default function HomePricing() {
           <div className="tq-summary" style={{ marginBottom: 14 }}>
             <div className="tq-summary-body">
               <div>
-                <div style={{ letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }} className="tq-summary-label">Your platform — live estimate</div>
+                <div style={{ letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }} className="tq-summary-label">Your platform · live estimate</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8 }}>
                   {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
                 </div>
@@ -224,7 +225,7 @@ export default function HomePricing() {
         {/* Dynamic CTA */}
         <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', textAlign: 'center' }}>
           <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 12px', lineHeight: 1.8 }}>
-            For many companies, we understand that emerging reporting requirements — and the pricing from other platforms and traditional consulting firms — are overwhelming. ThemisIQ offers a better way.
+            Reporting rules keep multiplying, and so do the quotes from platforms and consultancies. Our prices are published, so you know the cost before you start.
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{cta.headline}</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 14 }}>
