@@ -129,21 +129,21 @@ export function renderedDashes(file: string): number {
  * ⚠️ PENDING A DECISION, NOT EXEMPT. These are excluded from the sweep because the decision to change them
  * has not been taken, NOT because an em dash is acceptable in them.
  *
- * THE LEGAL PAGES carry document version numbers (TIQ-PRV-001 · v2.2 and its siblings), so a punctuation
- * edit raises the question of whether the version moves and whether docs/policy-snapshots needs a matching
- * entry. That is a legal-record judgement, not a copy one.
+ * ⚠️ THE THREE LEGAL PAGES HAVE LEFT THIS LIST, 27 Sep 2026. They carried document version numbers
+ * (TIQ-PRV-001 · v2.2 and its siblings) and a consent version rows in purchase_consents point at, so a
+ * punctuation edit raised a legal-record question rather than a copy one: does the version move, and does
+ * a snapshot need a matching entry? Decided: the version does NOT move, and the amendment is recorded in
+ * docs/policy-snapshots/README.md — a new file, so that no snapshot of a published version is edited. All
+ * three are now at zero and held there by the unbudgeted-files test like any other page.
  *
- * THE EMAIL TEMPLATES in app/api/* are the same templates CLAUDE.md records as the deliberately unmigrated
- * brand gradient, so they are already a known exception awaiting one decision rather than many.
+ * THE EMAIL TEMPLATES in app/api/* remain: they are the same templates CLAUDE.md records as the
+ * deliberately unmigrated brand gradient, so they are a known exception awaiting one decision rather than
+ * many.
  *
- * Counts are NOT asserted for these: the point is that nobody has looked yet, and pinning a number would
- * imply someone had.
+ * A count is NOT asserted for what remains: the point is that nobody has looked yet, and pinning a number
+ * would imply someone had.
  */
-const PENDING_DECISION = [
-  'app/privacy/page.tsx',
-  'app/terms/page.tsx',
-  'app/refund-policy/page.tsx',
-] as const
+const PENDING_DECISION: readonly string[] = []
 const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
 
 /**
@@ -166,7 +166,7 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
  * number rose gained nothing: it was always wrong.
  */
 /**
- * Whole-literal '—' empty-value glyphs left in the tree, counted 28 Sep 2026.
+ * Whole-literal '—' empty-value glyphs left in the tree, counted 27 Sep 2026.
  *
  * ⚠️ AN EQUALITY, NOT A CEILING, AND IT SHOULD ONLY EVER FALL. The old QUOTED_BULLET exempted every one of
  * these, so the ratchet could not see them at all; the GHG workings table's 24 were found by reading the
@@ -322,19 +322,21 @@ describe('no em dash reaches customer-facing copy, and the remaining budget only
       .toEqual([])
   })
 
-  it('the pending-decision files are named, not silently skipped', () => {
-    // Asserted so the exemption cannot quietly widen: a fourth legal page added to the list has to be a
-    // deliberate edit here, with the reason above it.
-    expect([...PENDING_DECISION]).toEqual([
-      'app/privacy/page.tsx',
-      'app/terms/page.tsx',
-      'app/refund-policy/page.tsx',
-    ])
+  it('the pending-decision list is empty, and the prefix still covers the email templates', () => {
+    // ⚠️ ASSERTED EMPTY RATHER THAN DELETED. The list is the shape of the remaining exemption, and a page
+    // added back to it has to be a deliberate edit here with the reason above it. The three legal pages
+    // left on 27 Sep 2026; see docs/policy-snapshots/README.md for the amendment that let them.
+    expect([...PENDING_DECISION]).toEqual([])
     expect(PENDING_DECISION_PREFIX).toBe('app/api/')
-    // And they do still carry em dashes, so the exemption is live rather than vestigial. If this fails
-    // because one is clean, delete it from PENDING_DECISION.
-    for (const f of PENDING_DECISION) {
-      expect(renderedDashes(f), `${f} is clean — remove it from PENDING_DECISION`).toBeGreaterThan(0)
+    // The templates the prefix covers do still carry em dashes, so the exemption is live rather than
+    // vestigial. If this fails because they are clean, delete the prefix and the filter that uses it.
+    const templates = walk('app/api').filter(f => !f.includes('.test.'))
+    expect(templates.some(f => renderedDashes(f) > 0),
+      'no app/api/ file carries an em dash any more').toBe(true)
+    // And the legal pages are held at zero by the unbudgeted-files test above, not by an exemption.
+    for (const f of ['app/privacy/page.tsx', 'app/terms/page.tsx', 'app/refund-policy/page.tsx']) {
+      expect(renderedDashes(f), `${f} has gained an em dash back`).toBe(0)
+      expect(SWEEP_BUDGET[f], `${f} must not have a budget`).toBeUndefined()
     }
   })
 

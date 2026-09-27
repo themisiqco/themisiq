@@ -60,7 +60,7 @@ export default function Page() {
 
           <Section id="r6" num="Section 6" title="Contact">
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Refund enquiries — ThemisIQ Compliance Inc.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Refund enquiries, ThemisIQ Compliance Inc.</div>
               <div className="tq-callout-text">Email: <a href="mailto:hello@themisiq.co" style={{ color: 'var(--color-brand)' }}>hello@themisiq.co</a></div>
             </div>
           </Section>

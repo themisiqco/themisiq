@@ -65,7 +65,7 @@ export default function PrivacyPage() {
             <div style={eyebrow}>Section 1</div>
             <h2 style={sectionHead}>Who we are</h2>
             <p style={body}><strong>ThemisIQ Compliance Inc.</strong> ("ThemisIQ", "we", "us") is a compliance intelligence and SaaS platform company incorporated in Canada, operating www.themisiq.co.</p>
-            <p style={body}>Our designated <strong>Privacy Officer</strong> is the Chief Executive Officer — <a href="mailto:privacy@themisiq.co" style={link}>privacy@themisiq.co</a>. All privacy requests should be directed to this address.</p>
+            <p style={body}>Our designated <strong>Privacy Officer</strong> is the Chief Executive Officer: <a href="mailto:privacy@themisiq.co" style={link}>privacy@themisiq.co</a>. All privacy requests should be directed to this address.</p>
           </div>
           <div style={divider} />
 
@@ -77,7 +77,7 @@ export default function PrivacyPage() {
               <tbody>
                 {[
                   ['Account data', 'Name, work email, job title, company, billing address', 'Controller'],
-                  ['Platform data', 'GHG data, workforce metrics, supply chain data, AI inventories entered into ThemisIQ modules', 'Processor — you are the controller'],
+                  ['Platform data', 'GHG data, workforce metrics, supply chain data, AI inventories entered into ThemisIQ modules', 'Processor: you are the controller'],
                   ['Assessment data', 'Compliance Assessment answers, email, company, role', 'Controller'],
                   ['Usage data', 'Log data, IP addresses, browser type, pages visited, feature usage', 'Controller'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
@@ -99,7 +99,7 @@ export default function PrivacyPage() {
                 {[
                   ['Delivering the ThemisIQ platform', 'Account data, platform data', 'Contract performance'],
                   ['Sending assessment results', 'Assessment data, email', 'Express consent (CASL)'],
-                  ['Marketing emails', 'Account data, email', 'Express consent (CASL) — unsubscribe anytime'],
+                  ['Marketing emails', 'Account data, email', 'Express consent (CASL): unsubscribe anytime'],
                   ['Billing and invoicing', 'Account data', 'Contract / legal obligation (CRA)'],
                   ['Platform security', 'Usage data, log data', 'Legitimate interests'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
@@ -111,9 +111,9 @@ export default function PrivacyPage() {
           <div id="s4" style={sectionStyle}>
             <div style={eyebrow}>Section 4</div>
             <h2 style={sectionHead}>Legal basis</h2>
-            <p style={body}>For Canadian residents, our basis is the <strong>PIPEDA fair information principles</strong> — primarily consent and legitimate business purposes.</p>
+            <p style={body}>For Canadian residents, our basis is the <strong>PIPEDA fair information principles</strong>: primarily consent and legitimate business purposes.</p>
             <p style={body}>For EU/EEA/UK residents, our bases under GDPR / UK GDPR are: contract performance (Art. 6(1)(b)), consent (Art. 6(1)(a)), legal obligation (Art. 6(1)(c)), and legitimate interests (Art. 6(1)(f)).</p>
-            <p style={body}>For Québec residents, <strong>Law 25</strong> applies additional requirements — Privacy Impact Assessments, 72-hour breach reporting to the CAI, named Privacy Officer, and data portability rights.</p>
+            <p style={body}>For Québec residents, <strong>Law 25</strong> applies additional requirements: Privacy Impact Assessments, 72-hour breach reporting to the CAI, named Privacy Officer, and data portability rights.</p>
           </div>
           <div style={divider} />
 
@@ -144,7 +144,7 @@ export default function PrivacyPage() {
             <h2 style={sectionHead}>International transfers</h2>
             <p style={body}>ThemisIQ is Canadian. Data is processed in Canada and transferred to sub-processors in the United States.</p>
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
-              <div className="tq-callout-heading">EU/UK customers — GDPR transfer mechanism</div>
+              <div className="tq-callout-heading">EU/UK customers: GDPR transfer mechanism</div>
               <div className="tq-callout-text">For EU/UK customers, we rely on Standard Contractual Clauses (SCCs) under GDPR Article 46(2)(c) and the UK International Data Transfer Agreement (IDTA). Our DPA incorporating SCCs is available at legal@themisiq.co.</div>
             </div>
           </div>
@@ -161,7 +161,7 @@ export default function PrivacyPage() {
                   ['Account and contact data', '7 years from last activity', 'Canada Revenue Agency'],
                   ['Marketing consent records', '3 years from last interaction', 'CASL'],
                   ['Assessment / lead data', '3 years from collection', 'PIPEDA / CASL'],
-                  ['Security and audit logs', '5 years', 'Legitimate interest — security'],
+                  ['Security and audit logs', '5 years', 'Legitimate interest: security'],
                   ['Billing records', '7 years', 'Canada Revenue Agency'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
@@ -177,7 +177,7 @@ export default function PrivacyPage() {
           <div style={divider} />
 
           <div id="s9" style={{ ...sectionStyle, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 15%, transparent)', borderRadius: 12, padding: '1.5rem' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: 'color-mix(in srgb, var(--color-brand) 10%, transparent)', color: 'var(--color-brand)', padding: '3px 10px', borderRadius: 99, marginBottom: 10 }}>🇺🇸 US residents — additional rights</div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: 'color-mix(in srgb, var(--color-brand) 10%, transparent)', color: 'var(--color-brand)', padding: '3px 10px', borderRadius: 99, marginBottom: 10 }}>🇺🇸 US residents: additional rights</div>
             <div style={eyebrow}>Section 9</div>
             <h2 style={sectionHead}>Additional rights for US residents</h2>
             <p style={body}>ThemisIQ does not sell personal information as defined under CCPA §1798.140(ad). You do not need to submit a "Do Not Sell or Share" request because we do not engage in these activities.</p>
@@ -198,7 +198,7 @@ export default function PrivacyPage() {
             <div style={eyebrow}>Section 11</div>
             <h2 style={sectionHead}>Contact & complaints</h2>
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Privacy Officer — ThemisIQ Compliance Inc.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Privacy Officer, ThemisIQ Compliance Inc.</div>
               <div className="tq-callout-text">Email: privacy@themisiq.co · Response: 30 days (Canada/EU) · 45 days (US)</div>
             </div>
           </div>

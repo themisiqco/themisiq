@@ -160,7 +160,7 @@ export default function Page() {
           <Section id="t17" num="Section 17" title="Governing law">
             <p style={body}>{`This Agreement is governed by the laws of the Province of Ontario and the laws of Canada applicable therein, without regard to conflict-of-law principles.`}</p>
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Legal enquiries — ThemisIQ Compliance Inc.</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Legal enquiries, ThemisIQ Compliance Inc.</div>
               <div className="tq-callout-text">Email: <a href="mailto:legal@themisiq.co" style={{ color: 'var(--color-brand)' }}>legal@themisiq.co</a></div>
             </div>
           </Section>
