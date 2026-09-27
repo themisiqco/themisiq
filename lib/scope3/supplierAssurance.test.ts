@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { stripTsComments } from '../testing/stripComments'
 import { join } from 'node:path'
 import {
   assuranceForLine, carriesThirdPartyAssurance, assuranceContradictsFigure,
@@ -36,9 +37,18 @@ describe('mapping the supplier answer', () => {
     expect(q!.options).toBeDefined()
 
     const states = q!.options!.map(opt =>
-      assuranceForLine({ raw: opt, asked: true, method: 'supplier-specific' }).assurance)
-    expect(states, 'every live option maps to a state, none falls through to unrecognised')
+      assuranceForLine({ raw: opt.value, asked: true, method: 'supplier-specific' }).assurance)
+    expect(states, 'every live option VALUE maps to a state, none falls through to unrecognised')
       .toEqual(['limited', 'reasonable', 'internal_only', 'no_measurement'])
+
+    // ⚠️ AND EVERY OPTION LABEL STILL MAPS TO THE SAME STATE. The label was the stored answer until
+    // 27 Sep 2026, so rows written before the migration and every supplier_assurance_raw already frozen
+    // into a snapshot hold prose. A snapshot is never rewritten, so this is permanent, not transitional:
+    // if it fails, historical lines have started reading as 'unrecognised' and telling a verifier the
+    // supplier gave an off-list answer.
+    const legacyStates = q!.options!.map(opt =>
+      assuranceForLine({ raw: opt.label, asked: true, method: 'supplier-specific' }).assurance)
+    expect(legacyStates, 'the four legacy labels must keep their states for good').toEqual(states)
   })
 
   it('keeps the supplier answer verbatim, em-dashes and all', () => {
@@ -188,9 +198,17 @@ describe('the state set, and why a member cannot be added casually', () => {
     // load-bearing for the immutability story: a snapshot line written before this field existed has NO
     // assurance key, and that absence is only readable because no member of this set means "unknown
     // whether it was recorded". Add one that does and old rows stop being distinguishable from new ones.
-    const src = readFileSync(join(__dirname, 'supplierAssurance.ts'), 'utf8')
-    const union = src.slice(src.indexOf('export type AssuranceState ='), src.indexOf('// ⚠️ EXACT STRINGS'))
-    const members = [...union.matchAll(/'([a-z_]+)'/g)].map(m => m[1])
+    // ⚠️ BOUNDED BY A DECLARATION, NOT BY A COMMENT'S WORDING. It used to slice up to the literal string
+    // '// ⚠️ EXACT STRINGS', and rewording that comment on 27 Sep 2026 made indexOf return -1: the slice
+    // then ran to the end of the file and the test read 63 "members". A comment is not an anchor.
+    // Comments are blanked first, and stripTsComments preserves every offset, so the two anchors still
+    // point where they did. Without it the slice picks up 'unrecognised' out of the prose between them.
+    const src = stripTsComments(readFileSync(join(__dirname, 'supplierAssurance.ts'), 'utf8'))
+    const from = src.indexOf('export type AssuranceState =')
+    const to = src.indexOf('const STATE_BY_ANSWER')
+    expect(from, 'the union has moved or been renamed').toBeGreaterThan(-1)
+    expect(to, 'STATE_BY_ANSWER has moved or been renamed').toBeGreaterThan(from)
+    const members = [...src.slice(from, to).matchAll(/'([a-z_]+)'/g)].map(m => m[1])
     expect(members).toEqual(ALL_STATES)
   })
 

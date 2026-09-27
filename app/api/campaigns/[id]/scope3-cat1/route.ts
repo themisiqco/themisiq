@@ -27,6 +27,7 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../../lib/supab
 import { EMISSION_FACTORS, DEFAULT_SPEND_EF } from '../../../../../lib/emissionFactors'
 import { templateAsks } from '../../../../../lib/supply-chain/templates'
 import { noFigureReasonForStatus } from '../../../../../lib/supply-chain/supplierStatus'
+import { optionLabel } from '../../../../../lib/supply-chain/templates'
 import {
   assuranceForLine, carriesThirdPartyAssurance, assuranceContradictsFigure, ASSURANCE_QUESTION_ID,
 } from '../../../../../lib/scope3/supplierAssurance'
@@ -133,7 +134,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     for (const s of supplierList) {
       const resp = responsesBySupplier[s.id] || {}
       const allocated = num(resp[Q_ALLOCATED])
-      const quality = resp[Q_QUALITY] || ''
+      // ⚠️ RESOLVED TO THE LABEL, BECAUSE data_quality IS FROZEN INTO A SNAPSHOT A VERIFIER READS. The
+      // stored answer is an option VALUE since 27 Sep 2026 (and a label before that); optionLabel accepts
+      // either and returns the supplier's words, so a snapshot never carries `measured_supplier_specific`.
+      const quality = resp[Q_QUALITY] ? optionLabel(Q_QUALITY, resp[Q_QUALITY]) : ''
       const method = resp[Q_METHOD] || ''
       // No extra query: resp already holds every answer this supplier gave.
       const assuranceRaw = resp[ASSURANCE_QUESTION_ID]

@@ -214,7 +214,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/stakeholder/[id]/report/page.tsx': 4,
   'app/dashboard/supply-chain/page.tsx': 63,
   'app/dashboard/supply-chain/portal/[id]/page.tsx': 2,
-  'app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx': 4,
+  'app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx': 1,
   'app/dashboard/supply-chain/portal/page.tsx': 1,
   'app/deals/[token]/page.tsx': 6,
   'app/impact/[token]/page.tsx': 11,

@@ -32,7 +32,7 @@ export type AssuranceState =
   | 'unrecognised'     // a value outside the option list reached the database
   | 'not_applicable'   // a spend-based line: the figure did not come from the supplier's reporting
 
-// ⚠️ EXACT STRINGS FROM lib/supply-chain/templates.ts, EM-DASHES INCLUDED, AND NO FUZZY MATCHING.
+// ⚠️ EXACT OPTION VALUES FROM lib/supply-chain/templates.ts, AND NO FUZZY MATCHING.
 // The option list is enforced nowhere: supplier_responses.response is text and portal_save_response
 // validates nothing, so any string can arrive from anyone holding the token. An off-list value
 // therefore becomes 'unrecognised' and is reported as given rather than mapped to its nearest
@@ -40,6 +40,24 @@ export type AssuranceState =
 // guessing, and the same reason: a near-match here would silently bracket 'reasonable assurance' with
 // 'limited assurance', and the difference between those two is the entire point of the field.
 const STATE_BY_ANSWER: Record<string, AssuranceState> = {
+  yes_limited_assurance:    'limited',
+  yes_reasonable_assurance: 'reasonable',
+  no_internal_only:         'internal_only',
+  no_measurement:           'no_measurement',
+}
+
+/**
+ * ⚠️ THE OLD LABELS, AND THEY STAY HERE PERMANENTLY. Until 27 Sep 2026 the option's prose WAS the stored
+ * answer, so every row written before then and every `supplier_assurance_raw` already frozen into a
+ * scope3_category_snapshot holds one of these four strings. A snapshot is a record of what was reported
+ * and is never rewritten, so dropping this map would turn every historical line into 'unrecognised' —
+ * whose statement tells a verifier "the recorded answer is not one of the questionnaire's options", a
+ * false claim about a supplier who answered correctly.
+ *
+ * ⚠️ IT IS SEPARATE FROM THE MAP ABOVE, NOT MERGED INTO IT, so the distinction stays visible: the keys
+ * above are the option values a new answer carries, these are prose nobody writes any more.
+ */
+const LEGACY_STATE_BY_ANSWER: Record<string, AssuranceState> = {
   'Yes — limited assurance':    'limited',
   'Yes — reasonable assurance': 'reasonable',
   'No — internal only':         'internal_only',
@@ -79,7 +97,10 @@ export function assuranceForLine(opts: {
   const raw = trimmed === '' ? null : trimmed
 
   if (opts.method === 'spend-based') return { supplier_assurance_raw: raw, assurance: 'not_applicable' }
-  if (raw !== null) return { supplier_assurance_raw: raw, assurance: STATE_BY_ANSWER[raw] ?? 'unrecognised' }
+  if (raw !== null) {
+    const state = STATE_BY_ANSWER[raw] ?? LEGACY_STATE_BY_ANSWER[raw] ?? 'unrecognised'
+    return { supplier_assurance_raw: raw, assurance: state }
+  }
   return { supplier_assurance_raw: null, assurance: opts.asked ? 'not_answered' : 'not_asked' }
 }
 

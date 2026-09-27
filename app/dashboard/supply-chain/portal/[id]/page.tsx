@@ -10,7 +10,7 @@ import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
 import { supplierStatusLabel, supplierStatusTone } from '../../../../../lib/supply-chain/supplierStatus'
-import { labelForQuestionId } from '../../../../../lib/supply-chain/templates'
+import { labelForQuestionId , optionLabel } from '../../../../../lib/supply-chain/templates'
 import { btnPrimary, btnStepPrimaryDisabled } from '@/app/components/buttonStyles'
 
 interface CampaignSupplier {
@@ -103,7 +103,13 @@ export default function CampaignDetail() {
         s.completed_at ? new Date(s.completed_at).toLocaleDateString() : '',
         s.annual_spend != null ? String(s.annual_spend) : '',
         s.spend_currency || '',
-        ...allQuestionIds.map(qid => allResponses[s.id]?.[qid] || ''),
+        // ⚠️ THE LABEL, NOT THE STORED VALUE, for the same reason as the single-supplier export: this file
+        // goes to a customer. A question id with no known label keeps its raw answer, because inventing
+        // one would be worse than showing what is there.
+        ...allQuestionIds.map(qid => {
+          const raw = allResponses[s.id]?.[qid] || ''
+          return raw ? raw.split(',').map(part => optionLabel(qid, part.trim())).join(', ') : ''
+        }),
       ]),
     ]
 

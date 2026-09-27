@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
-import { TEMPLATES, type Section } from '../../../lib/supply-chain/templates'
+import { TEMPLATES, type Section , optionValue, type QuestionOption } from '../../../lib/supply-chain/templates'
 
 const GRAD = 'var(--color-brand)'
 
@@ -179,13 +179,13 @@ export default function SupplierQuestionnaire() {
 
                   {q.type === 'radio' && q.options && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {q.options.map((opt: string) => (
-                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, border: `1px solid ${responses[q.id] === opt ? currentSection.color : '#e8e7e4'}`, background: responses[q.id] === opt ? currentSection.bg : '#fff', transition: 'all 0.1s' }}>
-                          <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${responses[q.id] === opt ? currentSection.color : '#e8e7e4'}`, background: responses[q.id] === opt ? currentSection.color : '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {responses[q.id] === opt && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                      {q.options.map(opt => (
+                        <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, border: `1px solid ${optionValue(q.id, responses[q.id] ?? '') === opt.value ? currentSection.color : '#e8e7e4'}`, background: optionValue(q.id, responses[q.id] ?? '') === opt.value ? currentSection.bg : '#fff', transition: 'all 0.1s' }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${optionValue(q.id, responses[q.id] ?? '') === opt.value ? currentSection.color : '#e8e7e4'}`, background: optionValue(q.id, responses[q.id] ?? '') === opt.value ? currentSection.color : '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {optionValue(q.id, responses[q.id] ?? '') === opt.value && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
                           </div>
-                          <input type="radio" name={q.id} value={opt} checked={responses[q.id] === opt} onChange={() => saveResponse(q.id, opt)} style={{ display: 'none' }} />
-                          <span style={{ fontSize: 13, color: '#0d0d0d' }}>{opt}</span>
+                          <input type="radio" name={q.id} value={opt.value} checked={optionValue(q.id, responses[q.id] ?? '') === opt.value} onChange={() => saveResponse(q.id, opt.value)} style={{ display: 'none' }} />
+                          <span style={{ fontSize: 13, color: '#0d0d0d' }}>{opt.label}</span>
                         </label>
                       ))}
                     </div>
@@ -196,26 +196,31 @@ export default function SupplierQuestionnaire() {
                       rows keep reading correctly without a migration. */}
                   {q.type === 'checkbox' && q.options && (() => {
                     const opts = q.options
-                    const selected = (responses[q.id] || '').split(',').map(s => s.trim()).filter(Boolean)
-                    const toggle = (opt: string) => {
-                      // 'None' is exclusive: it clears the rest, and any other tick clears it.
-                      const next = selected.includes(opt)
-                        ? selected.filter(s => s !== opt)
-                        : opt === 'None'
-                          ? ['None']
-                          : [...selected.filter(s => s !== 'None'), opt]
+                    // ⚠️ EACH PART IS NORMALISED, NOT JUST THE WHOLE. A row written before the values
+                    // migration holds labels ("CDP, GRI"), and one written by a page loaded before it
+                    // still can, so every part goes through optionValue. Values carry no comma, which is
+                    // what makes this delimiter safe at all — a label with one would have shredded it.
+                    const selected = (responses[q.id] || '').split(',').map(x => optionValue(q.id, x.trim()))
+                      .filter(Boolean)
+                    const toggle = (opt: QuestionOption) => {
+                      // 'none' is exclusive: it clears the rest, and any other tick clears it.
+                      const next = selected.includes(opt.value)
+                        ? selected.filter(v => v !== opt.value)
+                        : opt.value === 'none'
+                          ? ['none']
+                          : [...selected.filter(v => v !== 'none'), opt.value]
                       // Filter q.options rather than join `next` — order is the question's, not the click order.
-                      saveResponse(q.id, opts.filter(o => next.includes(o)).join(', '))
+                      saveResponse(q.id, opts.filter(o => next.includes(o.value)).map(o => o.value).join(', '))
                     }
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {opts.map((opt: string) => (
-                          <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, border: `1px solid ${selected.includes(opt) ? currentSection.color : '#e8e7e4'}`, background: selected.includes(opt) ? currentSection.bg : '#fff', transition: 'all 0.1s' }}>
-                            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${selected.includes(opt) ? currentSection.color : '#e8e7e4'}`, background: selected.includes(opt) ? currentSection.color : '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {selected.includes(opt) && <span style={{ fontSize: 10, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>}
+                        {opts.map(opt => (
+                          <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, border: `1px solid ${selected.includes(opt.value) ? currentSection.color : '#e8e7e4'}`, background: selected.includes(opt.value) ? currentSection.bg : '#fff', transition: 'all 0.1s' }}>
+                            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${selected.includes(opt.value) ? currentSection.color : '#e8e7e4'}`, background: selected.includes(opt.value) ? currentSection.color : '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {selected.includes(opt.value) && <span style={{ fontSize: 10, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>}
                             </div>
-                            <input type="checkbox" name={q.id} value={opt} checked={selected.includes(opt)} onChange={() => toggle(opt)} style={{ display: 'none' }} />
-                            <span style={{ fontSize: 13, color: '#0d0d0d' }}>{opt}</span>
+                            <input type="checkbox" name={q.id} value={opt.value} checked={selected.includes(opt.value)} onChange={() => toggle(opt)} style={{ display: 'none' }} />
+                            <span style={{ fontSize: 13, color: '#0d0d0d' }}>{opt.label}</span>
                           </label>
                         ))}
                       </div>
