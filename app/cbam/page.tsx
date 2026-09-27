@@ -259,7 +259,10 @@ const OUTPUTS: readonly ModuleOutput[] = [
     body: 'Specific embedded emissions per CN code with the Annex IV §1.2 summary, built from a sample installation.' },
 ]
 
-const FRAMEWORKS = ['(EU) 2023/956', 'Annex IV', 'Implementing regulations'] as const
+// ⚠️ THE NAMES app/frameworks/page.tsx USES, not the citation forms. FrameworkChips links every chip
+// there, so a chip has to be findable on arrival: '(EU) 2023/956' was the regulation's number and the
+// entry is called 'EU CBAM'. Same reason the homepage card was changed in the commit before this.
+const FRAMEWORKS = ['EU CBAM', 'CBAM Annex IV', 'CBAM implementing regulations'] as const
 
 /**
  * ⚠️ THE SECTORS ANSWER NAMES TWO, AND MUST. See the note at the top of this file: the seeds cover CN

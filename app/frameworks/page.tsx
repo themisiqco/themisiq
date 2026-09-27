@@ -27,6 +27,11 @@ import {
   ISO_27001_URL,
   ISO_42001_URL,
   NIS2_COMMISSION_URL,
+  GRI_305_URL,
+  SEC_CYBER_RULES_URL,
+  MODERN_SLAVERY_UK_S54_URL,
+  SASB_STANDARDS_URL,
+  CANADA_S211_URL,
   NIST_AI_RMF_URL,
   NIST_CSF_URL,
   SBTI_URL,
@@ -87,6 +92,12 @@ const groups: Group[] = [
       // SBTi is part of the GHG module rather than a module of its own, and the maps line now says so —
       // the mapping was already /climate-ghg and read as though it might be somewhere else.
       { name: 'SBTi', body: 'Science Based Targets initiative — corporate emissions-reduction target setting.', maps: 'Part of the GHG module, not a separate one: targets are set and tracked against the inventory you have already built, under the Corporate Net-Zero Standard.', href: SBTI_URL, covers: [{ href: '/climate-ghg' }] },
+      // ⚠️ GRI 305, NOT "GRI". lib/ghg/engine.ts:1538 names the chip `GRI 305` and cites 305-1, 305-2 and
+      // 305-3 by number, so this card is about the emissions standard and not about GRI as a publisher.
+      // The People group's 'GRI 400 series' card is the social half and is a different standard set.
+      // Added 26 Sep 2026: the homepage pricing row has claimed GRI 305 since before this page existed,
+      // with nothing here for the chip to link to.
+      { name: 'GRI 305', body: 'The GRI emissions standard, reporting Scope 1, 2 and 3 by individual gas.', maps: '305-1, 305-2 and 305-3, split by CO2, CH4, N2O and HFCs.', href: GRI_305_URL, covers: [{ href: '/climate-ghg' }] },
     ],
   },
   {
@@ -127,6 +138,12 @@ const groups: Group[] = [
       { name: 'EU CS3D', body: `The Corporate Sustainability Due Diligence Directive on value-chain human rights and environmental impacts. ${CS3D_CITATION}. Since ${CS3D_OMNIBUS_CITATION} there is a single scope tier: an EU company is caught only with ${CS3D_EMPLOYEE_THRESHOLD} and ${CS3D_TURNOVER_THRESHOLD}. Member States transpose by ${CS3D_TRANSPOSITION} and obligations apply from ${CS3D_APPLIES_FROM}. Almost certainly your customer is in scope and you are not — what reaches you is their request.`, maps: 'Structured human rights and environmental questionnaires you answer once and reuse for every customer that asks, plus the same collection from your own suppliers.', href: CS3D_COMMISSION_URL, covers: [{ href: '/supply-chain' }] },
       { name: 'ESRS S2', body: 'Workers in the value chain — the CSRD standard for upstream/downstream labour impacts.', maps: 'Workers-in-the-value-chain disclosures from your supplier data.', href: EFRAG_HOME_URL, covers: [{ href: '/supply-chain' }] },
       { name: 'EcoVadis', body: 'Business sustainability ratings used across supply chains.', maps: 'Evidence and scoring organized for EcoVadis assessments.', href: ECOVADIS_URL, covers: [{ href: '/supply-chain' }] },
+      // ⚠️ ONE OBLIGATION, TWO JURISDICTIONS, ONE href. The Item type carries a single href and the UK
+      // section 54 is it; the Australian Act is named in the body and its URL is MODERN_SLAVERY_AU_URL in
+      // lib/sources.ts, held there so the claim is sourced even though this shape cannot link it.
+      // The href is s.54 rather than the Act: the Act also covers offences and victim protection, and s.54
+      // is the only part the Supply Chain module addresses.
+      { name: 'Modern Slavery Act', body: 'The UK and Australian statements on steps taken to address forced labour in operations and supply chains.', maps: 'Supplier questionnaire responses and the evidence behind each answer.', href: MODERN_SLAVERY_UK_S54_URL, covers: [{ href: '/supply-chain' }] },
     ],
   },
   {
@@ -152,6 +169,12 @@ const groups: Group[] = [
     items: [
       { name: 'UK SECR', body: 'Streamlined Energy and Carbon Reporting. Caught by a two-of-three test on turnover, balance sheet total and employees.', maps: 'The threshold engine tests each limb, with FX conversion and near-threshold banding, so a company close to a limit is flagged rather than silently in or out.', href: SECR_GUIDANCE_URL, covers: [{ href: '/deals' }] },
       { name: 'CSRD thresholds', body: 'Who is caught after the Omnibus amendments, and from which financial year.', maps: 'Tested against a target or a portfolio company, with the result in an IC-ready pack.', href: EFRAG_HOME_URL, covers: [{ href: '/deals' }] },
+      // ⚠️ THE SIZE TEST HERE IS ONE OF THREE ROUTES INTO THE DEFINITION, AND THE ONLY ONE THE MODULE
+      // TESTS. s.2 "entity" is also met by a Canadian stock-exchange listing, at any size, and by anything
+      // prescribed by regulation. lib/deals/assessment.ts:577-597 models the size route alone, so the body
+      // below says "or" rather than implying the numbers are the whole definition. See the report of
+      // 26 Sep 2026 against the statute.
+      { name: 'Canada S-211', body: 'The Canadian forced and child labour reporting Act, reached by a stock-exchange listing or by size.', maps: 'The two-of-three size test on assets, revenue and employees, with the near-threshold margin flagged on both sides.', href: CANADA_S211_URL, covers: [{ href: '/deals' }] },
     ],
   },
   {
@@ -161,6 +184,13 @@ const groups: Group[] = [
       { name: 'ESRS S1', body: 'Own workforce — the CSRD standard covering your direct employees.', maps: 'Headcount, DEI, health & safety and pay metrics mapped to ESRS S1.', href: EFRAG_HOME_URL, covers: [{ href: '/people' }] },
       { name: 'GRI 400 series', body: 'GRI social topic standards (401\u2013410) on employment, labour and diversity.', maps: 'Employment, labour-relations and diversity disclosures.', href: GRI_HOME_URL, covers: [{ href: '/people' }] },
       { name: 'Pay Transparency', body: 'Emerging gender pay-gap and pay-data reporting requirements (EU Pay Transparency Directive, CA pay data).', maps: 'Gender pay-gap analysis and California pay-data reporting support.', href: CA_PAY_DATA_URL, covers: [{ href: '/people' }] },
+      // ⚠️ THE HUMAN CAPITAL TOPICS, NOT SASB. app/dashboard/people/page.tsx:285 offers exactly one SASB
+      // option, 'SASB Human Capital', described there as "Sector-specific workforce metrics". SASB is 77
+      // industry standards covering far more than workforce, so a card reading "SASB" would claim the set.
+      // ⚠️ ifrs.org, NOT sasb.org: the standards moved to the ISSB under the IFRS Foundation.
+      // Added 26 Sep 2026, and it is the reason SASB left the homepage strip for one commit. It was always
+      // backed by the picker above; what it lacked was this entry.
+      { name: 'SASB Human Capital', body: 'The workforce disclosure topics within the SASB Standards, now maintained by the ISSB, which investors ask for by sector.', maps: 'Sector-specific workforce metrics, from the same data the other workforce frameworks draw on.', href: SASB_STANDARDS_URL, covers: [{ href: '/people' }] },
     ],
   },
   {
@@ -183,6 +213,13 @@ const groups: Group[] = [
       { name: 'ISO/IEC 27001', body: 'The international standard for information-security management systems.', maps: 'ISMS controls and a maintained Statement of Applicability.', href: ISO_27001_URL, covers: [{ href: '/cyber' }] },
       { name: 'NIS2', body: 'The EU directive raising cybersecurity requirements across essential sectors.', maps: 'Risk-management measures and incident-reporting workflows.', href: NIS2_COMMISSION_URL, covers: [{ href: '/cyber' }] },
       { name: 'DORA', body: 'The EU Digital Operational Resilience Act for financial entities.', maps: 'ICT risk and operational-resilience controls for financial entities.', href: DORA_REGULATION_URL, covers: [{ href: '/cyber' }] },
+      // ⚠️ THE COUNT COMES FROM THE CONTROL SET, NOT FROM THIS CARD. app/dashboard/cyber/page.tsx tags 5 of
+      // its 25 controls `sec`, and lib/obligations.ts:173 publishes the same figure. The three must not
+      // drift: if a control gains or loses the tag, this number moves with it.
+      // Added 26 Sep 2026. lib/obligations.ts has mapped `sec-cyber` to the Cyber module since before this
+      // page existed, so /cyber named a framework this page could not describe, and the chip row on that
+      // page had to omit it for exactly that reason.
+      { name: 'SEC Cybersecurity Rules', body: 'The US disclosure rules for material cybersecurity incidents and governance, for SEC registrants.', maps: 'The 5 controls the rules reach, including the 8-K materiality assessment.', href: SEC_CYBER_RULES_URL, covers: [{ href: '/cyber' }] },
     ],
   },
 ]

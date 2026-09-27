@@ -282,3 +282,49 @@ export const CA_PAY_DATA_URL = 'https://www.calcivilrights.ca.gov/paydatareporti
 export const EFRAG_HOME_URL = 'https://www.efrag.org/en'
 // @source-status: resolves 2026-09-25
 export const GRI_HOME_URL = 'https://www.globalreporting.org'
+
+// Intent: GRI 305: Emissions (2016), the standard the GHG module's `gri` framework chip is built on.
+// SEPARATE FROM GRI_HOME_URL, which is the organisation. lib/ghg/engine.ts:1538 cites 305-1, 305-2 and
+// 305-3 by number, so a card naming GRI 305 needs the standard itself rather than the publisher: the
+// home page cannot tell a reader which disclosures the mapping covers.
+// ⚠️ A DIRECT PDF, AND THAT IS THE DOCUMENT. GRI publishes each standard as a PDF under /media/, so
+// there is no HTML landing page for 305 to link instead.
+// @source-status: verified 2026-09-26
+export const GRI_305_URL = 'https://www.globalreporting.org/standards/media/1012/gri-305-emissions-2016.pdf'
+
+// Intent: the SEC's adopting release for the cybersecurity disclosure rules, Release 33-11216, adopted
+// 26 July 2023. The rulemaking page rather than a press release, because the release is what states the
+// 8-K Item 1.05 and 10-K Item 106 requirements the Cyber module's controls are scored against.
+// ⚠️ THE RULES HAD NO CONSTANT AT ALL UNTIL 26 SEP 2026, which is why app/frameworks/page.tsx carried no
+// SEC entry while lib/obligations.ts:173 mapped `sec-cyber` to the Cyber module. The module claimed a
+// framework the reference page could not describe.
+// @source-status: verified 2026-09-26
+export const SEC_CYBER_RULES_URL = 'https://www.sec.gov/rules-regulations/2023/07/s7-09-22'
+
+// Intent: section 54 of the UK Modern Slavery Act 2015, "Transparency in supply chains", which is the
+// provision that creates the statement duty. Not the Act's front page: the Act covers offences and
+// victim protection, and s.54 is the only part the Supply Chain module addresses.
+// @source-status: verified 2026-09-26
+export const MODERN_SLAVERY_UK_S54_URL = 'https://www.legislation.gov.uk/ukpga/2015/30/section/54'
+
+// Intent: the Australian Modern Slavery Act 2018, named in the framework card's body rather than carried
+// as its href. ⚠️ ONE OBLIGATION, TWO JURISDICTIONS, AND THE Item TYPE HOLDS ONE href. Rather than change
+// that shape for a single card, the UK section above is the link and Australia is named in the prose. If a
+// third jurisdiction arrives, that is the point to reconsider, not this one.
+// @source-status: verified 2026-09-26
+export const MODERN_SLAVERY_AU_URL = 'https://www.legislation.gov.au/C2018A00153/latest/text'
+
+// Intent: the SASB Standards, now maintained by the ISSB under the IFRS Foundation, which is why this is
+// an ifrs.org URL and not sasb.org. app/dashboard/people/page.tsx:285 offers "SASB Human Capital" as a
+// selectable framework, so the claim is about the human-capital topics and not the full set of 77
+// industry standards.
+// @source-status: verified 2026-09-26
+export const SASB_STANDARDS_URL = 'https://www.ifrs.org/issued-standards/sasb-standards/'
+
+// Intent: the Fighting Against Forced Labour and Child Labour in Supply Chains Act, S.C. 2023, c. 9 (the
+// bill number S-211 is what everyone calls it, and what lib/deals/assessment.ts:578 stores as the
+// framework name). Section 2 carries the "entity" definition the Deals threshold test is built from.
+// ⚠️ THE JUSTICE LAWS PAGE, NOT A SUMMARY. The size limbs are numbers in the definition, so the test's
+// citation has to reach the definition itself.
+// @source-status: verified 2026-09-26
+export const CANADA_S211_URL = 'https://laws-lois.justice.gc.ca/eng/acts/F-10.6/page-1.html'

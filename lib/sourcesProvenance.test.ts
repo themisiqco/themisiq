@@ -58,6 +58,16 @@ const EXPECTED: Record<string, Status> = {
   EPA_USEEIO_URL: 'verified',
   ISO_27001_URL: 'verified',
 
+  // Added 26 Sep 2026 with the three framework cards that needed them, plus SASB. All five were opened by
+  // hand and confirmed to resolve to the document the constant's intent names, which is what 'verified'
+  // claims here and the only basis on which it may be claimed.
+  GRI_305_URL: 'verified',
+  SEC_CYBER_RULES_URL: 'verified',
+  MODERN_SLAVERY_UK_S54_URL: 'verified',
+  MODERN_SLAVERY_AU_URL: 'verified',
+  SASB_STANDARDS_URL: 'verified',
+  CANADA_S211_URL: 'verified',
+
   ISO_14064_3_URL: 'form-verified',
   ISO_42001_URL: 'form-verified',
 

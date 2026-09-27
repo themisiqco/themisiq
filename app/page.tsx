@@ -205,15 +205,15 @@ export default function Home() {
       ⚠️ TWO CHIPS WERE REMOVED ON 25 SEP 2026 AND MUST NOT COME BACK WITHOUT SOMETHING BEHIND THEM.
       "SEC Climate Rule" appeared nowhere in lib/ or app/ — nothing mapped, nothing scored, no export —
       and the rule's own status has never been settled. "RE100" appeared in exactly one place, a pricing
-      bullet. Both claimed coverage the product does not have. Of the eighteen below, nine are entries in
-      OBLIGATIONS (lib/obligations.ts); the other nine are standards the engine or a module cites by name,
+      bullet. Both claimed coverage the product does not have. Of the nineteen below, nine are entries in
+      OBLIGATIONS (lib/obligations.ts); the other ten are standards the engine or a module cites by name,
       each verified in the tree: ESRS/CSRD 26 files in lib/, GHG Protocol 17, SBTi 12 (lib/sbti.ts), TCFD
-      6, GRI 3, and ISO 27001, NIST AI RMF, NIST CSF and ISO 42001 in the Cyber and AI Governance module
-      surfaces, which keep their control sets in app/ rather than lib/. Adding a chip means finding its
+      6, GRI 3, and ISO 27001, NIST AI RMF, NIST CSF, ISO 42001 and SASB in the Cyber, AI Governance and
+      People module surfaces, which keep their control sets in app/ rather than lib/. Adding a chip means finding its
       evidence first.
-      ⚠️ SASB WAS THE TENTH AND IS NOW REMOVED, THOUGH ITS EVIDENCE WAS NEVER IN DOUBT — see the note on
-      FRAMEWORKS below. It is live in the People module's picker; what it lacks is an
-      app/frameworks/page.tsx entry, which is a different test and the one this strip now applies. */}
+      ⚠️ AND EVERY NAME HERE NOW RESOLVES TO AN app/frameworks/page.tsx ENTRY, which is a second test this
+      strip applies and the reason four entries were added on 26 Sep 2026. A chip that links to a page not
+      describing it is a promise the page breaks. */}
       <section style={{ padding: '4rem 2.5rem', borderTop: '0.5px solid var(--color-line)' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.6vw, 2rem)', fontWeight: 400, color: 'var(--color-ink)', marginBottom: '0.6rem' }}>
@@ -379,14 +379,13 @@ const MODULES_HOME = [
 ] as const
 
 /**
- * Eighteen, and it was nineteen until 26 Sep 2026, when 'SASB' came off.
- * ⚠️ NOT BECAUSE IT IS UNBACKED. It is: app/dashboard/people/page.tsx:285 offers 'SASB Human Capital' as a
- * selectable framework in the People module. An audit on 26 Sep 2026 reported it as unsupported after
- * grepping lib/ and app/frameworks/ and not app/dashboard/, and the section comment above had it right all
- * along. It came off for a narrower reason: every other name on this strip resolves to an
- * app/frameworks/page.tsx entry, and SASB does not, so it was the one chip promising a description that
- * page cannot give. It belongs back here the day it has an entry, alongside GRI 305, SEC Cybersecurity
- * Disclosure Rules and the Modern Slavery Act, which are in the same position.
+ * Nineteen, and 'SASB' left and returned within the same day on 26 Sep 2026.
+ * ⚠️ IT WAS NEVER UNBACKED, AND THE AUDIT THAT SAID SO WAS WRONG. app/dashboard/people/page.tsx:285 has
+ * offered 'SASB Human Capital' as a selectable framework throughout; the audit grepped lib/ and
+ * app/frameworks/ and not app/dashboard/, and the section comment above had it right all along. It came
+ * off for the narrower reason that it resolved to no app/frameworks/page.tsx entry, which is the test this
+ * strip applies, and it is back because that entry now exists. GRI 305, SEC Cybersecurity Rules and the
+ * Modern Slavery Act were added in the same pass for the same reason.
  * Not a count to be printed — see the section comment for why the
  * "30+" stat went — and not a
  * hand-typed list forever: it duplicates names that lib/obligations.ts already holds for nine of them.
@@ -396,7 +395,7 @@ const MODULES_HOME = [
 const FRAMEWORKS = [
   'SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis',
   'TCFD', 'GHG Protocol', 'GRI', 'SBTi', 'NIST AI RMF', 'EU AI Act', 'ISO 42001', 'ISO 27001',
-  'NIST CSF', 'EU Pay Transparency', 'NIS2', 'DORA',
+  'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA',
 ] as const
 
 const WIDER = [
