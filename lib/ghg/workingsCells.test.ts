@@ -156,6 +156,41 @@ describe('workings cell rendering', () => {
     }
   })
 
+  it('the declaration-state note renders with the figure, not under Factor source', () => {
+    // ⚠️ POSITIONAL, BECAUSE THE COLUMNS ARE. The note occupied cell 4 in all six row shapes until
+    // 28 Sep 2026, and cell 4's heading reads 'Factor source' — so a sentence saying a stream was never
+    // quantified sat where a verifier looks for a citation. The verifier page has always put row notes
+    // beside the activity figure (rowNoteOf), which is what these six now do.
+    const operator = src(OPERATOR)
+    const shapes = [...operator.matchAll(/if \(r\.declaration === '(\w+)'\) \{/g)].map(m => m[1])
+    // All eight branches: five with their own row shape, and the three country states that share
+    // excludedRow. The same list declarationStates.test.ts holds, from the other direction.
+    expect(shapes.sort(), 'the declaration branches on the operator page').toEqual([
+      'attested_absent', 'country_not_listed', 'country_not_set', 'country_not_supported',
+      'declared_unquantified', 'no_published_factor', 'undeclared', 'unpriceable',
+    ])
+
+    const rowShapes = [...operator.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map(m => m[1])
+      .filter(b => b.includes('workingsActivityCell(r)'))
+    // Six declaration shapes (excludedRow plus the five branches) and the priced row.
+    expect(rowShapes.length, 'every workings row shape').toBe(7)
+    for (const block of rowShapes) {
+      const tds = [...block.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(m => m[1])
+      expect(tds.length).toBe(8)
+      expect(tds[1], 'cell 2, Activity data, must carry the note').toContain('r.note')
+      expect(tds[3], 'cell 4, Factor source, must carry the citation').toContain('workingsFactorSourceCell(r)')
+      expect(tds[3], 'cell 4 must not carry the note').not.toContain('r.note')
+      expect(tds[6], 'cell 7, GWP basis, carries quantification_method where a row has one')
+        .not.toContain('r.note')
+    }
+    // The verifier page's activity cell does the same thing, through its own helper.
+    const verifier = src(VERIFIER)
+    const activityCell = [...verifier.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)]
+      .map(m => m[1]).find(c => c.includes('workingsActivityCell(w)'))
+    expect(activityCell, 'the verifier activity cell').toBeDefined()
+    expect(activityCell, 'rowNoteOf renders beside the figure').toContain('rowNoteOf(w)')
+  })
+
   it('no workings cell hard-codes an em dash outside the allow-list', () => {
     // Every <td> in the operator table's declaration branches and in excludedRow.
     const operator = src(OPERATOR)

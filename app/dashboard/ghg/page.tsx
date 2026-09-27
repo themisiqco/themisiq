@@ -435,6 +435,7 @@ interface WorkingsRowCells {
   activity_data?: number | null
   activity_unit?: string | null
   emission_factor_display?: string
+  ef_source?: string
   factor_vintage?: string
   scope2_method?: string
   result_tco2e?: number | null
@@ -450,9 +451,14 @@ function excludedRow(r: WorkingsRowCells, ri: number) {
   const amber = { color: 'var(--color-state-warn)' }
   return <tr key={ri} style={{ background: '#FEF3E2' }}>
     <td style={{ ...wTd, ...amber, fontWeight: 600 }}>{r.source}</td>
-    <td style={{ ...wTd, ...amber }}>{workingsActivityCell(r)}</td>
+    <td style={{ ...wTd, ...amber }}>{workingsActivityCell(r)}
+      {/* ⚠️ THE NOTE SITS WITH THE FIGURE, NOT UNDER 'Factor source'. It used to occupy the
+          fourth cell, whose heading reads Factor source, so a sentence saying a stream was
+          never quantified appeared where a verifier looks for a citation. The verifier page
+          has always rendered row notes beside the activity figure; this is the same place. */}
+      {r.note && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}</td>
     <td style={{ ...wTd, ...amber }}>{r.emission_factor_display}</td>
-    <td style={{ ...wTd, ...amber }}>{r.note}</td>
+    <td style={{ ...wTd, ...amber }}>{workingsFactorSourceCell(r)}</td>
     <td style={{ ...wTd, ...amber }}>{workingsVintageCell(r)}</td>
     <td style={{ ...wTd, ...amber }}>{workingsScope2MethodCell(r)}</td>
     <td style={{ ...wTd, ...amber }}>{r.gwp_basis}</td>
@@ -2595,9 +2601,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             if (r.declaration === 'attested_absent') {
                               return <tr key={ri} style={{ background: '#f4f4f2' }}>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.source}</td>
-                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsActivityCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsActivityCell(r)}
+                                  {/* The note sits with the figure, as on the verifier page: see excludedRow above. */}
+                                  {r.note && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.emission_factor_display}</td>
-                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsFactorSourceCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsVintageCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-ink-muted)' }}>{r.gwp_basis}</td>
@@ -2618,9 +2626,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             if (r.declaration === 'unpriceable') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}
+                                  {/* The note sits with the figure, as on the verifier page: see excludedRow above. */}
+                                  {r.note && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsFactorSourceCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
@@ -2638,9 +2648,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             if (r.declaration === 'declared_unquantified') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}
+                                  {/* The note sits with the figure, as on the verifier page: see excludedRow above. */}
+                                  {r.note && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsFactorSourceCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
@@ -2656,26 +2668,29 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                             if (r.declaration === 'no_published_factor') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}
+                                  {/* The note sits with the figure, as on the verifier page: see excludedRow above. */}
+                                  {r.note && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>
-                                  {r.note}
-                                  {/* What was actually checked, where a search was done. Absent for
-                                      the EU entry, which never claims one. */}
-                                  {r.quantification_method && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}
-                                </td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsFactorSourceCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}
+                                  {/* What was actually checked, where a search was done. Absent for
+                                      the EU entry, which never claims one. It renders under GWP basis
+                                      here and on the verifier page, and on the priced rows below. */}
+                                  {r.quantification_method && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.quantification_method}</div>}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{workingsResultCell(r)}</td>
                               </tr>
                             }
                             if (r.declaration === 'undeclared') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.source}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}
+                                  {/* The note sits with the figure, as on the verifier page: see excludedRow above. */}
+                                  {r.note && <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.4, whiteSpace: 'normal' }}>{r.note}</div>}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.emission_factor_display}</td>
-                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.note}</td>
+                                <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsFactorSourceCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsVintageCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsScope2MethodCell(r)}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{r.gwp_basis}</td>
