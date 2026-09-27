@@ -4,7 +4,7 @@ import {
   DEAL_CURRENCIES, USD_PER_UNIT, UNITS_PER_EUR, THRESHOLD_TESTS, isTestActive, evaluateTest,
   validateThresholdTests, type ThresholdTest,
   CSRD_NON_EU_REASON, csrdNonEuAbstention, CS3D_PENDING_REASON, cs3dPendingAbstention,
-  CS3D_ROUTE_NOT_MET_REASON,
+  CS3D_ROUTE_NOT_MET_REASON, CANADA_S211_ROUTE_NOT_MET_REASON,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedNote, partiallyAssessedNote, routeNotMetNote,
   partialHeadingPhrase,
@@ -13,7 +13,7 @@ import {
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
 import { REGIME_COLUMNS } from './exportPipelineXlsx'
-import { resolveCs3d } from './reportModel'
+import { resolveCs3d, resolveCanadaS211, canadaS211NoteReport } from './reportModel'
 
 // Tests assert the CONTRACT, never the current FX rates: cross-currency inputs are derived from
 // USD_PER_UNIT at runtime, so refreshing the dated rate table cannot turn them red.
@@ -1178,5 +1178,86 @@ describe('every jurisdiction the wizard offers is one the engine knows', () => {
     // the one most likely to reach production data.
     expect(bigDeal('UK')).toContain('SECR')
     expect(bigDeal('United Kingdom')).not.toContain('SECR')
+  })
+})
+
+describe('Canada S-211 reaches an entity by listing OR by size, and never confidently misses', () => {
+  // ⚠️ THE DEFECT THESE PIN, in the words of the statute: s.2 "entity" is met by (a) a listing on a
+  // Canadian stock exchange, at ANY size, (b) a Canadian presence meeting at least two of CAD 20m assets,
+  // CAD 40m revenue and an average of 250 employees, or (c) anything prescribed by regulation. Until
+  // 26 Sep 2026 the model held (b) alone AND declared itself exhaustive, so a small listed target was
+  // reported NOT IN SCOPE. In diligence a false negative is the worse failure: a buyer told a statute does
+  // not apply stops looking.
+  const S211 = 'Canada S-211'
+  const ca = (revenue: number, size: Parameters<typeof getFrameworkApplicability>[5] = {}) =>
+    find(getFrameworkApplicability('Canada', revenue, 'Technology', 'ma', 'CAD', size), S211)!
+
+  it('a small listed target is in scope, although it meets no size limb', () => {
+    // Deliberately tiny on every limb: the listing is doing all the work.
+    const row = ca(1_000_000, { total_assets: 500_000, employee_count: 10, listed_ca_exchange: true })
+    expect(row.applies, 's.2(a) reaches a listed entity at any size').toBe(true)
+    expect(row.status).toBe('applies')
+    // ⚠️ NO `reason` ON AN APPLYING ROW. lib/deals/reportModel.ts:313 maps any row carrying one to
+    // 'conditional' on a branch documented as ungated on status, so a reason here would eventually be
+    // read as "could not be established" about a row that is settled. See the note in assessment.ts.
+    expect(row.reason, 'an applying row must not carry a withholding reason').toBeUndefined()
+  })
+
+  it('an unlisted target meeting two of three is in scope', () => {
+    const row = ca(50_000_000, { total_assets: 25_000_000, employee_count: 10, listed_ca_exchange: false })
+    expect(row.applies, 'revenue and assets are two of three').toBe(true)
+  })
+
+  it('an unlisted target meeting one of three is NOT in scope, and is not-assessed rather than not-applicable', () => {
+    const row = ca(50_000_000, { total_assets: 1_000_000, employee_count: 10, listed_ca_exchange: false })
+    expect(row.applies, 'one limb is not two').toBe(false)
+    // ⚠️ THE POINT OF exhaustive: false. The size route was evaluated and not met, which settles the
+    // route and NOT the framework, because (a) and (c) exist. 'not-applicable' would claim the statute
+    // does not reach this company, which this model cannot establish.
+    expect(row.status, 'a non-exhaustive route that is not met withholds').toBe('not-assessed')
+    expect(row.reason, 'and says why it withheld').toBe(CANADA_S211_ROUTE_NOT_MET_REASON)
+  })
+
+  it('an UNANSWERED listing question is never read as not listed', () => {
+    // The "Not sure" path. Identical handling to false today, and that is the safety property: the
+    // listing route is untaken, and the size route cannot return a confident negative either way.
+    for (const listed of [null, undefined]) {
+      const row = ca(50_000_000, { total_assets: 1_000_000, employee_count: 10, listed_ca_exchange: listed })
+      expect(row.applies).toBe(false)
+      expect(row.status, `listed=${String(listed)} must withhold, not exclude`).toBe('not-assessed')
+    }
+  })
+
+  it('a withheld row reaches the report with a heading and a reason, never silently', () => {
+    // ⚠️ THE REASON THE NARRATION WAS GENERALISED. Before 26 Sep 2026 every function that turns a
+    // withheld row into report text was CS3D-specific, so an S-211 row that withheld carried its reason
+    // in the data and appeared nowhere on the page. For a document an external deal team reads, an
+    // unexplained absence is the worst of the three outcomes.
+    const app = getFrameworkApplicability('Canada', 50_000_000, 'Technology', 'ma', 'CAD',
+      { total_assets: 1_000_000, employee_count: 10, listed_ca_exchange: false })
+    const fw = app.filter(f => f.applies).map(f => f.framework)
+    const state = resolveCanadaS211(fw, app)
+    expect(state.state, 'the route was evaluated and not met').toBe('conditional')
+    const note = canadaS211NoteReport(state)
+    expect(note, 'a withheld regime must produce a note').not.toBeNull()
+    expect(note!.heading).toBe('Canada S-211 not assessed')
+    expect(note!.body, 'and the note must carry the engine\'s own reason').toContain('listed on a Canadian stock exchange')
+  })
+
+  it('an APPLYING row produces no note, so nothing is qualified that was settled', () => {
+    const app = getFrameworkApplicability('Canada', 1_000_000, 'Technology', 'ma', 'CAD',
+      { total_assets: 500_000, employee_count: 10, listed_ca_exchange: true })
+    const fw = app.filter(f => f.applies).map(f => f.framework)
+    expect(canadaS211NoteReport(resolveCanadaS211(fw, app))).toBeNull()
+  })
+
+  it('the employees limb states the statutory measure, as the other three tests do', () => {
+    // Was 'Employees of the entity', which describes a point count. s.2(b) measures an average, and
+    // SECR, CSRD and CS3D all already said so. This pins that S-211 stopped being the outlier.
+    const limb = THRESHOLD_TESTS[S211].limbs.find(l => l.measure === 'employees')!
+    expect(limb.basis).toContain('average')
+    expect(limb.measureNote).toContain('AVERAGE')
+    expect(limb.amount).toBe(250)
+    expect(limb.comparison, 's.2(b) is "at least"').toBe('gte')
   })
 })

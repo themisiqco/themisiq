@@ -194,9 +194,13 @@ const ARRIVALS = [
 /**
  * ⚠️ THE QUALIFIER ON THE FIRST ROW IS SCOPED PER REGIME, NOT APPLIED TO ALL FIVE. An earlier draft said
  * the model states unrun parts of "a test", which reads as all of them. Measured from THRESHOLD_TESTS:
- *   exhaustive: false          CS3D only
+ *   exhaustive: false          CS3D and Canada S-211  (S-211 added 26 Sep 2026; was CS3D only)
  *   lookbackModelled: false    CS3D and Canada S-211
- *   comparison 'gte'           CSRD only; the other four use 'gt'
+ *   comparison 'gte'           Canada S-211 only; the other four use 'gt'
+ * ⚠️ THE 'gte' LINE SAID "CSRD only" UNTIL 26 SEP 2026 AND WAS BACKWARDS. Counted from the limbs:
+ * SB 253 gt×1, SECR gt×3, CSRD gt×2, CS3D gt×2, Canada S-211 gte×3. CSRD and S-211 were the two swapped,
+ * which is the pair the line names, so the sentence read plausibly while being wrong about both. A comment
+ * that says "measured from THRESHOLD_TESTS" has to be re-measured when it is edited, not reasoned from.
  * A qualifier that over-applies is its own small over-claim, in the opposite direction, and on a page
  * about defensibility it costs more than it saves.
  *
@@ -240,7 +244,7 @@ const FAQ: readonly Faq[] = [
     extra: [
       'A screen also states the parts of a test it did not run, rather than letting you assume they passed. Four it will tell you about:',
       'CS3D scope. It tests the employee and turnover route only, so a company below those limbs is outside that route rather than outside the Directive. It also does not apply the exclusions that remove funds from scope regardless of size.',
-      'Two-year lookback. For CS3D and Canada S-211 it reads one financial year where the law asks for two consecutive years, so a company that crossed once is reported as crossing.',
+      'Two-year lookback. Both CS3D and Canada S-211 read one financial year. CS3D asks for two consecutive years, so a company that crossed once is reported as crossing. Canada S-211 asks for either of the two most recent years, so a company that crossed in the earlier year and dipped is reported as not crossing.',
       'SB 253 measure. California measures gross receipts with no deduction for cost of goods sold. The figure you enter is revenue, which is materially smaller for a distributor.',
       `Currency. Converted at the European Central Bank reference rate for ${FX_AS_OF}, cited on the answer rather than applied silently.`,
     ] },

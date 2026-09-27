@@ -283,9 +283,12 @@ export type Cs3dState =
   | { state: 'conditional'; reason: string }
   | { state: 'not-applicable' }
 
-export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplicability[]): Cs3dState => {
-  if (frameworks.includes('CS3D')) return { state: 'applies' }
-  const row = applicability.find(f => f.framework === 'CS3D')
+export const resolveRegime = (
+  labels: RegimeLabels, frameworks: string[], applicability: FrameworkApplicability[],
+): Cs3dState => {
+  const fw = labels.framework
+  if (frameworks.includes(fw)) return { state: 'applies' }
+  const row = applicability.find(f => f.framework === fw)
   // ABOVE the reason branch, and that placement is the whole fix. A near-threshold row carrying a
   // routeNotMet reason satisfies BOTH conditions, so whichever branch comes first decides what the
   // report claims — and with the reason branch first the answer was 'conditional', i.e. "not
@@ -313,19 +316,29 @@ export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplic
   if (row?.reason) return { state: 'conditional', reason: row.reason.replace(/\.$/, '') }
   if (row?.status === 'not-assessed') {
     // Withheld with no reason of its own ⇒ name the field(s) that would settle it, where any would.
-    const prompt = resolveFieldsPrompt(row.test?.fieldsToResolve ?? [], ['CS3D'])
+    const prompt = resolveFieldsPrompt(row.test?.fieldsToResolve ?? [], [fw])
     return { state: 'conditional', reason: `size test incomplete${prompt ? ` — ${prompt}` : ''}` }
   }
   if (row?.status === 'not-applicable') return { state: 'not-applicable' }
   // No row at all ⇒ CS3D was never in scope for this jurisdiction. CHECKED rather than assumed: this
   // sentence asserts facts about the target (formed outside the EU, markets not captured), so it must
   // not be the fall-through for a row that merely matched no branch above.
-  if (!row) return { state: 'conditional', reason: 'CS3D reaches non-EU companies through EU-facing activity; this assessment does not capture the target’s markets, so applicability cannot be resolved here' }
+  // ⚠️ PER REGIME, AND AN ABSENT `noRowReason` MEANS "SAY NOTHING" RATHER THAN "SAY SOMETHING GENERIC".
+  // CS3D supplies a sentence because it genuinely reaches non-EU companies, so a missing row is a fact
+  // worth stating. Canada S-211 supplies NONE, deliberately: s.2(a) does reach a company listed on a
+  // Canadian exchange wherever it is established, but the jurisdiction gate in getFrameworkApplicability
+  // only creates the row for jurisdiction === 'Canada', so there is nothing this function can say that
+  // the engine has established. Falling through to 'not-applicable' keeps today's behaviour, which is
+  // silence. THAT IS THE OPEN GAP, NOT A DESIGN: see the report of 26 Sep 2026. Giving S-211 a sentence
+  // here would announce a limitation on every non-Canadian deal without fixing it.
+  if (!row) return labels.noRowReason
+    ? { state: 'conditional', reason: labels.noRowReason }
+    : { state: 'not-applicable' }
   // A row that matched nothing above. States ONLY what is known — no claim about jurisdiction, about
   // markets, or about a missing field, because none of those has been established here. An honest
   // non-answer, because an error message that guesses at a cause it cannot verify eventually names
   // the wrong one; the branch above is what that looked like.
-  return { state: 'conditional', reason: 'CS3D applicability was not resolved by this assessment' }
+  return { state: 'conditional', reason: labels.unresolvedReason }
 }
 
 // Rewrite generic disclosure-regime labels (SB 253, bare CSRD) on a static sector risk template to
@@ -342,6 +355,25 @@ export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplic
 // finding. Two surfaces, one spelling each: the report's near-threshold heading MUST read the same
 // as the token in the Framework column beside it, or the page names the same row two ways. That is
 // the drift three separate literals once produced, so neither string is ever written inline again.
+// ⚠️ A LABEL SET PER REGIME, AND CS3D'S ARE STILL ITS OWN LITERALS. Generalised on 26 Sep 2026 when
+// Canada S-211 became the second non-exhaustive test. The generic functions below take one of these
+// rather than deriving text from the framework name: derivation would have produced the same four
+// strings for CS3D today and made any future casing or wording difference in one regime impossible to
+// express. The wrappers pass CS3D's existing constants unchanged, so its output is byte-identical.
+export type RegimeLabels = {
+  framework: string
+  notAssessedLabel: string    // Framework-column cell
+  nearThresholdLabel: string  // Framework-column cell, and the near-threshold note heading
+  notAssessedHeading: string  // the note heading, which is NOT the cell label — see below
+  // The sentence for "no row at all". OPTIONAL, and its absence is meaningful: omit it where the engine
+  // creates no row and nothing has been established about why, and the regime falls through to
+  // 'not-applicable' (silence) instead of asserting a cause it cannot verify.
+  noRowReason?: string
+  // The honest non-answer for a row that matched no branch. States only that the assessment did not
+  // resolve it; claims nothing about jurisdiction, markets or missing fields.
+  unresolvedReason: string
+}
+
 export const CS3D_NOT_ASSESSED_LABEL = 'CS3D (not assessed)'
 export const CS3D_NEAR_THRESHOLD_LABEL = 'CS3D (near threshold)'
 // The abstention HEADING is not the abstention LABEL, and the difference is not an oversight. The
@@ -349,6 +381,30 @@ export const CS3D_NEAR_THRESHOLD_LABEL = 'CS3D (near threshold)'
 // instrument's name; the heading opens a sentence, where they would read as an aside. Near-threshold
 // needs no second spelling — its heading IS its label, so the parenthesised form appears there.
 export const CS3D_NOT_ASSESSED_HEADING = 'CS3D not assessed'
+
+export const CS3D_LABELS: RegimeLabels = {
+  framework: 'CS3D',
+  notAssessedLabel: CS3D_NOT_ASSESSED_LABEL,
+  nearThresholdLabel: CS3D_NEAR_THRESHOLD_LABEL,
+  notAssessedHeading: CS3D_NOT_ASSESSED_HEADING,
+  noRowReason: 'CS3D reaches non-EU companies through EU-facing activity; this assessment does not capture the target’s markets, so applicability cannot be resolved here',
+  unresolvedReason: 'CS3D applicability was not resolved by this assessment',
+}
+
+// Canada S-211's set, added with the s.2(a) listing route. Same four shapes as CS3D's, which is what
+// makes the report word two regimes one way rather than two.
+export const CANADA_S211_NOT_ASSESSED_LABEL = 'Canada S-211 (not assessed)'
+export const CANADA_S211_NEAR_THRESHOLD_LABEL = 'Canada S-211 (near threshold)'
+export const CANADA_S211_NOT_ASSESSED_HEADING = 'Canada S-211 not assessed'
+
+export const CANADA_S211_LABELS: RegimeLabels = {
+  framework: 'Canada S-211',
+  notAssessedLabel: CANADA_S211_NOT_ASSESSED_LABEL,
+  nearThresholdLabel: CANADA_S211_NEAR_THRESHOLD_LABEL,
+  notAssessedHeading: CANADA_S211_NOT_ASSESSED_HEADING,
+  // NO noRowReason — see the note at the !row branch in resolveRegime.
+  unresolvedReason: 'Canada S-211 applicability was not resolved by this assessment',
+}
 
 // Exhaustiveness guard. Every `switch` over a discriminated union ends in `default: assertNever(x)`,
 // so ADDING A MEMBER BREAKS THE BUILD AT EVERY CONSUMER rather than silently falling to an else-arm.
@@ -378,7 +434,7 @@ export type Cs3dNote = { heading: string; body: string | null } | null
 // Return type is NARROWER than Cs3dNote — `body` is a plain string, never null. That is what lets
 // the wizard's render site append its full stop unconditionally: this surface either has a sentence
 // or prints nothing, so there is no heading-only case for punctuation to dangle off.
-export const cs3dNoteWizard = (cs3d: Cs3dState): { heading: string; body: string } | null => {
+export const regimeNoteWizard = (labels: RegimeLabels, cs3d: Cs3dState): { heading: string; body: string } | null => {
   switch (cs3d.state) {
     case 'applies':
     case 'not-applicable':
@@ -388,14 +444,14 @@ export const cs3dNoteWizard = (cs3d: Cs3dState): { heading: string; body: string
       // An empty reason suppresses the line outright. A heading with nothing after it is not a
       // shorter finding, it is a finding that lost its content and still looks authoritative.
       const body = cs3d.reason.trim()
-      return body ? { heading: CS3D_NOT_ASSESSED_HEADING, body } : null
+      return body ? { heading: labels.notAssessedHeading, body } : null
     }
     default:
       return assertNever(cs3d)
   }
 }
 
-export const cs3dNoteReport = (cs3d: Cs3dState): Cs3dNote => {
+export const regimeNoteReport = (labels: RegimeLabels, cs3d: Cs3dState): Cs3dNote => {
   switch (cs3d.state) {
     case 'applies':
     case 'not-applicable':
@@ -408,11 +464,11 @@ export const cs3dNoteReport = (cs3d: Cs3dState): Cs3dNote => {
       // is what would lose them. Heading text is the TOKEN'S OWN CONSTANT, so the Framework column
       // and this sentence cannot word one row two ways.
       const body = cs3d.reason?.trim()
-      return { heading: CS3D_NEAR_THRESHOLD_LABEL, body: body || null }
+      return { heading: labels.nearThresholdLabel, body: body || null }
     }
     case 'conditional': {
       const body = cs3d.reason.trim()
-      return body ? { heading: CS3D_NOT_ASSESSED_HEADING, body } : null
+      return body ? { heading: labels.notAssessedHeading, body } : null
     }
     default:
       return assertNever(cs3d)
@@ -433,12 +489,13 @@ export const cs3dNoteReport = (cs3d: Cs3dState): Cs3dNote => {
 //   not-assessed                                              → withheld
 //   no row at all                                             → CS3D not in scope for this
 //                                                               jurisdiction; still not a negative
-export const cs3dToken = (row: FrameworkApplicability | undefined): RegimeToken | null => {
-  if (!row) return { text: CS3D_NOT_ASSESSED_LABEL, framework: 'CS3D', qualified: true }
-  if (row.applies) return { text: 'CS3D', framework: 'CS3D' }
+export const regimeTokenFor = (labels: RegimeLabels, row: FrameworkApplicability | undefined): RegimeToken | null => {
+  const fw = labels.framework
+  if (!row) return { text: labels.notAssessedLabel, framework: fw, qualified: true }
+  if (row.applies) return { text: fw, framework: fw }
   if (row.status === 'not-applicable') return null
-  if (row.status === 'near-threshold') return { text: CS3D_NEAR_THRESHOLD_LABEL, framework: 'CS3D', qualified: true }
-  return { text: CS3D_NOT_ASSESSED_LABEL, framework: 'CS3D', qualified: true }
+  if (row.status === 'near-threshold') return { text: labels.nearThresholdLabel, framework: fw, qualified: true }
+  return { text: labels.notAssessedLabel, framework: fw, qualified: true }
 }
 
 // Joins tokens for display. THE ONLY PLACE ' / ' IS WRITTEN ON THE OUTPUT SIDE — the separator used
@@ -478,3 +535,39 @@ export const themisIqFigure = (o: Obligations, unsetLabel = 'Enter locations →
     : o.themisIqHasCustom
       ? (o.themisIqTotal != null ? `~USD ${o.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
       : `~USD ${(o.themisIqTotal ?? 0).toLocaleString()}`
+
+
+/* ── CS3D's wrappers ─────────────────────────────────────────────────────────────────────────────────
+ * ⚠️ THIN BY DESIGN, AND THE REASON IS EVIDENCE RATHER THAN TIDINESS. The five functions above were
+ * CS3D-only until 26 Sep 2026, when Canada S-211 became the second non-exhaustive test and its withheld
+ * rows were reaching the report with no heading and no reason at all. Generalising them risked changing
+ * CS3D's output, which is the one thing that could not happen: those strings are pinned by test and read
+ * by an external deal team. Keeping CS3D's entry points as wrappers that pass CS3D_LABELS means every
+ * existing call site, test and snapshot goes through the same code path it did before, with the same
+ * literals, so "unchanged" is structural rather than asserted.
+ * A before-and-after snapshot across all six CS3D states was taken and compared; see the commit report.
+ */
+export const resolveCs3d = (frameworks: string[], applicability: FrameworkApplicability[]): Cs3dState =>
+  resolveRegime(CS3D_LABELS, frameworks, applicability)
+
+export const cs3dNoteWizard = (cs3d: Cs3dState): { heading: string; body: string } | null =>
+  regimeNoteWizard(CS3D_LABELS, cs3d)
+
+export const cs3dNoteReport = (cs3d: Cs3dState): Cs3dNote =>
+  regimeNoteReport(CS3D_LABELS, cs3d)
+
+export const cs3dToken = (row: FrameworkApplicability | undefined): RegimeToken | null =>
+  regimeTokenFor(CS3D_LABELS, row)
+
+/* ── Canada S-211's, the second consumer ─────────────────────────────────────────────────────────── */
+export const resolveCanadaS211 = (frameworks: string[], applicability: FrameworkApplicability[]): Cs3dState =>
+  resolveRegime(CANADA_S211_LABELS, frameworks, applicability)
+
+export const canadaS211NoteWizard = (s: Cs3dState): { heading: string; body: string } | null =>
+  regimeNoteWizard(CANADA_S211_LABELS, s)
+
+export const canadaS211NoteReport = (s: Cs3dState): Cs3dNote =>
+  regimeNoteReport(CANADA_S211_LABELS, s)
+
+export const canadaS211Token = (row: FrameworkApplicability | undefined): RegimeToken | null =>
+  regimeTokenFor(CANADA_S211_LABELS, row)

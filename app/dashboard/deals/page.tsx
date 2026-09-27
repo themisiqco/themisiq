@@ -22,6 +22,7 @@ import {
   assessmentView, partiallyAssessedNote, routeNotMetNote, partialHeadingPhrase,
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
+  CANADA_S211_LISTING_QUESTION, CANADA_S211_LISTING_HINT,
 } from '../../../lib/deals/assessment'
 // Presentation model shared with app/dashboard/deals/report/page.tsx. These wizard screens and the
 // printed report phrase one assessment the same way — neither re-derives it, so they cannot state
@@ -29,6 +30,7 @@ import {
 import {
   DEAL_TYPES, spellMagnitude, NEAR_PCT, nearSentence,
   resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf, cs3dNoteWizard,
+  resolveCanadaS211, canadaS211NoteWizard,
 } from '../../../lib/deals/reportModel'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -127,6 +129,7 @@ function DealsDashboardInner() {
     // zero. A holding company with 0 employees definitively fails the employee limb; not knowing
     // the headcount makes the OUTCOME indeterminate. The form must preserve that difference.
     employee_count: null as number | null,
+    listed_ca_exchange: null as boolean | null,
     total_assets: null as number | null,
     jurisdiction: 'USA',
     deal_type: 'ma',
@@ -271,6 +274,7 @@ function DealsDashboardInner() {
         sector: data.sector ?? '',
         revenue: Number(data.revenue) || 0,
         employee_count: data.employee_count == null ? null : Number(data.employee_count),
+        listed_ca_exchange: typeof data.listed_ca_exchange === 'boolean' ? data.listed_ca_exchange : null,
         total_assets: data.total_assets == null ? null : Number(data.total_assets),
         jurisdiction: data.jurisdiction ?? 'USA',
         deal_type: data.deal_type ?? 'ma',
@@ -302,12 +306,15 @@ function DealsDashboardInner() {
       // deal.currency is load-bearing here: revenue is entered in it, and the SB 253 / SECR
       // triggers are denominated in USD / GBP respectively. Omitting it treats every deal as USD.
       const detected = getApplicableFrameworks(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
-        { total_assets: deal.total_assets, employee_count: deal.employee_count })
+        { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange })
       setFrameworks(detected)
     } else {
       setFrameworks([])
     }
-  }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type, deal.currency, deal.total_assets, deal.employee_count])
+    // listed_ca_exchange IS IN HERE, and was missing when the field was added on 26 Sep 2026: without it
+    // the persisted `frameworks` list kept its pre-answer value while the derived `applicability` below
+    // recomputed on every render, so the two views of one deal disagreed about whether S-211 applied.
+  }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type, deal.currency, deal.total_assets, deal.employee_count, deal.listed_ca_exchange])
 
   const update = (field: string, value: any) => { setDeal(prev => ({ ...prev, [field]: value })); setSaved(false); setDirty(true) }
 
@@ -334,6 +341,7 @@ function DealsDashboardInner() {
         sector: deal.sector,
         revenue: deal.revenue,
         employee_count: deal.employee_count,   // null when undeclared — never coerced to 0
+        listed_ca_exchange: deal.listed_ca_exchange,   // null when unanswered — never coerced to false
         total_assets: deal.total_assets,
         jurisdiction: deal.jurisdiction,
         deal_type: deal.deal_type,
@@ -391,7 +399,7 @@ function DealsDashboardInner() {
   const evaluated = !!(deal.sector && deal.jurisdiction)   // revenue is NOT part of this gate
   const applicability: FrameworkApplicability[] = evaluated
     ? getFrameworkApplicability(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
-        { total_assets: deal.total_assets, employee_count: deal.employee_count })
+        { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange })
     : []
   const nearThreshold = applicability.filter(f => f.status === 'near-threshold')
   const nearByFramework = new Map(nearThreshold.map(f => [f.framework, f]))
@@ -430,6 +438,12 @@ function DealsDashboardInner() {
   // null ⇒ print nothing. On THIS screen 'near-threshold' is null on purpose: `citedNear` below
   // already prints that row's limbs and figures, and a second line would describe it twice.
   const cs3dNote = cs3dNoteWizard(cs3d)
+  // ⚠️ THE SECOND NON-EXHAUSTIVE REGIME, NARRATED THE SAME WAY. Canada S-211 gained `exhaustive: false`
+  // on 26 Sep 2026, which made a failed size test withhold rather than exclude — correct, but the row
+  // then reached this screen with no heading and no reason, which is the absence-rendered-as-nothing
+  // failure the three-state machinery exists to prevent. Same functions, its own label set.
+  const s211 = resolveCanadaS211(frameworks, applicability)
+  const s211Note = canadaS211NoteWizard(s211)
   const cs3dRow = applicability.find(f => f.framework === 'CS3D')
   const mapFramework = makeMapFramework(frameworks, cs3dRow)
   // ESTABLISHED ONLY. The severity tiles are a decision input, and counting a conditioned finding
@@ -613,7 +627,12 @@ function DealsDashboardInner() {
         {/* Size limbs. Blank stays NULL — `?? ''` and the '' → null branch below are what keep an
             undeclared headcount distinct from a declared zero, which the N-of-M rule depends on. */}
         <div>
-          <label style={labelStyle}>Employees (headcount)</label>
+          {/* ⚠️ "AVERAGE OVER THE YEAR", NOT "HEADCOUNT", because all four tests that read this field
+              measure an average: SECR (Companies Act s.465), CSRD and CS3D (Accounting Directive art. 3)
+              already said so in their limb notes, and Canada S-211 now does too. The field still holds one
+              number and every limb note still records that a point figure is what gets applied; the label
+              just stops asking for the wrong measure. */}
+          <label style={labelStyle}>Employees (average over the financial year)</label>
           <input style={inputStyle} type="number" value={deal.employee_count ?? ''} placeholder="Leave blank if unknown"
             onChange={e => update('employee_count', e.target.value === '' ? null : Number(e.target.value))} />
           <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
@@ -628,6 +647,32 @@ function DealsDashboardInner() {
             {deal.total_assets == null ? 'Undeclared — limbs needing total assets cannot be assessed.' : `Declared: ${deal.currency} ${deal.total_assets.toLocaleString()} — ${spellMagnitude(deal.total_assets)}.`}
           </div>
         </div>
+        {/* ⚠️ SHOWN FOR CANADA ONLY, because s.2(a) is a Canadian-exchange test and the question is
+            meaningless anywhere else. A form that asks everyone reads as though the answer mattered
+            everywhere, and this one changes exactly one framework.
+            ⚠️ THREE STATES, AND "NOT SURE" IS THE DEFAULT. null leaves the listing route untaken and lets
+            the size test answer as far as it can — which is never a confident negative, because the test
+            is non-exhaustive, so an unanswered question can only ever withhold. Answering "No" behaves
+            identically today and is offered so a user who KNOWS can say so. */}
+        {deal.jurisdiction === 'Canada' && (
+          <div>
+            <label style={labelStyle}>{CANADA_S211_LISTING_QUESTION}</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {([['Yes', true], ['No', false], ['Not sure', null]] as const).map(([lbl, val]) => (
+                <button key={lbl} type="button" onClick={() => update('listed_ca_exchange', val)}
+                  style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    background: deal.listed_ca_exchange === val ? 'var(--tq-mod-wash, var(--color-brand-wash))' : 'var(--color-accent-neutral-wash)',
+                    color: 'var(--color-ink)',
+                    border: `0.5px solid ${deal.listed_ca_exchange === val ? 'var(--tq-mod, var(--color-brand))' : 'var(--color-line)'}` }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5, color: 'var(--color-ink-muted)' }}>
+              {CANADA_S211_LISTING_HINT}
+            </div>
+          </div>
+        )}
         <div>
           <label style={labelStyle}>Number of locations / sites</label>
           <input style={inputStyle} type="number" value={deal.location_count || ''} onChange={e => update('location_count', Number(e.target.value))} placeholder="0" />
@@ -672,6 +717,19 @@ function DealsDashboardInner() {
           The `unevaluated` conjunct is what keeps the copy and the gate describing the same rows:
           `frameworksState` is driven by the UNION, so on a routeNotMet-only deal this branch would
           open and then interpolate an empty name list into "Size test incomplete for  —". */}
+      {/* ⚠️ STANDALONE, NOT ATTACHED TO A FINDING, AND THAT IS THE WHOLE DIFFERENCE FROM CS3D'S NOTE.
+          CS3D's rides on sector-risk findings whose own `framework` string cites CS3D, so its token
+          check has something to match. NOTHING IN SECTOR_RISKS CITES 'Canada S-211' — checked
+          26 Sep 2026, the only two occurrences of that string are the threshold test's own name and
+          the engine's push — so the same per-finding gate would have been dead code that looked
+          correct. Gated on the note alone: if the regime has something to say, it is said.
+          This is what stops a withheld S-211 row being silently absent. */}
+      {s211Note && (
+        <div style={{ background: 'var(--color-accent-amber-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-amber) 20%, transparent)', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 12, fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
+          <strong style={{ fontWeight: 600 }}>{s211Note.heading}{s211Note.body ? ':' : ''}</strong>
+          {s211Note.body ? ` ${s211Note.body}.` : ''}
+        </div>
+      )}
       {frameworksState === 'not-assessed' && (!view.evaluated || view.unevaluated.length > 0) ? (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 12, padding: '1.25rem', marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-state-warn)', letterSpacing: '0.04em', marginBottom: 6 }}>NOT ASSESSED</div>

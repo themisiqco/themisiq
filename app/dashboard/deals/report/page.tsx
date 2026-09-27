@@ -54,6 +54,7 @@ import {
   dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
   buildLimbRows, buildFxBasisRows, limbValueDisplay, limbThresholdDisplay,
   resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure, cs3dNoteReport,
+  resolveCanadaS211, canadaS211NoteReport,
 } from '../../../../lib/deals/reportModel'
 
 // ─── The deal row ─────────────────────────────────────────────────────────────
@@ -363,6 +364,10 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
   // 'near-threshold' gets its own note here rather than being deferred to one that does not exist.
   // Its `body` may be null, meaning heading only — the render below owns that punctuation.
   const cs3dNote = cs3dNoteReport(cs3d)
+  // Canada S-211, the second non-exhaustive regime, through the same functions with its own labels.
+  // Added 26 Sep 2026: without it a withheld S-211 row reached this document silently, which for a
+  // report an external deal team reads is the worst place for an unexplained absence.
+  const s211Note = canadaS211NoteReport(resolveCanadaS211(frameworks, applicability))
   const cs3dRow = applicability.find(f => f.framework === 'CS3D')
   const mapFramework = makeMapFramework(frameworks, cs3dRow)
 
@@ -431,6 +436,15 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         {/* 2 ── APPLICABLE FRAMEWORKS */}
         <section className="page" style={{ marginTop: 40 }}>
           <H>Applicable frameworks</H>
+          {/* ⚠️ STANDALONE, AND NOT ATTACHED TO A FINDING. CS3D's note rides on sector-risk findings whose
+              own `framework` string cites CS3D. NOTHING IN SECTOR_RISKS CITES 'Canada S-211' — checked
+              26 Sep 2026 — so the same per-finding gate would have been dead code. Placed at the head of
+              the frameworks section because that is where a reader looks for what was and was not
+              determined, and because a withheld regime that appears nowhere is the failure this whole
+              vocabulary exists to prevent. */}
+          {s211Note && (
+            <NotAssessed title={s211Note.heading}>{s211Note.body ?? null}</NotAssessed>
+          )}
           {!evaluated ? (
             <NotAssessed title="NOT ASSESSED">
               Sector and jurisdiction are not both set on this deal, so nothing has been evaluated. An empty list here is <strong style={{ fontWeight: 600 }}>not</strong> a finding that no framework applies.

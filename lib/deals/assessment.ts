@@ -538,6 +538,29 @@ export type ThresholdTest = {
 //
 // No trailing full stop: the report appends one at the render site (deals/report/page.tsx), and
 // resolveCs3d strips any trailing period defensively.
+// ⚠️ THE SECOND NON-EXHAUSTIVE TEST, and the note at CS3D_ROUTE_NOT_MET_REASON anticipated it: "when a
+// second non-exhaustive test lands, they will [collide], and each keeps its own sentence." This is that
+// sentence. Canada S-211's modelled route is the SIZE route in s.2(b); the definition is also met by a
+// Canadian stock-exchange listing at ANY size, and by anything prescribed by regulation.
+export const CANADA_S211_ROUTE_NOT_MET_REASON =
+  'below the size route assessed here; the Act also reaches any entity listed on a Canadian stock exchange, at any size, and anything prescribed by regulation, neither of which this route tests.'
+
+// ⚠️ NO `reason` ON THE LISTING ROUTE'S ROW, AND THAT IS DELIBERATE RATHER THAN AN OMISSION. A sentence
+// naming the route was drafted and dropped on 26 Sep 2026: `FrameworkApplicability.reason` is documented
+// as "why the framework's applicability could not be ESTABLISHED from the modelled test", and
+// lib/deals/reportModel.ts:313 maps any row carrying one to state 'conditional' on a branch its own
+// comment says "must stay ungated on status". That function is CS3D-only today, so nothing would have
+// misfired — but a row that definitively APPLIES, carrying a field that means "could not be established",
+// is a trap for whoever generalises it. The route is recorded in the comment at the push site instead.
+
+// ⚠️ THE WIZARD QUESTION, HELD AS A CONSTANT SO ONE STRING SERVES THE FORM AND ANY LATER SURFACE. Plain
+// language, and the third option is not decoration: a target whose listing status is unknown must not be
+// reported as out of scope, so "Not sure" leaves the listing route untaken and lets the size route answer
+// as far as it can, which is never a confident negative because the test is non-exhaustive.
+export const CANADA_S211_LISTING_QUESTION = 'Is the target listed on a Canadian stock exchange?'
+export const CANADA_S211_LISTING_HINT =
+  'A listing brings a company within the Act whatever its size. If you are not sure, choose Not sure and the size test is used instead.'
+
 export const CS3D_ROUTE_NOT_MET_REASON =
   'below the size route assessed here; CS3D can also reach companies through group parentage and through franchising or licensing arrangements, which this assessment does not model'
 
@@ -574,9 +597,20 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
         measureNote: 'Average number of employees over the financial year, not headcount at a point in time.' },
     ],
   },
+  // ⚠️ THE SIZE ROUTE ONLY, AND s.2 HAS THREE. (a) a Canadian stock-exchange listing, at any size, which
+  // getFrameworkApplicability routes separately on `listed_ca_exchange`; (b) the size test below; and
+  // (c) anything PRESCRIBED BY REGULATION, which is a DELIBERATE ABSENCE HERE. Nothing has been
+  // prescribed to date, and modelling an empty power would mean inventing a limb with no content. It is
+  // written down rather than omitted silently because `exhaustive: false` is what carries it: the day
+  // something is prescribed, the withheld outcome is already the correct one and only this comment needs
+  // to change.
   'Canada S-211': {
     framework: 'Canada S-211',
     requires: 2, semantics: 'n-of-m',
+    // s.2 gives three routes and this models one, so a failed size test is 'not-assessed' rather than
+    // 'not-applicable'. See CANADA_S211_ROUTE_NOT_MET_REASON.
+    exhaustive: false,
+    routeNotMetReason: CANADA_S211_ROUTE_NOT_MET_REASON,
     // See the migration header: the statute measures over EITHER of the two most recent financial
     // years; two scalar columns hold one. Evaluated on the most recent year only. Failure mode is
     // UNDER-calling a target that crossed a limb last year and dipped this year; the below-side
@@ -594,8 +628,12 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
         measureNote: 'Revenue per consolidated financial statements. LOOKBACK NOT MODELLED — most recent year only.' },
       { measure: 'employees', amount: 250, unit: { unit: 'count' },
         source: 'employee_count', exactMeasure: false, comparison: 'gte',
-        basis: 'At least 250 employees, in either of the two most recent financial years.',
-        measureNote: 'Employees of the entity. LOOKBACK NOT MODELLED — most recent year only.' },
+        basis: 'An average of at least 250 employees, in either of the two most recent financial years.',
+        // ⚠️ AN AVERAGE, WHICH THIS LIMB DID NOT SAY UNTIL 26 SEP 2026. s.2(b) measures an average over
+        // the financial year; the note read "Employees of the entity", which describes a point count and
+        // made S-211 the one employees limb in this file not stating the measure. SECR, CSRD and CS3D all
+        // already did. Same shape as theirs: name the statutory measure, then name what is applied.
+        measureNote: 'The Act measures an AVERAGE number of employees over the financial year. The figure applied is the deal’s single point figure. LOOKBACK NOT MODELLED — most recent year only.' },
     ],
   },
   // POST-OMNIBUS. Directive (EU) 2026/470 (Omnibus I), OJ 26 Feb 2026, in force 18 Mar 2026,
@@ -1125,7 +1163,14 @@ const applyTest = (test: ThresholdTest, size: DealSize): FrameworkApplicability 
 // trigger depends on it today); kept so the signature matches getApplicableFrameworks.
 export const getFrameworkApplicability = (
   jurisdiction: string, revenue: number, sector: string, dealType: string, currency: string = 'USD',
-  size: { total_assets?: number | null; employee_count?: number | null } = {},
+  // ⚠️ `listed_ca_exchange` IS TRI-STATE AND THE THIRD STATE IS THE POINT. true takes the listing route;
+  // false and null/undefined both leave it untaken. It is optional with a default so every existing
+  // caller keeps working unchanged, and an absent answer can never be read as "not listed".
+  size: {
+    total_assets?: number | null
+    employee_count?: number | null
+    listed_ca_exchange?: boolean | null
+  } = {},
 ): FrameworkApplicability[] => {
   const out: FrameworkApplicability[] = []
   const dealSize: DealSize = {
@@ -1166,10 +1211,28 @@ export const getFrameworkApplicability = (
     }
   }
 
-  // Canada — S-211 forced/child labour supply-chain reporting. 2-of-3 size test; NOT a
-  // supply-chain MODULE trigger (it is a reporting obligation, not a value-chain accounting scope),
-  // so it does not enter SUPPLY_CHAIN_TRIGGERS and does not price anything.
-  if (jurisdiction === 'Canada') plain('Canada S-211')
+  // Canada — S-211 forced/child labour supply-chain reporting. NOT a supply-chain MODULE trigger (it is
+  // a reporting obligation, not a value-chain accounting scope), so it does not enter
+  // SUPPLY_CHAIN_TRIGGERS and does not price anything.
+  //
+  // ⚠️ TWO ROUTES, AND THE LISTING ONE IS CHECKED FIRST BECAUSE IT DOES NOT DEPEND ON THE FIGURES.
+  // s.2(a) brings a listed entity within the Act at ANY size, so a small listed target is in scope while
+  // failing every size limb. Routing it here rather than as a limb is deliberate: ThresholdLimb models
+  // SIZE measures with a ±10% near-threshold margin, and a boolean has no margin, no unit and no
+  // proximity. Expressing it as a limb would mean widening SizeMeasure, LimbSource, LimbUnit and the
+  // marginal-value logic to carry one field that none of them describes. The jurisdiction gate above is
+  // already the place where non-size routing lives.
+  // ⚠️ AND A FALSE OR ABSENT ANSWER STILL DOES NOT PRODUCE A NEGATIVE. The size test is non-exhaustive,
+  // so failing it yields 'not-assessed'. That is what makes "Not sure" safe to offer.
+  if (jurisdiction === 'Canada') {
+    if (size.listed_ca_exchange === true) {
+      // No `reason`: see the note beside CANADA_S211_ROUTE_NOT_MET_REASON. This row APPLIES, and `reason`
+      // means the opposite. The listing is the route; the row says so by applying while the limbs do not.
+      out.push({ framework: 'Canada S-211', applies: true, status: 'applies' })
+    } else {
+      plain('Canada S-211')
+    }
+  }
 
   // Investor baseline (expected regardless of jurisdiction)
   plain('IFRS S2')
@@ -1204,7 +1267,13 @@ export const JURISDICTIONS = ['USA', 'European Union', 'UK', 'Canada', 'Australi
 
 export const getApplicableFrameworks = (
   jurisdiction: string, revenue: number, sector: string, dealType: string, currency: string = 'USD',
-  size: { total_assets?: number | null; employee_count?: number | null } = {},
+  // Kept in step with getFrameworkApplicability's `size`, which the comment above already requires:
+  // this is the thin wrapper, and a field it cannot forward is a field the filtered list cannot see.
+  size: {
+    total_assets?: number | null
+    employee_count?: number | null
+    listed_ca_exchange?: boolean | null
+  } = {},
 ): string[] =>
   getFrameworkApplicability(jurisdiction, revenue, sector, dealType, currency, size)
     .filter(f => f.applies)
