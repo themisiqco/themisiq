@@ -8,6 +8,7 @@ import { reportingYearOptions, defaultReportingYear } from '../../../lib/reporti
 import { supabase } from '../../../lib/supabase'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
+import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { factorEditionsForSave } from '../../../lib/ghg/factorEditions'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
@@ -584,6 +585,28 @@ const searchParams = useSearchParams()
     if (loadId) { setMode('wizard'); return }
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { setMode('wizard'); return }
+      // ⚠️ THE RESTORE RUNS FOR A SIGNED-IN VISITOR, NOT A SIGNED-OUT ONE, AND THE ORDER IS THE POINT. A
+      // draft only exists because someone was bounced to /login by handleSave, so by the time it matters
+      // there IS a session. Restoring while signed out would also fight the form they are still typing in.
+      const draft = readGhgDraft()
+      if (draft) {
+        // Merged OVER the defaults, never the reverse: a field the draft omits keeps the value the form
+        // already had. locations is spread over emptyLocation() the same way, so a location missing a
+        // field gets that field's default rather than undefined.
+        setInventory(prev => ({
+          ...prev,
+          ...draft,
+          locations: draft.locations
+            ? draft.locations.map((l, i) => ({ ...emptyLocation(String(i + 1), `Location ${i + 1}`), ...(l as object) }))
+            : prev.locations,
+        }))
+        // Cleared on RESTORE, not on save — see the note in lib/ghg/draft.ts. Leaving it would restore
+        // stale figures over a later edit on the next reload.
+        clearGhgDraft()
+        setDirty(true)   // it is unsaved work: the Save button must not read as already saved
+        setMode('wizard')
+        return
+      }
       const { data } = await supabase
         .from('ghg_inventories')
         .select('id, company_name, reporting_year, updated_at')
@@ -1403,7 +1426,26 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     setIsSaving(true)
     try {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    // ⚠️ THIS WAS `if (!session) return` AND IT LOST THE VISITOR'S WORK. A signed-out visitor who built a
+    // whole inventory and clicked Save saw the button flicker and nothing else: no prompt, no route to
+    // sign-in, and the figures gone on the next navigation. Four other paths in this function alert; this
+    // one said nothing at all, which is the silent-failure class this codebase treats as worse than an
+    // error. Found 26 Sep 2026 while checking whether copy promising "sign in when you save it" was true.
+    //
+    // ⚠️ THE STASH HAPPENS BEFORE THE ALERT, NOT AFTER. An alert is modal but a visitor can dismiss it and
+    // navigate; writing first means the draft is safe even if they never reach /login. Same ordering as
+    // lib/checkout.ts's unauthenticated branch: stash the intent, then move.
+    //
+    // ⚠️ AND THE ALERT IS DELIBERATE, NOT LAZINESS. This function navigates immediately afterwards, so an
+    // inline notice would be painted and destroyed in the same tick. alert() is the only thing that
+    // reliably reaches the reader before a redirect, and this file already uses it for four other save
+    // failures, so it is the register a Save failure speaks in here.
+    if (!session) {
+      saveGhgDraft(inventory, { anon: true })
+      alert('Sign in to save your inventory. Your figures will be kept while you do.')
+      window.location.href = `/login?next=${encodeURIComponent('/dashboard/ghg')}`
+      return
+    }
     // Resolve the company_id for this inventory's company_name.
     let resolvedCompanyId = inventory.company_id || null
     const trimmedName = (inventory.company_name || '').trim()
@@ -3676,7 +3718,24 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
     if (!inventoryId) return
     setCreating(true)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { alert('Please sign in to invite a verifier.'); setCreating(false); return }
+    // ⚠️ A ROUTE, NOT JUST A MESSAGE. This said "Please sign in to invite a verifier." and stopped, which
+    // told the reader what to do and gave them no way to do it.
+    //
+    // ⚠️ AND NO STASH HERE, UNLIKE handleSave, BECAUSE THIS POPULATION HAS NOTHING TO LOSE. A signed-out
+    // VISITOR cannot reach this line at all: `if (!inventoryId) return` above fires first, and
+    // inventoryId is set only at :783 (the ?id= load, behind its own session check) and :1550 (inside
+    // handleSave, past the session check). So the only reader who gets here is someone whose session
+    // EXPIRED after saving — their inventory is already a row in the database. Stashing would be worse
+    // than useless: the restore effect merges a draft over the loaded row, so it would revive the figures
+    // they had on screen over the ones the server already holds and mark a saved inventory dirty.
+    //
+    // The wording says what happened rather than "please sign in", which reads as though they never had a
+    // session. Same register as BOT_ERRORS.unauthenticated at the top of this file.
+    if (!session) {
+      alert('Your session has ended. Sign in again and your saved inventory will be waiting.')
+      window.location.href = `/login?next=${encodeURIComponent('/dashboard/ghg')}`
+      return
+    }
     const { error } = await supabase.from('verifier_access').insert({
       inventory_id: inventoryId,
       customer_user_id: session.user.id,

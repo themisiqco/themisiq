@@ -38,6 +38,9 @@ export const DRAFT_KEYS = {
   people:       'themisiq:draft:people',
   aiGovernance: 'themisiq:draft:ai-governance',
   cyber:        'themisiq:draft:cyber',
+  // Added 26 Sep 2026 with the signed-out Save fix. See lib/ghg/draft.ts for why this one is
+  // localStorage where lib/deals/draft.ts is sessionStorage.
+  ghg:          'themisiq:draft:ghg',
 } as const
 
 // The envelope. `payload` is the tool's own inventory; everything beside it exists so a reader can
