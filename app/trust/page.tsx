@@ -140,7 +140,7 @@ export default function TrustPage() {
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>{section.title}</div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
                 {section.items.map((item, i) => (
-                  <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 24, padding: '1rem 1.5rem', borderBottom: i < section.items.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
+                  <div key={item.label} className="tq-data-row" style={{ padding: '1rem 1.5rem', borderBottom: i < section.items.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{item.label}</div>
                     <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{item.detail}</div>
                   </div>
@@ -155,7 +155,7 @@ export default function TrustPage() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: '1rem' }}>Regulatory compliance</div>
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, overflow: 'hidden' }}>
             {COMPLIANCE.map((c, i) => (
-              <div key={c.law} style={{ display: 'grid', gridTemplateColumns: '120px 180px 1fr', gap: 24, padding: '1rem 1.5rem', borderBottom: i < COMPLIANCE.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
+              <div key={c.law} className="tq-data-row-3" style={{ padding: '1rem 1.5rem', borderBottom: i < COMPLIANCE.length - 1 ? '0.5px solid #f3f4f6' : 'none', alignItems: 'flex-start' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d' }}>{c.law}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{c.jurisdiction}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{c.note}</div>

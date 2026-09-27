@@ -46,7 +46,7 @@ export default function PrivacyPage() {
       </div>
 
       {/* BODY */}
-      <div style={{ maxWidth: 920, margin: '0 auto', padding: '3rem 2.5rem', display: 'grid', gridTemplateColumns: '200px 1fr', gap: '3.5rem', alignItems: 'start' }}>
+      <div className="tq-side-column" style={{ maxWidth: 920, margin: '0 auto', padding: '3rem 2.5rem', alignItems: 'start' }}>
 
         {/* TOC */}
         <div style={{ position: 'sticky', top: 80 }}>

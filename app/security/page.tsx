@@ -128,7 +128,7 @@ export default function Page() {
 
       {/* DATA PROTECTION */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'start' }}>
+        <div className="tq-two-col" style={{ alignItems: 'start' }}>
           <div>
             <div style={eyebrow}>Data protection</div>
             <h2 style={sectionTitle}>How your data is protected.</h2>
@@ -186,7 +186,7 @@ export default function Page() {
 
       {/* VULNERABILITY */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem' }}>
+        <div className="tq-two-col">
           <div>
             <div style={eyebrow}>Vulnerability management</div>
             <h2 style={sectionTitle}>Keeping the platform secure.</h2>

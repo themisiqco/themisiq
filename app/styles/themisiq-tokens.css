@@ -680,6 +680,54 @@ h3 { font-size: var(--text-xl); }
   .tq-footer-legal { flex-wrap: wrap; gap: 10px; justify-content: flex-start; }
 }
 
+/* Two EQUAL columns, and a narrow SIDE column beside its content. Both are fixed column counts written
+   as an explicit track list rather than through repeat(), which is exactly why the first sweep for
+   `repeat(N, 1fr)` missed them: the pattern to look for is a gridTemplateColumns value with no repeat()
+   and no auto-fit in it, whatever its tracks say.
+
+   ⚠️ FOUND 26 SEP 2026 ON /security, WHICH WAS THE LAST PAGE STILL OVERFLOWING at both 320px and 375px.
+   `1fr 1fr` with a 4rem gap put the "Responsible disclosure" block in a 169px second column ending at
+   400px. A `1fr` track's automatic minimum is min-content, so neither column could give way.
+
+   ⚠️ THE SIDE-COLUMN CASE IS ARITHMETICALLY WORSE AND WAS NOT MEASURED BY ANYONE. `200px 1fr` with a
+   3.5rem gap needs 256px before the content column gets anything, and a 320px viewport leaves 240px
+   after the page's own padding. It cannot fit, on any of the three legal pages that share the line. */
+/* ⚠️ minmax(0, 1fr), NOT 1fr, AND STACKING ALONE WAS NOT ENOUGH. /privacy still overflowed to 380px
+   after these classes landed, because a bare `1fr` track keeps an automatic minimum of MIN-CONTENT: the
+   column stacked correctly and then sized itself to its widest unbreakable descendant, 340px in a 240px
+   box. minmax(0, …) is what removes that floor. The overflow moved from the grid to the text, which is
+   why the second half below is also required.
+
+   ⚠️ overflow-wrap: anywhere, NOT break-word, AND THE DIFFERENCE IS THE WHOLE POINT. Both break a long
+   word that would otherwise overflow, but only `anywhere` is taken into account when the browser computes
+   MIN-CONTENT size. `break-word` would have left the track measuring its widest token all over again and
+   the page would still have been 380px. It inherits, so every descendant of these grids gets it, and it
+   only ever acts on a word that does not fit: at any width where nothing overflows, nothing changes. */
+.tq-two-col     { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4rem; overflow-wrap: anywhere; }
+.tq-side-column { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 3.5rem; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .tq-two-col     { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; }
+  .tq-side-column { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+}
+
+/* The two label-and-detail tables on /trust, which CLIPPED rather than overflowed and so passed every
+   scrollWidth check made of them.
+
+   ⚠️ THE CLIP IS WHY THIS WAS INVISIBLE. Both sit inside a card carrying `overflow: 'hidden'`, so the
+   page never widened and the right-hand text was simply cut off instead. Measured at 320px, against the
+   256px those cards leave: the two-track row had 32px for its detail column, and the three-track row
+   needed 324px before its detail column got anything. A test that only asks whether the document is wider
+   than the viewport cannot see either.
+
+   Stacked below 640px rather than 760px: these are nested inside a card, so they run out of room later
+   than a full-width grid does, and 640 keeps the side-by-side reading on a tablet. */
+.tq-data-row   { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; overflow-wrap: anywhere; }
+.tq-data-row-3 { display: grid; grid-template-columns: 120px 180px minmax(0, 1fr); gap: 24px; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .tq-data-row,
+  .tq-data-row-3 { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+}
+
 /* The module pages' "What the module covers" rows: a label column beside its value.
    `minmax(12rem, 16rem) 1fr` cannot reach 320px. The label floor is 192px and the gap is 24px, so of
    the 240px a 320px viewport leaves after the section's padding there are 24px for the value — and a
