@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
+import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '@/lib/pricingCopy'
 
 type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
 
@@ -88,8 +89,7 @@ export default function HomePricing() {
         <p style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Pricing</p>
         <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 3.5vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '1rem', color: '#0d0d0d' }}>Simple, honest pricing.</h2>
         <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, lineHeight: 1.75, fontWeight: 400, marginBottom: '0.5rem' }}>
-          Whether the request comes from a regulator, a lender, your board or a customer, you pay only for
-          the modules it calls for.
+          {PRICING_DRIVER_SENTENCE}
         </p>
         <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginBottom: '2rem' }}>All prices in USD</p>
 
@@ -225,7 +225,7 @@ export default function HomePricing() {
         {/* Dynamic CTA */}
         <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 14, padding: '1.5rem', textAlign: 'center' }}>
           <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, maxWidth: 500, margin: '0 auto 12px', lineHeight: 1.8 }}>
-            Reporting rules keep multiplying, and so do the quotes from platforms and consultancies. Our prices are published, so you know the cost before you start.
+            {PRICING_PUBLISHED_SENTENCE}
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{cta.headline}</div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 14 }}>

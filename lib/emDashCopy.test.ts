@@ -109,9 +109,13 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
  */
 const SWEEP_BUDGET: Record<string, number> = {
   'app/assess/page.tsx': 50,
-  'app/calculate-emissions/page.tsx': 3,
-  'app/cbam/preview/page.tsx': 16,
-  'app/cbam/readiness/page.tsx': 4,
+  // ⚠️ ITS ONE REMAINING DASH IS NOT COPY, AND THE BUDGET KEEPS IT ANYWAY. app/calculate-emissions
+  // holds a CSS comment inside a <style> template literal, explaining why two retired gradient stops
+  // were deleted. stripTsComments does not strip CSS comments inside a template literal — correctly,
+  // since it tracks template literals as strings — so it counts. It is shipped to the browser and read
+  // by nobody. Left at 1 rather than teaching the stripper about nested CSS comments, or deleting a
+  // useful note to satisfy a counter.
+  'app/calculate-emissions/page.tsx': 1,
   'app/dashboard/ai-governance/page.tsx': 21,
   'app/dashboard/cbam/disclosures/page.tsx': 14,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
@@ -150,12 +154,8 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx': 4,
   'app/dashboard/supply-chain/portal/page.tsx': 1,
   'app/deals/[token]/page.tsx': 6,
-  'app/forgot-password/page.tsx': 1,
   'app/impact/[token]/page.tsx': 11,
   'app/order/page.tsx': 1,
-  'app/pricing/page.tsx': 23,
-  'app/reset-password/page.tsx': 1,
-  'app/signup/page.tsx': 1,
   'app/supplier/[token]/page.tsx': 1,
   'app/survey/[token]/page.tsx': 11,
   'app/verify-cbam/[token]/page.tsx': 19,
@@ -191,7 +191,6 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/nis2.ts': 3,
   'lib/obligations.ts': 23,
   'lib/order/invoice.ts': 3,
-  'lib/pricing.ts': 3,
   'lib/sb253.ts': 3,
   'lib/sbti.ts': 9,
   'lib/scope3/supplierAssurance.ts': 3,

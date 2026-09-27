@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
                   <p style={{ fontSize: 14, color: '#0F6E56', margin: 0, fontWeight: 500 }}>Check your inbox</p>
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, margin: 0 }}>
-                  If an account exists for <strong style={{ color: '#555553', fontWeight: 500 }}>{email}</strong>, we've sent a link to reset your password. It may take a minute to arrive — check your spam folder if you don't see it.
+                  If an account exists for <strong style={{ color: '#555553', fontWeight: 500 }}>{email}</strong>, we've sent a link to reset your password. It may take a minute to arrive, so check your spam folder if you don't see it.
                 </p>
               </div>
             ) : (

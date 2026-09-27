@@ -109,7 +109,7 @@ export default function ResetPasswordPage() {
             {status === 'done' && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ background: '#ECF7F2', border: '0.5px solid rgba(15,110,86,0.2)', borderRadius: 8, padding: '12px 16px' }}>
-                  <p style={{ fontSize: 14, color: '#0F6E56', margin: 0, fontWeight: 500 }}>Password updated — signing you in…</p>
+                  <p style={{ fontSize: 14, color: '#0F6E56', margin: 0, fontWeight: 500 }}>Password updated. Signing you in…</p>
                 </div>
               </div>
             )}

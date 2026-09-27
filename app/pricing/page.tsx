@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
+import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/pricingCopy'
 // tierPrice and tierStrikethrough dropped with the old-model blocks — both priced the retired
 // per-module-per-tier model and had no reader left. `Tier` STAYS — see the note on the tier state
 // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
@@ -40,7 +41,7 @@ interface Module {
 const MODULES: Module[] = [
   {
     id: 'ghg',
-    name: 'Climate — GHG Inventory · Scope 1, 2 & 3',
+    name: 'Climate · GHG Inventory · Scope 1, 2 & 3',
     description: 'Scope 1, 2 & 3 · SB 253 · CDP · ESRS E1 · GRI 305 · IFRS S2 · EcoVadis · GHG Protocol · SBTi · RE100',
     tags: [
       { label: 'Live now', color: 'green' },
@@ -48,14 +49,14 @@ const MODULES: Module[] = [
     ],
     cta: {
       headline: 'Ready to see your emissions?',
-      sub: 'Your SB 253 Scope 1, 2 & 3 inventory can be complete in days — not months.',
+      sub: 'Your SB 253 Scope 1, 2 & 3 inventory can be complete in days, not months.',
       btn: 'See your emissions instantly →',
       href: '/dashboard/ghg',
     },
   },
   {
     id: 'cbam',
-    name: 'CBAM — Carbon Border Adjustment Mechanism',
+    name: 'CBAM · Carbon Border Adjustment Mechanism',
     description: 'Regulation (EU) 2023/956 · specific embedded emissions (SEE) · direct & indirect split · precursor tracing · installation-level actuals · Annex IV §1.2 summary for your EU customer',
     tags: [
       { label: 'Non-EU exporters', color: 'purple' },
@@ -63,7 +64,7 @@ const MODULES: Module[] = [
     ],
     cta: {
       headline: 'Is your EU customer asking for your actual emissions?',
-      sub: 'Defaults carry a mark-up on top of the figure published for your country — 10% for 2026, rising to 30% by 2028. Your own verified emissions give your EU customer the choice.',
+      sub: 'Defaults carry a mark-up on top of the figure published for your country: 10% for 2026, rising to 30% by 2028. Your own verified emissions give your EU customer the choice.',
       btn: 'Calculate your embedded emissions →',
       href: '/dashboard/cbam',
     },
@@ -120,7 +121,7 @@ const MODULES: Module[] = [
     ],
     cta: {
       headline: 'Ready to map your supply chain?',
-      sub: 'Scope 3, EcoVadis, CS3D and supplier engagement — one platform.',
+      sub: 'Scope 3, EcoVadis, CS3D and supplier engagement, one platform.',
       btn: 'Map your supply chain →',
       href: '/supply-chain',
     },
@@ -132,7 +133,7 @@ const MODULES: Module[] = [
     tags: [{ label: 'EU Pay · Jun 2026', color: 'orange' }],
     cta: {
       headline: 'Do you know your gender pay gap?',
-      sub: "Most companies don't. Find out in minutes — EU Pay Transparency ready.",
+      sub: "Most companies don't. Find out in minutes. EU Pay Transparency ready.",
       btn: 'Calculate your pay gap →',
       href: '/people',
     },
@@ -159,7 +160,7 @@ const MODULES: Module[] = [
     tags: [{ label: 'EU AI Act · high-risk', color: 'orange' }],
     cta: {
       headline: 'Do you know which of your AI systems are high-risk?',
-      sub: `Annex III classification, Article 11 documentation and registration — high-risk obligations apply from ${AI_ACT_HIGH_RISK_STANDALONE}.`,
+      sub: `Annex III classification, Article 11 documentation and registration. High-risk obligations apply from ${AI_ACT_HIGH_RISK_STANDALONE}.`,
       btn: 'Start your AI inventory →',
       href: '/ai-governance',
     },
@@ -298,7 +299,7 @@ function PricingPageInner() {
     }
     if (count >= 4) return {
       headline: 'Ready to build your compliance platform?',
-      sub: 'One platform, one obligation at a time — powered by expert advisors.',
+      sub: 'One platform, one obligation at a time, powered by expert advisors.',
       buttons: [
         { label: 'Start your free assessment →', href: '/assess', primary: true },
         { label: 'Talk to a specialist', href: '/advisory', primary: false },
@@ -319,7 +320,7 @@ function PricingPageInner() {
     const mods = MODULES.filter(m => selected.has(m.id))
     return {
       headline: 'Ready to get started?',
-      sub: "Pick where you'd like to begin — or talk to a specialist who can guide you across all your needs.",
+      sub: "Pick where you'd like to begin, or talk to a specialist who can guide you across all your needs.",
       buttons: [
         ...mods.map((m, i) => ({ label: m.cta.btn, href: m.cta.href, primary: i === 0 })),
         { label: 'Talk to a specialist', href: '/advisory', primary: false },
@@ -471,9 +472,7 @@ function PricingPageInner() {
             One platform. Purpose-built for each obligation.<br />
             <span style={gradText}>Expert-grade, priced for every business.</span>
           </div>
-          <p style={s.heroSub}>
-            Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.
-          </p>
+          <p style={s.heroSub}>{PRICING_DRIVER_SENTENCE}</p>
         </div>
 
         {/* Interactive prompt — the page's first instruction, so it must describe the first action
@@ -496,8 +495,8 @@ function PricingPageInner() {
           <div style={s.promptInner}>
             <div style={{ ...s.promptDot, animation: 'pulse 2s ease-in-out infinite' }} />
             <div style={{ flex: 1 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive — </span>
-              <span style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>select the compliance modules your business needs. Your total updates instantly, with the multi-module discount applied automatically — two modules −10%, three or more −20%.</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d' }}>This pricing tool is interactive. </span>
+              <span style={{ fontSize: 12, color: '#555553', fontWeight: 400 }}>select the compliance modules your business needs. Your total updates instantly, with the multi-module discount applied automatically: two modules −10%, three or more −20%.</span>
             </div>
           </div>
         </div>
@@ -529,7 +528,7 @@ function PricingPageInner() {
             <div className="tq-band" style={{ borderRadius: 13, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 'min(260px, 100%)' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, marginBottom: 6 }}>Pick and pace.</div>
-                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow — each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
+                <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, maxWidth: 520 }}>Start with the module your next deadline demands. Add others as your obligations grow. Each one is a complete, standalone deliverable, not a partial view that only works when you buy the set.</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 10 }}>Two modules −10% · Three or more −20%</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -619,7 +618,7 @@ function PricingPageInner() {
                       {/* What counts as a location — placed at the point of CHOICE, because the tier
                           the buyer picks is a location count and nothing else on this page defines it. */}
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
-                        One location = one site with its own electricity supply. All of that site’s energy goes in together — electricity, gas, vehicle fuel, refrigerants — so a site with separate gas and electricity accounts is still one location.
+                        One location = one site with its own electricity supply. All of that site’s energy goes in together (electricity, gas, vehicle fuel, refrigerants), so a site with separate gas and electricity accounts is still one location.
                       </div>
                     </div>
                   )}
@@ -638,7 +637,7 @@ function PricingPageInner() {
             <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid var(--color-brand)' : '1px solid #e8e7e4', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge — we read your bills</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge: we read your bills</div>
                   <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced by number of locations.</div>
                 </div>
                 <button onClick={() => setConciergeOn(v => !v)} style={{ ...(conciergeOn ? btnSecondary : btnPrimary), flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
@@ -649,8 +648,8 @@ function PricingPageInner() {
                   <input type="number" min={1} value={conciergeLocations} onChange={e => setConciergeLocations(Math.max(1, Number(e.target.value) || 1))} style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
                   <span style={{ fontSize: 12, color: '#0d0d0d', fontWeight: 600 }}>
                     {conciergeResolved.isCustomQuote
-                      ? 'Enterprise (16+) — custom quote'
-                      : `${ADDONS[conciergeResolved.key].label.replace('Concierge — ', '')} · $${ADDONS[conciergeResolved.key].price.toLocaleString()}/yr`}
+                      ? 'Enterprise (16+): custom quote'
+                      : `${ADDONS[conciergeResolved.key].short} · $${ADDONS[conciergeResolved.key].price.toLocaleString()}/yr`}
                   </span>
                   {conciergeResolved.isCustomQuote && (
                     <a href="mailto:lisa.foster@themisiq.co?subject=Concierge%20Enterprise%20quote" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>Request a quote →</a>
@@ -666,7 +665,7 @@ function PricingPageInner() {
           <div className="tq-summary" style={s.pricePanel}>
             <div className="tq-summary-body">
               <div>
-                <div style={{ letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }} className="tq-summary-label">Your platform — live estimate</div>
+                <div style={{ letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }} className="tq-summary-label">Your platform · live estimate</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8 }}>
                   {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
                 </div>
@@ -689,7 +688,7 @@ function PricingPageInner() {
                   )}
                   {quote.requiresInvoice && (
                     <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--color-module-cbam-wash)', color: 'var(--color-module-cbam-ink)', border: '1px solid var(--color-module-cbam)' }}>
-                      Over $10k — completed by invoice
+                      Over $10k: completed by invoice
                     </div>
                   )}
                 </div>
@@ -731,9 +730,7 @@ function PricingPageInner() {
 
         {/* Dynamic closing CTA */}
         <div style={s.ctaWrap}>
-          <p style={s.ctaPara}>
-            For many companies, we understand that emerging reporting requirements — and the pricing from other platforms and traditional consulting firms — are overwhelming. ThemisIQ offers a better way.
-          </p>
+          <p style={s.ctaPara}>{PRICING_PUBLISHED_SENTENCE}</p>
           <div style={s.ctaHeadline}>{cta.headline}</div>
           <div style={s.ctaSub}>{cta.sub}</div>
           <div style={s.ctaBtns}>
@@ -747,7 +744,7 @@ function PricingPageInner() {
             ) : quote.requiresInvoice ? (
               <Link href={advisoryHref} style={primaryBtn}>Request an invoice →</Link>
             ) : (
-              <button onClick={() => setConsentOpen(true)} style={primaryBtn}>Buy now — ${newGrandTotal.toLocaleString()}/yr →</button>
+              <button onClick={() => setConsentOpen(true)} style={primaryBtn}>Buy now, ${newGrandTotal.toLocaleString()}/yr →</button>
             )}
             {cta.buttons.map((btn, i) => (
               <Link key={i} href={btn.href} style={btn.primary ? primaryBtn : ghostBtn}>

@@ -65,7 +65,7 @@ export default function Page() {
             What you&rsquo;ll need before you can file
           </h1>
           <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
-            The hard part of a CBAM declaration isn&rsquo;t the calculation — it&rsquo;s gathering twenty-seven pieces of information from six different parts of your organisation, several of which have long lead times. This is the full list, grouped by who holds it. Nothing here requires an account. Before you start collecting them, it&rsquo;s worth understanding why this matters.
+            The hard part of a CBAM declaration isn&rsquo;t the calculation. It&rsquo;s gathering twenty-seven pieces of information from six different parts of your organisation, several of which have long lead times. This is the full list, grouped by who holds it. Nothing here requires an account. Before you start collecting them, it&rsquo;s worth understanding why this matters.
           </p>
         </div>
       </section>
@@ -105,7 +105,7 @@ export default function Page() {
 
           {/* How to read the citations and the common-practice marker. */}
           <p style={{ fontSize: 13, color: faint, fontWeight: 400, lineHeight: 1.7, maxWidth: 620, marginBottom: '2.5rem' }}>
-            Most items below point to the provision that requires them. A few — marked common practice — describe where this information usually sits in an organisation rather than something the regulation specifies, so confirm those against your own site.
+            Most items below point to the provision that requires them. A few, marked common practice, describe where this information usually sits in an organisation rather than something the regulation specifies, so confirm those against your own site.
           </p>
 
           {groups.map(group => {
@@ -177,7 +177,7 @@ export default function Page() {
           Gather the information once, then keep it with the figures it supports. The module calculates your specific embedded emissions and prepares the summary your EU customer needs.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-          <a href="/order?modules=cbam" style={{ ...btnPrimary, textDecoration: 'none' }}>Get CBAM — ${cbamPrice}/yr</a>
+          <a href="/order?modules=cbam" style={{ ...btnPrimary, textDecoration: 'none' }}>Get CBAM, ${cbamPrice}/yr</a>
           <a href="/cbam/preview" style={{ ...btnSecondary, textDecoration: 'none' }}>See a sample report</a>
         </div>
       </section>

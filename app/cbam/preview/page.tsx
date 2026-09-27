@@ -85,10 +85,10 @@ const SAMPLE = {
 // report's Source documents section — to show the input→output loop. All
 // illustrative; no real files.
 const SAMPLE_DOCS = [
-  { file: 'Weighbridge tickets — Q1 2026.pdf', type: 'Production log', meta: '1.2 MB' },
-  { file: 'Natural gas invoice — Jan 2026.pdf', type: 'Fuel / energy', meta: '340 KB' },
-  { file: 'Scrap steel delivery notes — 2026.pdf', type: 'Input material', meta: '890 KB' },
-  { file: 'Electricity bill — Q1 2026.pdf', type: 'Energy', meta: '210 KB' },
+  { file: 'Weighbridge tickets Q1 2026.pdf', type: 'Production log', meta: '1.2 MB' },
+  { file: 'Natural gas invoice Jan 2026.pdf', type: 'Fuel / energy', meta: '340 KB' },
+  { file: 'Scrap steel delivery notes 2026.pdf', type: 'Input material', meta: '890 KB' },
+  { file: 'Electricity bill Q1 2026.pdf', type: 'Energy', meta: '210 KB' },
 ]
 
 // Derived totals — computed here so the arithmetic is demonstrably consistent.
@@ -101,7 +101,7 @@ const installationDirectTotal = perProcess.reduce((s, p) => s + p.totalDirect, 0
 // The not_applicable reason the real §1.2 report renders for an Annex II good's
 // indirect fields (lib/cbam/report/build.ts ANNEX_II_REASON) — steel is direct-only,
 // so see_indirect = 0 and item (4)(c) / (6) resolve to not_applicable, not a number.
-const ANNEX_II_REASON = 'Annex II good — direct emissions only'
+const ANNEX_II_REASON = 'Annex II good: direct emissions only'
 
 const n0 = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 0 })
 const n3 = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -142,7 +142,7 @@ export default function Page() {
             What your verified CBAM report looks like
           </h1>
           <p style={{ fontSize: 15, color: muted, lineHeight: 1.75, fontWeight: 400, maxWidth: 620 }}>
-            A sample CBAM Specific Embedded Emissions summary for an illustrative iron & steel installation — the verified report you share with your EU customers. Figures are illustrative — this is not real data.
+            A sample CBAM Specific Embedded Emissions summary for an illustrative iron & steel installation, the verified report you share with your EU customers. Figures are illustrative, so this is not real data.
           </p>
         </div>
       </section>
@@ -153,10 +153,10 @@ export default function Page() {
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10, flexWrap: 'wrap' as const }}>
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: faint }}>Step 1 · Attach evidence</span>
-            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: faint, background: canvas, border: `0.5px solid ${hair}`, borderRadius: 99, padding: '2px 8px' }}>Illustration — not an uploader</span>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: faint, background: canvas, border: `0.5px solid ${hair}`, borderRadius: 99, padding: '2px 8px' }}>Illustration: not an uploader</span>
           </div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, color: ink, marginBottom: 6 }}>Every figure starts with a record.</h2>
-          <p style={{ fontSize: 14, color: muted, fontWeight: 400, lineHeight: 1.7, maxWidth: 620, marginBottom: '1.5rem' }}>You attach the evidence behind each number — we keep the link, so every figure in the report below traces straight back to its source document.</p>
+          <p style={{ fontSize: 14, color: muted, fontWeight: 400, lineHeight: 1.7, maxWidth: 620, marginBottom: '1.5rem' }}>You attach the evidence behind each number, and we keep the link, so every figure in the report below traces straight back to its source document.</p>
           <div style={{ border: `0.5px solid ${hair}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ background: canvas, borderBottom: `0.5px solid ${hair}`, padding: '10px 16px', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: faint }}>Evidence attached · illustrative</div>
             {SAMPLE_DOCS.map((d, i) => (
@@ -245,16 +245,16 @@ export default function Page() {
                   <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: BRAND, marginBottom: 4 }}>Specific embedded emissions (SEE)</div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: ink, lineHeight: 1 }}>{n3(g.specificDirect)} <span style={{ fontSize: 13, color: faint }}>tCO₂e / tonne</span></div>
                   <div style={{ fontSize: 12, color: muted, marginTop: 10, lineHeight: 1.55 }}>
-                    Indirect emissions: not applicable — Annex II good, direct emissions only.
+                    Indirect emissions: not applicable: Annex II good, direct emissions only.
                   </div>
                 </div>
 
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: faint, marginBottom: 4 }}>Derived from</div>
                 <Row label="(4)(a) Specific direct (tCO₂e/t)">{n3(g.specificDirect)}</Row>
                 <Row label="(4)(c) Specific indirect"><span style={{ color: faint, fontStyle: 'italic' }}>{ANNEX_II_REASON}</span></Row>
-                <Row label="(4)(b) Share determined with default values">{g.defaultShareDirect === 0 ? '0% — fully actual' : pct(g.defaultShareDirect)}</Row>
+                <Row label="(4)(b) Share determined with default values">{g.defaultShareDirect === 0 ? '0%: fully actual' : pct(g.defaultShareDirect)}</Row>
                 <Row label="(4)(f) Benchmark used (Column A)">{n3(g.benchmarkValue)} <span style={{ color: faint, fontSize: 11 }}>· indicator ({g.benchmarkIndicator}) · IR 2025/2620 §5.3</span></Row>
-                <Row label="(4)(e) Specific embedded free allocation (SEFA)"><span style={{ color: muted }}>Pending — CSCF not yet published by the Commission (Art. 14(6) Del. Reg. 2019/331)</span></Row>
+                <Row label="(4)(e) Specific embedded free allocation (SEFA)"><span style={{ color: muted }}>Pending: CSCF not yet published by the Commission (Art. 14(6) Del. Reg. 2019/331)</span></Row>
               </div>
             ))}
           </ItemSection>
@@ -276,7 +276,7 @@ export default function Page() {
           </ItemSection>
 
           {/* (12) Default-value precursor */}
-          <ItemSection n="(12)" title="Precursor — default values">
+          <ItemSection n="(12)" title="Precursor: default values">
             <div style={cardStyle}>
               <div style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 8 }}>{SAMPLE.defaultPrecursor.cnCode} · {SAMPLE.defaultPrecursor.name}</div>
               <Row label="(12)(c) Country of origin">{SAMPLE.defaultPrecursor.originCountry}</Row>
@@ -285,7 +285,7 @@ export default function Page() {
           </ItemSection>
 
           {/* (13) Actual-value precursor + origin (traceability) */}
-          <ItemSection n="(13)" title="Precursor — actual values">
+          <ItemSection n="(13)" title="Precursor: actual values">
             <div style={cardStyle}>
               <div style={{ fontSize: 13, fontWeight: 600, color: ink, marginBottom: 8 }}>{SAMPLE.actualPrecursor.cnCode} · {SAMPLE.actualPrecursor.name}</div>
               <Row label="(13)(c) Country of origin">{SAMPLE.actualPrecursor.originCountry}</Row>
@@ -317,7 +317,7 @@ export default function Page() {
 
           {/* Provenance note */}
           <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', background: canvas, border: `0.5px solid ${hair}`, borderRadius: 10, fontSize: 11, color: faint, lineHeight: 1.6 }}>
-            Illustrative sample. Every figure a real report shows is sourced, traceable, and computed under the CBAM implementing regulations (Regulation (EU) 2023/956 · IR 2025/2547 · 2025/2620 · 2025/2621), ready for independent review by an accredited verifier (EN ISO/IEC 14065). This page contains no real installation data and no real documents — the evidence files shown are illustrative.
+            Illustrative sample. Every figure a real report shows is sourced, traceable, and computed under the CBAM implementing regulations (Regulation (EU) 2023/956 · IR 2025/2547 · 2025/2620 · 2025/2621), ready for independent review by an accredited verifier (EN ISO/IEC 14065). This page contains no real installation data and no real documents: the evidence files shown are illustrative.
           </div>
         </div>
       </section>
@@ -328,7 +328,7 @@ export default function Page() {
           Give your EU customers the figures they need.
         </h2>
         <p style={{ fontSize: 15, color: muted, maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
-          Installation-level actuals, with the evidence attached — instead of a published default set conservatively.
+          Installation-level actuals, with the evidence attached, instead of a published default set conservatively.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/pricing?modules=cbam" style={{ ...btnPrimary, textDecoration: 'none' }}>See CBAM pricing →</a>

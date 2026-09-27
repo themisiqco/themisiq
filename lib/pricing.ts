@@ -283,23 +283,38 @@ export type AddOnKey = 'concierge-basic' | 'concierge-standard' | 'concierge-ent
 
 export const ADDONS: Record<
   AddOnKey,
-{ key: AddOnKey; label: string; price: number; requires: ModuleKey[]; isCustomQuote?: boolean }
+{ key: AddOnKey; label: string; short: string; price: number; requires: ModuleKey[]; isCustomQuote?: boolean }
 > = {
   'concierge-basic': {
     key: 'concierge-basic',
-    label: 'Concierge — Basic (up to 5 locations)',
+    label: 'Concierge · Basic (up to 5 locations)',
+    // ⚠️ `short` EXISTS SO NOTHING PARSES `label` ON ITS PUNCTUATION. app/pricing/page.tsx read
+    // `label.replace('Concierge — ', '')` to get this, which made the em dash load-bearing: the
+    // em-dash sweep would have silently started printing the full label in a cell sized for the tier.
+    // Same fix as DEAL_TYPES.short in lib/deals/reportModel.ts, and for the same reason.
+    // ⚠️ THE LABEL IS PAYMENT-FACING AND WAS CHANGED ANYWAY, ON EVIDENCE. It reaches Stripe through
+    // priceLine -> price_data.product_data.name (app/api/checkout/route.ts:133) and invoice lines through
+    // app/api/admin/create-invoice/route.ts:160, so it appears on a customer's checkout page and invoice.
+    // Checked 27 Sep 2026 before touching it: NOTHING matches it by text. The Stripe webhook decides what
+    // was bought from `metadata` (user_id plus comma-separated entitlement keys), never from a line-item
+    // name; there is no price or product lookup by name, no lookup_key, and no reconciliation comparing
+    // description text. So the label is a DISPLAY string on Stripe's side, and the change is cosmetic
+    // there. If a future flow ever matches on it, this is the note that says it used to be safe.
+    short: 'Basic (up to 5 locations)',
     price: 799,
     requires: ['ghg'],
   },
   'concierge-standard': {
     key: 'concierge-standard',
-    label: 'Concierge — Standard (6–15 locations)',
+    label: 'Concierge · Standard (6–15 locations)',
+    short: 'Standard (6–15 locations)',
     price: 1499,
     requires: ['ghg'],
   },
   'concierge-enterprise': {
     key: 'concierge-enterprise',
-    label: 'Concierge — Enterprise (16+ locations)',
+    label: 'Concierge · Enterprise (16+ locations)',
+    short: 'Enterprise (16+ locations)',
     // price 0 is a PLACEHOLDER, not a sellable price. isCustomQuote is the signal — never the 0.
     // (Inferring "custom quote" from price===0 is the absence-vs-zero confusion: 0 is a claim
     // (it's free), a flag is the absence of a self-serve price.) Enforced in addOnRequirementsMet.
@@ -364,7 +379,7 @@ export function toStripeAmount(dollars: number): number {
 // entitlement. A zero price is not a price.
 export function priceLine(name: string, dollars: number): Stripe.Checkout.SessionCreateParams.LineItem {
   if (dollars <= 0) {
-    throw new Error(`priceLine: refusing a $0 line item for "${name}" — a zero price is not a price.`)
+    throw new Error(`priceLine: refusing a $0 line item for "${name}": a zero price is not a price.`)
   }
   return {
     quantity: 1,

@@ -604,7 +604,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>What is SB 253, and does it apply to me?</summary>
                 <div className="qa-body">
-                  SB 253 (the Climate Corporate Data Accountability Act) requires entities that do business in California with at least <strong>$1 billion in annual revenue</strong> to disclose their Scope 1 and Scope 2 greenhouse-gas emissions, with the first reports proposed for <strong>{SB253_FIRST_REPORT_DATE}</strong> — {SB253_DATE_STATUS}, not yet final. Scope 3 reporting follows in {SB253_SCOPE3_FROM}. If you&rsquo;re under that threshold, SB 253 may not apply to you directly &mdash; but your larger customers and investors who <em>are</em> in scope will often ask you for your emissions so they can complete their own value-chain reporting.
+                  SB 253 (the Climate Corporate Data Accountability Act) requires entities that do business in California with at least <strong>$1 billion in annual revenue</strong> to disclose their Scope 1 and Scope 2 greenhouse-gas emissions, with the first reports proposed for <strong>{SB253_FIRST_REPORT_DATE}</strong>, {SB253_DATE_STATUS}, not yet final. Scope 3 reporting follows in {SB253_SCOPE3_FROM}. If you&rsquo;re under that threshold, SB 253 may not apply to you directly &mdash; but your larger customers and investors who <em>are</em> in scope will often ask you for your emissions so they can complete their own value-chain reporting.
                 </div>
               </details>
 
@@ -696,7 +696,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>Is this a subscription? Will I be charged again?</summary>
                 <div className="qa-body">
-                  No &mdash; this is not a subscription, and your credit card will not be charged again. ThemisIQ is a one-time purchase: you select and pay for the modules you need, once. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout — nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
+                  No &mdash; this is not a subscription, and your credit card will not be charged again. ThemisIQ is a one-time purchase: you select and pay for the modules you need, once. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout, with nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
                 </div>
               </details>
 

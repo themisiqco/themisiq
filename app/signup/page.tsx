@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import ThemisIQLogo from '../components/ThemisIQLogo'
+import { PRICING_DRIVER_SENTENCE } from '../../lib/pricingCopy'
 
 export default function SignupPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', company: '', role: '' })
@@ -85,7 +86,7 @@ export default function SignupPage() {
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 8 }}>Your sustainability compliance platform</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>Countless compliance requirements. One Intelligent Platform.</h1>
-            <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', fontWeight: 400 }}>Whether your driver is a regulator, a board, an investor, or a customer — ThemisIQ is your sustainability compliance reporting solution.</p>
+            <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{PRICING_DRIVER_SENTENCE}</p>
           </div>
 
           {/* FORM */}
