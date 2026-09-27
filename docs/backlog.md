@@ -1814,6 +1814,65 @@ the value outlived its own retirement.
 
 ---
 
+## Migrate the pre-token neutrals, and start with `Nav.tsx` and `Footer.tsx`
+
+Logged 26 Sep 2026, split out of the Cyber dashboard's colour migration when the computed comparison showed
+the neutral half is not the same kind of change as the colour half. **The colour half moved 24 literals onto
+`--color-accent-*` with a 0 rgb distance on every one. Not one neutral is an exact match.**
+
+⚠️ **THIS IS THE APP'S PREVAILING NEUTRAL SET, NOT A REMNANT. 2,106 live uses across 85 files**, counted
+26 Sep 2026 with comment spans stripped: `#e8e7e4` 673, `#0d0d0d` 597, `#555553` 520, `#f8f7f5` 314,
+`#888784` 2. The heaviest files are `app/dashboard/ghg/page.tsx` (182), `app/dashboard/climate-risk/page.tsx`
+(135), `app/verify/[token]/page.tsx` (105), `app/dashboard/scope3/page.tsx` (99) and
+`app/dashboard/deals/page.tsx` (68). These five values are also what `CLAUDE.md` still lists under **Brand
+constants** as the neutrals, so the token layer and that list disagree and neither is wrong — one is the
+target and one is the tree.
+
+**THE MAPPING, WITH THE DISTANCE, because every row moves and the sizes are not comparable:**
+
+| Literal | Live uses | Token | Token value | rgb distance |
+|---|---|---|---|---|
+| `#e8e7e4` | 673 | `--color-line` | `#D7DDDF` | 20.3 |
+| `#0d0d0d` | 597 | `--color-ink` | `#151A1D` | 22.1 |
+| `#555553` | 520 | `--color-ink-2` | `#3B474D` | 30.1 |
+| `#f8f7f5` | 314 | see the two rules below | | |
+| `#888784` | 2 | `--color-ink-muted` | `#5A686E` | 59.7 — the largest, and see the on-dark rule |
+| `#fff` | — | `--color-paper` | `#FFFFFF` | **0, exact** |
+| `#f3f4f6` | — | `--color-sunken` | `#EDEFF0` | 9.8 |
+
+⚠️ **RULE 1 — A `#f8f7f5` PAGE BACKGROUND MAPS TO `--color-ground` `#F7F8F8`, NOT TO
+`--color-accent-neutral-wash`.** The accent wash holds `#f8f7f5` exactly, so it is the tempting answer and
+it is the wrong one: it names the app's background a CATEGORY ground, and the day that accent moves the page
+background follows it. `--color-ground` is the app background by declaration and is a different value, which
+is the whole reason this is a decision and not a find-and-replace. All five sibling dashboards
+(`deals`, `supply-chain`, `ai-governance`, `people`, `scope3`) set `background: '#f8f7f5', minHeight: '100vh'`,
+so they move together or the family splits. `--color-accent-neutral-wash` remains correct for `#f8f7f5` used
+as a SURFACE TINT — unselected buttons, table stripes, panel grounds — and that split has to be made per
+occurrence, not per file.
+
+⚠️ **RULE 2 — TEXT ON A DARK GROUND MAPS TO `--color-on-dark` / `--color-on-dark-muted`, NOT TO THE INK
+FAMILY.** The ink tokens are for text on light grounds; applying them on a dark panel inverts the intent and
+can drop below AA. **The worked case is `app/cyber/page.tsx:476`**, a `#888784` domain chip on the `#0d0d0d`
+control header: **5.41:1 today, 3.37:1 if mapped to `--color-ink-muted`** — under AA for 10px text — against
+**10.13:1** for `--color-on-dark-muted` `#B2BDC1`. The `#fff` title beside it is the same shape: 19.44:1
+today, 16.52:1 for `--color-on-dark` `#EAEDEE`, which passes but is not the same pixel.
+**`:476` IS NOT A DEFECT AND WAS DELIBERATELY NOT CHANGED** (decided 26 Sep 2026): it passes today at
+5.41:1. It is recorded here because it is the mapping note, and because a sweep that applied the ink family
+uniformly would have broken it silently.
+
+**START WITH `app/components/Nav.tsx` AND `app/components/Footer.tsx`, AND THE REASON IS NOT THAT THEY ARE
+SMALL.** They are the seam. `Nav.tsx` carries **9 × `#0d0d0d`, 3 × `#555553`, 9 × `#e8e7e4`** as live
+literals while ALSO using `var(--color-ink)`, `var(--color-ink-muted)` and `var(--color-paper)` — it is
+already half migrated against itself. `Footer.tsx` has `#555553`, `#e8e7e4` and `#f8f7f5`. Both render on
+every page, so any page migrated before them puts `#151A1D` headings under a `#0d0d0d` nav and `#D7DDDF`
+rules against a `#e8e7e4` nav border, on one screen. **Migrating a single page first is what makes the shift
+visible; migrating the chrome first is what makes it invisible.**
+
+⚠️ **DO NOT DO THIS AS ONE COMMIT, AND DO NOT DO IT PER PAGE EITHER.** Per value across the chrome, then per
+value across the tree, is the only order in which a half-finished state still looks deliberate.
+
+---
+
 ## Consider extending the separation assertion to `--color-accent-*`
 
 Logged 26 Sep 2026, prompted by a near-miss rather than by a defect. **Nothing is wrong in the token layer

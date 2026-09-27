@@ -5,6 +5,7 @@ import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle, ruledSectionTitle } from '@/app/components/headingStyles'
 import { ruledSection, ruledSectionInner } from '@/app/components/sectionStyles'
+import { moduleEyebrow } from '@/app/components/modulePage'
 
 export default function Page() {
   // Price from the single source of truth, formatted as app/cbam/page.tsx does.
@@ -28,13 +29,13 @@ export default function Page() {
       <section style={{ padding: '5rem 2.5rem 4rem', borderBottom: '0.5px solid #e8e7e4' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
           <div>
-            <div style={eyebrow}>Cyber Governance</div>
+            <div style={moduleEyebrow}>Cyber Governance</div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 4vw, 3.2rem)', fontWeight: 400, lineHeight: 1.15, marginBottom: '1.25rem', color: '#0d0d0d' }}>
               Cyber Governance &<br />
               <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Resilience</span>
             </h1>
             <p style={{ fontSize: 16, color: '#555553', lineHeight: 1.75, fontWeight: 400, marginBottom: '2rem', maxWidth: 480 }}>
-              NIS2, DORA, SEC cyber disclosure, ISO 27001, and NIST CSF — all in one platform. Cyber risk registers, policy management, incident workflows, vendor reviews, and board-level reporting.
+              NIS2, DORA, SEC cyber disclosure, ISO 27001 and NIST CSF, all in one platform. Cyber risk registers, policy management, incident workflows, vendor reviews, and board-level reporting.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
               <a href="/dashboard/cyber" style={{ ...btnPrimary, textDecoration: 'none' }}>Check your cyber readiness →</a>
@@ -42,7 +43,7 @@ export default function Page() {
               <a href="/advisory" style={{ fontSize: 14, fontWeight: 400, padding: '13px 4px', color: '#555553', textDecoration: 'underline', display: 'inline-block' }}>Talk to a specialist</a>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 8 }}>
-              {['NIS2', 'DORA', 'SEC cyber', 'ISO 27001', 'NIST CSF', 'ISO 27001', 'SOC 2', 'NIST 800-53'].map(tag => (
+              {['NIS2', 'DORA', 'SEC cyber', 'ISO 27001', 'NIST CSF', 'SOC 2', 'NIST 800-53'].map(tag => (
                 <span key={tag} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 99, background: '#f8f7f5', border: '0.5px solid #e8e7e4', color: '#555553' }}>{tag}</span>
               ))}
             </div>
@@ -51,10 +52,18 @@ export default function Page() {
           {/* STAT CARDS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {[
-              { val: '72h', unit: 'NIS2 report', label: 'full incident report to national authority after significant cyber incident', color: '#B91C1C', bg: '#FCEBEB' },
+              // ⚠️ ACCENTS, NOT STATES. A regulatory deadline is a CATEGORY, not a claim about the
+              // customer's data, so none of these four is a warning, an error or a pass. Every value is
+              // byte-identical to what it replaced (26 Sep 2026): nothing moved on screen.
+              // ⚠️ THE 4-DAYS CARD WAS CROSSING THE TWO FAMILIES and that is the one real fix here. It
+              // paired var(--color-state-warn) #A94E0D with #FEF3E2, which is accent-amber's wash —
+              // state-warn's own wash is #FBE7DD. The colour is the same in both families, so this reads
+              // as a rename; it is not. It is what lets one family move without dragging the other,
+              // which is why the token layer declares them separately in the first place.
+              { val: '72h', unit: 'NIS2 report', label: 'full incident report to national authority after significant cyber incident', color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-wash)' },
               { val: '€10M', unit: 'or 2%', label: 'maximum NIS2 fine for essential entity non-compliance', color: 'var(--color-brand)', bg: 'var(--color-brand-wash)' },
-              { val: '4 days', unit: 'SEC 8-K', label: 'to disclose material cybersecurity incidents as a US public company', color: 'var(--color-state-warn)', bg: '#FEF3E2' },
-              { val: 'Art. 20', unit: 'NIS2', label: 'board members personally accountable for cyber risk management', color: '#0F6E56', bg: '#E1F5EE' },
+              { val: '4 days', unit: 'SEC 8-K', label: 'to disclose material cybersecurity incidents as a US public company', color: 'var(--color-accent-amber)', bg: 'var(--color-accent-amber-wash)' },
+              { val: 'Art. 20', unit: 'NIS2', label: 'board members personally accountable for cyber risk management', color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-wash)' },
             ].map(({ val, unit, label, color, bg }) => (
               <div key={label} style={{ background: bg, borderRadius: 12, padding: '1.5rem', border: `0.5px solid color-mix(in srgb, ${color} 13%, transparent)` }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 400, color, lineHeight: 1 }}>{val}</div>
@@ -74,7 +83,7 @@ export default function Page() {
       <section style={ruledSection}>
         <div style={ruledSectionInner}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={{ ...eyebrow, marginBottom: 8 }}>Three active frameworks</div>
+            <div style={{ ...moduleEyebrow, marginBottom: 8 }}>Three active frameworks</div>
             <h2 style={{ ...ruledSectionTitle, marginBottom: 0 }}>NIS2. DORA. SEC cyber. All active. All enforced.</h2>
           </div>
           {/* ⚠️ THE CELL BORDERS WERE FAKED AND COULD NOT BE RECOLOURED. This grid used `gap: 1`
@@ -88,26 +97,32 @@ export default function Page() {
               {
                 name: 'EU NIS2 Directive',
                 active: 'Active since October 2024',
-                who: 'Essential and important entities across 18 sectors in the EU — energy, financial, health, transport, technology, manufacturing, and more',
+                who: 'Essential and important entities across 18 EU sectors, including energy, financial, health, transport, technology and manufacturing',
                 key: ['Article 20: Board personal accountability for cyber risk', 'Article 21: MFA, supply chain security, incident handling, encryption', 'Article 23: 24h early warning · 72h full report · 1-month final report', 'Fines: up to €10M or 2% global turnover (essential entities)'],
-                color: '#B91C1C',
+                color: 'var(--color-accent-red)',
               },
               {
                 name: 'EU DORA',
                 active: 'Active since January 2025',
-                who: 'Financial entities with EU operations — banks, insurers, investment firms, crypto-asset service providers, and their critical ICT third-party providers',
-                key: ['ICT risk management framework — policies, procedures, controls', 'Digital operational resilience testing — including TLPT', 'ICT-related incident classification and reporting', 'Third-party ICT risk management and CTPP oversight'],
+                who: 'Financial entities with EU operations, including banks, insurers, investment firms, crypto-asset service providers, and their critical ICT third-party providers',
+                key: ['ICT risk management framework covering policies, procedures and controls', 'Digital operational resilience testing, including TLPT', 'ICT-related incident classification and reporting', 'Third-party ICT risk management and CTPP oversight'],
                 color: 'var(--color-brand)',
               },
               {
                 name: 'SEC Cyber Rules',
                 active: 'Active since December 2023',
-                who: 'US publicly listed companies — NYSE, Nasdaq, and other SEC-registered issuers',
-                key: ['Form 8-K: material cyber incident disclosure within 4 business days', 'Form 10-K: annual cyber risk management programme description', 'Board oversight and CISO governance disclosure required', 'SEC enforcement already underway — no grace period'],
-                color: '#0C447C',
+                who: 'Companies registered with the SEC, including those listed on NYSE and Nasdaq',
+                key: ['Form 8-K: material cyber incident disclosure within 4 business days', 'Form 10-K: annual cyber risk management programme description', 'Board oversight and CISO governance disclosure required', 'SEC enforcement is already underway, with no grace period'],
+                color: 'var(--color-accent-blue)',
               },
+              // ⚠️ NO COLOURED TOP RULE ON THE CARD. A 3px rule is not in the edge vocabulary at all —
+              // that is 6px LEFT for module identity, 4px TOP for semantic state, 1px for everything else —
+              // and a framework is a CATEGORY, so it is the third case. The rule the vocabulary gives for it
+              // is explicit: "colour lives in the label and the button, not in the frame." The colour has not
+              // left the card; it is in the `active` pill and the `→` markers below, which is where it is
+              // read. See app/styles/themisiq-tokens.css, EDGE VOCABULARY.
             ].map(({ name, active, who, key, color }) => (
-              <div key={name} style={{ background: 'var(--color-paper)', padding: '2rem', border: '1px solid var(--color-line)', borderRadius: 12, borderTop: `3px solid ${color}` }}>
+              <div key={name} style={{ background: 'var(--color-paper)', padding: '2rem', border: '1px solid var(--color-line)', borderRadius: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 4 }}>{name}</div>
                 <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 12, background: `color-mix(in srgb, ${color} 13%, transparent)`, padding: '2px 8px', borderRadius: 99, display: 'inline-block' }}>{active}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginBottom: 16, fontWeight: 400 }}>{who}</div>
@@ -126,10 +141,16 @@ export default function Page() {
       {/* FEATURES */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={eyebrow}>Platform capabilities</div>
+          <div style={moduleEyebrow}>Platform capabilities</div>
           <h2 style={sectionTitle}>Everything your cyber governance programme needs.</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
+        {/* ⚠️ THE SAME FAKED CELL BORDER THE FRAMEWORK GRID ABOVE ALREADY LOST, and it survived here and
+            in the incident clock below because the earlier fix was applied per grid rather than per file.
+            `gap: 1` over a background made the GAP the border: nothing drew a line, the panel showed
+            through a 1px seam, so the seam could not be recoloured, could not take a radius, and collapsed
+            to nothing wherever a cell spanned. Each cell now draws a real 1px var(--color-line) border and
+            the gap is a real gap. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
           {[
             { title: 'Cyber risk register', desc: 'Structured cyber risk identification, assessment, and treatment. NIST CSF and ISO 27001 Annex A control mapping. Risk heat maps and board-ready risk summaries.' },
             { title: 'Policy management', desc: 'Information security policy library aligned to ISO 27001:2022 and NIS2 Article 21. Version control, review workflows, and staff acknowledgement tracking.' },
@@ -138,7 +159,7 @@ export default function Page() {
             { title: 'Board reporting', desc: 'Cyber risk dashboard for board and audit committee. NIS2 Article 20 personal accountability documentation. SEC 10-K governance disclosure preparation. CISO briefing packs.' },
             { title: 'Resilience testing', desc: 'DORA digital operational resilience testing programme management. TLPT coordination, penetration test tracking, and finding remediation. TIBER-EU framework alignment.' },
           ].map(({ title, desc }) => (
-            <div key={title} style={{ background: '#fff', padding: '2rem' }}>
+            <div key={title} style={{ background: '#fff', padding: '2rem', border: '1px solid var(--color-line)', borderRadius: 12 }}>
               
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, fontWeight: 400 }}>{desc}</div>
@@ -151,18 +172,26 @@ export default function Page() {
       <section style={{ background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4', borderBottom: '0.5px solid #e8e7e4', padding: '5rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <div style={eyebrow}>Incident notification timelines</div>
+            <div style={moduleEyebrow}>Incident notification timelines</div>
             <h2 style={sectionTitle}>The clock starts the moment you detect it.</h2>
-            <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }}>ThemisIQ's incident response workflow triggers the right notification at the right time — so you never miss a regulatory deadline under pressure.</p>
+            <p style={{ fontSize: 15, color: '#555553', maxWidth: 540, margin: '0 auto', lineHeight: 1.75, fontWeight: 400 }}>ThemisIQ's incident response workflow triggers the right notification at the right time, so you never miss a regulatory deadline under pressure.</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: '#e8e7e4', border: '0.5px solid #e8e7e4', borderRadius: 16, overflow: 'hidden' }}>
+          {/* Faked cell border, same as the features grid above — see that comment. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             {[
+              // Accents for the same reason as the hero cards: a notification deadline is a category.
+              // All four values unchanged; Hour 24 also stops crossing state-warn into an accent role.
               { time: 'Hour 1', title: 'Contain & assess', desc: 'Isolate affected systems. Assign incident commander. Open ThemisIQ incident record. Determine severity classification.', color: 'var(--color-brand)' },
-              { time: 'Hour 24', title: 'NIS2 early warning', desc: 'Submit early warning to national competent authority. Indicate whether incident is suspected to be malicious. Customer notification if data breach confirmed.', color: 'var(--color-state-warn)' },
-              { time: 'Hour 72', title: 'Full report + SEC 8-K', desc: 'NIS2 full incident notification. DORA ICT incident report. US public companies: assess 8-K materiality and file if material. GDPR Article 33 if personal data involved.', color: '#B91C1C' },
-              { time: 'Day 30', title: 'Final report', desc: 'NIS2 final report with root cause, impact assessment, cross-border effects, and measures taken. Post-incident review completion. Corrective action verification.', color: '#0F6E56' },
+              { time: 'Hour 24', title: 'NIS2 early warning', desc: 'Submit early warning to national competent authority. Indicate whether incident is suspected to be malicious. Customer notification if data breach confirmed.', color: 'var(--color-accent-amber)' },
+              { time: 'Hour 72', title: 'Full report + SEC 8-K', desc: 'NIS2 full incident notification. DORA ICT incident report. US public companies: assess 8-K materiality and file if material. GDPR Article 33 if personal data involved.', color: 'var(--color-accent-red)' },
+              { time: 'Day 30', title: 'Final report', desc: 'NIS2 final report with root cause, impact assessment, cross-border effects, and measures taken. Post-incident review completion. Corrective action verification.', color: 'var(--color-accent-green)' },
+              // ⚠️ THE 4px TOP RULE IS GONE, AND IT WAS THE RIGHT DEVICE FOR THE WRONG THING. 4px top
+              // means SEMANTIC STATE in the edge vocabulary, and it belongs to .tq-callout with --tq-state.
+              // A notification deadline is a category, not a state: nothing here is a warning about the
+              // customer's data. So these take the 1px case like the framework cards, and the colour stays
+              // in the `time` heading where it is read.
             ].map(({ time, title, desc, color }) => (
-              <div key={time} style={{ background: '#fff', padding: '2rem', borderTop: `4px solid ${color}` }}>
+              <div key={time} style={{ background: '#fff', padding: '2rem', border: '1px solid var(--color-line)', borderRadius: 12 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color, marginBottom: 4 }}>{time}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 8 }}>{title}</div>
                 <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, fontWeight: 400 }}>{desc}</div>
@@ -175,7 +204,7 @@ export default function Page() {
       {/* FRAMEWORK TABLE */}
       <section style={{ padding: '5rem 2.5rem', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={eyebrow}>Full framework coverage</div>
+          <div style={moduleEyebrow}>Full framework coverage</div>
           <h2 style={sectionTitle}>Every cyber framework. One platform.</h2>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -188,18 +217,18 @@ export default function Page() {
           </thead>
           <tbody>
             {[
-              ['EU NIS2 Directive', 'European Union', 'Essential + important entities · 18 sectors', 'Active Oct 2024', '✓ Full — gap assessment + incident workflow'],
-              ['EU DORA', 'EU financial services', 'Banks, insurers, investment firms, crypto', 'Active Jan 2025', '✓ Full — ICT risk + CTPP register + testing'],
-              ['SEC Cybersecurity Rules', 'USA · public companies', 'NYSE / Nasdaq listed companies', 'Active Dec 2023', '✓ Full — 8-K + 10-K disclosure workflow'],
-              ['ISO 27001:2022', 'Global', 'Any organisation seeking ISMS certification', 'Voluntary / customer-required', '✓ Full — Annex A control mapping'],
-              ['NIST CSF 2.0', 'USA (global adoption)', 'US federal + voluntary for all sectors', 'Active 2024', '✓ Full — Govern, Identify, Protect, Detect, Respond, Recover'],
-              ['NIST 800-53 Rev.5', 'USA federal', 'Federal agencies + contractors', 'Mandatory for federal', '✓ Partial — control mapping'],
-              ['SOC 2 Type II', 'USA (industry standard)', 'SaaS and technology companies', 'Customer-required', '✓ Partial — TSC alignment'],
-              ['UK Cyber Essentials', 'United Kingdom', 'UK government suppliers + voluntary', 'Active', '✓ Partial — basic controls mapping'],
+              ['EU NIS2 Directive', 'European Union', 'Essential + important entities · 18 sectors', 'Active Oct 2024', '✓ Full gap assessment and incident workflow'],
+              ['EU DORA', 'EU financial services', 'Banks, insurers, investment firms, crypto', 'Active Jan 2025', '✓ Full ICT risk, CTPP register and testing'],
+              ['SEC Cybersecurity Rules', 'USA · public companies', 'NYSE / Nasdaq listed companies', 'Active Dec 2023', '✓ Full 8-K and 10-K disclosure workflow'],
+              ['ISO 27001:2022', 'Global', 'Any organisation seeking ISMS certification', 'Voluntary / customer-required', '✓ Full Annex A control mapping'],
+              ['NIST CSF 2.0', 'USA (global adoption)', 'US federal + voluntary for all sectors', 'Active 2024', '✓ All six functions: Govern, Identify, Protect, Detect, Respond, Recover'],
+              ['NIST 800-53 Rev.5', 'USA federal', 'Federal agencies + contractors', 'Mandatory for federal', '✓ Partial control mapping'],
+              ['SOC 2 Type II', 'USA (industry standard)', 'SaaS and technology companies', 'Customer-required', '✓ Partial TSC alignment'],
+              ['UK Cyber Essentials', 'United Kingdom', 'UK government suppliers + voluntary', 'Active', '✓ Partial basic controls mapping'],
             ].map((row, i) => (
               <tr key={i}>
                 {row.map((cell, j) => (
-                  <td key={j} style={{ padding: '10px 14px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: j === 4 ? '#0F6E56' : '#555553', fontWeight: j === 4 ? 500 : 400 }}>{cell}</td>
+                  <td key={j} style={{ padding: '10px 14px', borderBottom: '0.5px solid #e8e7e4', background: i % 2 === 0 ? '#fff' : '#f8f7f5', color: j === 4 ? 'var(--color-accent-green)' : '#555553', fontWeight: j === 4 ? 500 : 400 }}>{cell}</td>
                 ))}
               </tr>
             ))}
@@ -214,7 +243,7 @@ export default function Page() {
           <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Are you compliant?</span>
         </h2>
         <p style={{ fontSize: 15, color: 'var(--color-ink-2)', maxWidth: 480, margin: '0 auto 2.5rem', fontWeight: 400, lineHeight: 1.7 }}>
-          ThemisIQ's cyber governance gap assessment identifies where you stand against NIS2, DORA, and SEC cyber rules — and tells you exactly what to fix first.
+          ThemisIQ's cyber governance gap assessment identifies where you stand against NIS2, DORA and SEC cyber rules, and tells you exactly what to fix first.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' as const }}>
           <a href="/dashboard/cyber" style={{ fontSize: 14, fontWeight: 500, padding: '13px 32px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', display: 'inline-block' }}>Check your cyber readiness →</a>
@@ -231,7 +260,3 @@ export default function Page() {
   )
 }
 
-const navLink: React.CSSProperties = { fontSize: 11, color: '#555553', textDecoration: 'none' }
-const btnGrad: React.CSSProperties = { fontSize: 13, fontWeight: 500, padding: '8px 18px', borderRadius: 8, background: 'var(--color-brand)', color: '#fff', textDecoration: 'none', display: 'inline-block' }
-const btnOutline: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '8px 18px', borderRadius: 8, background: 'none', color: '#0d0d0d', border: '0.5px solid #e8e7e4', textDecoration: 'none', display: 'inline-block' }
-const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }
