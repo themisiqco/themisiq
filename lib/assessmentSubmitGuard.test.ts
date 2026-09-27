@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+import { stripTsComments } from './testing/stripComments'
+
+const ROOT = join(__dirname, '..')
 import {
   ASSESSMENT_IP_BUCKET, ASSESSMENT_IP_LIMIT, ASSESSMENT_IP_WINDOW_MS,
   ASSESSMENT_EMAIL_BUCKET, ASSESSMENT_EMAIL_LIMIT, ASSESSMENT_EMAIL_WINDOW_MS,
-  ASSESSMENT_HONEYPOT_FIELD, isHoneypotTripped, recipientKey,
+  HONEYPOT_FIELD, isHoneypotTripped, recipientKey,
 } from './assessmentSubmitGuard'
 
 // ⚠️ WHAT THESE PROTECT. /api/assessment/submit sent two Resend emails per call with no session, no
@@ -36,9 +42,33 @@ describe('the assessment honeypot drops a bot without telling it why', () => {
   })
 
   it('the field name is boring, because a revealing one tells a bot to skip it', () => {
-    expect(ASSESSMENT_HONEYPOT_FIELD).toBe('website')
+    expect(HONEYPOT_FIELD).toBe('website')
     for (const tell of ['honey', 'trap', 'bot', 'spam', 'ignore', 'do_not', 'hidden']) {
-      expect(ASSESSMENT_HONEYPOT_FIELD.toLowerCase()).not.toContain(tell)
+      expect(HONEYPOT_FIELD.toLowerCase()).not.toContain(tell)
+    }
+    // ⚠️ 'hp' IS WHAT /api/order/quote-request USED, AND IT FAILS THIS TEST. It is an obvious honeypot
+    // name, which is the one property a honeypot's name must not have. Both routes now read the
+    // constant above.
+    expect(HONEYPOT_FIELD).not.toBe('hp')
+  })
+
+  it('the predicate is the ONLY honeypot check in the app, so the weaker one cannot come back', () => {
+    // The inline check this replaced was `contact?.hp && String(contact.hp).trim()`. Asserting its
+    // absence is what stops it being reintroduced beside the shared one, which is how the two drifted
+    // apart in the first place: one of them was written before this module existed.
+    const routes = [
+      'app/api/order/quote-request/route.ts',
+      'app/api/assessment/submit/route.ts',
+    ]
+    for (const r of routes) {
+      // ⚠️ COMMENTS STRIPPED FIRST, AND THIS TEST FAILED WITHOUT IT. Each route's comment EXPLAINS the
+      // weaker check it replaced, quoting `String(contact.hp)` verbatim — so a raw substring match
+      // fires on the documentation and calls a fixed route broken. stripTsComments exists for exactly
+      // this: it blanks comment spans while preserving offsets.
+      const src = stripTsComments(readFileSync(join(ROOT, r), 'utf8'))
+      expect(src, `${r} must call the shared predicate`).toContain('isHoneypotTripped(')
+      expect(src, `${r} must not re-implement the check inline`).not.toMatch(/String\(contact\.hp\)/)
+      expect(src, `${r} must not hard-code the field name`).not.toMatch(/contact\?\.\s*hp\b/)
     }
   })
 })

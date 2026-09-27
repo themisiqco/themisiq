@@ -10,7 +10,7 @@ import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimi
 import {
   ASSESSMENT_IP_BUCKET, ASSESSMENT_IP_LIMIT, ASSESSMENT_IP_WINDOW_MS,
   ASSESSMENT_EMAIL_BUCKET, ASSESSMENT_EMAIL_LIMIT, ASSESSMENT_EMAIL_WINDOW_MS,
-  ASSESSMENT_HONEYPOT_FIELD, isHoneypotTripped, recipientKey,
+  HONEYPOT_FIELD, isHoneypotTripped, recipientKey,
 } from '../../../../lib/assessmentSubmitGuard'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     // allowed limiter call INSERTS a row; running the limiter on traffic already known to be a bot
     // would let a loop write unbounded rows through the service-role client, which is a second abuse
     // vector opened by the fix for the first.
-    if (isHoneypotTripped((lead as Record<string, unknown>)[ASSESSMENT_HONEYPOT_FIELD])) {
+    if (isHoneypotTripped((lead as Record<string, unknown>)[HONEYPOT_FIELD])) {
       console.warn('[assessment/submit] honeypot tripped, dropping submission')
       return silentOk()
     }

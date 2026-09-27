@@ -4,7 +4,7 @@ import { useState } from 'react'
 // RELATIVE, NOT '@/lib/...'. tsconfig resolves the alias and vitest does not, so an aliased import
 // here typechecks clean and then fails app/assess/obligations.test.ts at import time. Every other
 // import in this file is relative for the same reason.
-import { ASSESSMENT_HONEYPOT_FIELD } from '../../lib/assessmentSubmitGuard'
+import { HONEYPOT_FIELD } from '../../lib/assessmentSubmitGuard'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
@@ -614,7 +614,7 @@ export default function AssessPage() {
       await fetch('/api/assessment/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role, [ASSESSMENT_HONEYPOT_FIELD]: email.website }, obligations, profile: answerProfile() }),
+        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role, [HONEYPOT_FIELD]: email.website }, obligations, profile: answerProfile() }),
       })
     } catch (e) {
       console.error('Email send failed:', e)
@@ -838,7 +838,7 @@ export default function AssessPage() {
               assistive technology as well as to sighted users — a honeypot that a screen-reader user
               fills in is a trap for the wrong person. */}
           <input value={email.website} onChange={e => setEmail(v => ({...v, website: e.target.value}))}
-            name={ASSESSMENT_HONEYPOT_FIELD} tabIndex={-1} aria-hidden="true" autoComplete="off"
+            name={HONEYPOT_FIELD} tabIndex={-1} aria-hidden="true" autoComplete="off"
             style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} />
           {/* setStep(RESULTS_STEP), never a literal. This was `setStep(8)`, which meant 'results'
               only while the email gate sat at a hardcoded step 7 and made questions[7] unreachable.

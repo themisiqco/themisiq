@@ -38,12 +38,23 @@ export const ASSESSMENT_EMAIL_WINDOW_MS = 24 * 60 * 60 * 1000      // 1 day
 /**
  * The honeypot field's name, shared by the form and the route so the two cannot drift.
  *
+ * ⚠️ NOT PREFIXED `ASSESSMENT_`, BECAUSE /api/order/quote-request READS IT TOO. That route has had its
+ * own honeypot since fd6b0bb, predating this module, checked inline as
+ * `contact?.hp && String(contact.hp).trim()`. Two implementations of one idea is how one of them ends
+ * up weaker, and it had: see the table on isHoneypotTripped. Both now read the same predicate and the
+ * same field name. The module is still called assessmentSubmitGuard because its LIMITS are
+ * assessment-specific; renaming it is a follow-up, not a change to make beside a behaviour fix.
+ *
+ * ⚠️ ONE NAME FOR BOTH FORMS IS A DELIBERATE TRADE. A bot that learns to skip `website` defeats both at
+ * once, where two names would have to be learned separately. Weighed against two predicates drifting
+ * apart, which already happened, one authority wins.
+ *
  * ⚠️ 'website' IS CHOSEN TO BE FILLED, NOT TO BE IGNORED. A bot that autofills a form looks for
  * plausible names, and a URL field is among the first it completes; a human never sees this one. The
  * name must stay boring for that reason — renaming it to `honeypot` or `do_not_fill` would tell a
  * bot exactly which field to leave alone.
  */
-export const ASSESSMENT_HONEYPOT_FIELD = 'website'
+export const HONEYPOT_FIELD = 'website'
 
 /**
  * TRUE ⇒ drop the submission. Trimmed, so a field a browser filled with whitespace is not treated as
@@ -53,6 +64,18 @@ export const ASSESSMENT_HONEYPOT_FIELD = 'website'
  * array) is treated as TRIPPED: nothing legitimate puts one there, and the field is not rendered as
  * anything a person could type into.
  */
+// ⚠️ THE NON-STRING CASES ARE WHY THIS REPLACED /api/order/quote-request's INLINE CHECK. That check was
+// `contact?.hp && String(contact.hp).trim()`, and these five values passed it while tripping this one:
+//
+//   value   inline check   this
+//   0       passes         TRIPS   falsy, so the `&&` short-circuits before String() runs
+//   false   passes         TRIPS   same
+//   []      passes         TRIPS   String([]) === '', so the trim is empty
+//   {}      passes         TRIPS   String({}) === '[object Object]' — this one tripped inline too
+//   1       TRIPS          TRIPS
+//
+// Not one of those is something a person can type into a text input, so each is a signal the body was
+// constructed rather than filled in. `0` and `[]` are exactly what a script posting JSON produces.
 export function isHoneypotTripped(value: unknown): boolean {
   if (value === undefined || value === null) return false
   if (typeof value !== 'string') return true

@@ -10,6 +10,8 @@
 // call startCheckout when the cart requires a quote/invoice (it 400s by design).
 
 import { useState, Suspense } from 'react'
+// RELATIVE, not '@/lib/...': tsconfig resolves the alias and vitest does not.
+import { HONEYPOT_FIELD } from '../../lib/assessmentSubmitGuard'
 import { useSearchParams } from 'next/navigation'
 import {
   LEGACY_PRICING_PAGE_ID,
@@ -65,7 +67,9 @@ function OrderInner() {
   const searchParams = useSearchParams()
   const [submitting, setSubmitting] = useState(false)
   // Quote-request form (>$10k / Advisory path) — email-only, no payment.
-  const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' }) // hp = honeypot (bots fill it)
+  // `hp` is the honeypot's LOCAL state name; the wire field is HONEYPOT_FIELD, shared with the route
+  // and with /assess so one edit moves all three. See lib/assessmentSubmitGuard.ts.
+  const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' })
   const [quoteStatus, setQuoteStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
 
   // ── Params → canonical keys + validated tier ──────────────────────────────────
@@ -129,7 +133,7 @@ function OrderInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contact: { name: q.name.trim(), email: q.email.trim(), company: q.company.trim(), phone: q.phone.trim() || undefined, hp: q.hp || undefined },
+          contact: { name: q.name.trim(), email: q.email.trim(), company: q.company.trim(), phone: q.phone.trim() || undefined, [HONEYPOT_FIELD]: q.hp || undefined },
           order: { modules: keys, tier, totalUSD: quote.totalUSD, ref: ref ?? undefined },
         }),
       })
@@ -206,9 +210,13 @@ function OrderInner() {
                 <input value={q.company} onChange={e => setQ(v => ({ ...v, company: e.target.value }))} placeholder="Acme Industries Inc." style={orderInput} />
                 <label style={orderLabel}>Phone <span style={{ color: 'var(--color-ink-muted)', fontWeight: 400 }}>(optional)</span></label>
                 <input value={q.phone} onChange={e => setQ(v => ({ ...v, phone: e.target.value }))} placeholder="+1 555 000 0000" style={orderInput} />
-                {/* Honeypot — visually hidden; real users never fill it, bots do → server silently drops. */}
+                {/* Honeypot: visually hidden, real users never fill it, bots do, and the server silently
+                    drops the submission. ⚠️ THE `name` ATTRIBUTE WAS MISSING, and many form-filling bots key
+                    off it rather than off the label, so a field labelled "Website" with no name is a weaker
+                    trap than it looks. It now carries HONEYPOT_FIELD, the same constant the route reads, so
+                    the form and the route cannot drift. */}
                 <div aria-hidden="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', left: '-9999px' }}>
-                  <label>Website<input type="text" tabIndex={-1} autoComplete="off" value={q.hp} onChange={e => setQ(v => ({ ...v, hp: e.target.value }))} /></label>
+                  <label>Website<input type="text" name={HONEYPOT_FIELD} tabIndex={-1} autoComplete="off" value={q.hp} onChange={e => setQ(v => ({ ...v, hp: e.target.value }))} /></label>
                 </div>
 
                 {quoteStatus === 'error' && (

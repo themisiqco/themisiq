@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
+import { HONEYPOT_FIELD, isHoneypotTripped } from '../../../../lib/assessmentSubmitGuard'
 import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
 import type { Tier } from '../../../../lib/pricing'
 import { BRAND, BRAND_WASH, INK_MUTED } from '@/lib/brand'
@@ -33,7 +34,19 @@ export async function POST(req: NextRequest) {
 
     // Honeypot: bots fill the hidden field; real users leave it empty. Silently accept + drop
     // (return ok so the bot believes it succeeded, but send nothing and record nothing).
-    if (contact?.hp && String(contact.hp).trim()) {
+    //
+    // ⚠️ THE PREDICATE IS SHARED NOW, AND THE INLINE ONE IT REPLACED WAS WEAKER. This was
+    // `contact?.hp && String(contact.hp).trim()`, which passes `0`, `false` and `[]` — the `&&`
+    // short-circuits on the first two, and String([]) is ''. Those are precisely what a script posting
+    // JSON produces, as opposed to a person typing into a text input. See the table in
+    // lib/assessmentSubmitGuard.ts.
+    // ⚠️ AND THE FIELD NAME IS SHARED, so the form and both routes cannot drift. It was `hp` here,
+    // which is also a name a bot can learn to skip precisely because it is obviously a honeypot.
+    // CHECKED BEFORE THE RATE LIMITER BELOW, unchanged: every allowed limiter call INSERTs a row, so
+    // limiting traffic already known to be a bot would let a loop write rows through the service-role
+    // client.
+    if (isHoneypotTripped(contact?.[HONEYPOT_FIELD])) {
+      console.warn('[order/quote-request] honeypot tripped, dropping submission')
       return NextResponse.json({ ok: true })
     }
 
