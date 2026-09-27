@@ -1744,14 +1744,46 @@ become `--color-accent-violet` at its current value, or does the colourway suppl
 **There is now a third answer that is better than both — Cyber owns 270°, so the violet family can point at
 the Cyber tokens** and the platform gains a hue rather than keeping an orphan.
 
-The files, from a sweep on 26 Sep 2026:
+The files. ⚠️ **THE FOUR-ROW LIST PUBLISHED HERE UNTIL 26 SEP 2026 NAMED FOUR OF THE ELEVEN**, and
+the omission mattered: a reader checking the list would have concluded the value was confined to
+materiality, supply-chain templates, trust and the supplier portal, and the seven dashboard uses would
+have outlived a sweep that thought it was complete. **Which is the failure mode this task's own closing
+line describes.** Re-swept 26 Sep 2026 by stripping comment spans first, which is what separates a live
+use from a note about one.
 
-| File | What it is |
-|---|---|
-| `app/materiality/page.tsx` | the **five-step ladder**: `PURPLE #7425E3`, `PURPLE_MID #534AB7`, `PURPLE_SLATE #3C3489`, `PURPLE_INK #26215C`, `PURPLE_TINT #FAF9FE`, plus the decomposed RGB channels for the fill-opacity grounds |
-| `lib/supply-chain/templates.ts` | `:66` Labour & Human Rights, `:173` Risk Identification, `:209` the custom questionnaire |
-| `app/trust/page.tsx` | `:24`, `:30` — two of the six card accents |
-| `app/dashboard/supply-chain/portal/page.tsx` | `:29` — the EcoVadis swatch |
+**WHERE THE 32 COMES FROM, so the count is not recomputed differently next time:** 18 live uses across
+11 application files, plus 14 in 6 transactional email templates. The templates are the deliberately
+unmigrated gradient that `CLAUDE.md` records under **Brand constants**, so they are in the 32 but are
+NOT part of this task. A further 5 files mention the value in comments ONLY — `app/styles/themisiq-tokens.css`,
+`lib/brand.ts`, `lib/ghg/engine.ts`, `lib/pdf/palette.test.ts` and the two `app/dashboard/cbam/` files —
+and a file-level `grep -l` counts those as hits. That is exactly how the first pass at this list reported
+thirteen files.
+
+| File | Live uses | What it is |
+|---|---|---|
+| `app/dashboard/sbti/page.tsx` | `:641`, `:1090`, `:1205` | three Recharts `<Line stroke>` — the required-trajectory and two emissions series |
+| `lib/supply-chain/templates.ts` | `:64`, `:177`, `:212` | Labour & Human Rights, Risk Identification, the custom questionnaire — each `color` paired with `bg: '#EDE9FE'` |
+| `app/dashboard/ghg/trends/page.tsx` | `:28`, `:438` | `COLORS.scope1`, and the per-revenue `<Line stroke>`. ⚠️ `:28` is one of THREE gradient members still in one object — `scope2: '#22ACFE'`, `scope3: '#64FE3E'` — so replacing the violet alone leaves a two-thirds gradient behind |
+| `app/trust/page.tsx` | `:24`, `:30` | two of the six card accents |
+| `app/dashboard/climate-risk/page.tsx` | `:273` | the legend `<circle fill>` for one scenario |
+| `app/dashboard/climate-risk/report/page.tsx` | `:231` | the same legend circle, duplicated into the report view — change both or the report diverges from the page it reports on |
+| `app/dashboard/cyber/page.tsx` | `:82` | the DORA row of `FRAMEWORK_CONFIG`. See the note below: this one CANNOT take the obvious replacement |
+| `app/dashboard/page.tsx` | `:202` | the `professional` plan chip, `color` plus `bg: '#EDE9FE'` |
+| `app/dashboard/reports/page.tsx` | `:79` | the `resilience` analysis-type chip, same `#EDE9FE` pairing |
+| `app/dashboard/supply-chain/portal/page.tsx` | `:28` | the EcoVadis swatch |
+| `app/materiality/page.tsx` | `:71` | `PURPLE`, the first rung of the **five-step ladder**: `PURPLE #7425E3`, `PURPLE_MID #534AB7`, `PURPLE_SLATE #3C3489`, `PURPLE_INK #26215C`, `PURPLE_TINT #FAF9FE`, plus the decomposed RGB channels for the fill-opacity grounds. Only the first rung holds this value; the other four move with it or the ladder breaks |
+
+⚠️ **`#EDE9FE` TRAVELS WITH IT, FOUR TIMES** — `lib/supply-chain/templates.ts` (×3), `app/dashboard/page.tsx:202`,
+`app/dashboard/reports/page.tsx:79`. It is the violet's wash and appears in no token. Retiring the colour
+without its ground leaves a replacement sitting on a violet tint.
+
+⚠️ **THE CYBER DORA ROW CANNOT BECOME `--color-accent-magenta`.** That was proposed on 26 Sep 2026 and
+withdrawn the same day: `#AF3790` is **6.8° and 1.05:1 from `--color-state-info` `#B5179E`**, which is the
+precise collision the three-commit colourway sequence was ordered to avoid. **The separation assertion in
+`lib/tokenContrast.test.ts` does not catch it**, because its `FOREGROUND` pattern admits only
+`--color-module-*` and `--color-state-*`. Nor can the row take `--color-module-cyber-ink`: DORA is one of
+five category colours read side by side inside the Cyber module, so the module's own identity colour would
+make one row read as the module. A new accent hue is needed, and it is being chosen separately.
 
 ⚠️ **THE LADDER IS THE HARD PART AND MUST NOT BE FLATTENED.** `app/materiality/page.tsx` documents it as
 information design, where "colour carries meaning — container weight, lens against ground, a five-step
@@ -1766,6 +1798,64 @@ merely exist.
 
 **Do it in one pass, not per file.** Twenty-two of the thirty-two arrived one file at a time, which is how
 the value outlived its own retirement.
+
+---
+
+## Consider extending the separation assertion to `--color-accent-*`
+
+Logged 26 Sep 2026, prompted by a near-miss rather than by a defect. **Nothing is wrong in the token layer
+today; the gap is in what the test can see.**
+
+`collisions()` in `lib/tokenContrast.test.ts` builds its pair list from
+`FOREGROUND = /^--color-(module-[a-z0-9]+(-ink)?|state-[a-z0-9]+)$/`. The accent family is outside it. So
+`--color-accent-magenta` `#AF3790` sitting **6.8° and 1.05:1 from `--color-state-info` `#B5179E`** is not a
+finding as far as any test is concerned — and both are text colours, both land on light washes, and the two
+can appear in the same view.
+
+**How it surfaced.** A plan proposed `--color-accent-magenta` as the replacement for the retired violet on
+the Cyber dashboard's DORA row, and the collision with `state-info` was caught by reading, not by running
+anything. The whole point of the assertion is that reading is what fails. One near-miss is not proof the
+scope is wrong, but it is the first evidence either way.
+
+**Why it is not simply "add accents to the pattern".** Three things have to be decided first, and each one
+can make the extension noisy rather than useful:
+
+1. **`--color-accent-neutral` `#555553` is a grey.** `collisions()` already skips anything under 0.1
+   saturation, so it drops out on its own — confirm that rather than assume it.
+2. **Accents and states SHARE VALUES BY DESIGN.** `--color-accent-red` and `--color-state-error` are both
+   `#B91C1C`; `--color-accent-green` and `--color-state-ok` are both `#0F6E56`; `--color-accent-amber`,
+   `--color-state-warn` and `--color-scale-mid` are all `#A94E0D`. An identical pair is 0° and 1.00:1, so
+   those three report as collisions while being the same colour on purpose. The families are separate so that
+   one can move without the others, which the token file states at three separate places. The rule therefore
+   needs an identical-value exemption, or those pairs need naming in `KNOWN_COLLISIONS` — and the two options
+   differ: an exemption stays silent if the values later diverge INTO a near-miss, which is the case worth
+   catching.
+3. **Two live pairs would have to be resolved or allow-listed, not one.** Adding the scope without deciding
+   them turns a green suite red, which is the one outcome that gets a test deleted.
+
+**WHAT IT WOULD ACTUALLY REPORT, measured 26 Sep 2026** by widening the pattern to
+`^--color-(module-[a-z0-9]+(-ink)?|state-[a-z0-9]+|accent-[a-z0-9]+)$` and changing nothing else: **six
+pairs, of which three are deliberate aliases and three are real.** The third real one is already allow-listed.
+
+| Pair | Figures | |
+|---|---|---|
+| `--color-accent-blue` `#0C447C` vs `--color-module-climate` `#004AAD` | 1.21:1 at 4.3° | ⚠️ **REAL, LIVE, AND NOT PREVIOUSLY RECORDED ANYWHERE** |
+| `--color-accent-magenta` `#AF3790` vs `--color-state-info` `#B5179E` | 1.05:1 at 6.8° | real — the near-miss above |
+| `--color-module-cbam-ink` vs `--color-module-ghg-ink` | 1.00:1 at 1.8° | real, and the sole existing `KNOWN_COLLISIONS` entry (the emissions family, by decision) |
+| `--color-accent-amber` vs `--color-state-warn` | 1.00:1 at 0.0° | alias |
+| `--color-accent-green` vs `--color-state-ok` | 1.00:1 at 0.0° | alias |
+| `--color-accent-red` vs `--color-state-error` | 1.00:1 at 0.0° | alias |
+
+⚠️ **THE `accent-blue` / `module-climate` PAIR IS THE ARGUMENT FOR DOING THIS.** It is the same failure as
+the `state-info` one that the three-commit sequence was built to fix — a category blue 4.3° from the Climate
+Risk module fill — and it has been live throughout, unrecorded, because no test looks there. It is also
+already on screen together: `app/dashboard/cyber/page.tsx` uses `#0C447C` for the SEC framework row. Whether
+it is resolved or allow-listed is a separate decision; **what matters is that reading the token file twice
+did not find it and one query did.**
+
+**A cheaper first step, if the full extension looks too broad:** assert only accent-vs-state pairs whose
+values DIFFER, which is the exact shape of the near-miss and excludes every deliberate alias by
+construction.
 
 ---
 

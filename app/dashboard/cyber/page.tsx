@@ -279,7 +279,7 @@ export default function CyberDashboard() {
             </div>
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => (
-                <button key={String(opt.val)} onClick={() => update(field as keyof CyberInventory, opt.val)} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: (inventory as any)[field] === opt.val ? 'var(--color-brand-wash)' : '#f8f7f5', color: (inventory as any)[field] === opt.val ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${(inventory as any)[field] === opt.val ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer' }}>
+                <button key={String(opt.val)} onClick={() => update(field as keyof CyberInventory, opt.val)} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, background: (inventory as any)[field] === opt.val ? 'var(--tq-mod-wash, var(--color-brand-wash))' : '#f8f7f5', color: (inventory as any)[field] === opt.val ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${(inventory as any)[field] === opt.val ? 'var(--tq-mod, var(--color-brand))' : '#e8e7e4'}`, cursor: 'pointer' }}>
                   {opt.label}
                 </button>
               ))}
@@ -321,7 +321,7 @@ export default function CyberDashboard() {
           const answered = domControls.filter(c => inventory.responses[c.id] && inventory.responses[c.id] !== 'none').length
           const isActive = activeDomain === domain
           return (
-            <button key={domain} onClick={() => setActiveDomain(domain)} style={{ fontSize: 11, padding: '6px 12px', borderRadius: 8, background: isActive ? 'var(--color-brand-wash)' : '#f8f7f5', color: isActive ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${isActive ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button key={domain} onClick={() => setActiveDomain(domain)} style={{ fontSize: 11, padding: '6px 12px', borderRadius: 8, background: isActive ? 'var(--tq-mod-wash, var(--color-brand-wash))' : '#f8f7f5', color: isActive ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${isActive ? 'var(--tq-mod, var(--color-brand))' : '#e8e7e4'}`, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
               {domain}
               {answered > 0 && <span style={{ fontSize: 9, background: isActive ? 'var(--color-paper)' : '#e8e7e4', color: 'var(--color-ink-2)', padding: '1px 5px', borderRadius: 99 }}>{answered}/{domControls.length}</span>}
             </button>
@@ -500,7 +500,7 @@ export default function CyberDashboard() {
           reaching for and is what they now use. Pre-existing: git log shows c389415 touched this file for
           colour only. */}
       <div className="tq-summary" style={{ marginBottom: 20, display: 'block', padding: '20px 24px' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Assessment summary — {inventory.company || 'Your company'}</div>
+        <div style={{ textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Assessment summary — {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Overall score', val: `${pct}%`, urgent: pct < 50 },
@@ -546,7 +546,16 @@ export default function CyberDashboard() {
   const totalControls = CONTROLS.filter(c => inventory.frameworks.some(f => c[f as keyof typeof c])).length
 
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
+    // ⚠️ data-module ON THE PAGE ROOT, NOT ON EACH .tq-summary — and that is a deliberate departure from
+    // the six dashboards that do it per card (deals, scope3, supply-chain, ai-governance, people, and the
+    // supplier portal). Those read --tq-mod in .tq-summary alone, so the attribute can sit on the card.
+    // This page also reads it in three places that are NOT summaries: the step tab strip's active underline,
+    // the Yes/No buttons and the domain tab strip. Per-element would mean SIX attributes here (three
+    // .tq-summary cards plus those three) all having to stay in step; one on the container that actually is
+    // the module cannot fall out of step with itself. app/styles/themisiq-tokens.css:408 permits any
+    // container: "Set data-module on any container; descendants inherit the hue."
+    // Nothing else changes: .tq-band takes --color-band, not --tq-mod.
+    <div data-module="cyber" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       {/* ⚠️ INK ON THE FILL, NOT WHITE. Inverted 26 Sep 2026 with the colourway. White on this fill
           measures 2.28:1 — below AA for 12-13px text — because the 2026 module values are light. Measured
@@ -573,7 +582,7 @@ export default function CyberDashboard() {
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2.5rem', overflowX: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex' }}>
           {STEP_NAMES.map((name, i) => (
-            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? '#B91C1C' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button key={i} onClick={() => setStep(i)} style={{ padding: '14px 16px', fontSize: 12, fontWeight: step === i ? 600 : 400, color: step === i ? '#0d0d0d' : 'var(--color-ink-muted)', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--tq-mod, var(--color-brand))' : 'transparent'}`, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {i + 1}. {name}
             </button>
           ))}
@@ -592,7 +601,7 @@ export default function CyberDashboard() {
             <div style={{ position: 'sticky', top: 80 }}>
               {/* Same defect as the Assessment summary above, same fix — see that comment. */}
               <div className="tq-summary" style={{ marginBottom: 12, display: 'block', padding: '20px 24px' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Live score</div>
+                <div style={{ textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Live score</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', fontWeight: 400, color: pct > 0 ? scoreColor : 'var(--color-ink-muted)', lineHeight: 1, marginBottom: 4 }}>{pct > 0 ? `${pct}%` : '—'}</div>
                 {pct > 0 && <div style={{ fontSize: 11, fontWeight: 600, color: scoreColor, marginBottom: 12 }}>{scoreLabel}</div>}
                 <div style={{ height: 4, background: 'var(--color-sunken)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
