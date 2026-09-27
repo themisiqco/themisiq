@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import Papa from 'papaparse'
-import { csvCell, toCsv } from './csv'
+import { csvCell, toCsv, csvBlob, CSV_BOM } from './csv'
 import { stripTsComments } from './testing/stripComments'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,19 +87,52 @@ describe('CSV writer', () => {
     expect(back[3]).toEqual(['C'])
   })
 
-  it('every page that downloads a CSV builds it with toCsv', () => {
+  it('the downloaded file starts with the UTF-8 BOM, so Excel on Windows decodes it as UTF-8', async () => {
+    const blob = csvBlob([['Supplier', 'Country'], ['Société Générale, SA', 'FR']])
+    expect(blob.type).toBe('text/csv;charset=utf-8')
+    // ⚠️ THE BYTES, NOT blob.text(). Blob.text() runs UTF-8 decode, which strips a leading BOM — so
+    // reading it back as text would assert nothing about what lands on disk for Excel to read.
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    expect([...bytes.slice(0, 3)], 'EF BB BF').toEqual([0xef, 0xbb, 0xbf])
+  })
+
+  it('papaparse still reads the header cleanly, and the accented name survives', async () => {
+    const name = 'Société Générale, SA'
+    const blob = csvBlob([['Supplier', 'Country'], [name, 'FR']])
+    // Blob.text() decodes UTF-8 and drops the BOM, which is what a browser or a parser reading the
+    // file does. The literal prefix is stripped here too, so the assertion holds either way.
+    const text = (await blob.text()).replace(CSV_BOM, '')
+    const back = parse(text)
+    expect(back[0], 'no BOM on the first header cell').toEqual(['Supplier', 'Country'])
+    expect(back[1][0]).toBe(name)
+  })
+
+  it('papaparse strips a BOM from string input by itself', () => {
+    // papaparse.js:238, string input only. The four CSV IMPORTERS pass a File instead, where the File
+    // API's decode step removes it before papaparse is reached — which is why adding the BOM to the
+    // exports cannot break a customer who re-uploads one of our own files.
+    const withBom = CSV_BOM + toCsv([['Supplier', 'Country'], ['Acme, Inc.', 'DE']])
+    const back = parse(withBom)
+    expect(back[0]).toEqual(['Supplier', 'Country'])
+  })
+
+  it('every page that downloads a CSV builds it with csvBlob', () => {
+    const producers: string[] = []
     const offenders: string[] = []
     for (const rel of walk('app')) {
       const src = stripTsComments(readFileSync(join(ROOT, rel), 'utf8'))
-      if (!/type: 'text\/csv/.test(src)) continue
-      if (!/\btoCsv\(/.test(src)) offenders.push(`${rel}: downloads a CSV without toCsv`)
-      // The two shapes that were wrong, and the hand-rolled quoting that was right but duplicated.
+      const usesHelper = /\bcsvBlob\(/.test(src)
+      if (usesHelper) producers.push(rel)
+      // ⚠️ THE THREE SHAPES THAT WENT WRONG, EACH CHECKED SEPARATELY. Naming the media type means the
+      // page built its own Blob and so has no BOM; assembling the body means no quoting; and a Blob
+      // built from a `csv` variable is how the GHG export came to be the only one with a BOM.
+      if (/type: 'text\/csv/.test(src) && !usesHelper) offenders.push(`${rel}: names the CSV media type itself`)
       if (/\.join\(','\)\)\.join\('\\n'\)/.test(src)) offenders.push(`${rel}: assembles the CSV body itself`)
+      if (/new Blob\(\[[^\]]*csv/i.test(src)) offenders.push(`${rel}: builds the Blob itself`)
     }
     expect(offenders).toEqual([])
-    // Guard against the guard passing vacuously.
-    const producers = walk('app').filter(rel =>
-      /type: 'text\/csv/.test(stripTsComments(readFileSync(join(ROOT, rel), 'utf8'))))
-    expect(producers.length, 'the CSV producers moved or were renamed').toBe(8)
+    // Guard against the guard passing vacuously: eight exports, and the count is the thing that
+    // notices when a ninth is added without the helper.
+    expect(producers.length, `the CSV exports moved or were renamed: ${producers.join(', ')}`).toBe(8)
   })
 })

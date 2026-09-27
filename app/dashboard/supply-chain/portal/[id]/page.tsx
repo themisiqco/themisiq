@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '../../../../components/Nav'
 import { supabase } from '../../../../../lib/supabase'
-import { toCsv } from '../../../../../lib/csv'
+import { csvBlob } from '../../../../../lib/csv'
 import { useEntitlementState } from '../../../../../lib/useEntitlement'
 import PaywallCard from '../../../../components/PaywallCard'
 import Papa from 'papaparse'
@@ -107,8 +107,7 @@ export default function CampaignDetail() {
       ]),
     ]
 
-    const csv = toCsv(rows)
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const blob = csvBlob(rows)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

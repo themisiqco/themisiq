@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Nav from '../../components/Nav'
 import { supabase } from '../../../lib/supabase'
-import { toCsv } from '../../../lib/csv'
+import { csvBlob } from '../../../lib/csv'
 import { useEntitlementState } from '../../../lib/useEntitlement'
 import { SPEND_EF_SOURCES } from '../../../lib/emissionFactors/spend'
 import { scope3MethodFor, scope3MethodDescription, takesEnteredFigure } from '../../../lib/scope3/categoryMethods'
@@ -3028,8 +3028,7 @@ export default function Scope3Dashboard() {
     // once joined raw values with ',' — so one reason spilled across several columns. The local writer
     // that fixed it lived here and nowhere else, which is why four other exports still had the bug;
     // lib/csv.ts is now the one writer, and it quotes every cell rather than only the ones that need it.
-    const csv = toCsv(rows)
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const blob = csvBlob(rows)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

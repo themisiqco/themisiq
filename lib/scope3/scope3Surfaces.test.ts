@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { scope3MethodDescription, scope3MethodFor, type Scope3Method } from './categoryMethods'
 import { methodologyHierarchyLines, assistantScope3Basis, assistantScope3GwpClause, enteredFigureSentence } from './methodSummary'
 import { KNOWN_EMISSIONS_PLACEHOLDER } from './formCopy'
+import { CSV_BOM } from '../csv'
 import { SCOPE3_FIXTURE_CAT_DATA, SCOPE3_FIXTURE_META, SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 
 // ── THE SCOPE 3 SURFACE SNAPSHOT ─────────────────────────────────────────────────────────────────
@@ -160,7 +161,15 @@ async function capture(): Promise<Record<string, unknown>> {
     const cap = (globalThis as Record<string, unknown>).__SCOPE3_CAPTURE__ as Capture
     cap.generateExport()
     await cap.saveScope3()
-    const rows: string[][] = csv.split('\n').filter(l => !l.startsWith('Generated,')).map(parseCsvLine)
+    // ⚠️ THE BOM IS DROPPED BEFORE PARSING, AND THE SNAPSHOT IS DELIBERATELY UNCHANGED BY IT. The Blob
+    // stub above captures the file's exact contents, and since 28 Sep 2026 every export begins with a
+    // UTF-8 byte order mark (lib/csv.ts csvBlob) so Excel on Windows decodes accented names correctly.
+    // Every real reader skips it: Excel, Sheets, the File API's decode step, and papaparse on string
+    // input. Carrying it into the first cell would model a naive reader that does not exist, and would
+    // write an encoding detail into a snapshot that exists to pin COPY.
+    expect(csv.startsWith(CSV_BOM), 'the Scope 3 export lost its BOM').toBe(true)
+    const rows: string[][] = csv.slice(CSV_BOM.length).split('\n')
+      .filter(l => !l.startsWith('Generated,')).map(parseCsvLine)
     const factorBasis = String((saved.payload?.factor_basis as string) ?? '').split('\n')
     const coverage = cap.coverage()
     const perCategory = (id: string) => {

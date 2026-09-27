@@ -57,3 +57,26 @@ export function csvCell(v: unknown): string {
 export function toCsv(rows: readonly (readonly unknown[])[]): string {
   return rows.map(r => r.map(csvCell).join(',')).join('\n')
 }
+
+/**
+ * ⚠️ THE BYTE ORDER MARK IS FOR EXCEL ON WINDOWS, AND NOTHING ELSE NEEDS IT. Without it Excel decodes a
+ * .csv as the system's legacy code page, so "Société Générale" opens as "SociÃ©tÃ© GÃ©nÃ©rale" — in the
+ * supplier name, the company name and every pay-band label. Numbers, Sheets, LibreOffice and every
+ * parser read UTF-8 regardless, and the three bytes are skipped as a BOM rather than shown.
+ *
+ * ⚠️ IT IS ADDED HERE AND NOT IN toCsv, SO THE TEXT STAYS THE TEXT. lib/scope3/scope3Surfaces.test.ts
+ * snapshots the Scope 3 export's ROWS, and other guards read the body as a string; a BOM inside toCsv
+ * would put an invisible character at the front of the first cell of everything that inspects it.
+ *
+ * ⚠️ AND IT DOES NOT BREAK THE FOUR CSV IMPORTERS. app/dashboard/people, app/dashboard/supply-chain,
+ * the campaign portal and the materiality respondent import all call Papa.parse(file) with a File, and
+ * the File API's decode step does BOM sniffing and drops it before papaparse sees a character.
+ * papaparse strips one itself only for STRING input (papaparse.js:238), which is the path
+ * lib/csv.test.ts exercises.
+ */
+export const CSV_BOM = '\ufeff'
+
+/** The downloadable file: the BOM, the body, and the media type that names the encoding. */
+export function csvBlob(rows: readonly (readonly unknown[])[]): Blob {
+  return new Blob([CSV_BOM + toCsv(rows)], { type: 'text/csv;charset=utf-8' })
+}
