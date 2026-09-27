@@ -152,16 +152,42 @@ describe('supplier questionnaire options', () => {
     // ⚠️ THE SQL IS A FUNCTION OF THIS FILE, and this is what keeps it so. A label reworded without
     // regenerating leaves a pair in db/sql that no longer matches any stored answer, so the backfill
     // silently skips those rows — and a skipped row is indistinguishable from an already-migrated one.
-    const sql = readFileSync(join(ROOT, 'db/sql/supplier-option-values.sql'), 'utf8')
+    const dir = join(ROOT, 'db/sql/supplier-options')
+    expect(readdirSync(dir).sort(), 'four files, numbered so the order is the filename')
+      .toEqual(['1_preflight.sql', '2_backfill.sql', '3_verify.sql', '9_rollback.sql'])
+    const read = (f: string) => readFileSync(join(dir, f), 'utf8')
     const q = (x: string) => `'${x.replace(/'/g, "''")}'`
-    for (const { qid, opt } of ALL) {
-      expect(sql, `${qid} / ${opt.value} is missing from the generated SQL`)
-        .toContain(`(${q(qid)}, ${q(opt.label)}, ${q(opt.value)})`)
+
+    // Every pair appears in the three files that carry the map.
+    for (const f of ['1_preflight.sql', '2_backfill.sql', '9_rollback.sql']) {
+      const sql = read(f)
+      const wanted = f === '1_preflight.sql' ? ALL : ALL.filter(({ qid }) => qid !== 'env_reporting')
+      for (const { qid, opt } of wanted) {
+        expect(sql, `${f}: ${qid} / ${opt.value} is missing`)
+          .toContain(`(${q(qid)}, ${q(opt.label)}, ${q(opt.value)})`)
+      }
+      expect(sql, `${f} must name its source`).toContain('219 pairs across 56 questions')
     }
-    expect(sql).toContain('219 pairs across 56 questions')
-    // Both directions exist: the backfill and its exact reverse.
-    expect(sql, 'the rollback must be in the same file').toContain('-- ── ROLLBACK')
-    expect((sql.match(/^begin;$/gm) ?? []).length, 'backfill and rollback are each one transaction').toBe(2)
+
+    // ⚠️ EACH FILE RUNS AS PASTED: no bind parameters, and every question id written out.
+    for (const f of ['1_preflight.sql', '2_backfill.sql', '3_verify.sql', '9_rollback.sql']) {
+      expect(read(f), `${f} has a bind parameter the SQL editor cannot fill`).not.toMatch(/\$\d/)
+      expect(read(f).split('\n')[0], `${f} must open with a one-line header`).toMatch(/^-- /)
+    }
+    expect(read('3_verify.sql'), 'the verify query lists the ids itself').toContain(q('env_policy'))
+
+    // The two writing files are one transaction each; the two read-only ones are not transactions.
+    for (const f of ['2_backfill.sql', '9_rollback.sql']) {
+      expect((read(f).match(/^begin;$/gm) ?? []).length, `${f} is one transaction`).toBe(1)
+      expect((read(f).match(/^commit;$/gm) ?? []).length, `${f} commits once`).toBe(1)
+      expect((read(f).match(/^update supplier_responses r$/gm) ?? []).length, `${f} has both updates`).toBe(2)
+    }
+    for (const f of ['1_preflight.sql', '3_verify.sql']) {
+      expect(read(f), `${f} must not write`).not.toMatch(/\b(begin|commit|update|insert|delete)\b/i)
+    }
+    // And the rollback is the backfill's exact reverse: label matched, value written, and vice versa.
+    expect(read('2_backfill.sql')).toContain('and r.response = m.label;')
+    expect(read('9_rollback.sql')).toContain('and r.response = m.value;')
   })
 
   it('the files that read a stored answer are these, and no more', () => {
