@@ -231,7 +231,7 @@ export default function PeopleDashboard() {
     const meanGap = calcMeanGap(inventory.bands)
     const medianGap = calcMedianGap(inventory.bands)
     const rows = [
-      ['ThemisIQ — Gender Pay Gap Report'],
+      ['ThemisIQ: Gender Pay Gap Report'],
       ['Company', inventory.company],
       ['Reporting Year', inventory.reporting_year],
       ['Currency', inventory.currency],
@@ -245,7 +245,7 @@ export default function PeopleDashboard() {
       ['Job Band', 'Male Count', 'Female Count', 'Other Count', 'Male Avg Salary', 'Female Avg Salary', 'Pay Gap %', 'Above 5% Threshold'],
       ...inventory.bands.map(b => {
         const gap = calcGap(b.male_avg_salary, b.female_avg_salary)
-        return [b.name, b.male_count, b.female_count, b.other_count, b.male_avg_salary, b.female_avg_salary, `${gap.toFixed(2)}%`, Math.abs(gap) >= 5 ? 'YES — Joint Assessment Required' : 'No']
+        return [b.name, b.male_count, b.female_count, b.other_count, b.male_avg_salary, b.female_avg_salary, `${gap.toFixed(2)}%`, Math.abs(gap) >= 5 ? 'YES: Joint Assessment Required' : 'No']
       }),
       [''],
       ['WORKFORCE METRICS'],
@@ -274,7 +274,7 @@ export default function PeopleDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {[
           { id: 'eu_pay', name: 'EU Pay Transparency Directive', desc: 'Gender pay gap reporting by job band · 100+ EU employees · Jun 2026', urgency: 'critical' },
-          { id: 'esrs_s1', name: 'ESRS S1 — Own Workforce', desc: 'Full workforce disclosure · large EU companies · FY2024 active', urgency: 'critical' },
+          { id: 'esrs_s1', name: 'ESRS S1: Own Workforce', desc: 'Full workforce disclosure · large EU companies · FY2024 active', urgency: 'critical' },
           // The DFEH was renamed the CALIFORNIA CIVIL RIGHTS DEPARTMENT in 2022, so "DFEH submission" named an
             // agency that no longer exists. lib/sources.ts already had it right — "California Civil Rights
             // Department's pay data reporting portal" — while this picker and two lines on app/people/page.tsx
@@ -332,12 +332,12 @@ export default function PeopleDashboard() {
           <input style={inputStyle} type="number" value={inventory.total_employees || ''} onChange={e => update('total_employees', Number(e.target.value))} placeholder="0" />
           {inventory.total_employees >= 100 && (
             <div style={{ marginTop: 8, background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#0C447C' }}>
-              ✓ 100+ employees — EU Pay Transparency and CA Pay Data thresholds triggered
+              ✓ 100+ employees: EU Pay Transparency and CA Pay Data thresholds triggered
             </div>
           )}
           {inventory.total_employees >= 250 && (
             <div style={{ marginTop: 6, background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#B91C1C' }}>
-              ⚠ 250+ employees — annual gender pay gap reporting required under EU Pay Transparency (not every 3 years)
+              ⚠ 250+ employees: annual gender pay gap reporting required under EU Pay Transparency (not every 3 years)
             </div>
           )}
         </div>
@@ -373,7 +373,7 @@ export default function PeopleDashboard() {
       </div>
       <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>💡 Tip</div>
-        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>The EU Pay Transparency Directive requires pay gap analysis by "job band" — groups of workers doing the same work or work of equal value. Use your existing job levels or pay grades.</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>The EU Pay Transparency Directive requires pay gap analysis by "job band", groups of workers doing the same work or work of equal value. Use your existing job levels or pay grades.</div>
       </div>
     </div>
   )
@@ -470,11 +470,11 @@ export default function PeopleDashboard() {
           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>Recordable incidents per 200,000 hours</div>
         </div>
         <div>
-          <label style={labelStyle}>Avg training hours — male employees</label>
+          <label style={labelStyle}>Avg training hours: male employees</label>
           <input style={inputStyle} type="number" step="0.1" value={inventory.metrics.training_hours_male || ''} onChange={e => updateMetric('training_hours_male', Number(e.target.value))} placeholder="0" />
         </div>
         <div>
-          <label style={labelStyle}>Avg training hours — female employees</label>
+          <label style={labelStyle}>Avg training hours: female employees</label>
           <input style={inputStyle} type="number" step="0.1" value={inventory.metrics.training_hours_female || ''} onChange={e => updateMetric('training_hours_female', Number(e.target.value))} placeholder="0" />
         </div>
         <div>
@@ -482,11 +482,11 @@ export default function PeopleDashboard() {
           <input style={inputStyle} type="number" min="0" max="100" value={inventory.metrics.collective_bargaining_pct || ''} onChange={e => updateMetric('collective_bargaining_pct', Number(e.target.value))} placeholder="0" />
         </div>
         <div>
-          <label style={labelStyle}>Parental leave return rate — male (%)</label>
+          <label style={labelStyle}>Parental leave return rate: male (%)</label>
           <input style={inputStyle} type="number" min="0" max="100" value={inventory.metrics.parental_leave_male || ''} onChange={e => updateMetric('parental_leave_male', Number(e.target.value))} placeholder="0" />
         </div>
         <div>
-          <label style={labelStyle}>Parental leave return rate — female (%)</label>
+          <label style={labelStyle}>Parental leave return rate: female (%)</label>
           <input style={inputStyle} type="number" min="0" max="100" value={inventory.metrics.parental_leave_female || ''} onChange={e => updateMetric('parental_leave_female', Number(e.target.value))} placeholder="0" />
         </div>
       </div>
@@ -549,7 +549,7 @@ export default function PeopleDashboard() {
           <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '1rem', marginBottom: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#B91C1C', marginBottom: 4 }}>⚠ Joint pay assessment required</div>
             <div style={{ fontSize: 12, color: '#B91C1C', lineHeight: 1.6 }}>
-              {bandsAboveThreshold.map(b => b.name).join(', ')} — gaps exceed the 5% EU Pay Transparency threshold. You are required to conduct a joint pay assessment with worker representatives and implement remediation measures within 6 months.
+              {bandsAboveThreshold.map(b => b.name).join(', ')}: gaps exceed the 5% EU Pay Transparency threshold. You are required to conduct a joint pay assessment with worker representatives and implement remediation measures within 6 months.
             </div>
           </div>
         )}

@@ -135,12 +135,12 @@ interface BotMessage {
 // same words: two phrasings would let a customer meet the problem twice and think it was two
 // different problems.
 const ASK_MORE_NARROWLY =
-  'Ask it again more narrowly — one location, one fuel, or one step at a time — and I’ll get there.'
+  'Ask it again more narrowly (one location, one fuel, or one step at a time), and I’ll get there.'
 
 // Sits BENEATH a truncated answer, which stays exactly as it is. Not an error state: the text is
 // real and worth reading, it just stopped early. No stop_reason, no token budget — nothing a
 // customer would not say themselves.
-const BOT_INCOMPLETE_NOTE = `This answer stopped before the end — it ran longer than I can send in one piece. ${ASK_MORE_NARROWLY}`
+const BOT_INCOMPLETE_NOTE = `This answer stopped before the end. It ran longer than I can send in one piece. ${ASK_MORE_NARROWLY}`
 
 // What the guide says when the route refuses, keyed by the error code it returns. Written in the
 // register of LockedDocUpload — state the position plainly, say what it is for, and where there is
@@ -152,19 +152,19 @@ const BOT_ERRORS: Record<string, string> = {
   unauthenticated:
     'Your session has ended. Refresh the page and sign in again, and the guide will pick straight back up.',
   entitlement_required:
-    'The guide is available on paid plans — it answers the boundary and data questions that come up as you build an inventory: what counts as yours, where a figure comes from, what a verifier will look for.',
+    'The guide is available on paid plans. It answers the boundary and data questions that come up as you build an inventory: what counts as yours, where a figure comes from, what a verifier will look for.',
   entitlement_check_failed:
     'We couldn’t confirm your plan just now. Give it a moment and ask again.',
   rate_limited:
-    'That’s a lot of questions in a short stretch. Give it a few minutes and carry on — nothing is lost.',
+    'That’s a lot of questions in a short stretch. Give it a few minutes and carry on. Nothing is lost.',
   conversation_too_long:
-    'This conversation has got long. Close the guide and open it again to start a fresh one — your inventory is untouched.',
+    'This conversation has got long. Close the guide and open it again to start a fresh one. Your inventory is untouched.',
   message_too_long:
     'That message is too long for me to take in one go. Try asking it in a couple of shorter parts.',
   answer_too_long:
     `That answer ran longer than I can send in one piece. ${ASK_MORE_NARROWLY}`,
   empty_reply:
-    'I didn’t get an answer back that time. Ask again — it usually works on the second try.',
+    'I didn’t get an answer back that time. Ask again. It usually works on the second try.',
   not_configured:
     'The guide isn’t available right now. Everything else in the wizard works as normal.',
   default:
@@ -183,7 +183,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      setMessages([{ role: 'assistant', content: `Hi! I'm your GHG inventory guide. You're on step ${currentStep + 1}: ${stepNames[currentStep]}. Ask me anything — "What is an Mcf?", "Where do I find my kWh?", "What's Scope 2?"` }])
+      setMessages([{ role: 'assistant', content: `Hi! I'm your GHG inventory guide. You're on step ${currentStep + 1}: ${stepNames[currentStep]}. Ask me anything: "What is an Mcf?", "Where do I find my kWh?", "What's Scope 2?"` }])
     }
   }, [open])
 
@@ -299,14 +299,14 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
   const copy = {
     expired: {
       title: 'Your GHG access has expired.',
-      body: 'Renewing turns saving back on. Your existing inventories are still here and still readable — open any of them from your inventory list.',
+      body: 'Renewing turns saving back on. Your existing inventories are still here and still readable: open any of them from your inventory list.',
       cta: 'Renew GHG →',
       href: '/pricing?modules=ghg',
       secondary: { label: 'View your inventories', href: '/dashboard/ghg?view=list' },
     },
     none: {
       title: 'Saving an inventory needs the GHG module.',
-      body: 'You can price it up in a couple of minutes. Once it is on your account, everything you enter here saves as you go — and stays available for the whole of your reporting year.',
+      body: 'You can price it up in a couple of minutes. Once it is on your account, everything you enter here saves as you go, and stays available for the whole of your reporting year.',
       cta: 'See GHG pricing →',
       href: '/pricing?modules=ghg',
       secondary: { label: 'Back to dashboard', href: '/dashboard' },
@@ -481,7 +481,7 @@ function exclusionBannerHeading(u: UnpriceableLocation): string {
 function exclusionBannerTrailer(u: UnpriceableLocation, hasFigures: boolean): string {
   return u.kind === 'country'
     ? refusalBannerTrailer(u.refusal, hasFigures)
-    : "Until then this location is left out of your totals \u2014 it isn't counted as zero, and nothing else you've entered here is lost."
+    : "Until then this location is left out of your totals: it isn't counted as zero, and nothing else you've entered here is lost."
 }
 
 function unpriceableMessage(u: UnpriceableLocation, hasFigures: boolean): string {
@@ -505,7 +505,7 @@ function LockedDocUpload({ label }: { label: string }) {
         <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>📎 {label}</span>
         <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>🔒 Paid plan</span>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, fontWeight: 400 }}>Evidence uploads are available on paid plans — keeping your inventory assurance-ready for third-party verification.</div>
+      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, fontWeight: 400 }}>Evidence uploads are available on paid plans, keeping your inventory assurance-ready for third-party verification.</div>
     </div>
   )
 }
@@ -978,7 +978,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // the one case that needs a transient message. Silently doing nothing was indistinguishable
         // from a successful upload that produced no figures.
         console.error('[upload] storage failed', error)
-        setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: `${file.name} didn’t upload — ${error.message}. Please try again.` }))
+        setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: `${file.name} didn’t upload: ${error.message}. Please try again.` }))
         continue
       }
       {
@@ -992,7 +992,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           // still the evidence behind whatever figure gets typed in. Say so rather than attempting a
           // call the route would reject and then discarding its explanation.
           doc.read_outcome = 'not_read'
-          doc.read_note = 'Kept as evidence. We read PDFs and photos — type this figure into the box above.'
+          doc.read_note = 'Kept as evidence. We read PDFs and photos. Type this figure into the box above.'
         } else if (CONCIERGE_DEV && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)) {
           try {
   const res = await fetch('/api/concierge/extract', {
@@ -1048,21 +1048,21 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                 // working — the wording must not read as a fault, or a customer will re-upload a
                 // file that will abstain again for the same good reason.
                 doc.read_outcome = 'abstained'
-                doc.read_note = 'We read this one but couldn’t take a figure from it with confidence — type it into the box above.'
+                doc.read_note = 'We read this one but couldn’t take a figure from it with confidence. Type it into the box above.'
               }
             } else {
               // (b) The route answered, but not with usable fields — a rejected file type, a bad
               // request, an upstream error. Its own message is the most specific thing available.
               doc.read_outcome = 'failed'
               doc.read_note = typeof json?.error === 'string'
-                ? `We couldn’t read this one — ${json.error} Type the figure into the box above, or try uploading again.`
+                ? `We couldn’t read this one: ${json.error} Type the figure into the box above, or try uploading again.`
                 : 'We couldn’t read this one. Type the figure into the box above, or try uploading again.'
             }
           } catch (e) {
             // (b) The call itself failed — network, timeout, malformed response.
             console.error('[concierge extract] failed', e)
             doc.read_outcome = 'failed'
-            doc.read_note = 'We couldn’t read this one — the connection dropped. Type the figure into the box above, or try uploading again.'
+            doc.read_note = 'We couldn’t read this one: the connection dropped. Type the figure into the box above, or try uploading again.'
           }
         }
 
@@ -1106,7 +1106,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     const { error } = await supabase.storage.from('source-documents').remove([filePath])
     if (error) {
       console.error('[removeDoc] storage delete failed', error)
-      setUploadErrors(prev => ({ ...prev, [errorKey]: `That document couldn’t be deleted — ${error.message}. It is still attached to this location; try Remove again.` }))
+      setUploadErrors(prev => ({ ...prev, [errorKey]: `That document couldn’t be deleted: ${error.message}. It is still attached to this location; try Remove again.` }))
       return
     }
     setInventory(inv => ({
@@ -1626,9 +1626,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     <div>
       <h2 style={sectionHead}>Which reporting frameworks do you need?</h2>
       {pack && packNames[pack] ? (
-        <p style={sectionSub}>Based on your <strong style={{ color: '#0F6E56', fontWeight: 600 }}>{packNames[pack]}</strong> selection, these are the reports you need — the highlighted frameworks below are included in your package. You can add others any time.</p>
+        <p style={sectionSub}>Based on your <strong style={{ color: '#0F6E56', fontWeight: 600 }}>{packNames[pack]}</strong> selection, these are the reports you need: the highlighted frameworks below are included in your package. You can add others any time.</p>
       ) : (
-        <p style={sectionSub}>Select all that apply. ThemisIQ collects your data once and generates each report automatically — no duplicate entry required.</p>
+        <p style={sectionSub}>Select all that apply. ThemisIQ collects your data once and generates each report automatically, no duplicate entry required.</p>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: '2rem' }}>
         {FRAMEWORKS.map(fw => {
@@ -1655,7 +1655,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Selected: {activeFrameworks.map(f => f.name).join(' · ')}</div>
           <div style={{ fontSize: 12, color: 'var(--color-ink-2)', fontWeight: 400, lineHeight: 1.6 }}>
             ThemisIQ will collect your data once and produce {inventory.selected_frameworks.length} report{inventory.selected_frameworks.length > 1 ? 's' : ''}.
-            {needsMarketBased && ' ESRS/GRI requires market-based Scope 2 — we\'ll ask about renewable energy contracts.'}
+            {needsMarketBased && ' ESRS/GRI requires market-based Scope 2: we\'ll ask about renewable energy contracts.'}
             {needsPriorYear && ' CDP requires prior year comparison figures.'}
             {needsBiogenic && ' ESRS/GRI requires biogenic CO₂ to be reported separately.'}
           </div>
@@ -1673,7 +1673,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {companyLocked ? (
             <>
               <input value={inventory.company_name} readOnly style={{ ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' }} />
-              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6 }}>Linked company — set when this inventory was created.</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6 }}>Linked company: set when this inventory was created.</div>
             </>
           ) : (addingNewCompany || companies.length === 0) ? (
             <>
@@ -1747,7 +1747,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           </select>
         </Field>
         {inventory.selected_frameworks.includes('sb253') && (
-          <Field label="Does your company have California nexus?" hint="California operations, employees, or sales — determines SB 253 applicability">
+          <Field label="Does your company have California nexus?" hint="California operations, employees, or sales: determines SB 253 applicability">
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setInventory(i => ({...i, california_nexus: true}))} style={{ fontSize: 13, padding: '8px 20px', borderRadius: 8, background: inventory.california_nexus ? '#B91C1C' : '#f8f7f5', color: inventory.california_nexus ? '#fff' : '#555553', border: `0.5px solid ${inventory.california_nexus ? '#B91C1C' : '#e8e7e4'}`, }}>Yes</button>
               <button onClick={() => setInventory(i => ({...i, california_nexus: false}))} style={{ fontSize: 13, padding: '8px 20px', borderRadius: 8, background: !inventory.california_nexus ? '#0d0d0d' : '#f8f7f5', color: !inventory.california_nexus ? '#fff' : '#555553', border: `0.5px solid ${!inventory.california_nexus ? '#0d0d0d' : '#e8e7e4'}`, }}>No</button>
@@ -1805,7 +1805,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 />
                 {/* The second clause is load-bearing: without it a customer whose figures moved on
                     volume alone reads "Nothing changed" as false and picks the other option. */}
-                Nothing changed — the difference is normal business activity
+                Nothing changed: the difference is normal business activity
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#555553', cursor: 'pointer' }}>
                 <input
@@ -1853,7 +1853,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             locations_data entries, so a third word for the same thing left the customer to guess
             what they were being metered on. The hint carries the short form of the definition used
             on /climate-ghg and /pricing. */}
-        <Field label="List your locations" hint="One location = one site with its own electricity supply; all of that site's energy goes in together. Enter name and state — we'll collect energy data for each one.">
+        <Field label="List your locations" hint="One location = one site with its own electricity supply; all of that site's energy goes in together. Enter name and state: we'll collect energy data for each one.">
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {inventory.locations.map((loc, i) => (
               <div key={loc.id} style={{ display: 'flex', gap: 8 }}>
@@ -1955,7 +1955,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               <div style={{ marginTop: 12, background: 'var(--color-brand-wash)', border: '0.5px solid var(--color-brand-line)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
-                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more — your existing data stays exactly as it is.</div>
+                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more: your existing data stays exactly as it is.</div>
                   <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
                 </div>
                 <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -1981,7 +1981,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     return (
       <div>
         <h2 style={sectionHead}>Energy & fuel data</h2>
-        <p style={sectionSub}>Enter what appears on your utility bills and fuel records. All calculations happen automatically — you never need to look up emission factors.</p>
+        <p style={sectionSub}>Enter what appears on your utility bills and fuel records. All calculations happen automatically. You never need to look up emission factors.</p>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
           {inventory.locations.map((l, i) => (
             <button key={l.id} onClick={() => setActiveLocation(i)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeLocation === i ? 'var(--color-brand-wash)' : '#f8f7f5', color: activeLocation === i ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${activeLocation === i ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeLocation === i ? 500 : 400 }}>
@@ -1993,7 +1993,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div style={{ width: '100%', marginTop: 8, background: 'var(--color-brand-wash)', border: '0.5px solid var(--color-brand-line)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more — your existing data stays exactly as it is.</div>
+                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more: your existing data stays exactly as it is.</div>
                 <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
               </div>
               <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -2012,7 +2012,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20 }}>
-            <QuestionCard question={streamQuestion('natural_gas')} hint="For heating, boilers, furnaces — check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
+            <QuestionCard question={streamQuestion('natural_gas')} hint="For heating, boilers, furnaces: check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
               {loc.has_natural_gas && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
@@ -2021,7 +2021,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <button key={val} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total natural gas — ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
+                  <Field label={`Total natural gas: ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
                     <input type="number" value={loc.natural_gas_amount || ''} onChange={e => updateLocation(activeLocation, 'natural_gas_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
@@ -2033,7 +2033,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question={streamQuestion('propane')} hint="For forklifts and heating — check delivery records" checked={loc.has_propane} onToggle={v => updateLocation(activeLocation, 'has_propane', v)}>
+            <QuestionCard question={streamQuestion('propane')} hint="For forklifts and heating: check delivery records" checked={loc.has_propane} onToggle={v => updateLocation(activeLocation, 'has_propane', v)}>
               {loc.has_propane && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -2041,14 +2041,14 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <button key={val} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total propane purchased — ${inventory.reporting_year} (${loc.propane_unit})`}>
+                  <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
-            <QuestionCard question={streamQuestion('diesel_stationary')} hint="Backup generators, boilers — not vehicles" checked={loc.has_diesel_stationary} onToggle={v => updateLocation(activeLocation, 'has_diesel_stationary', v)}>
+            <QuestionCard question={streamQuestion('diesel_stationary')} hint="Backup generators, boilers: not vehicles" checked={loc.has_diesel_stationary} onToggle={v => updateLocation(activeLocation, 'has_diesel_stationary', v)}>
               {loc.has_diesel_stationary && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -2056,7 +2056,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <button key={val} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total diesel in stationary equipment — ${inventory.reporting_year}`}>
+                  <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
                     <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
@@ -2084,7 +2084,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_distillate_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_distillate_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total heating oil purchased — ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                  <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
@@ -2100,7 +2100,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_residual_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_residual_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total heavy fuel oil purchased — ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                  <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
@@ -2108,10 +2108,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               )}
             </QuestionCard>
 
-            <QuestionCard question={streamQuestion('mobile')} hint="Delivery trucks, forklifts, company cars — check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
+            <QuestionCard question={streamQuestion('mobile')} hint="Delivery trucks, forklifts, company cars: check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
               {loc.has_mobile && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
-                  <Field label={`Gasoline for company vehicles — ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
+                  <Field label={`Gasoline for company vehicles: ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input type="number" value={loc.gasoline_amount || ''} onChange={e => updateLocation(activeLocation, 'gasoline_amount', Number(e.target.value))} placeholder="0" style={{ ...inputStyle, flex: 1 }} />
                       <select value={loc.gasoline_unit} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
@@ -2121,7 +2121,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       </select>
                     </div>
                   </Field>
-                  <Field label={`Diesel for company vehicles — ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
+                  <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input type="number" value={loc.diesel_mobile_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_mobile_amount', Number(e.target.value))} placeholder="0" style={{ ...inputStyle, flex: 1 }} />
                       <select value={loc.diesel_mobile_unit} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
@@ -2143,10 +2143,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <button onClick={() => { updateLocation(activeLocation, 'has_hfc_refrigerants', true); updateLocation(activeLocation, 'uses_ammonia', false) }} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: loc.has_hfc_refrigerants ? 'var(--color-brand)' : '#f8f7f5', color: loc.has_hfc_refrigerants ? 'var(--color-on-dark)' : '#555553', border: `0.5px solid ${loc.has_hfc_refrigerants ? 'var(--color-brand)' : '#e8e7e4'}`, }}>HFC refrigerants</button>
                 <button onClick={() => { updateLocation(activeLocation, 'uses_ammonia', false); updateLocation(activeLocation, 'has_hfc_refrigerants', false) }} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: (!loc.uses_ammonia && !loc.has_hfc_refrigerants) ? '#555553' : '#f8f7f5', color: (!loc.uses_ammonia && !loc.has_hfc_refrigerants) ? '#fff' : '#555553', border: '0.5px solid #e8e7e4', }}>None</button>
               </div>
-              {loc.uses_ammonia && <div style={{ background: '#E1F5EE', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0F6E56', fontWeight: 500 }}>✓ Ammonia has zero global warming potential — no further data needed</div>}
+              {loc.uses_ammonia && <div style={{ background: '#E1F5EE', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0F6E56', fontWeight: 500 }}>✓ Ammonia has zero global warming potential: no further data needed</div>}
               {loc.has_hfc_refrigerants && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
-                  <div style={{ background: '#FEF3E2', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#633806' }}>Check refrigeration service records — refrigerant purchased for top-up = refrigerant leaked (GHG Protocol methodology)</div>
+                  <div style={{ background: '#FEF3E2', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#633806' }}>Check refrigeration service records: refrigerant purchased for top-up = refrigerant leaked (GHG Protocol methodology)</div>
                   <Field label="Refrigerant type"><select value={loc.refrigerant_type} onChange={e => updateLocation(activeLocation, 'refrigerant_type', e.target.value)} style={inputStyle}><option value="r410a">R-410A</option><option value="r22">R-22</option><option value="r134a">R-134a</option><option value="r404a">R-404A</option><option value="r507">R-507</option></select></Field>
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
@@ -2157,9 +2157,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Purchased electricity</div>
-              <p style={qHint}>Check your electricity utility bills — kWh is always shown.</p>
+              <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
-                <Field label={`Total electricity — ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
+                <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
                   <input type="number" value={loc.electricity_kwh || ''} onChange={e => updateLocation(activeLocation, 'electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
                 </Field>
                 {validateElectricity(loc.electricity_kwh) && (
@@ -2176,22 +2176,22 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     whose region is unresolved, which is a real and fixable state. */}
                 {countryRefusal(loc) ? null : loc.country === 'AU'
                   ? (loc.grid_region.startsWith('AU_')
-                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
+                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
                       : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Select your state above to resolve the grid emission factor.</div>)
                   : loc.state
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong> — {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong>: {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
                   : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK' || loc.grid_region === 'NZ')
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? `DEFRA ${getGridFactor(loc.grid_region, inventory.reporting_year).usedYear}` : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? `DEFRA ${getGridFactor(loc.grid_region, inventory.reporting_year).usedYear}` : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
                   : isResolvedGridRegion(loc.grid_region)
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong> — {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
                   : (loc.country === 'CA' || loc.country === 'US')
                   ? <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                       <div style={{ fontSize: 12, color: '#92400e' }}>Select your {loc.country === 'CA' ? 'province' : 'state'}/region to resolve the grid emission factor.</div>
                       {loc.country === 'CA'
-                        ? <select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label} — {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
-                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{s} — {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
+                        ? <select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label}: {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
+                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{s}: {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
                     </div>
-                  : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Grid factor not available for this jurisdiction — <a href="mailto:hello@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>contact us</a>.</div>
+                  : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Grid factor not available for this jurisdiction: <a href="mailto:hello@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>contact us</a>.</div>
                 }
                 {loc.country === 'NZ' && (
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
@@ -2199,7 +2199,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Combustion use-class</div>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 8 }}>MfE publishes stationary-combustion factors by use-class. Most sites are Commercial (default).</div>
                       <details>
-                        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-brand)' }}>{(loc.nz_use_class ?? 'commercial') === 'industrial' ? 'Industrial selected — change use-class' : 'Advanced: change use-class (using Commercial)'}</summary>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-brand)' }}>{(loc.nz_use_class ?? 'commercial') === 'industrial' ? 'Industrial selected: change use-class' : 'Advanced: change use-class (using Commercial)'}</summary>
                         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                           {(['commercial', 'industrial'] as const).map(uc => (
                             <button key={uc} onClick={() => updateLocation(activeLocation, 'nz_use_class', uc)} style={unitBtn((loc.nz_use_class ?? 'commercial') === uc)}>{uc === 'commercial' ? 'Commercial' : 'Industrial'}</button>
@@ -2209,13 +2209,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     </div>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555553', cursor: 'pointer' }}>
                       <input type="checkbox" checked={!!loc.nz_td_losses} onChange={e => updateLocation(activeLocation, 'nz_td_losses', e.target.checked)} style={{ marginTop: 2, flexShrink: 0 }} />
-                      <span>Include electricity <strong>transmission &amp; distribution (T&amp;D) losses</strong> — reported as a separate <strong>Scope 3 Category 3</strong> line, not added to Scope 2. <span style={{ color: 'var(--color-ink-muted)' }}>Off by default.</span></span>
+                      <span>Include electricity <strong>transmission &amp; distribution (T&amp;D) losses</strong>: reported as a separate <strong>Scope 3 Category 3</strong> line, not added to Scope 2. <span style={{ color: 'var(--color-ink-muted)' }}>Off by default.</span></span>
                     </label>
                   </div>
                 )}
                 {loc.country === 'US' && (
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '12px 14px' }}>
-                    <Field label="eGRID subregion (for market-based Scope 2)" hint="Required only for ESRS E1 / GRI 305 market-based reporting. Leave blank if not reporting those — market-based will use the grid-average factor as a conservative fallback.">
+                    <Field label="eGRID subregion (for market-based Scope 2)" hint="Required only for ESRS E1 / GRI 305 market-based reporting. Leave blank if not reporting those: market-based will use the grid-average factor as a conservative fallback.">
                       <select value={loc.residual_region || ''} onChange={e => updateLocation(activeLocation, 'residual_region', e.target.value)} style={inputStyle}>
                         <option value="">Select your eGRID subregion…</option>
                         {US_SUBREGIONS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
@@ -2227,7 +2227,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
-            <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system — Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
+            <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system: Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
               {loc.has_purchased_steam && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
@@ -2237,7 +2237,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       <button key={val} onClick={() => updateLocation(activeLocation, 'purchased_steam_unit', val as 'mmbtu' | 'gj')} style={unitBtn((loc.purchased_steam_unit ?? 'mmbtu') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total purchased steam — ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
+                  <Field label={`Total purchased steam: ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
                     <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {/* ── WHAT WE CAN AND CANNOT PRICE HERE, PER JURISDICTION ────────────────────
@@ -2267,17 +2267,17 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5 }}>
                           We apply the published factor for this jurisdiction ({entry.source}).
                           District-heating networks vary, so if your supplier publishes its own factor, that figure
-                          is more accurate than ours and will be used instead — worth giving your verifier where
+                          is more accurate than ours and will be used instead, worth giving your verifier where
                           steam is a material part of your footprint.
                         </div>
                       ) : (
                         <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.5, background: '#FEF3E2', border: '1px solid #f0d9b5', borderRadius: 6, padding: '10px 12px' }}>
                           <strong>No published factor for this jurisdiction.</strong> {entry.guidance}
-                          {' '}Until you enter one, this stream is reported as unquantified and export stays locked —
-                          we will not price it with another country&rsquo;s factor.
+                          {' '}Until you enter one, this stream is reported as unquantified and export stays locked.
+                          We will not price it with another country&rsquo;s factor.
                         </div>
                       )}
-                      <Field label={`Supplier emission factor — kg CO₂e per ${basisLabel(supBasis)}${entry?.kind === 'published' ? ' (optional)' : ' (required)'}`}>
+                      <Field label={`Supplier emission factor: kg CO₂e per ${basisLabel(supBasis)}${entry?.kind === 'published' ? ' (optional)' : ' (required)'}`}>
                         <input type="number" step="any" value={loc.purchased_steam_supplier_ef ?? ''} placeholder={entry?.kind === 'published' ? 'Leave blank to use the published factor' : 'e.g. 0.198'}
                           onChange={e => {
                             const v = e.target.value === '' ? undefined : Number(e.target.value)
@@ -2287,7 +2287,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                           }} style={inputStyle} />
                       </Field>
                       {hasSupplier && (
-                        <Field label="Where this factor came from — provider and document (printed on your workings for the verifier)">
+                        <Field label="Where this factor came from: provider and document (printed on your workings for the verifier)">
                           <input type="text" value={loc.purchased_steam_supplier_source ?? ''} placeholder="e.g. Vattenfall Bristol Heat Network, 2025 emissions statement"
                             onChange={e => updateLocation(activeLocation, 'purchased_steam_supplier_source', e.target.value as never)} style={inputStyle} />
                         </Field>
@@ -2322,7 +2322,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               return (
                 <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 12, padding: '1.15rem 1.25rem' }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>Confirm what this location does NOT have</div>
-                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>An undeclared stream is not the same as zero — completeness can&apos;t be asserted until each is either entered above or attested absent. Required before export.</div>
+                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>An undeclared stream is not the same as zero: completeness can&apos;t be asserted until each is either entered above or attested absent. Required before export.</div>
                   <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                     {activeUndeclared.map(u => (
                       <label key={u.stream} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
@@ -2338,7 +2338,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           </div>
           <div style={{ position: 'sticky', top: 80 }}>
             <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 12 }} className="tq-summary-label">{loc.name} — live results</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, marginBottom: 12 }} className="tq-summary-label">{loc.name}: live results</div>
               {/* NOT five dashes. A "—" beside "Scope 1 total" sits in the same column, in the same
                   row, as a figure — it reads as a measured zero rather than as an absent result.
                   The rows are removed and the reason takes their place. */}
@@ -2417,25 +2417,25 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           {/* brand-line, not brand: this is a container, not a focus or selected state. */}
           {needsMarketBased && (
             <div style={{ background: '#fff', border: '0.5px solid var(--color-brand-line)', borderRadius: 12, padding: '1.5rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305 — Market-based Scope 2</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305: Market-based Scope 2</div>
               <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require you to report Scope 2 on both a location-based AND market-based basis. Market-based Scope 2 subtracts electricity from renewable energy contracts (PPAs, RECs, green tariffs).</p>
               {inventory.locations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
-                  <Field label={`${loc.name} — Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
+                  <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
                     <input type="number" value={loc.renewable_electricity_kwh || ''} onChange={e => updateLocation(i, 'renewable_electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label={`Upload RECs / PPAs — ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs — ${loc.name}`} />}
+                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
                 </div>
               ))}
             </div>
           )}
           {needsBiogenic && (
             <div style={{ background: '#fff', border: '0.5px solid #0F6E56', borderRadius: 12, padding: '1.5rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305 — Biogenic CO₂</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305: Biogenic CO₂</div>
               <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require biogenic CO₂ emissions to be reported separately from fossil fuel emissions. Biogenic CO₂ comes from burning biomass, wood waste, or agricultural residues.</p>
               {inventory.locations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
-                  <Field label={`${loc.name} — Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues — 0 if none">
+                  <Field label={`${loc.name}: Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
                     <input type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {/* Biogenic was the only figure in the wizard with no evidence path — every other
@@ -2443,7 +2443,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                       docs live in the locations_data jsonb with no DB constraint on document_type,
                       and /api/verifier-documents iterates source_docs generically, so this slot
                       reaches the verifier surface on its own. */}
-                  {isPaid ? <DocUpload label={`Upload biomass records — ${loc.name}`} locIdx={i} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records — ${loc.name}`} />}
+                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -2489,7 +2489,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     return (
       <div>
         <h2 style={sectionHead}>Review, results & calculation workings</h2>
-        <p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required — complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
+        <p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required: complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
         {/* Scope 3 is calculated from THIS inventory's energy, so the way to it belongs where the
             customer is reading those figures. One control, one rule: lib/moduleLinks.ts. */}
         <Scope3Control />
@@ -2501,7 +2501,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 const totals = totals_ar6
                 return (
                   <div key={fw.id} style={{ background: fw.bg, border: `0.5px solid color-mix(in srgb, ${fw.color} 20%, transparent)`, borderRadius: 10, padding: '1.25rem' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name} — GWP {fw.gwp}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name}: GWP {fw.gwp}</div>
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 1</div>
                       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
@@ -2525,7 +2525,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {totals.s3_td > 0 && (
                       <div style={{ marginBottom: 6 }}>
                         {/* Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Never folded into S1/S2. */}
-                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 3 (Cat 3 — electricity T&amp;D)</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 3 (Cat 3, electricity T&amp;D)</div>
                         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
                       </div>
                     )}
@@ -2581,7 +2581,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 <div key={loc.id} style={{ background: '#fff', border: blocked ? '0.5px solid color-mix(in srgb, var(--color-state-warn) 40%, transparent)' : '0.5px solid #e8e7e4', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
                   <div onClick={() => setShowWorkings(w => ({...w, [key]: !w[key]}))} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', }}>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{loc.name}{loc.state && ` — ${loc.state}`}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d' }}>{loc.name}{loc.state && `: ${loc.state}`}</div>
                       {/* No numbers for a blocked location — not even a dash beside "S1:", which
                           still reads as a measured scope. The reason takes the figures' place. */}
                       {blocked
@@ -2592,7 +2592,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                   </div>
                   {showWorkings[key] && (
                     <div style={{ padding: '0 1.25rem 1.25rem', borderTop: '0.5px solid #e8e7e4' }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings — ISO 14064-3 / ISAE 3410 transparency</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', margin: '1rem 0 0.75rem', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>Calculation workings: ISO 14064-3 / ISAE 3410 transparency</div>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                         <thead><tr>{['Source', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO₂e)'].map(h => <th key={h} style={{ background: '#f8f7f5', padding: '6px 10px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'var(--color-ink-muted)', borderBottom: '0.5px solid #e8e7e4' }}>{h}</th>)}</tr></thead>
                         <tbody>
@@ -2737,7 +2737,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                           {/* The per-location TOTAL row. A blocked location has no total to state —
                               printing 0.0000 here would be the exact claim the exclusion exists to
                               avoid, and it would contradict the row above it. */}
-                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL — {loc.name} {c ? '(Scope 1 + Scope 2 location-based)' : '— excluded from all totals'}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{c ? (c.s1_total + c.s2_location).toFixed(4) : '—'}</td></tr>
+                          <tr style={{ background: '#0d0d0d' }}><td colSpan={5} style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>TOTAL: {loc.name} {c ? '(Scope 1 + Scope 2 location-based)' : '— excluded from all totals'}</td><td style={{ ...wTd, color: '#fff', fontWeight: 700, background: '#0d0d0d' }}>{c ? (c.s1_total + c.s2_location).toFixed(4) : '—'}</td></tr>
                         </tbody>
                       </table>
                     </div>
@@ -2749,7 +2749,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </>
             })()}
             <div className="tq-summary" style={{ display: 'block', padding: '1.5rem', marginTop: '1.5rem' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Assurance readiness — ISO 14064-3 / ISAE 3410</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Assurance readiness: ISO 14064-3 / ISAE 3410</div>
               {[
                 // ⚠️ THE SECOND COPY OF THE SAME CATALOGUE, AND A CLAIM ABOUT THIS INVENTORY.
                 // This checklist tells the customer their package is assurance-ready; a note listing
@@ -2807,8 +2807,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           if (sb253FirstYear) return (
             <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>SB 253 — Scope 3 not required for your first reporting year</div>
-                <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 is expected from {SB253_SCOPE3_FROM}, under a separate CARB rulemaking that is still in workshops — the final regulation is expected by the end of 2026, so the requirement is not settled. Starting now puts the data in place either way.</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>SB 253: Scope 3 not required for your first reporting year</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 is expected from {SB253_SCOPE3_FROM}, under a separate CARB rulemaking that is still in workshops: the final regulation is expected by the end of 2026, so the requirement is not settled. Starting now puts the data in place either way.</div>
               </div>
               <Scope3Control compact />
             </div>
@@ -2835,13 +2835,13 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     On a pricing page or a feature list the same words are read as fifteen CALCULATED
                     categories, which is why those sites derive their claim from METHOD_BY_CATEGORY instead.
                     The sibling that also stays is the in-product banner in app/dashboard/scope3/page.tsx. */}
-                <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories — GHG Protocol aligned.</div>
+                <div style={{ fontSize: 12, color: '#555553' }}>This wizard covers Scope 1 & 2. Use the Scope 3 Complete Calculator for all 15 categories, GHG Protocol aligned.</div>
               </div>
               <Scope3Control compact />
             </div>
           )
         })()}
-        <p style={sectionSub}>One inventory — {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Unlock your paid plan to download.</p>
+        <p style={sectionSub}>One inventory: {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Unlock your paid plan to download.</p>
         <div style={{ position: 'relative' }}>
           {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
@@ -2860,7 +2860,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               return (
                 <div key={fw.id}>
                   <div className="tq-summary" style={{ display: 'block', padding: '2rem', marginBottom: '1rem' }}>
-                    <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, borderRadius: 6, padding: '3px 10px', marginBottom: 12 }}>{fw.name} — {fw.full}</div>
+                    <div style={{ display: 'inline-block', fontSize: 11, fontWeight: 700, color: fw.color, background: fw.bg, borderRadius: 6, padding: '3px 10px', marginBottom: 12 }}>{fw.name}: {fw.full}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: '1.5rem' }}>
                       {[
                         ['Company', inventory.company_name || '—'],
@@ -2886,7 +2886,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                     {(!conciergeReady || !gridReady || !declarationsReady || !pricingReady || !steamFactorsReady) && (
                       <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                         {unpriceableLocations.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')} — fix the country or the unit on the Energy &amp; fuel step</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')}: fix the country or the unit on the Energy &amp; fuel step</div>
                         )}
                       {conciergePending.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
@@ -2898,17 +2898,17 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
                         )}
                         {streamsNeverAnswered.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {streamsNeverAnswered.length} undeclared stream{streamsNeverAnswered.length > 1 ? 's' : ''} — enter the data or attest absent on the Energy &amp; fuel step: {streamsNeverAnswered.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {streamsNeverAnswered.length} undeclared stream{streamsNeverAnswered.length > 1 ? 's' : ''}: enter the data or attest absent on the Energy &amp; fuel step: {streamsNeverAnswered.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
                         {streamsWithoutFigure.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure — enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure: enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
                         {/* Names the ACTION, not just the problem. Unlike every other gate here the
                             remedy is not "enter a number you already have" — the customer has to go
                             and ask their provider for one, so the message has to say that plainly or
                             it reads as an unexplained lock. */}
                         {steamFactorGaps.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'} — ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'}: ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
                         )}
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
@@ -2947,7 +2947,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem', marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' as const }}>
               <div style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 6 }}>Your inventory is the baseline for science-based targets.</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — built directly on the figures you just confirmed.</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0: built directly on the figures you just confirmed.</div>
               </div>
               {/* Carry THIS inventory's company so SBTi binds to it directly (highest-precedence
                   selection), not the alphabetical-first. Falls back to the bare link if unsaved. */}
@@ -2988,7 +2988,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
           return [
             l.name || 'Location',
             res.applicable ? res.source : 'Location-factor fallback',
-            res.applicable ? `${res.vintage}${res.note ? ` — ${res.note}` : ''}` : (res.note || '—'),
+            res.applicable ? `${res.vintage}${res.note ? `: ${res.note}` : ''}` : (res.note || '—'),
           ]
         })
       : []
@@ -3004,7 +3004,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     const rev = inventory.revenue_millions
     const emp = inventory.employee_count
     const header = [
-      [`${fw.full} — GHG Emissions Report`],
+      [`${fw.full}: GHG Emissions Report`],
       [`Generated by ThemisIQ · www.themisiq.co · ${new Date().toLocaleDateString()}`],
       ['GWP basis', `IPCC ${fw.gwp}`],
       [''],
@@ -3026,9 +3026,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(CSV_DP)],
       ['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(CSV_DP)],
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (tCO₂e)', totals.s2_market.toFixed(CSV_DP)]] : []),
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂) — reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
+      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂): reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
       // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
-      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3 — electricity T&D (tCO₂e)', totals.s3_td.toFixed(CSV_DP)]] : []),
+      ...(totals.s3_td > 0 ? [['Scope 3 Cat 3: electricity T&D (tCO₂e)', totals.s3_td.toFixed(CSV_DP)]] : []),
       ...(fw.id === 'cdp' ? [
         [`Prior year Scope 1 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s1],
         [`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s2],
@@ -3048,8 +3048,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       ...gridSourcesFor(inventory.locations).map(src => ['Electricity factors', src]),
       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
       ...sourceAttributionsForLocations(inventory.locations).flatMap(a => [
-        [`Licence attribution — ${a.publisher}`, a.attribution],
-        [`Licence — ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
+        [`Licence attribution: ${a.publisher}`, a.attribution],
+        [`Licence: ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
       ]),
       // The same dead branch the PDF had: it chose gwp_ar4 or gwp_ar5 for a framework on AR4 or AR5, and none is.
       ['GWP values', EF_SOURCES.gwp_ar6],
@@ -3059,7 +3059,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             ...inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
               const resRegion = residualRegionFor(l)
               const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion)
-              return [`Residual factor — ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
+              return [`Residual factor: ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
             }),
           ]
         : []),
@@ -3088,7 +3088,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
               // "Nothing from this location is included in any total on this report", and the GWP
               // basis cell beside it reads "excluded". Three statements of one fact in one row.
               ? countryRefusalText(blocked.refusal, 'verifier', locationHasEnteredFigures(loc))
-              : `EXCLUDED FROM TOTALS — ${unpriceableMessage(blocked, locationHasEnteredFigures(loc))} No figure for this location is included in any total on this report.`]
+              : `EXCLUDED FROM TOTALS: ${unpriceableMessage(blocked, locationHasEnteredFigures(loc))} No figure for this location is included in any total on this report.`]
         }
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
         return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), '']
@@ -3236,7 +3236,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         {step === 3 && renderStep3()}
         {(step === 4 || step === 5) && dirty && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid var(--color-state-warn)33', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>You have unsaved changes — save your draft before {step === 5 ? 'exporting' : 'continuing'}.</span>
+            <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>You have unsaved changes: save your draft before {step === 5 ? 'exporting' : 'continuing'}.</span>
             <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' as const }}>{isSaving ? 'Saving…' : 'Save draft'}</button>
           </div>
         )}
@@ -3334,12 +3334,12 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         </div>
         <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, marginTop: 4, lineHeight: 1.5 }}>
           {conciergeReads
-            ? 'We’ll read the consumption figures automatically — you confirm before anything’s saved. PDF or photo (JPG, PNG) — large phone photos are fine.'
+            ? 'We’ll read the consumption figures automatically. You confirm before anything’s saved. PDF or photo (JPG, PNG). Large phone photos are fine.'
             : hasConcierge
               /* Leads with why the upload is worth making. The limitation comes last and is stated
                  plainly — not as a downgrade, because the evidence is the point of the upload. */
-              ? 'Upload it so your figure is evidenced — this is the document a verifier traces your number back to. Type the figure into the box above; we don’t read these ones automatically. PDF, image, XLSX or CSV.'
-              : 'PDF, image, XLSX or CSV. Enter figures manually after uploading — large files are fine.'}
+              ? 'Upload it so your figure is evidenced. This is the document a verifier traces your number back to. Type the figure into the box above; we don’t read these ones automatically. PDF, image, XLSX or CSV.'
+              : 'PDF, image, XLSX or CSV. Enter figures manually after uploading. Large files are fine.'}
         </div>
       </div>
       <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
@@ -3399,7 +3399,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
             )}
             {cov.issues.includes('overlap') && !dupRes && (
               <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Two bills cover the same period — remove the duplicate above, or:</span>
+                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Two bills cover the same period. Remove the duplicate above, or:</span>
                 <button
                   onClick={() => onAddCoverageResolution({
                     locId,
@@ -3430,6 +3430,12 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                         straddleChoice: opt.choice,
                         daysInYear: cov.straddles[0]?.daysInYear,
                         totalDays: cov.straddles[0]?.totalDays,
+                        // ⚠️ THE DASH STAYS, AND IT IS THE ONLY ONE LEFT ON THIS SCREEN THAT IS PROSE.
+                        // This note is PERSISTED in coverage_resolutions and reprinted to verifiers
+                        // through rowNoteOf on /verify/[token]. Resolutions already recorded carry the
+                        // dash, so sweeping it here would put both forms in one audit trail without
+                        // changing a single stored record. applyResolutions never reads it, so this is
+                        // a wording decision and not a correctness one. Budgeted in lib/emDashCopy.test.ts.
                         note: `Boundary-straddling bill for ${fuelOfStrip || 'this fuel'} resolved by "${opt.label}" — ${opt.note}.`,
                         acknowledgedAt: new Date().toISOString(),
                       })}
@@ -3629,7 +3635,7 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
     return (
       <div>
         <h2 style={auditSectionHead}>Audit trail</h2>
-        <p style={auditSectionSub}>Every change to this inventory is recorded automatically — who, what, and when — in a tamper-evident log. This is the record your verifier reviews.</p>
+        <p style={auditSectionSub}>Every change to this inventory is recorded automatically (who, what, and when) in a tamper-evident log. This is the record your verifier reviews.</p>
         <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 6 }}>No history yet</div>
           <div style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6 }}>Your audit trail will appear here once you save your inventory. Use the &ldquo;Save draft&rdquo; button at the top right to create the first entry.</div>
@@ -3641,7 +3647,7 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
   return (
     <div>
       <h2 style={auditSectionHead}>Audit trail</h2>
-      <p style={auditSectionSub}>Every change to this inventory is recorded automatically — who, what, and when — in a tamper-evident log. This is the record your verifier reviews.</p>
+      <p style={auditSectionSub}>Every change to this inventory is recorded automatically (who, what, and when) in a tamper-evident log. This is the record your verifier reviews.</p>
 
       {/* ⚠️ THE ISO STRIP RENDERS ONLY ON A SUCCESSFUL READ. "N changes logged · entries cannot be
           edited or deleted · ISO 14064-3 / ISAE 3410 traceability" is a claim about the record. It
@@ -3661,7 +3667,7 @@ function AuditTrail({ inventoryId, step }: { inventoryId: string | null; step: n
         <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#B91C1C', '--tq-state-wash': '#FCEBEB', marginBottom: '1.5rem' } as React.CSSProperties}>
           <div className="tq-callout-heading">The audit trail could not be read</div>
           <div className="tq-callout-text">
-            This is a display failure, not a statement about your record — the entries are held in the
+            This is a display failure, not a statement about your record: the entries are held in the
             database and are unaffected. Until it loads, this screen cannot show you what it contains,
             and the assurance package will not be generated. Reported by the database as:{' '}
             <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12 }}>{error}</span>
@@ -3826,10 +3832,10 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
           product. "Revoke one" rather than "revoke access", because access is the thing that does
           not fully revoke. */}
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '0.75rem' }}>
-        Generate a read-only link for your independent assurance provider. They&apos;ll see this inventory&apos;s summary, methodology, and full audit trail &mdash; with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
+        Generate a read-only link for your independent assurance provider. They&apos;ll see this inventory&apos;s summary, methodology, and full audit trail, with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
       </p>
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.25rem' }}>
-        Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected &mdash; an assurance provider is required to keep the evidence behind their opinion in their own working papers.
+        Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected. An assurance provider is required to keep the evidence behind their opinion in their own working papers.
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>

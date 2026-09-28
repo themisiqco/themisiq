@@ -124,7 +124,7 @@ export default function ReportsPage() {
         {!loading && !error && rows.length > 0 && (
           <>
             <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginBottom: 16 }}>
-              {rows.length} saved {rows.length === 1 ? 'report' : 'reports'}. These reopen the full report exactly as generated — reopen to view or re-download as PDF.
+              {rows.length} saved {rows.length === 1 ? 'report' : 'reports'}. These reopen the full report exactly as generated. Reopen to view or re-download as PDF.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {rows.map(r => {

@@ -299,7 +299,7 @@ export default function SurveyProgress() {
         {counts.neverOpened > 0 && (
           <div style={{ background: BLUE_BG, border: `0.5px solid ${BLUE}`, borderRadius: 12, padding: '12px 16px', marginBottom: 20, fontSize: 12.5, color: '#0d0d0d', lineHeight: 1.75 }}>
             <strong>{counts.neverOpened} of {counts.invited} people have not opened the survey.</strong>{' '}
-            Results are calculated over the {counts.reached} who did — an unopened invitation is not
+            Results are calculated over the {counts.reached} who did: an unopened invitation is not
             counted as “asked and skipped”, because that would report a delivery problem as a finding
             about {round?.company_name || 'your company'}. This gap is about your invitations: check
             the addresses, and whether the mail reached them.
@@ -419,7 +419,7 @@ export default function SurveyProgress() {
                 <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div>
                     <strong style={{ color: '#0d0d0d' }}>Everyone's link works again.</strong> Anyone
-                    who had started picks up exactly where they left off — nothing they answered was
+                    who had started picks up exactly where they left off. Nothing they answered was
                     lost when it closed.
                   </div>
                   <div>
@@ -482,8 +482,8 @@ export default function SurveyProgress() {
                     <strong style={{ color: '#0d0d0d' }}>{openedNotSubmitted} {openedNotSubmitted === 1 ? 'person has' : 'people have'} started but not submitted.</strong>{' '}
                     {/* Counter-intuitive and worth stating: responses exist independently of
                         submission, and the counters read in_progress rows. */}
-                    Whatever they have answered so far <em>is</em> already counted in the results —
-                    submitting is not what makes an answer count. They will not be able to add to it.
+                    Whatever they have answered so far <em>is</em> already counted in the results.
+                    Submitting is not what makes an answer count. They will not be able to add to it.
                   </div>
                 )}
                 <div>
@@ -503,7 +503,7 @@ export default function SurveyProgress() {
                       removed when the button was built. A warning that describes a missing control
                       after the control exists is the same defect one step removed. */}
                   <strong style={{ color: '#0d0d0d' }}>This can be undone until an assessment uses
-                  the round — and not afterwards.</strong> You can reopen it from this page while
+                  the round, and not afterwards.</strong> You can reopen it from this page while
                   that is still true. If people are still answering, waiting costs nothing.
                 </div>
               </div>

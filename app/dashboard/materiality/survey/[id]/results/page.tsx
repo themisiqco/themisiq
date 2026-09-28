@@ -210,7 +210,7 @@ export default function SurveyResults() {
      */
     if (data === null || data === undefined) {
       setLoadError('The aggregation returned nothing for this round. That means the round does not '
-                 + 'exist, or it belongs to another account — those two cannot be told apart from '
+                 + 'exist, or it belongs to another account: those two cannot be told apart from '
                  + 'here. Nothing was calculated and nothing is being hidden.')
       setLoading(false); return
     }
@@ -329,12 +329,12 @@ export default function SurveyResults() {
 
         <div style={{ background: BLUE_BG, border: `0.5px solid ${BLUE}`, borderRadius: 12,
                       padding: '12px 16px', marginBottom: 8, fontSize: 12.5, color: INK, lineHeight: 1.75 }}>
-          <strong>Every figure below is out of {p.reached}, the people who opened the survey — not out
+          <strong>Every figure below is out of {p.reached}, the people who opened the survey, not out
           of {p.invited}, the people invited.</strong> An unopened invitation is never counted as
           “asked and skipped”: that would report a delivery problem as a finding about
           {' '}{agg.round.company_name || 'your company'}.
           {p.never_opened > 0 && <> {p.never_opened} {p.never_opened === 1 ? 'person has' : 'people have'} not
-          opened it yet — that gap is about your invitations, and it is chased from the{' '}
+          opened it yet: that gap is about your invitations, and it is chased from the{' '}
           <Link href={`/dashboard/materiality/survey/${roundId}`} style={{ color: BLUE }}>progress screen</Link>.</>}
         </div>
 
@@ -360,7 +360,7 @@ export default function SurveyResults() {
                 Results appear here as people submit. Nothing is calculated until someone opens the
                 survey, so there is nothing on this page to be wrong yet.
                 {p.invited === 0
-                  ? <> No one has been invited — start on the{' '}
+                  ? <> No one has been invited: start on the{' '}
                       <Link href={`/dashboard/materiality/survey/${roundId}/respondents`} style={{ color: BRAND }}>respondents screen</Link>.</>
                   : <> {p.invited} {p.invited === 1 ? 'invitation is' : 'invitations are'} out.</>}
               </div>
@@ -508,7 +508,7 @@ export default function SurveyResults() {
                           By {titleise(g.dimension)}: <strong>{catName(g.a.group) || titleise(g.a.group)}</strong>{' '}
                           {pct(g.a.top_box)} ({g.a.n_answered} answered) against{' '}
                           <strong>{catName(g.b.group) || titleise(g.b.group)}</strong>{' '}
-                          {pct(g.b.top_box)} ({g.b.n_answered} answered) — a gap of {pct(g.gap)}.
+                          {pct(g.b.top_box)} ({g.b.n_answered} answered), a gap of {pct(g.gap)}.
                         </div>
                       ))}
                     </div>
@@ -526,7 +526,7 @@ export default function SurveyResults() {
             <div style={CARD}>
               <div style={H2}>Every sub-topic</div>
               <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 14 }}>
-                In the order respondents saw them. This table is a reference, not a ranking — it has
+                In the order respondents saw them. This table is a reference, not a ranking. It has
                 no score column and no sort, because a single number per sub-topic is the field most
                 likely to be read as a decision the survey has not made.
               </div>
@@ -545,7 +545,7 @@ export default function SurveyResults() {
                   <span style={{ background: PAPER, color: MID, border: `0.5px solid ${LINE}`, borderRadius: 4,
                                  minWidth: 20, textAlign: 'center', fontSize: 11, fontWeight: 700, padding: '2px 0' }}>—</span>
                   <span style={{ fontSize: 11.5, color: MID, lineHeight: 1.6 }}>
-                    Not enough visibility to assess — a recorded answer, never a zero and never a low
+                    Not enough visibility to assess: a recorded answer, never a zero and never a low
                   </span>
                 </div>
               </div>
@@ -556,7 +556,7 @@ export default function SurveyResults() {
                               padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
                   <strong>On {abstentionLed.length} {abstentionLed.length === 1 ? 'sub-topic' : 'sub-topics'},
                   more people said they could not judge it than gave a view.</strong>{' '}
-                  That is a finding about visibility, not a low score — marked below, and usually it
+                  That is a finding about visibility, not a low score: marked below, and usually it
                   means the company cannot yet see its own impact here.
                   <div style={{ marginTop: 6, color: MID, fontSize: 11.5 }}>
                     {abstentionLed.map(s => s.short_name).join(' · ')}
@@ -587,7 +587,7 @@ export default function SurveyResults() {
                     <div key={q.question_id} style={{ padding: '12px 0', borderBottom: `0.5px solid ${LINE}` }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: INK, marginBottom: 8 }}>{q.short_name}</div>
                       {q.status !== 'included'
-                        ? <div style={{ fontSize: 11.5, color: MUTE }}>Not in scope for this round{q.exclusion_reason ? ` — ${q.exclusion_reason}` : ''}.</div>
+                        ? <div style={{ fontSize: 11.5, color: MUTE }}>Not in scope for this round{q.exclusion_reason ? `: ${q.exclusion_reason}` : ''}.</div>
                         : q.overall
                           ? <div>
                               <DistBar d={q.overall.distribution} />
@@ -631,11 +631,11 @@ export default function SurveyResults() {
             <strong>No mean is computed anywhere on this page.</strong> {agg.method.mean_note}
           </div>
 
-          <Disclosure summary="The full method — median, dispersion, thresholds, suppression, and what is not produced">
+          <Disclosure summary="The full method: median, dispersion, thresholds, suppression, and what is not produced">
             <div style={{ display: 'grid', gap: 12 }}>
               <MethodItem label="Median" body={agg.method.median_convention} />
               <MethodItem label="Spread" body={agg.method.dispersion.definition} />
-              <MethodItem label="Agreement coefficient — not computed"
+              <MethodItem label="Agreement coefficient: not computed"
                           body={agg.method.dispersion.agreement_coefficient_note} tone="amber" />
               <MethodItem label="Who counts as asked" body={agg.method.n_asked_basis} />
               <MethodItem label="Suppression" body={agg.method.suppression.rule} />
@@ -714,7 +714,7 @@ function SubTopicRow({ s, catName, floor }:
 
       {s.status !== 'included' ? (
         <div style={{ fontSize: 11.5, color: MUTE, lineHeight: 1.7 }}>
-          Not in scope for this round{s.exclusion_reason ? ` — ${s.exclusion_reason}` : ''}.
+          Not in scope for this round{s.exclusion_reason ? `: ${s.exclusion_reason}` : ''}.
         </div>
       ) : !o || o.n_asked === 0 ? (
         <div style={{ fontSize: 11.5, color: MUTE, lineHeight: 1.7 }}>
@@ -731,8 +731,8 @@ function SubTopicRow({ s, catName, floor }:
             <strong>{o.n_abstained} of {o.n_asked} said they could not judge this
             {o.n_answered === 0 ? '' : `, and ${o.n_answered} gave a view`}.</strong>{' '}
             {o.n_answered === 0
-              ? 'Everyone asked said they could not judge this — a finding about visibility, not a low score.'
-              : 'More people could not judge this than gave a view — a finding about visibility, not a low score.'}
+              ? 'Everyone asked said they could not judge this: a finding about visibility, not a low score.'
+              : 'More people could not judge this than gave a view: a finding about visibility, not a low score.'}
           </div>
           {o.n_answered > 0 && (
             <div style={{ marginTop: 10 }}>
@@ -758,7 +758,7 @@ function SubTopicRow({ s, catName, floor }:
                above — so the whole of n_asked was skipped. */
             <div style={{ fontSize: 12, color: MID, lineHeight: 1.8, marginTop: 10 }}>
               <strong style={{ color: INK }}>No one gave a view.</strong> All {o.n_asked}{' '}
-              {o.n_asked === 1 ? 'person' : 'people'} asked skipped this — nobody scored it, and
+              {o.n_asked === 1 ? 'person' : 'people'} asked skipped this: nobody scored it, and
               nobody said they could not judge it. There is no distribution, no median and no
               share to report: an absence, not a low score.
             </div>
@@ -810,7 +810,7 @@ function BreakdownView({ dim, b, catName, floor }:
       </div>
       {b.omitted ? (
         <div style={{ fontSize: 11.5, color: MUTE, lineHeight: 1.7 }}>
-          {OMISSION_COPY[b.reason || ''] || `Not shown — ${b.reason}.`}
+          {OMISSION_COPY[b.reason || ''] || `Not shown: ${b.reason}.`}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 6 }}>
@@ -827,7 +827,7 @@ function BreakdownView({ dim, b, catName, floor }:
               </div>
               {c.suppressed || !c.distribution ? (
                 <div style={{ fontSize: 11, color: MUTE, fontStyle: 'italic', lineHeight: 1.6 }}>
-                  Withheld — fewer than {floor} people in this group answered, and showing it would
+                  Withheld: fewer than {floor} people in this group answered, and showing it would
                   identify them.
                 </div>
               ) : (
@@ -851,7 +851,7 @@ const UNKNOWN_COPY: Record<string, { text: string; fg: string; bg: string }> = {
     text: 'No one has opened the survey yet.', fg: BLUE, bg: BLUE_BG },
   no_eligible_respondents: {
     text: 'No one who responded belongs to a stakeholder group that is asked about this. That is a '
-        + 'finding about who was engaged, not about the topic — to get a view here you have to '
+        + 'finding about who was engaged, not about the topic: to get a view here you have to '
         + 'invite different people.', fg: AMBER, bg: AMBER_BG },
   no_answers: {
     text: 'People were asked and none gave a view.', fg: AMBER, bg: AMBER_BG },
@@ -859,7 +859,7 @@ const UNKNOWN_COPY: Record<string, { text: string; fg: string; bg: string }> = {
 
 function TopicRowView({ t }: { t: TopicRow }) {
   const u = t.unknown ? (UNKNOWN_COPY[t.unknown_reason || ''] ||
-                         { text: `Unknown — ${t.unknown_reason}.`, fg: AMBER, bg: AMBER_BG }) : null
+                         { text: `Unknown: ${t.unknown_reason}.`, fg: AMBER, bg: AMBER_BG }) : null
   return (
     <div style={{ border: `0.5px solid ${u ? `color-mix(in srgb, ${u.fg} 33%, transparent)` : LINE}`, borderRadius: 10,
                   padding: '12px 16px', background: u ? u.bg : '#fff' }}>
@@ -980,7 +980,7 @@ function ScopeSummary({ agg }: { agg: Agg }) {
       <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8 }}>
         {included.length} of {agg.subtopics.length} sub-topics are in scope
         {agg.entity_specific.length > 0 && `, plus ${agg.entity_specific.length} entity-specific ${agg.entity_specific.length === 1 ? 'question' : 'questions'}`}.
-        {agg.round.frozen_at && ' The question set is frozen — the first response locked it, so every answer in this round is to the same questions.'}
+        {agg.round.frozen_at && ' The question set is frozen: the first response locked it, so every answer in this round is to the same questions.'}
       </div>
       {excluded.length > 0 && (
         <Disclosure summary={`${excluded.length} left out, and why`} tone="quiet">
@@ -989,7 +989,7 @@ function ScopeSummary({ agg }: { agg: Agg }) {
               <div key={s.subtopic_code} style={{ fontSize: 11.5, color: MID, lineHeight: 1.7 }}>
                 <strong style={{ color: INK }}>{s.short_name}</strong>{' '}
                 <span style={{ color: MUTE }}>{s.subtopic_code}</span>
-                {s.exclusion_reason ? ` — ${s.exclusion_reason}` : ' — no reason recorded'}
+                {s.exclusion_reason ? `: ${s.exclusion_reason}` : ': no reason recorded'}
               </div>
             ))}
           </div>

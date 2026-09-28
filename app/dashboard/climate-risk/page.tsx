@@ -107,7 +107,7 @@ const REGION_COVERAGE: Record<string, string> = {
   EAS: 'Eastern China, Japan, Korea, Taiwan',
   ARP: 'Saudi Arabia, UAE, Oman, Yemen and the Gulf states',
   WCA: 'Iran, Iraq, the Central Asian states, Afghanistan, the Caucasus',
-  WAF: 'Nigeria, Ghana, Senegal, Ivory Coast — Sahel to Gulf of Guinea',
+  WAF: 'Nigeria, Ghana, Senegal, Ivory Coast: Sahel to Gulf of Guinea',
   ESAF: 'Kenya, Tanzania, Mozambique, Zambia, Zimbabwe, eastern South Africa',
   EAU: 'Eastern Australia (Queensland, NSW, Victoria coast)',
   NAU: 'Northern Australia (Northern Territory, north Queensland, the Kimberley)',
@@ -119,7 +119,7 @@ const JURISDICTIONS = [
   { code: 'uk_ets', label: 'UK (UK ETS)', desc: 'Operate energy-intensive installations, power, or aviation in the UK.' },
   { code: 'ca', label: 'Canada (federal pricing)', desc: 'Operations in Canadian provinces under the federal carbon-pricing backstop.' },
   { code: 'us_fed', label: 'US (federal)', desc: 'US operations exposed to federal climate rules and SEC climate disclosure.' },
-  { code: 'us_ca', label: 'US — California cap-and-trade', desc: 'Operations or large emissions sources located in California.' },
+  { code: 'us_ca', label: 'US: California cap-and-trade', desc: 'Operations or large emissions sources located in California.' },
   { code: 'cn', label: 'China (national ETS)', desc: "Power or industrial operations covered by China's national emissions trading." },
   { code: 'kr', label: 'South Korea (K-ETS)', desc: "Operations covered by Korea's emissions trading scheme." },
   { code: 'jp', label: 'Japan', desc: "Operations exposed to Japan's GX carbon-pricing and disclosure regime." },
@@ -155,9 +155,9 @@ const SCENARIOS = [
   //
   // If these are edited again, or a seventh scenario is added, re-read the live table first:
   //   select code, framework, physical_mult, transition_mult from public.mr_scenarios order by sort_order;
-  { code: 'ngfs_orderly', label: 'NGFS Orderly', descriptor: 'Early policy', desc: 'Early, gradual policy action — moderate transition risk and one of the lowest physical-risk paths.' },
-  { code: 'ngfs_disorderly', label: 'NGFS Disorderly', descriptor: 'Late, abrupt', desc: 'Late, sudden policy action — high transition risk from abrupt regulatory and market shifts.' },
-  { code: 'ngfs_hothouse', label: 'NGFS Hot House', descriptor: 'Limited action', desc: 'Little further climate action — minimal transition risk but the most severe physical damage.' },
+  { code: 'ngfs_orderly', label: 'NGFS Orderly', descriptor: 'Early policy', desc: 'Early, gradual policy action: moderate transition risk and one of the lowest physical-risk paths.' },
+  { code: 'ngfs_disorderly', label: 'NGFS Disorderly', descriptor: 'Late, abrupt', desc: 'Late, sudden policy action: high transition risk from abrupt regulatory and market shifts.' },
+  { code: 'ngfs_hothouse', label: 'NGFS Hot House', descriptor: 'Limited action', desc: 'Little further climate action: minimal transition risk but the most severe physical damage.' },
 ]
 
 // Plain-English one-liner per ESRS topic, shown under the topic name on the impact step.
@@ -191,13 +191,13 @@ const ESRS_TOPIC_DESC: Record<string, string> = {
   E2: 'Air, water, and soil pollution your operations release.',
   // Was "…and effect on water and marine ecosystems" — 2023-specific, since ESRS (2026) narrows
   // this topic to "Water". Reworded to the water-use substance common to both.
-  E3: 'Your water use — withdrawal, consumption, discharge and storage.',
+  E3: 'Your water use: withdrawal, consumption, discharge and storage.',
   E4: 'Your impact on species, habitats, and land use.',
   // Was "Raw-material consumption, waste, and recyclability" — reworded to the inflow/outflow
   // framing both standards use, so it fits "Resource use and circular economy" (2023) and
   // "Circular Economy and Resource Use" (2026) equally.
   E5: 'Material inflows, product and waste outflows, and circularity.',
-  S1: 'People you employ directly — pay, hours, health and safety, equal treatment.',
+  S1: 'People you employ directly: pay, hours, health and safety, equal treatment.',
   S2: 'People employed by your suppliers and contractors, not by you.',
   S3: 'Effect of your operations on local and indigenous communities.',
   S4: 'Health, safety, and rights of the people who use your products.',
@@ -378,7 +378,7 @@ export default function MaterialityWizard() {
   // the database rather than from whatever this client happens to hold. This is display only.
   const displayTopics = resolveTopicLabels(dbTopics, topicLabels, standardVersion).topics
 
-  const SCENARIO_RATIONALE = "Yes — SSP2-4.5 (~2.7°C) is the most common starting choice and a reasonable middle case, so it's fine to leave it as-is. Change it only if you have a specific reason to test a more optimistic or more severe future. You can always re-run with a different scenario later."
+  const SCENARIO_RATIONALE = "Yes: SSP2-4.5 (~2.7°C) is the most common starting choice and a reasonable middle case, so it's fine to leave it as-is. Change it only if you have a specific reason to test a more optimistic or more severe future. You can always re-run with a different scenario later."
   const HORIZON_RATIONALE = "Medium term (to 2040) is the default lens for a first screening. Companies with long-lived physical assets may prefer the long-term view."
 
   const stepNames = mode === 'csrd'
@@ -519,7 +519,7 @@ export default function MaterialityWizard() {
           <p style={{ ...sectionSub, marginBottom: 24 }}>Assess your climate-related physical and transition risk, and determine what's material under your reporting standard. Double materiality adds impact materiality to single (financial) materiality. Choose the standard you report under.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'stretch' }}>
             {[
-              { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report — screening-level support for the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
+              { m: 's2' as Mode, t: 'IFRS S2', sub: 'Single (financial) materiality · resilience', d: 'How climate-related risks affect your enterprise value. Produces the multi-scenario climate resilience report: screening-level support for the resilience analysis IFRS S2 (and CSRD) call for.', feat: false },
               { m: 'csrd' as Mode, t: 'CSRD / ESRS', sub: 'Double materiality', d: 'Financial materiality plus impact materiality across all ten ESRS topics, plotted on the double-materiality matrix.', feat: true },
             ].map(o => (
               <div key={o.m} style={{ background: '#fff', border: o.feat ? '2px solid var(--color-brand)' : '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
@@ -539,7 +539,7 @@ export default function MaterialityWizard() {
                   <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 3 }}>Which version of ESRS do you report under?</div>
                     <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginBottom: 10 }}>
-                      All three apply to FY2026 and you must state which you used — but only ESRS (2026) can be selected here; see the note under the others. It sets the topic names in your report. You can leave this until later.
+                      All three apply to FY2026 and you must state which you used, but only ESRS (2026) can be selected here; see the note under the others. It sets the topic names in your report. You can leave this until later.
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {[
@@ -639,8 +639,8 @@ export default function MaterialityWizard() {
             </div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
-            Optional. If your financial year is not the calendar year &mdash; 1 April 2026 to 31 March 2027,
-            say &mdash; enter it as it actually runs. Which ESRS version applies depends on the day it begins.
+            Optional. If your financial year is not the calendar year (1 April 2026 to 31 March 2027,
+            say), enter it as it actually runs. Which ESRS version applies depends on the day it begins.
           </div>
           {/* ⚠️ NOT nudge-gated, unlike sector and regions. A half-filled or reversed pair is
               something the user just DID; the sector prompt is something they have not yet done.
@@ -711,7 +711,7 @@ export default function MaterialityWizard() {
               {chk.certainty === 'inferred' && (
                 <>This one is read from the scope of Article 2(1) rather than from a prohibition in terms.{' '}</>
               )}
-              You can continue — which version applies is your disclosure to make, and it is recorded
+              You can continue: which version applies is your disclosure to make, and it is recorded
               as you state it. This note is carried onto the report.
             </div>
           </div>
@@ -735,8 +735,8 @@ export default function MaterialityWizard() {
   const renderRegions = () => (
     <div>
       <h2 style={sectionHead}>Where do you operate?</h2>
-      <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong> — where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
-      <p style={sectionSub}><strong style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions — each carries a distinct hazard profile that drives your physical-risk results.</p>
+      <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: -4, marginBottom: 12 }}>This step is about <strong style={{ color: '#555553' }}>physical location</strong>: where your assets sit, which drives weather and climate hazards. Whose climate laws apply comes in the next step.</p>
+      <p style={sectionSub}><strong style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Click the ⓘ on any region to see the countries it covers and confirm your operations fall within it.</strong> These follow the IPCC AR6 climate reference regions. Each carries a distinct hazard profile that drives your physical-risk results.</p>
       {regionGroups.length === 0 && (
         <p style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Loading regions…</p>
       )}
@@ -795,10 +795,10 @@ export default function MaterialityWizard() {
       {/* Contrast callback: distinguishes this step from Operating regions */}
       <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>Different from the last step</div>
-        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}><em>Operating regions</em> was about where your assets physically sit — that drives weather and climate hazards. This step is about whose climate <em>laws</em> reach you — carbon costs and disclosure rules — which can include places you don't operate at all, like selling into the EU.</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}><em>Operating regions</em> was about where your assets physically sit: that drives weather and climate hazards. This step is about whose climate <em>laws</em> reach you (carbon costs and disclosure rules), which can include places you don't operate at all, like selling into the EU.</div>
       </div>
-      <p style={sectionSub}>Tick every place where your company has operations, legal entities, or significant sales — those are where carbon-pricing and climate rules can reach you, even if you're not headquartered there. Not sure? Tick where you're based and where you earn most of your revenue. This drives transition risk, separately from your physical regions.</p>
-      <p style={{ ...sectionSub, marginTop: -8 }}>Not every country prices carbon. Many economies still have no mandatory scheme — much of the Gulf and Middle East, most of Africa outside South Africa, and several South and Southeast Asian economies such as Pakistan, Bangladesh, Thailand, and Vietnam — so you may operate somewhere with nothing to tick here. That's expected: those operations still carry physical climate risk, captured in the previous step. Coverage is expanding quickly, so this list will grow.</p>
+      <p style={sectionSub}>Tick every place where your company has operations, legal entities, or significant sales. Those are where carbon-pricing and climate rules can reach you, even if you're not headquartered there. Not sure? Tick where you're based and where you earn most of your revenue. This drives transition risk, separately from your physical regions.</p>
+      <p style={{ ...sectionSub, marginTop: -8 }}>Not every country prices carbon. Many economies still have no mandatory scheme (much of the Gulf and Middle East, most of Africa outside South Africa, and several South and Southeast Asian economies such as Pakistan, Bangladesh, Thailand, and Vietnam), so you may operate somewhere with nothing to tick here. That's expected: those operations still carry physical climate risk, captured in the previous step. Coverage is expanding quickly, so this list will grow.</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
         {JURISDICTIONS.map(j => {
           const sel = jurisdictionCodes.includes(j.code)
@@ -811,7 +811,7 @@ export default function MaterialityWizard() {
           </div>
         })}
       </div>
-      <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 12 }}>These are simplified guides — each scheme has its own thresholds and exceptions, so check the specific rules if you're near a threshold.</p>
+      <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 12 }}>These are simplified guides: each scheme has its own thresholds and exceptions, so check the specific rules if you're near a threshold.</p>
     </div>
   )
 
@@ -822,10 +822,10 @@ export default function MaterialityWizard() {
       {/* UX: plain-English "what is a scenario?" explainer */}
       <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>What's a climate scenario?</div>
-        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>A scenario is a plausible future used to stress-test your business — not a prediction. Each one describes how far the world warms and how fast climate policy tightens. Higher-warming futures raise physical risk (floods, heat, storms); faster-policy futures raise transition risk (carbon costs, market shifts). Good practice is to test more than one. We've picked a sensible default below — you can keep it.</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>A scenario is a plausible future used to stress-test your business, not a prediction. Each one describes how far the world warms and how fast climate policy tightens. Higher-warming futures raise physical risk (floods, heat, storms); faster-policy futures raise transition risk (carbon costs, market shifts). Good practice is to test more than one. We've picked a sensible default below. You can keep it.</div>
       </div>
       <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>Why this default — and can I just keep it?</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>Why this default, and can I just keep it?</div>
         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{SCENARIO_RATIONALE}</div>
       </div>
       <label style={labelStyle}>Scenario</label>
@@ -855,7 +855,7 @@ export default function MaterialityWizard() {
   const renderImpact = () => (
     <div>
       <h2 style={sectionHead}>Impact materiality</h2>
-      <p style={sectionSub}>The inside-out view: how much does your business affect each ESRS topic? Pre-filled from your industry — adjust to your reality. This axis is what makes the assessment "double".</p>
+      <p style={sectionSub}>The inside-out view: how much does your business affect each ESRS topic? Pre-filled from your industry. Adjust to your reality. This axis is what makes the assessment "double".</p>
       {/* Topics come from the DB, named for the selected version. While the reference fetch is in
           flight (or if it failed) the list is empty — say so rather than render an empty box that
           reads as "no topics apply to you". */}
@@ -1026,7 +1026,7 @@ export default function MaterialityWizard() {
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid var(--color-state-warn)', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Physical risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry × geography × scenario</span></div>
           <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 12px' }}>Flagged only where your industry sensitivity meets real regional hazard exposure.</p>
-          <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed — no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</span>}</div>
+          <div>{phys.length ? phys.map((p: any, i: number) => <span key={'p'+i}>{p.dataStatus === 'no_reference_data' ? pill(p.hazard, 'unknown', 'not assessed: no reference data') : pill(p.hazard, p.band, 'in ' + p.drivingRegion)}</span>) : <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}>No material physical risks at this intersection.</span>}</div>
         </div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #534AB7', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 12 }}>Transition risks <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>industry carbon × jurisdiction × scenario</span></div>
@@ -1042,7 +1042,7 @@ export default function MaterialityWizard() {
     return (
       <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderTop: '4px solid #0F6E56', borderRadius: 'var(--radius-panel)', padding: '1rem', marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d', marginBottom: 2 }}>Climate opportunities <span style={{ fontWeight: 400, color: '#aaa', fontSize: 12 }}>TCFD categories · industry × scenario</span></div>
-        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 12px' }}>The upside view IFRS S2 and TCFD ask for alongside risk — where the transition creates opportunity for your industry.</p>
+        <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 12px' }}>The upside view IFRS S2 and TCFD ask for alongside risk: where the transition creates opportunity for your industry.</p>
         {opps.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {opps.map((o: any, i: number) => (
@@ -1116,13 +1116,13 @@ export default function MaterialityWizard() {
 
         {/* honesty footnote */}
         <div style={{ background: '#E6F1FB', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: '#0C447C', lineHeight: 1.6, marginBottom: 12 }}>
-          Screening output, built on IPCC AR6 climatic impact-drivers, TCFD risk{mode === 'csrd' ? ' and opportunity categories, and the ten ESRS topics' : ' and opportunity categories'} — all public frameworks. This is a structured first pass to scope a formal assessment, not a disclosure. Refine weightings with your own materiality assessment.
+          Screening output, built on IPCC AR6 climatic impact-drivers, TCFD risk{mode === 'csrd' ? ' and opportunity categories, and the ten ESRS topics' : ' and opportunity categories'}: all public frameworks. This is a structured first pass to scope a formal assessment, not a disclosure. Refine weightings with your own materiality assessment.
         </div>
 
         {/* acknowledgment block — required before download */}
         {savedId && (
           <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 12, padding: '1.25rem', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 10 }}>Before you download — limitations and disclaimer</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 10 }}>Before you download: limitations and disclaimer</div>
 
             <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, margin: '0 0 10px' }}>
               <strong>This is a screening, not a formal {mode === 'csrd' ? 'CSRD / ESRS double materiality assessment' : 'IFRS S2 disclosure'}.</strong> Before publication, the following are required:
@@ -1248,7 +1248,7 @@ export default function MaterialityWizard() {
     return (
       <div>
         <h2 style={sectionHead}>Climate resilience analysis</h2>
-        <p style={sectionSub}>Your risk and opportunity profile tested across a diverse range of climate futures — screening-level support for the multi-scenario resilience assessment IFRS S2 and CSRD/ESRS ask for.</p>
+        <p style={sectionSub}>Your risk and opportunity profile tested across a diverse range of climate futures: screening-level support for the multi-scenario resilience assessment IFRS S2 and CSRD/ESRS ask for.</p>
 
         {/* trio header — provenance inline */}
         <div style={{ background: '#f8f7f5', borderRadius: 14, padding: '1.25rem', marginBottom: 12 }}>
@@ -1263,7 +1263,7 @@ export default function MaterialityWizard() {
             ))}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10 }}>
-            These three pathways span a low-warming Paris-aligned future, a current-trajectory middle case, and a high-warming case — a diverse range that stresses both transition and physical risk, and includes a Paris-aligned scenario as IFRS S2 requires.
+            These three pathways span a low-warming Paris-aligned future, a current-trajectory middle case, and a high-warming case: a diverse range that stresses both transition and physical risk, and includes a Paris-aligned scenario as IFRS S2 requires.
           </div>
         </div>
 
@@ -1318,7 +1318,7 @@ export default function MaterialityWizard() {
         {/* acknowledgment + download, reusing the same gate */}
         {savedId && (
           <div style={{ background: '#fff', border: '1px solid #e8e7e4', borderRadius: 12, padding: '1.25rem', marginBottom: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 10 }}>Before you download — limitations and disclaimer</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 10 }}>Before you download: limitations and disclaimer</div>
             <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.7, margin: '0 0 10px' }}>
               <strong>This is a screening-level resilience analysis, not a formal {mode === 'csrd' ? 'CSRD / ESRS' : 'IFRS S2'} disclosure.</strong> Scenario classifications are derived from starter scoring values and require validation against your entity's own data and circumstances before publication.
             </p>
@@ -1399,12 +1399,12 @@ export default function MaterialityWizard() {
                       <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ ...runOutline, ...((submitting || !canAdvance()) ? runOff : null), cursor: submitting ? 'wait' : (canAdvance() ? 'pointer' : 'not-allowed') }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
                       <button onClick={submit} disabled={submitting || !canAdvance()} style={{ ...runFilled, ...((submitting || !canAdvance()) ? runOff : null), cursor: submitting ? 'wait' : (canAdvance() ? 'pointer' : 'not-allowed') }}>{submitting ? 'Running…' : 'Run double materiality screening →'}</button>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting — neither, by itself, satisfies it. Each is saved as its own report.</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 400, lineHeight: 1.5 }}>Double materiality plots all ten ESRS topics on the financial × impact matrix using your inputs above. Resilience tests three diverse climate futures (Paris-aligned, current trajectory, high warming). Both are pre-mapped to CSRD/ESRS disclosure requirements and support that reporting, neither, by itself, satisfies it. Each is saved as its own report.</div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                     <button onClick={submitResilience} disabled={submitting || !canAdvance()} style={{ ...runFilled, ...((submitting || !canAdvance()) ? runOff : null), cursor: submitting ? 'wait' : (canAdvance() ? 'pointer' : 'not-allowed') }}>{submitting ? 'Running…' : 'Run resilience analysis →'}</button>
-                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming) — screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'right', maxWidth: 320, lineHeight: 1.5 }}>Recommended. Tests three diverse climate futures (Paris-aligned, current trajectory, high warming): screening-level support for the scenario analysis IFRS S2 and CSRD ask for.</div>
                   </div>
                 )
               ) : (

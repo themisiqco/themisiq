@@ -44,9 +44,16 @@ const ALLOWED_GLYPH_CELLS: string[] = []
  * The table's TOTAL footer, which is not a row cell: one is prose and one is the same null-result
  * glyph. They belong to the dashboard's own em-dash sweep group, not to the cell vocabulary above, and
  * they are listed here so that this test does not have to pretend they are absent.
+ *
+ * ⚠️ THE DASHBOARD SWEEP RAN ON 28 Sep 2026 AND THESE TWO SURVIVED IT, for the reason this file
+ * exists: neither is sentence punctuation. "TOTAL — {loc.name}" itself became a colon, which is why
+ * the first prefix has moved; what is left inside it is '— excluded from all totals', a glyph carrying
+ * a label. Both want the Not provided / Not applicable vocabulary above, and the operator cell has to
+ * go on agreeing with the verifier cell beside it, so they are a vocabulary change and not a
+ * punctuation one. lib/emDashCopy.test.ts budgets them under app/dashboard/ghg/page.tsx: 2.
  */
 const PENDING_DASHBOARD_SWEEP = [
-  "TOTAL — {loc.name} {c ? '(Scope 1 + Scope 2 location-based)' : '— excluded from all totals'}",
+  "TOTAL: {loc.name} {c ? '(Scope 1 + Scope 2 location-based)' : '— excluded from all totals'}",
   "{c ? (c.s1_total + c.s2_location).toFixed(4) : '—'}",
 ]
 

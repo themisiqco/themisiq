@@ -493,7 +493,7 @@ export default function LeadDetermine() {
     setBlockNote(n => {
       const c = { ...n }
       if (loses) c[k] = 'Your likelihood answer has been removed. An impact that is already '
-                      + 'happening carries no likelihood — applying one would understate it.'
+                      + 'happening carries no likelihood: applying one would understate it.'
       else delete c[k]
       return c
     })
@@ -584,7 +584,7 @@ export default function LeadDetermine() {
           <div style={{ background: BLUE_BG, border: `0.5px solid ${BLUE}`, borderRadius: 12,
                         padding: '12px 16px', marginBottom: 20, fontSize: 12.5, color: INK, lineHeight: 1.75 }}>
             <strong>What your stakeholders said is shown beside each question</strong>, not
-            summarised here — reading it all first would colour every judgement that followed. From
+            summarised here: reading it all first would colour every judgement that followed. From
             “{roundName}”. It informs your determination; it does not make it.
           </div>
         ) : (
@@ -595,7 +595,7 @@ export default function LeadDetermine() {
                   be recorded as made without it, which is what will have happened. The server said:
                   {' '}{aggError}</>
               : <><strong>No stakeholder survey is linked to this assessment.</strong> Every
-                  determination below will be recorded as made without survey evidence — which is
+                  determination below will be recorded as made without survey evidence, which is
                   accurate, and is what the report will say.</>}
           </div>
         )}
@@ -676,7 +676,7 @@ export default function LeadDetermine() {
                   <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.75, marginBottom: 10 }}>
                     <strong style={{ color: INK }}>Is there a specific impact, risk or opportunity
                     here?</strong>{' '} ESRS calls these IROs. If one particular thing under this
-                    heading needs judging on its own — a site, a product, a supplier — name it as
+                    heading needs judging on its own (a site, a product, a supplier), name it as
                     an IRO. It gets its own questions, and if it turns out material it can carry
                     this topic there by itself. It appears in your report under the name you give it.
                   </div>
@@ -777,7 +777,7 @@ export default function LeadDetermine() {
                               flexDirection: 'column', gap: 8 }}>
                   <div>
                     <strong style={{ color: INK }}>They stop being drafts.</strong> Each becomes
-                    this assessment’s recorded judgement about that sub-topic — the answer the
+                    this assessment’s recorded judgement about that sub-topic: the answer the
                     report is built from.
                   </div>
                   <div>
@@ -798,7 +798,7 @@ export default function LeadDetermine() {
                   <div>
                     <strong style={{ color: INK }}>All of them, together.</strong> This covers every
                     sub-topic you hold rather than one at a time. If any is missing an answer, you
-                    will be told exactly which — and nothing will be submitted until they are done.
+                    will be told exactly which, and nothing will be submitted until they are done.
                   </div>
                 </div>
 
@@ -864,7 +864,7 @@ function EvidencePanel({ ev, contrast, hasRound, aggFailed, floor, contrastCavea
     <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.75 }}>
       {aggFailed
         ? 'The survey results could not be loaded, so no stakeholder survey informed this determination.'
-        : 'No stakeholder survey informed this determination — none is linked to this assessment.'}
+        : 'No stakeholder survey informed this determination. None is linked to this assessment.'}
     </div>, 'none')
 
   if (!ev) return wrap(
@@ -892,8 +892,8 @@ function EvidencePanel({ ev, contrast, hasRound, aggFailed, floor, contrastCavea
                       padding: '10px 13px', marginBottom: 10, fontSize: 12, color: INK, lineHeight: 1.75 }}>
           <strong>{o.n_abstained} of {o.n_asked} said they could not judge this.</strong>{' '}
           {o.n_answered === 0
-            ? 'Everyone asked said so — a finding about visibility, not a low priority.'
-            : 'More could not judge it than gave a view — a finding about visibility, not a low priority.'}
+            ? 'Everyone asked said so: a finding about visibility, not a low priority.'
+            : 'More could not judge it than gave a view: a finding about visibility, not a low priority.'}
         </div>
       ) : null}
 
@@ -922,7 +922,7 @@ function EvidencePanel({ ev, contrast, hasRound, aggFailed, floor, contrastCavea
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10,
                             flexWrap: 'wrap', fontSize: 11.5, color: MID, marginBottom: 4 }}>
                 <span>{who}</span>
-                <span><strong style={{ color: INK }}>{pct(side.top_box)}</strong> — {side.n_answered} answered</span>
+                <span><strong style={{ color: INK }}>{pct(side.top_box)}</strong>, {side.n_answered} answered</span>
               </div>
               <DistBar d={side.distribution} height={14} />
             </div>

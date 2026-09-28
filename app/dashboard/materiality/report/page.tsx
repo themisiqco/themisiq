@@ -27,7 +27,7 @@ import { reportingPeriodText } from '../../../../lib/reportDates'
 const STANDARD_VERSION_LABEL: Record<string, string> = {
   esrs_2023: 'ESRS (2023), as last amended by Del. Reg. (EU) 2025/1416',
   esrs_2023_reliefs: 'ESRS (2023) with the reliefs permitted by Del. Reg. C(2026) 5010',
-  esrs_2026: 'ESRS (2026) — Del. Reg. C(2026) 5010, applied in full',
+  esrs_2026: 'ESRS (2026): Del. Reg. C(2026) 5010, applied in full',
 }
 
 // How the topic names in this report were arrived at, from workings.labelResolution.
@@ -267,7 +267,7 @@ const SECTOR_LABEL: Record<string, string> = {
 // duplicated inline here; do not re-inline it.
 const JURISDICTION_LABEL: Record<string, string> = {
   eu_ets: 'EU (EU ETS)', cbam: 'EU CBAM exposure', uk_ets: 'UK (UK ETS)',
-  ca: 'Canada (federal pricing)', us_fed: 'US (federal)', us_ca: 'US — California cap-and-trade',
+  ca: 'Canada (federal pricing)', us_fed: 'US (federal)', us_ca: 'US: California cap-and-trade',
   cn: 'China (national ETS)', kr: 'South Korea (K-ETS)', jp: 'Japan',
   au: 'Australia (Safeguard)', nz: 'New Zealand (NZ ETS)', ch: 'Switzerland (CH ETS)',
   in: 'India (CCTS)', id: 'Indonesia (ETS)', sg: 'Singapore (carbon tax)',
@@ -529,8 +529,8 @@ function ReportInner() {
           </h1>
           <p style={{ fontSize: 15, color: '#555553', marginBottom: 36, lineHeight: 1.6 }}>
             {isCsrd
-              ? 'CSRD / ESRS — financial and impact materiality screening across the ten ESRS topical standards.'
-              : 'IFRS S2 — single (financial) materiality screening for climate-related risks and opportunities.'}
+              ? 'CSRD / ESRS: financial and impact materiality screening across the ten ESRS topical standards.'
+              : 'IFRS S2: single (financial) materiality screening for climate-related risks and opportunities.'}
           </p>
           <div style={{ borderTop: '1px solid #e8e7e4', borderBottom: '1px solid #e8e7e4', padding: '20px 0', marginBottom: 24 }}>
             <Row k="Legal entity" v={a.workings?.disclosure?.legalEntity || 'Not specified'} />
@@ -604,7 +604,7 @@ function ReportInner() {
           <h3 style={h3}>Key findings</h3>
           <ul style={ul}>
             {physical.filter(p => p.band === 'high').slice(0, 3).map((p, i) => (
-              <li key={'phf'+i} style={li}>Physical risk: <strong>{p.hazard}</strong> is material (high band, score {p.score}) — driven by exposure in <strong>{p.drivingRegion}</strong>.</li>
+              <li key={'phf'+i} style={li}>Physical risk: <strong>{p.hazard}</strong> is material (high band, score {p.score}), driven by exposure in <strong>{p.drivingRegion}</strong>.</li>
             ))}
             {transition.filter(t => t.band === 'high').slice(0, 2).map((t, i) => (
               <li key={'trf'+i} style={li}>Transition risk: <strong>{t.driver}</strong> is material (high band) under the chosen scenario and jurisdictions.</li>
@@ -629,15 +629,15 @@ function ReportInner() {
           <p style={p}>IFRS S2 permits climate-related scenario analysis to be refreshed on the entity&rsquo;s strategic planning cycle rather than annually. The materiality conclusions drawn from it must be reassessed and disclosed in every annual reporting period. ESRS E1 likewise requires the materiality assessment to be current for the reporting period.</p>
           <h3 style={h3}>Frameworks</h3>
           <ul style={ul}>
-            <li style={li}><strong>IPCC AR6 WGI reference regions</strong> — the 20 land regions used here are drawn from the Sixth Assessment Report Working Group I reference-region set (Iturbide et al., 2020), each with its characteristic profile of climatic impact-drivers.</li>
-            <li style={li}><strong>IPCC climatic impact-drivers</strong> — the physical hazards (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost) follow the AR6 climatic-impact-driver categories.</li>
-            <li style={li}><strong>TCFD transition risk categories</strong> — transition risks follow the Task Force on Climate-related Financial Disclosures classification: policy and legal, technology, market, and reputation.</li>
-            {isCsrd && <li style={li}><strong>ESRS topical standards</strong> — the impact-materiality axis assesses the ten ESRS topical standards (E1–E5 environment, S1–S4 social, G1 governance).</li>}
-            <li style={li}><strong>Scenario pathways</strong> — both IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) and NGFS scenarios (Orderly, Disorderly, Hot House) are available; this screening uses {SCENARIO_LABEL[a.scenario_code]?.l}.</li>
+            <li style={li}><strong>IPCC AR6 WGI reference regions</strong>: the 20 land regions used here are drawn from the Sixth Assessment Report Working Group I reference-region set (Iturbide et al., 2020), each with its characteristic profile of climatic impact-drivers.</li>
+            <li style={li}><strong>IPCC climatic impact-drivers</strong>: the physical hazards (extreme heat, drought, water stress, inland flooding, coastal flooding, wildfire, storms/cyclones, cold/permafrost) follow the AR6 climatic-impact-driver categories.</li>
+            <li style={li}><strong>TCFD transition risk categories</strong>: transition risks follow the Task Force on Climate-related Financial Disclosures classification: policy and legal, technology, market, and reputation.</li>
+            {isCsrd && <li style={li}><strong>ESRS topical standards</strong>: the impact-materiality axis assesses the ten ESRS topical standards (E1–E5 environment, S1–S4 social, G1 governance).</li>}
+            <li style={li}><strong>Scenario pathways</strong>: both IPCC Shared Socioeconomic Pathways (SSP1-2.6, SSP2-4.5, SSP5-8.5) and NGFS scenarios (Orderly, Disorderly, Hot House) are available; this screening uses {SCENARIO_LABEL[a.scenario_code]?.l}.</li>
           </ul>
           <h3 style={h3}>Risk model</h3>
           <p style={p}>
-            <strong>Physical risk</strong> is computed as industry sensitivity × regional hazard exposure × scenario severity × time-horizon multiplier. A risk is flagged only where industry sensitivity and regional hazard exposure intersect — preventing the common error of flagging, for example, drought for any agricultural entity regardless of where it operates.
+            <strong>Physical risk</strong> is computed as industry sensitivity × regional hazard exposure × scenario severity × time-horizon multiplier. A risk is flagged only where industry sensitivity and regional hazard exposure intersect, preventing the common error of flagging, for example, drought for any agricultural entity regardless of where it operates.
           </p>
           <p style={p}>
             <strong>Transition risk</strong> is computed as industry carbon exposure × jurisdictional policy intensity × scenario policy-speed × time-horizon multiplier. Transition geography (policy jurisdictions) is deliberately distinct from physical geography (IPCC regions): physical exposure depends on where assets and hazards are; transition exposure depends on which policy regimes apply.
@@ -649,7 +649,7 @@ function ReportInner() {
                 <strong>Double materiality</strong> combines single (financial) materiality and impact materiality: <em>double materiality = financial + impact</em>. The financial (outside-in) axis uses the engine above; the climate (E1) financial score is taken directly from the physical + transition computation.
               </p>
               <p style={p}>
-                The impact (inside-out) axis assesses how the undertaking's own activities affect people and the environment across the ten ESRS topics. Under ESRS, impact materiality is a function of the <strong>severity</strong> of an impact — its scale, scope, and irremediability — and, for potential impacts, its <strong>likelihood</strong>. Each topic starts from a sector baseline and is refined by the preparer's self-assessment; a topic is material where it is significant on the impact axis, the financial axis, or both.
+                The impact (inside-out) axis assesses how the undertaking's own activities affect people and the environment across the ten ESRS topics. Under ESRS, impact materiality is a function of the <strong>severity</strong> of an impact (its scale, scope, and irremediability) and, for potential impacts, its <strong>likelihood</strong>. Each topic starts from a sector baseline and is refined by the preparer's self-assessment; a topic is material where it is significant on the impact axis, the financial axis, or both.
               </p>
             </>
           )}
@@ -678,7 +678,7 @@ function ReportInner() {
             Under both IFRS S2 and CSRD/ESRS, the choice of scenarios used and the rationale for that choice are themselves disclosable. This section documents that judgment.
           </p>
           <h3 style={h3}>Scenario selection and relevance</h3>
-          <p style={p}>This assessment runs a single scenario — {scenarioLabel}{scenarioDescriptor ? ` (${scenarioDescriptor})` : ''} — selected by the user. It is not tailored to your entity.</p>
+          <p style={p}>This assessment runs a single scenario ({scenarioLabel}{scenarioDescriptor ? ` (${scenarioDescriptor})` : ''}) selected by the user. It is not tailored to your entity.</p>
           <p style={p}>Both IFRS S2 22(b)(i) and ESRS E1 require an entity to explain why its chosen scenario is relevant to it, and IFRS S2 further requires that a diverse range of scenarios, including one aligned with the latest international agreement on climate change, be used to assess climate resilience. A single pathway does not meet that requirement.</p>
           <p style={p}>A formal assessment should (a) select scenarios that stress the specific hazards and jurisdictions identified in this screening, (b) include a Paris-aligned pathway, and (c) state that reasoning. Scenario selection is a matter for management. The Resilience Analysis in this module runs a diverse three-scenario trio and should be used where a resilience conclusion is required.</p>
         </section>
@@ -688,7 +688,7 @@ function ReportInner() {
           <section className="page" style={{ marginTop: 48 }}>
             <H>Double materiality matrix</H>
             <p style={p}>
-              Each ESRS topic is plotted on the two axes — financial materiality (vertical) and impact materiality (horizontal). Topics in the top-right quadrant are material on both axes and represent the highest reporting and management priority.
+              Each ESRS topic is plotted on the two axes: financial materiality (vertical) and impact materiality (horizontal). Topics in the top-right quadrant are material on both axes and represent the highest reporting and management priority.
             </p>
             <Matrix topics={matrix} />
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: '#555553' }}>
@@ -702,7 +702,7 @@ function ReportInner() {
         {/* ── MATERIALITY TABLE (CSRD) ───────────────────────────────────── */}
         {isCsrd && matrix.length > 0 && (
           <section className="page" style={{ marginTop: 48 }}>
-            <H>Materiality determination — all topics</H>
+            <H>Materiality determination: all topics</H>
             <p style={p}>
               All ten ESRS topical standards, with their financial and impact materiality scores (0–10) and band. Sorted by maximum of the two axes.
             </p>
@@ -720,10 +720,10 @@ function ReportInner() {
                   name a version the rows beneath it do not come from. Null on an empty roadmap:
                   a heading claims a vintage only when there are rows to have one. */}
               <H>{roadmapVintage(a.workings?.drResolution)
-                ? `Disclosure roadmap — ${roadmapVintage(a.workings?.drResolution)}`
+                ? `Disclosure roadmap: ${roadmapVintage(a.workings?.drResolution)}`
                 : 'Disclosure roadmap'}</H>
               <p style={p}>
-                Each topic determined material above triggers a defined set of ESRS disclosure requirements. This roadmap maps those topics to the requirements ESRS Set 1 attaches to them, so <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong> can see what these screening conclusions point to — turning <em>what is material</em> into <em>what to scope for collection and reporting</em>. It does not determine what the entity must file; applicability is the entity's own determination, made on its own facts. The key disclosure requirements are shown per topic; the full set within each topical standard applies.
+                Each topic determined material above triggers a defined set of ESRS disclosure requirements. This roadmap maps those topics to the requirements ESRS Set 1 attaches to them, so <strong>{a.company_name || SECTOR_LABEL[a.industry_code] || 'the entity'}</strong> can see what these screening conclusions point to, turning <em>what is material</em> into <em>what to scope for collection and reporting</em>. It does not determine what the entity must file; applicability is the entity's own determination, made on its own facts. The key disclosure requirements are shown per topic; the full set within each topical standard applies.
               </p>
               <p style={p}>
                 Two cross-cutting elements always apply regardless of which topics are material: <strong>ESRS 2 General disclosures</strong> (governance, strategy, and the IRO-1 / IRO-2 / SBM-3 disclosures that document this materiality process), and the minimum disclosure requirements on policies, actions, targets and metrics (MDR-P / A / T / M) referenced within each topic below.
@@ -744,7 +744,7 @@ function ReportInner() {
               <p style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>
                 The requirements listed below are those held for{' '}
                 <strong>{roadmapVintage(a.workings?.drResolution) ?? 'the standard version stated above'}</strong>,
-                resolved when this assessment was run and stored with it — so this roadmap reprints the
+                resolved when this assessment was run and stored with it, so this roadmap reprints the
                 requirements as they stood on that date rather than as they stand today. Disclosure-requirement
                 codes were renumbered between ESRS (2023) and ESRS (2026), so a code alone does not identify a
                 requirement across versions.
@@ -784,7 +784,7 @@ function ReportInner() {
                   for individual disclosure requirements. Eligibility and the length of the window depend
                   on the undertaking&rsquo;s reporting wave, its net turnover, its average number of employees
                   and how many years it has been reporting. This assessment does not collect those facts, so
-                  no transitional omission is applied or implied here &mdash; the requirements below are listed
+                  no transitional omission is applied or implied here: the requirements below are listed
                   in full. Confirm your eligibility against the standard before omitting any of them.
                 </p>
               )}
@@ -864,7 +864,7 @@ function ReportInner() {
           <H>Assumptions register</H>
           <ul style={ul}>
             <li style={li}>All scoring inputs are ordinal sector-level starter defaults (0–3 and 0–10 scales) derived from the public frameworks above. They are not empirically calibrated to the entity and require validation against entity-specific data.</li>
-            <li style={li}><strong>Impact-materiality baselines.</strong> Each ESRS topic's impact score starts from a sector baseline and is refined by the preparer's self-assessment. ESRS does not prescribe numeric impact scores — severity (scale, scope, irremediability) and likelihood are a disclosed, preparer-set judgement.</li>
+            <li style={li}><strong>Impact-materiality baselines.</strong> Each ESRS topic's impact score starts from a sector baseline and is refined by the preparer's self-assessment. ESRS does not prescribe numeric impact scores: severity (scale, scope, irremediability) and likelihood are a disclosed, preparer-set judgement.</li>
             <li style={li}><strong>Financial-materiality engine.</strong> The financial axis is the physical + transition computation (industry × geography × jurisdiction × scenario × horizon); the climate (E1) financial score is taken directly from it.</li>
             <li style={li}><strong>Materiality threshold.</strong> The matrix quadrants use a mid-scale split for illustration. ESRS requires the undertaking to set and document its own materiality threshold through its governance process; that threshold is not set by this screening.</li>
             <li style={li}><strong>Single scenario.</strong> This determination uses the selected scenario ({SCENARIO_LABEL[a.scenario_code]?.l || a.scenario_code}). Resilience across a diverse range of scenarios is assessed in the separate resilience analysis, as ESRS E1 requires.</li>
@@ -874,7 +874,7 @@ function ReportInner() {
         {/* ── DATA LINEAGE ───────────────────────────────────────────────── */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Data lineage</H>
-          <p style={p}>The following inputs were provided by the user for this assessment: primary sector, operating regions, policy jurisdictions, asset profile, time horizon, scenario, and the per-topic impact-materiality self-assessment. All scoring defaults — hazard sensitivities, regional hazard intensities, carbon exposure, jurisdictional policy intensities, transition-driver weights, opportunity relevances, and ESRS topic baselines — are platform reference values, not entity-supplied. The boundary matters for assurance: user inputs scope the assessment; platform defaults and the impact self-assessment must be validated, and informed by stakeholder engagement, before any disclosure.</p>
+          <p style={p}>The following inputs were provided by the user for this assessment: primary sector, operating regions, policy jurisdictions, asset profile, time horizon, scenario, and the per-topic impact-materiality self-assessment. All scoring defaults (hazard sensitivities, regional hazard intensities, carbon exposure, jurisdictional policy intensities, transition-driver weights, opportunity relevances, and ESRS topic baselines) are platform reference values, not entity-supplied. The boundary matters for assurance: user inputs scope the assessment; platform defaults and the impact self-assessment must be validated, and informed by stakeholder engagement, before any disclosure.</p>
         </section>
 
         {/* ── DATA PROVENANCE — how firm the reference values are. Disclosed, never gated. ── */}
@@ -1162,7 +1162,7 @@ function DisclosureRoadmap({ matrix, requirements, drResolution }: { matrix: any
                         column cannot support, and the same absence-rendered-as-a-finding failure the
                         GHG engine's declaration states exist to prevent. */}
                     <td style={d.datapoints ? td : { ...td, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>
-                      {d.datapoints || 'Not yet summarised — see the standard text for this requirement.'}
+                      {d.datapoints || 'Not yet summarised: see the standard text for this requirement.'}
                     </td>
                   </tr>
                 ))}

@@ -200,7 +200,7 @@ export default function RespondentImport() {
         if (!first) throw new Error('The workbook has no sheets.')
         records = XLSX.utils.sheet_to_json(wb.Sheets[first], { defval: '' }) as Record<string, unknown>[]
       } else {
-        setParseError(`“${f.name}” is not a .csv or .xlsx file. Legacy .xls is not supported — save it as .xlsx.`)
+        setParseError(`“${f.name}” is not a .csv or .xlsx file. Legacy .xls is not supported: save it as .xlsx.`)
         return
       }
 
@@ -280,7 +280,7 @@ export default function RespondentImport() {
     setCreating(false)
     if (error) { setCreateError(error.message); return }
     if (!data || data.length !== payload.length) {
-      setCreateError(`Expected ${payload.length} respondents to be created but the database returned ${data?.length ?? 0}. Nothing partial has been left behind — the insert is a single statement — but reload and check before trying again.`)
+      setCreateError(`Expected ${payload.length} respondents to be created but the database returned ${data?.length ?? 0}. Nothing partial has been left behind (the insert is a single statement), but reload and check before trying again.`)
       return
     }
     setCreated({ n: data.length, skipped: excluded.filter(isDuplicate).length, blocked: excluded.filter(isBlocked).length })
@@ -352,7 +352,7 @@ export default function RespondentImport() {
             <strong>{created.n} respondent{created.n === 1 ? '' : 's'} created.</strong>
             {created.skipped > 0 && ` ${created.skipped} skipped as already invited.`}
             {created.blocked > 0 && ` ${created.blocked} could not be created and were not.`}
-            {' '}They have not been emailed yet — send invitations from the round overview.
+            {' '}They have not been emailed yet: send invitations from the round overview.
           </div>
         )}
 
@@ -360,7 +360,7 @@ export default function RespondentImport() {
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.35rem 1.6rem', marginBottom: 16, opacity: closed ? 0.5 : 1 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 6 }}>Download the template, or upload any list you already have</div>
           <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.7, marginBottom: 10 }}>
-            The template is a starting point, not a required format — if you already keep a list of
+            The template is a starting point, not a required format: if you already keep a list of
             people, upload it as it is. {CATEGORY_COLUMNS_LINE}
           </div>
           {/* ⚠️ The same string is written into the template's Categories sheet — a customer who
@@ -376,7 +376,7 @@ export default function RespondentImport() {
               {tplBusy ? 'Building…' : 'Download the template (.xlsx)'}
             </button>
             {/* A disabled control with no reason beside it reads as a broken button. */}
-            {closed && <span style={{ fontSize: 11.5, color: 'var(--color-ink-muted)' }}>Unavailable — this round is closed.</span>}
+            {closed && <span style={{ fontSize: 11.5, color: 'var(--color-ink-muted)' }}>Unavailable: this round is closed.</span>}
           </div>
           {/* ⚠️ THE TWO BOXES ARE A SEQUENCE FOR A TEMPLATE USER, NOT ALTERNATIVES. Without this the
               second box reads as a different route for a different kind of file, and someone who
@@ -418,7 +418,7 @@ export default function RespondentImport() {
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: '#0d0d0d', marginBottom: 6 }}>Upload your list</div>
           <div style={{ fontSize: 12.5, color: '#555553', lineHeight: 1.7, marginBottom: 12 }}>
             The template you just downloaded, or any .csv or .xlsx with a name and an email column.
-            Nothing else is needed — you assign categories on the next step, from a list, so a typo
+            Nothing else is needed: you assign categories on the next step, from a list, so a typo
             cannot put someone in the wrong group.
           </div>
           {downloaded && (
@@ -452,7 +452,7 @@ export default function RespondentImport() {
                     one of them had to be wrong and it was the banner. No row is ever created without
                     a category; whether you create the rest now or later is a separate question. */}
                 <strong>{unassigned.length} of {rows.length} rows still need a category.</strong> Nobody is
-                created without one — the category decides which questions that person is asked, so it
+                created without one: the category decides which questions that person is asked, so it
                 is never guessed or defaulted.
               </div>
             )}
@@ -490,7 +490,7 @@ export default function RespondentImport() {
                 }}
                 style={{ fontSize: 12.5, padding: '5px 8px', borderRadius: 7, border: 'none', background: selected.size ? '#fff' : 'rgba(255,255,255,0.25)', color: '#0d0d0d' }}>
                 <option value="">Assign category to selected…</option>
-                {cats.map(c => <option key={c.code} value={c.code}>{c.label} — {questionsFor(c.labour_routing, counts)} questions</option>)}
+                {cats.map(c => <option key={c.code} value={c.code}>{c.label}, {questionsFor(c.labour_routing, counts)} questions</option>)}
               </select>
               {selected.size > 0 && <button onClick={() => setSelected(new Set())} style={{ ...btn, padding: '4px 10px', fontSize: 11.5 }}>Clear</button>}
               <div style={{ flex: 1 }} />
@@ -565,7 +565,7 @@ export default function RespondentImport() {
                 {excluded.filter(isDuplicate).length > 0 && ` · ${excluded.filter(isDuplicate).length} already invited, skipped`}
                 {excluded.filter(isBlocked).length > 0 && ` · ${excluded.filter(isBlocked).length} cannot be created`}
                 {unassigned.length > 0 && ` · ${unassigned.length} still need a category`}
-                . This list is not saved until you create it — leaving the page discards it.
+                . This list is not saved until you create it: leaving the page discards it.
               </div>
               {createError && (
                 <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12, color: '#555553', lineHeight: 1.7 }}>

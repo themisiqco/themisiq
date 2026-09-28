@@ -283,7 +283,7 @@ export default function Iro1Page() {
               {state === 'declined' && !isEditing && (
                 <div style={{ background: BLUE_BG, borderRadius: 10, padding: '12px 14px', marginTop: 12,
                               fontSize: 13, color: INK, lineHeight: 1.8 }}>
-                  Recorded: this was not done. That is what the disclosure will say — not that the
+                  Recorded: this was not done. That is what the disclosure will say, not that the
                   question went unanswered.
                 </div>
               )}
@@ -393,7 +393,7 @@ export default function Iro1Page() {
                 )}
                 {nudged && blockers.length > 0 && (
                   <div style={{ fontSize: 11.5, color: MID, lineHeight: 1.6, maxWidth: 520 }}>
-                    Each one above has two buttons — an answer, or a record that it was not done.
+                    Each one above has two buttons: an answer, or a record that it was not done.
                     Either clears it.
                   </div>
                 )}

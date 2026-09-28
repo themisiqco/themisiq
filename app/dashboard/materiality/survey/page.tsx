@@ -143,7 +143,7 @@ export default function SurveyRounds() {
       return
     }
     if (!data) {
-      setCreateError('The round did not save, and the database returned no error and no row. Nothing was created — reload and try again.')
+      setCreateError('The round did not save, and the database returned no error and no row. Nothing was created. Reload and try again.')
       return
     }
 
@@ -184,7 +184,7 @@ export default function SurveyRounds() {
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: '#0d0d0d' }}>Stakeholder surveys</div>
             <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.7, marginTop: 6, maxWidth: 620 }}>
-              Ask the people who see your company — staff, suppliers, communities, customers — which
+              Ask the people who see your company (staff, suppliers, communities, customers), which
               sustainability topics they think you should prioritise. Their answers are the
               stakeholder-engagement evidence ESRS 2 SBM-2 asks for, and the input your materiality
               assessment is set against.
@@ -223,7 +223,7 @@ export default function SurveyRounds() {
                     is nonsense to the one respondent who most needs the sentence to land. The column
                     is nullable at the database on purpose; the requirement belongs here. */}
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 5, lineHeight: 1.6 }}>
-                  Used throughout the survey — “What strategic priority should <em>{company.trim() || 'Acme Foods Ltd'}</em> assign
+                  Used throughout the survey: “What strategic priority should <em>{company.trim() || 'Acme Foods Ltd'}</em> assign
                   to this topic?” Respondents outside your organisation need it to know who is asking.
                 </div>
               </div>
@@ -254,7 +254,7 @@ export default function SurveyRounds() {
                   they cannot run a survey, not shown a dropdown with one entry. */}
               <div>
                 This round is built against <strong>ESRS (2026)</strong> and its 37 sub-topics. Rounds
-                against ESRS (2023) are not yet supported — that taxonomy is a different instrument,
+                against ESRS (2023) are not yet supported. That taxonomy is a different instrument,
                 three levels deep, and has to be transcribed before a survey can be built on it.
               </div>
 
@@ -294,7 +294,7 @@ export default function SurveyRounds() {
                 Cancel
               </button>
               <button onClick={create} disabled={!nameOk || !companyOk || saving}
-                title={!companyOk ? 'A company name is required — the survey copy names it throughout' : undefined}
+                title={!companyOk ? 'A company name is required: the survey copy names it throughout' : undefined}
                 style={{ fontSize: 13, fontWeight: 600, padding: '9px 20px', borderRadius: 8, border: 'none', background: nameOk && companyOk ? '#0d0d0d' : '#e8e7e4', color: nameOk && companyOk ? '#fff' : 'var(--color-ink-muted)', cursor: nameOk && companyOk && !saving ? 'pointer' : 'not-allowed' }}>
                 {saving ? 'Creating…' : 'Create and choose topics'}
               </button>
@@ -318,8 +318,8 @@ export default function SurveyRounds() {
           <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '2.5rem', textAlign: 'center', marginTop: 20 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#0d0d0d', marginBottom: 8 }}>No survey rounds yet</div>
             <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', lineHeight: 1.7, maxWidth: 460, margin: '0 auto' }}>
-              A round is one survey sent to one group of people. Most companies run several — staff
-              first, then suppliers, then communities — and use them together.
+              A round is one survey sent to one group of people. Most companies run several (staff
+              first, then suppliers, then communities), and use them together.
             </div>
           </div>
         )}

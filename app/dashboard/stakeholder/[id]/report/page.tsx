@@ -715,7 +715,7 @@ export default function StakeholderBoardReport() {
             deciding whether the paper is worth producing. Completeness beats elegance here: the
             sentence is longer and lists rather than summarises, deliberately. */}
         <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9 }}>
-          It opens with what we asked and what your own assessment did, then gives three figures —
+          It opens with what we asked and what your own assessment did, then gives three figures:
           topics assessed, topics found material, and topics where the two views point differently.
           After that: who was engaged and what they said on each topic, where responses divided,
           your own workforce set beside workers in your value chain, the severity determinations
@@ -725,7 +725,7 @@ export default function StakeholderBoardReport() {
         </div>
         <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.9, marginTop: 10 }}>
           It is written for directors or senior leadership rather than for specialists, and it asks
-          the reader to approve nothing — it reports what was found.
+          the reader to approve nothing. It reports what was found.
         </div>
       </div>
 
@@ -783,8 +783,8 @@ export default function StakeholderBoardReport() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         gap: 16, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 12.5, color: INK, lineHeight: 1.8, flex: 1, minWidth: 260 }}>
-              <strong>Ready.</strong> The paper is generated here in your browser and downloaded —
-              it is not stored on our servers, and nothing is sent anywhere.
+              <strong>Ready.</strong> The paper is generated here in your browser and downloaded.
+              It is not stored on our servers, and nothing is sent anywhere.
             </div>
             <button onClick={() => void download()} disabled={busy}
                     style={{ flexShrink: 0, fontSize: 13, fontWeight: 600, padding: '9px 20px',
@@ -800,7 +800,7 @@ export default function StakeholderBoardReport() {
       )}
 
       <div style={{ fontSize: 11.5, color: MUTE, lineHeight: 1.8 }}>
-        The paper reports the impact half of double materiality — the effect your organisation has
+        The paper reports the impact half of double materiality: the effect your organisation has
         on people and the environment. It does not assess how sustainability matters affect your
         own finances, and it says so on its own limitations page.
       </div>

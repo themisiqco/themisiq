@@ -53,50 +53,50 @@ interface SupplyChainInventory {
 
 const COUNTRY_RISK: Record<string, { risk: number; label: string }> = {
   // Critical risk
-  'Bangladesh': { risk: 4, label: 'Critical — labour rights, safety' },
-  'Myanmar': { risk: 4, label: 'Critical — conflict, forced labour' },
-  'North Korea': { risk: 4, label: 'Critical — forced labour' },
-  'Eritrea': { risk: 4, label: 'Critical — forced labour' },
-  'Uzbekistan': { risk: 3, label: 'High — cotton forced labour risk' },
-  'China': { risk: 3, label: 'High — Xinjiang forced labour risk' },
-  'Pakistan': { risk: 3, label: 'High — labour rights gaps' },
-  'Cambodia': { risk: 3, label: 'High — garment sector risks' },
-  'Vietnam': { risk: 2, label: 'Medium — improving but gaps remain' },
-  'India': { risk: 2, label: 'Medium — sector-dependent risk' },
-  'Brazil': { risk: 2, label: 'Medium — deforestation, labour risk' },
-  'Mexico': { risk: 2, label: 'Medium — labour rights, security' },
-  'Turkey': { risk: 2, label: 'Medium — labour rights concerns' },
-  'Indonesia': { risk: 2, label: 'Medium — palm oil, deforestation' },
-  'Thailand': { risk: 2, label: 'Medium — migrant labour risk' },
+  'Bangladesh': { risk: 4, label: 'Critical (labour rights, safety)' },
+  'Myanmar': { risk: 4, label: 'Critical (conflict, forced labour)' },
+  'North Korea': { risk: 4, label: 'Critical (forced labour)' },
+  'Eritrea': { risk: 4, label: 'Critical (forced labour)' },
+  'Uzbekistan': { risk: 3, label: 'High (cotton forced labour risk)' },
+  'China': { risk: 3, label: 'High (Xinjiang forced labour risk)' },
+  'Pakistan': { risk: 3, label: 'High (labour rights gaps)' },
+  'Cambodia': { risk: 3, label: 'High (garment sector risks)' },
+  'Vietnam': { risk: 2, label: 'Medium (improving but gaps remain)' },
+  'India': { risk: 2, label: 'Medium (sector-dependent risk)' },
+  'Brazil': { risk: 2, label: 'Medium (deforestation, labour risk)' },
+  'Mexico': { risk: 2, label: 'Medium (labour rights, security)' },
+  'Turkey': { risk: 2, label: 'Medium (labour rights concerns)' },
+  'Indonesia': { risk: 2, label: 'Medium (palm oil, deforestation)' },
+  'Thailand': { risk: 2, label: 'Medium (migrant labour risk)' },
   // Low risk
-  'Germany': { risk: 1, label: 'Low — strong regulatory framework' },
-  'France': { risk: 1, label: 'Low — strong regulatory framework' },
-  'UK': { risk: 1, label: 'Low — Modern Slavery Act compliance' },
-  'Netherlands': { risk: 1, label: 'Low — strong regulatory framework' },
-  'Sweden': { risk: 1, label: 'Low — strong regulatory framework' },
-  'Denmark': { risk: 1, label: 'Low — strong regulatory framework' },
-  'USA': { risk: 1, label: 'Low — regulated market' },
-  'Canada': { risk: 1, label: 'Low — regulated market' },
-  'Australia': { risk: 1, label: 'Low — Modern Slavery Act' },
-  'Japan': { risk: 1, label: 'Low — regulated market' },
-  'South Korea': { risk: 1, label: 'Low — regulated market' },
+  'Germany': { risk: 1, label: 'Low (strong regulatory framework)' },
+  'France': { risk: 1, label: 'Low (strong regulatory framework)' },
+  'UK': { risk: 1, label: 'Low (Modern Slavery Act compliance)' },
+  'Netherlands': { risk: 1, label: 'Low (strong regulatory framework)' },
+  'Sweden': { risk: 1, label: 'Low (strong regulatory framework)' },
+  'Denmark': { risk: 1, label: 'Low (strong regulatory framework)' },
+  'USA': { risk: 1, label: 'Low (regulated market)' },
+  'Canada': { risk: 1, label: 'Low (regulated market)' },
+  'Australia': { risk: 1, label: 'Low (Modern Slavery Act)' },
+  'Japan': { risk: 1, label: 'Low (regulated market)' },
+  'South Korea': { risk: 1, label: 'Low (regulated market)' },
 }
 
 const SECTOR_RISK: Record<string, { risk: number; label: string; ef: number }> = {
-  'Agriculture & Food': { risk: 3, label: 'High — land use, labour, water', ef: 2.8 },
-  'Garments & Textiles': { risk: 4, label: 'Critical — labour, chemicals', ef: 1.2 },
-  'Electronics & Technology': { risk: 3, label: 'High — minerals, e-waste', ef: 0.4 },
-  'Construction & Materials': { risk: 3, label: 'High — safety, environment', ef: 3.1 },
-  'Chemicals': { risk: 3, label: 'High — environmental, safety', ef: 1.8 },
-  'Mining & Metals': { risk: 4, label: 'Critical — environment, safety', ef: 4.2 },
-  'Transport & Logistics': { risk: 2, label: 'Medium — safety, emissions', ef: 0.9 },
-  'Professional Services': { risk: 1, label: 'Low — standard risks only', ef: 0.1 },
-  'IT & Software': { risk: 1, label: 'Low — data privacy focus', ef: 0.05 },
-  'Financial Services': { risk: 1, label: 'Low — regulated sector', ef: 0.08 },
-  'Healthcare & Pharma': { risk: 2, label: 'Medium — quality, safety', ef: 0.3 },
-  'Energy & Utilities': { risk: 3, label: 'High — environmental impact', ef: 2.1 },
-  'Retail & Distribution': { risk: 2, label: 'Medium — labour, packaging', ef: 0.4 },
-  'Other Manufacturing': { risk: 2, label: 'Medium — sector-dependent', ef: 1.1 },
+  'Agriculture & Food': { risk: 3, label: 'High (land use, labour, water)', ef: 2.8 },
+  'Garments & Textiles': { risk: 4, label: 'Critical (labour, chemicals)', ef: 1.2 },
+  'Electronics & Technology': { risk: 3, label: 'High (minerals, e-waste)', ef: 0.4 },
+  'Construction & Materials': { risk: 3, label: 'High (safety, environment)', ef: 3.1 },
+  'Chemicals': { risk: 3, label: 'High (environmental, safety)', ef: 1.8 },
+  'Mining & Metals': { risk: 4, label: 'Critical (environment, safety)', ef: 4.2 },
+  'Transport & Logistics': { risk: 2, label: 'Medium (safety, emissions)', ef: 0.9 },
+  'Professional Services': { risk: 1, label: 'Low (standard risks only)', ef: 0.1 },
+  'IT & Software': { risk: 1, label: 'Low (data privacy focus)', ef: 0.05 },
+  'Financial Services': { risk: 1, label: 'Low (regulated sector)', ef: 0.08 },
+  'Healthcare & Pharma': { risk: 2, label: 'Medium (quality, safety)', ef: 0.3 },
+  'Energy & Utilities': { risk: 3, label: 'High (environmental impact)', ef: 2.1 },
+  'Retail & Distribution': { risk: 2, label: 'Medium (labour, packaging)', ef: 0.4 },
+  'Other Manufacturing': { risk: 2, label: 'Medium (sector-dependent)', ef: 1.1 },
 }
 
 const COUNTRIES = Object.keys(COUNTRY_RISK).sort()
@@ -113,7 +113,7 @@ const SECTORS = Object.keys(SECTOR_RISK).sort()
 // below the `>= 3` threshold that used to hide it.
 //   scope3 becomes null. Null is not zero and is not rendered as a figure.
 const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; factors: string[]; scope3: number | null } => {
-  const countryData = COUNTRY_RISK[supplier.country] || { risk: 2, label: 'Unknown — assess manually' }
+  const countryData = COUNTRY_RISK[supplier.country] || { risk: 2, label: 'Unknown (assess manually)' }
   const sectorData = SECTOR_RISK[supplier.sector]
 
   const factors: string[] = []
@@ -125,16 +125,16 @@ const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; fa
 
   // Sector risk (40%)
   score += (sectorData?.risk ?? 2) * 2.5
-  if (!sectorData) factors.push('Sector risk not rated — no risk profile held for this sector yet')
+  if (!sectorData) factors.push('Sector risk not rated (no risk profile held for this sector yet)')
   else if (sectorData.risk >= 3) factors.push(`Sector risk: ${sectorData.label}`)
 
   // Spend concentration (10%)
-  if (supplier.annual_spend > 1000000) { score += 1; factors.push('High spend concentration — strategic dependency') }
-  if (supplier.annual_spend > 5000000) { score += 1; factors.push('Very high spend — enhanced due diligence required') }
+  if (supplier.annual_spend > 1000000) { score += 1; factors.push('High spend concentration (strategic dependency)') }
+  if (supplier.annual_spend > 5000000) { score += 1; factors.push('Very high spend (enhanced due diligence required)') }
 
   // Tier risk (10%)
-  if (supplier.tier === '2') { score += 0.5; factors.push('Tier 2 supplier — limited visibility') }
-  if (supplier.tier === '3') { score += 1; factors.push('Tier 3 supplier — very limited visibility') }
+  if (supplier.tier === '2') { score += 0.5; factors.push('Tier 2 supplier (limited visibility)') }
+  if (supplier.tier === '3') { score += 1; factors.push('Tier 3 supplier (very limited visibility)') }
 
   // No assessment
   if (!supplier.has_assessment) { score += 0.5; factors.push('No sustainability assessment on file') }
@@ -238,10 +238,10 @@ function parseSupplyChainDraft(u: unknown): SupplyChainInventory | null {
 // would get different text depending on which layer caught it.
 const SAVE_REFUSAL: Record<'expired' | 'none' | 'unknown', string> = {
   expired: 'Your Supply Chain access has expired. Renew to save a new register. Your existing registers are still here and still readable.',
-  none: 'Saving a register requires the Supply Chain module. Your suppliers are still on screen — purchase to save them.',
+  none: 'Saving a register requires the Supply Chain module. Your suppliers are still on screen. Purchase to save them.',
   // States what was observed, not a guess at why. The read failed; naming a cause we cannot verify
   // is how a wrong one ends up on screen for months.
-  unknown: 'We could not check your Supply Chain access, so nothing was saved. This is usually temporary — try again in a moment.',
+  unknown: 'We could not check your Supply Chain access, so nothing was saved. This is usually temporary. Try again in a moment.',
 }
 
 function SupplyChainDashboardInner() {
@@ -364,7 +364,7 @@ function SupplyChainDashboardInner() {
       // Same shape as resolveWizardGate()'s `!dealIdParam` exemption in lib/deals/gates.ts.
       if (access !== 'active' && !registerId) {
         setSaveError(access === 'loading'
-          ? 'Still checking your access — try again in a moment.'
+          ? 'Still checking your access. Try again in a moment.'
           : SAVE_REFUSAL[access])
         return
       }
@@ -505,7 +505,7 @@ function SupplyChainDashboardInner() {
           const more = rejected.length > 5 ? ` and ${rejected.length - 5} more` : ''
           setSaveError(
             `Imported ${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}. ` +
-            `Skipped ${rejected.length} with a sector that is not on the list — ${shown}${more}. ` +
+            `Skipped ${rejected.length} with a sector that is not on the list: ${shown}${more}. ` +
             'Sectors are EXIOBASE industry codes now, such as i01.b for wheat. Pick them from the ' +
             'dropdown, or put the code in the Sector column and upload again.'
           )
@@ -544,13 +544,13 @@ function SupplyChainDashboardInner() {
 
   const generateExport = () => {
     const rows = [
-      ['ThemisIQ — Supply Chain Risk & Scope 3 Assessment'],
+      ['ThemisIQ: Supply Chain Risk & Scope 3 Assessment'],
       ['Company', inventory.company],
       ['Reporting Year', inventory.reporting_year],
       ['Total Suppliers', inventory.suppliers.length],
       ['Total Annual Spend', `${inventory.currency} ${totalSpend.toLocaleString()}`],
       ['Total Scope 3 Cat.1 (estimated)', totalScope3 === null
-        ? `Not available — ${unpricedCount} of ${inventory.suppliers.length} suppliers have no spend factor for their sector`
+        ? `Not available: ${unpricedCount} of ${inventory.suppliers.length} suppliers have no spend factor for their sector`
         // CSV_DP: the per-supplier rows below sum to this cell to within their own rounding, and a
         // coarser precision (this was 2 decimals) breaks the addition outright.
         : `${totalScope3.toFixed(CSV_DP)} mt CO2e`],
@@ -702,15 +702,15 @@ function SupplyChainDashboardInner() {
             <div>
               <label style={labelStyle}>Supplier tier</label>
               <select style={inputStyle} value={inventory.suppliers[activeSupplier].tier} onChange={e => updateSupplier(activeSupplier, 'tier', e.target.value as '1' | '2' | '3')}>
-                <option value="1">Tier 1 — direct supplier</option>
-                <option value="2">Tier 2 — supplier's supplier</option>
-                <option value="3">Tier 3+ — deeper supply chain</option>
+                <option value="1">Tier 1: direct supplier</option>
+                <option value="2">Tier 2: supplier's supplier</option>
+                <option value="3">Tier 3+: deeper supply chain</option>
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={labelStyle}>Sustainability assessment on file?</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                {[{ label: 'Yes — EcoVadis, audit, or questionnaire', val: true }, { label: 'No assessment', val: false }].map(opt => (
+                {[{ label: 'Yes (EcoVadis, audit, or questionnaire)', val: true }, { label: 'No assessment', val: false }].map(opt => (
                   <button key={String(opt.val)} onClick={() => updateSupplier(activeSupplier, 'has_assessment', opt.val)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, ...(inventory.suppliers[activeSupplier].has_assessment === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>
                     {opt.label}
                   </button>
@@ -722,7 +722,7 @@ function SupplyChainDashboardInner() {
             {inventory.suppliers[activeSupplier].risk_factors.length > 0 && (
               <div style={{ gridColumn: '1 / -1', background: RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].bg, border: `1px solid ${RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].border}`, borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].color, marginBottom: 6 }}>
-                  ⚡ Risk score: {inventory.suppliers[activeSupplier].risk_score}/10 — {RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].label}
+                  ⚡ Risk score: {inventory.suppliers[activeSupplier].risk_score}/10, {RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].label}
                 </div>
                 {inventory.suppliers[activeSupplier].risk_factors.map((f, i) => (
                   <div key={i} style={{ fontSize: 11, color: '#555553', marginBottom: 3 }}>• {f}</div>
@@ -754,7 +754,7 @@ function SupplyChainDashboardInner() {
       <p style={sectionSub}>Every supplier risk-scored by country, sector, spend concentration and tier. Sorted by priority.</p>
 
       {inventory.suppliers.length === 0 ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No suppliers added — go back to Step 2 to add your suppliers.</div>
+        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No suppliers added: go back to Step 2 to add your suppliers.</div>
       ) : (
         <>
           {/* Summary */}
@@ -839,7 +839,7 @@ function SupplyChainDashboardInner() {
                   : unpricedCount === 0
                     ? 'every supplier is priced from a fixed per-sector factor held in this module, with no published source, year or region recorded'
                     : `${inventory.suppliers.length - unpricedCount} of ${inventory.suppliers.length} suppliers are priced from a fixed per-sector factor held in this module, with no published source, year or region recorded; ${unpricedCount} have no factor for their sector`}<br />
-                This is an estimate only — primary data collection from suppliers is the gold standard
+                This is an estimate only: primary data collection from suppliers is the gold standard
               </div>
             </div>
             {totalScope3 === null ? (
@@ -885,7 +885,7 @@ function SupplyChainDashboardInner() {
 
           <div style={{ marginTop: 16, background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>Next step: primary data collection</div>
-            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>For high-emission suppliers, switch from spend-based to primary data — request actual activity data via the ThemisIQ supplier portal. This improves accuracy and satisfies SB 253, CDP supplier engagement and ESRS E1-6 requirements.</div>
+            <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>For high-emission suppliers, switch from spend-based to primary data: request actual activity data via the ThemisIQ supplier portal. This improves accuracy and satisfies SB 253, CDP supplier engagement and ESRS E1-6 requirements.</div>
           </div>
         </>
       )}
@@ -899,7 +899,7 @@ function SupplyChainDashboardInner() {
 
       <div className="tq-summary" data-module="supply" style={{ marginBottom: 20 }}>
         <div style={{ flex: 1, padding: '20px 24px' }}>
-        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Programme summary — {inventory.company || 'Your company'}</div>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Programme summary: {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Suppliers', val: inventory.suppliers.length },
@@ -935,7 +935,7 @@ function SupplyChainDashboardInner() {
       ) : (
         <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your full supply chain programme</div>
-          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>Download your full supplier risk register — every supplier scored by country, sector and spend — and pull supplier-reported data into your Scope 3 Category 1 calculation.</div>
+          <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>Download your full supplier risk register (every supplier scored by country, sector and spend), and pull supplier-reported data into your Scope 3 Category 1 calculation.</div>
           <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing →</a>
         </div>
       )}

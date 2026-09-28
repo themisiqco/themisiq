@@ -86,7 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (format !== 'xlsx') {
     return NextResponse.json({
       error: format === 'csv'
-        ? 'The template is only available as .xlsx — a CSV cannot carry the category list or the guidance. You can still UPLOAD a .csv of your own list.'
+        ? 'The template is only available as .xlsx. A CSV cannot carry the category list or the guidance. You can still UPLOAD a .csv of your own list.'
         : `Unknown format "${format}". The template is .xlsx.`,
     }, { status: 400 })
   }

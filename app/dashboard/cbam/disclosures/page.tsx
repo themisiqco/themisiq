@@ -302,7 +302,7 @@ export default function CbamDisclosuresPage() {
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Build your verifier-ready Carbon Border Adjustment Mechanism report — installation disclosures, embedded-emissions calculations, and Annex IV §1.2 output. Unlock the CBAM module to begin.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Build your verifier-ready Carbon Border Adjustment Mechanism report: installation disclosures, embedded-emissions calculations, and Annex IV §1.2 output. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-brand)', color: '#0d0d0d' }}>
                 Unlock CBAM →
               </button>
@@ -338,7 +338,7 @@ export default function CbamDisclosuresPage() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 2rem' }}>
       <div style={sectionHead}>CBAM installation disclosures</div>
       <div style={sectionSub}>
-        Annex IV §1.2 items (7)–(11) — the plant-characteristic disclosures — plus the process-completeness attestation. Every question has three states: Yes, No, and unanswered. Leave a question unanswered until you can answer it truthfully; an unanswered question is reported as <em>missing</em>, never as a declared “No”.
+        Annex IV §1.2 items (7)–(11), the plant-characteristic disclosures, plus the process-completeness attestation. Every question has three states: Yes, No, and unanswered. Leave a question unanswered until you can answer it truthfully; an unanswered question is reported as <em>missing</em>, never as a declared “No”.
       </div>
 
       {/* ── Installation + reporting-period selectors ── */}
@@ -352,7 +352,7 @@ export default function CbamDisclosuresPage() {
               style={cbamInputStyle}
             >
               {installations.map((i) => (
-                <option key={i.id} value={i.id}>{i.name} — {i.country}</option>
+                <option key={i.id} value={i.id}>{i.name}, {i.country}</option>
               ))}
             </select>
           </CbamField>
@@ -488,14 +488,14 @@ export default function CbamDisclosuresPage() {
           />
           <DisclosureQuestion
             question="produced from fossil sources"
-            hint="Annex IV §1.2 (11)(c). Both fossil and renewable may be Yes — a plant can generate from both."
+            hint="Annex IV §1.2 (11)(c). Both fossil and renewable may be Yes: a plant can generate from both."
             value={disc.elec_source_fossil}
             onChange={(v) => setField('elec_source_fossil', v)}
             disabled={disabled}
           />
           <DisclosureQuestion
             question="produced from renewable sources"
-            hint="Annex IV §1.2 (11)(c). Both fossil and renewable may be Yes — a plant can generate from both."
+            hint="Annex IV §1.2 (11)(c). Both fossil and renewable may be Yes: a plant can generate from both."
             value={disc.elec_source_renewable}
             onChange={(v) => setField('elec_source_renewable', v)}
             disabled={disabled}
@@ -511,16 +511,16 @@ export default function CbamDisclosuresPage() {
       </DisclosureQuestion>
       {subFlagsCleared && disc.electricity_produced_onsite === false && (
         <div style={{ marginTop: 10, background: '#FEF3E2', border: '0.5px solid #f5d9ad', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
-          The (11)(a)–(d) sub-answers were cleared because you answered “No” to on-site electricity generation — they no longer apply, and the database rejects a saved “No” that still carries them. Answer “Yes” again to re-enter them.
+          The (11)(a)–(d) sub-answers were cleared because you answered “No” to on-site electricity generation. They no longer apply, and the database rejects a saved “No” that still carries them. Answer “Yes” again to re-enter them.
         </div>
       )}
 
       {/* ── The attestation — visually distinct, NOT a DisclosureQuestion ── */}
       <div style={{ marginTop: '2.5rem', border: '1.5px solid var(--color-brand)', borderRadius: 12, padding: '1.5rem', background: 'var(--color-brand-wash)' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 8 }}>Declaration — legal weight</div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 8 }}>Declaration: legal weight</div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 10 }}>Process-set completeness attestation</div>
         <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, fontWeight: 400, marginBottom: '1rem' }}>
-          This is a declaration, not a factual disclosure. Attesting that the process set is complete is an assertion — under the reasonable-assurance standard — that the production processes recorded for <strong>this installation and reporting period</strong> are the complete set. It gates §1.2 items 5 and 6 (installation-level total direct and indirect emissions): <strong>those totals cannot be reported without this attestation</strong>, because a partial sum must never be presented as an installation-level total. It is unset until you act — never pre-selected.
+          This is a declaration, not a factual disclosure. Attesting that the process set is complete is an assertion (under the reasonable-assurance standard) that the production processes recorded for <strong>this installation and reporting period</strong> are the complete set. It gates §1.2 items 5 and 6 (installation-level total direct and indirect emissions): <strong>those totals cannot be reported without this attestation</strong>, because a partial sum must never be presented as an installation-level total. It is unset until you act, never pre-selected.
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
@@ -545,7 +545,7 @@ export default function CbamDisclosuresPage() {
               onClick={() => setProcessesComplete(null)}
               disabled={disabled}
               style={{ fontSize: 12, padding: '8px 14px', borderRadius: 8, background: 'transparent', color: 'var(--color-ink-muted)', border: '0.5px solid #e8e7e4', cursor: disabled ? 'not-allowed' : 'pointer' }}
-              title="Retract to unanswered — the declaration timestamp is cleared server-side on save"
+              title="Retract to unanswered: the declaration timestamp is cleared server-side on save"
             >
               Clear
             </button>
@@ -553,11 +553,11 @@ export default function CbamDisclosuresPage() {
         </div>
         <div style={{ marginTop: 12, fontSize: 11, color: 'var(--color-ink-muted)' }}>
           {disc.processes_complete === null && 'Not yet declared.'}
-          {disc.processes_complete === false && 'Declared incomplete — installation-level totals (items 5 and 6) will not be reported.'}
+          {disc.processes_complete === false && 'Declared incomplete: installation-level totals (items 5 and 6) will not be reported.'}
           {disc.processes_complete === true && (
             declaredAt
               ? `Declared complete. Attested at ${new Date(declaredAt).toLocaleString()} (server timestamp).`
-              : 'Declared complete — the attestation timestamp is stamped by the server when you save.'
+              : 'Declared complete: the attestation timestamp is stamped by the server when you save.'
           )}
         </div>
       </div>

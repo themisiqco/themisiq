@@ -195,7 +195,7 @@ export default function SurveyRespondents() {
     setSaving(false)
     if (error) { setAddError(error.message); return }
     if (!data) {
-      setAddError('The respondent was not added. No row was returned and no error was given — nothing was saved. Reload before trying again.')
+      setAddError('The respondent was not added. No row was returned and no error was given. Nothing was saved. Reload before trying again.')
       return
     }
     setName(''); setEmail(''); setCategory('')
@@ -213,7 +213,7 @@ export default function SurveyRespondents() {
 
     if (error) { setRowError(prev => ({ ...prev, [r.id]: error.message })); return }
     if (!data || data.length === 0) {
-      setRowError(prev => ({ ...prev, [r.id]: 'Nothing was updated — reload and try again.' }))
+      setRowError(prev => ({ ...prev, [r.id]: 'Nothing was updated. Reload and try again.' }))
       return
     }
     load()
@@ -279,7 +279,7 @@ export default function SurveyRespondents() {
             read the setup screen meets it for the first time on this one. */}
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1.1rem 1.35rem', margin: '18px 0', fontSize: 13, color: '#555553', lineHeight: 1.75 }}>
           <strong style={{ color: '#0d0d0d' }}>The category determines which questions each person sees.</strong>{' '}
-          Employees and supplier contacts are asked about workforce conditions — their own — while
+          Employees and supplier contacts are asked about workforce conditions (their own), while
           customers, regulators and community representatives are not, because they cannot observe
           either workforce.
           <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-ink-muted)' }}>
@@ -332,7 +332,7 @@ export default function SurveyRespondents() {
               <option value="">Choose a category…</option>
               {offered.map(c => (
                 <option key={c.code} value={c.code}>
-                  {c.label}{!c.typically_surveyed ? ' — not usually surveyed' : ''}
+                  {c.label}{!c.typically_surveyed ? ': not usually surveyed' : ''}
                 </option>
               ))}
             </select>
@@ -350,13 +350,13 @@ export default function SurveyRespondents() {
               A <strong>{chosen.label.toLowerCase()}</strong> will be asked{' '}
               <strong style={{ color: '#0d0d0d' }}>{questionsFor(chosen.labour_routing)}</strong> questions
               {chosen.labour_routing === 'not_asked' ? (
-                <> — the workforce topics are left out, because they cannot observe either workforce.
+                <>: the workforce topics are left out, because they cannot observe either workforce.
                 Their answers are not counted as “no view” on those topics; they are recorded as
                 never asked.</>
               ) : chosen.labour_routing === 's1' ? (
-                <> — including the workforce topics, about <strong>your own</strong> workforce.</>
+                <>: including the workforce topics, about <strong>your own</strong> workforce.</>
               ) : (
-                <> — including the workforce topics, about <strong>their own</strong> organisation’s
+                <>: including the workforce topics, about <strong>their own</strong> organisation’s
                 workforce, not yours.</>
               )}
               {chosen.answers_as === 'organisation' && (

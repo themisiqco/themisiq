@@ -291,7 +291,7 @@ export default function Dashboard() {
                 Welcome to ThemisIQ!
               </div>
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)' }}>
-                Start by checking which compliance requirements apply to your company — it takes 2 minutes.
+                Start by checking which compliance requirements apply to your company. It takes 2 minutes.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>

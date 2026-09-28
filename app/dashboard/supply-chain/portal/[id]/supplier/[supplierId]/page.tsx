@@ -96,7 +96,7 @@ export default function SupplierResponseViewer() {
 
   const exportCSV = () => {
     const rows = [
-      ['ThemisIQ — Supplier Sustainability Response'],
+      ['ThemisIQ: Supplier Sustainability Response'],
       ['Supplier', supplier?.supplier_name],
       ['Email', supplier?.supplier_email],
       ['Status', supplier?.status],

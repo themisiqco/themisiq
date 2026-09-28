@@ -730,7 +730,7 @@ describe('the trends page renders a DISTINCT output for each state', () => {
     expect(trendsSrc.length, `${TRENDS} looks empty`).toBeGreaterThan(10_000)
     expect(trendsSrc).toContain("from '../../../../lib/ghg/factorEditions'")
     // The pre-existing GWP span is still there — this change sits beside it, it does not replace it.
-    expect(trendsSrc).toContain('Mixed GWP basis — comparison may not be valid')
+    expect(trendsSrc).toContain('Mixed GWP basis: comparison may not be valid')
   })
 })
 

@@ -282,7 +282,7 @@ export default function CbamReportPage() {
           <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>CBAM is a paid module.</div>
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Generate the verifier-ready Annex IV §1.2 summary emissions report — with every field shown as a value, a reasoned N/A, or an outstanding to-do. Unlock the CBAM module to begin.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Generate the verifier-ready Annex IV §1.2 summary emissions report, with every field shown as a value, a reasoned N/A, or an outstanding to-do. Unlock the CBAM module to begin.</div>
               <button onClick={() => (window.location.href = '/pricing')} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--color-brand)', color: '#0d0d0d' }}>
                 Unlock CBAM →
               </button>
@@ -329,7 +329,7 @@ export default function CbamReportPage() {
               style={cbamInputStyle}
             >
               {installations.map((i) => (
-                <option key={i.id} value={i.id}>{i.name} — {i.country}</option>
+                <option key={i.id} value={i.id}>{i.name}, {i.country}</option>
               ))}
             </select>
           </CbamField>
@@ -421,7 +421,7 @@ export default function CbamReportPage() {
                   {procs.map((p) => (
                     <div key={p.processId} style={{ fontSize: 13, color: '#0d0d0d' }}>
                       <span style={{ fontWeight: 500 }}>{p.processId}</span>
-                      <span style={{ color: '#555553' }}> — route {p.route ?? '(none)'} · goods {p.goods.length ? p.goods.join(', ') : '(none)'}</span>
+                      <span style={{ color: '#555553' }}>, route {p.route ?? '(none)'} · goods {p.goods.length ? p.goods.join(', ') : '(none)'}</span>
                     </div>
                   ))}
                 </div>
@@ -477,7 +477,7 @@ export default function CbamReportPage() {
             <Field label="(11)(d) Exported from a production process" field={report.item11_onsiteElectricity.exportedFromProcess} render={(v: boolean) => fmtBool(v)} />
           </ItemSection>
 
-          <ItemSection n="(12)" title="Precursors — default values used">
+          <ItemSection n="(12)" title="Precursors: default values used">
             {report.item12_defaultPrecursors
               ? (report.item12_defaultPrecursors.length === 0
                   ? <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No default-value precursors.</div>
@@ -492,7 +492,7 @@ export default function CbamReportPage() {
               : <AbsentPart2 what="Default-value precursors (item 12)" />}
           </ItemSection>
 
-          <ItemSection n="(13)" title="Precursors — actual values used">
+          <ItemSection n="(13)" title="Precursors: actual values used">
             {report.item13_actualPrecursors
               ? (report.item13_actualPrecursors.length === 0
                   ? <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No actual-value precursors.</div>
@@ -648,7 +648,7 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
         Generate a read-only link for your independent verifier. They&apos;ll see this installation&apos;s Annex IV &sect;1.2 summary and source documents for {reportingPeriod}, with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
       </p>
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.25rem' }}>
-        Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected &mdash; an accredited CBAM verifier is required to keep the evidence behind their report in their own working papers.
+        Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected. An accredited CBAM verifier is required to keep the evidence behind their report in their own working papers.
       </p>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -689,8 +689,8 @@ function Item4View({ g }: { g: Item4Good }) {
       </div>
       <Field label="(4)(a) Specific direct" field={g.specificDirect} render={(v: number) => fmtNum(v)} />
       <Field label="(4)(b) Default-value share (direct)" field={g.defaultShareDirect} render={(v: number) => fmtNum(v)} />
-      <Field label="(4)(c) Indirect — actual-value share" field={g.indirect.actualShare} render={(v: number) => fmtNum(v)} />
-      <Field label="(4)(c) Indirect — default-value share" field={g.indirect.defaultShare} render={(v: number) => fmtNum(v)} />
+      <Field label="(4)(c) Indirect: actual-value share" field={g.indirect.actualShare} render={(v: number) => fmtNum(v)} />
+      <Field label="(4)(c) Indirect: default-value share" field={g.indirect.defaultShare} render={(v: number) => fmtNum(v)} />
       <Field label="(4)(c) Actual-value criteria confirmed" field={g.indirect.criteriaConfirmation} render={(v: boolean) => fmtBool(v)} />
       <Field label="(4)(c) Specific indirect" field={g.indirect.specificIndirect} render={(v: number) => fmtNum(v)} />
       <Field label="(4)(d) Imported electricity" field={g.importedElectricity} />
@@ -705,7 +705,7 @@ function Item5View({ item5 }: { item5: Item5TotalDirect }) {
   return (
     <div>
       {item5.perProcess.map((p, i) => (
-        <Field key={p.processId + i} label={`(5) Process ${p.processId} — total direct`} field={p.totalDirect} render={(v: number) => fmtNum(v)} />
+        <Field key={p.processId + i} label={`(5) Process ${p.processId}: total direct`} field={p.totalDirect} render={(v: number) => fmtNum(v)} />
       ))}
       <Field label="(5) Installation-level total direct" field={item5.installationTotal} render={(v: number) => fmtNum(v)} />
     </div>
@@ -744,7 +744,7 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
     <div style={{ marginTop: '1.5rem' }}>
       {outstandingCount === 0 ? (
         <div style={{ background: '#E1F5EE', border: '0.5px solid #b8e6d5', borderRadius: 12, padding: '1rem 1.25rem' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#0F6E56' }}>✓ {suppliedCount} of {requiredCount} supplied — nothing outstanding.</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#0F6E56' }}>✓ {suppliedCount} of {requiredCount} supplied, nothing outstanding.</div>
         </div>
       ) : (
         <div style={{ background: '#fff', border: '1.5px solid #f5d9ad', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
@@ -777,7 +777,7 @@ function MissingChecklist({ completeness }: { completeness: CompletenessResult }
           {regulatorLimits.length > 0 && (
             <>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555553', marginBottom: 4 }}>Unresolved in the regulation</div>
-              <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>The instrument does not settle these. They are recorded rather than assumed — no classification or value has been inferred.</div>
+              <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '0.75rem' }}>The instrument does not settle these. They are recorded rather than assumed. No classification or value has been inferred.</div>
               <div>{regulatorLimits.map(limitRow)}</div>
             </>
           )}
@@ -832,7 +832,7 @@ function ErrorPanel({ err }: { err: ErrState }) {
   if (err.status === 409) {
     return (
       <div style={{ marginTop: '1.5rem', background: '#FEE2E2', border: '1.5px solid #ef4444', borderRadius: 12, padding: '1.25rem 1.5rem' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#991b1b', marginBottom: 6 }}>Stale record — conflict (409)</div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#991b1b', marginBottom: 6 }}>Stale record: conflict (409)</div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#0d0d0d', marginBottom: 8 }}>A stored figure disagrees with a fresh recomputation</div>
         <div style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.6, marginBottom: 10, whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{err.message}</div>
         <div style={{ fontSize: 13, color: '#991b1b', lineHeight: 1.6, fontWeight: 500 }}>

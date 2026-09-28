@@ -252,7 +252,7 @@ export default function TrendsPage() {
 
       {!loading && result && !result.error && result.series.length === 0 && (
         <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1.5rem', color: '#555553', fontSize: 14 }}>
-          No inventories yet — <a href="/dashboard/ghg?view=list" style={{ color: 'var(--color-brand)', fontWeight: 600, textDecoration: 'none' }}>create a GHG inventory</a> to see trends.
+          No inventories yet: <a href="/dashboard/ghg?view=list" style={{ color: 'var(--color-brand)', fontWeight: 600, textDecoration: 'none' }}>create a GHG inventory</a> to see trends.
         </div>
       )}
 
@@ -282,13 +282,13 @@ export default function TrendsPage() {
             <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>
               Baseline year {selected.baselineYear}
               {!selected.baselineUsable && (
-                <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}> — not usable, so no year is shown as a change against it</span>
+                <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>: not usable, so no year is shown as a change against it</span>
               )}
               {' · '}
               {selected.gwpConsistent ? (
                 <span>GWP basis: {gwpVersion}</span>
               ) : (
-                <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>Mixed GWP basis — comparison may not be valid</span>
+                <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>Mixed GWP basis: comparison may not be valid</span>
               )}
               {/* Factor editions — the SHORT label only. The full sentence is the panel below; this
                   strip is 12px muted text and the changed disclosure runs to 233 characters. Both
@@ -326,7 +326,7 @@ export default function TrendsPage() {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>
                   {latest.scope12Total == null
-                    ? `${latest.year} can't be shown — see below`
+                    ? `${latest.year} can't be shown: see below`
                     : `tCO₂e · Scope 1+2 · ${latest.year}`}
                 </div>
               </div>
@@ -401,7 +401,7 @@ export default function TrendsPage() {
                 </div>
               ))}
               <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 6 }}>
-                The gap is deliberate — the line is not drawn across it, because we have no figure for
+                The gap is deliberate: the line is not drawn across it, because we have no figure for
                 {brokenYears.length === 1 ? ' that year' : ' those years'} to draw to.
               </div>
             </div>
@@ -432,7 +432,7 @@ export default function TrendsPage() {
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Science-based targets</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 400, color: '#0d0d0d', lineHeight: 1.25, marginBottom: 8 }}>You&rsquo;ve mapped your emissions. Now set your targets.</div>
               <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.6, marginBottom: 16, maxWidth: 620 }}>
-                Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0 — your baseline is already here. Your target pathway will appear on this chart.
+                Set near-term and net-zero targets under the SBTi Corporate Net-Zero Standard V2.0. Your baseline is already here. Your target pathway will appear on this chart.
               </p>
               {/* Carry the selected company to SBTi (highest-precedence selection) so it binds to
                   THIS company, not the alphabetical-first. `selected` is guaranteed non-null here. */}
@@ -454,7 +454,7 @@ export default function TrendsPage() {
                 </ResponsiveContainer>
               </div>
               <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4, lineHeight: 1.6 }}>
-                Intensity — tCO₂e per $M revenue. Falling intensity with rising revenue shows real decoupling.
+                Intensity: tCO₂e per $M revenue. Falling intensity with rising revenue shows real decoupling.
               </p>
             </div>
           )}
@@ -535,8 +535,8 @@ export default function TrendsPage() {
                 </div>
                 <p style={{ marginTop: 8, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>
                   {monthly.measuredMonths} month{monthly.measuredMonths === 1 ? '' : 's'} with utility-bill data ·{' '}
-                  {monthly.totalTco2e.toLocaleString()} tCO₂e total. Months without dated bills are omitted —
-                  this is a partial, concierge-sourced view; the yearly chart above is authoritative.
+                  {monthly.totalTco2e.toLocaleString()} tCO₂e total. Months without dated bills are omitted.
+                  This is a partial, concierge-sourced view; the yearly chart above is authoritative.
                 </p>
               </>
             )}

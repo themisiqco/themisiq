@@ -127,7 +127,7 @@ export default function WorksheetIndex() {
 
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>Impact worksheet</div>
         <div style={{ fontSize: 13, color: MID, marginTop: 6, marginBottom: 22, lineHeight: 1.8, maxWidth: 700 }}>
-          Where your own severity determination is recorded, against ESRS 1 — how grave an impact is,
+          Where your own severity determination is recorded, against ESRS 1: how grave an impact is,
           how widespread, and how hard to put right. The stakeholder survey collects what other people
           think matters; this is the judgement your organisation makes, and it is the part an assurer
           reads as the assessment.
@@ -160,7 +160,7 @@ export default function WorksheetIndex() {
                   wizard was the only thing that inserted an assessment row, so a customer holding
                   the Materiality Assessment alone landed here with nothing to open and a link to a module
                   they had not bought. */}
-              An impact worksheet hangs off a materiality assessment. Create one to begin — three
+              An impact worksheet hangs off a materiality assessment. Create one to begin. Three
               questions: who you are reporting as, which ESRS version you report under, and the
               period it covers.
             </div>
@@ -201,7 +201,7 @@ export default function WorksheetIndex() {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
                     {r.contributors === 0 && r.assigned === 0 ? (
                       <span style={{ fontSize: 11.5, color: MUTE }}>
-                        No severity work started — nothing assigned, no contributors invited.
+                        No severity work started: nothing assigned, no contributors invited.
                       </span>
                     ) : (
                       <>

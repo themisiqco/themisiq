@@ -75,7 +75,7 @@ const CARD: React.CSSProperties = {
 const STANDARD_VERSION_LABEL: Record<string, string> = {
   esrs_2023: 'ESRS (2023), as last amended by Del. Reg. (EU) 2025/1416',
   esrs_2023_reliefs: 'ESRS (2023) with the reliefs permitted by Del. Reg. C(2026) 5010',
-  esrs_2026: 'ESRS (2026) — Del. Reg. C(2026) 5010, applied in full',
+  esrs_2026: 'ESRS (2026): Del. Reg. C(2026) 5010, applied in full',
 }
 
 type Assessment = {
@@ -403,7 +403,7 @@ export default function WorksheetAssign() {
   const addContributor = async () => {
     setAddError(null)
     if (!newName.trim() && !newEmail.trim()) {
-      setAddError('A name or an email is needed — the report names the invitation this determination came from.')
+      setAddError('A name or an email is needed. The report names the invitation this determination came from.')
       return
     }
     setWorking(true)
@@ -607,7 +607,7 @@ export default function WorksheetAssign() {
     setLinkNote(linkedIds.length === 0
       ? 'Linked. The sub-topics below are now the ones that round asked about.'
       : 'Linked, and recorded alongside the round already there. Scope still comes from the '
-        + 'earliest one — the two have not been merged.')
+        + 'earliest one: the two have not been merged.')
     // ⚠️ THE EXISTING FETCH, RE-RUN. Scope, names, assignments and determinations all derive from
     // the link, so re-reading in one place is what keeps them consistent with each other.
     await load()
@@ -819,8 +819,8 @@ export default function WorksheetAssign() {
           <div style={{ ...CARD, background: FAIL_BG, borderColor: FAIL }}>
             <div style={{ fontSize: 13, color: INK, lineHeight: 1.8 }}>
               <strong>This assessment states no ESRS standard version, so nothing can be assigned.</strong>{' '}
-              Every sub-topic is identified by its code <em>and</em> its standard version — the two
-              together are what the database stores — so without a version there is no sub-topic to
+              Every sub-topic is identified by its code <em>and</em> its standard version (the two
+              together are what the database stores), so without a version there is no sub-topic to
               point at.{' '}
               {/* Until 22 Aug 2026 this sentence ended here, telling a customer to do something the
                   application gave them no way to do. */}
@@ -832,7 +832,7 @@ export default function WorksheetAssign() {
         ) : scopeSource === 'round' ? (
           <div style={{ background: BLUE_BG, border: `0.5px solid ${BLUE}`, borderRadius: 12,
                         padding: '12px 16px', marginBottom: 18, fontSize: 12.5, color: INK, lineHeight: 1.75 }}>
-            <strong>Scope is inherited from “{round?.name}”</strong> and is not chosen again here — the
+            <strong>Scope is inherited from “{round?.name}”</strong> and is not chosen again here: the
             {' '}{scope.length} sub-topics below are the ones that round asked about. Changing what is
             in scope is done on the round, so the survey and the assessment cannot come to disagree
             about what was assessed.
@@ -884,7 +884,7 @@ export default function WorksheetAssign() {
                               padding: '10px 14px', marginBottom: 14, fontSize: 12, color: INK,
                               lineHeight: 1.75 }}>
                   <strong>Scope comes from the first round linked here</strong>
-                  {round?.name ? ` — “${round.name}”.` : '.'} Linking another records it alongside;
+                  {round?.name ? `: “${round.name}”.` : '.'} Linking another records it alongside;
                   the two are not merged, and the sub-topics below stay the first round’s.
                   {linkedIds.length > 1 && ` ${linkedIds.length} rounds are linked.`}
                 </div>
@@ -907,8 +907,8 @@ export default function WorksheetAssign() {
 
               {allRounds.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: MUTE, lineHeight: 1.8 }}>
-                  You have not created a survey round yet. An assessment does not need one — the
-                  list below is then every sub-topic for this standard version — but a round is what
+                  You have not created a survey round yet. An assessment does not need one (the
+                  list below is then every sub-topic for this standard version), but a round is what
                   brings stakeholder answers into it.{' '}
                   <Link href="/dashboard/materiality/survey" style={{ color: BRAND }}>Surveys</Link>
                 </div>
@@ -979,7 +979,7 @@ export default function WorksheetAssign() {
                               )
                             ) : (
                               <>Recorded on this assessment, but not where the sub-topics below come
-                              from — that is the first round linked. Nothing has been drawn from
+                              from. That is the first round linked. Nothing has been drawn from
                               this one.</>
                             )
                           ) : !closed ? (
@@ -1023,7 +1023,7 @@ export default function WorksheetAssign() {
           <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 16 }}>
             An HR director assessing workplace severity is more defensible than one person assessing
             everything. Each sub-topic has exactly one assignee, and their determination is the one
-            that stands — you can supersede it later, with a reason that appears in the report.
+            that stands. You can supersede it later, with a reason that appears in the report.
           </div>
 
           {live.length === 0 && (
@@ -1061,7 +1061,7 @@ export default function WorksheetAssign() {
                       {a.invited_at
                         ? <>Invited {fmt(a.invited_at)}
                             {a.reminder_sent_at && <> · reminded {fmt(a.reminder_sent_at)}</>}</>
-                        : <>Added {fmt(a.created_at)} — <strong>not yet invited</strong></>}
+                        : <>Added {fmt(a.created_at)}, <strong>not yet invited</strong></>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1115,7 +1115,7 @@ export default function WorksheetAssign() {
                         Access withdrawn {fmt(a.revoked_at)}.{' '}
                         {rows > 0
                           ? <><strong>{rows} {rows === 1 ? 'determination remains' : 'determinations remain'} attributed to them</strong>{' '}
-                              and {rows === 1 ? 'is' : 'are'} unaffected — what was withdrawn is the access, not the judgement.</>
+                              and {rows === 1 ? 'is' : 'are'} unaffected: what was withdrawn is the access, not the judgement.</>
                           : <>They had made no determinations.</>}
                       </div>
                     </div>
@@ -1154,7 +1154,7 @@ export default function WorksheetAssign() {
                         borderRadius: 10, padding: '12px 14px', fontSize: 12, color: MID, lineHeight: 1.75 }}>
             <strong style={{ color: INK }}>Divide the sub-topics before you invite anyone.</strong>{' '}
             An invitation names how many topics the colleague has been asked to judge, and their
-            screen shows exactly those — so Send stays closed until they have some. Nothing is sent
+            screen shows exactly those, so Send stays closed until they have some. Nothing is sent
             when you add a colleague; the invitation goes only when you send it, and this list says
             who has had one.
           </div>
@@ -1167,7 +1167,7 @@ export default function WorksheetAssign() {
               Divide the sub-topics
             </div>
             <div style={{ fontSize: 12.5, color: MID, lineHeight: 1.8, marginBottom: 6 }}>
-              Grouped by ESRS topic. The grouping is ordering only — assignment is always per
+              Grouped by ESRS topic. The grouping is ordering only: assignment is always per
               sub-topic, and anything left unassigned is yours to determine.
             </div>
 
@@ -1197,7 +1197,7 @@ export default function WorksheetAssign() {
                 Everything else went through.
                 <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
                   {rowErrors.map((e, i) => (
-                    <div key={i}><strong>{e.code}</strong> — {e.message}</div>
+                    <div key={i}><strong>{e.code}</strong>: {e.message}</div>
                   ))}
                 </div>
               </div>
@@ -1439,7 +1439,7 @@ export default function WorksheetAssign() {
             Their link stops working. {(rowsBy[confirmRevoke.id] ?? 0) > 0 ? (
               <><strong>The {rowsBy[confirmRevoke.id]} {rowsBy[confirmRevoke.id] === 1 ? 'determination' : 'determinations'} already
               attributed to them {rowsBy[confirmRevoke.id] === 1 ? 'stays' : 'stay'}</strong>, unchanged and still
-              theirs — what is withdrawn is the access, not the judgement. They remain listed, with
+              theirs: what is withdrawn is the access, not the judgement. They remain listed, with
               the date, so the report can say who determined what.</>
             ) : (
               <>They have made no determinations. They remain listed with the date.</>

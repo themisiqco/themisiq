@@ -107,7 +107,7 @@ export default function NewAssessmentPage() {
         New materiality assessment
       </div>
       <div style={{ fontSize: 13, color: MID, marginTop: 6, marginBottom: 24, lineHeight: 1.8 }}>
-        Three questions. Everything else — scope, contributors, the survey — follows from these.
+        Three questions. Everything else (scope, contributors, the survey) follows from these.
       </div>
       <div style={{ background: '#fff', border: `0.5px solid ${LINE}`, borderRadius: 16, padding: '1.75rem' }}>
         <AssessmentForm
@@ -118,7 +118,7 @@ export default function NewAssessmentPage() {
       </div>
       <div style={{ fontSize: 11.5, color: MUTE, marginTop: 14, lineHeight: 1.7 }}>
         This creates the assessment only. It does not run the Climate Risk screening, and does not
-        need to — the two are separate modules producing separate documents.
+        need to. The two are separate modules producing separate documents.
       </div>
     </Shell>
   )

@@ -201,6 +201,49 @@ export function renderedDashes(file: string): number {
  * from is shared: lib/sb253 (3) with eight other pages, lib/nis2 (3) with /cyber, lib/ifrsS2 (1) with
  * /climate-risk. Those three stay listed for the shared-lib group.
  *
+ * ⚠️ THE DASHBOARDS, 28 Sep 2026: 533 dashes swept across 34 screens, and 25 budget lines deleted.
+ * 34 are left, and NONE of them is prose anybody has yet to get to:
+ *   · app/dashboard/cbam/report/exportXlsx.ts (10) writes XLSX cells. Exports group, unread here.
+ *   · SIX SIT IN A CSS COMMENT inside a print-<style> template literal: climate-risk/report (2),
+ *     materiality/report (2), deals/report (2) — the same page-break comment, copied three times. The
+ *     parser counts them because a template literal is text, and it is right to: it cannot know that
+ *     a CSS comment inside a <style> reaches nobody. They are budgeted rather than exempted so the
+ *     decision stays visible; an exemption would need its own assertion, and nobody has argued for one.
+ *   · ONE IS PROSE AND STAYS ANYWAY: the coverage-resolution note at app/dashboard/ghg/page.tsx:3433.
+ *     It is PERSISTED in coverage_resolutions and reprinted to verifiers through rowNoteOf on
+ *     /verify/[token], and every resolution already recorded carries the dash. Sweeping the generator
+ *     would put both forms into one audit trail while changing no stored record. applyResolutions
+ *     reads straddleChoice and the dates, never the note, so nothing about the figure depends on it.
+ *   · EIGHTEEN ARE NOT SENTENCE PUNCTUATION, so none of the four patterns applies. In each the dash
+ *     has no space before it INSIDE ITS OWN LITERAL, which is what tells them apart mechanically:
+ *       an empty-value glyph carrying a label — '— not answered', '— could not judge',
+ *         '— mt Scope 2', '— excluded from all totals' (ghg 2, determinations 4, results 1)
+ *       a placeholder bracketed by two dashes — '— none (unevidenced) —', '— not set —'
+ *         (cbam/setup 2, respondents/import 2)
+ *       an ornament prefixing a byline or a button — '— {contributor}', '— {label}',
+ *         '— {NO_VISIBILITY_LABEL}' (determinations 2, results 1)
+ *       a qualifier whose spacing comes from a SIBLING node, so the punctuation cannot be written into
+ *         this literal at all (people 2, worksheet/[id] 1, results 1)
+ *     The first two want the Not provided / Not applicable vocabulary in lib/ghg/workingsCells.ts, and
+ *     the operator cell has to keep agreeing with the verifier cell beside it, so they are a vocabulary
+ *     commit and not a punctuation one.
+ *
+ * ⚠️ WHAT THE DASHBOARD GROUP HAD TO PROVE, and it is not what the AST check proves. Three strings
+ * reached logic through an indirection no syntactic test sees:
+ *   · app/dashboard/ai-governance/page.tsx builds `${name} ${purpose} ${decision_type}`.toLowerCase()
+ *     at :133 and keyword-matches it for the AI Act risk level. 14 library entries' classifier text
+ *     changed; all 51 keywords were re-tested across all 34 entries and NO classification moved.
+ *   · app/dashboard/supply-chain/page.tsx pushes the COUNTRY_RISK / SECTOR_RISK labels into
+ *     risk_factors, which IS written to supply_chain_registers — but :191 says those four fields are
+ *     recomputed on load, never read, so the stored copy is not an input. Display and the CSV only.
+ *   · the 46 risk labels take a BRACKETED qualifier, not a colon, because their consumer already
+ *     prefixes one: `Country risk: ${label}` would read "Country risk: Critical: labour rights, safety".
+ *     "Critical (labour rights, safety)" composes. The same form is used for the '— required' and
+ *     '— optional' field markers that follow a question mark, where a colon is ungrammatical.
+ * A colon can also move a FIRST-COLON SPLIT. The only two consumers in the tree read
+ * CANONICAL_S211 — CANADA_S211_JURISDICTION_CAVEAT, already colon-first and pinned by its own test —
+ * so nothing in this group feeds one. Check again before introducing a colon into shared copy.
+ *
  * ⚠️ THE SHARED lib/ COPY WENT NEXT, 27 Sep 2026: 73 dashes across 22 modules, and 19 budget lines with
  * them. What is left in lib/ is there for a reason, not for want of a sweep:
  *   · THREE MODULES KEPT A DASH THE SWEEP HAD ALREADY TAKEN, and were put back the same day. Reachability
@@ -283,42 +326,17 @@ const SWEEP_BUDGET: Record<string, number> = {
   //   · ONE IS AN ADMIN API ERROR WITH NO UI CALLER: /api/admin/create-invoice is fetched from nowhere in
   //     app/ or lib/ — it is called directly — so its 400 message is read in a terminal, not a browser.
   'app/api/admin/create-invoice/route.ts': 1,
-  'app/dashboard/ai-governance/page.tsx': 21,
-  'app/dashboard/cbam/disclosures/page.tsx': 14,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
-  'app/dashboard/cbam/report/page.tsx': 12,
-  'app/dashboard/cbam/setup/page.tsx': 81,
-  'app/dashboard/climate-risk/page.tsx': 35,
-  'app/dashboard/climate-risk/report/page.tsx': 16,
-  'app/dashboard/cyber/page.tsx': 6,
+  'app/dashboard/cbam/setup/page.tsx': 2,
+  'app/dashboard/climate-risk/report/page.tsx': 2,
   'app/dashboard/deals/report/page.tsx': 2,
-  'app/dashboard/ghg/page.tsx': 111,
-  'app/dashboard/ghg/trends/page.tsx': 8,
-  'app/dashboard/materiality/assessment/AssessmentForm.tsx': 12,
-  'app/dashboard/materiality/assessment/new/page.tsx': 3,
-  'app/dashboard/materiality/report/page.tsx': 27,
-  'app/dashboard/materiality/survey/[id]/page.tsx': 4,
-  'app/dashboard/materiality/survey/[id]/respondents/import/page.tsx': 12,
-  'app/dashboard/materiality/survey/[id]/respondents/page.tsx': 8,
-  'app/dashboard/materiality/survey/[id]/respondents/template/route.ts': 1,
-  'app/dashboard/materiality/survey/[id]/results/page.tsx': 25,
-  'app/dashboard/materiality/survey/[id]/scope/page.tsx': 4,
-  'app/dashboard/materiality/survey/page.tsx': 8,
-  'app/dashboard/materiality/worksheet/[id]/determinations/page.tsx': 14,
-  'app/dashboard/materiality/worksheet/[id]/determine/page.tsx': 11,
-  'app/dashboard/materiality/worksheet/[id]/iro-1/page.tsx': 2,
-  'app/dashboard/materiality/worksheet/[id]/page.tsx': 18,
-  'app/dashboard/materiality/worksheet/[id]/register/page.tsx': 1,
-  'app/dashboard/materiality/worksheet/page.tsx': 3,
-  'app/dashboard/page.tsx': 1,
-  'app/dashboard/people/page.tsx': 13,
-  'app/dashboard/reports/page.tsx': 1,
-  'app/dashboard/sbti/page.tsx': 12,
-  'app/dashboard/stakeholder/[id]/report/page.tsx': 4,
-  'app/dashboard/supply-chain/page.tsx': 63,
-  'app/dashboard/supply-chain/portal/[id]/page.tsx': 2,
-  'app/dashboard/supply-chain/portal/[id]/supplier/[supplierId]/page.tsx': 1,
-  'app/dashboard/supply-chain/portal/page.tsx': 1,
+  'app/dashboard/ghg/page.tsx': 3,
+  'app/dashboard/materiality/report/page.tsx': 2,
+  'app/dashboard/materiality/survey/[id]/respondents/import/page.tsx': 2,
+  'app/dashboard/materiality/survey/[id]/results/page.tsx': 3,
+  'app/dashboard/materiality/worksheet/[id]/determinations/page.tsx': 6,
+  'app/dashboard/materiality/worksheet/[id]/page.tsx': 1,
+  'app/dashboard/people/page.tsx': 2,
   'app/deals/[token]/page.tsx': 6,
   'app/impact/[token]/page.tsx': 11,
   'app/order/page.tsx': 1,

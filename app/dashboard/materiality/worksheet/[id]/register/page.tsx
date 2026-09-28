@@ -517,7 +517,7 @@ export default function WorksheetRegister() {
           <div style={{ background: FAIL_BG, border: `0.5px solid ${FAIL}`, borderRadius: 12,
                         padding: '12px 16px', marginBottom: 20, fontSize: 12.5, color: INK, lineHeight: 1.75 }}>
             <strong>The survey results could not be read.</strong> {aggError} Nothing below is
-            missing because respondents said nothing — this page could not get their answers at all.
+            missing because respondents said nothing. This page could not get their answers at all.
           </div>
         )}
 

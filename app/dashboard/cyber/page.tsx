@@ -239,11 +239,11 @@ export default function CyberDashboard() {
 
   const generateExport = () => {
     const rows = [
-      ['ThemisIQ — Cyber Governance Gap Assessment'],
+      ['ThemisIQ: Cyber Governance Gap Assessment'],
       ['Company', inventory.company],
       ['Reporting Year', inventory.reporting_year],
       ['Frameworks', inventory.frameworks.map(f => FRAMEWORK_CONFIG[f].label).join(', ')],
-      ['Overall Score', `${pct}% — ${scoreLabel}`],
+      ['Overall Score', `${pct}%, ${scoreLabel}`],
       [''],
       ['GAP ASSESSMENT RESULTS'],
       ['Control', 'Domain', 'Maturity', 'Gap', 'Priority'],
@@ -339,7 +339,7 @@ export default function CyberDashboard() {
   const renderStep1 = () => (
     <div>
       <h2 style={sectionHead}>Gap assessment</h2>
-      <p style={sectionSub}>Rate your current maturity for each control. Be honest — this is your gap assessment, not an audit.</p>
+      <p style={sectionSub}>Rate your current maturity for each control. Be honest. This is your gap assessment, not an audit.</p>
 
       {/* Domain tabs */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: '1.5rem', overflowX: 'auto' }}>
@@ -477,7 +477,7 @@ export default function CyberDashboard() {
   const renderStep3 = () => (
     <div>
       <h2 style={sectionHead}>Top 5 remediation priorities</h2>
-      <p style={sectionSub}>Based on your gap assessment, these are the highest-priority controls to implement first — ranked by regulatory impact and risk weight.</p>
+      <p style={sectionSub}>Based on your gap assessment, these are the highest-priority controls to implement first, ranked by regulatory impact and risk weight.</p>
 
       {top5.length === 0 ? (
         <div style={{ background: 'var(--color-accent-green-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-green) 20%, transparent)', borderRadius: 12, padding: '1.5rem', textAlign: 'center' }}>
@@ -529,7 +529,7 @@ export default function CyberDashboard() {
           reaching for and is what they now use. Pre-existing: git log shows c389415 touched this file for
           colour only. */}
       <div className="tq-summary" style={{ marginBottom: 20, display: 'block', padding: '20px 24px' }}>
-        <div style={{ textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Assessment summary — {inventory.company || 'Your company'}</div>
+        <div style={{ textTransform: 'uppercase', marginBottom: 12 }} className="tq-summary-label">Assessment summary: {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Overall score', val: `${pct}%`, urgent: pct < 50 },
@@ -603,7 +603,7 @@ export default function CyberDashboard() {
           {pct > 0 && (
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 2 }}>Overall score</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor }}>{pct}% — {scoreLabel}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor }}>{pct}%, {scoreLabel}</div>
             </div>
           )}
         </div>

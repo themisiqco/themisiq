@@ -430,7 +430,7 @@ export type FactorEditionState = 'consistent' | 'changed' | 'unknown'
 // constant and not a literal.
 //
 // ⚠️ TWO FIELDS BECAUSE THE STRIP CANNOT HOLD THE SENTENCE, AND NOTHING IS TRUNCATED.
-// The trends header line is 12px muted text currently holding "Mixed GWP basis — comparison may not
+// The trends header line is 12px muted text currently holding "Mixed GWP basis: comparison may not
 // be valid" (44 characters). The changed disclosure is 233, and shortening it would drop the
 // base-year recalculation prompt, which is the actionable half. So `label` goes inline beside the
 // GWP span and `detail` goes in an amber panel directly below the header, IN FULL.

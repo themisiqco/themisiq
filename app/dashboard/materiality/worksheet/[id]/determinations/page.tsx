@@ -105,8 +105,8 @@ const fmt = (d: string | null) =>
  */
 const RULE_TEXT: Record<string, string> = {
   mean: 'the average of the three',
-  override: 'escalated because one dimension was scored at the top band — the average alone was below the threshold',
-  max: 'social topic: the highest of the three, not the average (ESRS 1 ¶40 — severity takes precedence over likelihood)',
+  override: 'escalated because one dimension was scored at the top band: the average alone was below the threshold',
+  max: 'social topic: the highest of the three, not the average (ESRS 1 ¶40, severity takes precedence over likelihood)',
   subsumed_override:
     'social topic: the highest of the three (ESRS 1 ¶40). One dimension was scored at the top band; '
   + 'on this rule that changes nothing, because the maximum is already 4.',
@@ -410,8 +410,8 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
   if (!d || !d.nature) return (
     <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12,
                   fontSize: 12.5, color: MUTE, lineHeight: 1.7 }}>
-      <strong style={{ color: MID }}>{harm ? 'As a harm' : 'As a benefit'}</strong> — not determined
-      yet. {contributor === 'you' ? 'This one is yours — it is on your own determinations screen.' : `Waiting on ${contributor}.`}
+      <strong style={{ color: MID }}>{harm ? 'As a harm' : 'As a benefit'}</strong>: not determined
+      yet. {contributor === 'you' ? 'This one is yours: it is on your own determinations screen.' : `Waiting on ${contributor}.`}
     </div>
   )
 
@@ -454,7 +454,7 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
       {!sev.complete ? (
         <div style={{ background: AMBER_BG, border: `0.5px solid ${AMBER}`, borderRadius: 10,
                       padding: '11px 14px', fontSize: 12.5, color: INK, lineHeight: 1.8 }}>
-          <strong>No severity — this determination is incomplete.</strong>{' '}
+          <strong>No severity: this determination is incomplete.</strong>{' '}
           {sev.abstained.length > 0 && (
             <>Recorded as not enough visibility to judge: {sev.abstained.join(', ')}.{' '}</>
           )}
@@ -482,7 +482,7 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
 
       {d.likelihood !== null && (
         <div style={{ fontSize: 11.5, color: MUTE, marginTop: 6 }}>
-          Likelihood {d.likelihood} of 4 — recorded, and not folded into the figure above: the
+          Likelihood {d.likelihood} of 4, recorded, and not folded into the figure above: the
           weighting has not been set, so nothing is applied rather than a number being invented.
         </div>
       )}
@@ -536,7 +536,7 @@ function DeterminationRow({ dir, d, prior, category, contributor, onOverride }: 
         {d.evidence_in_view
           ? 'Made with the stakeholder survey results in view.'
           : d.assignment_id
-            ? `Made by ${contributor} without the survey results — contributors do not see them.`
+            ? `Made by ${contributor} without the survey results: contributors do not see them.`
             : 'Made without the survey results in view.'}
       </div>
 
@@ -728,7 +728,7 @@ function AssigneeChip({ a, name }: { a: Assignment | null; name: string }) {
       {/* ⚠️ ACCESS WITHDRAWN, NOT THE DETERMINATION. A reader who sees "revoked" beside a figure
           will otherwise assume the figure was retracted. */}
       {revoked && <span style={{ display: 'block', fontSize: 10.5 }}>
-        access withdrawn {fmt(a?.revoked_at ?? null)} — their determinations stand
+        access withdrawn {fmt(a?.revoked_at ?? null)}: their determinations stand
       </span>}
     </div>
   )

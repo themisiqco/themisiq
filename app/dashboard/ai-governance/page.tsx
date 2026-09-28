@@ -29,40 +29,40 @@ const HIGH_RISK_BOTH_DATES =
 // ─── AI System Library ────────────────────────────────────────────────────────
 
 const AI_SYSTEM_LIBRARY = [
-  { category: 'HR & Recruitment', name: 'CV / Resume Screening Tool', purpose: 'Automatically screens and ranks job applicants based on CV analysis', decision_type: 'Hiring decisions — shortlisting candidates for interview', eu_deployment: true, affects_individuals: true },
-  { category: 'HR & Recruitment', name: 'Candidate Ranking System', purpose: 'Ranks job candidates based on assessment scores and profile matching', decision_type: 'Hiring decisions — candidate prioritisation', eu_deployment: true, affects_individuals: true },
+  { category: 'HR & Recruitment', name: 'CV / Resume Screening Tool', purpose: 'Automatically screens and ranks job applicants based on CV analysis', decision_type: 'Hiring decisions: shortlisting candidates for interview', eu_deployment: true, affects_individuals: true },
+  { category: 'HR & Recruitment', name: 'Candidate Ranking System', purpose: 'Ranks job candidates based on assessment scores and profile matching', decision_type: 'Hiring decisions: candidate prioritisation', eu_deployment: true, affects_individuals: true },
   { category: 'HR & Recruitment', name: 'Performance Management System', purpose: 'Evaluates and scores employee performance using automated metrics', decision_type: 'Performance reviews, promotion and termination decisions', eu_deployment: true, affects_individuals: true },
   { category: 'HR & Recruitment', name: 'Task Allocation System', purpose: 'Automatically assigns tasks and workload to employees', decision_type: 'Work allocation and scheduling decisions', eu_deployment: true, affects_individuals: true },
   { category: 'HR & Recruitment', name: 'Employee Monitoring System', purpose: 'Monitors employee productivity, activity and behaviour', decision_type: 'Performance assessment and management decisions', eu_deployment: true, affects_individuals: true },
-  { category: 'HR & Recruitment', name: 'Workforce Planning Model', purpose: 'Predicts hiring needs and workforce composition', decision_type: 'Internal planning — no individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'HR & Recruitment', name: 'Workforce Planning Model', purpose: 'Predicts hiring needs and workforce composition', decision_type: 'Internal planning: no individual decisions', eu_deployment: true, affects_individuals: false },
   { category: 'Finance & Credit', name: 'Credit Scoring Model', purpose: 'Assesses creditworthiness of individuals or businesses', decision_type: 'Credit approval, loan decisions, interest rate setting', eu_deployment: true, affects_individuals: true },
   { category: 'Finance & Credit', name: 'Loan Approval System', purpose: 'Automates loan application assessment and approval', decision_type: 'Lending decisions affecting individuals', eu_deployment: true, affects_individuals: true },
   { category: 'Finance & Credit', name: 'Insurance Risk Assessment', purpose: 'Calculates insurance premiums and coverage eligibility', decision_type: 'Insurance pricing and coverage decisions', eu_deployment: true, affects_individuals: true },
   { category: 'Finance & Credit', name: 'Fraud Detection System', purpose: 'Detects potentially fraudulent transactions in real time', decision_type: 'Transaction blocking and account restriction decisions', eu_deployment: true, affects_individuals: true },
   { category: 'Finance & Credit', name: 'AML / KYC System', purpose: 'Screens customers for anti-money laundering and KYC compliance', decision_type: 'Customer onboarding and transaction monitoring decisions', eu_deployment: true, affects_individuals: true },
-  { category: 'Finance & Credit', name: 'Sales Forecasting Model', purpose: 'Predicts quarterly revenue based on pipeline and historical data', decision_type: 'Internal business planning — no individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Finance & Credit', name: 'Sales Forecasting Model', purpose: 'Predicts quarterly revenue based on pipeline and historical data', decision_type: 'Internal business planning: no individual decisions', eu_deployment: true, affects_individuals: false },
   { category: 'Finance & Credit', name: 'Algorithmic Trading System', purpose: 'Automatically executes trades based on market signals', decision_type: 'Investment and trading decisions', eu_deployment: true, affects_individuals: false },
   { category: 'Customer & Marketing', name: 'Customer Support Chatbot', purpose: 'Answers customer queries and resolves issues automatically', decision_type: 'Recommends solutions to customer service queries', eu_deployment: true, affects_individuals: true },
   { category: 'Customer & Marketing', name: 'Product Recommendation Engine', purpose: 'Recommends products or content based on user behaviour', decision_type: 'Product and content recommendations to individuals', eu_deployment: true, affects_individuals: true },
-  { category: 'Customer & Marketing', name: 'Sentiment Analysis Tool', purpose: 'Analyses customer sentiment from reviews and feedback', decision_type: 'Internal analytics — no direct individual decisions', eu_deployment: true, affects_individuals: false },
-  { category: 'Customer & Marketing', name: 'Lead Scoring Model', purpose: 'Scores sales leads by likelihood to convert', decision_type: 'Sales prioritisation — internal use only', eu_deployment: true, affects_individuals: false },
+  { category: 'Customer & Marketing', name: 'Sentiment Analysis Tool', purpose: 'Analyses customer sentiment from reviews and feedback', decision_type: 'Internal analytics: no direct individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Customer & Marketing', name: 'Lead Scoring Model', purpose: 'Scores sales leads by likelihood to convert', decision_type: 'Sales prioritisation: internal use only', eu_deployment: true, affects_individuals: false },
   { category: 'Customer & Marketing', name: 'Ad Targeting System', purpose: 'Targets advertising to individuals based on behavioural data', decision_type: 'Advertising decisions affecting individuals', eu_deployment: true, affects_individuals: true },
-  { category: 'Customer & Marketing', name: 'Churn Prediction Model', purpose: 'Predicts which customers are likely to cancel or leave', decision_type: 'Internal retention planning — no direct individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Customer & Marketing', name: 'Churn Prediction Model', purpose: 'Predicts which customers are likely to cancel or leave', decision_type: 'Internal retention planning: no direct individual decisions', eu_deployment: true, affects_individuals: false },
   { category: 'Customer & Marketing', name: 'Dynamic Pricing System', purpose: 'Adjusts prices in real time based on demand and user data', decision_type: 'Pricing decisions affecting individuals', eu_deployment: true, affects_individuals: true },
-  { category: 'Operations', name: 'Demand Forecasting Model', purpose: 'Predicts product demand for inventory and supply chain planning', decision_type: 'Internal supply chain planning — no individual decisions', eu_deployment: true, affects_individuals: false },
-  { category: 'Operations', name: 'Predictive Maintenance System', purpose: 'Predicts equipment failures before they occur', decision_type: 'Maintenance scheduling — no individual decisions', eu_deployment: true, affects_individuals: false },
-  { category: 'Operations', name: 'Quality Control System', purpose: 'Automatically detects product defects using computer vision', decision_type: 'Production quality decisions — no individual decisions', eu_deployment: true, affects_individuals: false },
-  { category: 'Operations', name: 'Route Optimisation System', purpose: 'Optimises delivery and logistics routes automatically', decision_type: 'Logistics planning — no individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Operations', name: 'Demand Forecasting Model', purpose: 'Predicts product demand for inventory and supply chain planning', decision_type: 'Internal supply chain planning: no individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Operations', name: 'Predictive Maintenance System', purpose: 'Predicts equipment failures before they occur', decision_type: 'Maintenance scheduling: no individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Operations', name: 'Quality Control System', purpose: 'Automatically detects product defects using computer vision', decision_type: 'Production quality decisions: no individual decisions', eu_deployment: true, affects_individuals: false },
+  { category: 'Operations', name: 'Route Optimisation System', purpose: 'Optimises delivery and logistics routes automatically', decision_type: 'Logistics planning: no individual decisions', eu_deployment: true, affects_individuals: false },
   { category: 'Healthcare & Education', name: 'Clinical Decision Support', purpose: 'Assists clinicians with diagnosis and treatment recommendations', decision_type: 'Clinical decisions affecting patients', eu_deployment: true, affects_individuals: true },
   { category: 'Healthcare & Education', name: 'Student Assessment System', purpose: 'Automatically grades or scores student work', decision_type: 'Educational assessment decisions affecting students', eu_deployment: true, affects_individuals: true },
   { category: 'Healthcare & Education', name: 'Admissions Screening Tool', purpose: 'Screens and ranks student applications for admission', decision_type: 'Educational admission decisions', eu_deployment: true, affects_individuals: true },
   { category: 'Healthcare & Education', name: 'Exam Monitoring System', purpose: 'Monitors students during online exams for suspicious behaviour', decision_type: 'Examination integrity decisions affecting students', eu_deployment: true, affects_individuals: true },
-  { category: 'Cybersecurity & IT', name: 'Intrusion Detection System', purpose: 'Detects and responds to cybersecurity threats automatically', decision_type: 'Security response — blocks access or isolates systems', eu_deployment: true, affects_individuals: false },
+  { category: 'Cybersecurity & IT', name: 'Intrusion Detection System', purpose: 'Detects and responds to cybersecurity threats automatically', decision_type: 'Security response: blocks access or isolates systems', eu_deployment: true, affects_individuals: false },
   { category: 'Cybersecurity & IT', name: 'Email Filtering System', purpose: 'Automatically filters spam and phishing emails', decision_type: 'Email delivery decisions', eu_deployment: true, affects_individuals: true },
   { category: 'Cybersecurity & IT', name: 'Access Control System', purpose: 'Grants or denies system access based on behaviour patterns', decision_type: 'Access decisions affecting individuals', eu_deployment: true, affects_individuals: true },
-  { category: 'General Purpose AI', name: 'Large Language Model (LLM)', purpose: 'General purpose AI for text generation, summarisation and analysis', decision_type: 'Varies — depends on use case and deployment context', eu_deployment: true, affects_individuals: false },
+  { category: 'General Purpose AI', name: 'Large Language Model (LLM)', purpose: 'General purpose AI for text generation, summarisation and analysis', decision_type: 'Varies: depends on use case and deployment context', eu_deployment: true, affects_individuals: false },
   { category: 'General Purpose AI', name: 'Image Recognition System', purpose: 'Identifies objects, faces or content in images', decision_type: 'Content moderation or identification decisions', eu_deployment: true, affects_individuals: true },
-  { category: 'General Purpose AI', name: 'Document Processing System', purpose: 'Automatically extracts and processes data from documents', decision_type: 'Data extraction — internal use only', eu_deployment: true, affects_individuals: false },
+  { category: 'General Purpose AI', name: 'Document Processing System', purpose: 'Automatically extracts and processes data from documents', decision_type: 'Data extraction: internal use only', eu_deployment: true, affects_individuals: false },
 ]
 
 const LIBRARY_CATEGORIES = [...new Set(AI_SYSTEM_LIBRARY.map(s => s.category))]
@@ -133,7 +133,7 @@ const classifySystem = (system: AISystem): { risk: RiskLevel; category: string; 
   const text = `${system.name} ${system.purpose} ${system.decision_type}`.toLowerCase()
 
   if (PROHIBITED_KEYWORDS.some(k => text.includes(k))) {
-    return { risk: 'prohibited', category: 'Prohibited AI Practice (Article 5)', requirements: ['IMMEDIATE: Discontinue or fundamentally redesign this system', 'Fines up to €35M or 7% global revenue', 'No grace period — prohibited since February 2, 2025'] }
+    return { risk: 'prohibited', category: 'Prohibited AI Practice (Article 5)', requirements: ['IMMEDIATE: Discontinue or fundamentally redesign this system', 'Fines up to €35M or 7% global revenue', 'No grace period: prohibited since February 2, 2025'] }
   }
 
   for (const cat of HIGH_RISK_CATEGORIES) {
@@ -289,7 +289,7 @@ export default function AIGovernanceDashboard() {
 
   const generateExport = () => {
     const rows = [
-      ['ThemisIQ — EU AI Act Inventory & Gap Assessment'],
+      ['ThemisIQ: EU AI Act Inventory & Gap Assessment'],
       ['Company', inventory.company],
       ['Reporting Year', inventory.reporting_year],
       ['Generated', new Date().toLocaleDateString()],
@@ -347,8 +347,8 @@ export default function AIGovernanceDashboard() {
         </div>
       </div>
       <div style={{ marginTop: 20, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>EU AI Act — global scope</div>
-        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>The EU AI Act applies to any organisation whose AI systems affect EU residents — regardless of where the company is based. A US company using CV screening for EU job applicants is in scope.</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4 }}>EU AI Act: global scope</div>
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>The EU AI Act applies to any organisation whose AI systems affect EU residents, regardless of where the company is based. A US company using CV screening for EU job applicants is in scope.</div>
       </div>
     </div>
   )
@@ -426,7 +426,7 @@ export default function AIGovernanceDashboard() {
               )
             })}
             {filteredLibrary.length === 0 && (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No systems found — try a different search or category</div>
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)', fontSize: 13 }}>No systems found: try a different search or category</div>
             )}
           </div>
           <div style={{ padding: '10px 16px', background: '#f8f7f5', borderTop: '0.5px solid #e8e7e4' }}>
@@ -521,7 +521,7 @@ export default function AIGovernanceDashboard() {
       <h2 style={sectionHead}>Risk classification</h2>
       <p style={sectionSub}>ThemisIQ has automatically classified each system under the EU AI Act. Review and confirm.</p>
       {inventory.systems.length === 0 ? (
-        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No systems added yet — go back to Step 2 to add your AI systems.</div>
+        <div style={{ background: '#f8f7f5', borderRadius: 12, padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>No systems added yet: go back to Step 2 to add your AI systems.</div>
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -610,7 +610,7 @@ export default function AIGovernanceDashboard() {
       <p style={sectionSub}>Your EU AI Act inventory and gap assessment is ready.</p>
       <div className="tq-summary" data-module="ai" style={{ marginBottom: 20 }}>
         <div style={{ flex: 1, padding: '20px 24px' }}>
-        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary — {inventory.company || 'Your company'}</div>
+        <div className="tq-summary-label" style={{ marginBottom: 12 }}>Inventory summary: {inventory.company || 'Your company'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           {[
             { label: 'Total systems', val: inventory.systems.length },

@@ -185,7 +185,7 @@ export function AssessmentForm({
         {versionUnavailable && values.version && (
           <div style={warn}>
             This assessment states {STANDARD_VERSION_COPY[values.version].l}, which is not yet
-            available in ThemisIQ — no sub-topics are held under it, which is why its worksheet
+            available in ThemisIQ: no sub-topics are held under it, which is why its worksheet
             opens with nothing in it. Choose a version that is available; nothing else on this form
             can be saved until you do.
           </div>
@@ -214,7 +214,7 @@ export function AssessmentForm({
             This assessment holds {versionLock.determinations} recorded
             determination{versionLock.determinations === 1 ? '' : 's'}, each keyed to the version
             above. Sub-topic codes differ in name, count and structure between versions, so changing
-            it would leave that work keyed to a taxonomy this assessment no longer uses — it would
+            it would leave that work keyed to a taxonomy this assessment no longer uses. It would
             not error, it would silently disappear from the worksheet.
 
             {/* ⚠️ AND THERE IS NO RECOVERY, WHICH IS A GAP WORTH SOMEONE FINDING.
@@ -236,7 +236,7 @@ export function AssessmentForm({
               <strong>What you can do.</strong> Create a new assessment stating the correct version,
               unlink the survey round from this one and link it to the new one, re-invite your
               contributors and record the determinations again. There is no way to move the existing
-              determinations across, and <strong>this assessment cannot be deleted</strong> — it will
+              determinations across, and <strong>this assessment cannot be deleted</strong>. It will
               stay in your list. If that is the situation you are in,{' '}
               {/* ⚠️ AN INSTRUCTION TO CONTACT US ON A SCREEN WITH NOTHING TO CONTACT IS NOT AN
                   INSTRUCTION. Same address as the board report's back cover
@@ -268,8 +268,7 @@ export function AssessmentForm({
             and the assessment cannot be finalised.
 
             <div style={{ marginTop: 10 }}>
-              <strong>What you can do.</strong> Set the version to {versionLabel(versionLock.to)} —
-              the one option offered above — which is what the recorded work already uses. Nothing is
+              <strong>What you can do.</strong> Set the version to {versionLabel(versionLock.to)} (the one option offered above), which is what the recorded work already uses. Nothing is
               re-entered and nothing is lost. No other version is offered, because moving to a third
               one would leave that work orphaned exactly as it is now.
             </div>
@@ -291,7 +290,7 @@ export function AssessmentForm({
             <strong>This one needs looking at, and not from here.</strong>{' '}
             {versionLock.carried.length > 0
               ? <>Its recorded determinations do not all use the same version of the ESRS
-                  standards — they carry {versionLock.carried.map(versionLabel).join(' and ')}. No
+                  standards. They carry {versionLock.carried.map(versionLabel).join(' and ')}. No
                   single version agrees with all of them.</>
               : <>The versions its recorded determinations use could not be established, so it is not
                   known whether they agree with this assessment.</>}
@@ -299,7 +298,7 @@ export function AssessmentForm({
             further.
 
             <div style={{ marginTop: 10 }}>
-              Nothing is lost — every determination is still stored.{' '}
+              Nothing is lost: every determination is still stored.{' '}
               <a href={`mailto:${CONTACT}?subject=Materiality%20assessment%20version%20mismatch`}
                  style={LINK_STYLE}>Email {CONTACT}</a>{' '}
               and include the address of this page, which identifies the assessment. Putting it right
@@ -319,7 +318,7 @@ export function AssessmentForm({
                 looking at on our side sends them to write an email about a transient error, and
                 leaves them believing something is wrong with work that is fine. */}
             <strong>This page could not read the recorded determinations.</strong>{' '}
-            Until it can, the ESRS version is not editable — changing it without knowing what work
+            Until it can, the ESRS version is not editable: changing it without knowing what work
             already exists is what this screen is here to prevent. Nothing is wrong as far as anyone
             can tell; the request did not complete. Reload the page. The other fields save normally.
           </div>
@@ -339,7 +338,7 @@ export function AssessmentForm({
             <strong>This assessment was finalised.</strong>{' '}
             Version {finalisedVersion} froze the disclosure requirements for the version recorded at
             the time. Change the version and that frozen copy describes a different standard than the
-            assessment now claims. Finalise again afterwards — the earlier version is kept alongside.
+            assessment now claims. Finalise again afterwards: the earlier version is kept alongside.
           </div>
         )}
       </div>
@@ -362,8 +361,7 @@ export function AssessmentForm({
             "Not stated" without them and the ESRS 2 IRO-1 prose has no period to describe — both
             honest, and both a worse document than one where the question was simply asked. */}
         <div style={hint}>
-          Enter the period as it actually runs. If your financial year is not the calendar year —
-          1 April 2026 to 31 March 2027, say — enter those dates. Which ESRS version applies depends
+          Enter the period as it actually runs. If your financial year is not the calendar year (1 April 2026 to 31 March 2027, say), enter those dates. Which ESRS version applies depends
           on the day it begins.
         </div>
         {halfFilled && (
@@ -383,7 +381,7 @@ export function AssessmentForm({
                 again is what re-pairs them. */}
             The report cover prints the reporting period and the finalisation date in the same table.
             Change the period now and version {finalisedVersion}&apos;s date will sit beside a period
-            it was not taken against — finalise again afterwards so the cover states one thing.
+            it was not taken against. Finalise again afterwards so the cover states one thing.
           </div>
         )}
       </div>

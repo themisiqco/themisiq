@@ -41,7 +41,7 @@ const SECTOR_LABEL: Record<string, string> = {
 // duplicated inline here; do not re-inline it.
 const JURISDICTION_LABEL: Record<string, string> = {
   eu_ets: 'EU (EU ETS)', cbam: 'EU CBAM exposure', uk_ets: 'UK (UK ETS)',
-  ca: 'Canada (federal pricing)', us_fed: 'US (federal)', us_ca: 'US — California cap-and-trade',
+  ca: 'Canada (federal pricing)', us_fed: 'US (federal)', us_ca: 'US: California cap-and-trade',
   cn: 'China (national ETS)', kr: 'South Korea (K-ETS)', jp: 'Japan',
   au: 'Australia (Safeguard)', nz: 'New Zealand (NZ ETS)', ch: 'Switzerland (CH ETS)',
 }
@@ -377,7 +377,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         {/* SCENARIO SELECTION & RATIONALE — credibility register 1 */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Scenario selection and rationale</H>
-          <p style={p}>Resilience is assessed across a fixed diverse trio of scenarios. The set is chosen to span a low-warming Paris-aligned future, a current-trajectory middle case, and a high-warming case — deliberately stressing both the transition channel (most acute under rapid decarbonisation) and the physical channel (most acute under high warming).</p>
+          <p style={p}>Resilience is assessed across a fixed diverse trio of scenarios. The set is chosen to span a low-warming Paris-aligned future, a current-trajectory middle case, and a high-warming case: deliberately stressing both the transition channel (most acute under rapid decarbonisation) and the physical channel (most acute under high warming).</p>
           <table style={tbl}>
             <thead><tr style={trh}><th style={th}>Role</th><th style={th}>Scenario</th><th style={th}>Warming</th><th style={th}>Source</th></tr></thead>
             <tbody>
@@ -418,13 +418,13 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
           <p style={p}>IFRS S2 permits climate-related scenario analysis to be refreshed on the entity&rsquo;s strategic planning cycle rather than annually. The resilience conclusion drawn from it must be reassessed and disclosed in every annual reporting period.</p>
           <h3 style={h3}>Frameworks</h3>
           <ul style={ul}>
-            <li style={li}><strong>IPCC AR6 WGI reference regions</strong> and <strong>climatic impact-drivers</strong> — the basis for physical-hazard exposure.</li>
-            <li style={li}><strong>TCFD transition risk categories</strong> — policy and legal, technology, market, and reputation.</li>
-            <li style={li}><strong>IPCC Shared Socioeconomic Pathways</strong> — SSP1-2.6, SSP2-4.5, SSP5-8.5 form the diverse trio.</li>
-            {isCsrd && <li style={li}><strong>ESRS E1</strong> — the resilience-of-business-model and anticipated-financial-effects requirements this analysis informs.</li>}
+            <li style={li}><strong>IPCC AR6 WGI reference regions</strong> and <strong>climatic impact-drivers</strong>: the basis for physical-hazard exposure.</li>
+            <li style={li}><strong>TCFD transition risk categories</strong>: policy and legal, technology, market, and reputation.</li>
+            <li style={li}><strong>IPCC Shared Socioeconomic Pathways</strong>: SSP1-2.6, SSP2-4.5, SSP5-8.5 form the diverse trio.</li>
+            {isCsrd && <li style={li}><strong>ESRS E1</strong>: the resilience-of-business-model and anticipated-financial-effects requirements this analysis informs.</li>}
           </ul>
           <h3 style={h3}>Rules-based resilience synthesis</h3>
-          <p style={p}>Each risk and opportunity is classified by how it behaves across the trio: <strong>Persistent</strong> (material under all three futures — a robust exposure independent of the policy path); <strong>Warming-driven</strong> (most acute under high warming — a physical-risk-led exposure); <strong>Policy-driven</strong> (most acute under the Paris-aligned pathway — sensitivity to the speed of decarbonisation rather than to warming); or <strong>Low across futures</strong>. The overall profile swing measures how much the count of material risks changes between the low- and high-warming ends, and the two-channel check states whether stress is concentrated in transition-led futures, physical-led futures, or both.</p>
+          <p style={p}>Each risk and opportunity is classified by how it behaves across the trio: <strong>Persistent</strong> (material under all three futures, a robust exposure independent of the policy path); <strong>Warming-driven</strong> (most acute under high warming, a physical-risk-led exposure); <strong>Policy-driven</strong> (most acute under the Paris-aligned pathway, sensitivity to the speed of decarbonisation rather than to warming); or <strong>Low across futures</strong>. The overall profile swing measures how much the count of material risks changes between the low- and high-warming ends, and the two-channel check states whether stress is concentrated in transition-led futures, physical-led futures, or both.</p>
         </section>
 
         {/* ASSUMPTIONS REGISTER — credibility register 3 */}
@@ -432,7 +432,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
           <H>Assumptions register</H>
           <ul style={ul}>
             <li style={li}>All scoring inputs are ordinal sector-level starter defaults (0–3 scales), derived from the public frameworks above. They are not empirically calibrated to the entity and require validation against entity-specific data.</li>
-            <li style={li}><strong>Transition-driver weights</strong> are applied per sector across the four TCFD transition categories. Neither TCFD nor IFRS S2 prescribes relative weights among these categories — the standards state only that magnitude varies by sector — so these weights are a disclosed methodological choice, set per sector rather than universally. They range 1–3 across sectors; the scale permits 0 (not material), but on review every sector was judged to face at least limited exposure on every transition channel.</li>
+            <li style={li}><strong>Transition-driver weights</strong> are applied per sector across the four TCFD transition categories. Neither TCFD nor IFRS S2 prescribes relative weights among these categories (the standards state only that magnitude varies by sector), so these weights are a disclosed methodological choice, set per sector rather than universally. They range 1–3 across sectors; the scale permits 0 (not material), but on review every sector was judged to face at least limited exposure on every transition channel.</li>
             <li style={li}><strong>Band thresholds.</strong> Policy-driver scores carry an additional jurisdiction factor and use higher band cut-offs than the other three transition drivers, which are scaled to their narrower range. Physical and opportunity bands follow the model configuration.</li>
             <li style={li}><strong>Scenario multipliers.</strong> Each SSP carries a physical and a transition multiplier; physical and transition risk therefore move in opposite directions across the trio.</li>
           </ul>
@@ -441,7 +441,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
         {/* DATA LINEAGE — credibility register 4 */}
         <section className="page" style={{ marginTop: 48 }}>
           <H>Data lineage</H>
-          <p style={p}>The following inputs were provided by the user for this analysis: primary sector, operating regions, policy jurisdictions, asset profile, and time horizon. All scoring values — hazard sensitivities, regional hazard intensities, carbon-exposure, jurisdictional policy intensities, transition-driver weights, opportunity relevances, and scenario multipliers — are platform reference defaults, not entity-supplied. The boundary matters for assurance: user inputs scope the analysis; platform defaults must be validated against the entity's own operations before any disclosure.</p>
+          <p style={p}>The following inputs were provided by the user for this analysis: primary sector, operating regions, policy jurisdictions, asset profile, and time horizon. All scoring values (hazard sensitivities, regional hazard intensities, carbon-exposure, jurisdictional policy intensities, transition-driver weights, opportunity relevances, and scenario multipliers) are platform reference defaults, not entity-supplied. The boundary matters for assurance: user inputs scope the analysis; platform defaults must be validated against the entity's own operations before any disclosure.</p>
         </section>
 
         {/* DATA PROVENANCE — how firm the reference values are. Disclosed, never gated. */}
@@ -472,7 +472,7 @@ function ResilienceReport({ a, reportDate }: { a: any; reportDate: string }) {
           <ul style={ul}>
             <li style={li}>This is a <strong>qualitative</strong> resilience screening. It does not quantify per-scenario financial effects in monetary terms; both IFRS S2 and ESRS permit qualitative resilience assessment, particularly in early reporting years, but a full disclosure may require quantified anticipated financial effects.</li>
             <li style={li}>Scores are <strong>ordinal and relative</strong>, not absolute measures of probability or loss.</li>
-            <li style={li}>Transition drivers are scored on different scales — policy carries a jurisdiction factor the other three do not. To compare them, each driver is expressed relative to its own high-materiality threshold before the most material is carried to the financial axis. This means 'high' has the same meaning across all four drivers. The score reflects the most material driver, not cumulative exposure across drivers.</li>
+            <li style={li}>Transition drivers are scored on different scales: policy carries a jurisdiction factor the other three do not. To compare them, each driver is expressed relative to its own high-materiality threshold before the most material is carried to the financial axis. This means 'high' has the same meaning across all four drivers. The score reflects the most material driver, not cumulative exposure across drivers.</li>
             <li style={li}>The financial-materiality score is bounded at 10. Companies whose transition exposure exceeds the high-materiality threshold by a wide margin will all score at or near the ceiling. This is intentional: the score answers a threshold question (is climate financially material?), not a magnitude-ranking question. The four underlying transition driver scores are disclosed separately and are unbounded.</li>
             <li style={li}>For <strong>financial institutions</strong>, this entity-level transition screen reflects the firm's own operations and understates portfolio (financed-emissions) exposure, which requires a separate financed-emissions assessment.</li>
             <li style={li}>The diverse trio is a fixed screening set. A formal assessment may test additional or entity-specific scenarios.</li>

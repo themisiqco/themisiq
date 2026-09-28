@@ -89,7 +89,7 @@ export default function CampaignDetail() {
     const header = ['Supplier', 'Email', 'Contact', 'Status', 'Completed', 'Annual spend', 'Spend currency',
       ...allQuestionIds.map(qid => labelForQuestionId(qid) ?? qid)]
     const rows = [
-      [`ThemisIQ — Bulk Supplier Response Export`],
+      [`ThemisIQ: Bulk Supplier Response Export`],
       [`Campaign: ${campaign?.name}`],
       [`Exported: ${new Date().toLocaleDateString()}`],
       [`Completed suppliers: ${completedSuppliers.length}`],
@@ -429,7 +429,7 @@ export default function CampaignDetail() {
 
         {/* CSV template */}
         <div style={{ marginTop: 16, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '0.75rem 1rem', fontSize: 12, color: 'var(--color-ink-muted)' }}>
-          CSV import format: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>Supplier, Email, Contact, Spend</code> &mdash; Spend is optional; you can also enter it inline after import. Spend is recorded in the campaign currency selected above.
+          CSV import format: <code style={{ background: '#fff', padding: '1px 6px', borderRadius: 4 }}>Supplier, Email, Contact, Spend</code>: Spend is optional; you can also enter it inline after import. Spend is recorded in the campaign currency selected above.
         </div>
       </div>
     </div>

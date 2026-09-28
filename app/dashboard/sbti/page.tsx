@@ -584,7 +584,7 @@ export default function SbtiDashboard() {
     const invalid = cards.filter(({ sc, d }) =>
       !validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: false }, {}).ok)
     if (invalid.length > 0) {
-      alert('Cannot save — fix the invalid target(s): ' + invalid.map(({ sc }) => SCOPE_LABEL[sc]).join(', '))
+      alert('Cannot save. Fix the invalid target(s): ' + invalid.map(({ sc }) => SCOPE_LABEL[sc]).join(', '))
       return
     }
     if (cards.length === 0) { alert('No valid targets to save.'); return }
@@ -642,7 +642,7 @@ export default function SbtiDashboard() {
     const invalid = cards.filter(({ sc, d }) =>
       !validateTargetConfig({ standardVersion, scope: sc, method: 'absolute_aca', baseYear: d.baseYear, targetYear: d.targetYear, reductionPct: d.reductionPct, isNetZero: true }, {}).ok)
     if (invalid.length > 0) {
-      alert('Cannot save — fix the invalid net-zero target(s): ' + invalid.map(({ sc }) => SCOPE_LABEL[sc]).join(', '))
+      alert('Cannot save. Fix the invalid net-zero target(s): ' + invalid.map(({ sc }) => SCOPE_LABEL[sc]).join(', '))
       return
     }
     if (cards.length === 0) { alert('No valid net-zero targets to save.'); return }
@@ -943,7 +943,7 @@ export default function SbtiDashboard() {
                 <div style={{ marginTop: 18 }}>
                   <label style={labelStyle}>Is your ultimate-parent company headquartered in a World Bank high-income country?</label>
                   <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5, marginBottom: 8 }}>
-                    Gates the high-income categorisation route (Route 2 — the emissions / two-of-three thresholds).
+                    Gates the high-income categorisation route (Route 2, the emissions / two-of-three thresholds).
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => { setHighIncome(true); setDirty(true) }} style={toggleBtn(highIncome === true)}>Yes</button>
@@ -1014,7 +1014,7 @@ export default function SbtiDashboard() {
                       <div key={scope} style={{ display: 'flex', gap: 8, fontSize: 13, marginBottom: 6, alignItems: 'baseline' }}>
                         <span style={{ color: ok ? '#0F6E56' : '#B91C1C', fontWeight: 700, flexShrink: 0 }}>{ok ? '✓' : '✗'}</span>
                         <span style={{ color: '#555553', fontWeight: 400 }}>
-                          {SCOPE_LABEL[scope]}{!ok && reasons.length > 0 ? ` — ${reasons.join('; ')}` : ''}
+                          {SCOPE_LABEL[scope]}{!ok && reasons.length > 0 ? `: ${reasons.join('; ')}` : ''}
                         </span>
                       </div>
                     ))}
@@ -1044,7 +1044,7 @@ export default function SbtiDashboard() {
                 )}
                 {series && !series.estimationConsistent && (
                   <div style={{ background: '#FDF6EC', border: '0.5px solid #EAD9BE', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
-                    <span style={{ fontWeight: 600 }}>Evidence basis varies across years</span> — one or more reporting years include estimated data, so a year-over-year comparison may not be like-for-like.
+                    <span style={{ fontWeight: 600 }}>Evidence basis varies across years</span>: one or more reporting years include estimated data, so a year-over-year comparison may not be like-for-like.
                   </div>
                 )}
 
@@ -1058,7 +1058,7 @@ export default function SbtiDashboard() {
                     <div>{describeYearStatus(series.years.find(y => y.year === series.baselineYear)!) ?? `${series.baselineYear} can’t be used as a base year.`}</div>
                     <div style={{ marginTop: 4 }}>
                       A target says &ldquo;we will cut emissions by X% from this year&rdquo;, so the base year has to be a
-                      complete figure. Fix that year in your inventory and it will appear here — we won&rsquo;t quietly
+                      complete figure. Fix that year in your inventory and it will appear here. We won&rsquo;t quietly
                       use a different year instead.
                     </div>
                   </div>
@@ -1068,12 +1068,12 @@ export default function SbtiDashboard() {
                     year can be unusable while the base year is fine, and vice versa. */}
                 {series && series.years.length > 0 && series.years[series.years.length - 1].dataStatus !== 'ok' && (
                   <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12.5, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>
-                    <span style={{ fontWeight: 600 }}>Your most recent year isn&rsquo;t being used</span> — {describeYearStatus(series.years[series.years.length - 1])} Progress is graded against the most recent year we can stand behind, not that one.
+                    <span style={{ fontWeight: 600 }}>Your most recent year isn&rsquo;t being used</span>: {describeYearStatus(series.years[series.years.length - 1])} Progress is graded against the most recent year we can stand behind, not that one.
                   </div>
                 )}
 
                 {selectedScopes.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No scopes selected — go back to Step 2 to choose scopes.</div>
+                  <div style={{ fontSize: 13, color: 'var(--color-ink-muted)', fontWeight: 400 }}>No scopes selected: go back to Step 2 to choose scopes.</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {selectedScopes.map(sc => {
@@ -1092,9 +1092,9 @@ export default function SbtiDashboard() {
                             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 400, marginBottom: 8 }}>{SCOPE_LABEL[sc]}</div>
                             <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: 12 }}>
                               {blockedForUnpriced
-                                ? `Your ${series?.baselineYear ?? 'baseline'} Scope 3 total leaves out ${s3Unpriced} categor${s3Unpriced === 1 ? 'y' : 'ies'} you marked relevant and filled in: ThemisIQ could not price ${s3Unpriced === 1 ? 'it' : 'them'}. A base year is fixed for the life of a target, so setting one against this figure would carry that gap into every year of the pathway. Fix the pricing in the Scope 3 module first — your near-term submission can proceed on Scope 1 + 2 meanwhile.`
+                                ? `Your ${series?.baselineYear ?? 'baseline'} Scope 3 total leaves out ${s3Unpriced} categor${s3Unpriced === 1 ? 'y' : 'ies'} you marked relevant and filled in: ThemisIQ could not price ${s3Unpriced === 1 ? 'it' : 'them'}. A base year is fixed for the life of a target, so setting one against this figure would carry that gap into every year of the pathway. Fix the pricing in the Scope 3 module first. Your near-term submission can proceed on Scope 1 + 2 meanwhile.`
                                 : s3Basis === 'covers_nothing'
-                                  ? `Your Scope 3 inventory for ${series?.baselineYear ?? 'the baseline year'} is saved but counts no categories yet — none has been answered relevant and calculated, so there is no baseline to set a target against. Answer the categories in the Scope 3 module. Your near-term submission can proceed on Scope 1 + 2 alone.`
+                                  ? `Your Scope 3 inventory for ${series?.baselineYear ?? 'the baseline year'} is saved but counts no categories yet. None has been answered relevant and calculated, so there is no baseline to set a target against. Answer the categories in the Scope 3 module. Your near-term submission can proceed on Scope 1 + 2 alone.`
                                   : 'To set a Scope 3 target, complete your Scope 3 inventory first. Your near-term submission can proceed on Scope 1 + 2 alone.'}
                             </p>
                             <a href="/dashboard/scope3" onClick={() => { navIntentRef.current = true }} style={{ ...btnPrimary, padding: '9px 18px', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Go to Scope 3 Calculator →</a>
@@ -1127,7 +1127,7 @@ export default function SbtiDashboard() {
                               {sc === 's3' && s3Basis === 'measured' && baselineYearRow?.scope3Relevant != null && baselineYearRow.scope3InTotal != null
                                 && baselineYearRow.scope3Relevant > baselineYearRow.scope3InTotal && (
                                 <div style={{ marginTop: 4, color: 'var(--color-state-warn)' }}>
-                                  {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal} categor{baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'y you marked relevant has' : 'ies you marked relevant have'} no figure yet, so {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'it is' : 'they are'} not in this baseline. You can set a target on it — the baseline is fixed once you do.
+                                  {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal} categor{baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'y you marked relevant has' : 'ies you marked relevant have'} no figure yet, so {baselineYearRow.scope3Relevant - baselineYearRow.scope3InTotal === 1 ? 'it is' : 'they are'} not in this baseline. You can set a target on it. The baseline is fixed once you do.
                                 </div>
                               )}
                               {sc === 's3' && s3Basis === 'not_recorded' && (
@@ -1311,7 +1311,7 @@ export default function SbtiDashboard() {
                     {/* Honest-scoping note — a per-target ✓ is NOT full net-zero compliance. */}
                     <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid var(--color-state-warn)33', borderRadius: 12, padding: '1rem 1.2rem' }}>
                       <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.65 }}>
-                        <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>These checks are per-target only.</strong> A ✓ confirms this scope&rsquo;s net-zero rules (≥{NET_ZERO.minAbsoluteReductionPct}% reduction, ≤{NET_ZERO.latestNetZeroYear}, absolute method). It does <strong style={{ fontWeight: 600 }}>not</strong> confirm full net-zero compliance, which also requires aggregate coverage of ≥90% of total emissions across all scopes, ≥90% Scope 3 coverage, and neutralisation of residual emissions via permanent removals — all assessed separately in a later step.
+                        <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>These checks are per-target only.</strong> A ✓ confirms this scope&rsquo;s net-zero rules (≥{NET_ZERO.minAbsoluteReductionPct}% reduction, ≤{NET_ZERO.latestNetZeroYear}, absolute method). It does <strong style={{ fontWeight: 600 }}>not</strong> confirm full net-zero compliance, which also requires aggregate coverage of ≥90% of total emissions across all scopes, ≥90% Scope 3 coverage, and neutralisation of residual emissions via permanent removals, all assessed separately in a later step.
                       </div>
                     </div>
 

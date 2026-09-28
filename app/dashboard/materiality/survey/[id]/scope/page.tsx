@@ -267,7 +267,7 @@ export default function SurveyScope() {
       setSaveState(prev => ({ ...prev, [qid]: 'error' }))
       setSaveError(prev => ({
         ...prev,
-        [qid]: 'The change did not save. No row was updated — the round may belong to another account, or it may have been changed elsewhere. Reload before trying again.',
+        [qid]: 'The change did not save. No row was updated. The round may belong to another account, or it may have been changed elsewhere. Reload before trying again.',
       }))
       return false
     }
@@ -361,7 +361,7 @@ export default function SurveyScope() {
             {(counts.s1 > 0 || counts.s2 > 0) && (
               <div style={{ marginTop: 4 }}>
                 {counts.s1 === counts.s2
-                  ? `The ${counts.s1}-question difference is the workforce topics — only people who can see a workforce are asked about one.`
+                  ? `The ${counts.s1}-question difference is the workforce topics: only people who can see a workforce are asked about one.`
                   : `The difference is the workforce topics: ${counts.s1} asked of your own workforce, ${counts.s2} of value-chain contacts, and neither asked of anyone else.`}
               </div>
             )}
@@ -408,7 +408,7 @@ export default function SurveyScope() {
           </div>
           <div style={{ fontSize: 13.5, color: '#555553', lineHeight: 1.75 }}>
             All {questions.length} ESRS sub-topics are included by default. Exclude any that do not
-            apply to {round?.company_name || 'your company'} — each exclusion is recorded in your
+            apply to {round?.company_name || 'your company'}: each exclusion is recorded in your
             report as a topic considered and excluded, with the reason you give.
           </div>
         </div>
@@ -530,7 +530,7 @@ export default function SurveyScope() {
                           <div style={{ fontSize: 11.5, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 6 }}>
                             This is printed in your report as the reason this topic was considered and
                             excluded. It is your disclosure, in your own words, and appears exactly as
-                            written — including “n/a”.
+                            written, including “n/a”.
                           </div>
 
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
