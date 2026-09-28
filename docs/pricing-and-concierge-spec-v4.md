@@ -41,6 +41,16 @@ Rules:
 
 ## Concierge add-on (requires `ghg`) — Resolution X
 
+> **SUPERSEDED 28 Sep 2026 by `docs/pricing-and-concierge-spec-v5.md`.** Concierge is no longer
+> priced on location count. It is a one-time onboarding fee by GHG tier, plus an annual fee per
+> DATA SOURCE, where a data source is one utility account or meter billed on a recurring basis.
+> The three band keys below were retired and the single existing grant was re-keyed by
+> `supabase/migrations/20260928_concierge_source_model.sql`. Nothing in this section describes the
+> live model. It is kept because it records the labour basis behind the original bands, and the
+> reasoning about why Concierge was priced apart from the module tiers still holds.
+> The rest of this document, covering the GHG software tiers, is not affected.
+
+
 Priced on the customer's ACTUAL location count, independent of their module tier.
 The system reads location count and offers the matching concierge tier automatically;
 the customer only ever sees their one correct price (no "two ladders" confusion).

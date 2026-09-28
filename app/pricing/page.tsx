@@ -12,7 +12,7 @@ import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/p
 // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
 // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
 // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
-import { LEGACY_PRICING_PAGE_ID, volumeDiscount, ADDONS, conciergeTierForLocations, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey, type AddOnKey } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
@@ -227,7 +227,7 @@ function PricingPageInner() {
   const [selected, setSelected] = useState<Set<ModuleId>>(initialModules)
   // Add-on selection state
   const [conciergeOn, setConciergeOn] = useState(false)
-  const [conciergeLocations, setConciergeLocations] = useState(1)
+  const [conciergeSources, setConciergeSources] = useState(1)
 
 
   // Pricing logic. unitPrice / gross / discount / net / totalNet were deleted with the old-model
@@ -235,17 +235,33 @@ function PricingPageInner() {
   // no reader left once those blocks went. Everything shown or charged now derives from cartQuote
   // below. `count` survives because the live panel reads it for volumeDiscount().
   const count = selected.size
-  // Add-on logic. Concierge tier is resolved from the location count. Verification Readiness was
-  // retired 10 Aug 2026 — see docs/ghg-verifier-grade-roadmap.md.
-  // is only available once Concierge is added (mirrors the server dependency rule).
+  // Add-on logic. Concierge is priced per DATA SOURCE since 28 Sep 2026, not by location band.
+  // Verification Readiness was retired 10 Aug 2026, see docs/ghg-verifier-grade-roadmap.md.
+  // Concierge requires GHG, which mirrors the server dependency rule.
   const ghgSelected = selected.has('ghg')
-  const conciergeResolved = conciergeTierForLocations(conciergeLocations)
   const conciergeActive = ghgSelected && conciergeOn
-  const selectedAddOns: AddOnKey[] = [
-    ...(conciergeActive && !conciergeResolved.isCustomQuote ? [conciergeResolved.key] : []),
-  ]
-  const addOnsTotal =
-    (conciergeActive && !conciergeResolved.isCustomQuote ? ADDONS[conciergeResolved.key].price : 0)
+
+  // ⚠️ isFirstPurchase IS TRUE HERE AND THE SERVER DECIDES THE TRUTH. This page serves logged-out
+  // visitors, and whether a customer has ever held Concierge is a read of their entitlements that
+  // only /api/checkout can make. Assuming true shows onboarding to everyone, so the preview can be
+  // HIGHER than the charge for a returning customer and never lower. The line is labelled "charged
+  // on your first Concierge order" so the wording is true for both readers.
+  // The rule this bends is displayed-equals-charged; it bends in the safe direction, and this is
+  // the only place in the file where the two can differ.
+  const conciergeQ = conciergeActive
+    ? (() => {
+        // conciergeQuote throws on a count it will not price. The input below is clamped to whole
+        // numbers from 1 to the ceiling, so the throw is unreachable from the UI. The guard is here
+        // because an unhandled throw during render is a blank page, and a price panel that cannot
+        // price itself should say so rather than take the page down with it.
+        try {
+          return { quote: conciergeQuote({ ghgTier: tier as GhgTier, uploadedSources: conciergeSources, isFirstPurchase: true }), error: null }
+        } catch (e) {
+          return { quote: null, error: (e as Error).message.replace(/^conciergeQuote: /, '') }
+        }
+      })()
+    : { quote: null, error: null }
+  const addOnsTotal = conciergeQ.quote?.totalUSD ?? 0
   // ── PRICING — DISPLAY ONLY. The module total comes solely from the shared cartQuote(), so the
   // preview equals exactly what the server charges. submitConsentAndPay sends
   // { tier, moduleKeys, addOns } through startCheckout, which prices from the same function.
@@ -272,7 +288,7 @@ function PricingPageInner() {
     startCheckout({
       tier,
       moduleKeys,
-      ...(selectedAddOns.length > 0 ? { addOns: selectedAddOns } : {}),
+      ...(conciergeActive ? { concierge: { uploadedSources: conciergeSources } } : {}),
       ...payload,
     })
   }
@@ -638,21 +654,46 @@ function PricingPageInner() {
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge: we read your bills</div>
-                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced by number of locations.</div>
+                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced per data source.</div>
                 </div>
                 <button onClick={() => setConciergeOn(v => !v)} style={{ ...(conciergeOn ? btnSecondary : btnPrimary), flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
               </div>
               {conciergeOn && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efed', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <label style={{ fontSize: 12, color: '#555553' }}>Locations:</label>
-                  <input type="number" min={1} value={conciergeLocations} onChange={e => setConciergeLocations(Math.max(1, Number(e.target.value) || 1))} style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
-                  <span style={{ fontSize: 12, color: '#0d0d0d', fontWeight: 600 }}>
-                    {conciergeResolved.isCustomQuote
-                      ? 'Enterprise (16+): custom quote'
-                      : `${ADDONS[conciergeResolved.key].short} · $${ADDONS[conciergeResolved.key].price.toLocaleString()}/yr`}
-                  </span>
-                  {conciergeResolved.isCustomQuote && (
-                    <a href="mailto:lisa.foster@themisiq.co?subject=Concierge%20Enterprise%20quote" style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>Request a quote →</a>
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efed' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 12, color: '#555553' }} htmlFor="concierge-sources">Data sources:</label>
+                    <input id="concierge-sources" type="number" min={1} max={CONCIERGE_MAX_SELF_SERVE_SOURCES} value={conciergeSources}
+                      onChange={e => setConciergeSources(Math.min(CONCIERGE_MAX_SELF_SERVE_SOURCES, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
+                      style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
+                    <span style={{ fontSize: 11, color: '#555553' }}>One utility account or meter, such as an electricity account or a gas meter.</span>
+                  </div>
+
+                  {/* ⚠️ THE CONNECTED RATE IS PUBLISHED AND NOT SELECTABLE, AND IT IS TEXT RATHER THAN A
+                      DISABLED CONTROL. A greyed-out input invites a customer to try it and then explains
+                      why they cannot; a line of copy states the position once. UTILITY_CONNECT_ENABLED
+                      is the single authority, and conciergeQuote refuses a connected quantity on the
+                      server whatever this page renders. */}
+                  <div style={{ marginTop: 10, fontSize: 12, color: '#0d0d0d', lineHeight: 1.8 }}>
+                    <div>Uploaded source: {`$${CONCIERGE_SOURCE_USD.uploaded}`} each a year</div>
+                    <div style={{ color: 'var(--color-ink-muted)' }}>
+                      Connected source: {`$${CONCIERGE_SOURCE_USD.connected}`} each a year. Coming soon.
+                    </div>
+                  </div>
+
+                  {conciergeQ.quote && (
+                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f0efed', fontSize: 12, color: '#0d0d0d', lineHeight: 1.9 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span>{conciergeSources} data source{conciergeSources === 1 ? '' : 's'} a year</span>
+                        <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.sourcesUSD.toLocaleString()}`}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span>One-time onboarding, charged on your first Concierge order</span>
+                        <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.onboardingUSD.toLocaleString()}`}</span>
+                      </div>
+                    </div>
+                  )}
+                  {conciergeQ.error && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-state-error)' }}>{conciergeQ.error}</div>
                   )}
                 </div>
               )}
@@ -669,12 +710,12 @@ function PricingPageInner() {
                 <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8 }}>
                   {MODULES.filter(m => selected.has(m.id)).map(m => <div key={m.id}>{m.name}</div>)}
                 </div>
-                {selectedAddOns.length > 0 && (
+                {conciergeQ.quote && (
                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.8, marginBottom: 8, paddingTop: 8, borderTop: '1px solid var(--color-line)' }}>
-                    {selectedAddOns.map(k => (
-                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span>{ADDONS[k].label}</span>
-                        <span style={{ color: 'var(--color-ink-2)', whiteSpace: 'nowrap' }}>+${ADDONS[k].price.toLocaleString()}</span>
+                    {conciergeQ.quote.lines.map(l => (
+                      <div key={l.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span>{l.quantity > 1 ? `${l.label} x ${l.quantity}` : l.label}</span>
+                        <span style={{ color: 'var(--color-ink-2)', whiteSpace: 'nowrap' }}>{`+$${(l.unitUSD * l.quantity).toLocaleString()}`}</span>
                       </div>
                     ))}
                   </div>

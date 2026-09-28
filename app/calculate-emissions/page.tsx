@@ -20,7 +20,7 @@
 import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
-import { GHG_TIERS } from '../../lib/pricing';
+import { GHG_TIERS, CONCIERGE_SOURCE_USD } from '../../lib/pricing';
 import Link from "next/link";
 import Footer from '../components/Footer'
 
@@ -573,7 +573,7 @@ export default function CalculateEmissionsPage() {
               </div>
               <div className="tier">
                 <div className="tier-name">Concierge</div>
-                <div className="tier-price">from $799</div>
+                <div className="tier-price">{`from $${CONCIERGE_SOURCE_USD.uploaded} per data source a year, plus a one-time onboarding fee`}</div>
                 <p>Missing invoices, or not comfortable tabulating the annual totals? Our Concierge add-on does the heavy lifting: we extract and total the data from your statements for you.</p>
                 <div className="tier-when">Best when your bills are scattered or you&rsquo;d rather not key in numbers.</div>
               </div>
@@ -685,7 +685,7 @@ export default function CalculateEmissionsPage() {
                   <ul className="price-list">
                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
                     <li><span className="pl-name">GHG module: Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
-                    <li><span className="pl-name">Concierge: we tabulate the data from your bills</span><span className="pl-price">from $799</span></li>
+                    <li><span className="pl-name">Concierge: we tabulate the data from your bills. One-time onboarding fee applies.</span><span className="pl-price">{`from $${CONCIERGE_SOURCE_USD.uploaded} per data source a year`}</span></li>
                     <li><span className="pl-name">Advisory: dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
                     <li><span className="pl-name">Scope 3: full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
                   </ul>
