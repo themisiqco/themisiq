@@ -16,6 +16,56 @@ import {
 const ALL: SupplierStatus[] = ['invited', 'in_progress', 'completed', 'expired']
 const ROOT = join(__dirname, '..', '..')
 
+/**
+ * The newest schema dump, with psql meta-commands removed.
+ *
+ * ⚠️ NEWEST ONLY, AND NEVER A FALLBACK TO AN OLDER ONE. A guard that quietly reads the second-newest dump
+ * when the newest is unusable would assert against a schema nobody is running, and report PASS while doing
+ * it. If the newest file cannot be read as a dump, that IS the finding.
+ *
+ * ⚠️ AN EMPTY FILE IS A FAILED pg_dump, AND THE MESSAGE HAS TO SAY SO. On 27 Sep 2026 a dump produced a
+ * 0-byte file; it sorted newest, this test picked it up, and the failure read "no status CHECK found in
+ * schema_public_20260927_1751.sql" — which names a cause nobody had verified and sends the reader looking
+ * for a dropped constraint in production. The file was empty. Checked here, in order, so the message
+ * matches what is actually wrong: empty, then truncated, then missing the table.
+ *
+ * ⚠️ AND pg_dump 18 WRAPS THE FILE IN \restrict / \unrestrict, which are psql meta-commands and not SQL.
+ * Each carries a 63-character random token (pg_dump 18.4 against server 17.6 writes two such lines; 17
+ * wrote none). The token is opaque text that no guard accounts for, so both lines are blanked before
+ * anything is matched, and any OTHER backslash command fails loudly rather than being scanned as schema.
+ */
+const RESTRICT_LINE = /^\\(un)?restrict [A-Za-z0-9]+$/
+
+function newestDump(): { name: string; sql: string } {
+  const dir = join(ROOT, 'db', 'dumps')
+  const name = readdirSync(dir).filter(f => /^schema_public_.*\.sql$/.test(f)).sort().pop()
+  expect(name, 'db/dumps holds no schema_public_*.sql at all').toBeDefined()
+  const raw = readFileSync(join(dir, name!), 'utf8')
+
+  expect(raw.length,
+    `THE NEWEST DUMP IS EMPTY: db/dumps/${name} is 0 bytes, so pg_dump failed or was interrupted. ` +
+    `Re-dump and check the byte count before trusting it. This test deliberately does NOT fall back to ` +
+    `an older dump: the newest file being unusable is the finding.`).toBeGreaterThan(0)
+
+  // ⚠️ THE COMPLETION MARKER, NOT A SIZE FLOOR. pg_dump writes it last, so its absence means the file was
+  // truncated — which a byte-count threshold can only guess at.
+  expect(raw.includes('PostgreSQL database dump complete'),
+    `THE NEWEST DUMP IS TRUNCATED: db/dumps/${name} has no "PostgreSQL database dump complete" marker, ` +
+    `so pg_dump did not finish. Re-dump; do not edit the file.`).toBe(true)
+
+  const lines = raw.split('\n')
+  const meta = lines.map((l, i) => [l, i + 1] as const).filter(([l]) => l.startsWith('\\'))
+  for (const [l, n] of meta) {
+    expect(l, `db/dumps/${name}:${n} is a psql meta-command this guard does not know how to ignore. ` +
+      `Only \\restrict and \\unrestrict are expected (pg_dump 18). Anything else must be accounted for ` +
+      `before the dump is scanned as schema.`).toMatch(RESTRICT_LINE)
+  }
+  // Blanked rather than deleted, so a reported line number still matches the file on disk.
+  const sql = lines.map(l => (RESTRICT_LINE.test(l) ? '' : l)).join('\n')
+  expect(sql, 'a \\restrict token survived the strip').not.toMatch(/^\\/m)
+  return { name: name!, sql }
+}
+
 describe('the four statuses the database permits', () => {
   it('are exactly the four the CHECK constraint names', () => {
     // ⚠️ READ OUT OF THE SCHEMA DUMP, AND THE DUMP IS THE ONLY SOURCE IN GIT. campaign_suppliers is
@@ -28,10 +78,10 @@ describe('the four statuses the database permits', () => {
     // the database and no dump is taken, this keeps passing against a stale list. It is still worth
     // having: it catches the case where someone adds a fifth status to this module without a label and
     // a sentence, and it fails loudly if the dump ever disappears rather than skipping.
-    const dumps = join(ROOT, 'db', 'dumps')
-    const newest = readdirSync(dumps).filter(f => /^schema_public_.*\.sql$/.test(f)).sort().pop()!
-    const sql = readFileSync(join(dumps, newest), 'utf8')
-    const table = sql.slice(sql.indexOf('CREATE TABLE public.campaign_suppliers'))
+    const { name: newest, sql } = newestDump()
+    const at = sql.indexOf('CREATE TABLE public.campaign_suppliers')
+    expect(at, `campaign_suppliers is not in ${newest}`).toBeGreaterThan(-1)
+    const table = sql.slice(at)
     const check = /campaign_suppliers_status_check CHECK \(\(status = ANY \(ARRAY\[([^\]]+)\]\)\)\)/.exec(table)
     expect(check, `no status CHECK found in ${newest}`).not.toBeNull()
     const permitted = [...check![1].matchAll(/'([a-z_]+)'::text/g)].map(m => m[1]).sort()
