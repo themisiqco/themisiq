@@ -14,11 +14,20 @@ import type { Tier, ModuleKey, AddOnKey } from './pricing'
 
 // What the caller passes. Use any combination:
 //   { tier: 'starter', moduleKeys: ['ghg', 'climate-risk'] }
-//   { tier: 'starter', moduleKeys: ['ghg'], addOns: ['concierge-basic'] }
+//   { tier: 'starter', moduleKeys: ['ghg'], concierge: { uploadedSources: 4 } }
+//   { tier: 'starter', moduleKeys: ['ghg'], addOns: ['concierge-basic'] }   // old model, until Batch 4
 export interface CheckoutSelection {
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
+  /**
+   * Concierge on the source-based model. Mutually exclusive with an old concierge-* key in
+   * `addOns`: the server rejects both together rather than charging twice.
+   * The client sends COUNTS ONLY. It does not send a tier, a price, or isFirstPurchase: all three
+   * are derived server side, because all three decide an amount. connectedSources is refused while
+   * UTILITY_CONNECT_ENABLED is false, whatever is sent.
+   */
+  concierge?: { uploadedSources: number; connectedSources?: number }
   // New-model B2B consent (collected in the configurator modal; rides through the
   // resume-after-login bounce because the whole selection is stored + replayed).
   // email/ip are captured server-side at /api/checkout, NOT here.

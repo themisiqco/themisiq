@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { GHG_TIERS, locationAllowanceForTier, type Tier } from './pricing'
+import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierFromAllowance, LEGACY_CONCIERGE_KEYS, type Tier } from './pricing'
 
 // A WRITER OMITTING THE KEY GRANTS UNLIMITED LOCATIONS.
 //
@@ -36,7 +36,23 @@ const WEBHOOK = 'app/api/webhooks/stripe/route.ts'
 // The four keys grantFromMetadata's contract depends on. `source` is informational, the other three
 // are load-bearing: no user_id or entitlements → nothing granted; no ghg_location_allowance →
 // uncapped.
-const REQUIRED_KEYS = ['user_id', 'entitlements', 'source', 'ghg_location_allowance']
+const REQUIRED_KEYS = ['user_id', 'entitlements', 'source', 'ghg_location_allowance', 'ghg_tier']
+
+// The Concierge keys, added Sep 2026 with the source-based model. Both writers spread a
+// conciergeMeta object rather than listing these inline, so the assertion is on the spread plus the
+// keys being present in the file that builds it.
+//
+// ⚠️ SAME DEFECT CLASS AS ghg_location_allowance, WHICH IS WHY THEY ARE PINNED HERE. A writer that
+// omits concierge_source_allowance does not fail: it grants Concierge with no recorded source count,
+// and whatever Batch 3 enforces against that count silently has nothing to enforce.
+// concierge_onboarding_usd is the exception: it is RECORDED and must never become an entitlement.
+const CONCIERGE_META_KEYS = [
+  'concierge_uploaded_sources',
+  'concierge_connected_sources',
+  'concierge_source_allowance',
+  'concierge_onboarding_usd',
+  'concierge_ghg_tier',
+]
 
 // The stringify expression both writers must use, verbatim. The empty-string convention is not
 // cosmetic: '' is what the webhook's truthiness check reads as null → uncapped.
@@ -145,3 +161,103 @@ describe('the entitlement metadata contract', () => {
 //      grantFromMetadata call it. Then the round-trip is a real unit test, not a mirrored copy.
 // Neither is done here: restructuring two live payment routes is not this test's job, and both routes
 // are on the money path where CLAUDE.md requires the change be proposed and reviewed, not assumed.
+// ── Concierge metadata, Sep 2026 source-based model ─────────────────────────
+describe('Concierge purchase metadata', () => {
+  it('M10 both writers spread conciergeMeta into the metadata literal', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      expect(metadataLiteral(read(rel)), `${rel} must spread conciergeMeta`).toContain('...conciergeMeta')
+    }
+  })
+
+  it('M11 both writers build every Concierge key', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      const src = read(rel)
+      for (const key of CONCIERGE_META_KEYS) {
+        expect(src, `${rel} is missing ${key}`).toContain(key)
+      }
+    }
+  })
+
+  it('M12 both writers carry ghg_tier beside the allowance, same empty-string convention', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      expect(metadataLiteral(read(rel)), `${rel} must write ghg_tier`).toContain("ghg_tier: ghgTierForMeta ?? ''")
+    }
+  })
+
+  // ⚠️ THE ONBOARDING FEE IS NOT ACCESS. It buys setup work once. If it ever reached the
+  // entitlements string it would become a row with a 365-day term, and would then expire, which is
+  // meaningless for work already done and billed.
+  it('M13 neither writer adds the onboarding fee to the entitlements being granted', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      const src = read(rel)
+      expect(src, `${rel} must not grant onboarding`).not.toMatch(/add\(\s*['"]concierge[_-]onboarding/i)
+    }
+  })
+})
+
+// ── Concierge route logic ────────────────────────────────────────
+describe('isFirstConciergePurchase', () => {
+  it('M14 true only when no Concierge row of any generation exists', () => {
+    expect(isFirstConciergePurchase([])).toBe(true)
+    expect(isFirstConciergePurchase(['ghg', 'cbam'])).toBe(true)
+    expect(isFirstConciergePurchase(['ghg', 'concierge'])).toBe(false)
+    for (const legacy of LEGACY_CONCIERGE_KEYS) {
+      expect(isFirstConciergePurchase(['ghg', legacy]), `${legacy} is still a prior purchase`).toBe(false)
+    }
+  })
+
+  // The rule Lisa set: Concierge rows only. A source-based test would match a hand-written GHG row
+  // for a pilot customer and wrongly skip their onboarding fee.
+  it('M15 a manual grant on another module is not a prior Concierge purchase', () => {
+    expect(isFirstConciergePurchase(['ghg'])).toBe(true)
+  })
+})
+
+describe('ghgTierFromAllowance', () => {
+  it('M16 identifies the two capped tiers from GHG_TIERS, not from literals', () => {
+    expect(ghgTierFromAllowance(GHG_TIERS.starter.locationAllowance)).toBe('starter')
+    expect(ghgTierFromAllowance(GHG_TIERS.professional.locationAllowance)).toBe('professional')
+  })
+
+  // ⚠️ NULL MUST NOT RESOLVE. It is Advisory under the current model and an uncapped pre-rescope
+  // row under the old one. 10 and 20 are pre-rescope values with no current equivalent. Each of
+  // these returning a tier would pick between a 1250 and a 2500 charge for a real customer.
+  it('M17 returns null for every ambiguous stored value', () => {
+    expect(ghgTierFromAllowance(null)).toBeNull()
+    expect(ghgTierFromAllowance(10)).toBeNull()
+    expect(ghgTierFromAllowance(20)).toBeNull()
+    expect(ghgTierFromAllowance(0)).toBeNull()
+  })
+})
+
+describe('Concierge route guards', () => {
+  it('M18 both routes price through conciergeQuote and the pricing constants, never a literal', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      const src = read(rel)
+      expect(src, `${rel} must call conciergeQuote`).toContain('conciergeQuote(')
+      expect(src, `${rel} must not compute a source price itself`).not.toMatch(/CONCIERGE_SOURCE_USD\s*\./)
+    }
+  })
+
+  it('M19 both routes refuse a connected quantity at the server boundary', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      const src = read(rel)
+      expect(src, `${rel} must check the flag itself`).toContain('UTILITY_CONNECT_ENABLED')
+      expect(src, `${rel} must reject connected sources`).toMatch(/not available yet/i)
+    }
+  })
+
+  it('M20 both routes validate the tier where the onboarding fee uses it', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      const src = read(rel)
+      const branch = src.slice(src.indexOf('body.concierge'))
+      expect(branch, `${rel} must validate body.tier inside the Concierge branch`).toMatch(/TIER_PRICING(_FOR_VALIDATION)?\[body\.tier\]/)
+    }
+  })
+
+  it('M21 both routes fail loudly when the entitlement read errors', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      expect(read(rel), `${rel} must not treat a failed read as owning nothing`).toMatch(/ownedErr/)
+    }
+  })
+})

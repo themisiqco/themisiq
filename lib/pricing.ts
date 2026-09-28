@@ -454,6 +454,46 @@ export interface ConciergeQuote {
 // range checks (NaN < 0 and NaN < 1 are each false) to return a NaN quote that would have rendered
 // as "$NaN" and reached Stripe as a bad amount. A count that is not a whole number is a caller bug,
 // and the loud failure is the cheap one.
+// ── Concierge entitlement identity ─────────────────────────────────────
+// ⚠️ ONE LIST, BECAUSE FIVE COPIES IS THE DRIFT. Both purchase routes, the webhook,
+// useHasConcierge() and /api/concierge/extract all have to agree on what "holds Concierge" means.
+// The old keys are here because a customer who bought under the band model still holds Concierge:
+// dropping them from this list would charge them onboarding a second time on renewal.
+export const CONCIERGE_KEY = 'concierge' as const
+export const LEGACY_CONCIERGE_KEYS = ['concierge-basic', 'concierge-standard', 'concierge-enterprise'] as const
+export const CONCIERGE_ENTITLEMENT_KEYS: readonly string[] = [CONCIERGE_KEY, ...LEGACY_CONCIERGE_KEYS]
+
+/**
+ * Has this customer ever held Concierge? Pass every module_key on their entitlements rows.
+ * ⚠️ CONCIERGE ROWS ONLY. Not `source`, and not the GHG row. A `source` test such as 'manual-test'
+ * would match a hand-written GHG row for a pilot customer and skip their onboarding fee.
+ * ⚠️ NOT TERM-AWARE, DELIBERATELY, and this is the opposite of the access check. An EXPIRED
+ * Concierge customer is still not a first purchase: the setup work was done and billed once.
+ */
+export function isFirstConciergePurchase(existingModuleKeys: readonly string[]): boolean {
+  return !existingModuleKeys.some((k) => CONCIERGE_ENTITLEMENT_KEYS.includes(k))
+}
+
+/**
+ * The GHG tier a Concierge onboarding fee is priced from, for a customer who is NOT buying GHG in
+ * this cart. Derived from the stored location_allowance, never from anything the client sends.
+ * Returns null when the stored value cannot identify a tier, which the routes turn into a 400.
+ *
+ * ⚠️ NULL IS AMBIGUOUS AND MUST NOT DEFAULT. A null allowance is Advisory under the current model
+ * and an uncapped pre-rescope row under the old one, and 10 or 20 are pre-rescope values with no
+ * current equivalent. Guessing here picks between a 1250 and a 2500 charge for someone.
+ *
+ * ⚠️ THIS IS A FALLBACK FROM BATCH 3 ONWARD. entitlements.ghg_tier records the tier directly from
+ * then on; the routes read that first and only reach here when it is null, which is every row
+ * written before the column existed.
+ */
+export function ghgTierFromAllowance(allowance: number | null): GhgTier | null {
+  if (allowance == null) return null
+  if (allowance === GHG_TIERS.starter.locationAllowance) return 'starter'
+  if (allowance === GHG_TIERS.professional.locationAllowance) return 'professional'
+  return null
+}
+
 export function conciergeQuote(sel: ConciergeSelection): ConciergeQuote {
   const uploaded = sel.uploadedSources
   const connected = sel.connectedSources ?? 0

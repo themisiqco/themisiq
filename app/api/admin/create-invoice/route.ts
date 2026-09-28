@@ -43,6 +43,12 @@ import {
   locationAllowanceForTier,
   cartQuote,
   NEW_PRICING_ACTIVE,
+  conciergeQuote,
+  isFirstConciergePurchase,
+  ghgTierFromAllowance,
+  CONCIERGE_KEY,
+  LEGACY_CONCIERGE_KEYS,
+  UTILITY_CONNECT_ENABLED,
   type Tier,
   type GhgTier,
   type ModuleKey,
@@ -57,6 +63,7 @@ interface CreateInvoiceBody {
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
+  concierge?: { uploadedSources?: unknown; connectedSources?: unknown }
   daysUntilDue?: number
 }
 
@@ -100,6 +107,8 @@ export async function POST(req: NextRequest) {
     // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
     // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
     let ghgAllowance: number | null = null
+    let ghgTierForMeta: GhgTier | null = null
+    let conciergeMeta: Record<string, string> = {}
 
     if (body.tier || body.moduleKeys) {
       const tier = body.tier
@@ -136,7 +145,10 @@ export async function POST(req: NextRequest) {
       sources.push('configurator')
       // Same derivation as app/api/checkout/route.ts:124 — one helper, one source of truth.
       // Omitting this is what made every manually-invoiced GHG customer uncapped.
-      if (moduleKeys.includes('ghg')) ghgAllowance = locationAllowanceForTier(tier)
+      if (moduleKeys.includes('ghg')) {
+        ghgAllowance = locationAllowanceForTier(tier)
+        ghgTierForMeta = tier as GhgTier // see the note on the same capture in the checkout route
+      }
     }
 
     if (body.addOns && body.addOns.length > 0) {
@@ -163,6 +175,94 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Concierge on the source-based model. Mirrors section 2d of app/api/checkout/route.ts,
+    // including the connected-source refusal, the tier validation and the fee derivation.
+    // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because
+    // this runs as admin for someone else and there is no RLS scoping to rely on. And there is no
+    // >$10k block: this route IS the invoice path, so a large Concierge order belongs here.
+    if (body.concierge) {
+      const legacyInCart = (body.addOns ?? []).some((k) => (LEGACY_CONCIERGE_KEYS as readonly string[]).includes(k))
+      if (legacyInCart) {
+        return NextResponse.json(
+          { error: 'Concierge was selected twice, on both the old and the new model.' },
+          { status: 400 },
+        )
+      }
+
+      const uploadedSources = body.concierge.uploadedSources as number
+      const connectedSources = body.concierge.connectedSources as number | undefined
+
+      if (!UTILITY_CONNECT_ENABLED && typeof connectedSources === 'number' && connectedSources > 0) {
+        return NextResponse.json(
+          { error: 'Connected utility sources are not available yet. Invoice uploaded sources only.' },
+          { status: 400 },
+        )
+      }
+
+      const { data: ownedRows, error: ownedErr } = await supabaseAdmin
+        .from('entitlements')
+        .select('module_key, location_allowance')
+        .eq('user_id', userId)
+      if (ownedErr) {
+        console.error('[admin-invoice] entitlement read failed:', ownedErr.message)
+        return NextResponse.json({ error: 'Could not read the customer entitlements.' }, { status: 503 })
+      }
+      const ownedKeys = (ownedRows ?? []).map((r) => r.module_key)
+
+      const ghgInCart = entitlements.has('ghg')
+      if (!ghgInCart && !ownedKeys.includes('ghg')) {
+        return NextResponse.json(
+          { error: 'Concierge requires the GHG module. Add it to this invoice or grant it first.' },
+          { status: 400 },
+        )
+      }
+
+      // The tier is validated here rather than inherited: the guard above runs only inside the
+      // NEW_PRICING_ACTIVE arm, and this fee's amount must not depend on a branch two levels away.
+      let conciergeTier: GhgTier | null = null
+      if (ghgInCart) {
+        if (!body.tier || !TIER_PRICING[body.tier]) {
+          return NextResponse.json({ error: 'Invalid or missing tier.' }, { status: 400 })
+        }
+        conciergeTier = body.tier as GhgTier
+      } else {
+        const ghgRow = (ownedRows ?? []).find((r) => r.module_key === 'ghg')
+        conciergeTier = ghgTierFromAllowance(ghgRow?.location_allowance ?? null)
+      }
+      if (!conciergeTier) {
+        return NextResponse.json(
+          { error: 'Could not determine the customer GHG plan level, which sets the Concierge onboarding fee. Add a manual line item instead.' },
+          { status: 400 },
+        )
+      }
+
+      const isFirstPurchase = isFirstConciergePurchase(ownedKeys)
+
+      let quote
+      try {
+        quote = conciergeQuote({ ghgTier: conciergeTier, uploadedSources, connectedSources, isFirstPurchase })
+      } catch (e) {
+        return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
+      }
+
+      for (const line of quote.lines) {
+        // ⚠️ QUANTITY IS FLATTENED INTO THE AMOUNT AND NAMED IN THE LABEL. stripe.invoiceItems.create
+        // below takes a single `amount`, not a unit price and a count, so the multiplication happens
+        // here. The label carries the count so the customer can check the arithmetic on the invoice.
+        const label = line.quantity > 1 ? `${line.label} x ${line.quantity}` : line.label
+        lines.push({ label, amount: line.unitUSD * line.quantity })
+      }
+      entitlements.add(CONCIERGE_KEY)
+      conciergeMeta = {
+        concierge_uploaded_sources: String(uploadedSources),
+        concierge_connected_sources: String(connectedSources ?? 0),
+        concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
+        concierge_onboarding_usd: String(quote.onboardingUSD),
+        concierge_ghg_tier: conciergeTier,
+      }
+      sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
+    }
+
     if (lines.length === 0) {
       return NextResponse.json({ error: 'Nothing to invoice.' }, { status: 400 })
     }
@@ -180,6 +280,11 @@ export async function POST(req: NextRequest) {
       // Stripe metadata values are strings, and the webhook's `raw ? Number(raw) : null` reads '' as
       // null → uncapped. Deviating in either direction here silently changes what the customer gets.
       ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
+      // Same key, same empty-string convention, as app/api/checkout/route.ts. Both writers feed one
+      // reader, so a key present in only one of them is the defect lib/entitlementMetadata.test.ts
+      // exists to catch.
+      ghg_tier: ghgTierForMeta ?? '',
+      ...conciergeMeta,
     }
 
     // 8) Create the DRAFT invoice FIRST, then attach each line item to it.

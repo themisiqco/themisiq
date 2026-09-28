@@ -25,6 +25,14 @@ import {
   cartQuote,
   NEW_PRICING_ACTIVE,
   priceLine,
+  priceLineQty,
+  conciergeQuote,
+  isFirstConciergePurchase,
+  ghgTierFromAllowance,
+  CONCIERGE_KEY,
+  LEGACY_CONCIERGE_KEYS,
+  UTILITY_CONNECT_ENABLED,
+  TIER_PRICING as TIER_PRICING_FOR_VALIDATION,
   type ModuleKey,
   type Tier,
   type GhgTier,
@@ -41,6 +49,7 @@ interface CheckoutBody {
   tier?: Tier
   moduleKeys?: ModuleKey[]
   addOns?: AddOnKey[]
+  concierge?: { uploadedSources?: unknown; connectedSources?: unknown }
   business?: { name?: string; regNumber?: string }
   purchaser?: { name?: string }
   consent?: { businessCapacity?: boolean; digitalAccess?: boolean; dataAuthority?: boolean; atISO?: string; version?: string }
@@ -62,6 +71,9 @@ export async function POST(req: NextRequest) {
     const modulesInCart = new Set<ModuleKey>()
     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
     let ghgAllowance: number | null = null // GHG location ceiling to write onto the ghg entitlement row
+    let ghgTierForMeta: GhgTier | null = null // GHG tier, recorded so the webhook can write entitlements.ghg_tier
+    let conciergeMeta: Record<string, string> = {}
+    let ownedRows: { module_key: string; location_allowance: number | null }[] = []
     const sources: string[] = []
 
     // 2b) Build-your-own (tier + modules)
@@ -100,18 +112,41 @@ export async function POST(req: NextRequest) {
         entitlementsToGrant.add(m)
       })
       sources.push('configurator')
-      if (moduleKeys.includes('ghg') && tier) ghgAllowance = locationAllowanceForTier(tier) // tier-based ceiling
+      if (moduleKeys.includes('ghg') && tier) {
+        ghgAllowance = locationAllowanceForTier(tier) // tier-based ceiling
+        // The tier itself, recorded for the webhook. location_allowance alone cannot identify it:
+        // null means Advisory under the current model and uncapped under the old one, and that
+        // ambiguity is what forces the Concierge onboarding fee to reject rather than guess.
+        ghgTierForMeta = tier as GhgTier
+      }
     }
 
     // 2c) Add-ons (Verification Readiness + the Concierge tiers). Each is validated generically
     // against ADDONS via addOnRequirementsMet, which also rejects quote-only tiers (Enterprise).
-    if (body.addOns && body.addOns.length > 0) {
-      // What modules does the customer already own? (RLS scopes this to them.)
-      const { data: owned } = await supabase
+    // What does the customer already hold? RLS scopes this to them. Read ONCE: the add-on branch
+    // needs it for prerequisites and the Concierge branch needs it for isFirstPurchase.
+    //
+    // ⚠️ THE READ FAILS LOUDLY. It used to discard its error and treat the result as "owns nothing",
+    // which was harmless while it only fed a prerequisite check. It is not harmless now: reading
+    // nothing makes isFirstConciergePurchase true, and an existing Concierge customer would be
+    // charged the onboarding fee a second time on renewal.
+    let ownedKeys = new Set<string>()
+    if ((body.addOns && body.addOns.length > 0) || body.concierge) {
+      const { data: owned, error: ownedErr } = await supabase
         .from('entitlements')
-        .select('module_key')
-      const ownedKeys = new Set<string>((owned ?? []).map((r) => r.module_key))
+        .select('module_key, location_allowance')
+      if (ownedErr) {
+        console.error('[checkout] entitlement read failed:', ownedErr.message)
+        return NextResponse.json(
+          { error: 'We could not confirm what you already own. Please try again in a moment.' },
+          { status: 503 },
+        )
+      }
+      ownedRows = owned ?? []
+      ownedKeys = new Set<string>(ownedRows.map((r) => r.module_key))
+    }
 
+    if (body.addOns && body.addOns.length > 0) {
       for (const addOnKey of body.addOns) {
         const addOn = ADDONS[addOnKey]
         if (!addOn) {
@@ -134,6 +169,88 @@ export async function POST(req: NextRequest) {
         entitlementsToGrant.add(addOn.key)
       }
       sources.push(`addons:${body.addOns.join('+')}`)
+    }
+
+    // 2d) Concierge on the source-based model. The old concierge-* keys above still work until the
+    // configurator moves in Batch 4; this is the path everything new uses.
+    if (body.concierge) {
+      const legacyInCart = (body.addOns ?? []).some((k) => (LEGACY_CONCIERGE_KEYS as readonly string[]).includes(k))
+      if (legacyInCart) {
+        return NextResponse.json(
+          { error: 'Concierge was selected twice, on both the old and the new model. Please start the order again.' },
+          { status: 400 },
+        )
+      }
+
+      // Counts pass through unchanged. conciergeQuote validates them and throws rather than
+      // coercing, so the error names the real fault instead of a rounded number.
+      const uploadedSources = body.concierge.uploadedSources as number
+      const connectedSources = body.concierge.connectedSources as number | undefined
+
+      // ⚠️ THE FLAG IS ENFORCED AT THE SERVER BOUNDARY TOO, not only inside conciergeQuote. The
+      // client cannot be the thing that decides what is sellable.
+      if (!UTILITY_CONNECT_ENABLED && typeof connectedSources === 'number' && connectedSources > 0) {
+        return NextResponse.json(
+          { error: 'Connected utility sources are not available yet. Please order uploaded sources only.' },
+          { status: 400 },
+        )
+      }
+
+      // Concierge requires GHG, the same rule addOnRequirementsMet applies to the old keys.
+      const ghgInCart = modulesInCart.has('ghg')
+      if (!ghgInCart && !ownedKeys.has('ghg')) {
+        return NextResponse.json(
+          { error: 'Concierge requires the GHG module. Add it to your cart or purchase it first.' },
+          { status: 400 },
+        )
+      }
+
+      // ⚠️ THE TIER IS VALIDATED HERE, NOT INHERITED FROM THE CART BRANCH ABOVE. That branch does
+      // validate body.tier, but only when it runs and only inside the NEW_PRICING_ACTIVE arm, so
+      // relying on it would make this fee's price depend on a guard two branches away. It sets an
+      // amount, so it is checked where it is used.
+      let conciergeTier: GhgTier | null = null
+      if (ghgInCart) {
+        if (!body.tier || !TIER_PRICING_FOR_VALIDATION[body.tier]) {
+          return NextResponse.json({ error: 'Invalid or missing tier.' }, { status: 400 })
+        }
+        conciergeTier = body.tier as GhgTier
+      } else {
+        // Not in the cart, so it comes from what is stored, never from the client.
+        const ghgRow = ownedRows.find((r) => r.module_key === 'ghg')
+        conciergeTier = ghgTierFromAllowance(ghgRow?.location_allowance ?? null)
+      }
+      if (!conciergeTier) {
+        return NextResponse.json(
+          { error: 'We could not work out your GHG plan level, which sets the Concierge onboarding fee. Please contact us and we will invoice this order.' },
+          { status: 400 },
+        )
+      }
+
+      const isFirstPurchase = isFirstConciergePurchase([...ownedKeys])
+
+      let quote
+      try {
+        quote = conciergeQuote({ ghgTier: conciergeTier, uploadedSources, connectedSources, isFirstPurchase })
+      } catch (e) {
+        // conciergeQuote's messages are written for a person and name the actual fault.
+        return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
+      }
+
+      for (const line of quote.lines) {
+        lineItems.push(priceLineQty(line.label, line.unitUSD, line.quantity))
+      }
+      entitlementsToGrant.add(CONCIERGE_KEY)
+      conciergeMeta = {
+        concierge_uploaded_sources: String(uploadedSources),
+        concierge_connected_sources: String(connectedSources ?? 0),
+        concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
+        // Recorded, never granted. The onboarding fee buys setup work, not access, so the webhook
+        // must not turn this into an entitlement row or stamp a term on it.
+        concierge_onboarding_usd: String(quote.onboardingUSD),
+        concierge_ghg_tier: conciergeTier,
+      }
+      sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
     }
 
     // 3) Must be buying something.
@@ -179,6 +296,12 @@ export async function POST(req: NextRequest) {
       entitlements, // e.g. "ghg,supply-chain,verification"
       source: sources.join(' | '),
       ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
+      // The tier behind that allowance. Written whenever GHG is in the cart, and empty otherwise,
+      // following the same empty-string convention: Stripe metadata values are strings and the
+      // webhook reads '' as absent. Batch 3 writes it to entitlements.ghg_tier.
+      ghg_tier: ghgTierForMeta ?? '',
+      // Empty when Concierge is not in this order, same convention again.
+      ...conciergeMeta,
       ...consentMeta,
     }
 
