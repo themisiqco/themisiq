@@ -41,14 +41,21 @@ describe('mapping the supplier answer', () => {
     expect(states, 'every live option VALUE maps to a state, none falls through to unrecognised')
       .toEqual(['limited', 'reasonable', 'internal_only', 'no_measurement'])
 
-    // ⚠️ AND EVERY OPTION LABEL STILL MAPS TO THE SAME STATE. The label was the stored answer until
-    // 27 Sep 2026, so rows written before the migration and every supplier_assurance_raw already frozen
-    // into a snapshot hold prose. A snapshot is never rewritten, so this is permanent, not transitional:
-    // if it fails, historical lines have started reading as 'unrecognised' and telling a verifier the
-    // supplier gave an off-list answer.
-    const legacyStates = q!.options!.map(opt =>
-      assuranceForLine({ raw: opt.label, asked: true, method: 'supplier-specific' }).assurance)
-    expect(legacyStates, 'the four legacy labels must keep their states for good').toEqual(states)
+    // ⚠️ AND THE PROSE A SNAPSHOT HOLDS STILL MAPS TO THE SAME STATE. The label WAS the stored answer
+    // until 27 Sep 2026, so every supplier_assurance_raw already frozen into a scope3_category_snapshot
+    // holds it. A snapshot is never rewritten, so this is permanent, not transitional: if it fails,
+    // historical lines have started reading as 'unrecognised', which tells a verifier the supplier gave an
+    // off-list answer when they did not.
+    //
+    // ⚠️ IT IS THE legacyLabel, NOT THE LABEL, and the difference is the point. The labels were swept to
+    // the comma convention on 27 Sep 2026 — 'Yes, limited assurance' is the wording shown today and was
+    // never stored, while 'Yes — limited assurance' is what is in the snapshots. templates.ts keeps both.
+    const frozen = q!.options!.map(opt => opt.legacyLabel ?? opt.label)
+    expect(frozen, 'the four options must still record the prose a snapshot holds')
+      .toEqual(['Yes — limited assurance', 'Yes — reasonable assurance', 'No — internal only', 'No measurement'])
+    const legacyStates = frozen.map(raw =>
+      assuranceForLine({ raw, asked: true, method: 'supplier-specific' }).assurance)
+    expect(legacyStates, 'the four frozen labels must keep their states for good').toEqual(states)
   })
 
   it('keeps the supplier answer verbatim, em-dashes and all', () => {

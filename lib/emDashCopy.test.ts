@@ -54,6 +54,24 @@ const quotedBullet = (rel: string, p: Piece): boolean =>
  */
 const emptyValueGlyph = (p: Piece): boolean => p.whole && p.text.trim() === DASH
 
+/**
+ * A string assigned to a property named `legacyLabel` is a LOOKUP KEY FOR DATA ALREADY STORED, not copy.
+ *
+ * ⚠️ IT IS THE ONLY EXEMPTION THAT PROTECTS TEXT NOBODY WILL EVER SEE, which is what earns it. The 104 of
+ * these in lib/supply-chain/templates.ts are the questionnaire's option wordings as they stood before the
+ * sweep of 27 Sep 2026. Rows in supplier_responses written before that hold them, every
+ * supplier_assurance_raw frozen into a scope3_category_snapshot holds them, and db/sql/supplier-options/
+ * maps FROM them. optionValue() matches them and returns the CURRENT label, so what a customer reads is
+ * the swept wording — the dash survives only as a key.
+ *
+ * ⚠️ "REWRITE THE KEY TOO" IS THE MISTAKE THIS PREVENTS. Sweeping one would not tidy a page; it would
+ * orphan every historic answer and turn a verifier's snapshot line into 'unrecognised'.
+ *
+ * Asserted below to exist, to be confined to templates.ts, and to match the `label` beside it under the
+ * sweep's own convention — so the exemption cannot be used to hide a wording nobody has swept.
+ */
+const legacyDataKey = (p: Piece): boolean => p.whole && p.property === 'legacyLabel'
+
 const EF_SOURCES_OBJECT = { file: 'lib/ghg/engine.ts', name: 'EF_SOURCES' }
 
 /**
@@ -63,7 +81,7 @@ const EF_SOURCES_OBJECT = { file: 'lib/ghg/engine.ts', name: 'EF_SOURCES' }
  * used since it was written, and which was right about app/dashboard/scope3/page.tsx when this file was
  * wrong about it.
  */
-interface Piece { where: string; text: string; whole: boolean; pos: number }
+interface Piece { where: string; text: string; whole: boolean; pos: number; property?: string }
 
 /**
  * ⚠️ AN ENTITY IN JSX TEXT IS AN EM DASH TO THE CUSTOMER, AND NEITHER COUNTER SAW ONE. `&mdash;` in JSX
@@ -87,7 +105,11 @@ function pieces(rel: string): Piece[] {
     else if (ts.isTemplateHead(n) || ts.isTemplateMiddle(n) || ts.isTemplateTail(n)) text = n.text
     else if (ts.isJsxText(n)) text = decodeJsxEntities(n.text)
     if (text !== null) {
-      out.push({ where: `${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`, text, whole, pos: n.getStart() })
+      // The property this literal initialises, where it is one: how a data key is told from copy.
+      const parent = n.parent
+      const property = parent && ts.isPropertyAssignment(parent) ? parent.name.getText() : undefined
+      out.push({ where: `${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`, text, whole,
+                 pos: n.getStart(), property })
     }
     ts.forEachChild(n, visit)
   }
@@ -121,7 +143,7 @@ export function renderedDashes(file: string): number {
     : null
   return pieces(file)
     .filter(p => !(ef && p.pos >= ef[0] && p.pos <= ef[1]))
-    .filter(p => !quotedBullet(file, p) && !emptyValueGlyph(p))
+    .filter(p => !quotedBullet(file, p) && !emptyValueGlyph(p) && !legacyDataKey(p))
     .reduce((n, p) => n + (p.text.match(new RegExp(DASH, 'g')) ?? []).length, 0)
 }
 
@@ -258,7 +280,10 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/sb253.ts': 3,
   'lib/sbti.ts': 9,
   'lib/scope3/supplierAssurance.ts': 3,
-  'lib/supply-chain/templates.ts': 107,
+  // 107 -> 3 on 27 Sep 2026 with no answer orphaned: 104 were option LABELS, now swept to the comma
+  // convention, with the old wording kept beside each as a legacyLabel data key (exempt above). The three
+  // left are QUESTION labels, which are ordinary copy and still to sweep.
+  'lib/supply-chain/templates.ts': 3,
 }
 
 /**
@@ -361,6 +386,20 @@ describe('no em dash reaches customer-facing copy, and the remaining budget only
 
     expect(declarationRange(EF_SOURCES_OBJECT.file, EF_SOURCES_OBJECT.name),
       'EF_SOURCES is no longer a top-level declaration the parser can find').not.toBeNull()
+  })
+
+  it('the legacy-label exemption is confined to templates.ts, and each key has a swept label beside it', () => {
+    const keys = sourceFiles().flatMap(f => pieces(f).filter(legacyDataKey).map(p => ({ f, ...p })))
+    expect(keys.length, 'no legacyLabel left: delete the exemption above').toBeGreaterThan(0)
+    expect([...new Set(keys.map(k => k.f))], 'a legacyLabel outside the questionnaire definition')
+      .toEqual(['lib/supply-chain/templates.ts'])
+    // ⚠️ THE EXEMPTION CANNOT HIDE UNSWEPT COPY. Every option carrying a legacy key must show a current
+    // label that HAS been swept, so the pair is "old wording kept as a key, new wording shown".
+    const src = readFileSync(join(ROOT, 'lib/supply-chain/templates.ts'), 'utf8')
+    for (const m of src.matchAll(/label: '((?:[^'\\]|\\.)*)', tone: '[a-z]+', legacyLabel: '((?:[^'\\]|\\.)*)'/g)) {
+      expect(m[1], `the label beside legacyLabel '${m[2]}' still carries an em dash`).not.toContain(DASH)
+      expect(m[2], `legacyLabel '${m[2]}' does not differ from its label`).not.toBe(m[1])
+    }
   })
 
   it('the empty-value glyph is counted separately, not swept', () => {

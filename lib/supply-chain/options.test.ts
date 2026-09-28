@@ -69,6 +69,33 @@ describe('supplier questionnaire options', () => {
     }
   })
 
+  it('a value is the slug of the label the option FIRST carried, so relabelling cannot move it', () => {
+    // ⚠️ THE INVARIANT BEHIND "VALUES STAY BYTE-IDENTICAL". A value is stored in supplier_responses and
+    // matched by lib/scope3/supplierAssurance.ts; changing one orphans data. Expressing it as a rule
+    // rather than a pinned list means a NEW option is covered too: its value must be the slug of its own
+    // label, and once it has a legacyLabel the value is frozen against that instead.
+    const slug = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    for (const { qid, opt } of ALL) {
+      expect(opt.value, `${qid}: ${opt.label}`).toBe(slug(opt.legacyLabel ?? opt.label))
+    }
+    // And the sweep did change wording: if this reaches zero, every legacyLabel is redundant.
+    expect(ALL.filter(({ opt }) => opt.legacyLabel).length, 'options whose wording has changed').toBe(104)
+  })
+
+  it('a checkbox label may not contain a comma, because the answer is comma-joined', () => {
+    // ⚠️ THE ONE PLACE PUNCTUATION IS A DATA FORMAT. A multi-select answer is stored as one
+    // comma-separated string and split on read; a comma inside a label would shred it. Values carry no
+    // comma either (asserted above), so this guards the LABEL against the sweep's own convention.
+    for (const q of Object.values(TEMPLATES).flatMap(t => t.sections).flatMap(s => s.questions)) {
+      if (q.type !== 'checkbox') continue
+      for (const opt of q.options ?? []) {
+        expect(opt.label, `${q.id}: a checkbox label may not contain a comma`).not.toContain(',')
+        expect(opt.legacyLabel ?? '', `${q.id}: nor may its legacy label`).not.toContain(',')
+      }
+    }
+  })
+
   it('values are unique within a question, so no answer is ambiguous', () => {
     for (const q of Object.values(TEMPLATES).flatMap(t => t.sections).flatMap(s => s.questions)) {
       const vs = (q.options ?? []).map(o => o.value)
@@ -83,7 +110,14 @@ describe('supplier questionnaire options', () => {
       expect(optionValue(qid, opt.value), `${qid}: value in, value out`).toBe(opt.value)
       // ⚠️ THE LEGACY PATH. Rows written before the migration hold the label; this is what lets the
       // backfill be optional rather than a cutover, and it must keep working while any such row exists.
-      expect(optionValue(qid, opt.label), `${qid}: legacy label in, value out`).toBe(opt.value)
+      expect(optionValue(qid, opt.label), `${qid}: label in, value out`).toBe(opt.value)
+      if (opt.legacyLabel) {
+        // The prose a pre-sweep row holds still resolves, and reads back as the CURRENT label.
+        expect(optionValue(qid, opt.legacyLabel), `${qid}: legacy label in, value out`).toBe(opt.value)
+        expect(optionLabel(qid, opt.legacyLabel), `${qid}: a historic row reads with today's wording`)
+          .toBe(opt.label)
+        expect(optionTone(qid, opt.legacyLabel), `${qid}: and is toned`).toBe(opt.tone)
+      }
       expect(optionLabel(qid, opt.value), `${qid}: value in, label out`).toBe(opt.label)
       expect(optionLabel(qid, opt.label), `${qid}: label in, label out`).toBe(opt.label)
       expect(optionTone(qid, opt.label), `${qid}: a legacy row is toned too`).toBe(opt.tone)
@@ -162,16 +196,31 @@ describe('supplier questionnaire options', () => {
     const read = (f: string) => readFileSync(join(dir, f), 'utf8')
     const q = (x: string) => `'${x.replace(/'/g, "''")}'`
 
-    // Every pair appears in the three files that carry the map.
-    for (const f of ['1_preflight.sql', '2_backfill.sql', '9_rollback.sql']) {
+    // ⚠️ EVERY PROSE FORM AN ANSWER COULD BE STORED AS, in the two files that convert prose to a value.
+    // The labels were swept on 27 Sep 2026; what is stored is whatever the wording was at the time.
+    for (const f of ['1_preflight.sql', '2_backfill.sql']) {
       const sql = read(f)
       const wanted = f === '1_preflight.sql' ? ALL : ALL.filter(({ qid }) => qid !== 'env_reporting')
       for (const { qid, opt } of wanted) {
-        expect(sql, `${f}: ${qid} / ${opt.value} is missing`)
-          .toContain(`(${q(qid)}, ${q(opt.label)}, ${q(opt.value)})`)
+        for (const form of new Set([opt.label, opt.legacyLabel].filter(Boolean) as string[])) {
+          expect(sql, `${f}: ${qid} / ${form} is missing`).toContain(`(${q(qid)}, ${q(form)}, ${q(opt.value)})`)
+        }
       }
-      expect(sql, `${f} must name its source`).toContain('219 pairs across 56 questions')
     }
+    // ⚠️ THE ROLLBACK CARRIES ONE FORM PER OPTION, AND IT IS THE OLDEST. Two rows sharing a value would
+    // make `set response = m.label where r.response = m.value` join twice and restore an arbitrary one.
+    const rollback = read('9_rollback.sql')
+    for (const { qid, opt } of ALL.filter(({ qid }) => qid !== 'env_reporting')) {
+      const oldest = opt.legacyLabel ?? opt.label
+      expect(rollback, `9_rollback.sql: ${qid} / ${oldest} is missing`)
+        .toContain(`(${q(qid)}, ${q(oldest)}, ${q(opt.value)})`)
+      if (opt.legacyLabel) {
+        expect(rollback, `9_rollback.sql must not also carry the current label for ${qid}`)
+          .not.toContain(`(${q(qid)}, ${q(opt.label)}, ${q(opt.value)})`)
+      }
+    }
+    expect(read('1_preflight.sql'), 'the header counts label forms, not options')
+      .toContain('323 label forms across 56 questions')
 
     // ⚠️ EACH FILE RUNS AS PASTED: no bind parameters, and every question id written out.
     for (const f of ['1_preflight.sql', '2_backfill.sql', '3_verify.sql', '9_rollback.sql']) {
@@ -220,7 +269,7 @@ describe('supplier questionnaire options', () => {
     // label is recognisable as a questionnaire answer when it is long or carries the option dash; the four
     // legacy assurance labels all qualify, which is what this guard exists to pin.
     const found = new Set<string>()
-    const labels = [...new Set(ALL.map(({ opt }) => opt.label))]
+    const labels = [...new Set(ALL.flatMap(({ opt }) => [opt.label, opt.legacyLabel].filter(Boolean) as string[]))]
       .filter(l => l.includes('—') || l.length >= 14)
     for (const rel of RESPONSE_READERS) {
       const src = stripTsComments(readFileSync(join(ROOT, rel), 'utf8'))

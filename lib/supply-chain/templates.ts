@@ -55,6 +55,19 @@ export interface QuestionOption {
   value: string
   label: string
   tone: Tone
+  /**
+   * The wording this option carried before the labels were swept, where it has changed.
+   *
+   * ⚠️ IT IS A DATA KEY, NOT COPY, AND IT IS NEVER SHOWN. Answers stored before 27 Sep 2026 hold the
+   * option's prose, and every `supplier_assurance_raw` frozen into a scope3_category_snapshot still does
+   * — a snapshot is the record of what was reported and is never rewritten. optionValue() therefore
+   * accepts this form as well, which is what lets a historic row resolve to its option and read with the
+   * CURRENT label. Removing one of these silently turns those rows into answers that match nothing.
+   *
+   * It is also what db/sql/supplier-options/ maps FROM: the backfill looks for what is stored, and what
+   * is stored is this, not the label above it.
+   */
+  legacyLabel?: string
 }
 
 export interface Question {
@@ -86,13 +99,13 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Energy, emissions, environmental management',
         questions: [
           { id: 'env_policy', type: 'radio', label: 'Does your company have a formal environmental policy?', options: [
-            { value: 'yes_board_approved', label: 'Yes — board approved', tone: 'good' },
-            { value: 'yes_management_approved', label: 'Yes — management approved', tone: 'good' },
+            { value: 'yes_board_approved', label: 'Yes, board approved', tone: 'good', legacyLabel: 'Yes — board approved' },
+            { value: 'yes_management_approved', label: 'Yes, management approved', tone: 'good', legacyLabel: 'Yes — management approved' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'env_iso14001', type: 'radio', label: 'Is your company certified to ISO 14001?', options: [
-            { value: 'yes_current_certificate', label: 'Yes — current certificate', tone: 'good' },
+            { value: 'yes_current_certificate', label: 'Yes, current certificate', tone: 'good', legacyLabel: 'Yes — current certificate' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
@@ -108,14 +121,14 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
           ] },
           { id: 'env_ghg_year', type: 'text', label: 'Emissions reporting year', hint: 'e.g. 2024' },
           { id: 'env_renewable', type: 'radio', label: 'Do you use renewable energy?', options: [
-            { value: 'yes_more_than_50', label: 'Yes — more than 50%', tone: 'good' },
-            { value: 'yes_less_than_50', label: 'Yes — less than 50%', tone: 'watch' },
+            { value: 'yes_more_than_50', label: 'Yes, more than 50%', tone: 'good', legacyLabel: 'Yes — more than 50%' },
+            { value: 'yes_less_than_50', label: 'Yes, less than 50%', tone: 'watch', legacyLabel: 'Yes — less than 50%' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'env_target', type: 'radio', label: 'Has your company set a carbon reduction target?', options: [
-            { value: 'yes_science_based_sbti', label: 'Yes — science-based (SBTi)', tone: 'good' },
-            { value: 'yes_internal_target', label: 'Yes — internal target', tone: 'good' },
+            { value: 'yes_science_based_sbti', label: 'Yes, science-based (SBTi)', tone: 'good', legacyLabel: 'Yes — science-based (SBTi)' },
+            { value: 'yes_internal_target', label: 'Yes, internal target', tone: 'good', legacyLabel: 'Yes — internal target' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
@@ -134,49 +147,49 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Health & safety, working conditions, human rights',
         questions: [
           { id: 'lab_policy', type: 'radio', label: 'Does your company have a formal health & safety policy?', options: [
-            { value: 'yes_board_approved', label: 'Yes — board approved', tone: 'good' },
-            { value: 'yes_management_approved', label: 'Yes — management approved', tone: 'good' },
+            { value: 'yes_board_approved', label: 'Yes, board approved', tone: 'good', legacyLabel: 'Yes — board approved' },
+            { value: 'yes_management_approved', label: 'Yes, management approved', tone: 'good', legacyLabel: 'Yes — management approved' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'lab_iso45001', type: 'radio', label: 'Is your company certified to ISO 45001?', options: [
-            { value: 'yes_current_certificate', label: 'Yes — current certificate', tone: 'good' },
+            { value: 'yes_current_certificate', label: 'Yes, current certificate', tone: 'good', legacyLabel: 'Yes — current certificate' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'lab_ltifr', type: 'number', label: 'Lost Time Injury Frequency Rate (LTIFR)', hint: 'Injuries per million hours worked. Enter 0 if none.' },
           { id: 'lab_fatalities', type: 'number', label: 'Work-related fatalities in reporting year', hint: 'Enter 0 if none.' },
           { id: 'lab_hours', type: 'radio', label: 'Do all workers comply with maximum working hour regulations?', options: [
-            { value: 'yes_always', label: 'Yes — always', tone: 'good' },
-            { value: 'mostly_occasional_exceptions', label: 'Mostly — occasional exceptions', tone: 'watch' },
+            { value: 'yes_always', label: 'Yes, always', tone: 'good', legacyLabel: 'Yes — always' },
+            { value: 'mostly_occasional_exceptions', label: 'Mostly, with occasional exceptions', tone: 'watch', legacyLabel: 'Mostly — occasional exceptions' },
             { value: 'no', label: 'No', tone: 'bad' },
             { value: 'unknown', label: 'Unknown', tone: 'bad' },
           ] },
           { id: 'lab_wages', type: 'radio', label: 'Do all workers receive at least the legal minimum wage?', options: [
-            { value: 'yes_all_workers', label: 'Yes — all workers', tone: 'good' },
-            { value: 'yes_direct_employees_only', label: 'Yes — direct employees only', tone: 'watch' },
+            { value: 'yes_all_workers', label: 'Yes, all workers', tone: 'good', legacyLabel: 'Yes — all workers' },
+            { value: 'yes_direct_employees_only', label: 'Yes, direct employees only', tone: 'watch', legacyLabel: 'Yes — direct employees only' },
             { value: 'no', label: 'No', tone: 'bad' },
             { value: 'unknown', label: 'Unknown', tone: 'bad' },
           ] },
           { id: 'lab_freedom', type: 'radio', label: 'Do workers have freedom of association rights?', options: [
-            { value: 'yes_fully_respected', label: 'Yes — fully respected', tone: 'good' },
+            { value: 'yes_fully_respected', label: 'Yes, fully respected', tone: 'good', legacyLabel: 'Yes — fully respected' },
             { value: 'partially', label: 'Partially', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
             { value: 'unknown', label: 'Unknown', tone: 'bad' },
           ] },
           { id: 'lab_forced', type: 'radio', label: 'Has your company conducted a forced labour risk assessment?', options: [
-            { value: 'yes_documented', label: 'Yes — documented', tone: 'good' },
+            { value: 'yes_documented', label: 'Yes, documented', tone: 'good', legacyLabel: 'Yes — documented' },
             { value: 'informal_assessment', label: 'Informal assessment', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'lab_child', type: 'radio', label: 'Have there been any child labour incidents in the past 3 years?', options: [
             { value: 'no_incidents', label: 'No incidents', tone: 'good' },
-            { value: 'yes_remediated', label: 'Yes — remediated', tone: 'watch' },
-            { value: 'yes_unresolved', label: 'Yes — unresolved', tone: 'bad' },
+            { value: 'yes_remediated', label: 'Yes, remediated', tone: 'watch', legacyLabel: 'Yes — remediated' },
+            { value: 'yes_unresolved', label: 'Yes, unresolved', tone: 'bad', legacyLabel: 'Yes — unresolved' },
             { value: 'unknown', label: 'Unknown', tone: 'bad' },
           ] },
           { id: 'lab_hrdd', type: 'radio', label: 'Has your company conducted a human rights due diligence (HRDD) assessment?', options: [
-            { value: 'yes_documented', label: 'Yes — documented', tone: 'good' },
+            { value: 'yes_documented', label: 'Yes, documented', tone: 'good', legacyLabel: 'Yes — documented' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
@@ -187,43 +200,43 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Anti-corruption, whistleblowing, data privacy',
         questions: [
           { id: 'eth_anticorruption', type: 'radio', label: 'Does your company have a formal anti-corruption policy?', options: [
-            { value: 'yes_board_approved', label: 'Yes — board approved', tone: 'good' },
-            { value: 'yes_management_approved', label: 'Yes — management approved', tone: 'good' },
+            { value: 'yes_board_approved', label: 'Yes, board approved', tone: 'good', legacyLabel: 'Yes — board approved' },
+            { value: 'yes_management_approved', label: 'Yes, management approved', tone: 'good', legacyLabel: 'Yes — management approved' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'eth_training', type: 'radio', label: 'Do employees receive anti-corruption training?', options: [
-            { value: 'yes_mandatory_annual', label: 'Yes — mandatory annual', tone: 'good' },
-            { value: 'yes_on_joining', label: 'Yes — on joining', tone: 'good' },
+            { value: 'yes_mandatory_annual', label: 'Yes, mandatory annual', tone: 'good', legacyLabel: 'Yes — mandatory annual' },
+            { value: 'yes_on_joining', label: 'Yes, on joining', tone: 'good', legacyLabel: 'Yes — on joining' },
             { value: 'ad_hoc', label: 'Ad hoc', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'eth_incidents', type: 'radio', label: 'Have there been any corruption or bribery incidents in the past 3 years?', options: [
             { value: 'no_incidents', label: 'No incidents', tone: 'good' },
-            { value: 'yes_investigated_and_resolved', label: 'Yes — investigated and resolved', tone: 'watch' },
-            { value: 'yes_unresolved', label: 'Yes — unresolved', tone: 'bad' },
+            { value: 'yes_investigated_and_resolved', label: 'Yes, investigated and resolved', tone: 'watch', legacyLabel: 'Yes — investigated and resolved' },
+            { value: 'yes_unresolved', label: 'Yes, unresolved', tone: 'bad', legacyLabel: 'Yes — unresolved' },
             { value: 'unknown', label: 'Unknown', tone: 'bad' },
           ] },
           { id: 'eth_whistleblower', type: 'radio', label: 'Does your company have a whistleblower/grievance mechanism?', options: [
-            { value: 'yes_anonymous_channel_available', label: 'Yes — anonymous channel available', tone: 'good' },
-            { value: 'yes_named_reporting_only', label: 'Yes — named reporting only', tone: 'good' },
+            { value: 'yes_anonymous_channel_available', label: 'Yes, anonymous channel available', tone: 'good', legacyLabel: 'Yes — anonymous channel available' },
+            { value: 'yes_named_reporting_only', label: 'Yes, named reporting only', tone: 'good', legacyLabel: 'Yes — named reporting only' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'eth_conflicts', type: 'radio', label: 'Does your company have a conflicts of interest policy?', options: [
-            { value: 'yes_documented', label: 'Yes — documented', tone: 'good' },
+            { value: 'yes_documented', label: 'Yes, documented', tone: 'good', legacyLabel: 'Yes — documented' },
             { value: 'informal', label: 'Informal', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'eth_gdpr', type: 'radio', label: 'Is your company GDPR compliant (if processing EU personal data)?', options: [
-            { value: 'yes_fully_compliant', label: 'Yes — fully compliant', tone: 'good' },
+            { value: 'yes_fully_compliant', label: 'Yes, fully compliant', tone: 'good', legacyLabel: 'Yes — fully compliant' },
             { value: 'partially_compliant', label: 'Partially compliant', tone: 'watch' },
             { value: 'not_applicable', label: 'Not applicable', tone: 'neutral' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'eth_sanctions', type: 'radio', label: 'Has your company been subject to regulatory sanctions in the past 3 years?', options: [
             { value: 'no', label: 'No', tone: 'good' },
-            { value: 'yes_resolved', label: 'Yes — resolved', tone: 'watch' },
-            { value: 'yes_ongoing', label: 'Yes — ongoing', tone: 'bad' },
+            { value: 'yes_resolved', label: 'Yes, resolved', tone: 'watch', legacyLabel: 'Yes — resolved' },
+            { value: 'yes_ongoing', label: 'Yes, ongoing', tone: 'bad', legacyLabel: 'Yes — ongoing' },
           ] },
         ],
       },
@@ -232,39 +245,39 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Your own supply chain sustainability practices',
         questions: [
           { id: 'proc_code', type: 'radio', label: 'Do you have a supplier code of conduct?', options: [
-            { value: 'yes_signed_by_suppliers', label: 'Yes — signed by suppliers', tone: 'good' },
-            { value: 'yes_not_yet_enforced', label: 'Yes — not yet enforced', tone: 'watch' },
+            { value: 'yes_signed_by_suppliers', label: 'Yes, signed by suppliers', tone: 'good', legacyLabel: 'Yes — signed by suppliers' },
+            { value: 'yes_not_yet_enforced', label: 'Yes, not yet enforced', tone: 'watch', legacyLabel: 'Yes — not yet enforced' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'proc_assess', type: 'radio', label: 'Do you assess your own suppliers for sustainability risks?', options: [
-            { value: 'yes_all_key_suppliers', label: 'Yes — all key suppliers', tone: 'good' },
-            { value: 'yes_selected_suppliers', label: 'Yes — selected suppliers', tone: 'good' },
+            { value: 'yes_all_key_suppliers', label: 'Yes, all key suppliers', tone: 'good', legacyLabel: 'Yes — all key suppliers' },
+            { value: 'yes_selected_suppliers', label: 'Yes, selected suppliers', tone: 'good', legacyLabel: 'Yes — selected suppliers' },
             { value: 'occasionally', label: 'Occasionally', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'proc_audit', type: 'radio', label: 'Do you conduct or require third-party audits of suppliers?', options: [
-            { value: 'yes_regular_audits', label: 'Yes — regular audits', tone: 'good' },
-            { value: 'yes_occasional', label: 'Yes — occasional', tone: 'watch' },
+            { value: 'yes_regular_audits', label: 'Yes, regular audits', tone: 'good', legacyLabel: 'Yes — regular audits' },
+            { value: 'yes_occasional', label: 'Yes, occasional', tone: 'watch', legacyLabel: 'Yes — occasional' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'proc_traceability', type: 'radio', label: 'Can you trace your key raw materials to source?', options: [
-            { value: 'yes_tier_1_and_beyond', label: 'Yes — tier 1 and beyond', tone: 'good' },
-            { value: 'yes_tier_1_only', label: 'Yes — tier 1 only', tone: 'watch' },
+            { value: 'yes_tier_1_and_beyond', label: 'Yes, tier 1 and beyond', tone: 'good', legacyLabel: 'Yes — tier 1 and beyond' },
+            { value: 'yes_tier_1_only', label: 'Yes, tier 1 only', tone: 'watch', legacyLabel: 'Yes — tier 1 only' },
             { value: 'partially', label: 'Partially', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'proc_ecovadis', type: 'radio', label: 'Does your company have an EcoVadis rating?', options: [
-            { value: 'yes_gold', label: 'Yes — Gold', tone: 'good' },
-            { value: 'yes_silver', label: 'Yes — Silver', tone: 'good' },
-            { value: 'yes_bronze', label: 'Yes — Bronze', tone: 'good' },
-            { value: 'yes_rated_no_medal', label: 'Yes — rated (no medal)', tone: 'watch' },
+            { value: 'yes_gold', label: 'Yes, Gold', tone: 'good', legacyLabel: 'Yes — Gold' },
+            { value: 'yes_silver', label: 'Yes, Silver', tone: 'good', legacyLabel: 'Yes — Silver' },
+            { value: 'yes_bronze', label: 'Yes, Bronze', tone: 'good', legacyLabel: 'Yes — Bronze' },
+            { value: 'yes_rated_no_medal', label: 'Yes, rated (no medal)', tone: 'watch', legacyLabel: 'Yes — rated (no medal)' },
             { value: 'no_rating', label: 'No rating', tone: 'watch' },
           ] },
           { id: 'proc_scope3cat1', type: 'radio', label: 'Do you collect primary emissions data from your own suppliers?', options: [
-            { value: 'yes_most_suppliers', label: 'Yes — most suppliers', tone: 'good' },
-            { value: 'yes_key_suppliers_only', label: 'Yes — key suppliers only', tone: 'good' },
-            { value: 'no_spend_based_only', label: 'No — spend-based only', tone: 'watch' },
+            { value: 'yes_most_suppliers', label: 'Yes, most suppliers', tone: 'good', legacyLabel: 'Yes — most suppliers' },
+            { value: 'yes_key_suppliers_only', label: 'Yes, key suppliers only', tone: 'good', legacyLabel: 'Yes — key suppliers only' },
+            { value: 'no_spend_based_only', label: 'No, spend-based only', tone: 'watch', legacyLabel: 'No — spend-based only' },
             { value: 'no_measurement', label: 'No measurement', tone: 'bad' },
           ] },
         ],
@@ -307,17 +320,17 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
             { value: 'unknown', label: 'Unknown', tone: 'watch' },
           ] },
           { id: 's3_target', type: 'radio', label: 'Has your company set a carbon reduction target?', options: [
-            { value: 'yes_science_based_sbti_committed', label: 'Yes — science-based (SBTi committed)', tone: 'good' },
-            { value: 'yes_sbti_approved', label: 'Yes — SBTi approved', tone: 'good' },
-            { value: 'yes_net_zero_target', label: 'Yes — net zero target', tone: 'good' },
-            { value: 'yes_internal_reduction_target', label: 'Yes — internal reduction target', tone: 'good' },
+            { value: 'yes_science_based_sbti_committed', label: 'Yes, science-based (SBTi committed)', tone: 'good', legacyLabel: 'Yes — science-based (SBTi committed)' },
+            { value: 'yes_sbti_approved', label: 'Yes, SBTi approved', tone: 'good', legacyLabel: 'Yes — SBTi approved' },
+            { value: 'yes_net_zero_target', label: 'Yes, net zero target', tone: 'good', legacyLabel: 'Yes — net zero target' },
+            { value: 'yes_internal_reduction_target', label: 'Yes, internal reduction target', tone: 'good', legacyLabel: 'Yes — internal reduction target' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no_target', label: 'No target', tone: 'bad' },
           ] },
           { id: 's3_assurance', type: 'radio', label: 'Are your emissions figures independently assured?', options: [
-            { value: 'yes_limited_assurance', label: 'Yes — limited assurance', tone: 'good' },
-            { value: 'yes_reasonable_assurance', label: 'Yes — reasonable assurance', tone: 'good' },
-            { value: 'no_internal_only', label: 'No — internal only', tone: 'watch' },
+            { value: 'yes_limited_assurance', label: 'Yes, limited assurance', tone: 'good', legacyLabel: 'Yes — limited assurance' },
+            { value: 'yes_reasonable_assurance', label: 'Yes, reasonable assurance', tone: 'good', legacyLabel: 'Yes — reasonable assurance' },
+            { value: 'no_internal_only', label: 'No, internal only', tone: 'watch', legacyLabel: 'No — internal only' },
             { value: 'no_measurement', label: 'No measurement', tone: 'bad' },
           ] },
         ],
@@ -333,26 +346,26 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Forced labour, debt bondage and worker freedom',
         questions: [
           { id: 'ms_policy', type: 'radio', label: 'Does your company have a formal modern slavery or human trafficking policy?', options: [
-            { value: 'yes_publicly_available', label: 'Yes — publicly available', tone: 'good' },
-            { value: 'yes_internal_only', label: 'Yes — internal only', tone: 'good' },
+            { value: 'yes_publicly_available', label: 'Yes, publicly available', tone: 'good', legacyLabel: 'Yes — publicly available' },
+            { value: 'yes_internal_only', label: 'Yes, internal only', tone: 'good', legacyLabel: 'Yes — internal only' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_risk_assess', type: 'radio', label: 'Has your company conducted a modern slavery risk assessment?', options: [
-            { value: 'yes_documented_and_reviewed_annually', label: 'Yes — documented and reviewed annually', tone: 'good' },
-            { value: 'yes_conducted_once', label: 'Yes — conducted once', tone: 'good' },
+            { value: 'yes_documented_and_reviewed_annually', label: 'Yes, documented and reviewed annually', tone: 'good', legacyLabel: 'Yes — documented and reviewed annually' },
+            { value: 'yes_conducted_once', label: 'Yes, conducted once', tone: 'good', legacyLabel: 'Yes — conducted once' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_forced', type: 'radio', label: 'Has your company identified any forced labour in its operations or supply chain in the past 3 years?', options: [
-            { value: 'no_confirmed_through_assessment', label: 'No — confirmed through assessment', tone: 'good' },
-            { value: 'no_not_assessed', label: 'No — not assessed', tone: 'bad' },
-            { value: 'yes_remediated', label: 'Yes — remediated', tone: 'watch' },
-            { value: 'yes_unresolved', label: 'Yes — unresolved', tone: 'bad' },
+            { value: 'no_confirmed_through_assessment', label: 'No, confirmed through assessment', tone: 'good', legacyLabel: 'No — confirmed through assessment' },
+            { value: 'no_not_assessed', label: 'No, not assessed', tone: 'bad', legacyLabel: 'No — not assessed' },
+            { value: 'yes_remediated', label: 'Yes, remediated', tone: 'watch', legacyLabel: 'Yes — remediated' },
+            { value: 'yes_unresolved', label: 'Yes, unresolved', tone: 'bad', legacyLabel: 'Yes — unresolved' },
           ] },
           { id: 'ms_recruitment', type: 'radio', label: 'Does your company prohibit the use of recruitment fees charged to workers?', options: [
-            { value: 'yes_policy_in_place_and_enforced', label: 'Yes — policy in place and enforced', tone: 'good' },
-            { value: 'yes_policy_in_place', label: 'Yes — policy in place', tone: 'good' },
+            { value: 'yes_policy_in_place_and_enforced', label: 'Yes, policy in place and enforced', tone: 'good', legacyLabel: 'Yes — policy in place and enforced' },
+            { value: 'yes_policy_in_place', label: 'Yes, policy in place', tone: 'good', legacyLabel: 'Yes — policy in place' },
             { value: 'no_explicit_prohibition', label: 'No explicit prohibition', tone: 'bad' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
@@ -363,14 +376,14 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Child labour prevention and minimum age compliance',
         questions: [
           { id: 'ms_child_policy', type: 'radio', label: 'Does your company have a minimum age policy aligned to ILO Convention 138?', options: [
-            { value: 'yes_documented_and_enforced', label: 'Yes — documented and enforced', tone: 'good' },
-            { value: 'yes_informal', label: 'Yes — informal', tone: 'watch' },
+            { value: 'yes_documented_and_enforced', label: 'Yes, documented and enforced', tone: 'good', legacyLabel: 'Yes — documented and enforced' },
+            { value: 'yes_informal', label: 'Yes, informal', tone: 'watch', legacyLabel: 'Yes — informal' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_child_incidents', type: 'radio', label: 'Have there been any child labour incidents in your operations or supply chain in the past 3 years?', options: [
             { value: 'no_incidents', label: 'No incidents', tone: 'good' },
-            { value: 'yes_investigated_and_remediated', label: 'Yes — investigated and remediated', tone: 'watch' },
-            { value: 'yes_unresolved', label: 'Yes — unresolved', tone: 'bad' },
+            { value: 'yes_investigated_and_remediated', label: 'Yes, investigated and remediated', tone: 'watch', legacyLabel: 'Yes — investigated and remediated' },
+            { value: 'yes_unresolved', label: 'Yes, unresolved', tone: 'bad', legacyLabel: 'Yes — unresolved' },
             { value: 'unknown', label: 'Unknown', tone: 'bad' },
           ] },
         ],
@@ -380,31 +393,31 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Supply chain due diligence and grievance mechanisms',
         questions: [
           { id: 'ms_dd_suppliers', type: 'radio', label: 'Do you conduct modern slavery due diligence on your suppliers?', options: [
-            { value: 'yes_all_tier_1_suppliers', label: 'Yes — all tier 1 suppliers', tone: 'good' },
-            { value: 'yes_high_risk_suppliers_only', label: 'Yes — high-risk suppliers only', tone: 'good' },
+            { value: 'yes_all_tier_1_suppliers', label: 'Yes, all tier 1 suppliers', tone: 'good', legacyLabel: 'Yes — all tier 1 suppliers' },
+            { value: 'yes_high_risk_suppliers_only', label: 'Yes, high-risk suppliers only', tone: 'good', legacyLabel: 'Yes — high-risk suppliers only' },
             { value: 'occasionally', label: 'Occasionally', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_grievance', type: 'radio', label: 'Does your company have a grievance mechanism accessible to workers in your supply chain?', options: [
-            { value: 'yes_anonymous_and_accessible', label: 'Yes — anonymous and accessible', tone: 'good' },
-            { value: 'yes_limited_access', label: 'Yes — limited access', tone: 'good' },
+            { value: 'yes_anonymous_and_accessible', label: 'Yes, anonymous and accessible', tone: 'good', legacyLabel: 'Yes — anonymous and accessible' },
+            { value: 'yes_limited_access', label: 'Yes, limited access', tone: 'good', legacyLabel: 'Yes — limited access' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_training', type: 'radio', label: 'Do relevant employees receive training on modern slavery recognition?', options: [
-            { value: 'yes_mandatory_annual', label: 'Yes — mandatory annual', tone: 'good' },
-            { value: 'yes_on_induction', label: 'Yes — on induction', tone: 'good' },
+            { value: 'yes_mandatory_annual', label: 'Yes, mandatory annual', tone: 'good', legacyLabel: 'Yes — mandatory annual' },
+            { value: 'yes_on_induction', label: 'Yes, on induction', tone: 'good', legacyLabel: 'Yes — on induction' },
             { value: 'ad_hoc', label: 'Ad hoc', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_statement', type: 'radio', label: 'Does your company publish a Modern Slavery Act transparency statement?', options: [
-            { value: 'yes_annual_board_approved', label: 'Yes — annual, board approved', tone: 'good' },
-            { value: 'yes_published_but_not_annual', label: 'Yes — published but not annual', tone: 'good' },
-            { value: 'no_below_threshold', label: 'No — below threshold', tone: 'neutral' },
+            { value: 'yes_annual_board_approved', label: 'Yes, annual and board approved', tone: 'good', legacyLabel: 'Yes — annual, board approved' },
+            { value: 'yes_published_but_not_annual', label: 'Yes, published but not annual', tone: 'good', legacyLabel: 'Yes — published but not annual' },
+            { value: 'no_below_threshold', label: 'No, below threshold', tone: 'neutral', legacyLabel: 'No — below threshold' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'ms_kpis', type: 'radio', label: 'Does your company track KPIs to measure effectiveness of modern slavery actions?', options: [
-            { value: 'yes_reported_publicly', label: 'Yes — reported publicly', tone: 'good' },
-            { value: 'yes_internal_only', label: 'Yes — internal only', tone: 'good' },
+            { value: 'yes_reported_publicly', label: 'Yes, reported publicly', tone: 'good', legacyLabel: 'Yes — reported publicly' },
+            { value: 'yes_internal_only', label: 'Yes, internal only', tone: 'good', legacyLabel: 'Yes — internal only' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
@@ -422,20 +435,20 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Human rights due diligence governance and policy',
         questions: [
           { id: 'cs_policy', type: 'radio', label: 'Does your company have a human rights policy aligned to the UN Guiding Principles (UNGPs)?', options: [
-            { value: 'yes_publicly_available_board_approved', label: 'Yes — publicly available, board approved', tone: 'good' },
-            { value: 'yes_internal_policy', label: 'Yes — internal policy', tone: 'good' },
+            { value: 'yes_publicly_available_board_approved', label: 'Yes, publicly available and board approved', tone: 'good', legacyLabel: 'Yes — publicly available, board approved' },
+            { value: 'yes_internal_policy', label: 'Yes, internal policy', tone: 'good', legacyLabel: 'Yes — internal policy' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_governance', type: 'radio', label: 'Is board or senior management accountable for human rights due diligence?', options: [
-            { value: 'yes_board_level', label: 'Yes — board level', tone: 'good' },
-            { value: 'yes_senior_management', label: 'Yes — senior management', tone: 'good' },
+            { value: 'yes_board_level', label: 'Yes, board level', tone: 'good', legacyLabel: 'Yes — board level' },
+            { value: 'yes_senior_management', label: 'Yes, senior management', tone: 'good', legacyLabel: 'Yes — senior management' },
             { value: 'delegated_to_sustainability_team', label: 'Delegated to sustainability team', tone: 'watch' },
             { value: 'no_formal_accountability', label: 'No formal accountability', tone: 'bad' },
           ] },
           { id: 'cs_scope', type: 'radio', label: 'Does your HRDD programme cover your full value chain (upstream and downstream)?', options: [
-            { value: 'yes_full_value_chain', label: 'Yes — full value chain', tone: 'good' },
-            { value: 'yes_direct_suppliers_only', label: 'Yes — direct suppliers only', tone: 'watch' },
+            { value: 'yes_full_value_chain', label: 'Yes, full value chain', tone: 'good', legacyLabel: 'Yes — full value chain' },
+            { value: 'yes_direct_suppliers_only', label: 'Yes, direct suppliers only', tone: 'watch', legacyLabel: 'Yes — direct suppliers only' },
             { value: 'operations_only', label: 'Operations only', tone: 'watch' },
             { value: 'no_hrdd_programme', label: 'No HRDD programme', tone: 'bad' },
           ] },
@@ -446,8 +459,8 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Identification and assessment of human rights risks',
         questions: [
           { id: 'cs_risk_assess', type: 'radio', label: 'Does your company conduct human rights risk assessments?', options: [
-            { value: 'yes_annual_documented', label: 'Yes — annual, documented', tone: 'good' },
-            { value: 'yes_ad_hoc', label: 'Yes — ad hoc', tone: 'watch' },
+            { value: 'yes_annual_documented', label: 'Yes, annual and documented', tone: 'good', legacyLabel: 'Yes — annual, documented' },
+            { value: 'yes_ad_hoc', label: 'Yes, ad hoc', tone: 'watch', legacyLabel: 'Yes — ad hoc' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
@@ -459,14 +472,14 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
             { value: 'none', label: 'None', tone: 'bad' },
           ] },
           { id: 'cs_salient', type: 'radio', label: 'Has your company identified its salient human rights issues?', options: [
-            { value: 'yes_publicly_disclosed', label: 'Yes — publicly disclosed', tone: 'good' },
-            { value: 'yes_internal_only', label: 'Yes — internal only', tone: 'good' },
+            { value: 'yes_publicly_disclosed', label: 'Yes, publicly disclosed', tone: 'good', legacyLabel: 'Yes — publicly disclosed' },
+            { value: 'yes_internal_only', label: 'Yes, internal only', tone: 'good', legacyLabel: 'Yes — internal only' },
             { value: 'in_progress', label: 'In progress', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_high_risk', type: 'radio', label: 'Have you identified high-risk geographies or sectors in your supply chain?', options: [
-            { value: 'yes_documented_and_monitored', label: 'Yes — documented and monitored', tone: 'good' },
-            { value: 'yes_identified_informally', label: 'Yes — identified informally', tone: 'watch' },
+            { value: 'yes_documented_and_monitored', label: 'Yes, documented and monitored', tone: 'good', legacyLabel: 'Yes — documented and monitored' },
+            { value: 'yes_identified_informally', label: 'Yes, identified informally', tone: 'watch', legacyLabel: 'Yes — identified informally' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
         ],
@@ -476,28 +489,28 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Actions taken to prevent and remediate human rights harms',
         questions: [
           { id: 'cs_prevention', type: 'radio', label: 'Does your company have action plans to prevent or mitigate identified human rights risks?', options: [
-            { value: 'yes_documented_with_timelines', label: 'Yes — documented with timelines', tone: 'good' },
-            { value: 'yes_informal_plans', label: 'Yes — informal plans', tone: 'watch' },
+            { value: 'yes_documented_with_timelines', label: 'Yes, documented with timelines', tone: 'good', legacyLabel: 'Yes — documented with timelines' },
+            { value: 'yes_informal_plans', label: 'Yes, informal plans', tone: 'watch', legacyLabel: 'Yes — informal plans' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_supplier_code', type: 'radio', label: 'Does your supplier code of conduct include human rights requirements aligned to ILO core conventions?', options: [
-            { value: 'yes_fully_aligned', label: 'Yes — fully aligned', tone: 'good' },
+            { value: 'yes_fully_aligned', label: 'Yes, fully aligned', tone: 'good', legacyLabel: 'Yes — fully aligned' },
             { value: 'partially_aligned', label: 'Partially aligned', tone: 'watch' },
             { value: 'code_exists_but_not_hrdd_focused', label: 'Code exists but not HRDD-focused', tone: 'watch' },
             { value: 'no_code', label: 'No code', tone: 'bad' },
           ] },
           { id: 'cs_grievance', type: 'radio', label: 'Does your company operate a grievance mechanism accessible to affected stakeholders?', options: [
-            { value: 'yes_operational_anonymous', label: 'Yes — operational, anonymous', tone: 'good' },
-            { value: 'yes_limited_access', label: 'Yes — limited access', tone: 'good' },
+            { value: 'yes_operational_anonymous', label: 'Yes, operational and anonymous', tone: 'good', legacyLabel: 'Yes — operational, anonymous' },
+            { value: 'yes_limited_access', label: 'Yes, limited access', tone: 'good', legacyLabel: 'Yes — limited access' },
             { value: 'in_development', label: 'In development', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_remediation', type: 'radio', label: 'Has your company provided or facilitated remediation for any human rights harm in the past 3 years?', options: [
-            { value: 'yes_documented', label: 'Yes — documented', tone: 'good' },
-            { value: 'yes_informal', label: 'Yes — informal', tone: 'watch' },
+            { value: 'yes_documented', label: 'Yes, documented', tone: 'good', legacyLabel: 'Yes — documented' },
+            { value: 'yes_informal', label: 'Yes, informal', tone: 'watch', legacyLabel: 'Yes — informal' },
             { value: 'no_harm_identified', label: 'No harm identified', tone: 'good' },
-            { value: 'no_harm_identified_but_not_remediated', label: 'No — harm identified but not remediated', tone: 'bad' },
+            { value: 'no_harm_identified_but_not_remediated', label: 'No, harm identified but not remediated', tone: 'bad', legacyLabel: 'No — harm identified but not remediated' },
           ] },
         ],
       },
@@ -506,19 +519,19 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Monitoring effectiveness and public disclosure',
         questions: [
           { id: 'cs_monitoring', type: 'radio', label: 'Does your company monitor the effectiveness of its HRDD measures?', options: [
-            { value: 'yes_kpis_tracked_and_reported', label: 'Yes — KPIs tracked and reported', tone: 'good' },
-            { value: 'yes_internal_monitoring', label: 'Yes — internal monitoring', tone: 'good' },
+            { value: 'yes_kpis_tracked_and_reported', label: 'Yes, KPIs tracked and reported', tone: 'good', legacyLabel: 'Yes — KPIs tracked and reported' },
+            { value: 'yes_internal_monitoring', label: 'Yes, internal monitoring', tone: 'good', legacyLabel: 'Yes — internal monitoring' },
             { value: 'ad_hoc', label: 'Ad hoc', tone: 'watch' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_disclosure', type: 'radio', label: 'Does your company publicly disclose its HRDD approach and findings?', options: [
-            { value: 'yes_annual_report_or_dedicated_statement', label: 'Yes — annual report or dedicated statement', tone: 'good' },
-            { value: 'yes_on_request', label: 'Yes — on request', tone: 'good' },
+            { value: 'yes_annual_report_or_dedicated_statement', label: 'Yes, annual report or dedicated statement', tone: 'good', legacyLabel: 'Yes — annual report or dedicated statement' },
+            { value: 'yes_on_request', label: 'Yes, on request', tone: 'good', legacyLabel: 'Yes — on request' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_stakeholder', type: 'radio', label: 'Does your company engage with affected stakeholders (workers, communities) in its HRDD process?', options: [
-            { value: 'yes_formal_engagement_process', label: 'Yes — formal engagement process', tone: 'good' },
-            { value: 'yes_ad_hoc', label: 'Yes — ad hoc', tone: 'watch' },
+            { value: 'yes_formal_engagement_process', label: 'Yes, formal engagement process', tone: 'good', legacyLabel: 'Yes — formal engagement process' },
+            { value: 'yes_ad_hoc', label: 'Yes, ad hoc', tone: 'watch', legacyLabel: 'Yes — ad hoc' },
             { value: 'no', label: 'No', tone: 'bad' },
           ] },
           { id: 'cs_incidents', type: 'number', label: 'Number of human rights incidents identified in your value chain in the past year', hint: 'Enter 0 if none identified.' },
@@ -617,8 +630,9 @@ export function optionsFor(questionId: string): QuestionOption[] {
 /**
  * The stored answer, normalised to a value.
  *
- * ⚠️ IT ACCEPTS A LEGACY LABEL, AND THAT IS WHAT MAKES THE BACKFILL OPTIONAL RATHER THAN A CUTOVER. Rows
- * written before the migration hold the label; a supplier with the questionnaire already open keeps
+ * ⚠️ IT ACCEPTS EITHER LABEL, AND THAT IS WHAT MAKES THE BACKFILL OPTIONAL RATHER THAN A CUTOVER. Rows
+ * written before the values migration hold the option's prose, and rows written before the labels were
+ * swept hold the OLDER prose (see legacyLabel); a supplier with the questionnaire already open keeps
  * writing whatever their loaded page holds. Both resolve here, so no window exists in which the
  * application and the data disagree.
  *
@@ -628,7 +642,7 @@ export function optionsFor(questionId: string): QuestionOption[] {
 export function optionValue(questionId: string, stored: string): string {
   const opts = optionsFor(questionId)
   if (opts.some(o => o.value === stored)) return stored
-  return opts.find(o => o.label === stored)?.value ?? stored
+  return opts.find(o => o.label === stored || o.legacyLabel === stored)?.value ?? stored
 }
 
 /** What a human reads: the label for a value, or the input unchanged if it names no option. */

@@ -29,6 +29,25 @@ select count(*) as all_responses, count(distinct campaign_supplier_id) as suppli
   from supplier_responses;
 ```
 
+## 27 September 2026, later the same day — the four files were regenerated
+
+The option **labels** were swept to the comma convention (`Yes — board approved` became
+`Yes, board approved`) while every **value** stayed byte-identical. The four SQL files were regenerated
+from `lib/supply-chain/templates.ts`, and they grew: the map now carries **323 label forms** rather than
+219, because an option whose wording has changed is listed under every wording it has had. What is stored
+is whatever the label said when the supplier answered, so a map built from the current labels alone would
+look for prose nobody ever wrote.
+
+⚠️ **The preflight and verify results recorded above were produced by the PREVIOUS generation of these
+files**, the one with 219 pairs. They remain valid as findings — there was no label prose in
+`supplier_responses` then, and adding more label forms to look for cannot create rows that are not there —
+but they are not an execution record for the files now on disk. Re-run `1_preflight.sql` before
+`2_backfill.sql` if you ever run it.
+
+The rollback also changed shape: it carries one prose form per option, the **oldest**, because two rows
+sharing a value would make `set response = m.label where r.response = m.value` join twice and restore an
+arbitrary one of them.
+
 The backfill remains correct and runnable as it stands: `optionValue()` accepts a label or a value, so it
 can be run at any future point — for instance if an older deployment writes label prose again, or if rows
 are restored from a backup taken before 27 September 2026.
