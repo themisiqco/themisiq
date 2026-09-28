@@ -743,6 +743,10 @@ h3 { font-size: var(--text-xl); }
 }
 
 /* ⚠️ THE GRADATION GROUND, AND THIS IS A CONTRAST FIX RATHER THAN A LAYOUT ONE.
+   ⚠️ ONE GROUND, NOT TWO, SINCE 28 Sep 2026: the homepage hero became a photograph and left this
+   class, so only the closing band uses it. The hero rows in the table below are kept because they
+   are what established the 900px breakpoint, and because they are the measurement anyone reversing
+   that change would need. The hero's own wash is .tq-hero-wash, further down.
    --gradation-ink-safe holds ink to the light 60% of the band, which works only
    while the text column IS 60%. Both grounds set `min-width: min(100%, 34rem)`
    (hero) and `min(100%, 28rem)` (closing band), and MIN-WIDTH BEATS MAX-WIDTH,
@@ -776,6 +780,51 @@ h3 { font-size: var(--text-xl); }
 .tq-gradation-ground { background: var(--gradation-band); }
 @media (max-width: 900px) {
   .tq-gradation-ground { background: linear-gradient(90deg, #FFDE59 0%, #7ED957 100%); }
+}
+
+/* ⚠️ THE HERO WASH — AT EVERY WIDTH, AND HEAVIER BELOW 900px. The homepage hero is a photograph
+   (public/home/hero-aurora.jpg) with --color-on-dark copy over it.
+
+   ⚠️ DESKTOP NEEDS A WASH TOO, WHICH IS THE OPPOSITE OF WHAT THIS BLOCK FIRST SAID. It was written
+   claiming 5.7:1 under the text column on desktop and no wash needed. Measured, that was wrong in
+   the dangerous direction. `object-fit: cover` on a 16:9 photograph in a box that is far wider than
+   it is tall crops vertically and scales up, so a wide viewport shows the LOWER band of the frame,
+   where the teal curtains sweep left into the copy. Wider is therefore worse, not better, and the
+   text column is centred inside a 1180px wrapper, so it slides right into the brighter middle as
+   the viewport grows. Every figure below is #EAEDEE against the rendered background with the copy
+   hidden, sampled per pixel over each element's own rect, taken 28 Sep 2026:
+
+     viewport   column   body paragraph   whole column      with no wash at all
+       375px     295px      6.59:1            4.79:1         3.67 / 2.31  ← both fail
+       768px     544px      8.98:1            4.97:1         6.00 / 2.42  ← column fails
+       900px     544px      9.20:1            7.92:1         6.23 / 4.85
+      1280px     708px      5.72:1            5.35:1         4.74 / 4.43  ← column fails
+      1440px     708px      5.72:1            5.53:1         4.74 / 4.60
+      1920px     708px      5.08:1            5.08:1         4.16 / 4.16  ← both fail
+
+   So the worst case is 1920px, not 375px. 0.15 carries it to 5.08:1, and the whole-column low
+   across every width measured is 4.79:1 at 375px. AA body is 4.5:1 and nothing is below it.
+
+   ⚠️ 0.4 BELOW 900px IS A SEPARATE PROBLEM WITH A SEPARATE CAUSE. There the column stops being a
+   column: `min-width: min(100%, 34rem)` beats the max-width, exactly as it does on the gradation
+   band above, so the copy spans the full width and crosses the curtains head-on. 0.15 does not
+   cover that — at 375px the whole column reads 2.31:1 unwashed.
+
+   ⚠️ A SEPARATE ELEMENT, NOT A FILTER ON THE IMAGE AND NOT opacity ON THE TEXT. It has to sit
+   BETWEEN the photograph and the copy. Over the copy it would drag the text down with the picture,
+   which is the mistake the DISABLED AND INACTIVE STATE block below sets out.
+
+   ⚠️ NOT A BREAKPOINT ON THE IMAGE ITSELF. Swapping objectPosition at 900px would move the warm
+   bottom-right corner out of frame, and the anchor is what keeps it. The wash changes what is over
+   the picture, never which part of the picture is shown. */
+.tq-hero-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(4, 24, 48, 0.15);
+}
+@media (max-width: 900px) {
+  .tq-hero-wash { background: rgba(4, 24, 48, 0.4); }
 }
 
 /* ================================================================

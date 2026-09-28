@@ -3,7 +3,7 @@ import Image from 'next/image'
 import HomePricing from './components/HomePricing'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
-import { btnPrimary, btnSecondary, btnOnBand, btnOnBandOutline } from '@/app/components/buttonStyles'
+import { btnPrimary, btnSecondary, btnOnBand, btnOnBandOutline, btnOnDark, btnOnDarkOutline } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import { SB253_SHORT } from '../lib/sb253'
 import { AUDIT_TRAIL_NOTE_SHORT } from '../lib/auditTrailNotice'
@@ -39,32 +39,42 @@ export default function Home() {
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────────────────────────────────────────────────
-      Full-bleed, via .tq-gradation-ground rather than the token directly. Copy is held to
-      --gradation-ink-safe, the light 60%: --color-ink clears AA body to 72% of the width and AA large
-      text to 88%, so 60% is the margin. If this ever needs copy on the right, FLIP THE BAND — see the
-      GRADATION block in the token file.
-      ⚠️ THE 60% RULE HOLDS ONLY WHILE THE TEXT COLUMN IS 60%, AND BELOW 825px IT IS NOT. `min-width:
-      min(100%, 34rem)` beats the max-width, so the column spans the full width and the last words land
-      at 2.81:1 at 375px. The class is what fixes it, by dropping the band's dark half below 900px.
-      Measurements and the rejected vertical-band alternative are in the NARROW VIEWPORTS block. */}
-      <section className="tq-gradation-ground" style={{ padding: '6rem 2.5rem 5.5rem' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+      A PHOTOGRAPH, NOT THE GRADATION BAND, and the copy is on-dark because of it. It carries
+      .tq-hero-wash at EVERY width, not only narrow ones: measured, the worst case is 1920px, where
+      the body paragraph reads 4.16:1 unwashed and 5.08:1 with it. The table is in the token file.
+      ⚠️ THE IMAGE IS ANCHORED BOTTOM-RIGHT AND MUST NOT BE FLIPPED, MIRRORED OR ROTATED. The aurora
+      has its dark sky top-left, its bright teal curtains on the right and a small warm glow in the
+      bottom-right corner. `objectPosition: '100% 100%'` is what keeps that corner in frame as the
+      crop tightens; the dark sky staying top-left is what the text column sits on.
+      ⚠️ THE maxWidth ON THE TEXT COLUMN IS STILL LOAD-BEARING, and --gradation-ink-safe is still the
+      token that sets it. It no longer means "the band's light 60%" here — it is what holds the column
+      over the dark part of the photograph. Widening it walks the copy into the curtains.
+      ⚠️ AND BELOW 900px IT CANNOT HOLD AT ALL. `min-width: min(100%, 34rem)` beats the max-width, so
+      the column spans the full width and crosses the bright right-hand side head-on: 2.31:1 there
+      with no wash. That range takes a heavier wash, 0.4 against the 0.15 everywhere else.
+      The closing band below still uses .tq-gradation-ground, and its 60% reasoning is unchanged. */}
+      <section style={{ padding: '6rem 2.5rem 5.5rem', position: 'relative', overflow: 'hidden' }}>
+        <Image src="/home/hero-aurora.jpg" alt="" aria-hidden fill priority sizes="100vw" style={{ objectFit: 'cover', objectPosition: '100% 100%' }} />
+        <div className="tq-hero-wash" />
+        <div style={{ maxWidth: 1180, margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 34rem)' }}>
-            <p style={eyebrowOnBand}>Published methodologies and prices you can trust</p>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 4.6vw, 3.7rem)', fontWeight: 400, lineHeight: 1.14, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.9rem' }}>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 4.6vw, 3.7rem)', fontWeight: 400, lineHeight: 1.14, letterSpacing: '-0.015em', color: 'var(--color-on-dark)', marginBottom: '0.9rem' }}>
               Sustainability reporting that suits your needs and budget.
             </h1>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.1rem, 2vw, 1.4rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.5rem' }}>
+            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.1rem, 2vw, 1.4rem)', fontWeight: 400, color: 'var(--color-on-dark)', lineHeight: 1.45, marginBottom: '1.5rem' }}>
               Self-guided, or with human advisors standing by to help.
             </p>
-            <p style={{ fontSize: 15, color: 'var(--color-ink)', lineHeight: 1.7, maxWidth: '58ch', marginBottom: '2.25rem' }}>
+            <p style={{ fontSize: 15, color: 'var(--color-on-dark)', lineHeight: 1.7, maxWidth: '58ch', marginBottom: '2.25rem' }}>
               Customers, lenders and regulators are each asking for something different, and the rules change by country and by year. ThemisIQ works out which of them apply to you, tells you what to submit and when, and builds the reports from your own data.
             </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <a href="/assess" style={{ ...btnOnBand, textDecoration: 'none' }}>Start the free assessment</a>
-              <a href="/methodology" style={{ ...btnOnBandOutline, textDecoration: 'none' }}>See how it works</a>
+              <a href="/assess" style={{ ...btnOnDark, textDecoration: 'none' }}>Start the free assessment</a>
+              <a href="/methodology" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>See how it works</a>
             </div>
-            <p style={{ fontSize: 13, color: 'var(--color-ink)', marginTop: '1rem', opacity: 0.85 }}>
+            {/* --color-on-dark-muted, not opacity: the token file's DISABLED AND INACTIVE STATE block
+                is explicit that opacity composites the text with whatever is behind it, which over a
+                photograph is a different colour in every pixel and unmeasurable. */}
+            <p style={{ fontSize: 13, color: 'var(--color-on-dark-muted)', marginTop: '1rem' }}>
               Three questions, no account needed.
             </p>
           </div>
@@ -411,5 +421,6 @@ const WIDER = [
 ] as const
 
 // ── STYLES ────────────────────────────────────────────────────────────────────────────────────────
-/** Eyebrow over the gradation band: ink, because nothing on the band is any other colour. */
-const eyebrowOnBand: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink)', marginBottom: '1.1rem' }
+/* eyebrowOnBand is gone with the hero eyebrow it was written for, 28 Sep 2026. The closing band never
+   carried one, so nothing else referenced it; it is not held back for a future eyebrow, because an
+   eyebrow over the hero photograph would need on-dark colour and would not be this style anyway. */

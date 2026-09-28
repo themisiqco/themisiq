@@ -75,6 +75,44 @@ export const btnOnBandOutline: CSSProperties = {
   display: 'inline-block',
 }
 
+/**
+ * ON A PHOTOGRAPH. Same geometry as the band pair — 14px, 13px/32px, radius 8 — and the colours
+ * inverted: paper fill with an ink label, and a paper outline.
+ *
+ * ⚠️ THESE ARE NOT INTERCHANGEABLE WITH THE BAND PAIR, AND THAT IS THE WHOLE POINT. btnOnBand is
+ * ink-on-paper and btnOnBandOutline draws its edge in ink; over the homepage hero photograph both
+ * lose their label and their outline against the dark sky. A button that renders as a rectangle of
+ * nothing still occupies space and still takes a click, so this fails silently rather than visibly.
+ * The hero uses these two; the closing band keeps btnOnBand / btnOnBandOutline over the gradation.
+ *
+ * ⚠️ NO BRAND FILL HERE EITHER, for the reason the band block gives: --color-brand over the aurora's
+ * own teal is a third teal competing with the ground. Paper and ink only.
+ */
+export const btnOnDark: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 500,
+  padding: '13px 32px',
+  borderRadius: 8,
+  background: 'var(--color-on-dark)',
+  color: 'var(--color-ink)',
+  border: 'none',
+  cursor: 'pointer',
+  display: 'inline-block',
+}
+
+/** The outlined half of the on-dark pair: no fill, paper label and edge. */
+export const btnOnDarkOutline: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 400,
+  padding: '13px 32px',
+  borderRadius: 8,
+  background: 'none',
+  color: 'var(--color-on-dark)',
+  border: '1px solid var(--color-on-dark)',
+  cursor: 'pointer',
+  display: 'inline-block',
+}
+
 /** Outlined: no fill, brand text and edge. */
 export const btnSecondary: CSSProperties = {
   fontSize: 14,
