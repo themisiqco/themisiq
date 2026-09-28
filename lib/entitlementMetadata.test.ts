@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierFromAllowance, ghgTierMetaValue, GHG_TIER_KEYS, TIER_PRICING, LEGACY_CONCIERGE_KEYS, CONCIERGE_KEY, type Tier } from './pricing'
 
@@ -267,6 +267,32 @@ const MIGRATION = 'supabase/migrations/20260928_concierge_source_model.sql'
 const HOOKS = 'lib/useEntitlement.ts'
 const EXTRACT = 'app/api/concierge/extract/route.ts'
 
+/**
+ * The tier keys the live ghg_tier CHECK permits, read from whichever migration last defines it.
+ *
+ * ⚠️ READ, NOT HARDCODED, BECAUSE THE DATABASE IS DELIBERATELY AHEAD OF THE CODE. The constraint
+ * is widened by a migration that runs BEFORE the deployment using the new keys, so between the two
+ * there are values Postgres accepts and TypeScript does not. An assertion matching the constraint
+ * text verbatim forbids that window, which is the safe ordering and the one CLAUDE.md requires.
+ *
+ * Migrations are applied in filename order, so the last file defining the constraint is the one in
+ * force. Rollback files are excluded: they define the OLD constraint and would otherwise win the
+ * sort on any date where both exist.
+ */
+const ghgTierCheckKeys = (): string[] => {
+  const defining = readdirSync(join(ROOT, 'supabase/migrations'))
+    .filter(f => f.endsWith('.sql') && !f.includes('rollback'))
+    .sort()
+    .filter(f => /add constraint entitlements_ghg_tier_check/i.test(read(`supabase/migrations/${f}`)))
+  if (defining.length === 0) {
+    throw new Error('no migration defines entitlements_ghg_tier_check: this test cannot assert anything')
+  }
+  const sql = read(`supabase/migrations/${defining[defining.length - 1]}`)
+  const m = /ghg_tier in \(([^)]*)\)/i.exec(sql)
+  if (!m) throw new Error('the ghg_tier CHECK has no parseable value list')
+  return [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1])
+}
+
 describe('ghg_tier can never be a value the CHECK constraint rejects', () => {
   // ⚠️ THIS IS THE ONE THAT FAILS AFTER PAYMENT. The webhook writes ghg_tier into a column
   // constrained to three values. A fourth tier, or an unvalidated body.tier reaching metadata,
@@ -277,14 +303,27 @@ describe('ghg_tier can never be a value the CHECK constraint rejects', () => {
     expect([...GHG_TIER_KEYS].sort()).toEqual(Object.keys(GHG_TIERS).sort())
   })
 
-  it('M23 the SQL CHECK lists exactly the same three keys', () => {
-    const sql = read(MIGRATION)
+  // ⚠️ SUBSET, NOT EQUALITY, AND THE DIRECTION IS THE WHOLE POINT. The constraint must permit
+  // every key the code can write, and may permit more. The unsafe direction, a key in
+  // GHG_TIER_KEYS that the constraint rejects, fails here: that is the one that takes a customer's
+  // payment and then cannot grant them anything. The safe direction, a value the database allows
+  // and TypeScript does not, is the migration running ahead of the deployment, exactly as intended.
+  it('M23 the SQL CHECK permits every key the code can write', () => {
+    const permitted = ghgTierCheckKeys()
     for (const k of GHG_TIER_KEYS) {
-      expect(sql, `the ghg_tier CHECK must permit ${k}`).toContain(`'${k}'`)
+      expect(permitted, `the ghg_tier CHECK must permit ${k}, or a purchase on it fails after payment`)
+        .toContain(k)
     }
-    // The constraint text itself, so a fourth key added to GHG_TIER_KEYS without touching the
-    // migration fails here rather than in production.
-    expect(sql).toContain("check (ghg_tier is null or ghg_tier in ('starter', 'professional', 'advisory'))")
+  })
+
+  // And the constraint is genuinely read: a parse returning an empty list would make M23 vacuous
+  // while looking green.
+  it('M23b the constraint parses and still names the three original keys', () => {
+    const permitted = ghgTierCheckKeys()
+    expect(permitted.length).toBeGreaterThanOrEqual(3)
+    for (const k of ['starter', 'professional', 'advisory']) {
+      expect(permitted, `${k} has existed since the column did and cannot be dropped silently`).toContain(k)
+    }
   })
 
   it('M24 the guard passes the three through and flattens everything else to empty', () => {
