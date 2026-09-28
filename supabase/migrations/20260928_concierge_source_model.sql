@@ -1,14 +1,18 @@
 -- 20260928_concierge_source_model.sql
 --
+-- ⚠️ RUN ON 28 Sep 2026. Verified in the same session by reading the rows back: the concierge row
+-- carries source_allowance 60 and term_end 2027-08-11, the ghg row carries ghg_tier 'advisory', and
+-- no row holds a concierge-basic, concierge-standard or concierge-enterprise key.
+--
 -- Concierge moves from location bands to data sources. This file adds the columns the new
 -- model writes, re-keys the single existing Concierge row, and narrows concierge_jobs.
 --
--- ⚠️ RUN THIS BEFORE DEPLOYING THE BATCH 3 CODE. The webhook writes entitlements.ghg_tier and
+-- ⚠️ APPLY THIS BEFORE DEPLOYING THE BATCH 3 CODE. The webhook writes entitlements.ghg_tier and
 -- entitlements.source_allowance. Deployed against a database without them, every grant fails, and
 -- the failure is a 500 to Stripe, which retries: a customer pays and waits for access that cannot
 -- be written. The reverse order is safe. The columns sit unused until the code arrives.
 --
--- ⚠️ IT IS NOT RE-RUNNABLE AND THAT IS DELIBERATE. Every assertion below raises rather than
+-- ⚠️ IT CANNOT BE APPLIED TWICE, AND THAT IS DELIBERATE. Every assertion below raises rather than
 -- skipping. A second run would find zero rows to re-key, which is indistinguishable from a first
 -- run against the wrong database, so it stops instead of guessing which one happened.
 --

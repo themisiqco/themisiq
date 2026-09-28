@@ -4,7 +4,7 @@
 --
 -- ⚠️ REVERT THE CODE FIRST. The Batch 3 webhook writes ghg_tier and source_allowance. Dropping
 -- them under a running deployment makes every grant fail, which is worse than the state this
--- undoes. Roll the deployment back, confirm it, then run this.
+-- undoes. Roll the deployment back, confirm it, then apply this file.
 --
 -- ⚠️ THIS DROPS DATA. On a database with real Concierge customers it would drop their source
 -- counts with no way to recover them. It is written for the state the forward file ran against:
