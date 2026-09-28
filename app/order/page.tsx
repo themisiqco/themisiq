@@ -17,6 +17,8 @@ import {
   LEGACY_PRICING_PAGE_ID,
   cartQuote,
   GHG_TIERS,
+  GHG_TIER_LABELS,
+  isGhgTier,
   FLAT_MODULE_PRICES,
   type Tier,
   type GhgTier,
@@ -38,7 +40,6 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   'people': 'People & Workforce',
   'cyber': 'Cyber Governance',
 }
-const TIER_LABEL: Record<Tier, string> = { starter: 'Essentials', professional: 'Professional', advisory: 'Advisory' }
 
 const usd = (n: number) => `$${n.toLocaleString()}`
 
@@ -74,7 +75,10 @@ function OrderInner() {
 
   // ── Params → canonical keys + validated tier ──────────────────────────────────
   const rawTier = searchParams.get('tier')
-  const tier: Tier = (rawTier === 'starter' || rawTier === 'professional' || rawTier === 'advisory') ? rawTier : 'starter'
+  // ⚠️ VALIDATED THROUGH isGhgTier, NOT A DISJUNCTION. An unknown tier still falls back to the
+  // entry band, which is the safe direction for a price, but the membership test now widens with
+  // the tier list instead of being a fourth place to remember.
+  const tier: Tier = isGhgTier(rawTier) ? rawTier : 'starter'
   const ref = searchParams.get('ref') // attribution token — preserved, no logic this stage
 
   const keys = Array.from(new Set(
@@ -106,7 +110,7 @@ function OrderInner() {
   const lineItems = keys.map(k => ({
     key: k,
     label: MODULE_LABELS[k] ?? k,
-    detail: k === 'ghg' ? `${TIER_LABEL[tier]}${GHG_TIERS[tier].locationAllowance != null ? ` · up to ${GHG_TIERS[tier].locationAllowance} locations` : ' · uncapped'}` : 'Annual',
+    detail: k === 'ghg' ? `${GHG_TIER_LABELS[tier]}${GHG_TIERS[tier].locationAllowance != null ? ` · up to ${GHG_TIERS[tier].locationAllowance} locations` : ' · uncapped'}` : 'Annual',
     price: k === 'ghg' ? GHG_TIERS[tier].priceUSD : FLAT_MODULE_PRICES[k as Exclude<ModuleKey, 'ghg'>],
   }))
   const subtotal = lineItems.reduce((s, li) => s + (li.price ?? 0), 0)

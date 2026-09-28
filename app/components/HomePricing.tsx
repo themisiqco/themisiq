@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
+import { volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '@/lib/pricingCopy'
 
 type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
@@ -157,9 +157,9 @@ export default function HomePricing() {
                   </div>
                   {isGhg && isSelected && (
                     <div style={{ display: 'flex', gap: 8, padding: '0 16px 12px', flexWrap: 'wrap' }}>
-                      {(['starter', 'professional', 'advisory'] as GhgTier[]).map(t => {
+                      {GHG_TIER_KEYS.map(t => {
                         const tp = GHG_TIERS[t].priceUSD
-                        const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
+                        const label = GHG_TIER_LABELS[t]
                         const active = tier === t
                         return (
                           <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 'min(130px, 100%)', textAlign: 'left', padding: '8px 10px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>

@@ -500,6 +500,20 @@ export function isFirstConciergePurchase(existingModuleKeys: readonly string[]):
 export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory'] as const
 
 /**
+ * Is this a GHG tier key? For validating anything that arrives as text: a URL parameter, a request
+ * body, a stored value.
+ *
+ * ⚠️ THE POINT IS THAT A NEW TIER REACHES EVERY VALIDATOR AT ONCE. app/order/page.tsx read
+ * `raw === 'starter' || raw === 'professional' || raw === 'advisory'` and fell back to the entry
+ * band for anything else, so a link carrying a tier that page had not been taught about would have
+ * priced as Essentials and shown the customer a number nobody meant. A disjunction cannot be
+ * widened from one place. This can.
+ */
+export function isGhgTier(value: unknown): value is GhgTier {
+  return typeof value === 'string' && (GHG_TIER_KEYS as readonly string[]).includes(value)
+}
+
+/**
  * The value to put in the ghg_tier metadata key. Returns '' for anything that is not one of the
  * three, following the same empty-string convention as ghg_location_allowance.
  *
@@ -511,9 +525,7 @@ export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory'] as const
  * "tier not recorded", which the onboarding fee already knows how to handle.
  */
 export function ghgTierMetaValue(tier: unknown): GhgTier | '' {
-  return typeof tier === 'string' && (GHG_TIER_KEYS as readonly string[]).includes(tier)
-    ? (tier as GhgTier)
-    : ''
+  return isGhgTier(tier) ? tier : ''
 }
 
 export function ghgTierFromAllowance(allowance: number | null): GhgTier | null {

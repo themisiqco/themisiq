@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
 import { HONEYPOT_FIELD, isHoneypotTripped } from '../../../../lib/assessmentSubmitGuard'
 import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
-import type { Tier } from '../../../../lib/pricing'
+import { isGhgTier, type Tier } from '../../../../lib/pricing'
 import { BRAND, BRAND_WASH, INK_MUTED } from '@/lib/brand'
 import { NOT_PROVIDED } from '../../../../lib/notProvided'
 import { subjectText } from '../../../../lib/emailSubject'
@@ -69,8 +69,7 @@ export async function POST(req: NextRequest) {
     const vModules = Array.isArray(order?.modules) ? (order.modules as unknown[]).slice(0, 20).map(m => String(m).slice(0, 50)) : []
     const vTier    = order?.tier ? String(order.tier).slice(0, 30) : ''
     const vRef     = order?.ref ? String(order.ref).slice(0, 200) : ''
-    const tierParam: Tier | undefined =
-      vTier === 'starter' || vTier === 'professional' || vTier === 'advisory' ? vTier : undefined
+    const tierParam: Tier | undefined = isGhgTier(vTier) ? vTier : undefined
 
     // ── Rate limit (Supabase-backed; per IP + per email). 429 when exceeded ────
     const ip = ipFromHeaders(req)

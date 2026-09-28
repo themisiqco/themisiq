@@ -3,7 +3,7 @@ import { scope3ScopeClaim, scope3MethodFamilies } from '../../lib/scope3/methodS
 import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
-import { GHG_TIERS } from '@/lib/pricing'
+import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS } from '@/lib/pricing'
 import { CONCIERGE_FAQ } from './faq'
 import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
@@ -223,9 +223,9 @@ export default function Page() {
           {/* ⚠️ TIERS AND ALLOWANCES ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. advisory has
               priceUSD null and locationAllowance null, which mean "contact us" and "uncapped" — not
               zero and not missing. allowanceLabel is the only place that decides how a null reads. */}
-          {(['starter', 'professional', 'advisory'] as const).map(t => (
+          {GHG_TIER_KEYS.map(t => (
             <div key={t} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-ghg)', borderRadius: 6, padding: '1.5rem' }}>
-              <div style={{ ...moduleEyebrow, marginBottom: 8 }}>{TIER_LABELS[t]}</div>
+              <div style={{ ...moduleEyebrow, marginBottom: 8 }}>{GHG_TIER_LABELS[t]}</div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.9rem', fontWeight: 400, color: 'var(--color-ink)' }}>
                 {GHG_TIERS[t].priceUSD == null ? 'Contact us' : `$${GHG_TIERS[t].priceUSD!.toLocaleString('en-US')}`}
                 {GHG_TIERS[t].priceUSD != null && <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}> / yr</span>}
@@ -266,9 +266,6 @@ export default function Page() {
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────────────────────────────
-/** UI labels for the tier keys. GHG_TIERS.starter's label is "Essentials", per lib/pricing.ts. */
-const TIER_LABELS = { starter: 'Essentials', professional: 'Professional', advisory: 'Advisory' } as const
-
 const ARRIVALS = [
   { title: 'A customer asked',
     body: 'A buyer wants Scope 1 and 2 figures, often on a questionnaire with a deadline and no explanation of what is being asked for.' },

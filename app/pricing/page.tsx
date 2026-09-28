@@ -12,7 +12,7 @@ import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/p
 // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
 // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
 // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
-import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
@@ -615,9 +615,9 @@ function PricingPageInner() {
                   {/* GHG inline tier picker — only when GHG is selected */}
                   {isGhg && isSelected && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                      {(['starter', 'professional', 'advisory'] as GhgTier[]).map(t => {
+                      {GHG_TIER_KEYS.map(t => {
                         const tp = GHG_TIERS[t].priceUSD
-                        const label = t === 'starter' ? 'Essentials' : t === 'professional' ? 'Professional' : 'Advisory'
+                        const label = GHG_TIER_LABELS[t]
                         // Derived, not three literals. null = uncapped (Advisory), which the copy must
                         // say rather than leaving the reader to infer from a missing number.
                         const alw = GHG_TIERS[t].locationAllowance

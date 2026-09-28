@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getSupabaseAdmin } from '../supabaseAdmin'
-import { cartQuote, LEGACY_PRICING_PAGE_ID, type ModuleKey, type Tier, type GhgTier } from '../pricing'
+import { cartQuote, isGhgTier, LEGACY_PRICING_PAGE_ID, type ModuleKey, type Tier, type GhgTier } from '../pricing'
 
 // ── Account provisioning (the net-new "or-create" primitive) ──────────────────
 
@@ -97,9 +97,7 @@ export function priceOrder(input: { modules: string[]; tier?: Tier }): PricedOrd
   )) as ModuleKey[]
 
   // Validate the tier (default to Essentials, as the checkout/order surfaces do).
-  const tier: Tier = (input.tier === 'starter' || input.tier === 'professional' || input.tier === 'advisory')
-    ? input.tier
-    : 'starter'
+  const tier: Tier = isGhgTier(input.tier) ? input.tier : 'starter'
 
   const q = cartQuote({ modules: keys, ghgTier: tier as GhgTier })
   return {
