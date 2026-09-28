@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest'
+// ⚠️ DERIVED, NEVER A LITERAL. These assertions carried 4900 and 11900 until 28 Sep 2026 and
+// went stale the moment the employee bands repriced GHG. Reading the same table the code reads
+// means a reprice moves the expectation with the product instead of failing on a dead number.
+import { GHG_TIERS } from '../pricing'
 import {
   getApplicableFrameworks, getFrameworkApplicability, convertCurrency, isDealCurrency,
   DEAL_CURRENCIES, USD_PER_UNIT, UNITS_PER_EUR, THRESHOLD_TESTS, isTestActive, evaluateTest,
@@ -925,14 +929,14 @@ describe('blank revenue resolves everything that does not need revenue', () => {
     // KNOCK-ON: supply chain was triggered by CS3D. With CS3D abstaining and CSRD unresolved,
     // nothing triggers it, so it is no longer priced. Pricing follows the applies-filtered list.
     expect(o.included.find(x => x.short === 'supply chain')).toBeUndefined()
-    expect(o.themisIqTotal).toBe(4900)
+    expect(o.themisIqTotal).toBe(GHG_TIERS.starter.priceUSD)
   })
 
   it('USA resolves IFRS S2/TCFD, reports SB 253 not-assessed, and prices nothing extra', () => {
     const fws = getApplicableFrameworks('USA', 0, 'Technology', 'ma', 'USD')
     expect(fws).toEqual(['IFRS S2', 'TCFD'])
     expect(find(getFrameworkApplicability('USA', 0, 'Technology', 'ma', 'USD'), 'SB 253')!.status).toBe('not-assessed')
-    expect(getObligations(1, fws, 'Technology').themisIqTotal).toBe(4900)
+    expect(getObligations(1, fws, 'Technology').themisIqTotal).toBe(GHG_TIERS.starter.priceUSD)
   })
 })
 
@@ -988,7 +992,9 @@ describe('pricing is unchanged by the multi-limb work', () => {
           // CS3D no longer triggers it (abstains), and CSRD needs >1,000 employees — this fixture
           // has 300 — so SFDR is the only remaining trigger.
           const sfdr = j === 'European Union' && s === 'Financial Services'
-          const ghg = loc <= 3 ? 4900 : loc <= 15 ? 11900 : null
+          // The deal report's own ladder, named in lib/deals/assessment.ts: 3 and 15 locations.
+          // Above 15 it quotes rather than pricing, which is why this arm is null.
+          const ghg = loc <= 3 ? GHG_TIERS.starter.priceUSD : loc <= 15 ? GHG_TIERS.professional.priceUSD : null
           const supply = sfdr ? 2900 : 0
           expect(o.themisIqTotal).toBe(ghg == null ? (supply || null) : ghg + supply)
         }
@@ -997,7 +1003,7 @@ describe('pricing is unchanged by the multi-limb work', () => {
   it('SECR moving to 2-of-3 does not move any price', () => {
     for (const size of [{}, { employee_count: 300 }, { employee_count: 10, total_assets: 0 }])
       expect(getObligations(10, getApplicableFrameworks('UK', 50_000_000, 'Technology', 'ma', 'GBP', size), 'Technology').themisIqTotal)
-        .toBe(11900)
+        .toBe(GHG_TIERS.professional.priceUSD)
   })
 })
 

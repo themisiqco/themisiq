@@ -83,7 +83,11 @@ export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
 }
 
 // ── Tiers + founding offer ───────────────────────────────────────────────────
-export type Tier = 'starter' | 'professional' | 'advisory'
+// ⚠️ FIVE TIERS SINCE 28 Sep 2026, AND THE ORDER IS THE BAND ORDER. 'business' and 'enterprise'
+// are new. 'advisory' CHANGED MEANING: it was the quote-only tier and is now the 250 to 499 band at
+// a published price, and 'enterprise' is the quote path. The database constraint permitting these
+// five is in supabase/migrations/20260928_ghg_employee_bands.sql, and M23 ties the two together.
+export type Tier = 'starter' | 'professional' | 'business' | 'advisory' | 'enterprise'
 
 // THE SWITCH. While true, customers pay the `early` price below. Flip to false
 // (one line) to move the whole site to full pricing — nothing else needs editing.
@@ -97,7 +101,12 @@ export const FOUNDING_OFFER_ACTIVE = true
 // only Starter is discounted (full 1499 -> early 799), matching your pricing page;
 // pro & advisory are set to no discount (early === full). Change if you want them
 // discounted too.
-export const TIER_PRICING: Record<Tier, { full: number; early: number }> = {
+// ⚠️ THE RETIRED PER-MODULE LADDER, AND IT IS NOT THE TIER LIST. Pinned to the three keys the old
+// model had, deliberately: adding Business and Enterprise here would mint prices for a model that
+// cannot render, since the !NEW_PRICING_ACTIVE branch is unreachable. Anything asking "is this a
+// tier?" wants isGhgTier, not a lookup in this object.
+export type LegacyTier = 'starter' | 'professional' | 'advisory'
+export const TIER_PRICING: Record<LegacyTier, { full: number; early: number }> = {
   starter:      { full: 1499, early: 999 },
   professional: { full: 2499, early: 2499 },
   advisory:     { full: 4999, early: 4999 },
@@ -116,14 +125,14 @@ export function locationAllowanceForTier(tier: Tier): number | null {
 }
 
 // The price actually charged right now for a given tier (respects the switch).
-export function tierPrice(tier: Tier): number {
+export function tierPrice(tier: LegacyTier): number {
   const p = TIER_PRICING[tier]
   return FOUNDING_OFFER_ACTIVE ? p.early : p.full
 }
 
 // The "full" (pre-discount) price — useful for the struck-through price on the
 // pricing page. Returns null when there's no active saving to show.
-export function tierStrikethrough(tier: Tier): number | null {
+export function tierStrikethrough(tier: LegacyTier): number | null {
   const p = TIER_PRICING[tier]
   return FOUNDING_OFFER_ACTIVE && p.early < p.full ? p.full : null
 }
@@ -145,12 +154,48 @@ export const NEW_PRICING_ACTIVE = true
 // Reuse the existing tier union under the name the rescope spec references.
 export type GhgTier = Tier
 
-// GHG is the only multi-tier module. priceUSD null = "Contact us" (quote path);
-// locationAllowance null = uncapped (matches the trigger's NULL = uncapped rule).
-export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllowance: number | null }> = {
-  starter:      { priceUSD: 4900,  locationAllowance: 3 },    // UI label: "Essentials"
-  professional: { priceUSD: 11900, locationAllowance: 15 },
-  advisory:     { priceUSD: null,  locationAllowance: null }, // Contact us / uncapped
+// GHG is the only multi-tier module. priceUSD null = "Contact us" (quote path).
+//
+// ⚠️ SIZED BY EMPLOYEES, NOT LOCATIONS, SINCE 28 Sep 2026. The bands are contiguous and
+// exhaustive from 1 upward, so ghgTierForEmployees always resolves. `employees.max` null means "and
+// above", which only the top band carries.
+//
+// ⚠️ EVERY locationAllowance IS NULL, AND THAT IS HOW THE CAP WAS RETIRED. Locations are unlimited
+// on every plan. null already meant uncapped to enforce_ghg_location_allowance() and already
+// rendered as "Unlimited locations" through allowanceLabel, so setting them null turned the cap off
+// everywhere at once without a single consumer changing. The column and the trigger branch are dead
+// weight now and come out in their own batch, where that risk is visible rather than mixed in here.
+export const GHG_TIERS: Record<GhgTier, {
+  priceUSD: number | null
+  locationAllowance: number | null
+  employees: { min: number; max: number | null }
+}> = {
+  starter:      { priceUSD:  475, locationAllowance: null, employees: { min:   1, max:  19 } },
+  professional: { priceUSD: 1425, locationAllowance: null, employees: { min:  20, max:  99 } },
+  business:     { priceUSD: 2850, locationAllowance: null, employees: { min: 100, max: 249 } },
+  advisory:     { priceUSD: 4550, locationAllowance: null, employees: { min: 250, max: 499 } },
+  enterprise:   { priceUSD: null, locationAllowance: null, employees: { min: 500, max: null } },
+}
+
+/**
+ * The band an employee count falls in. The single authority, the way conciergeTierForLocations was
+ * for the retired location bands.
+ *
+ * ⚠️ THROWS ON A COUNT IT CANNOT BAND rather than defaulting to the entry tier. A count below 1
+ * is not a small company, it is a bad input, and banding it as Essentials would sell a plan on a
+ * number nobody checked. Callers validate first; this is the backstop.
+ */
+export function ghgTierForEmployees(employees: number): GhgTier {
+  if (!Number.isInteger(employees) || employees < 1) {
+    throw new Error('ghgTierForEmployees: an employee count must be a whole number of at least 1.')
+  }
+  for (const key of GHG_TIER_KEYS) {
+    const { min, max } = GHG_TIERS[key].employees
+    if (employees >= min && (max == null || employees <= max)) return key
+  }
+  // Unreachable while the bands stay contiguous and the top one is open-ended. A gap lands here
+  // rather than silently picking a neighbour.
+  throw new Error(`ghgTierForEmployees: ${employees} falls in no band. The bands are not contiguous.`)
 }
 
 // The customer-facing tier names. `starter` has been labelled "Essentials" on every surface since
@@ -159,7 +204,9 @@ export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllow
 export const GHG_TIER_LABELS: Record<GhgTier, string> = {
   starter:      'Essentials',
   professional: 'Professional',
+  business:     'Business',
   advisory:     'Advisory',
+  enterprise:   'Enterprise',
 }
 
 // Flat single-tier modules (USD / year). Keyed on every non-GHG module so the
@@ -211,6 +258,12 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
 // (admin-invoice draft: card or manual wire — Canadian account has no Stripe ACH).
 export const CARD_THRESHOLD_USD = 10000
 
+// ⚠️ NOT A PLAN INCLUSION AND NOT A CHECKOUT PATH. Advisory support is not included in any plan
+// and is not sold self-serve: this is the rate quoted on /pricing beside a contact link, with no
+// flow behind it. It lives here because it is a price a customer reads, and no price a customer
+// reads is typed into a page.
+export const ADVISORY_HOURLY_USD = 175
+
 export function requiresInvoice(orderTotalUSD: number): boolean {
   return orderTotalUSD > CARD_THRESHOLD_USD
 }
@@ -227,7 +280,7 @@ export function volumeDiscount(moduleCount: number): number {
 
 // ── Configurator price (build-your-own) ──────────────────────────────────────
 // Returns the final price in whole dollars, discount applied.
-export function configuratorPrice(tier: Tier, moduleKeys: ModuleKey[]): number {
+export function configuratorPrice(tier: LegacyTier, moduleKeys: ModuleKey[]): number {
   const count = moduleKeys.length
   if (count === 0) return 0
   const gross = tierPrice(tier) * count
@@ -264,16 +317,21 @@ export function cartQuote(sel: CartSelection): CartQuote {
   if (modules.includes('ghg') && GHG_TIERS[ghgTier].priceUSD == null) {
     return { totalUSD: 0, requiresQuote: true, requiresInvoice: false }
   }
-  let sum = 0
-  for (const m of modules) {
-    if (m === 'ghg') {
-      sum += GHG_TIERS[ghgTier].priceUSD as number // non-null guaranteed above
-    } else {
-      sum += FLAT_MODULE_PRICES[m as Exclude<ModuleKey, 'ghg'>]
-    }
-  }
-  const discounted = Math.round(sum * (1 - volumeDiscount(modules.length)))
-  const totalUSD = discounted
+  // ⚠️ GHG COUNTS TOWARD THE BAND BUT IS NEVER DISCOUNTED BY IT, and those are two separate
+  // rules. The module tally that picks the discount band INCLUDES GHG, so buying GHG plus two
+  // others still reaches the 3-module band. The discount is then applied to the other modules'
+  // subtotal ONLY, and the GHG price is added at full. Decided 28 Sep 2026 with the employee-band
+  // reprice: GHG is sized by the customer now, so discounting it by how much else they bought
+  // prices the same company two ways.
+  //
+  // ⚠️ THE ROUNDING HAPPENS ON THE DISCOUNTED SUBTOTAL, BEFORE GHG IS ADDED. GHG is a whole
+  // dollar figure from GHG_TIERS, so rounding after adding it would give the same answer today and
+  // would start to differ the moment a tier carries cents. Rounding the only part that can be
+  // fractional is the form that stays correct.
+  const others = modules.filter(m => m !== 'ghg') as Exclude<ModuleKey, 'ghg'>[]
+  const othersSum = others.reduce((n, m) => n + FLAT_MODULE_PRICES[m], 0)
+  const ghgSum = modules.includes('ghg') ? (GHG_TIERS[ghgTier].priceUSD as number) : 0
+  const totalUSD = Math.round(othersSum * (1 - volumeDiscount(modules.length))) + ghgSum
   return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
 }
 
@@ -391,13 +449,15 @@ export function addOnRequirementsMet(
 export const UTILITY_CONNECT_ENABLED = false
 
 // One-time, charged on a customer's FIRST Concierge purchase only. Not an entitlement and it
-// writes no term: it buys the specialist's setup work, not access. Keyed on the GHG tier because
-// the work scales with the inventory. Moving up a GHG tier later does NOT re-trigger it.
-export const CONCIERGE_ONBOARDING_USD: Record<GhgTier, number> = {
-  starter:      1250,   // UI label: Essentials
-  professional: 1750,
-  advisory:     2500,
-}
+// writes no term: it buys the specialist's setup work, not access.
+//
+// ⚠️ FLAT SINCE 28 Sep 2026, AND THAT REMOVED A WHOLE CLASS OF PROBLEM. It was keyed on the GHG
+// tier, so the fee had to know which band a customer was on, so a customer adding Concierge WITHOUT
+// buying GHG in the same cart had to have their tier derived from their stored location allowance.
+// That derivation went inert the moment locations became unlimited on every plan, and it would have
+// refused exactly those customers. A flat fee does not ask the question, and ghgTierFromAllowance
+// was deleted with it.
+export const CONCIERGE_ONBOARDING_USD = 1395
 
 export type SourceKind = 'uploaded' | 'connected'
 
@@ -421,7 +481,6 @@ export function sourceKindSellable(kind: SourceKind): boolean {
 }
 
 export interface ConciergeSelection {
-  ghgTier: GhgTier
   uploadedSources: number
   /** Rejected while UTILITY_CONNECT_ENABLED is false. Omit, or 0, until then. */
   connectedSources?: number
@@ -475,29 +534,17 @@ export function isFirstConciergePurchase(existingModuleKeys: readonly string[]):
 }
 
 /**
- * The GHG tier a Concierge onboarding fee is priced from, for a customer who is NOT buying GHG in
- * this cart. Derived from the stored location_allowance, never from anything the client sends.
- * Returns null when the stored value cannot identify a tier, which the routes turn into a 400.
- *
- * ⚠️ NULL IS AMBIGUOUS AND MUST NOT DEFAULT. A null allowance is Advisory under the current model
- * and an uncapped pre-rescope row under the old one, and 10 or 20 are pre-rescope values with no
- * current equivalent. Guessing here picks between a 1250 and a 2500 charge for someone.
- *
- * ⚠️ THIS IS A FALLBACK FROM BATCH 3 ONWARD. entitlements.ghg_tier records the tier directly from
- * then on; the routes read that first and only reach here when it is null, which is every row
- * written before the column existed.
- */
-/**
  * The tier keys, as a value rather than a type, because a database CHECK constraint cannot read a
- * TypeScript union. entitlements.ghg_tier is constrained to exactly these three in
- * supabase/migrations/20260928_concierge_source_model.sql.
+ * TypeScript union. entitlements.ghg_tier is constrained to exactly these five in
+ * supabase/migrations/20260928_ghg_employee_bands.sql.
  *
- * ⚠️ A FOURTH TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
+ * ⚠️ A SIXTH TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
  * every purchase on the new tier fail AFTER payment: the webhook writes the value, Postgres rejects
- * it, the grant throws, and Stripe retries a write that can never succeed. lib/pricing.test.ts pins
- * this list against TIER_PRICING and GHG_TIERS so the omission fails a test rather than a customer.
+ * it, the grant throws, and Stripe retries a write that can never succeed. M23 in
+ * lib/entitlementMetadata.test.ts reads the constraint and pins this list against it, so the
+ * omission fails a test rather than a customer.
  */
-export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory'] as const
+export const GHG_TIER_KEYS = ['starter', 'professional', 'business', 'advisory', 'enterprise'] as const
 
 /**
  * Is this a GHG tier key? For validating anything that arrives as text: a URL parameter, a request
@@ -509,6 +556,19 @@ export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory'] as const
  * priced as Essentials and shown the customer a number nobody meant. A disjunction cannot be
  * widened from one place. This can.
  */
+/**
+ * Is this one of the three tiers the RETIRED per-module model priced?
+ *
+ * ⚠️ IT EXISTS ONLY TO KEEP THE DEAD ROLLBACK BRANCH HONEST. The !NEW_PRICING_ACTIVE arms in both
+ * purchase routes call configuratorPrice, which prices from TIER_PRICING, and TIER_PRICING has no
+ * Business or Enterprise entry because that model never had those tiers. Rather than cast a Tier
+ * into a LegacyTier and let an unreachable branch pretend it can price one, those arms check this
+ * and refuse. If the branch is ever deleted, this goes with it.
+ */
+export function isLegacyTier(value: unknown): value is LegacyTier {
+  return value === 'starter' || value === 'professional' || value === 'advisory'
+}
+
 export function isGhgTier(value: unknown): value is GhgTier {
   return typeof value === 'string' && (GHG_TIER_KEYS as readonly string[]).includes(value)
 }
@@ -526,13 +586,6 @@ export function isGhgTier(value: unknown): value is GhgTier {
  */
 export function ghgTierMetaValue(tier: unknown): GhgTier | '' {
   return isGhgTier(tier) ? tier : ''
-}
-
-export function ghgTierFromAllowance(allowance: number | null): GhgTier | null {
-  if (allowance == null) return null
-  if (allowance === GHG_TIERS.starter.locationAllowance) return 'starter'
-  if (allowance === GHG_TIERS.professional.locationAllowance) return 'professional'
-  return null
 }
 
 export function conciergeQuote(sel: ConciergeSelection): ConciergeQuote {
@@ -559,12 +612,13 @@ export function conciergeQuote(sel: ConciergeSelection): ConciergeQuote {
       'and the connected rate is display only until UTILITY_CONNECT_ENABLED is true.',
     )
   }
-  const onboardingUSD = sel.isFirstPurchase ? CONCIERGE_ONBOARDING_USD[sel.ghgTier] : 0
+  const onboardingUSD = sel.isFirstPurchase ? CONCIERGE_ONBOARDING_USD : 0
   const sourcesUSD =
     uploaded * CONCIERGE_SOURCE_USD.uploaded + connected * CONCIERGE_SOURCE_USD.connected
   const lines: ConciergeQuote['lines'] = []
   if (onboardingUSD > 0) {
-    lines.push({ label: `GHG Concierge onboarding (${GHG_TIER_LABELS[sel.ghgTier]})`, unitUSD: onboardingUSD, quantity: 1 })
+    // No tier in the label: the fee is the same whichever plan the customer is on.
+    lines.push({ label: 'GHG Concierge onboarding', unitUSD: onboardingUSD, quantity: 1 })
   }
   if (uploaded > 0) {
     lines.push({ label: 'GHG Concierge data source, uploaded (1 year)', unitUSD: CONCIERGE_SOURCE_USD.uploaded, quantity: uploaded })

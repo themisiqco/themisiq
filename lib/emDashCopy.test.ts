@@ -325,7 +325,6 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/api/cbam/compute/route.ts': 1,
   //   · ONE IS AN ADMIN API ERROR WITH NO UI CALLER: /api/admin/create-invoice is fetched from nowhere in
   //     app/ or lib/ — it is called directly — so its 400 message is read in a terminal, not a browser.
-  'app/api/admin/create-invoice/route.ts': 1,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
   'app/dashboard/cbam/setup/page.tsx': 2,
   'app/dashboard/climate-risk/report/page.tsx': 2,

@@ -255,7 +255,7 @@ function PricingPageInner() {
         // because an unhandled throw during render is a blank page, and a price panel that cannot
         // price itself should say so rather than take the page down with it.
         try {
-          return { quote: conciergeQuote({ ghgTier: tier as GhgTier, uploadedSources: conciergeSources, isFirstPurchase: true }), error: null }
+          return { quote: conciergeQuote({ uploadedSources: conciergeSources, isFirstPurchase: true }), error: null }
         } catch (e) {
           return { quote: null, error: (e as Error).message.replace(/^conciergeQuote: /, '') }
         }

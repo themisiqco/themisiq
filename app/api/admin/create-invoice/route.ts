@@ -45,11 +45,12 @@ import {
   NEW_PRICING_ACTIVE,
   conciergeQuote,
   isFirstConciergePurchase,
-  ghgTierFromAllowance,
   CONCIERGE_KEY,
   LEGACY_CONCIERGE_KEYS,
   UTILITY_CONNECT_ENABLED,
   ghgTierMetaValue,
+  isGhgTier,
+  isLegacyTier,
   type Tier,
   type GhgTier,
   type ModuleKey,
@@ -127,17 +128,23 @@ export async function POST(req: NextRequest) {
       if (NEW_PRICING_ACTIVE) {
         // admin guard above is `!tier` only — validate the tier here (inside the
         // flag-on branch, so the old path stays byte-unchanged) before cartQuote.
-        if (!TIER_PRICING[tier]) {
+        if (!isGhgTier(tier)) {
           return NextResponse.json({ error: 'Invalid tier.' }, { status: 400 })
         }
         const q = cartQuote({ modules: moduleKeys, ghgTier: tier as GhgTier })
         if (q.requiresQuote) {
-          return NextResponse.json({ error: 'GHG Advisory is a custom quote — add a manual line item in Stripe instead.' }, { status: 400 })
+          return NextResponse.json({ error: 'GHG Enterprise is a custom quote: add a manual line item in Stripe instead.' }, { status: 400 })
         }
         // This route IS the invoice path, so requiresInvoice (>$10k) does NOT block here.
         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
         lines.push({ label, amount: q.totalUSD })
       } else {
+        // ⚠️ THE OLD MODEL HAS NO PRICE FOR THE NEW TIERS, so this arm refuses rather than casting.
+        // It is unreachable while NEW_PRICING_ACTIVE is true; if the flag ever moved, a Business or
+        // Enterprise selection would otherwise index TIER_PRICING and come back undefined.
+        if (!isLegacyTier(tier)) {
+          return NextResponse.json({ error: 'That plan is not available on this pricing model.' }, { status: 400 })
+        }
         const price = configuratorPrice(tier, moduleKeys)
         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
         lines.push({ label, amount: price })
@@ -218,30 +225,15 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // The tier is validated here rather than inherited: the guard above runs only inside the
-      // NEW_PRICING_ACTIVE arm, and this fee's amount must not depend on a branch two levels away.
-      let conciergeTier: GhgTier | null = null
-      if (ghgInCart) {
-        if (!body.tier || !TIER_PRICING[body.tier]) {
-          return NextResponse.json({ error: 'Invalid or missing tier.' }, { status: 400 })
-        }
-        conciergeTier = body.tier as GhgTier
-      } else {
-        const ghgRow = (ownedRows ?? []).find((r) => r.module_key === 'ghg')
-        conciergeTier = ghgTierFromAllowance(ghgRow?.location_allowance ?? null)
-      }
-      if (!conciergeTier) {
-        return NextResponse.json(
-          { error: 'Could not determine the customer GHG plan level, which sets the Concierge onboarding fee. Add a manual line item instead.' },
-          { status: 400 },
-        )
-      }
-
+      // ⚠️ NO TIER IS NEEDED HERE ANY MORE. Mirrors the same removal in app/api/checkout/route.ts:
+      // onboarding was priced by GHG tier, which forced a derivation from the customer's stored
+      // location allowance whenever GHG was not on the same invoice. That derivation went inert
+      // when locations became unlimited. The fee is flat, so the question is not asked.
       const isFirstPurchase = isFirstConciergePurchase(ownedKeys)
 
       let quote
       try {
-        quote = conciergeQuote({ ghgTier: conciergeTier, uploadedSources, connectedSources, isFirstPurchase })
+        quote = conciergeQuote({ uploadedSources, connectedSources, isFirstPurchase })
       } catch (e) {
         return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
       }
@@ -259,7 +251,6 @@ export async function POST(req: NextRequest) {
         concierge_connected_sources: String(connectedSources ?? 0),
         concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
         concierge_onboarding_usd: String(quote.onboardingUSD),
-        concierge_ghg_tier: conciergeTier,
       }
       sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
     }

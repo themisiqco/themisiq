@@ -58,7 +58,7 @@ export async function createDraftInvoiceForOrder(input: CreateDraftInvoiceInput)
     }
     // Advisory → no self-serve price. Mirror the admin route: don't guess an amount.
     if (priced.requiresQuote) {
-      return { ok: false, reason: 'requires_quote', message: 'GHG Advisory is a custom quote: a manual line item is required; not auto-invoiced.' }
+      return { ok: false, reason: 'requires_quote', message: 'GHG Enterprise is a custom quote: a manual line item is required; not auto-invoiced.' }
     }
     // This path is for >$10k only. A card-eligible cart should NOT become an invoice.
     if (!priced.requiresInvoice) {

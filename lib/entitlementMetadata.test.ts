@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierFromAllowance, ghgTierMetaValue, GHG_TIER_KEYS, TIER_PRICING, LEGACY_CONCIERGE_KEYS, CONCIERGE_KEY, type Tier } from './pricing'
+import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierMetaValue, GHG_TIER_KEYS, TIER_PRICING, LEGACY_CONCIERGE_KEYS, CONCIERGE_KEY, type Tier } from './pricing'
 
 // A WRITER OMITTING THE KEY GRANTS UNLIMITED LOCATIONS.
 //
@@ -51,7 +51,6 @@ const CONCIERGE_META_KEYS = [
   'concierge_connected_sources',
   'concierge_source_allowance',
   'concierge_onboarding_usd',
-  'concierge_ghg_tier',
 ]
 
 // The stringify expression both writers must use, verbatim. The empty-string convention is not
@@ -122,20 +121,22 @@ describe('the entitlement metadata contract', () => {
     expect(read(WEBHOOK)).toContain("location_allowance: module_key === 'ghg' ? ghgAllowance : null")
   })
 
-  it('a GHG cart writes the tier ceiling — 3 at starter, 15 at professional — from GHG_TIERS', () => {
-    // Derived, not compared to literals: these read the same table checkout reads, so a tier change
-    // moves the expectation with the product rather than failing on a stale number.
-    for (const tier of ['starter', 'professional'] as Tier[]) {
+  // ⚠️ THIS ASSERTED 3 AT STARTER AND 15 AT PROFESSIONAL UNTIL 28 Sep 2026. Locations became
+  // unlimited on every plan with the employee-band reprice, so every locationAllowance is null and
+  // there is no ceiling left to write. The test is kept rather than deleted because what it really
+  // guards is the CONVENTION, not the numbers: the writer sends '' and the reader turns that back
+  // into null, which enforce_ghg_location_allowance() reads as uncapped. If that round trip ever
+  // breaks, every purchase silently acquires or loses a cap.
+  it('a GHG cart writes an uncapped allowance on every tier, and it round-trips as uncapped', () => {
+    for (const tier of GHG_TIER_KEYS) {
       const allowance = locationAllowanceForTier(tier)
+      expect(allowance, `${tier} must be uncapped: locations are unlimited on every plan`).toBeNull()
       expect(allowance).toBe(GHG_TIERS[tier].locationAllowance)
-      expect(allowance).not.toBeNull()
-      expect(writeConvention(allowance)).toBe(String(GHG_TIERS[tier].locationAllowance))
-      // Round-trip: what the writer sends, the reader turns back into the same integer.
-      expect(readConvention(writeConvention(allowance))).toBe(GHG_TIERS[tier].locationAllowance)
+      expect(writeConvention(allowance)).toBe('')
+      expect(readConvention(writeConvention(allowance))).toBeNull()
     }
-    // Sanity on the shape of the table itself, so the test above cannot pass vacuously.
-    expect(GHG_TIERS.starter.locationAllowance).toBeTypeOf('number')
-    expect(GHG_TIERS.professional.locationAllowance).toBeTypeOf('number')
+    // Sanity on the table itself, so the loop above cannot pass vacuously.
+    expect(Object.keys(GHG_TIERS).length).toBe(GHG_TIER_KEYS.length)
   })
 
   it("a non-GHG cart writes '' and round-trips to null — uncapped, which is why the key must be sent", () => {
@@ -213,22 +214,15 @@ describe('isFirstConciergePurchase', () => {
   })
 })
 
-describe('ghgTierFromAllowance', () => {
-  it('M16 identifies the two capped tiers from GHG_TIERS, not from literals', () => {
-    expect(ghgTierFromAllowance(GHG_TIERS.starter.locationAllowance)).toBe('starter')
-    expect(ghgTierFromAllowance(GHG_TIERS.professional.locationAllowance)).toBe('professional')
-  })
-
-  // ⚠️ NULL MUST NOT RESOLVE. It is Advisory under the current model and an uncapped pre-rescope
-  // row under the old one. 10 and 20 are pre-rescope values with no current equivalent. Each of
-  // these returning a tier would pick between a 1250 and a 2500 charge for a real customer.
-  it('M17 returns null for every ambiguous stored value', () => {
-    expect(ghgTierFromAllowance(null)).toBeNull()
-    expect(ghgTierFromAllowance(10)).toBeNull()
-    expect(ghgTierFromAllowance(20)).toBeNull()
-    expect(ghgTierFromAllowance(0)).toBeNull()
-  })
-})
+// ⚠️ ghgTierFromAllowance AND ITS TESTS (M16, M17) WERE DELETED ON 28 Sep 2026, and the reason is
+// worth keeping. It derived a GHG tier from a stored location_allowance so the Concierge onboarding
+// fee could be priced by band for a customer who was not buying GHG in the same cart. Two things
+// killed it on the same day: locations became unlimited, so every allowance is null and it could
+// only ever return null; and the onboarding fee became flat, so nothing needs a tier to price
+// Concierge at all. Both purchase routes lost the derivation and the 400 that went with it.
+//
+// If a Concierge price is ever banded again, do not revive this. Read entitlements.ghg_tier, which
+// records the band that was actually sold.
 
 describe('Concierge route guards', () => {
   it('M18 both routes price through conciergeQuote and the pricing constants, never a literal', () => {
@@ -247,11 +241,17 @@ describe('Concierge route guards', () => {
     }
   })
 
-  it('M20 both routes validate the tier where the onboarding fee uses it', () => {
+  // ⚠️ INVERTED ON 28 Sep 2026, AND THE INVERSION IS THE POINT. This asserted that both routes
+  // validate body.tier inside the Concierge branch, because the onboarding fee was priced by GHG
+  // tier. The fee is flat now, so the branch must not consult a tier AT ALL: reading one would
+  // reintroduce the dependency that forced a stored-allowance derivation and refused every customer
+  // adding Concierge on its own.
+  it('M20 neither route reads a GHG tier inside the Concierge branch', () => {
     for (const rel of [CHECKOUT, INVOICE]) {
       const src = read(rel)
       const branch = src.slice(src.indexOf('body.concierge'))
-      expect(branch, `${rel} must validate body.tier inside the Concierge branch`).toMatch(/TIER_PRICING(_FOR_VALIDATION)?\[body\.tier\]/)
+      expect(branch, `${rel}: the flat onboarding fee must not depend on a tier`).not.toMatch(/body\.tier/)
+      expect(branch, `${rel}: the tier derivation was deleted with the banded fee`).not.toMatch(/ghgTierFromAllowance/)
     }
   })
 
@@ -299,8 +299,10 @@ describe('ghg_tier can never be a value the CHECK constraint rejects', () => {
   // makes the grant throw, and throwing is Stripe's retry signal, so it retries a write that can
   // never succeed while the customer waits for access they have paid for.
   it('M22 GHG_TIER_KEYS matches the Tier union everywhere it is expressed', () => {
-    expect([...GHG_TIER_KEYS].sort()).toEqual(Object.keys(TIER_PRICING).sort())
     expect([...GHG_TIER_KEYS].sort()).toEqual(Object.keys(GHG_TIERS).sort())
+    // ⚠️ TIER_PRICING IS NOT IN THIS ASSERTION ANY MORE. It described the retired per-module
+    // ladder and is pinned to the three keys that model had. The two coincided until Business and
+    // Enterprise arrived on 28 Sep 2026; comparing them now would force prices into a dead model.
   })
 
   // ⚠️ SUBSET, NOT EQUALITY, AND THE DIRECTION IS THE WHOLE POINT. The constraint must permit
@@ -328,7 +330,7 @@ describe('ghg_tier can never be a value the CHECK constraint rejects', () => {
 
   it('M24 the guard passes the three through and flattens everything else to empty', () => {
     for (const k of GHG_TIER_KEYS) expect(ghgTierMetaValue(k)).toBe(k)
-    for (const bad of ['enterprise', 'STARTER', '', 'ghg', null, undefined, 3, {}, ['starter']]) {
+    for (const bad of ['platinum', 'STARTER', '', 'ghg', null, undefined, 3, {}, ['starter']]) {
       expect(ghgTierMetaValue(bad), `${String(bad)} must not reach metadata`).toBe('')
     }
   })

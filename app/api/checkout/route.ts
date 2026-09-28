@@ -28,12 +28,12 @@ import {
   priceLineQty,
   conciergeQuote,
   isFirstConciergePurchase,
-  ghgTierFromAllowance,
   CONCIERGE_KEY,
   LEGACY_CONCIERGE_KEYS,
   UTILITY_CONNECT_ENABLED,
   ghgTierMetaValue,
-  TIER_PRICING as TIER_PRICING_FOR_VALIDATION,
+  isGhgTier,
+  isLegacyTier,
   type ModuleKey,
   type Tier,
   type GhgTier,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (body.tier || body.moduleKeys) {
       const tier = body.tier
       const moduleKeys = body.moduleKeys ?? []
-      if (!tier || !TIER_PRICING[tier]) {
+      if (!isGhgTier(tier)) {
         return NextResponse.json({ error: 'Invalid or missing tier.' }, { status: 400 })
       }
       if (moduleKeys.length === 0) {
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         // configurator previews). tier is validated by the guard above.
         const q = cartQuote({ modules: moduleKeys, ghgTier: tier as GhgTier })
         if (q.requiresQuote) {
-          return NextResponse.json({ error: 'GHG Advisory is quote-only: please contact us.', requiresQuote: true }, { status: 400 })
+          return NextResponse.json({ error: 'GHG Enterprise is quote-only: please contact us.', requiresQuote: true }, { status: 400 })
         }
         if (q.requiresInvoice) {
           return NextResponse.json({ error: 'Orders over $10,000 are completed by invoice. Please request an invoice.', requiresInvoice: true }, { status: 400 })
@@ -104,6 +104,12 @@ export async function POST(req: NextRequest) {
         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
         lineItems.push(priceLine(label, q.totalUSD))
       } else {
+        // ⚠️ THE OLD MODEL HAS NO PRICE FOR THE NEW TIERS, so this arm refuses rather than casting.
+        // It is unreachable while NEW_PRICING_ACTIVE is true; if the flag ever moved, a Business or
+        // Enterprise selection would otherwise index TIER_PRICING and come back undefined.
+        if (!isLegacyTier(tier)) {
+          return NextResponse.json({ error: 'That plan is not available on this pricing model.' }, { status: 400 })
+        }
         const price = configuratorPrice(tier, moduleKeys)
         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
         lineItems.push(priceLine(label, price))
@@ -206,33 +212,17 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // ⚠️ THE TIER IS VALIDATED HERE, NOT INHERITED FROM THE CART BRANCH ABOVE. That branch does
-      // validate body.tier, but only when it runs and only inside the NEW_PRICING_ACTIVE arm, so
-      // relying on it would make this fee's price depend on a guard two branches away. It sets an
-      // amount, so it is checked where it is used.
-      let conciergeTier: GhgTier | null = null
-      if (ghgInCart) {
-        if (!body.tier || !TIER_PRICING_FOR_VALIDATION[body.tier]) {
-          return NextResponse.json({ error: 'Invalid or missing tier.' }, { status: 400 })
-        }
-        conciergeTier = body.tier as GhgTier
-      } else {
-        // Not in the cart, so it comes from what is stored, never from the client.
-        const ghgRow = ownedRows.find((r) => r.module_key === 'ghg')
-        conciergeTier = ghgTierFromAllowance(ghgRow?.location_allowance ?? null)
-      }
-      if (!conciergeTier) {
-        return NextResponse.json(
-          { error: 'We could not work out your GHG plan level, which sets the Concierge onboarding fee. Please contact us and we will invoice this order.' },
-          { status: 400 },
-        )
-      }
-
+      // ⚠️ NO TIER IS NEEDED HERE ANY MORE, AND THAT IS WHY A WHOLE BRANCH IS GONE. Onboarding was
+      // priced by GHG tier, so this had to work out the customer's band: from the cart when GHG was
+      // in it, and otherwise from their stored location allowance. That second path went inert when
+      // locations became unlimited, and it would have refused every customer adding Concierge on
+      // its own with a 400 about a plan level nobody could determine. The fee is flat now. The
+      // question is not asked, so it cannot be answered wrongly.
       const isFirstPurchase = isFirstConciergePurchase([...ownedKeys])
 
       let quote
       try {
-        quote = conciergeQuote({ ghgTier: conciergeTier, uploadedSources, connectedSources, isFirstPurchase })
+        quote = conciergeQuote({ uploadedSources, connectedSources, isFirstPurchase })
       } catch (e) {
         // conciergeQuote's messages are written for a person and name the actual fault.
         return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
@@ -249,7 +239,6 @@ export async function POST(req: NextRequest) {
         // Recorded, never granted. The onboarding fee buys setup work, not access, so the webhook
         // must not turn this into an entitlement row or stamp a term on it.
         concierge_onboarding_usd: String(quote.onboardingUSD),
-        concierge_ghg_tier: conciergeTier,
       }
       sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
     }

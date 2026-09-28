@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, type ModuleKey, type GhgTier } from './pricing'
+import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -14,11 +14,16 @@ const ALL: ModuleKey[] = [
 // the rest flat). Computed from the source-of-truth tables — never a literal —
 // so adding a module or repricing one keeps these tests honest instead of
 // silently wrong. That drift is exactly what broke the old Full-Platform tests.
-const grossCart = (ghgTier: GhgTier): number =>
-  ALL.reduce(
-    (sum, k) => sum + (k === 'ghg' ? (GHG_TIERS[ghgTier].priceUSD as number) : FLAT_MODULE_PRICES[k as Exclude<ModuleKey, 'ghg'>]),
-    0,
-  )
+// ⚠️ THE CART SPLITS IN TWO SINCE 28 Sep 2026, AND SO DOES THIS HELPER. GHG counts toward the
+// module tally that picks the discount band, and its own price is never discounted, so a single
+// gross-times-discount figure no longer describes any cart containing GHG. Modelled here the same
+// way cartQuote models it, from the same tables, so a reprice moves both together.
+const expectedCart = (modules: ModuleKey[], ghgTier: GhgTier): number => {
+  const others = modules.filter(k => k !== 'ghg') as Exclude<ModuleKey, 'ghg'>[]
+  const othersSum = others.reduce((sum, k) => sum + FLAT_MODULE_PRICES[k], 0)
+  const ghgSum = modules.includes('ghg') ? (GHG_TIERS[ghgTier].priceUSD as number) : 0
+  return Math.round(othersSum * (1 - volumeDiscount(modules.length))) + ghgSum
+}
 
 describe('cartQuote — new pricing model', () => {
   it('single flat module (People) = $1,499, card OK', () => {
@@ -40,17 +45,20 @@ describe('cartQuote — new pricing model', () => {
     expect(q.requiresQuote).toBe(false)
   })
 
-  it('GHG Professional alone = $11,900 and requiresInvoice (> $10k)', () => {
+  // ⚠️ THIS ASSERTED $11,900 AND requiresInvoice UNTIL 28 Sep 2026. Professional is $1,425 under
+  // the employee bands, which is far below CARD_THRESHOLD_USD, so the card path is now the normal
+  // one for it. The threshold behaviour itself is asserted below on a cart that still exceeds it.
+  it('GHG Professional alone is the band price and clears on card', () => {
     const q = cartQuote({ modules: ['ghg'], ghgTier: 'professional' })
-    expect(q.totalUSD).toBe(11900)
-    expect(q.requiresInvoice).toBe(true)
+    expect(q.totalUSD).toBe(GHG_TIERS.professional.priceUSD)
+    expect(q.totalUSD).toBeLessThan(CARD_THRESHOLD_USD)
+    expect(q.requiresInvoice).toBe(false)
     expect(q.requiresQuote).toBe(false)
   })
 
-  it('a full cart is the discounted sum — no bundle cap', () => {
+  it('a full cart is the discounted others plus GHG at full price, with no bundle cap', () => {
     const ghgTier: GhgTier = 'professional'
-    const expected = Math.round(grossCart(ghgTier) * (1 - volumeDiscount(ALL.length)))
-    expect(cartQuote({ modules: ALL, ghgTier }).totalUSD).toBe(expected)
+    expect(cartQuote({ modules: ALL, ghgTier }).totalUSD).toBe(expectedCart(ALL, ghgTier))
   })
 
   it('a large cart is discounted at the 3+ volume band (20%), not a literal', () => {
@@ -61,7 +69,9 @@ describe('cartQuote — new pricing model', () => {
     // …and that same band factor is what cartQuote actually applies.
     const ghgTier: GhgTier = 'professional'
     const q = cartQuote({ modules: ALL, ghgTier })
-    expect(q.totalUSD).toBe(Math.round(grossCart(ghgTier) * (1 - volumeDiscount(n))))
+    expect(q.totalUSD).toBe(expectedCart(ALL, ghgTier))
+    // And the band really is the one GHG helped reach: drop GHG and the tally falls by one.
+    expect(volumeDiscount(ALL.length)).toBe(volumeDiscount(ALL.filter(k => k !== 'ghg').length + 1))
   })
 
   it('a full cart exceeds the card threshold → requiresInvoice (cap no longer holds it under $10k)', () => {
@@ -70,8 +80,11 @@ describe('cartQuote — new pricing model', () => {
     expect(q.requiresInvoice).toBe(true)
   })
 
-  it('GHG Advisory -> requiresQuote, no self-serve total', () => {
-    const q = cartQuote({ modules: ['ghg'], ghgTier: 'advisory' })
+  // ⚠️ THE QUOTE TIER MOVED ON 28 Sep 2026. Advisory was the quote path and is now the 250 to 499
+  // band at a published price; Enterprise is the quote path. A test still naming Advisory here would
+  // pass only while some tier happened to have a null price, which is not what it is checking.
+  it('GHG Enterprise -> requiresQuote, no self-serve total', () => {
+    const q = cartQuote({ modules: ['ghg'], ghgTier: 'enterprise' })
     expect(q.requiresQuote).toBe(true)
     expect(q.totalUSD).toBe(0)
   })
@@ -131,27 +144,30 @@ describe('add-on purchasability — quote-only guard', () => {
 // ── Concierge, source-based model ──────────────────────────────────────
 describe('conciergeQuote', () => {
   it('C1 first purchase charges onboarding for the GHG tier, plus every uploaded source', () => {
-    const q = conciergeQuote({ ghgTier: 'starter', uploadedSources: 4, isFirstPurchase: true })
-    expect(q.onboardingUSD).toBe(1250)
+    const q = conciergeQuote({ uploadedSources: 4, isFirstPurchase: true })
+    expect(q.onboardingUSD).toBe(CONCIERGE_ONBOARDING_USD)
+    expect(CONCIERGE_ONBOARDING_USD).toBe(1395)
     expect(q.sourcesUSD).toBe(360)          // 4 x 90
-    expect(q.totalUSD).toBe(1610)
+    expect(q.totalUSD).toBe(1395 + 360)
     expect(q.lines.map(l => l.quantity)).toEqual([1, 4])
   })
 
   it('C2 renewal charges sources only: onboarding is once per customer, never on renewal', () => {
-    const q = conciergeQuote({ ghgTier: 'advisory', uploadedSources: 4, isFirstPurchase: false })
+    const q = conciergeQuote({ uploadedSources: 4, isFirstPurchase: false })
     expect(q.onboardingUSD).toBe(0)
     expect(q.totalUSD).toBe(360)
     expect(q.lines).toHaveLength(1)
   })
 
-  it('C3 onboarding follows the GHG tier, and a tier change does not re-trigger it', () => {
-    expect(conciergeQuote({ ghgTier: 'starter',      uploadedSources: 1, isFirstPurchase: true }).onboardingUSD).toBe(1250)
-    expect(conciergeQuote({ ghgTier: 'professional', uploadedSources: 1, isFirstPurchase: true }).onboardingUSD).toBe(1750)
-    expect(conciergeQuote({ ghgTier: 'advisory',     uploadedSources: 1, isFirstPurchase: true }).onboardingUSD).toBe(2500)
-    // Moving up a tier is a renewal for Concierge purposes: isFirstPurchase is false, so nothing.
-    expect(conciergeQuote({ ghgTier: 'advisory', uploadedSources: 1, isFirstPurchase: false }).onboardingUSD).toBe(0)
-    expect(CONCIERGE_ONBOARDING_USD.starter).toBe(1250)
+  // ⚠️ FLAT, AND THIS ASSERTED THE OPPOSITE UNTIL 28 Sep 2026. The fee was 1250 / 1750 / 2500 by
+  // GHG tier, which is what forced both purchase routes to work out a customer's band before they
+  // could price Concierge. conciergeQuote does not take a tier any more, so there is no tier for
+  // this to vary by: the assertion is that the fee is the same number, once, for everyone.
+  it('C3 onboarding does not vary by plan, and a tier change cannot re-trigger it', () => {
+    const first = conciergeQuote({ uploadedSources: 1, isFirstPurchase: true })
+    expect(first.onboardingUSD).toBe(CONCIERGE_ONBOARDING_USD)
+    // Moving up a plan is a renewal for Concierge purposes: isFirstPurchase is false, so nothing.
+    expect(conciergeQuote({ uploadedSources: 1, isFirstPurchase: false }).onboardingUSD).toBe(0)
   })
 
   // ⚠️ THE FLAG IS A SALES GATE, NOT A DISPLAY TWEAK. Pricing a connected source while the
@@ -160,7 +176,7 @@ describe('conciergeQuote', () => {
     expect(UTILITY_CONNECT_ENABLED).toBe(false)
     expect(sourceKindSellable('uploaded')).toBe(true)
     expect(sourceKindSellable('connected')).toBe(false)
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: 2, connectedSources: 1, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: 2, connectedSources: 1, isFirstPurchase: true }))
       .toThrow(/connected sources cannot be sold yet/i)
   })
 
@@ -170,9 +186,9 @@ describe('conciergeQuote', () => {
   })
 
   it('C6 zero or negative sources is refused: Concierge with nothing to read is not a purchase', () => {
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: 0, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: 0, isFirstPurchase: true }))
       .toThrow(/at least one data source/i)
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: -1, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: -1, isFirstPurchase: true }))
       .toThrow(/cannot be negative/i)
   })
 
@@ -180,23 +196,23 @@ describe('conciergeQuote', () => {
   // passed both range checks and produced a NaN quote, and 2.5 became 2 here while priceLineQty
   // rejected 2.5 downstream: two functions disagreeing about the same number.
   it('C7 NaN and Infinity are refused, not treated as a count', () => {
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: NaN, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: NaN, isFirstPurchase: true }))
       .toThrow(/whole number/i)
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: Infinity, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: Infinity, isFirstPurchase: true }))
       .toThrow(/whole number/i)
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: 2, connectedSources: NaN, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: 2, connectedSources: NaN, isFirstPurchase: true }))
       .toThrow(/whole number/i)
   })
 
   it('C8 a fractional count is refused rather than truncated', () => {
-    expect(() => conciergeQuote({ ghgTier: 'starter', uploadedSources: 2.5, isFirstPurchase: true }))
+    expect(() => conciergeQuote({ uploadedSources: 2.5, isFirstPurchase: true }))
       .toThrow(/whole number/i)
   })
 
   it('C9 an absent connectedSources is zero, not a validation failure', () => {
-    const omitted = conciergeQuote({ ghgTier: 'starter', uploadedSources: 3, isFirstPurchase: false })
-    const explicit = conciergeQuote({ ghgTier: 'starter', uploadedSources: 3, connectedSources: 0, isFirstPurchase: false })
-    const undef = conciergeQuote({ ghgTier: 'starter', uploadedSources: 3, connectedSources: undefined, isFirstPurchase: false })
+    const omitted = conciergeQuote({ uploadedSources: 3, isFirstPurchase: false })
+    const explicit = conciergeQuote({ uploadedSources: 3, connectedSources: 0, isFirstPurchase: false })
+    const undef = conciergeQuote({ uploadedSources: 3, connectedSources: undefined, isFirstPurchase: false })
     expect(omitted.totalUSD).toBe(270)
     expect(explicit).toEqual(omitted)
     expect(undef).toEqual(omitted)
@@ -204,16 +220,16 @@ describe('conciergeQuote', () => {
 
   it('C10 the self-serve ceiling holds at 60 and refuses 61', () => {
     expect(CONCIERGE_MAX_SELF_SERVE_SOURCES).toBe(60)
-    const at = conciergeQuote({ ghgTier: 'advisory', uploadedSources: 60, isFirstPurchase: false })
+    const at = conciergeQuote({ uploadedSources: 60, isFirstPurchase: false })
     expect(at.totalUSD).toBe(5400)          // 60 x 90
-    expect(() => conciergeQuote({ ghgTier: 'advisory', uploadedSources: 61, isFirstPurchase: false }))
+    expect(() => conciergeQuote({ uploadedSources: 61, isFirstPurchase: false }))
       .toThrow(/contact us for a quote/i)
   })
 
   // The ceiling counts the ORDER, not one kind. Uploaded plus connected is what a specialist would
   // have to set up, so it is the total that decides whether this is still self-serve.
   it('C11 the ceiling counts uploaded and connected together', () => {
-    expect(() => conciergeQuote({ ghgTier: 'advisory', uploadedSources: 60, connectedSources: 1, isFirstPurchase: false }))
+    expect(() => conciergeQuote({ uploadedSources: 60, connectedSources: 1, isFirstPurchase: false }))
       .toThrow(/contact us for a quote/i)
   })
 })
@@ -230,5 +246,93 @@ describe('priceLineQty', () => {
     expect(() => priceLineQty('x', 90, 0)).toThrow(/at least 1/i)
     expect(() => priceLineQty('x', 90, 2.5)).toThrow(/whole quantity/i)
     expect(() => priceLineQty('x', 90, NaN)).toThrow(/whole quantity/i)
+  })
+})
+
+// ── Employee bands, 28 Sep 2026 ──────────────────────────────────────────────
+describe('ghgTierForEmployees', () => {
+  it('E1 every band resolves at both of its edges', () => {
+    const edges: [number, string][] = [
+      [1, 'starter'], [19, 'starter'],
+      [20, 'professional'], [99, 'professional'],
+      [100, 'business'], [249, 'business'],
+      [250, 'advisory'], [499, 'advisory'],
+      [500, 'enterprise'], [10_000, 'enterprise'],
+    ]
+    for (const [n, tier] of edges) {
+      expect(ghgTierForEmployees(n), `${n} employees`).toBe(tier)
+    }
+  })
+
+  // ⚠️ A GAP OR AN OVERLAP IS A PRICING FAULT, NOT A COSMETIC ONE. A gap throws at checkout for a
+  // real company size; an overlap makes the answer depend on iteration order. Walking the range is
+  // the only way to prove neither, because reading the table cannot show what falls between rows.
+  it('E2 the bands are contiguous and exclusive from 1 to 600', () => {
+    for (let n = 1; n <= 600; n++) {
+      const matches = GHG_TIER_KEYS.filter(k => {
+        const { min, max } = GHG_TIERS[k].employees
+        return n >= min && (max == null || n <= max)
+      })
+      expect(matches.length, `${n} employees falls in ${matches.length} bands, not 1`).toBe(1)
+      expect(ghgTierForEmployees(n)).toBe(matches[0])
+    }
+  })
+
+  it('E3 a count that is not a whole number of at least 1 throws rather than banding', () => {
+    for (const bad of [0, -1, 2.5, NaN, Infinity]) {
+      expect(() => ghgTierForEmployees(bad), `${bad} must not resolve to a band`)
+        .toThrow(/whole number of at least 1/i)
+    }
+  })
+
+  it('E4 Enterprise is the only open-ended band and the only quote path', () => {
+    const quoteOnly = GHG_TIER_KEYS.filter(k => GHG_TIERS[k].priceUSD == null)
+    expect(quoteOnly).toEqual(['enterprise'])
+    const openEnded = GHG_TIER_KEYS.filter(k => GHG_TIERS[k].employees.max == null)
+    expect(openEnded).toEqual(['enterprise'])
+  })
+
+  it('E5 locations are unlimited on every plan', () => {
+    for (const k of GHG_TIER_KEYS) {
+      expect(GHG_TIERS[k].locationAllowance, `${k} must be uncapped`).toBeNull()
+    }
+  })
+})
+
+// ── GHG and the volume discount ──────────────────────────────────────────────
+// ⚠️ TWO RULES, NOT ONE. GHG COUNTS toward the module tally that picks the discount band, and its
+// own price is NEVER discounted. The worked cases below are the ones that distinguish that from
+// both of the simpler rules it could be mistaken for.
+describe('cartQuote keeps GHG out of the discount but not out of the count', () => {
+  const ghg = GHG_TIERS.starter.priceUSD as number
+  const cbam = FLAT_MODULE_PRICES.cbam
+  const supply = FLAT_MODULE_PRICES['supply-chain']
+
+  it('E6 GHG alone is the band price, undiscounted', () => {
+    expect(cartQuote({ modules: ['ghg'], ghgTier: 'starter' }).totalUSD).toBe(ghg)
+  })
+
+  it('E7 GHG plus one module reaches the 2-module band, and only the other module is discounted', () => {
+    const q = cartQuote({ modules: ['ghg', 'cbam'], ghgTier: 'starter' })
+    expect(q.totalUSD).toBe(Math.round(cbam * 0.9) + ghg)
+    expect(q.totalUSD).toBe(1824)
+  })
+
+  it('E8 GHG plus two modules reaches the 3-module band, and GHG is still full price', () => {
+    const q = cartQuote({ modules: ['ghg', 'cbam', 'supply-chain'], ghgTier: 'starter' })
+    expect(q.totalUSD).toBe(Math.round((cbam + supply) * 0.8) + ghg)
+    expect(q.totalUSD).toBe(3994)
+  })
+
+  it('E9 a cart without GHG is unchanged by any of this', () => {
+    expect(cartQuote({ modules: ['cbam', 'supply-chain'] }).totalUSD).toBe(3959)
+  })
+
+  it('E10 Enterprise sends the whole selection to quote, as Advisory used to', () => {
+    const q = cartQuote({ modules: ['ghg', 'cbam'], ghgTier: 'enterprise' })
+    expect(q.requiresQuote).toBe(true)
+    expect(q.totalUSD).toBe(0)
+    // And Advisory no longer does, because it has a price now.
+    expect(cartQuote({ modules: ['ghg'], ghgTier: 'advisory' }).requiresQuote).toBe(false)
   })
 })

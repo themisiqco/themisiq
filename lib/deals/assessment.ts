@@ -344,12 +344,34 @@ export function getObligations(locationCount: number, frameworks: string[], sect
   const loc = CONSULTANT_LOCATION_FACTOR(locationCount)
   const sec = CONSULTANT_SECTOR_FACTOR(sector)
 
-  // GHG — ALWAYS included. Tier by location count (GHG_TIERS is the authority).
+  // GHG is ALWAYS included. The band shown here is estimated from LOCATION COUNT, which is a deal
+  // report's own heuristic and no longer the plan model.
+  //
+  // ⚠️ THESE THRESHOLDS ARE THIS FILE'S, NOT GHG_TIERS'. They read
+  // `GHG_TIERS.starter.locationAllowance ?? 3` until 28 Sep 2026, where the `?? 3` was a fallback
+  // behind a real value. Locations became unlimited on every plan, every locationAllowance went
+  // null, and the fallbacks stopped being fallbacks: they silently became the thresholds. Naming
+  // them here is not a behaviour change, it is the same numbers said out loud, so the next reader
+  // is not misled into thinking the plan model still drives this.
+  //
+  // ⚠️ AND THE TOP BRANCH IS AN EXPLICIT QUOTE NOW. It read `tierPricing(GHG_TIERS.advisory.priceUSD)`
+  // with a comment saying Advisory's null price meant "custom quote for 16+ locations". Advisory is
+  // a priced band since the employee reprice, so that branch began quoting $4,550 at a case written
+  // to refuse a figure. QUOTE says what was always meant.
+  //
+  // ⚠️ THE WHOLE LADDER IS ON BORROWED TIME. Plans are sized by EMPLOYEE COUNT and a deal record
+  // holds no headcount, so a location count cannot pick a band: a three-site manufacturer and a
+  // three-site software company are different plans. The decision is to drop the recommendation and
+  // show the band table instead, which is a change to what the report says and belongs with the
+  // surfaces batch, not here. Until then this prices small deals at the entry bands, which is the
+  // closest honest answer available from what a deal actually knows.
+  const DEAL_REPORT_SMALL_MAX = 3
+  const DEAL_REPORT_MID_MAX = 15
   const ghgPricing: ObligationPricing =
     locationUnset ? QUOTE
-    : locationCount <= (GHG_TIERS.starter.locationAllowance ?? 3)      ? tierPricing(GHG_TIERS.starter.priceUSD)
-    : locationCount <= (GHG_TIERS.professional.locationAllowance ?? 15) ? tierPricing(GHG_TIERS.professional.priceUSD)
-    : tierPricing(GHG_TIERS.advisory.priceUSD) // null → Advisory / custom quote (16+)
+    : locationCount <= DEAL_REPORT_SMALL_MAX ? tierPricing(GHG_TIERS.starter.priceUSD)
+    : locationCount <= DEAL_REPORT_MID_MAX   ? tierPricing(GHG_TIERS.professional.priceUSD)
+    : QUOTE
 
   const included: ObligationTier[] = [
     // GHG consultant range scales by location AND sector (a heavy-sector inventory is more work).

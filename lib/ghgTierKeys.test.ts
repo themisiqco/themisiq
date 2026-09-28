@@ -99,8 +99,8 @@ describe('the GHG tier keys are named in one place', () => {
 
   it('T4 isGhgTier accepts every key and rejects everything else', () => {
     for (const k of GHG_TIER_KEYS) expect(isGhgTier(k)).toBe(true)
-    for (const bad of ['business', 'Starter', '', 'ghg', null, undefined, 1, {}, ['starter']]) {
-      expect(isGhgTier(bad), `${String(bad)} is not a tier key today`).toBe(false)
+    for (const bad of ['platinum', 'Starter', '', 'ghg', null, undefined, 1, {}, ['starter']]) {
+      expect(isGhgTier(bad), `${String(bad)} is not a tier key`).toBe(false)
     }
   })
 })
