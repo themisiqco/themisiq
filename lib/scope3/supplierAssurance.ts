@@ -67,10 +67,24 @@ const LEGACY_STATE_BY_ANSWER: Record<string, AssuranceState> = {
 export const ASSURANCE_QUESTION_ID = 's3_assurance'
 
 export interface LineAssurance {
-  // Exactly what the supplier selected, or null. ⚠️ NULL WHEN UNANSWERED, NEVER A FALLBACK STRING.
-  // data_quality on the same line mixes the supplier's words with ours ('Supplier-reported (basis
-  // unspecified)' is substituted when blank), so a reader cannot tell which it is holding without
-  // comparing against the option list. That ambiguity is now frozen into snapshots. Not repeated here.
+  // The option's wording at the time the snapshot was frozen, resolved from the stored answer. For
+  // answers given before 27 September 2026 this is today's wording of the same option; relabels to date
+  // change punctuation only.
+  //
+  // ⚠️ NULL WHEN UNANSWERED, NEVER A FALLBACK STRING. data_quality on the same line mixes the supplier's
+  // words with ours ('Supplier-reported (basis unspecified)' is substituted when blank), so a reader
+  // cannot tell which it is holding without comparing against the option list. That ambiguity is now
+  // frozen into snapshots. Not repeated here.
+  //
+  // ⚠️ IT HELD THE STORED ANSWER UNRESOLVED, AND FOR ONE WINDOW THAT MEANT A SLUG. The window opens at
+  // 9ec690d (27 Sep 2026), "Supplier answers carry a stable value and a per-option tone", which made the
+  // portal save `opt.value`: from then on this field received `yes_limited_assurance` — our storage key,
+  // in a field a verifier reads, on a record that is never rewritten. It closes at the commit this note
+  // belongs to, which resolves the wording at the write site; see `wordingOf`.
+  //
+  // Any snapshot line frozen inside that window still holds a value. Its `assurance` state is correct, so
+  // no figure and no conclusion is affected; the query for finding them is in the diff-3 report, and a
+  // correction would be a superseding snapshot with a restatement_reason, never an edit in place.
   supplier_assurance_raw: string | null
   assurance: AssuranceState
 }
@@ -92,14 +106,36 @@ export function assuranceForLine(opts: {
   raw: string | null | undefined
   asked: boolean
   method: SnapshotLine['method']
+  /**
+   * How to present the stored answer to a reader: given what is in supplier_responses, return the
+   * option's wording. The route passes `s => optionLabel(ASSURANCE_QUESTION_ID, s)`.
+   *
+   * ⚠️ A PARAMETER RATHER THAN AN IMPORT, AND THE REASON IS BUNDLE WEIGHT. This module could resolve the
+   * wording itself — it owns ASSURANCE_QUESTION_ID — but importing lib/supply-chain/templates.ts would
+   * pull the whole questionnaire definition into app/verify/[token], which imports assuranceStatement
+   * from here and shows a verifier nothing from the questionnaire.
+   *
+   * ⚠️ THE STATE IS NEVER DERIVED FROM THE RESULT. Both the state and the wording come from the same
+   * stored answer, so the two cannot disagree; a caller cannot hand in a wording that says one thing
+   * while the state says another.
+   *
+   * ⚠️ AN UNRECOGNISED ANSWER MUST PASS THROUGH UNCHANGED, which optionLabel does by returning its input
+   * when it names no option. That is what keeps the 'unrecognised' statement true: it promises the answer
+   * is "reported as given", and a resolver that normalised it would make that false.
+   *
+   * Optional only so the state-derivation tests need not repeat it; supplierAssurance.test.ts asserts
+   * that every non-test caller passes it.
+   */
+  wordingOf?: (stored: string) => string
 }): LineAssurance {
   const trimmed = (opts.raw ?? '').trim()
   const raw = trimmed === '' ? null : trimmed
+  const wording = raw === null ? null : (opts.wordingOf ? opts.wordingOf(raw) : raw)
 
-  if (opts.method === 'spend-based') return { supplier_assurance_raw: raw, assurance: 'not_applicable' }
+  if (opts.method === 'spend-based') return { supplier_assurance_raw: wording, assurance: 'not_applicable' }
   if (raw !== null) {
     const state = STATE_BY_ANSWER[raw] ?? LEGACY_STATE_BY_ANSWER[raw] ?? 'unrecognised'
-    return { supplier_assurance_raw: raw, assurance: state }
+    return { supplier_assurance_raw: wording, assurance: state }
   }
   return { supplier_assurance_raw: null, assurance: opts.asked ? 'not_answered' : 'not_asked' }
 }

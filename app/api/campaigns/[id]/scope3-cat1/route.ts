@@ -152,7 +152,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           value_mt: allocated,
           basis: `Supplier-reported allocated emissions: ${allocated} mt CO2e${method ? ` (allocated by ${method})` : ''}`,
           allocation_method: method || undefined,
-          ...assuranceForLine({ raw: assuranceRaw, asked: askedAssurance, method: 'supplier-specific' }),
+          ...assuranceForLine({ raw: assuranceRaw, asked: askedAssurance, method: 'supplier-specific',
+            // The snapshot records the option's WORDING, not our storage key. optionLabel takes the
+            // stored value, a pre-sweep label, or anything off-list, and returns what a reader should see.
+            wordingOf: (stored) => optionLabel(ASSURANCE_QUESTION_ID, stored) }),
         })
         continue
       }
@@ -191,7 +194,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           // Always 'not_applicable' here, whatever the supplier answered: this figure is the buyer's
           // spend times a factor, so the supplier's assurance status does not describe it. The raw
           // answer is still carried, because it is true about the supplier.
-          ...assuranceForLine({ raw: assuranceRaw, asked: askedAssurance, method: 'spend-based' }),
+          ...assuranceForLine({ raw: assuranceRaw, asked: askedAssurance, method: 'spend-based',
+            // The snapshot records the option's WORDING, not our storage key. optionLabel takes the
+            // stored value, a pre-sweep label, or anything off-list, and returns what a reader should see.
+            wordingOf: (stored) => optionLabel(ASSURANCE_QUESTION_ID, stored) }),
         })
         continue
       }

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { stripTsComments } from '../testing/stripComments'
+import { readdirSync } from 'node:fs'
+import { optionLabel } from '../supply-chain/templates'
 import { join } from 'node:path'
 import {
   assuranceForLine, carriesThirdPartyAssurance, assuranceContradictsFigure,
@@ -58,11 +60,59 @@ describe('mapping the supplier answer', () => {
     expect(legacyStates, 'the four frozen labels must keep their states for good').toEqual(states)
   })
 
-  it('keeps the supplier answer verbatim, em-dashes and all', () => {
-    // The methodology rule: preserve source values a verifier may cross-check. The supplier chose
-    // those words and will repeat them when asked. Our own wording lives in assuranceStatement().
-    const r = assuranceForLine({ raw: 'Yes — limited assurance', asked: true, method: 'supplier-specific' })
-    expect(r.supplier_assurance_raw).toBe('Yes — limited assurance')
+  it('records the option\'s wording, resolved from whatever the stored answer is', () => {
+    // ⚠️ STARTS FROM WHAT IS STORED AND GOES THROUGH THE ROUTE'S OWN PATH. The previous version of this
+    // test fed a label straight in and asserted it came back, so it kept passing on 27 Sep 2026 when the
+    // questionnaire began storing option VALUES and the field started receiving `yes_limited_assurance` —
+    // our storage key, in a field a verifier reads, on a record that is never rewritten.
+    const wordingOf = (stored: string) => optionLabel(ASSURANCE_QUESTION_ID, stored)
+
+    // A new answer: the portal stores the value.
+    const fromValue = assuranceForLine({
+      raw: 'yes_limited_assurance', asked: true, method: 'supplier-specific', wordingOf,
+    })
+    expect(fromValue.supplier_assurance_raw, 'the wording, not the key').toBe('Yes, limited assurance')
+    expect(fromValue.assurance, 'and the state still comes from the stored answer').toBe('limited')
+
+    // An answer given before the values migration: the row holds the option's prose of the day. It reads
+    // in TODAY's wording of the same option, which is what the field's comment says it is.
+    const fromLegacyLabel = assuranceForLine({
+      raw: 'Yes — limited assurance', asked: true, method: 'supplier-specific', wordingOf,
+    })
+    expect(fromLegacyLabel.supplier_assurance_raw).toBe('Yes, limited assurance')
+    expect(fromLegacyLabel.assurance).toBe('limited')
+
+    // ⚠️ AND AN OFF-LIST ANSWER IS REPORTED AS GIVEN. assuranceStatement('unrecognised') promises exactly
+    // that, so the resolver must not normalise it into something the supplier did not say.
+    const odd = assuranceForLine({
+      raw: 'limited-ish, ask our auditor', asked: true, method: 'supplier-specific', wordingOf,
+    })
+    expect(odd.supplier_assurance_raw, 'unchanged').toBe('limited-ish, ask our auditor')
+    expect(odd.assurance).toBe('unrecognised')
+    expect(assuranceStatement('unrecognised')).toContain('reported as given')
+  })
+
+  it('every caller that writes a snapshot resolves the wording', () => {
+    // ⚠️ THE PARAMETER IS OPTIONAL SO THE STATE TESTS NEED NOT REPEAT IT, WHICH MEANS A NEW CALLER COULD
+    // FORGET. Every call outside a test must pass wordingOf, or a slug reaches a frozen record again.
+    const REPO = join(__dirname, '..', '..')
+    const callers = ['app/api/campaigns/[id]/scope3-cat1/route.ts']
+    for (const rel of callers) {
+      const src = stripTsComments(readFileSync(join(REPO, rel), 'utf8'))
+      const calls = [...src.matchAll(/assuranceForLine\(\{[\s\S]*?\}\)/g)]
+      expect(calls.length, `${rel} calls assuranceForLine`).toBeGreaterThan(0)
+      for (const c of calls) {
+        expect(c[0], `${rel}: a call without wordingOf writes the stored answer unresolved`)
+          .toContain('wordingOf')
+      }
+    }
+    // And the list is complete: no other non-test file calls it.
+    const others = walkTs(join(REPO, 'app')).concat(walkTs(join(REPO, 'lib')))
+      .filter(f => !f.includes('.test.') && !f.endsWith('lib/scope3/supplierAssurance.ts'))
+      .filter(f => /assuranceForLine\(/.test(stripTsComments(readFileSync(f, 'utf8'))))
+      .map(f => f.slice(REPO.length + 1))
+    expect(others.sort(), 'a caller of assuranceForLine is missing from the list above')
+      .toEqual(callers.slice().sort())
   })
 
   it('does not fuzzy-match an off-list answer onto its nearest neighbour', () => {
@@ -458,3 +508,13 @@ describe('the buyer surface renders these and derives nothing itself', () => {
     }
   })
 })
+
+/** Every .ts/.tsx under a directory, for the caller-completeness check above. */
+function walkTs(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name)
+    if (e.isDirectory()) walkTs(p, out)
+    else if (/\.tsx?$/.test(e.name)) out.push(p)
+  }
+  return out
+}
