@@ -92,6 +92,34 @@ describe('entitlementTerm — the derivation', () => {
   })
 })
 
+/**
+ * The columns the webhook's prior-terms read asks for.
+ *
+ * ⚠️ PARSED, NOT MATCHED WHOLE, AND THAT IS THE FIX RATHER THAN A LOOSENING. This asserted the
+ * select string verbatim and broke on 28 Sep 2026 when the Concierge work widened it to carry
+ * ghg_tier and source_allowance. The test was right to fail loudly, but it was pinning the wrong
+ * thing: it exists to protect the never-shorten rule, which needs module_key, term_start and
+ * term_end and does not care what else travels with them. Adding a column is now invisible here.
+ * Removing any of the three still fails, which is the whole point.
+ *
+ * Keyed on term_start rather than on position, so it finds the right call even if the webhook
+ * grows a second read of the entitlements table. Exactly one select may carry it: two would mean
+ * two prior-terms reads, which is its own defect and should stop this test rather than be picked
+ * between silently.
+ */
+const priorTermsSelectColumns = (src: string): string[] => {
+  const carrying = [...src.matchAll(/\.select\(\s*'([^']*)'\s*\)/g)]
+    .map((m) => m[1])
+    .filter((cols) => cols.includes('term_start'))
+  if (carrying.length !== 1) {
+    throw new Error(
+      `expected exactly one select() carrying term_start in the webhook, found ${carrying.length}. ` +
+      'The prior-terms read is what stops a repurchase shortening a term that is already paid for.',
+    )
+  }
+  return carrying[0].split(',').map((c) => c.trim()).filter(Boolean)
+}
+
 describe('card and invoice cannot disagree about the term', () => {
   const ROOT = process.cwd()
   const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
@@ -127,7 +155,10 @@ describe('card and invoice cannot disagree about the term', () => {
   })
 
   it('the writer reads prior terms before writing — the never-shorten rule needs them', () => {
-    expect(WEBHOOK_CODE).toContain("select('module_key, term_start, term_end')")
+    const cols = priorTermsSelectColumns(WEBHOOK_CODE)
+    for (const required of ['module_key', 'term_start', 'term_end']) {
+      expect(cols, `the prior-terms read must still select ${required}`).toContain(required)
+    }
   })
 
   it('NO SECOND +365 EXISTS. One definition, or the two paths will drift', () => {

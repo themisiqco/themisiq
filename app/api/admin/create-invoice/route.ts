@@ -49,6 +49,7 @@ import {
   CONCIERGE_KEY,
   LEGACY_CONCIERGE_KEYS,
   UTILITY_CONNECT_ENABLED,
+  ghgTierMetaValue,
   type Tier,
   type GhgTier,
   type ModuleKey,
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest) {
       // Same key, same empty-string convention, as app/api/checkout/route.ts. Both writers feed one
       // reader, so a key present in only one of them is the defect lib/entitlementMetadata.test.ts
       // exists to catch.
-      ghg_tier: ghgTierForMeta ?? '',
+      ghg_tier: ghgTierMetaValue(ghgTierForMeta),
       ...conciergeMeta,
     }
 

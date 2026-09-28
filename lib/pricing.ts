@@ -487,6 +487,35 @@ export function isFirstConciergePurchase(existingModuleKeys: readonly string[]):
  * then on; the routes read that first and only reach here when it is null, which is every row
  * written before the column existed.
  */
+/**
+ * The tier keys, as a value rather than a type, because a database CHECK constraint cannot read a
+ * TypeScript union. entitlements.ghg_tier is constrained to exactly these three in
+ * supabase/migrations/20260928_concierge_source_model.sql.
+ *
+ * ⚠️ A FOURTH TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
+ * every purchase on the new tier fail AFTER payment: the webhook writes the value, Postgres rejects
+ * it, the grant throws, and Stripe retries a write that can never succeed. lib/pricing.test.ts pins
+ * this list against TIER_PRICING and GHG_TIERS so the omission fails a test rather than a customer.
+ */
+export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory'] as const
+
+/**
+ * The value to put in the ghg_tier metadata key. Returns '' for anything that is not one of the
+ * three, following the same empty-string convention as ghg_location_allowance.
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE TYPE SYSTEM STOPS AT THE REQUEST BOUNDARY. body.tier arrives as JSON.
+ * Both routes validate it before pricing anything, but create-invoice assigns the metadata value
+ * outside its NEW_PRICING_ACTIVE arm, where the only check is truthiness. That path is unreachable
+ * while the flag is true. It would not announce itself if the flag ever moved: the customer pays,
+ * the CHECK rejects the write, and the grant fails on retry forever. An empty string degrades to
+ * "tier not recorded", which the onboarding fee already knows how to handle.
+ */
+export function ghgTierMetaValue(tier: unknown): GhgTier | '' {
+  return typeof tier === 'string' && (GHG_TIER_KEYS as readonly string[]).includes(tier)
+    ? (tier as GhgTier)
+    : ''
+}
+
 export function ghgTierFromAllowance(allowance: number | null): GhgTier | null {
   if (allowance == null) return null
   if (allowance === GHG_TIERS.starter.locationAllowance) return 'starter'

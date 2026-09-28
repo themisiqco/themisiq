@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
-import type { ModuleKey } from './pricing'
+import { CONCIERGE_ENTITLEMENT_KEYS, type ModuleKey } from './pricing'
 
 // ONE READ, THREE SHAPES. useEntitlementAccess is the implementation; useEntitlementState and
 // useEntitlement below are projections of it, progressively lossier. Reach for the least lossy
@@ -166,7 +166,16 @@ export function useHasConcierge(): boolean {
       const { data, error } = await supabase
         .from('entitlements')
         .select('module_key')
-        .in('module_key', ['concierge-basic', 'concierge-standard', 'concierge-enterprise'])
+        .in('module_key', CONCIERGE_ENTITLEMENT_KEYS)
+        // ⚠️ TERM-AWARE SINCE 28 Sep 2026, AND IT WAS NOT BEFORE. This returned true for an
+        // EXPIRED Concierge row, so a customer whose term had ended kept bill extraction
+        // indefinitely: no error, no symptom, just access that outlived the payment. The GHG check
+        // has always compared term_end. This one simply never did.
+        // Same comparison enforce_ghg_location_allowance() makes in Postgres, and the same one the
+        // server route makes in app/api/concierge/extract/route.ts.
+        // ⚠️ NOT THE SAME QUESTION AS isFirstConciergePurchase, which is deliberately NOT term-aware:
+        // an expired customer has no access, but has still been billed for onboarding once.
+        .gt('term_end', new Date().toISOString())
         .limit(1)
       if (cancelled) return
       if (error) {

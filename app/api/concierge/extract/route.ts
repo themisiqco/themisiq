@@ -24,6 +24,7 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 // From the shared lib, NOT declared here: the wizard needs the same list, and it cannot import from
 // this module without pulling `next/server` into the client bundle. See lib/ghg/conciergeDocTypes.ts.
 import { SUPPORTED_FUELS, type FuelType } from '../../../../lib/ghg/conciergeDocTypes'
+import { CONCIERGE_ENTITLEMENT_KEYS } from '../../../../lib/pricing'
 
 const FUEL_GUIDANCE: Record<FuelType, string> = {
   electricity:
@@ -98,7 +99,16 @@ export async function POST(req: NextRequest) {
     const { data: conciergeRows, error: entErr } = await supabase
       .from('entitlements')
       .select('module_key')
-      .in('module_key', ['concierge-basic', 'concierge-standard', 'concierge-enterprise'])
+      .in('module_key', CONCIERGE_ENTITLEMENT_KEYS)
+      // ⚠️ TERM-AWARE SINCE 28 Sep 2026, AND IT WAS NOT BEFORE. This returned true for an
+      // EXPIRED Concierge row, so a customer whose term had ended kept bill extraction
+      // indefinitely: no error, no symptom, just access that outlived the payment. The GHG check
+      // has always compared term_end. This one simply never did.
+      // Same comparison enforce_ghg_location_allowance() makes in Postgres, and the same one the
+      // server route makes in app/api/concierge/extract/route.ts.
+      // ⚠️ NOT THE SAME QUESTION AS isFirstConciergePurchase, which is deliberately NOT term-aware:
+      // an expired customer has no access, but has still been billed for onboarding once.
+      .gt('term_end', new Date().toISOString())
       .limit(1)
     if (entErr) {
       console.error('[concierge/extract] entitlement read failed (denying):', entErr.message)

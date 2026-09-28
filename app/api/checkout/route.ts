@@ -32,6 +32,7 @@ import {
   CONCIERGE_KEY,
   LEGACY_CONCIERGE_KEYS,
   UTILITY_CONNECT_ENABLED,
+  ghgTierMetaValue,
   TIER_PRICING as TIER_PRICING_FOR_VALIDATION,
   type ModuleKey,
   type Tier,
@@ -299,7 +300,7 @@ export async function POST(req: NextRequest) {
       // The tier behind that allowance. Written whenever GHG is in the cart, and empty otherwise,
       // following the same empty-string convention: Stripe metadata values are strings and the
       // webhook reads '' as absent. Batch 3 writes it to entitlements.ghg_tier.
-      ghg_tier: ghgTierForMeta ?? '',
+      ghg_tier: ghgTierMetaValue(ghgTierForMeta),
       // Empty when Concierge is not in this order, same convention again.
       ...conciergeMeta,
       ...consentMeta,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierFromAllowance, LEGACY_CONCIERGE_KEYS, type Tier } from './pricing'
+import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierFromAllowance, ghgTierMetaValue, GHG_TIER_KEYS, TIER_PRICING, LEGACY_CONCIERGE_KEYS, CONCIERGE_KEY, type Tier } from './pricing'
 
 // A WRITER OMITTING THE KEY GRANTS UNLIMITED LOCATIONS.
 //
@@ -180,7 +180,7 @@ describe('Concierge purchase metadata', () => {
 
   it('M12 both writers carry ghg_tier beside the allowance, same empty-string convention', () => {
     for (const rel of [CHECKOUT, INVOICE]) {
-      expect(metadataLiteral(read(rel)), `${rel} must write ghg_tier`).toContain("ghg_tier: ghgTierForMeta ?? ''")
+      expect(metadataLiteral(read(rel)), `${rel} must write ghg_tier through the guard`).toContain('ghg_tier: ghgTierMetaValue(ghgTierForMeta)')
     }
   })
 
@@ -259,5 +259,104 @@ describe('Concierge route guards', () => {
     for (const rel of [CHECKOUT, INVOICE]) {
       expect(read(rel), `${rel} must not treat a failed read as owning nothing`).toMatch(/ownedErr/)
     }
+  })
+})
+
+// ── Batch 3: the columns, the guard, and the two term checks ─────────────────
+const MIGRATION = 'supabase/migrations/20260928_concierge_source_model.sql'
+const HOOKS = 'lib/useEntitlement.ts'
+const EXTRACT = 'app/api/concierge/extract/route.ts'
+
+describe('ghg_tier can never be a value the CHECK constraint rejects', () => {
+  // ⚠️ THIS IS THE ONE THAT FAILS AFTER PAYMENT. The webhook writes ghg_tier into a column
+  // constrained to three values. A fourth tier, or an unvalidated body.tier reaching metadata,
+  // makes the grant throw, and throwing is Stripe's retry signal, so it retries a write that can
+  // never succeed while the customer waits for access they have paid for.
+  it('M22 GHG_TIER_KEYS matches the Tier union everywhere it is expressed', () => {
+    expect([...GHG_TIER_KEYS].sort()).toEqual(Object.keys(TIER_PRICING).sort())
+    expect([...GHG_TIER_KEYS].sort()).toEqual(Object.keys(GHG_TIERS).sort())
+  })
+
+  it('M23 the SQL CHECK lists exactly the same three keys', () => {
+    const sql = read(MIGRATION)
+    for (const k of GHG_TIER_KEYS) {
+      expect(sql, `the ghg_tier CHECK must permit ${k}`).toContain(`'${k}'`)
+    }
+    // The constraint text itself, so a fourth key added to GHG_TIER_KEYS without touching the
+    // migration fails here rather than in production.
+    expect(sql).toContain("check (ghg_tier is null or ghg_tier in ('starter', 'professional', 'advisory'))")
+  })
+
+  it('M24 the guard passes the three through and flattens everything else to empty', () => {
+    for (const k of GHG_TIER_KEYS) expect(ghgTierMetaValue(k)).toBe(k)
+    for (const bad of ['enterprise', 'STARTER', '', 'ghg', null, undefined, 3, {}, ['starter']]) {
+      expect(ghgTierMetaValue(bad), `${String(bad)} must not reach metadata`).toBe('')
+    }
+  })
+
+  it('M25 both writers put ghg_tier through the guard, never a raw value', () => {
+    for (const rel of [CHECKOUT, INVOICE]) {
+      const lit = metadataLiteral(read(rel))
+      expect(lit, `${rel} must call the guard`).toContain('ghgTierMetaValue(')
+      expect(lit, `${rel} must not write a raw tier`).not.toMatch(/ghg_tier:\s*(body\.)?tier\b/)
+    }
+  })
+})
+
+describe('the webhook writes the Batch 3 columns', () => {
+  it('M26 it reads both new metadata keys with the empty-string convention', () => {
+    const src = read(WEBHOOK)
+    expect(src).toContain('metadata?.ghg_tier')
+    expect(src).toContain('metadata?.concierge_source_allowance')
+  })
+
+  it('M27 it writes ghg_tier on the ghg row and source_allowance on the concierge row', () => {
+    const src = read(WEBHOOK)
+    expect(src).toMatch(/ghg_tier:\s*module_key === 'ghg'/)
+    expect(src).toMatch(/source_allowance:\s*module_key === CONCIERGE_KEY/)
+    expect(CONCIERGE_KEY).toBe('concierge')
+  })
+
+  // The fallback is meaningless without the columns in the prior read: priorByKey would hold
+  // undefined for both, and every in-flight old session would blank them.
+  it('M28 the prior-terms read selects the two columns the fallback depends on', () => {
+    expect(read(WEBHOOK)).toContain("select('module_key, term_start, term_end, ghg_tier, source_allowance')")
+  })
+
+  // ⚠️ THE ONBOARDING FEE IS NOT ACCESS. As a row it would take a 365-day term and then expire,
+  // which is meaningless for work done and billed once.
+  it('M29 the onboarding fee never becomes an entitlement row', () => {
+    const src = read(WEBHOOK)
+    expect(src).not.toMatch(/module_key\s*===\s*['"]concierge[_-]onboarding/i)
+    expect(src).not.toMatch(/keys\.push\(\s*['"]concierge[_-]onboarding/i)
+  })
+})
+
+describe('Concierge access checks respect the term', () => {
+  // ⚠️ THE DEFECT THIS PINS PRODUCED NO ERROR AND NO SYMPTOM. useHasConcierge() selected the
+  // Concierge rows and never looked at term_end, so an expired customer kept bill extraction,
+  // which is the more expensive of the two model endpoints. Both readers now compare the term.
+  it('M30 both readers filter on term_end', () => {
+    for (const rel of [HOOKS, EXTRACT]) {
+      expect(read(rel), `${rel} must compare term_end, or an expired customer keeps access`)
+        .toMatch(/\.gt\(\s*'term_end'/)
+    }
+  })
+
+  it('M31 neither reader hardcodes the key list any more', () => {
+    for (const rel of [HOOKS, EXTRACT]) {
+      const src = read(rel)
+      expect(src, `${rel} must read the shared list`).toContain('CONCIERGE_ENTITLEMENT_KEYS')
+      expect(src, `${rel} must not inline the old keys`).not.toContain("'concierge-basic', 'concierge-standard'")
+    }
+  })
+
+  // isFirstConciergePurchase is the opposite question and must stay term-blind: an expired customer
+  // has no access, but the setup work was done and billed once.
+  it('M32 the onboarding check is still not term-aware', () => {
+    for (const legacy of LEGACY_CONCIERGE_KEYS) {
+      expect(isFirstConciergePurchase([legacy])).toBe(false)
+    }
+    expect(isFirstConciergePurchase(['concierge'])).toBe(false)
   })
 })

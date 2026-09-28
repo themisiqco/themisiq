@@ -18,6 +18,7 @@ import type Stripe from 'stripe'
 import { getStripe } from '../../../../lib/stripe'
 import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { entitlementTerm } from '../../../../lib/entitlementTerm'
+import { CONCIERGE_KEY } from '../../../../lib/pricing'
 import { INK_MUTED } from '@/lib/brand'
 
 export const runtime = 'nodejs'
@@ -179,6 +180,18 @@ async function grantFromMetadata(
   const entitlements = metadata?.entitlements
   const ghgAllowanceRaw = metadata?.ghg_location_allowance
   const ghgAllowance = ghgAllowanceRaw ? Number(ghgAllowanceRaw) : null
+  // Same empty-string convention as the allowance above: both writers send '' when the key does
+  // not apply to this order, and '' reads as absent. The writers pass ghg_tier through
+  // ghgTierMetaValue, so anything reaching here is one of the three keys the CHECK constraint on
+  // entitlements.ghg_tier permits, or ''.
+  const ghgTier = metadata?.ghg_tier || null
+  const conciergeAllowanceRaw = metadata?.concierge_source_allowance
+  const conciergeAllowance = conciergeAllowanceRaw ? Number(conciergeAllowanceRaw) : null
+  // ⚠️ concierge_onboarding_usd IS READ BY NOTHING HERE, AND THAT IS THE POINT. It records what was
+  // charged for setup work. It is not access, it has no term, and it must never become a
+  // module_key: as a row it would acquire a 365-day term and then expire, which is meaningless for
+  // work already done and billed once. Both routes are pinned against adding it to the
+  // entitlements string. This note is for whoever reads the metadata and wonders where it went.
 
   if (!userId || !entitlements) {
     console.warn('[webhook] missing user_id/entitlements in metadata; nothing to grant')
@@ -202,7 +215,7 @@ async function grantFromMetadata(
   // quietly cut short is not, and nothing downstream would ever report it.
   const { data: priorRows, error: readErr } = await supabaseAdmin
     .from('entitlements')
-    .select('module_key, term_start, term_end')
+    .select('module_key, term_start, term_end, ghg_tier, source_allowance')
     .eq('user_id', userId)
     .in('module_key', keys)
 
@@ -212,7 +225,12 @@ async function grantFromMetadata(
   }
 
   const priorByKey = new Map(
-    (priorRows ?? []).map((r) => [r.module_key as string, r as { term_start: string | null; term_end: string | null }]),
+    (priorRows ?? []).map((r) => [r.module_key as string, r as {
+      term_start: string | null
+      term_end: string | null
+      ghg_tier: string | null
+      source_allowance: number | null
+    }]),
   )
 
   // ONE clock for the whole grant. Calling entitlementTerm with a per-row `new Date()` would give
@@ -225,6 +243,21 @@ async function grantFromMetadata(
     module_key,
     source,
     location_allowance: module_key === 'ghg' ? ghgAllowance : null,
+    // ⚠️ PRESERVED WHEN THE ORDER DOES NOT CARRY THEM. A Checkout Session created before these two
+    // keys existed can complete after this deploys, and an upsert writing null would erase a tier
+    // or a source count that was already correct. The prior row is a FALLBACK, never a default:
+    // when the order does carry a value, that value wins, which is what makes a renewal with a
+    // different source count work.
+    //
+    // location_allowance deliberately does NOT get the same treatment. Every checkout sends it, and
+    // its null is read as uncapped rather than as absent, so a preserved stale value there would be
+    // worse than a null. Changing that is its own decision and not this one.
+    ghg_tier: module_key === 'ghg'
+      ? (ghgTier ?? priorByKey.get(module_key)?.ghg_tier ?? null)
+      : null,
+    source_allowance: module_key === CONCIERGE_KEY
+      ? (conciergeAllowance ?? priorByKey.get(module_key)?.source_allowance ?? null)
+      : null,
     // ONE definition of the term, shared by BOTH provisioning paths — see this function's header
     // for why that is already true. lib/entitlementTerm.ts is the only place +365 is written.
     ...entitlementTerm(now, priorByKey.get(module_key)),
