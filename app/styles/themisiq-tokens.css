@@ -827,6 +827,50 @@ h3 { font-size: var(--text-xl); }
   .tq-hero-wash { background: rgba(4, 24, 48, 0.4); }
 }
 
+/* ⚠️ THE CLOSING BAND'S WASH IS ITS OWN, AND IT DOES NOT SHARE .tq-hero-wash's VALUES. Same
+   photograph, but the band is about a third the height, so `cover` shows a thin SLICE rather than most
+   of the frame. The hero's 0.15 was tried first and does not hold here: the copy is fine on it, but
+   the two buttons sit on the RIGHT, which is where the curtains are, and they are what fails.
+
+   ⚠️ THE BINDING CONSTRAINT IS "Talk to us", NOT THE COPY. It is the outline button: no fill, so its
+   label and its 1px edge are both --color-on-dark directly over the picture. The headline clears 3:1
+   as large text and the paragraph and SB 253 line clear 4.5:1 with room at every width; the outline
+   label needs 4.5:1 and is the first thing to go. Its edge and the filled button's edge need 3:1 under
+   WCAG 1.4.11, being the only thing that says where the control is.
+
+   ⚠️ WHY objectPosition IS 100% 75% AND NOT 100% 100% LIKE THE HERO. The brief asked for the warm
+   bottom-right glow in frame if it would fit. It fits at 100% 100%, and it is the reason that crop
+   fails: the glow and the brightest curtain land exactly behind the right-hand buttons. Measured at
+   1440px, 100% 100% needs a 0.4 wash to pass, and at 0.4 the glow it was preserving is dulled out of
+   the picture anyway — and it still failed "Talk to us" at 1600 and 1920. 100% 75% shows the same sky
+   with the curtains toward the right, loses the glow below the crop, and passes everywhere on 0.25.
+   The trade was measured, not judged by eye: 100% 92% and 100% 85% both fail at 1600/1920 too.
+
+   Lowest ratio against --color-on-dark #EAEDEE, copy hidden and the real composited background
+   sampled per pixel over each element's own rect, 28 Sep 2026. Thresholds: headline 3.0 as large
+   text, paragraph / SB 253 / outline label 4.5, both button edges 3.0 under 1.4.11.
+
+     viewport   headline  paragraph  SB 253  "Talk to us"  its edge  filled edge
+       375px     12.25      9.26      7.94      8.81         8.81       4.82
+       768px      9.52      8.70      8.91      8.25         8.29       7.58
+       900px      8.13      9.16      7.82      8.16         8.24       7.58
+      1100px      8.91      7.50      7.87      4.87         4.94       5.56
+      1200px      8.31      7.15      7.47      4.80  ←worst 4.88       5.48
+      1440px      6.46      7.15      6.41      5.65         5.26       5.33
+      1920px      6.44      6.84      7.90      5.33         5.33       8.04
+
+   Fifteen widths from 375 to 1920 were measured and all pass; the tightest is 1200px, 1.07x over its
+   threshold. NO BREAKPOINT HERE, unlike .tq-hero-wash. The hero needs one because below 900px its
+   copy column spans the full width and crosses the curtains. This band's copy stays left and its
+   buttons wrap ABOVE the copy as the band grows taller, which moves them off the bright side rather
+   than onto it — 375px is the most comfortable width on this band, not the worst. */
+.tq-close-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(4, 24, 48, 0.25);
+}
+
 /* ================================================================
    DISABLED AND INACTIVE STATE — opacity is not a contrast-preserving device.
 

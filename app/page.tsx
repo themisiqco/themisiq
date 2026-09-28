@@ -3,7 +3,7 @@ import Image from 'next/image'
 import HomePricing from './components/HomePricing'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
-import { btnPrimary, btnSecondary, btnOnBand, btnOnBandOutline, btnOnDark, btnOnDarkOutline } from '@/app/components/buttonStyles'
+import { btnPrimary, btnSecondary, btnOnDark, btnOnDarkOutline } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import { SB253_SHORT } from '../lib/sb253'
 import { AUDIT_TRAIL_NOTE_SHORT } from '../lib/auditTrailNotice'
@@ -12,9 +12,12 @@ import { AUDIT_TRAIL_NOTE_SHORT } from '../lib/auditTrailNotice'
  * The homepage.
  *
  * ⚠️ THE COLOURWAY IS A FILL VALUE AND NEVER TEXT. docs/colourway-2026.md has the measurements and the
- * two approaches that were rejected to arrive at that rule. On this page the colourway appears in
- * exactly two forms: --gradation-band, as the hero and closing grounds, and --color-module-* on the 4px
- * card rules. Nothing on this page sets a colourway value on text, and nothing should.
+ * two approaches that were rejected to arrive at that rule. On this page the colourway now appears in
+ * ONE form: --color-module-* on the 4px card rules. --gradation-band was the hero and closing grounds
+ * until 28 Sep 2026; both are the aurora photograph now, and the 4px rule above the footer went with
+ * them. The token and .tq-gradation-ground are still live elsewhere — app/components/modulePage.tsx
+ * renders the band on every module page — so neither is dead, just no longer used here.
+ * Nothing on this page sets a colourway value on text, and nothing should.
  *
  * ⚠️ WHY THE 4px CARD RULES ARE PERMITTED AND THE 6px BAR IN THE PRODUCT IS NOT. WCAG 1.4.11 exempts a
  * graphic whose information is available in another form. Each card names its module in 1.2rem display
@@ -52,7 +55,7 @@ export default function Home() {
       ⚠️ AND BELOW 900px IT CANNOT HOLD AT ALL. `min-width: min(100%, 34rem)` beats the max-width, so
       the column spans the full width and crosses the bright right-hand side head-on: 2.31:1 there
       with no wash. That range takes a heavier wash, 0.4 against the 0.15 everywhere else.
-      The closing band below still uses .tq-gradation-ground, and its 60% reasoning is unchanged. */}
+      The closing band is the same photograph, cropped to a thin slice — see its own block below. */}
       <section style={{ padding: '6rem 2.5rem 5.5rem', position: 'relative', overflow: 'hidden' }}>
         <Image src="/home/hero-aurora.jpg" alt="" aria-hidden fill priority sizes="100vw" style={{ objectFit: 'cover', objectPosition: '100% 100%' }} />
         <div className="tq-hero-wash" />
@@ -276,37 +279,48 @@ export default function Home() {
       </section>
 
       {/* ── CLOSING BAND ──
-      Same direction as the hero and roughly a third its height, from the same token, so the two cannot
-      drift. Copy left inside --gradation-ink-safe; buttons right, which sit past the safe width and are
-      therefore ink-filled and ink-outlined rather than relying on the ground behind them. */}
-      <section className="tq-gradation-ground" style={{ padding: '2.75rem 2.5rem' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      THE SAME PHOTOGRAPH AS THE HERO, so the page opens and closes on one image rather than on a
+      gradient running the brand colourway backwards. Roughly a third the hero's height, which makes it
+      a thin horizontal SLICE of the same frame: at 1440 the box is about 7:1, so `cover` scales to the
+      width and crops the height to roughly a quarter of the picture. objectPosition therefore chooses
+      which quarter, and its X only does anything below about 1100px, where the box stops being wider
+      than the scaled image.
+      ⚠️ THE OLD "COPY LEFT INSIDE --gradation-ink-safe" REASONING NO LONGER APPLIES. That held the copy
+      to the band's light 60% so ink would clear it. There is no light end now, the copy is on-dark, and
+      the maxWidth below is doing nothing but setting a measure. The buttons are on-dark for the same
+      reason, and they sit over the brighter curtains, so they are measured separately.
+      Measurements and the objectPosition reasoning are in the CLOSING BAND block in the token file. */}
+      <section style={{ padding: '2.75rem 2.5rem', position: 'relative', overflow: 'hidden' }}>
+        <Image src="/home/hero-aurora.jpg" alt="" aria-hidden fill sizes="100vw" style={{ objectFit: 'cover', objectPosition: '100% 75%' }} />
+        <div className="tq-close-wash" />
+        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
           <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 28rem)' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2, marginBottom: '0.6rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 400, color: 'var(--color-on-dark)', lineHeight: 1.2, marginBottom: '0.6rem' }}>
               Face the next request with confidence.
             </h2>
-            <p style={{ fontSize: 14, color: 'var(--color-ink)', lineHeight: 1.65, margin: 0, maxWidth: '54ch' }}>
+            <p style={{ fontSize: 14, color: 'var(--color-on-dark)', lineHeight: 1.65, margin: 0, maxWidth: '54ch' }}>
               Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country.
             </p>
             {/* ⚠️ SB253_SHORT, NOT A SENTENCE WRITTEN HERE. It renders "SB 253 · 10 Nov 2026 proposed",
             and the word "proposed" is the whole reason the constant exists: lib/sb253.ts records that a
             surface printing the date without it "states as settled a date that has already moved once".
             Do not compose a local variant, and do not trim the status word to fit the line. */}
-            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', marginTop: '1rem', letterSpacing: '0.01em' }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-on-dark)', marginTop: '1rem', letterSpacing: '0.01em' }}>
               {SB253_SHORT}
             </p>
           </div>
           {/* No flexShrink: 0 — see the note in ClosingBand. It defeated flexWrap and overflowed at 375px. */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <a href="/assess" style={{ ...btnOnBand, textDecoration: 'none' }}>Start the free assessment</a>
-            <a href="/advisory" style={{ ...btnOnBandOutline, textDecoration: 'none' }}>Talk to us</a>
+            <a href="/assess" style={{ ...btnOnDark, textDecoration: 'none' }}>Start the free assessment</a>
+            <a href="/advisory" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>Talk to us</a>
           </div>
         </div>
       </section>
 
-      {/* 4px gradation rule separating the closing band from the footer. */}
-      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
-
+      {/* The 4px gradation rule that sat here is gone, 28 Sep 2026. It separated the closing band from
+      the footer, and the band it separated them with was the colourway the photograph replaced; under a
+      photograph it read as a stripe of the old brand rather than a divider. The footer's own deep blue
+      is the separation now. Nothing else referenced it — it was a bare div, not a class or a token. */}
       <Footer />
     </div>
   )
