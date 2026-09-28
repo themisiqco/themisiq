@@ -37,56 +37,24 @@ export const btnPrimary: CSSProperties = {
   display: 'inline-block',
 }
 
-/**
- * ON A GRADATION BAND. The band is --gradation-band and carries --color-ink text on its light end, so
- * a brand-teal fill here would be a third colour competing with the ground. These two are ink and
- * paper only.
- *
- * ⚠️ THEY EXIST SO THE HERO AND THE CLOSING BAND CANNOT DRIFT APART. Both bands draw from here, the
- * way the two cross-link bands on the homepage became one component after spending months as "the same
- * shape in two colours". A one-off inline style on either band is how that starts again.
- *
- * ⚠️ VALID ONLY OVER --gradation-ink-safe, the band's light 60%. btnOnBandOutline is paper-on-band,
- * so its edge and label inherit the ground's contrast: over the dark end it would be invisible, which
- * is the same constraint the ink text has and the reason the band's direction is fixed.
- */
-export const btnOnBand: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 500,
-  padding: '13px 32px',
-  borderRadius: 8,
-  background: 'var(--color-ink)',
-  color: 'var(--color-paper)',
-  border: 'none',
-  cursor: 'pointer',
-  display: 'inline-block',
-}
-
-/** The outlined half of the band pair: no fill, ink label and edge. */
-export const btnOnBandOutline: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 400,
-  padding: '13px 32px',
-  borderRadius: 8,
-  background: 'none',
-  color: 'var(--color-ink)',
-  border: '1px solid var(--color-ink)',
-  cursor: 'pointer',
-  display: 'inline-block',
-}
 
 /**
- * ON A PHOTOGRAPH. Same geometry as the band pair — 14px, 13px/32px, radius 8 — and the colours
- * inverted: paper fill with an ink label, and a paper outline.
+ * ON A PHOTOGRAPH. Paper fill with an ink label, and a paper outline. 14px, 13px/32px, radius 8.
  *
- * ⚠️ THESE ARE NOT INTERCHANGEABLE WITH THE BAND PAIR, AND THAT IS THE WHOLE POINT. btnOnBand is
- * ink-on-paper and btnOnBandOutline draws its edge in ink; over the homepage hero photograph both
- * lose their label and their outline against the dark sky. A button that renders as a rectangle of
- * nothing still occupies space and still takes a click, so this fails silently rather than visibly.
- * The hero uses these two; the closing band keeps btnOnBand / btnOnBandOutline over the gradation.
+ * ⚠️ THEY EXIST SO THE BANDS CANNOT DRIFT APART, which is the job btnOnBand and btnOnBandOutline
+ * used to do. Those were ink-on-paper and an ink edge, correct over the gradation band's light end
+ * and invisible over a photograph; they were REMOVED on 28 Sep 2026 once the homepage hero, the
+ * homepage closing band and ClosingBand on nine module pages had all become the aurora. A button that
+ * renders as a rectangle of nothing still occupies space and still takes a click, so that failure is
+ * silent rather than visible — which is why the two faces are not interchangeable and why the old
+ * pair was deleted rather than left available.
  *
- * ⚠️ NO BRAND FILL HERE EITHER, for the reason the band block gives: --color-brand over the aurora's
- * own teal is a third teal competing with the ground. Paper and ink only.
+ * ⚠️ NO BRAND FILL: --color-brand over the aurora's own teal is a third teal competing with the
+ * ground. Paper and ink only.
+ *
+ * ⚠️ THE OUTLINE IS THE ONE THAT NEEDS WATCHING. It has no fill, so its label and its 1px edge sit
+ * directly on the picture, and it is the first thing to fail when a crop moves. The per-page
+ * measurements are in the CLOSING BAND block in app/styles/themisiq-tokens.css.
  */
 export const btnOnDark: CSSProperties = {
   fontSize: 14,

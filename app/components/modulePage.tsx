@@ -1,8 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react'
+import Image from 'next/image'
 import type { ModuleKey } from '@/lib/pricing'
 import { evidenceClaim } from '@/lib/modulePages'
-import { btnSecondary, btnOnBand, btnOnBandOutline } from './buttonStyles'
+import { btnSecondary, btnOnDark, btnOnDarkOutline } from './buttonStyles'
 import { sectionTitle } from './headingStyles'
+import { AURORA_SRC, AURORA_CLOSE_POSITION } from './auroraBand'
 
 /**
  * The sections every module marketing page shares, built once.
@@ -13,7 +15,7 @@ import { sectionTitle } from './headingStyles'
  * built on one instance gets reshaped by the second. Those stay longhand until two real pages exist.
  * What is here is either pure data-in (the spine, the chips) or a correctness gate (the evidence
  * section), plus the closing band, which must be shared because the homepage already demonstrated the
- * failure: two gradation bands drifting apart is why btnOnBand exists at all.
+ * failure: two bands drifting apart is why the crop and the image path live in auroraBand.ts.
  */
 
 /* ── 1. The three-step spine ─────────────────────────────────────────────────────────────────────── */
@@ -200,15 +202,21 @@ export function ModuleOutputs({ intro, outputs }: { intro: string; outputs: read
 /* ── 7. The closing band ─────────────────────────────────────────────────────────────────────────── */
 
 /**
- * ⚠️ SHARED BECAUSE TWO BANDS ALREADY DRIFTED ONCE. app/page.tsx's hero and closing band are both
- * --gradation-band from the same token for exactly this reason, and btnOnBand exists so neither reaches
- * for a one-off style.
+ * ⚠️ SHARED BECAUSE TWO BANDS ALREADY DRIFTED ONCE. This is the homepage's closing band on nine more
+ * pages: the same aurora photograph, the same crop and the same .tq-close-wash. What keeps them in
+ * step is app/components/auroraBand.ts — the path and the closing crop are read from there by both,
+ * so neither can quietly acquire its own. That file says why, and why the hero's crop is not in it.
  *
- * ⚠️ COPY LEFT, INSIDE --gradation-ink-safe. The band runs light to dark, left to right, and
- * --color-ink clears AA body to 72% of its width. The 60% cap is the margin. If a layout ever wants
- * copy on the right, FLIP THE BAND rather than changing the text colour — see the GRADATION block in
- * app/styles/themisiq-tokens.css. Buttons sit right and are ink-filled and ink-outlined, so they do
- * not depend on the ground behind them.
+ * ⚠️ THE "LIGHT TO DARK, LEFT TO RIGHT" REASONING IS GONE, AND SO IS "FLIP THE BAND". Both described
+ * a gradient that no longer renders here. There is no light end to keep ink on and no direction to
+ * flip: the ground is a photograph, the copy is --color-on-dark, and what protects it is the wash
+ * plus the crop, both measured. The maxWidth below is now only a measure for the line length.
+ *
+ * ⚠️ THE BUTTONS ARE THE CONSTRAINT, NOT THE COPY, and they are why this band is measured per page.
+ * They sit RIGHT, which is where the curtains are, and the secondary is an outline: no fill, so its
+ * label and its 1px edge are both --color-on-dark directly over the picture. The band's height
+ * depends on the heading and body each page passes in, and the height decides the crop, so every
+ * page is a slightly different slice. The per-page table is in the token file's CLOSING BAND block.
  */
 export function ClosingBand({ heading, body, primary, secondary }: {
   heading: string
@@ -217,19 +225,21 @@ export function ClosingBand({ heading, body, primary, secondary }: {
   secondary?: { href: string; label: string }
 }) {
   return (
-    <section className="tq-gradation-ground" style={{ padding: '2.75rem 2.5rem' }}>
-      <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+    <section style={{ padding: '2.75rem 2.5rem', position: 'relative', overflow: 'hidden' }}>
+      <Image src={AURORA_SRC} alt="" aria-hidden fill sizes="100vw" style={{ objectFit: 'cover', objectPosition: AURORA_CLOSE_POSITION }} />
+      <div className="tq-close-wash" />
+      <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 28rem)' }}>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.8vw, 2.1rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2 }}>{heading}</h2>
-          {body && <p style={{ fontSize: 14, color: 'var(--color-ink)', lineHeight: 1.65, margin: '0.6rem 0 0', maxWidth: '54ch' }}>{body}</p>}
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 2.8vw, 2.1rem)', fontWeight: 400, color: 'var(--color-on-dark)', lineHeight: 1.2 }}>{heading}</h2>
+          {body && <p style={{ fontSize: 14, color: 'var(--color-on-dark)', lineHeight: 1.65, margin: '0.6rem 0 0', maxWidth: '54ch' }}>{body}</p>}
         </div>
         {/* ⚠️ NO flexShrink: 0 HERE, AND THAT IS THE FIX RATHER THAN AN OMISSION. flexWrap was already
             set and could never act: a container that refuses to shrink never becomes narrow enough to
             force a wrap, so the two buttons stayed on one line and ran off the page. Measured right edge
             at 375px before this: 403px. */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <a href={primary.href} style={{ ...btnOnBand, textDecoration: 'none' }}>{primary.label}</a>
-          {secondary && <a href={secondary.href} style={{ ...btnOnBandOutline, textDecoration: 'none' }}>{secondary.label}</a>}
+          <a href={primary.href} style={{ ...btnOnDark, textDecoration: 'none' }}>{primary.label}</a>
+          {secondary && <a href={secondary.href} style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>{secondary.label}</a>}
         </div>
       </div>
     </section>

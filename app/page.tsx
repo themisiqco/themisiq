@@ -5,6 +5,7 @@ import Nav from './components/Nav'
 import Footer from './components/Footer'
 import { btnPrimary, btnSecondary, btnOnDark, btnOnDarkOutline } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
+import { AURORA_SRC, AURORA_CLOSE_POSITION } from '@/app/components/auroraBand'
 import { SB253_SHORT } from '../lib/sb253'
 import { AUDIT_TRAIL_NOTE_SHORT } from '../lib/auditTrailNotice'
 
@@ -14,9 +15,8 @@ import { AUDIT_TRAIL_NOTE_SHORT } from '../lib/auditTrailNotice'
  * ⚠️ THE COLOURWAY IS A FILL VALUE AND NEVER TEXT. docs/colourway-2026.md has the measurements and the
  * two approaches that were rejected to arrive at that rule. On this page the colourway now appears in
  * ONE form: --color-module-* on the 4px card rules. --gradation-band was the hero and closing grounds
- * until 28 Sep 2026; both are the aurora photograph now, and the 4px rule above the footer went with
- * them. The token and .tq-gradation-ground are still live elsewhere — app/components/modulePage.tsx
- * renders the band on every module page — so neither is dead, just no longer used here.
+ * until 28 Sep 2026; both are the aurora photograph now, the 4px rule above the footer went with them,
+ * and the token and .tq-gradation-ground were removed outright once the module pages followed.
  * Nothing on this page sets a colourway value on text, and nothing should.
  *
  * ⚠️ WHY THE 4px CARD RULES ARE PERMITTED AND THE 6px BAR IN THE PRODUCT IS NOT. WCAG 1.4.11 exempts a
@@ -57,7 +57,7 @@ export default function Home() {
       with no wash. That range takes a heavier wash, 0.4 against the 0.15 everywhere else.
       The closing band is the same photograph, cropped to a thin slice — see its own block below. */}
       <section style={{ padding: '6rem 2.5rem 5.5rem', position: 'relative', overflow: 'hidden' }}>
-        <Image src="/home/hero-aurora.jpg" alt="" aria-hidden fill priority sizes="100vw" style={{ objectFit: 'cover', objectPosition: '100% 100%' }} />
+        <Image src={AURORA_SRC} alt="" aria-hidden fill priority sizes="100vw" style={{ objectFit: 'cover', objectPosition: '100% 100%' }} />
         <div className="tq-hero-wash" />
         <div style={{ maxWidth: 1180, margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 34rem)' }}>
@@ -291,7 +291,7 @@ export default function Home() {
       reason, and they sit over the brighter curtains, so they are measured separately.
       Measurements and the objectPosition reasoning are in the CLOSING BAND block in the token file. */}
       <section style={{ padding: '2.75rem 2.5rem', position: 'relative', overflow: 'hidden' }}>
-        <Image src="/home/hero-aurora.jpg" alt="" aria-hidden fill sizes="100vw" style={{ objectFit: 'cover', objectPosition: '100% 75%' }} />
+        <Image src={AURORA_SRC} alt="" aria-hidden fill sizes="100vw" style={{ objectFit: 'cover', objectPosition: AURORA_CLOSE_POSITION }} />
         <div className="tq-close-wash" />
         <div style={{ maxWidth: 1180, margin: '0 auto', display: 'flex', gap: '2.5rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
           <div style={{ maxWidth: 'var(--gradation-ink-safe)', minWidth: 'min(100%, 28rem)' }}>

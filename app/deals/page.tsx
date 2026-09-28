@@ -174,7 +174,9 @@ export default function DealsPage() {
         primary={{ href: '/assess', label: 'Start the free assessment' }}
         secondary={{ href: '/advisory', label: 'Talk to us' }}
       />
-      <div style={{ height: 4, background: 'var(--gradation-band)' }} />
+      {/* The 4px gradation stripe that sat here is gone, 28 Sep 2026, with the one on the homepage.
+      It was the brand colourway run left to right under a band that is now a photograph. Nothing
+      referenced it: a bare div, no class, no token of its own, no test. */}
 
       <Footer />
     </div>

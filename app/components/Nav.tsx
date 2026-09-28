@@ -141,9 +141,11 @@ export default function Nav() {
           {!isAuthed && (
             <>
               <a href="/login" style={{ fontSize: 12, fontWeight: 500, padding: '7px 10px', color: '#555553', textDecoration: 'none', display: 'inline-block', whiteSpace: 'nowrap' }} className="desktop-only">Sign in</a>
-              {/* ⚠️ FILLED INK, NOT BRAND. This nav sits above a --gradation-band hero on the homepage,
-                  where a brand-teal pill would be a third colour against the ground; ink reads the same
-                  on the band and on paper, which is what a nav on 49 pages needs. It replaced an
+              {/* ⚠️ FILLED INK, NOT BRAND. This nav is a white bar, and on the homepage it sits directly
+                  above a photographic hero: the aurora, with off-white copy on it. A brand-teal pill
+                  would be a third colour against that picture, and ink reads the same on the white bar
+                  here as it does on paper across the other 48 pages. (It sat above the gradation band
+                  until 28 Sep 2026; the reasoning did not change when the ground did.) It replaced an
                   outlined `ghostBtn`, which was too quiet for the page's one primary action — and that
                   style was DELETED in the same pass, because this was its only call site. */}
               <a href="/assess" style={inkBtn} className="desktop-only">Free assessment</a>

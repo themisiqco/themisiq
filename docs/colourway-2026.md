@@ -139,6 +139,14 @@ Hue and lightness both move monotonically for the first three steps; the fourth 
 the hue. Note the ramp runs **light to dark**, so anything drawn from it inherits its contrast from its
 position — the first two steps cannot carry text or a meaningful graphic at all.
 
+> **28 Sep 2026 — the gradation band no longer renders anywhere.** It was live as `--gradation-band`,
+> the full-bleed ground under the homepage hero, both closing bands and nine 4px stripes on the module
+> pages. All of those are now a photograph (`public/home/hero-aurora.jpg`), and the token and its
+> `.tq-gradation-ground` class were removed from `app/styles/themisiq-tokens.css` once nothing called
+> them. The ramp above is unchanged and still records the colourway; what changed is that nothing draws
+> a gradient from it today. `--gradation-ink-safe` survives as a plain measure on three text columns.
+> The rest of this document is as it was.
+
 ## Module assignment
 
 | Module | Target | Current |
