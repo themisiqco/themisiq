@@ -153,6 +153,15 @@ export const GHG_TIERS: Record<GhgTier, { priceUSD: number | null; locationAllow
   advisory:     { priceUSD: null,  locationAllowance: null }, // Contact us / uncapped
 }
 
+// The customer-facing tier names. `starter` has been labelled "Essentials" on every surface since
+// the rescope, recorded until now only in a comment above. It is here because the Concierge
+// onboarding line carries the tier name onto a Stripe invoice, where a key name would be wrong.
+export const GHG_TIER_LABELS: Record<GhgTier, string> = {
+  starter:      'Essentials',
+  professional: 'Professional',
+  advisory:     'Advisory',
+}
+
 // Flat single-tier modules (USD / year). Keyed on every non-GHG module so the
 // type fails to compile if a module is ever added without a price.
 export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
@@ -364,6 +373,127 @@ export function addOnRequirementsMet(
   return { ok: true }
 }
 
+// ── Concierge, Sep 2026 rescope ───────────────────────────────────────────
+// Priced on DATA SOURCES, not on locations. A data source is one utility account or meter billed
+// on a recurring basis: an electricity account, a gas meter. A location with electricity and gas
+// is usually two.
+//
+// ⚠️ THE OLD LOCATION BANDS ABOVE ARE SUPERSEDED AND ARE KEPT ONLY UNTIL THEIR CALLERS MOVE.
+// conciergeTierForLocations, the three concierge-* keys and ADDONS[key].price are read by
+// /api/checkout, /api/admin/create-invoice and app/pricing/page.tsx. They come out in the final
+// cleanup batch, once those three have moved. Nothing new may read them.
+// docs/pricing-and-concierge-spec-v5.md is the current model; v4's Concierge section is superseded.
+
+// ⚠️ UTILITY CONNECTION IS NOT BUILT. While this is false the connected rate is display only: it
+// shows as "Coming soon" and checkout sells uploaded sources only. conciergeQuote REFUSES a
+// connected quantity rather than quietly pricing it. Falling back to the uploaded rate, or to
+// zero, would sell a service that does not exist yet.
+export const UTILITY_CONNECT_ENABLED = false
+
+// One-time, charged on a customer's FIRST Concierge purchase only. Not an entitlement and it
+// writes no term: it buys the specialist's setup work, not access. Keyed on the GHG tier because
+// the work scales with the inventory. Moving up a GHG tier later does NOT re-trigger it.
+export const CONCIERGE_ONBOARDING_USD: Record<GhgTier, number> = {
+  starter:      1250,   // UI label: Essentials
+  professional: 1750,
+  advisory:     2500,
+}
+
+export type SourceKind = 'uploaded' | 'connected'
+
+// Annual, per source. A one-time charge each year that grants the usual 365-day term, the same
+// shape as every other line in this file. There are no subscriptions in this platform.
+export const CONCIERGE_SOURCE_USD: Record<SourceKind, number> = {
+  uploaded:  90,   // customer uploads bills, Concierge extracts
+  connected: 60,   // pulled directly from the utility
+}
+
+// ⚠️ A SELF-SERVE CEILING, NOT A TIER CAP. 60 is 20 locations at 3 sources each, 20 being the
+// Advisory location ceiling under the old model. GHG_TIERS.advisory.locationAllowance is null
+// (uncapped) today, so nothing else in this file bounds a Concierge order: without this, a typo in
+// a quantity field becomes a five-figure card charge. Above it the order is a conversation, which
+// is the same posture GHG Advisory and Concierge Enterprise already take.
+export const CONCIERGE_MAX_SELF_SERVE_SOURCES = 60
+
+/** Whether a source kind can be SOLD today. Connected is priced but not sellable yet. */
+export function sourceKindSellable(kind: SourceKind): boolean {
+  return kind === 'uploaded' || UTILITY_CONNECT_ENABLED
+}
+
+export interface ConciergeSelection {
+  ghgTier: GhgTier
+  uploadedSources: number
+  /** Rejected while UTILITY_CONNECT_ENABLED is false. Omit, or 0, until then. */
+  connectedSources?: number
+  /**
+   * True when the customer has never held Concierge. Decided server side, never by the client.
+   * ⚠️ FOR THE ROUTE THAT COMPUTES IT: look at CONCIERGE ROWS ONLY. True means the user has no
+   * entitlements row with module_key 'concierge' and none under any of the old concierge-* keys.
+   * Do NOT widen it to a `source` value such as 'manual-test': that matches manual grants on other
+   * modules, so a pilot customer given a hand-written GHG row would skip their onboarding fee.
+   * Onboarding is once per customer, so a false positive here charges someone twice for setup work.
+   */
+  isFirstPurchase: boolean
+}
+
+export interface ConciergeQuote {
+  onboardingUSD: number
+  sourcesUSD: number
+  totalUSD: number
+  /** Ready for priceLineQty. Onboarding first, so it reads first on the invoice. */
+  lines: { label: string; unitUSD: number; quantity: number }[]
+}
+
+// ⚠️ ONE FUNCTION FOR DISPLAY AND FOR CHARGE, which is the rule cartQuote follows for modules.
+// The configurator and /api/checkout both call this, so a displayed Concierge price cannot differ
+// from the charged one. Note that add-ons do NOT flow through cartQuote today: app/pricing/page.tsx
+// sums them separately. This function is what closes that gap for Concierge.
+//
+// ⚠️ EVERY GUARD THROWS. NONE OF THEM COERCES. An earlier draft ran the counts through Math.trunc,
+// which let 2.5 become 2 silently while priceLineQty rejected 2.5 outright, and let NaN through both
+// range checks (NaN < 0 and NaN < 1 are each false) to return a NaN quote that would have rendered
+// as "$NaN" and reached Stripe as a bad amount. A count that is not a whole number is a caller bug,
+// and the loud failure is the cheap one.
+export function conciergeQuote(sel: ConciergeSelection): ConciergeQuote {
+  const uploaded = sel.uploadedSources
+  const connected = sel.connectedSources ?? 0
+  // Number.isInteger is false for NaN, Infinity and any fraction, so this one test covers all
+  // three. connectedSources is checked only when supplied: absent means zero, which is valid.
+  if (!Number.isInteger(uploaded) || (sel.connectedSources != null && !Number.isInteger(sel.connectedSources))) {
+    throw new Error('conciergeQuote: a source count must be a whole number.')
+  }
+  if (uploaded < 0 || connected < 0) {
+    throw new Error('conciergeQuote: a source count cannot be negative.')
+  }
+  const total = uploaded + connected
+  if (total < 1) {
+    throw new Error('conciergeQuote: Concierge needs at least one data source.')
+  }
+  if (total > CONCIERGE_MAX_SELF_SERVE_SOURCES) {
+    throw new Error(`conciergeQuote: above ${CONCIERGE_MAX_SELF_SERVE_SOURCES} data sources, contact us for a quote.`)
+  }
+  if (connected > 0 && !UTILITY_CONNECT_ENABLED) {
+    throw new Error(
+      'conciergeQuote: connected sources cannot be sold yet. Utility connection is not built, ' +
+      'and the connected rate is display only until UTILITY_CONNECT_ENABLED is true.',
+    )
+  }
+  const onboardingUSD = sel.isFirstPurchase ? CONCIERGE_ONBOARDING_USD[sel.ghgTier] : 0
+  const sourcesUSD =
+    uploaded * CONCIERGE_SOURCE_USD.uploaded + connected * CONCIERGE_SOURCE_USD.connected
+  const lines: ConciergeQuote['lines'] = []
+  if (onboardingUSD > 0) {
+    lines.push({ label: `GHG Concierge onboarding (${GHG_TIER_LABELS[sel.ghgTier]})`, unitUSD: onboardingUSD, quantity: 1 })
+  }
+  if (uploaded > 0) {
+    lines.push({ label: 'GHG Concierge data source, uploaded (1 year)', unitUSD: CONCIERGE_SOURCE_USD.uploaded, quantity: uploaded })
+  }
+  if (connected > 0) {
+    lines.push({ label: 'GHG Concierge data source, connected (1 year)', unitUSD: CONCIERGE_SOURCE_USD.connected, quantity: connected })
+  }
+  return { onboardingUSD, sourcesUSD, totalUSD: onboardingUSD + sourcesUSD, lines }
+}
+
 // ── Stripe helper ────────────────────────────────────────────────────────────
 // Stripe expects amounts in the smallest currency unit (cents for USD).
 export function toStripeAmount(dollars: number): number {
@@ -389,6 +519,18 @@ export function priceLine(name: string, dollars: number): Stripe.Checkout.Sessio
       unit_amount: toStripeAmount(dollars),
     },
   }
+}
+
+// Quantity-aware sibling of priceLine, for per-unit lines such as Concierge data sources.
+// Stripe multiplies unit_amount by quantity, so the UNIT price is what goes in price_data.
+// Same fail-loud backstop, plus a quantity guard: quantity 0 is not a line item, it is the
+// absence of one, and a caller that means "none" must not push a line at all.
+export function priceLineQty(name: string, unitDollars: number, quantity: number): Stripe.Checkout.SessionCreateParams.LineItem {
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new Error(`priceLineQty: refusing quantity ${quantity} for "${name}": a line item needs a whole quantity of at least 1.`)
+  }
+  const line = priceLine(name, unitDollars)
+  return { ...line, quantity }
 }
 
 // Access term: one-time charge grants one year of access (renewal handled
