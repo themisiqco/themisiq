@@ -1,5 +1,10 @@
 -- 20260928_ghg_employee_bands.sql
 --
+-- ⚠️ RUN ON 28 Sep 2026. Verified in the same session by reading the rows and the catalog back: the
+-- ghg row is at ghg_tier 'enterprise' with employee_count null, the concierge row is unchanged at
+-- source_allowance 60, and entitlements_ghg_tier_check lists starter, professional, business,
+-- advisory and enterprise.
+--
 -- GHG plans move from location bands to employee bands. This file widens the ghg_tier CHECK to the
 -- five new keys and adds the employee count the customer states at checkout.
 --
