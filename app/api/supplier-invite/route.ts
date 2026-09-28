@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import { BRAND, INK_MUTED } from '@/lib/brand'
+import { subjectText } from '../../../lib/emailSubject'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -88,7 +89,7 @@ const inviteEmailHtml = ({
       ${deadlineText}
 
       <p style="margin:0 0 24px;color:#555553;font-size:14px;line-height:1.6;">
-        The questionnaire covers your company's environmental performance, labour practices, business ethics, and sustainable procurement. Your responses will be saved automatically — you can complete it in multiple sessions using the same link.
+        The questionnaire covers your company's environmental performance, labour practices, business ethics, and sustainable procurement. Your responses will be saved automatically: you can complete it in multiple sessions using the same link.
       </p>
 
       <!-- CTA Button -->
@@ -147,7 +148,7 @@ const reminderEmailHtml = ({
     <div style="background:#0d0d0d;padding:24px 32px;">
       <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
       <div style="font-size:20px;font-weight:700;color:#fff;font-family:Georgia,serif;">ThemisIQ</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;text-transform:uppercase;letter-spacing:0.08em;">Supplier Portal — Reminder</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;text-transform:uppercase;letter-spacing:0.08em;">Supplier Portal: Reminder</div>
     </div>
     <div style="padding:32px;">
       <p style="margin:0 0 16px;color:#0d0d0d;font-size:15px;">${greeting}</p>
@@ -155,7 +156,7 @@ const reminderEmailHtml = ({
         This is a friendly reminder that <strong style="color:#0d0d0d;">${buyer}</strong> is still waiting for your response to the <strong>${campaignLabel}</strong> sustainability questionnaire.
       </p>
       <p style="margin:0 0 24px;color:#555553;font-size:14px;line-height:1.6;">
-        ${deadlineText}Your previous responses have been saved — just click below to continue where you left off.
+        ${deadlineText}Your previous responses have been saved: just click below to continue where you left off.
       </p>
       <div style="text-align:center;margin:0 0 24px;">
         <a href="${portalUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#7425e3,#1fb1ff);color:#fff;font-size:14px;font-weight:600;text-decoration:none;border-radius:10px;">
@@ -216,10 +217,11 @@ export async function POST(req: NextRequest) {
   const buyerCompany = campaign.buyer_company || campaign.name
   const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.themisiq.co'}/supplier/${cs.token}`
 
-  // Not escaped: a subject is a header, not HTML.
+  // Not escaped: a subject is a header, not HTML. subjectText() removes CR and LF so an
+  // interpolated company name cannot end the Subject header and begin another one.
   const subject = type === 'reminder'
-    ? `Reminder: ${buyerCompany} — sustainability questionnaire`
-    : `${buyerCompany} has invited you to complete a sustainability questionnaire`
+    ? `Reminder: sustainability questionnaire from ${subjectText(buyerCompany)}`
+    : `${subjectText(buyerCompany)} has invited you to complete a sustainability questionnaire`
 
   const html = type === 'reminder'
     ? reminderEmailHtml({

@@ -12,6 +12,8 @@ import {
   ASSESSMENT_EMAIL_BUCKET, ASSESSMENT_EMAIL_LIMIT, ASSESSMENT_EMAIL_WINDOW_MS,
   HONEYPOT_FIELD, isHoneypotTripped, recipientKey,
 } from '../../../../lib/assessmentSubmitGuard'
+import { NOT_PROVIDED } from '../../../../lib/notProvided'
+import { subjectText } from '../../../../lib/emailSubject'
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY!
 const FROM_EMAIL       = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -152,7 +154,7 @@ export async function POST(req: NextRequest) {
 
     // INTERNAL ALERT: the same absence is INFORMATION — "this lead would not give a company" is
     // worth seeing, and a blank table cell reads as a rendering fault rather than a fact.
-    const NOT_GIVEN = '— not given'
+    const NOT_GIVEN = NOT_PROVIDED
 
     // Subject lines must still identify the lead in a full inbox. Name and company are both
     // optional, so the last resort is the email address: the one field that cannot be empty here.
@@ -174,7 +176,7 @@ export async function POST(req: NextRequest) {
     // email. Losing an obligation quietly is the one failure this table cannot have.
     const GROUP_HEADINGS: { key: string; title: string; sub: string }[] = [
       { key: 'regulatory', title: 'Regulatory / compliance', sub: 'Rules that apply to you, based on where you operate, your size and your sector.' },
-      { key: 'market',     title: 'Market-driven',           sub: 'What your customers, investors and lenders are asking for — often because they have a reporting obligation of their own.' },
+      { key: 'market',     title: 'Market-driven',           sub: 'What your customers, investors and lenders are asking for, often because they have a reporting obligation of their own.' },
       { key: '__ungrouped', title: 'Not classified',          sub: 'These entries arrived without a group. They are listed so nothing is lost; check them against the online results.' },
     ]
     // MODULE CELL — a priced link where the entry maps, plain text where it does not.
@@ -223,9 +225,9 @@ export async function POST(req: NextRequest) {
     // that is a different fact from a visitor who answered nothing, and the alert says which rather
     // than rendering a blank block that reads as "this lead told us nothing".
     const profileRows = !Array.isArray(profile)
-      ? `<div style="margin-top:16px;font-size:11px;color:#888;">Qualification profile not sent by the client — this submission predates the profile field, or the page was cached from an earlier deploy.</div>`
+      ? `<div style="margin-top:16px;font-size:11px;color:#888;">Qualification profile not sent by the client: this submission predates the profile field, or the page was cached from an earlier deploy.</div>`
       : profile.length === 0
-      ? `<div style="margin-top:16px;font-size:11px;color:#888;">Qualification profile sent, but empty — the visitor reached the email gate without a recorded answer.</div>`
+      ? `<div style="margin-top:16px;font-size:11px;color:#888;">Qualification profile sent, but empty: the visitor reached the email gate without a recorded answer.</div>`
       : `
     <div style="font-size:11px;font-weight:600;color:#888;letter-spacing:0.06em;text-transform:uppercase;margin:16px 0 6px;">What they told us</div>
     <table width="100%" style="border:1px solid #e8e7e4;border-radius:6px;overflow:hidden;">
@@ -357,7 +359,13 @@ export async function POST(req: NextRequest) {
         <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Priority</th>
         <th style="padding:6px 10px;text-align:left;font-size:10px;color:#888;font-weight:600;border-bottom:1px solid #e8e7e4;">Timing</th>
       </tr>
-      ${obligations.map((ob: any) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;">${ob.name.substring(0, 50)}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;font-weight:700;color:${URGENCY_COLOR[ob.urgency]};">${ob.urgency_label}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;color:#555;">${ob.timing}</td></tr>`).join('')}
+      <!-- ⚠️ THE NAME IS NOT TRUNCATED, AND substring(0, 50) IS GONE. It cut mid-word with no ellipsis:
+           'California SB 253: Climate Corporate Data Accountability Act' is 60 characters and arrived as
+           'California SB 253: Climate Corporate Data Account'. There was no layout reason: this table
+           sets no column width and no white-space rule, so a cell wraps like any other HTML cell, and
+           neither the Priority nor the Timing cell beside it was truncated. A statute name cut mid-word
+           is worse than a table row that wraps. -->
+      ${obligations.map((ob: any) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:12px;font-weight:600;color:#0d0d0d;">${ob.name}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;font-weight:700;color:${URGENCY_COLOR[ob.urgency]};">${ob.urgency_label}</td><td style="padding:6px 10px;border-bottom:1px solid #e8e7e4;font-size:11px;color:#555;">${ob.timing}</td></tr>`).join('')}
     </table>
     ${profileRows}
   </div>
@@ -376,7 +384,7 @@ export async function POST(req: NextRequest) {
         // list has carried market-driven entries since the results were split into two groups —
         // EcoVadis, a customer questionnaire, a board request — and none of those is a regulation.
         // This was the last surface still using the old word, so subject and body disagreed.
-        subject: `Your ThemisIQ Compliance Obligation Map — ${total} ${total === 1 ? 'obligation' : 'obligations'} identified for ${theirCompany}`,
+        subject: `Your ThemisIQ Compliance Obligation Map: ${total} ${total === 1 ? 'obligation' : 'obligations'} identified for ${theirCompany}`,
         html: leadHtml,
         text: `ThemisIQ identified ${total} ${total === 1 ? 'obligation' : 'obligations'} that apply to ${theirCompany}. ${critical} ${critical === 1 ? 'requires' : 'require'} immediate action. Visit www.themisiq.co to get started.`,
       }),
@@ -391,7 +399,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         from: `ThemisIQ <${FROM_EMAIL}>`,
         to: [MONITOR_EMAIL],
-        subject: `🔔 New lead: ${leadIdent} · ${critical} critical obligations`,
+        subject: `🔔 New lead: ${subjectText(leadIdent)} · ${critical} critical obligations`,
         html: notifyHtml,
         text: `New lead: ${leadName || NOT_GIVEN} · ${leadCompany || NOT_GIVEN} · ${leadEmail} · ${total} obligations · ${critical} critical`,
       }),

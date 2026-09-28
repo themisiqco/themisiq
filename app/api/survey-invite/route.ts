@@ -44,6 +44,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import { BRAND, INK_MUTED } from '@/lib/brand'
+import { subjectText } from '../../../lib/emailSubject'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -116,8 +117,8 @@ const inviteHtml = (o: {
   return shell(`
     <p style="margin:0 0 16px;color:#0d0d0d;font-size:15px;">${greeting}</p>
     <p style="margin:0 0 16px;color:#555553;font-size:14px;line-height:1.6;">
-      ${why} It is working out which sustainability topics matter most — to its business and to the
-      people and places its work affects — and is asking a range of people which ones they think
+      ${why} It is working out which sustainability topics matter most (to its business and to the
+      people and places its work affects) and is asking a range of people which ones they think
       should be prioritised.
     </p>
     <p style="margin:0 0 16px;color:#555553;font-size:14px;line-height:1.6;">
@@ -151,7 +152,7 @@ const reminderHtml = (o: {
     </p>
     <p style="margin:0 0 24px;color:#555553;font-size:14px;line-height:1.6;">
       ${o.started
-        ? 'Your answers so far have been saved — the link picks up where you left off.'
+        ? 'Your answers so far have been saved: the link picks up where you left off.'
         : 'It takes about fifteen minutes, and you can stop and come back to the same link.'}
     </p>
     ${cta(o.url, o.started ? 'Continue the survey' : 'Start the survey')}`)
@@ -206,10 +207,11 @@ export async function POST(req: NextRequest) {
   const company = round.company_name || round.name
   const url = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.themisiq.co'}/survey/${r.token}`
 
-  // Not escaped: a subject is a header, not HTML.
+  // Not escaped: a subject is a header, not HTML. subjectText() removes CR and LF so an
+  // interpolated company name cannot end the Subject header and begin another one.
   const subject = type === 'reminder'
-    ? `Reminder: ${company} would like your view`
-    : `${company} would like your view on its sustainability priorities`
+    ? `Reminder: ${subjectText(company)} would like your view`
+    : `${subjectText(company)} would like your view on its sustainability priorities`
 
   const html = type === 'reminder'
     ? reminderHtml({ name: r.invite_name, company, deadline: round.deadline, url, started: r.status === 'in_progress' })

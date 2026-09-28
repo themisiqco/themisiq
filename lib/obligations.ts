@@ -89,7 +89,7 @@ export interface Obligation {
 export const OBLIGATIONS: Record<ObligationId, Obligation> = {
   'sb253': {
     id: 'sb253',
-    name: 'California SB 253 — Climate Corporate Data Accountability Act',
+    name: 'California SB 253: Climate Corporate Data Accountability Act',
     modules: ['ghg'],
     does: {
       ghg: 'Builds the Scope 1 and 2 inventory and exports it on the CARB template, with every figure traceable to a source document.',
@@ -98,7 +98,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
 
   'sb261': {
     id: 'sb261',
-    name: 'California SB 261 — Climate-Related Financial Risk Act',
+    name: 'California SB 261: Climate-Related Financial Risk Act',
     modules: ['climate-risk'],
     does: {
       'climate-risk': 'Produces the TCFD-aligned climate financial-risk report across three IPCC scenarios.',
@@ -107,7 +107,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
 
   'ifrs-s2': {
     id: 'ifrs-s2',
-    name: 'IFRS S2 — Climate-related Disclosures',
+    name: 'IFRS S2: Climate-related Disclosures',
     // GHG first: the inventory is the metrics half, and the risk assessment cites it.
     modules: ['ghg', 'climate-risk'],
     does: {
@@ -118,7 +118,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
 
   'cbam': {
     id: 'cbam',
-    name: 'EU CBAM — Carbon Border Adjustment Mechanism',
+    name: 'EU CBAM: Carbon Border Adjustment Mechanism',
     modules: ['cbam'],
     does: {
       cbam: 'Computes specific embedded emissions per good from installation-level actuals, and builds the summary your EU customer carries into their declaration.',
@@ -127,18 +127,18 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
 
   'cs3d': {
     id: 'cs3d',
-    name: 'EU CS3D — Corporate Sustainability Due Diligence',
+    name: 'EU CS3D: Corporate Sustainability Due Diligence',
     modules: ['supply-chain'],
     does: {
       // States the boundary IN THE CUSTOMER-FACING LINE, not only in a comment: a buyer reading
       // this must not infer that buying Supply Chain discharges the whole duty.
-      'supply-chain': 'Runs human-rights and environmental due diligence across your chain of activities — supplier risk scoring, questionnaires and remediation tracking. Does not cover the duty over your own operations and subsidiaries.',
+      'supply-chain': 'Runs human-rights and environmental due diligence across your chain of activities: supplier risk scoring, questionnaires and remediation tracking. Does not cover the duty over your own operations and subsidiaries.',
     },
   },
 
   'eu-ai-act': {
     id: 'eu-ai-act',
-    name: 'EU AI Act — Artificial Intelligence Regulation',
+    name: 'EU AI Act: Artificial Intelligence Regulation',
     modules: ['ai-governance'],
     does: {
       'ai-governance': 'Inventories your AI systems, classifies them against the high-risk criteria, and prepares Article 11 technical documentation and registration.',
@@ -153,19 +153,19 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
   // obligation, and a buyer comparing the three learned nothing from it.
   'nis2': {
     id: 'nis2',
-    name: 'EU NIS2 — Network and Information Security Directive',
+    name: 'EU NIS2: Network and Information Security Directive',
     modules: ['cyber'],
     does: {
-      cyber: 'Scores you against the 19 controls NIS2 reaches, including the two it alone requires — a maintained asset inventory and a documented notification procedure for the 24-hour early warning and 72-hour full report.',
+      cyber: 'Scores you against the 19 controls NIS2 reaches, including the two it alone requires: a maintained asset inventory and a documented notification procedure for the 24-hour early warning and 72-hour full report.',
     },
   },
 
   'dora': {
     id: 'dora',
-    name: 'DORA — Digital Operational Resilience Act',
+    name: 'DORA: Digital Operational Resilience Act',
     modules: ['cyber'],
     does: {
-      cyber: 'Scores you against the 21 controls DORA reaches — the widest of the three cyber regimes — including its four unique ones: incident classification, resilience testing, an access-review process, and the critical third-party provider register.',
+      cyber: 'Scores you against the 21 controls DORA reaches (the widest of the three cyber regimes), including its four unique ones: incident classification, resilience testing, an access-review process, and the critical third-party provider register.',
     },
   },
 
@@ -174,13 +174,13 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     name: 'SEC Cybersecurity Disclosure Rules',
     modules: ['cyber'],
     does: {
-      cyber: 'Scores you against the 5 controls the SEC rules reach — the narrowest of the three — of which four are shared with NIS2 and DORA. The one it alone requires is the 8-K materiality assessment for deciding whether an incident is disclosable.',
+      cyber: 'Scores you against the 5 controls the SEC rules reach (the narrowest of the three), of which four are shared with NIS2 and DORA. The one it alone requires is the 8-K materiality assessment for deciding whether an incident is disclosable.',
     },
   },
 
   'eu-pay-transparency': {
     id: 'eu-pay-transparency',
-    name: 'EU Pay Transparency Directive',
+    name: 'EU Pay Transparency Directive (2023/970)',
     modules: ['people'],
     does: {
       people: 'Calculates the gender pay gap by job band and flags where a gap triggers a joint pay assessment.',
@@ -189,7 +189,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
 
   'ca-pay-data': {
     id: 'ca-pay-data',
-    name: 'California Pay Data Reporting',
+    name: 'California Pay Data Reporting (Gov. Code §12999)',
     modules: ['people'],
     does: {
       people: 'Assembles pay data by race, ethnicity, sex and job category for the annual state submission.',
@@ -205,19 +205,19 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
   // would have been easy to write as "training investment" because /assess uses that phrase.
   'sec-item-101': {
     id: 'sec-item-101',
-    name: 'SEC Item 101 — Human Capital Disclosure',
+    name: 'SEC Item 101: Human Capital Disclosure',
     modules: ['people'],
     does: {
-      people: 'Supplies three of the four figures the 10-K human capital section reports: global headcount and headcount by job band, LTIFR and TRIR for safety, and average training hours by gender — hours, not spend. Turnover is not collected and has to come from your HR system.',
+      people: 'Supplies three of the four figures the 10-K human capital section reports: global headcount and headcount by job band, LTIFR and TRIR for safety, and average training hours by gender: hours, not spend. Turnover is not collected and has to come from your HR system.',
     },
   },
 
   'modern-slavery': {
     id: 'modern-slavery',
-    name: 'Modern Slavery Act — UK and Australia',
+    name: 'Modern Slavery Act: UK and Australia',
     modules: ['supply-chain'],
     does: {
-      'supply-chain': 'Sends the modern-slavery questionnaire — policy, risk assessment, recruitment fees, ILO 138 minimum age, grievance mechanism, training — and risk-scores which suppliers to send it to first by country, sector and spend.',
+      'supply-chain': 'Sends the modern-slavery questionnaire: policy, risk assessment, recruitment fees, ILO 138 minimum age, grievance mechanism, training, and risk-scores which suppliers to send it to first by country, sector and spend.',
     },
   },
 
@@ -229,7 +229,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
   // about which of the four scored themes they would still be answering by hand.
   'cdp': {
     id: 'cdp',
-    name: 'CDP Climate — annual disclosure',
+    name: 'CDP Climate: annual disclosure',
     modules: ['ghg'],
     does: {
       ghg: 'Feeds the C6, C7 and C11 emissions sections directly from your inventory, on the CDP-required GWP basis.',
@@ -245,7 +245,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     modules: ['ghg', 'supply-chain'],
     does: {
       ghg: 'Produces the Scope 1, 2 and 3 figures the Environment theme is scored on, as a dated inventory traceable to source documents rather than a self-declared number.',
-      'supply-chain': 'Answers the Sustainable Procurement theme with documents rather than assertions — a supplier risk register, the questionnaires you issued and the responses returned — and gap-analyses the scorecard to show which criteria you hold no evidence for.',
+      'supply-chain': 'Answers the Sustainable Procurement theme with documents rather than assertions: a supplier risk register, the questionnaires you issued and the responses returned, and gap-analyses the scorecard to show which criteria you hold no evidence for.',
     },
   },
 
@@ -258,7 +258,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     modules: ['deals', 'ghg'],
     does: {
       deals: 'Turns "we diligence ESG" into a file an LP can audit: per-target screening, material findings by sector and jurisdiction, and a remediation cost estimate carried as a percentage of deal value into the IC memo.',
-      ghg: 'Covers the portfolio half — financed emissions by PCAF asset class, on the denominator each class requires, so climate exposure is reported across holdings and not only at the point of investment.',
+      ghg: 'Covers the portfolio half: financed emissions by PCAF asset class, on the denominator each class requires, so climate exposure is reported across holdings and not only at the point of investment.',
     },
   },
 }

@@ -148,25 +148,21 @@ export function renderedDashes(file: string): number {
 }
 
 /**
- * ⚠️ PENDING A DECISION, NOT EXEMPT. These are excluded from the sweep because the decision to change them
- * has not been taken, NOT because an em dash is acceptable in them.
+ * ⚠️ THERE IS NO EXEMPTION LIST ANY MORE, and the two that existed are recorded here because both were
+ * argued for at length before they were retired.
  *
- * ⚠️ THE THREE LEGAL PAGES HAVE LEFT THIS LIST, 27 Sep 2026. They carried document version numbers
- * (TIQ-PRV-001 · v2.2 and its siblings) and a consent version rows in purchase_consents point at, so a
- * punctuation edit raised a legal-record question rather than a copy one: does the version move, and does
- * a snapshot need a matching entry? Decided: the version does NOT move, and the amendment is recorded in
- * docs/policy-snapshots/README.md — a new file, so that no snapshot of a published version is edited. All
- * three are now at zero and held there by the unbudgeted-files test like any other page.
+ * THE THREE LEGAL PAGES left on 27 Sep 2026. They carry document version numbers and a consent version
+ * that purchase_consents rows point at, so a punctuation edit raised a legal-record question rather than
+ * a copy one. Decided: the version does not move, and the amendment is recorded in
+ * docs/policy-snapshots/README.md.
  *
- * THE EMAIL TEMPLATES in app/api/* remain: they are the same templates CLAUDE.md records as the
- * deliberately unmigrated brand gradient, so they are a known exception awaiting one decision rather than
- * many.
+ * THE EMAIL TEMPLATES, exempt by the path prefix `app/api/`, left on 27 Sep 2026 too. Six email-building
+ * routes are swept, and lib/obligations.ts with them, because its statute names travel into the internal
+ * notification email and the page and the email must read the same. What is left under app/api/ is NOT
+ * email copy and is budgeted below, file by file, with the reason.
  *
- * A count is NOT asserted for what remains: the point is that nobody has looked yet, and pinning a number
- * would imply someone had.
+ * Every file in app/ and lib/ is now covered by the same two rules: zero, or a budget that only shrinks.
  */
-const PENDING_DECISION: readonly string[] = []
-const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
 
 /**
  * The remaining sweep, file by file, with the count each one still carries.
@@ -187,12 +183,16 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
  * gone, not zeroed — the ratchet's own rule. The two blind spots above are what the guard now sees, which
  * is why those files could be finished at all.
  *
- * ⚠️ app/assess (50) FOLLOWED, AND ITS COPY SOURCES DID NOT. Every lib/ module the page takes copy from is
- * shared: lib/sb253 (3) with eight other pages, lib/nis2 (3) with /cyber, lib/ifrsS2 (1) with
- * /climate-risk. lib/obligations (23) looked /assess-only — its only importers are the page and the page's
- * own submit route — but that route renders an obligation's `name` into an EMAIL
- * (app/api/assessment/submit/route.ts:360), and the email templates are the pending decision above. All
- * four stay listed for the shared-lib group.
+ * ⚠️ app/assess (50) FOLLOWED, AND MOST OF ITS COPY SOURCES DID NOT. Every lib/ module the page takes copy
+ * from is shared: lib/sb253 (3) with eight other pages, lib/nis2 (3) with /cyber, lib/ifrsS2 (1) with
+ * /climate-risk. Those three stay listed for the shared-lib group.
+ *
+ * ⚠️ AND THEN THE EMAILS, 27 Sep 2026, WHICH TOOK lib/obligations (23) WITH THEM. It was held back one
+ * commit because an obligation's `name` travels into the internal notification email; once the templates
+ * stopped being exempt, holding it back stopped making sense — the page and the email now read the same
+ * statute pairs, with the colon convention /assess uses. 32 dashes across six email-building routes went
+ * with it, and app/api/assessment/submit/route.ts lost a substring(0, 50) that had been cutting statute
+ * names mid-word.
  *
  * Both were invisible to a byte match and are counted now, which is the point of the change. A file whose
  * number rose gained nothing: it was always wrong.
@@ -209,6 +209,34 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
 const GLYPH_COUNT = 73
 
 const SWEEP_BUDGET: Record<string, number> = {
+  // ⚠️ WHAT IS LEFT UNDER app/api/ IS READ BY NOBODY, 27 Sep 2026. The prefix exemption is gone; the six
+  // email-building routes are swept, and so is every API message a caller actually renders — checked one
+  // by one rather than assumed:
+  //     /api/materiality and /api/materiality/resilience   → app/dashboard/climate-risk/page.tsx:466
+  //                                                           setError(data.error ?? …)          SWEPT
+  //     /api/cbam/report                                   → app/dashboard/cbam/report/page.tsx:197
+  //                                                           setErr({ message: json.error … })  SWEPT
+  //     /api/checkout                                      → lib/checkout.ts:69 alert(error …)   SWEPT
+  //     /api/campaigns/[id]/scope3-cat1 uncovered[].reason  → app/dashboard/scope3/page.tsx:3597  SWEPT
+  //
+  // These five are what remains, and each is read by a machine, a log or nobody:
+  //
+  //   · TWO ARE MODEL PROMPTS, and CLAUDE.md treats one as a safety property: the concierge's prompt is
+  //     what makes the extractor abstain rather than guess a consumption figure. A prompt is input to a
+  //     model, not copy read by a person, and editing its punctuation is editing a model's instructions.
+  'app/api/concierge/extract/route.ts': 11,
+  'app/api/ghg-bot/route.ts': 19,
+  //   · THREE ARE console.warn SERVER LOGS in the materiality routes: a reporting-period conflict and a
+  //     partial topic-label resolve. They reach a log, never a screen.
+  'app/api/materiality/resilience/route.ts': 3,
+  'app/api/materiality/route.ts': 3,
+  //   · ONE IS A RESPONSE FIELD NO CALLER READS: cbam/compute returns `warning` beside `unresolved`, and
+  //     app/dashboard/cbam/setup does not render it (no `warning` reference in the file). Sweeping it
+  //     would be sweeping text nobody has ever seen; it is listed so that changes when someone shows it.
+  'app/api/cbam/compute/route.ts': 1,
+  //   · ONE IS AN ADMIN API ERROR WITH NO UI CALLER: /api/admin/create-invoice is fetched from nowhere in
+  //     app/ or lib/ — it is called directly — so its 400 message is read in a terminal, not a browser.
+  'app/api/admin/create-invoice/route.ts': 1,
   'app/dashboard/ai-governance/page.tsx': 21,
   'app/dashboard/cbam/disclosures/page.tsx': 14,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
@@ -281,8 +309,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/materiality/severityScale.ts': 6,
   'lib/materiality/versionAgreement.ts': 3,
   'lib/nis2.ts': 3,
-  'lib/obligations.ts': 23,
-  'lib/order/invoice.ts': 3,
+  'lib/order/invoice.ts': 2,
   'lib/sb253.ts': 3,
   'lib/sbti.ts': 9,
   'lib/scope3/supplierAssurance.ts': 3,
@@ -311,8 +338,6 @@ const sourceFiles = (): string[] =>
   [...walk('app'), ...walk('lib')]
     .map(f => relative('.', f))
     .filter(f => !f.includes('.test.'))
-    .filter(f => !f.startsWith(PENDING_DECISION_PREFIX))
-    .filter(f => !(PENDING_DECISION as readonly string[]).includes(f))
     .sort()
 
 describe('no em dash reaches customer-facing copy, and the remaining budget only shrinks', () => {
@@ -352,22 +377,24 @@ describe('no em dash reaches customer-facing copy, and the remaining budget only
       .toEqual([])
   })
 
-  it('the pending-decision list is empty, and the prefix still covers the email templates', () => {
-    // ⚠️ ASSERTED EMPTY RATHER THAN DELETED. The list is the shape of the remaining exemption, and a page
-    // added back to it has to be a deliberate edit here with the reason above it. The three legal pages
-    // left on 27 Sep 2026; see docs/policy-snapshots/README.md for the amendment that let them.
-    expect([...PENDING_DECISION]).toEqual([])
-    expect(PENDING_DECISION_PREFIX).toBe('app/api/')
-    // The templates the prefix covers do still carry em dashes, so the exemption is live rather than
-    // vestigial. If this fails because they are clean, delete the prefix and the filter that uses it.
-    const templates = walk('app/api').filter(f => !f.includes('.test.'))
-    expect(templates.some(f => renderedDashes(f) > 0),
-      'no app/api/ file carries an em dash any more').toBe(true)
-    // And the legal pages are held at zero by the unbudgeted-files test above, not by an exemption.
+  it('the files that were exempt are now covered by the ordinary rules', () => {
+    // ⚠️ THE EXEMPTIONS ARE GONE, SO THIS CHECKS THEY DID NOT TAKE THEIR FILES WITH THEM. A deleted
+    // exemption that also dropped its files from the scan would look identical to a finished sweep.
     for (const f of ['app/privacy/page.tsx', 'app/terms/page.tsx', 'app/refund-policy/page.tsx']) {
       expect(renderedDashes(f), `${f} has gained an em dash back`).toBe(0)
       expect(SWEEP_BUDGET[f], `${f} must not have a budget`).toBeUndefined()
     }
+    const api = sourceFiles().filter(f => f.startsWith('app/api/'))
+    expect(api.length, 'app/api/ is no longer scanned at all').toBeGreaterThan(20)
+    // The six email-building routes are swept and hold no budget; what remains under app/api/ is not
+    // email copy and is budgeted with its reason.
+    for (const f of ['app/api/assessment/submit/route.ts', 'app/api/impact-invite/route.ts',
+                     'app/api/order/quote-request/route.ts', 'app/api/supplier-invite/route.ts',
+                     'app/api/survey-invite/route.ts', 'app/api/webhooks/stripe/route.ts']) {
+      expect(renderedDashes(f), `${f} is an email route and must stay at zero`).toBe(0)
+      expect(SWEEP_BUDGET[f], `${f} must not have a budget`).toBeUndefined()
+    }
+    expect(renderedDashes('lib/obligations.ts'), 'its names travel into the email').toBe(0)
   })
 
   it('the permanent exemptions are real, and neither reaches further than its reason', () => {

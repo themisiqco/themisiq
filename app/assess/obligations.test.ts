@@ -193,8 +193,8 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
   // correctly, since both route to Cyber Governance at the same price — so `ids()` cannot tell them
   // apart, and an `ids(...).toContain('nis2')` assertion passes for either. The two entries differ by
   // NAME, which is also what the results list keys its React children and its expand state on.
-  const NIS2_MAIN = 'EU NIS2 Directive: Network and Information Security'
-  const NIS2_SURVIVING = 'EU NIS2 Directive: duties surviving DORA'
+  const NIS2_MAIN = 'EU NIS2: Network and Information Security Directive'
+  const NIS2_SURVIVING = 'EU NIS2: duties surviving DORA'
   const names = (sectors: string[]) => eu(sectors).map(o => o.name)
 
   it('an EU FINANCIAL entity gets DORA and NOT the main NIS2 entry', () => {
@@ -726,5 +726,109 @@ describe('option labels are display-only', () => {
       expect(collides, `${label} no longer occurs elsewhere: delete it from SHARED_VOCABULARY`).toBe(true)
     }
     expect(Object.keys(SHARED_VOCABULARY).length).toBe(13)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ONE OBLIGATION, ONE NAME, IN TWO FILES.
+//
+// /assess names each obligation in its own entry; lib/obligations.ts names the same obligation again,
+// beside the module that addresses it and its price. The page shows its name on screen and posts it to
+// /api/assessment/submit, which renders it into the internal notification email — so the two names are
+// read side by side by the same person, about the same rule.
+//
+// ⚠️ THEY HAD ALREADY DRIFTED, AND NOT ONLY IN PUNCTUATION. Measured 27 Sep 2026: the page said
+// 'SB 253: California Climate Corporate Data Accountability Act' where the module list said
+// 'California SB 253: Climate Corporate Data Accountability Act' — different WORD ORDER; 'Modern Slavery
+// Act: UK / Australia' against 'UK and Australia'; 'CDP Climate: Annual Disclosure' against 'annual
+// disclosure'; 'LP & Lender ESG Requirements' against 'LP and lender ESG requirements'; and
+// 'EU NIS2 Directive: Network and Information Security' against 'EU NIS2: Network and Information
+// Security Directive'. Nine were aligned onto the lib wording, and lib/obligations.ts gained the two
+// citations the page carried and it did not — (2023/970) and (Gov. Code §12999) — so matching cost no
+// statute reference.
+//
+// ⚠️ EXACT EQUALITY IS NOT POSSIBLE FOR EVERY ENTRY, which is why this is not a one-line assertion. An
+// obligationId can carry MORE THAN ONE page entry: NIS2 has a main entry and a second for the duties DORA
+// does not displace, and both carry `obligationId: 'nis2'` because both route to Cyber Governance at the
+// same price. A second entry therefore names an ARM of the regime, and it is pinned verbatim below
+// instead, so drift in it fails too.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A page entry that names one arm of a regime rather than the regime, with the reason it cannot match. */
+const ARM_ENTRIES: Record<string, string> = {
+  'EU NIS2: duties surviving DORA':
+    'the second nis2 entry: DORA displaces the main duties for a financial entity, and this names what ' +
+    'survives. Both entries carry obligationId nis2, so only one of them can equal the lib name.',
+}
+
+function libNames(): Record<string, string> {
+  const src = readFileSync(join(REPO_ROOT, 'lib/obligations.ts'), 'utf8')
+  const sf = ts.createSourceFile('obligations.ts', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const out: Record<string, string> = {}
+  const visit = (n: ts.Node) => {
+    if (ts.isPropertyAssignment(n) && ts.isObjectLiteralExpression(n.initializer)) {
+      const key = n.name.getText().replace(/'/g, '')
+      const nm = n.initializer.properties.find(p => p.name && p.name.getText() === 'name')
+      if (nm && ts.isPropertyAssignment(nm) && ts.isStringLiteral(nm.initializer)) out[key] = nm.initializer.text
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return out
+}
+
+/** Every { name, obligationId } pair declared on the page, from the source. */
+function pageEntries(): { name: string; id: string | null }[] {
+  const src = readFileSync(join(REPO_ROOT, 'app/assess/page.tsx'), 'utf8')
+  const sf = ts.createSourceFile('page.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const out: { name: string; id: string | null }[] = []
+  const visit = (n: ts.Node) => {
+    if (ts.isObjectLiteralExpression(n)) {
+      const get = (k: string) => n.properties.find(p => p.name && p.name.getText() === k)
+      const nm = get('name'), id = get('obligationId')
+      if (nm && ts.isPropertyAssignment(nm) && ts.isStringLiteral(nm.initializer)) {
+        out.push({
+          name: nm.initializer.text,
+          id: id && ts.isPropertyAssignment(id) && ts.isStringLiteral(id.initializer) ? id.initializer.text : null,
+        })
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return out
+}
+
+describe('the page and lib/obligations.ts name the same obligation the same way', () => {
+  it('every page entry with an obligationId matches the lib name, or is a declared arm', () => {
+    const lib = libNames()
+    const entries = pageEntries().filter(e => e.id)
+    expect(entries.length, 'the page declares no obligation with an id').toBeGreaterThan(10)
+
+    const drift: string[] = []
+    for (const e of entries) {
+      const libName = lib[e.id!]
+      if (libName === undefined) { drift.push(`${e.id}: no such obligation in lib/obligations.ts`); continue }
+      if (e.name === libName) continue
+      if (e.name.startsWith(`${libName}: `)) continue      // the regime, then which of its arms
+      if (ARM_ENTRIES[e.name]) continue
+      drift.push(`${e.id}: page "${e.name}" vs lib "${libName}"`)
+    }
+    expect(drift, drift.length === 0 ? '' :
+      'THE TWO OBLIGATION NAME LISTS HAVE DRIFTED:\n  ' + drift.join('\n  ') +
+      '\n\nThe same rule is named on screen and in the notification email, so the two must read the same. ' +
+      'Use the lib/obligations.ts wording on the page. If the page entry names one ARM of a regime rather ' +
+      'than the regime, add it to ARM_ENTRIES with the reason it cannot match.').toEqual([])
+  })
+
+  it('every declared arm still exists, and its wording is pinned', () => {
+    // An arm listed here but absent from the page is a stale exemption; an arm whose wording changed is
+    // drift that the rule above cannot see, because the rule lets any declared arm through.
+    const names = new Set(pageEntries().map(e => e.name))
+    for (const [arm, reason] of Object.entries(ARM_ENTRIES)) {
+      expect(names.has(arm), `${arm} is declared an arm but no longer appears on the page`).toBe(true)
+      expect(reason.length, `${arm} needs a reason`).toBeGreaterThan(40)
+    }
+    expect(Object.keys(ARM_ENTRIES).length, 'one arm today: the NIS2 surviving-duties entry').toBe(1)
   })
 })

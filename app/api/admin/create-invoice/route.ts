@@ -125,11 +125,11 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'GHG Advisory is a custom quote — add a manual line item in Stripe instead.' }, { status: 400 })
         }
         // This route IS the invoice path, so requiresInvoice (>$10k) does NOT block here.
-        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
+        const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
         lines.push({ label, amount: q.totalUSD })
       } else {
         const price = configuratorPrice(tier, moduleKeys)
-        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
+        const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
         lines.push({ label, amount: price })
       }
       moduleKeys.forEach((m) => entitlements.add(m))

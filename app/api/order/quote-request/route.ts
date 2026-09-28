@@ -4,6 +4,8 @@ import { HONEYPOT_FIELD, isHoneypotTripped } from '../../../../lib/assessmentSub
 import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
 import type { Tier } from '../../../../lib/pricing'
 import { BRAND, BRAND_WASH, INK_MUTED } from '@/lib/brand'
+import { NOT_PROVIDED } from '../../../../lib/notProvided'
+import { subjectText } from '../../../../lib/emailSubject'
 
 // Quote-request capture for /order carts that exceed the card threshold (>$10k) or are
 // GHG Advisory. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
@@ -83,10 +85,19 @@ export async function POST(req: NextRequest) {
     const date    = new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
     const name    = esc(vName)
     const email   = esc(vEmail)
-    const company = esc(vCompany || '—')
-    const phone   = vPhone ? esc(vPhone) : '—'
-    const modules = vModules.length ? esc(vModules.join(', ')) : '—'
-    const tier    = esc(vTier || '—')
+    const company = esc(vCompany || NOT_PROVIDED)
+    // ⚠️ THE SUBJECT IDENTIFIES THE REQUEST, SO IT CANNOT SAY 'Not provided'. Five subjects interpolate
+    // the company; with no company given they would all read "Quote request: Not provided", which is
+    // unsearchable in an inbox and identical across every such request. The email address is the one
+    // thing always present, and it is what a human would reply to anyway. The BODY keeps NOT_PROVIDED:
+    // there the field is labelled, so the absence is the honest answer to "Company".
+    // ⚠️ NOT esc(). A subject is plain text: the HTML escaper turned "AT&T" into "AT&amp;T" in all five
+    // subjects below, and there is no HTML parser in an inbox to undo it. subjectText strips CR and LF,
+    // which is the only thing a subject needs, and leaves the ampersand alone. The BODY keeps esc().
+    const subjectWho = subjectText(vCompany || vEmail)
+    const phone   = vPhone ? esc(vPhone) : NOT_PROVIDED
+    const modules = vModules.length ? esc(vModules.join(', ')) : NOT_PROVIDED
+    const tier    = esc(vTier || NOT_PROVIDED)
     const total   = typeof order?.totalUSD === 'number' && (order.totalUSD as number) > 0 ? `$${(order.totalUSD as number).toLocaleString()}` : 'Custom / Advisory'
     const ref     = vRef ? esc(vRef) : null
 
@@ -119,7 +130,7 @@ export async function POST(req: NextRequest) {
 
     await sendEmail(
       MONITOR_EMAIL,
-      `Quote request — ${company}`,
+      `Quote request: ${subjectWho}`,
       notifyHtml,
       `Quote request from ${vName} (${vEmail}) · ${company} · modules: ${modules} · tier: ${tier} · total: ${total}${ref ? ` · ref: ${ref}` : ''}`,
     )
@@ -132,7 +143,7 @@ export async function POST(req: NextRequest) {
   <tr><td style="background:#0d0d0d;padding:24px 32px;"><span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.5px;">ThemisIQ</span></td></tr>
   <tr><td style="background:#fff;padding:32px;">
     <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
-    <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Thanks — we've received your request.</div>
+    <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Thanks, we've received your request.</div>
     <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:16px;">Hi ${name}, thank you for your interest in ThemisIQ. Our team will prepare a quote for your selected configuration (${modules}) and follow up shortly at this address.</div>
     <div style="font-size:13px;color:${INK_MUTED};line-height:1.7;">If it's urgent, reply to this email or reach us at hello@themisiq.co.</div>
   </td></tr>
@@ -146,7 +157,7 @@ export async function POST(req: NextRequest) {
       vEmail,
       'We received your ThemisIQ quote request',
       confirmHtml,
-      `Thanks — we received your request and will prepare a quote for ${modules}, following up shortly at ${vEmail}.`,
+      `Thanks, we received your request and will prepare a quote for ${modules}, following up shortly at ${vEmail}.`,
     )
 
     // ── DRAFT-HOLD invoice (invoice-eligible path only) ────────────────────────
@@ -161,10 +172,10 @@ export async function POST(req: NextRequest) {
         const link = `https://dashboard.stripe.com/invoices/${inv.invoiceId}`
         await sendEmail(
           MONITOR_EMAIL,
-          `📝 Draft invoice ready — ${company} · $${inv.amount.toLocaleString()}`,
+          `📝 Draft invoice ready: ${subjectWho} · $${inv.amount.toLocaleString()}`,
           `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f8f7f5;padding:24px;">
 <div style="max-width:560px;background:#fff;border-radius:8px;border:1px solid #e8e7e4;overflow:hidden;">
-  <div style="background:#0d0d0d;padding:16px 20px;color:#fff;font-weight:700;font-size:14px;">ThemisIQ · Draft invoice — review &amp; send</div>
+  <div style="background:#0d0d0d;padding:16px 20px;color:#fff;font-weight:700;font-size:14px;">ThemisIQ · Draft invoice: review &amp; send</div>
   <div style="padding:20px;">
     <table width="100%" style="margin-bottom:14px;">
       <tr><td width="120" style="font-size:12px;color:#888;padding:3px 0;">Customer</td><td style="font-size:12px;color:#0d0d0d;font-weight:600;">${name} · ${company}</td></tr>
@@ -181,13 +192,13 @@ export async function POST(req: NextRequest) {
   </div>
 </div>
 </body></html>`,
-          `Draft invoice created — ${vName} (${vEmail}) · ${company} · $${inv.amount.toLocaleString()} · invoice ${inv.invoiceId}. Review & send: ${link}`,
+          `Draft invoice created: ${vName} (${vEmail}) · ${company} · $${inv.amount.toLocaleString()} · invoice ${inv.invoiceId}. Review & send: ${link}`,
         )
       } else if (inv.reason === 'requires_quote') {
         // Advisory — not auto-priced. Human builds a custom quote in Stripe.
         await sendEmail(
           MONITOR_EMAIL,
-          `Manual quote needed — ${company}`,
+          `Manual quote needed: ${subjectWho}`,
           `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Manual quote needed for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.message)}<br>Build a custom quote/invoice in Stripe manually.</p>`,
           `Manual quote needed for ${vName} (${vEmail}) · ${company} · ${modules}. ${inv.message}`,
         )
@@ -198,9 +209,9 @@ export async function POST(req: NextRequest) {
         // empty / error — invoice NOT created. Alert the monitor to handle it manually.
         await sendEmail(
           MONITOR_EMAIL,
-          `⚠ Invoice creation FAILED — ${company}`,
-          `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Automatic draft-invoice creation FAILED for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.reason)} — ${esc(inv.message)}<br><strong>Create the invoice manually in Stripe.</strong> The prospect was still confirmed normally.</p>`,
-          `Invoice creation FAILED for ${vName} (${vEmail}) · ${company} · ${modules}. Reason: ${inv.reason} — ${inv.message}. Create manually.`,
+          `⚠ Invoice creation FAILED: ${subjectWho}`,
+          `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Automatic draft-invoice creation FAILED for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.reason)}. ${esc(inv.message)}<br><strong>Create the invoice manually in Stripe.</strong> The prospect was still confirmed normally.</p>`,
+          `Invoice creation FAILED for ${vName} (${vEmail}) · ${company} · ${modules}. Reason: ${inv.reason}. ${inv.message} Create manually.`,
         )
       }
     } catch (invErr) {
@@ -210,7 +221,7 @@ export async function POST(req: NextRequest) {
       try {
         await sendEmail(
           MONITOR_EMAIL,
-          `⚠ Invoice step error — ${company}`,
+          `⚠ Invoice step error: ${subjectWho}`,
           `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">The invoice step threw for <strong>${name}</strong> (${email}) · ${company}. Create the invoice manually in Stripe. The prospect was confirmed normally.</p>`,
           `Invoice step threw for ${vName} (${vEmail}) · ${company}. Create manually.`,
         )

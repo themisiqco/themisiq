@@ -76,7 +76,7 @@ async function sendInvoiceLoginLink(stripe: Stripe, invoice: Stripe.Invoice) {
   <tr><td style="background:#fff;padding:32px;">
     <!-- Georgia here is deliberate, not a missed sweep: this is email HTML. A mail client cannot resolve var(--font-display), and web fonts do not load reliably in mail, so Literata would silently fall back anyway. Georgia is web-safe and is what every recipient actually sees. See app/components/headingStyles.ts. -->
     <div style="font-family:Georgia,serif;font-size:22px;color:#0d0d0d;margin-bottom:12px;">Your ThemisIQ access is ready.</div>
-    <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:20px;">Your payment is confirmed and your modules are unlocked. Click below to log in — no password needed.</div>
+    <div style="font-size:14px;color:#555553;line-height:1.7;margin-bottom:20px;">Your payment is confirmed and your modules are unlocked. Click below to log in: no password needed.</div>
     <a href="${actionLink}" style="display:inline-block;font-size:14px;font-weight:600;color:#0d0d0d;background:linear-gradient(135deg,#7425e3,#1fb1ff,#64fe3e);padding:12px 26px;border-radius:8px;text-decoration:none;">Log in to ThemisIQ →</a>
     <div style="font-size:12px;color:${INK_MUTED};line-height:1.7;margin-top:20px;">This link is single-use and expires shortly. If it has expired, use &ldquo;Forgot password&rdquo; on the login page. Questions? Reach us at hello@themisiq.co.</div>
   </td></tr>
@@ -86,7 +86,7 @@ async function sendInvoiceLoginLink(stripe: Stripe, invoice: Stripe.Invoice) {
 </td></tr></table>
 </body></html>`
 
-  await sendEmail(email, 'Your ThemisIQ access is ready — log in', html, `Your ThemisIQ access is ready. Log in: ${actionLink}`)
+  await sendEmail(email, 'Your ThemisIQ access is ready', html, `Your ThemisIQ access is ready. Log in: ${actionLink}`)
 
   // Mark sent (preserve existing metadata: user_id / entitlements / …) so redeliveries skip.
   await stripe.invoices.update(invoice.id, { metadata: { ...invoice.metadata, login_email_sent: '1' } })

@@ -115,7 +115,7 @@ export async function createDraftInvoiceForOrder(input: CreateDraftInvoiceInput)
         invoice: invoice.id, // attach to THIS invoice (or it won't be swept on → $0 invoice)
         currency: 'usd',
         amount: Math.round(priced.totalUSD * 100), // server-computed dollars → cents
-        description: `ThemisIQ — ${priced.keys.length} module${priced.keys.length > 1 ? 's' : ''}`,
+        description: `ThemisIQ: ${priced.keys.length} module${priced.keys.length > 1 ? 's' : ''}`,
       },
       { idempotencyKey: itemIdemKey },
     )

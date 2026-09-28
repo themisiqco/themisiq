@@ -177,7 +177,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           uncovered.push({
             supplier_id: s.id,
             supplier_name: s.supplier_name,
-            reason: `Spend is in ${currency} (not USD) — excluded from the auto-total pending conversion.`,
+            reason: `Spend is in ${currency} (not USD), excluded from the auto-total pending conversion.`,
           })
           continue
         }

@@ -37,6 +37,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import { BRAND, INK_MUTED } from '@/lib/brand'
+import { subjectText } from '../../../lib/emailSubject'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -119,7 +120,7 @@ const inviteHtml = (o: {
     </p>
     <p style="margin:0 0 16px;color:#555553;font-size:14px;line-height:1.6;">
       For each one you say whether the impact is already happening or might happen, and how serious
-      it would be. These are judgements from what you see in your own area — there is nothing to
+      it would be. These are judgements from what you see in your own area: there is nothing to
       look up, no score to hit, and “not enough visibility to assess” is a real answer on any
       question you cannot judge.
     </p>
@@ -145,12 +146,12 @@ const reminderHtml = (o: {
     <p style="margin:0 0 16px;color:#0d0d0d;font-size:15px;">${greeting}</p>
     <p style="margin:0 0 16px;color:#555553;font-size:14px;line-height:1.6;">
       A reminder that <strong style="color:#0d0d0d;">${company}</strong> is still waiting on your
-      part of its impact assessment — ${o.subtopics}
+      part of its impact assessment: ${o.subtopics}
       ${o.subtopics === 1 ? 'sub-topic' : 'sub-topics'} assigned to you.
     </p>
     <p style="margin:0 0 24px;color:#555553;font-size:14px;line-height:1.6;">
       ${o.started
-        ? 'Your answers so far have been saved — the link picks up where you left off.'
+        ? 'Your answers so far have been saved: the link picks up where you left off.'
         : 'There is nothing to look up, and you can stop and come back to the same link.'}
     </p>
     ${cta(o.url, o.started ? 'Continue your part' : 'Open your part')}
@@ -262,10 +263,11 @@ export async function POST(req: NextRequest) {
   const company = assessment.company_name || 'Your organisation'
   const url = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.themisiq.co'}/impact/${asg.token}`
 
-  // Not escaped: a subject is a header, not HTML.
+  // Not escaped: a subject is a header, not HTML. subjectText() removes CR and LF so an
+  // interpolated company name cannot end the Subject header and begin another one.
   const subject = type === 'reminder'
-    ? `Reminder: ${company} is waiting on your part of its impact assessment`
-    : `${company} has asked for your judgement on ${subtopics} sustainability ${subtopics === 1 ? 'topic' : 'topics'}`
+    ? `Reminder: ${subjectText(company)} is waiting on your part of its impact assessment`
+    : `${subjectText(company)} has asked for your judgement on ${subtopics} sustainability ${subtopics === 1 ? 'topic' : 'topics'}`
 
   const html = type === 'reminder'
     ? reminderHtml({

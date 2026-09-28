@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
         {
           error:
             `${subject} Every process needs an explicit declaration before a report can be ` +
-            `generated — either enter the precursors it consumes, or state that it consumes none.`,
+            `generated: either enter the precursors it consumes, or state that it consumes none.`,
           // Discriminator, same 'code' convention as ReportError. This shares status 409 with the
           // stale-record conflict, and the two need OPPOSITE remedies — re-running compute can
           // never satisfy this gate. A caller branching on status alone would tell the operator to
@@ -226,7 +226,7 @@ export async function GET(req: NextRequest) {
               `stored (direct=${record.see_direct}, indirect=${record.see_indirect}) != ` +
               `recomputed (direct=${loaded.result.direct}, indirect=${loaded.result.indirect}); ` +
               `computed_at=${record.computed_at}. Reference data or process inputs have changed since ` +
-              `this record was computed — re-run compute to produce a new record before generating the report.`,
+              `this record was computed. Re-run compute to produce a new record before generating the report.`,
             'stale_record',
           );
         }

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       if (!isStandardVersion(rawStandardVersion)) {
         return NextResponse.json({
           error: `Unrecognised standardVersion "${String(rawStandardVersion).slice(0, 40)}". `
-            + `Expected one of: ${STANDARD_VERSIONS.join(', ')} — or omit the field entirely to record it as not stated.`,
+            + `Expected one of: ${STANDARD_VERSIONS.join(', ')}. Omit the field entirely to record it as not stated.`,
         }, { status: 400 })
       }
       standardVersion = rawStandardVersion

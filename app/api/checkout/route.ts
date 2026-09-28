@@ -83,16 +83,16 @@ export async function POST(req: NextRequest) {
         // configurator previews). tier is validated by the guard above.
         const q = cartQuote({ modules: moduleKeys, ghgTier: tier as GhgTier })
         if (q.requiresQuote) {
-          return NextResponse.json({ error: 'GHG Advisory is quote-only — please contact us.', requiresQuote: true }, { status: 400 })
+          return NextResponse.json({ error: 'GHG Advisory is quote-only: please contact us.', requiresQuote: true }, { status: 400 })
         }
         if (q.requiresInvoice) {
           return NextResponse.json({ error: 'Orders over $10,000 are completed by invoice. Please request an invoice.', requiresInvoice: true }, { status: 400 })
         }
-        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
+        const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
         lineItems.push(priceLine(label, q.totalUSD))
       } else {
         const price = configuratorPrice(tier, moduleKeys)
-        const label = `ThemisIQ — ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
+        const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''} (${tier})`
         lineItems.push(priceLine(label, price))
       }
       moduleKeys.forEach((m) => {
