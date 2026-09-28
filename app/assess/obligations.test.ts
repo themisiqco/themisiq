@@ -1,4 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import ts from 'typescript'
+import { stripTsComments } from '../../lib/testing/stripComments'
+
+const REPO_ROOT = join(__dirname, '..', '..')
 import {
   computeObligations, canAdvance, asRevenueIndex, answered, UNANSWERED, REVENUE_INDICES,
   type EmployeesAnswer, type RevenueAnswer, type AiUseAnswer,
@@ -597,5 +603,128 @@ describe('the unanswered state cannot be mistaken for an answer', () => {
     // The floor and the ceiling of the same guarantee: nothing answered means nothing asserted, and
     // one answer is enough to produce something. An empty result must be a decision, not a crash.
     expect(computeObligations({ ...UNANSWERED_ALL, jurisdictions: ['eu'] }).length).toBeGreaterThan(0)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AN OPTION LABEL IS DISPLAY. LOGIC USES THE VALUE.
+//
+// Every option on this page is `{ value, label, sub }`: state holds the value (page.tsx:897 for a
+// single-select, :915 for a multi-select, which holds an ARRAY of values), the comparison is
+// `val === opt.value`, and the label is rendered and nothing else. The answer vocabularies at
+// page.tsx:50-55 are types derived from those values, so a gate that read a label would not compile
+// against them.
+//
+// ⚠️ WHY A GUARD FOR SOMETHING THAT IS ALREADY TRUE. The supplier questionnaire had no such separation
+// until 27 Sep 2026: its option prose WAS the stored answer, compared with === in the portal and matched
+// exactly by the assurance map, so rewording an option orphaned every answer given to it and silently
+// changed a verifier-facing state. That cost a migration, a backfill and four SQL files. This page is
+// built the right way round; this test is what keeps it that way while its copy is swept.
+//
+// ⚠️ TWO FILES ARE OUT OF SCOPE, AND ONLY TWO. app/assess/page.tsx declares the labels, and this file
+// necessarily quotes some to assert on them — obligations.test.ts:83 asserts a timing does NOT name a
+// headcount band, and :168 asserts an obligation's `jurisdiction` field, which happens to read the same
+// as an option label.
+//
+// ⚠️ WHAT IT CANNOT CATCH, STATED SO NOBODY RELIES ON IT FURTHER THAN IT REACHES. Thirteen labels are
+// ordinary words — country names, headcount bands, sector names, 'Other' — and they occur all over the
+// tree for unrelated reasons. They are exempt by name below, so a new match on one of THOSE would pass.
+// The list is asserted to be exactly those thirteen, so a fourteenth collision has to be looked at.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Labels that are ordinary vocabulary, with the reason each is expected to occur elsewhere. */
+const SHARED_VOCABULARY: Record<string, string> = {
+  'Other': 'a word in ordinary use; eleven modules have an Other bucket',
+  'Canada': 'a country name, held independently by lib/deals and lib/ghg',
+  'Australia': 'a country name; lib/deals and lib/ghg hold their own country lists',
+  'European Union': 'a region name; lib/deals and lib/materiality name the same region',
+  'United Kingdom': 'a region name; lib/deals names the same jurisdiction independently',
+  'California, USA': 'a place name; /trust names the same jurisdiction',
+  'Not listed': 'lib/ghg/countryPicker uses it for a country that resolves to no factor set',
+  'Financial services': 'a sector name; /dashboard/ai-governance has its own list',
+  'Healthcare': 'a sector name; /dashboard/ai-governance has its own sector list',
+  'Professional services': 'a sector name; /dashboard/ai-governance has its own list',
+  '50–249': 'a headcount band; /dashboard/cyber asks its own size question',
+  '1,000–4,999': 'a headcount band; /dashboard/cyber asks its own size question',
+  '5,000+': 'a headcount band; /dashboard/cyber asks its own size question',
+}
+
+const OUT_OF_SCOPE = ['app/assess/page.tsx', 'app/assess/obligations.test.ts']
+
+function optionLabels(): string[] {
+  const src = readFileSync(join(REPO_ROOT, 'app/assess/page.tsx'), 'utf8')
+  const sf = ts.createSourceFile('page.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let questionsDecl: ts.Node | null = null
+  const find = (n: ts.Node) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === 'questions') questionsDecl = n
+    ts.forEachChild(n, find)
+  }
+  find(sf)
+  expect(questionsDecl, 'the questions array has moved or been renamed').not.toBeNull()
+  const out: string[] = []
+  const visit = (n: ts.Node) => {
+    if (ts.isObjectLiteralExpression(n)) {
+      const get = (k: string) => n.properties.find(p => p.name && p.name.getText() === k)
+      const value = get('value'), label = get('label'), sub = get('sub')
+      // An option is the only object with all three; a question has id/title/sub.
+      if (value && label && sub && ts.isPropertyAssignment(label) && ts.isStringLiteral(label.initializer)) {
+        out.push(label.initializer.text)
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(questionsDecl!)
+  return out
+}
+
+function tsFiles(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(join(REPO_ROOT, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${e.name}`
+    if (e.isDirectory()) tsFiles(rel, out)
+    else if (/\.tsx?$/.test(e.name)) out.push(rel)
+  }
+  return out
+}
+
+describe('option labels are display-only', () => {
+  it('no option label appears as a string literal anywhere else in app/ or lib/', () => {
+    const labels = optionLabels()
+    expect(labels.length, 'the option list has shrunk unexpectedly').toBeGreaterThan(40)
+
+    const offenders: string[] = []
+    for (const rel of [...tsFiles('app'), ...tsFiles('lib')]) {
+      if (OUT_OF_SCOPE.includes(rel)) continue
+      const src = stripTsComments(readFileSync(join(REPO_ROOT, rel), 'utf8'))
+      for (const label of labels) {
+        if (SHARED_VOCABULARY[label]) continue
+        if (src.includes(`'${label}'`) || src.includes(`"${label}"`)) offenders.push(`${rel}: "${label}"`)
+      }
+    }
+    expect(offenders, offenders.length === 0 ? '' :
+      'AN /assess OPTION LABEL APPEARS OUTSIDE THE QUESTIONS ARRAY:\n  ' + offenders.join('\n  ') +
+      '\n\nLABELS ARE DISPLAY-ONLY. Logic must use the option VALUE: state holds it (page.tsx:897, :915), ' +
+      'the comparison is `val === opt.value`, and the answer types at page.tsx:50-55 are derived from the ' +
+      'values. Matching, storing or sending the label means rewording the copy changes behaviour — the ' +
+      'defect the supplier questionnaire needed a data migration to undo. If the string is a coincidence ' +
+      'rather than a copy, add it to SHARED_VOCABULARY with the reason.').toEqual([])
+  })
+
+  it('the shared-vocabulary exemption is exactly these thirteen, and every one still collides', () => {
+    // ⚠️ ASSERTED BOTH WAYS. An exemption that stops colliding is a rule nobody relies on and should be
+    // deleted; a fourteenth collision must be a deliberate edit here, because the alternative is that the
+    // guard quietly stops covering a label.
+    const labels = new Set(optionLabels())
+    for (const label of Object.keys(SHARED_VOCABULARY)) {
+      expect(labels.has(label), `${label} is exempt but is no longer an option label`).toBe(true)
+      expect(SHARED_VOCABULARY[label].length, `${label} needs a reason`).toBeGreaterThan(20)
+      const collides = [...tsFiles('app'), ...tsFiles('lib')]
+        .filter(rel => !OUT_OF_SCOPE.includes(rel))
+        .some(rel => {
+          const src = stripTsComments(readFileSync(join(REPO_ROOT, rel), 'utf8'))
+          return src.includes(`'${label}'`) || src.includes(`"${label}"`)
+        })
+      expect(collides, `${label} no longer occurs elsewhere: delete it from SHARED_VOCABULARY`).toBe(true)
+    }
+    expect(Object.keys(SHARED_VOCABULARY).length).toBe(13)
   })
 })
