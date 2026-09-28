@@ -187,6 +187,13 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
  * gone, not zeroed — the ratchet's own rule. The two blind spots above are what the guard now sees, which
  * is why those files could be finished at all.
  *
+ * ⚠️ app/assess (50) FOLLOWED, AND ITS COPY SOURCES DID NOT. Every lib/ module the page takes copy from is
+ * shared: lib/sb253 (3) with eight other pages, lib/nis2 (3) with /cyber, lib/ifrsS2 (1) with
+ * /climate-risk. lib/obligations (23) looked /assess-only — its only importers are the page and the page's
+ * own submit route — but that route renders an obligation's `name` into an EMAIL
+ * (app/api/assessment/submit/route.ts:360), and the email templates are the pending decision above. All
+ * four stay listed for the shared-lib group.
+ *
  * Both were invisible to a byte match and are counted now, which is the point of the change. A file whose
  * number rose gained nothing: it was always wrong.
  */
@@ -202,7 +209,6 @@ const PENDING_DECISION_PREFIX = 'app/api/'   // every email template
 const GLYPH_COUNT = 73
 
 const SWEEP_BUDGET: Record<string, number> = {
-  'app/assess/page.tsx': 50,
   'app/dashboard/ai-governance/page.tsx': 21,
   'app/dashboard/cbam/disclosures/page.tsx': 14,
   'app/dashboard/cbam/report/exportXlsx.ts': 10,

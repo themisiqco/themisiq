@@ -64,7 +64,9 @@ const answers = (employees: EmployeesAnswer) => ({
 // The CSRD entry carries NO obligationId — deliberately, because no module covers ESRS G1 (see the
 // comment on Obligation.obligationId in page.tsx, and the CSRD absence note in lib/obligations.ts).
 // So it is identified by name, which is the only stable handle it has.
-const CSRD_NAME = 'CSRD / ESRS — Corporate Sustainability Reporting Directive'
+// ⚠️ PAGE COPY, PINNED HERE. It moves when the page's wording moves: the em-dash sweep of 27 Sep 2026
+// turned this separator into a colon, and these three constants are what failed and had to follow.
+const CSRD_NAME = 'CSRD / ESRS: Corporate Sustainability Reporting Directive'
 const findCsrd = (employees: EmployeesAnswer) =>
   computeObligations(answers(employees)).find(o => o.name === CSRD_NAME)
 
@@ -185,8 +187,8 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
   // correctly, since both route to Cyber Governance at the same price — so `ids()` cannot tell them
   // apart, and an `ids(...).toContain('nis2')` assertion passes for either. The two entries differ by
   // NAME, which is also what the results list keys its React children and its expand state on.
-  const NIS2_MAIN = 'EU NIS2 Directive — Network and Information Security'
-  const NIS2_SURVIVING = 'EU NIS2 Directive — duties surviving DORA'
+  const NIS2_MAIN = 'EU NIS2 Directive: Network and Information Security'
+  const NIS2_SURVIVING = 'EU NIS2 Directive: duties surviving DORA'
   const names = (sectors: string[]) => eu(sectors).map(o => o.name)
 
   it('an EU FINANCIAL entity gets DORA and NOT the main NIS2 entry', () => {
@@ -248,7 +250,9 @@ describe('computeObligations — DORA is lex specialis over NIS2', () => {
     expect(surviving.urgency).toBe('medium')
     expect(surviving.urgency_label).toBe('STILL APPLIES')
     // The three things it must land, asserted on the customer-visible string rather than described.
-    expect(surviving.what).toContain('you remain in scope')
+    // Capital Y since the em-dash sweep: `${NIS2_CITATION} — you remain in scope` became two sentences,
+    // because a comma after a citation is a splice and a colon reads as though the citation introduced it.
+    expect(surviving.what).toContain('You remain in scope')
     expect(surviving.what).toContain('does not cease to apply')
     expect(surviving.what).toContain('art. 3(4)')
     // NOT art. 27 — the mislabelled article lib/nis2.ts was written to keep out of this entry.
