@@ -603,7 +603,7 @@ export const TRIGGERS_INACTIVE: { name: string; reason: string }[] = [
 export const THRESHOLD_NOTE =
   'A sub-topic counts as high on the stakeholder side when the share choosing "needs significant ' +
   'strategic focus" is strictly greater than this value, so an even split is not high. The ' +
-  'denominator is substantive responses only — respondents who were asked and gave a rating — and ' +
+  'denominator is substantive responses only: respondents who were asked and gave a rating, and ' +
   'it is printed beside every figure. This is the value snapshotted by the survey round, so a ' +
   'later change to the threshold does not alter a round already run.'
 

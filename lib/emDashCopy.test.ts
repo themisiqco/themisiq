@@ -72,6 +72,19 @@ const emptyValueGlyph = (p: Piece): boolean => p.whole && p.text.trim() === DASH
  */
 const legacyDataKey = (p: Piece): boolean => p.whole && p.property === 'legacyLabel'
 
+/**
+ * A key of LEGACY_STATE_BY_ANSWER in lib/scope3/supplierAssurance.ts is the same kind of thing as a
+ * legacyLabel, and it is exempt for the same reason: it is DATA, matched against what a snapshot holds.
+ *
+ * ⚠️ IT CANNOT EVER BE SWEPT, WHICH IS WHY IT IS NOT A BUDGET. It was budgeted at 3 until 27 Sep 2026, as
+ * though someone would one day get to it. Sweeping one would not tidy a page; it would stop a frozen
+ * supplier_assurance_raw resolving and tell a verifier the supplier gave an off-list answer. A budget
+ * says "not yet"; this says "never".
+ */
+const ASSURANCE_LEGACY_FILE = 'lib/scope3/supplierAssurance.ts'
+const assuranceLegacyKey = (rel: string, p: Piece): boolean =>
+  rel === ASSURANCE_LEGACY_FILE && p.whole && /^(Yes|No) — |^No measurement$/.test(p.text)
+
 const EF_SOURCES_OBJECT = { file: 'lib/ghg/engine.ts', name: 'EF_SOURCES' }
 
 /**
@@ -143,7 +156,8 @@ export function renderedDashes(file: string): number {
     : null
   return pieces(file)
     .filter(p => !(ef && p.pos >= ef[0] && p.pos <= ef[1]))
-    .filter(p => !quotedBullet(file, p) && !emptyValueGlyph(p) && !legacyDataKey(p))
+    .filter(p => !quotedBullet(file, p) && !emptyValueGlyph(p) && !legacyDataKey(p)
+             && !assuranceLegacyKey(file, p))
     .reduce((n, p) => n + (p.text.match(new RegExp(DASH, 'g')) ?? []).length, 0)
 }
 
@@ -187,7 +201,39 @@ export function renderedDashes(file: string): number {
  * from is shared: lib/sb253 (3) with eight other pages, lib/nis2 (3) with /cyber, lib/ifrsS2 (1) with
  * /climate-risk. Those three stay listed for the shared-lib group.
  *
- * ⚠️ AND THEN THE EMAILS, 27 Sep 2026, WHICH TOOK lib/obligations (23) WITH THEM. It was held back one
+ * ⚠️ THE SHARED lib/ COPY WENT NEXT, 27 Sep 2026: 73 dashes across 22 modules, and 19 budget lines with
+ * them. What is left in lib/ is there for a reason, not for want of a sweep:
+ *   · THREE MODULES KEPT A DASH THE SWEEP HAD ALREADY TAKEN, and were put back the same day. Reachability
+ *     from a PDF is not the test; being PRINTED by one is, and these are:
+ *       lib/materiality/severityScale.ts (1) worksheetSubtopicHeading, printed at boardReportPdf.ts:850
+ *         and :922. It renders on app/impact/[token] too, so it cannot be split by surface: one function,
+ *         one string, and the PDF half decides.
+ *       lib/materiality/register.ts (3) NEVER_IN_SURVEY_SCOPE_DETAIL and the TRIGGERS_INACTIVE reason,
+ *         printed at boardReportPdf.ts:1049 and :1055. THRESHOLD_NOTE is the one register string that
+ *         reaches a screen only, and it stayed swept. The detail is ALSO half of a grouping key at
+ *         boardReportPdf.ts:1042 — both sides come from this constant in the same process, so a rewrite
+ *         does not break the grouping, but a `detail` that is keyed on is not display copy.
+ *       lib/ghg/comparability.ts (1) magnitudeText, and this one is not about a PDF at all. Its output is
+ *         STORED, in ghg_inventories.comparability_disclosure.observations, and compared against a
+ *         recompute at the next save (comparability.ts:655). The capture is rehydrated from the stored
+ *         record on page load (app/dashboard/ghg/page.tsx:859) precisely so the next save notices drift —
+ *         so changing the generator would set observationsChanged on every inventory answered before the
+ *         change, and show a verifier the "what was shown / what it says now" divergence block for a
+ *         comma. docs/item-3-comparability-disclosure.md quotes the sentence, and comparability.test.ts
+ *         asserts it eight times; all three move together or not at all.
+ *   · lib/ghg/engine.ts (64), lib/assurancePdf.ts (3), lib/auditTrailNotice.ts (3),
+ *     lib/materiality/boardReport.ts (17), lib/materiality/boardReportPdf.ts (6),
+ *     lib/cbam/report/build.ts (7), lib/cbam/sefa.ts (4), lib/cbam/sefaCompute.ts (1) all feed a PDF or
+ *     an XLSX, where a line break is a layout decision. They are the exports group.
+ *   · lib/cbam/boundaries.ts (17) sits beside a verbatim quotation of Annex II, and its own prose has to
+ *     be told from the instrument's line by line.
+ *   · lib/cbam/readiness.ts (20) has not been read for quoted regulation text yet.
+ *   · lib/flag/estimate.ts (9) is imported by NOTHING but its own test, so its copy reaches no surface.
+ *     Sweeping it would be tidying text no customer can see; it is listed so the question stays open.
+ *   · lib/scope3/supplierAssurance.ts left the budget entirely: its three were match targets, and they
+ *     are exempt above rather than pending.
+ *
+ * ⚠️ AND BEFORE THAT, THE EMAILS, 27 Sep 2026, WHICH TOOK lib/obligations (23) WITH THEM. It was held back one
  * commit because an obligation's `name` travels into the internal notification email; once the templates
  * stopped being exempt, holding it back stopped making sense — the page and the email now read the same
  * statute pairs, with the colon convention /assess uses. 32 dashes across six email-building routes went
@@ -283,40 +329,22 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/assurancePdf.ts': 3,
   'lib/auditTrailNotice.ts': 3,
   'lib/cbam/boundaries.ts': 17,
-  'lib/cbam/cn.ts': 1,
   'lib/cbam/readiness.ts': 20,
   'lib/cbam/report/build.ts': 7,
   'lib/cbam/sefa.ts': 4,
   'lib/cbam/sefaCompute.ts': 1,
-  'lib/emissionFactors/spend.ts': 1,
-  'lib/emissionFactors/spendAdjustment.ts': 1,
   'lib/flag/estimate.ts': 9,
+  // Printed by a PDF, or stored and compared. Put back on 27 Sep 2026 after the shared-lib sweep had
+  // already taken them; the reason each survives is in the header above, per file.
   'lib/ghg/comparability.ts': 1,
-  'lib/ghg/conciergeDocTypes.ts': 2,
   'lib/ghg/engine.ts': 64,
-  'lib/ghg/factorEditions.ts': 2,
-  'lib/ghg/loadSeries.ts': 1,
-  'lib/ghg/series.ts': 4,
-  'lib/ifrsS2.ts': 1,
-  'lib/materiality.ts': 8,
   'lib/materiality/boardReport.ts': 17,
   'lib/materiality/boardReportPdf.ts': 6,
-  'lib/materiality/impactContext.ts': 5,
-  'lib/materiality/iro1.ts': 6,
-  'lib/materiality/register.ts': 5,
-  'lib/materiality/respondentImport.ts': 9,
-  'lib/materiality/severity.ts': 1,
-  'lib/materiality/severityScale.ts': 6,
-  'lib/materiality/versionAgreement.ts': 3,
-  'lib/nis2.ts': 3,
-  'lib/order/invoice.ts': 2,
-  'lib/sb253.ts': 3,
-  'lib/sbti.ts': 9,
-  'lib/scope3/supplierAssurance.ts': 3,
+  'lib/materiality/register.ts': 3,
+  'lib/materiality/severityScale.ts': 1,
   // 107 -> 3 on 27 Sep 2026 with no answer orphaned: 104 were option LABELS, now swept to the comma
   // convention, with the old wording kept beside each as a legacyLabel data key (exempt above). The three
   // left are QUESTION labels, which are ordinary copy and still to sweep.
-  'lib/supply-chain/templates.ts': 3,
 }
 
 /**

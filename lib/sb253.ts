@@ -40,7 +40,7 @@ export const SB253_DATE_STATUS = 'proposed'
 export const SB253_SCOPE3_FROM = '2027'
 
 export const SB253_CITATION =
-  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026 — not yet approved'
+  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026, not yet approved'
 
 // The statute alone, for a slot that needs the instrument but not its history — a directory card,
 // a chip, a table cell. SB261_CITATION is the sibling and is deliberately the same shape.
@@ -57,7 +57,7 @@ export const SB253_PROGRAMME_URL = 'https://ww2.arb.ca.gov/our-work/programs/cal
 // that it is not final, what remains outstanding, and that it has moved — so a reader can judge how
 // much to rely on it rather than being handed a countdown.
 export const SB253_STATUS_SENTENCE =
-  'CARB has proposed 10 November 2026 for the first SB 253 report — Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.'
+  'CARB has proposed 10 November 2026 for the first SB 253 report: Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.'
 
 // For a chip, tag or nav-width slot where the sentence will not fit. Carries the posture in the
 // shortest honest form; if even this does not fit, the surface should name no date.
@@ -72,4 +72,4 @@ export const SB253_POSTURE = 'first report proposed for 10 November 2026, not ye
 // dependent' — i.e. FRAMEWORKS.deadline in lib/ghg/engine.ts, rendered in the GHG export summary
 // beside computed totals under the label "Deadline". Short by necessity, but it must still carry the
 // posture: this was the only sibling naming a specific day, and it named it as settled.
-export const SB253_FRAMEWORK_DEADLINE = '10 Nov 2026 — proposed, not final'
+export const SB253_FRAMEWORK_DEADLINE = '10 Nov 2026: proposed, not final'

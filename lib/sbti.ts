@@ -272,7 +272,7 @@ export function trajectoryPointForYear(trajectory: Point[], year: number): Point
     throw new Error(`trajectoryPointForYear: year must be a finite number (got ${year}).`);
   }
   if (trajectory.length === 0) {
-    throw new Error('trajectoryPointForYear: trajectory is empty — no path to select from (e.g. a deferred intensity trajectory).');
+    throw new Error('trajectoryPointForYear: trajectory is empty: no path to select from (e.g. a deferred intensity trajectory).');
   }
 
   const matches = trajectory.filter(p => p.year === year);
@@ -282,7 +282,7 @@ export function trajectoryPointForYear(trajectory: Point[], year: number): Point
     throw new Error(`trajectoryPointForYear: no point for year ${year} (available range ${first}–${last}).`);
   }
   if (matches.length > 1) {
-    throw new Error(`trajectoryPointForYear: ${matches.length} points found for year ${year} — duplicate-year data integrity violation.`);
+    throw new Error(`trajectoryPointForYear: ${matches.length} points found for year ${year}: duplicate-year data integrity violation.`);
   }
   return matches[0];
 }
@@ -489,13 +489,13 @@ export function requiredScope3Categories(
   const seen = new Set<number>();
   for (const row of scope3Breakdown) {
     if (!Number.isInteger(row.category) || row.category < 1 || row.category > 15) {
-      throw new Error(`requiredScope3Categories: invalid category ${row.category} — must be an integer GHG Protocol Scope 3 category (1–15).`);
+      throw new Error(`requiredScope3Categories: invalid category ${row.category}: must be an integer GHG Protocol Scope 3 category (1–15).`);
     }
     if (!(row.emissions >= 0) || !Number.isFinite(row.emissions)) {
-      throw new Error(`requiredScope3Categories: category ${row.category} has invalid emissions ${row.emissions} — must be a finite, non-negative number.`);
+      throw new Error(`requiredScope3Categories: category ${row.category} has invalid emissions ${row.emissions}: must be a finite, non-negative number.`);
     }
     if (seen.has(row.category)) {
-      throw new Error(`requiredScope3Categories: duplicate category ${row.category} — data-integrity violation (input must have one row per category).`);
+      throw new Error(`requiredScope3Categories: duplicate category ${row.category}: data-integrity violation (input must have one row per category).`);
     }
     seen.add(row.category);
   }
@@ -571,10 +571,10 @@ export function cycleState(input: {
 
   // Integrity guard: cycleStart <= cycleEnd <= renewalDue (string compare = calendar order).
   if (cycle.cycleStart > cycle.cycleEnd) {
-    throw new Error(`cycleState: cycleStart (${cycle.cycleStart}) is after cycleEnd (${cycle.cycleEnd}) — upstream write bug.`);
+    throw new Error(`cycleState: cycleStart (${cycle.cycleStart}) is after cycleEnd (${cycle.cycleEnd}): upstream write bug.`);
   }
   if (cycle.cycleEnd > cycle.renewalDue) {
-    throw new Error(`cycleState: cycleEnd (${cycle.cycleEnd}) is after renewalDue (${cycle.renewalDue}) — upstream write bug.`);
+    throw new Error(`cycleState: cycleEnd (${cycle.cycleEnd}) is after renewalDue (${cycle.renewalDue}): upstream write bug.`);
   }
 
   // Phase — mutually exclusive, evaluated in order (pure string comparison).
@@ -626,7 +626,7 @@ export function flagTargetApplicability(input: {
     throw new Error('flagTargetApplicability: totalS123Emissions must be a finite number > 0 (cannot compute a percentage of zero total).');
   }
   if (flagGrossEmissions > totalS123Emissions) {
-    throw new Error(`flagTargetApplicability: flagGrossEmissions (${flagGrossEmissions}) cannot exceed totalS123Emissions (${totalS123Emissions}) — input error.`);
+    throw new Error(`flagTargetApplicability: flagGrossEmissions (${flagGrossEmissions}) cannot exceed totalS123Emissions (${totalS123Emissions}): input error.`);
   }
 
   // Net-sequestering FLAG inventory: no positive gross emissions to weigh — honest exempt, not a silent 0.
@@ -635,7 +635,7 @@ export function flagTargetApplicability(input: {
       status: 'exempt_below_floor',
       flagPct: 0,
       required: false,
-      reason: 'net-sequestering FLAG inventory (gross < 0); no positive FLAG emissions to trigger materiality — FLAG removals-target rules may still apply (SBTi FLAG v1.2).',
+      reason: 'net-sequestering FLAG inventory (gross < 0); no positive FLAG emissions to trigger materiality: FLAG removals-target rules may still apply (SBTi FLAG v1.2).',
     };
   }
 

@@ -86,7 +86,7 @@ const SCALE_NEGATIVE: ScaleDefinition = {
     { value: 2, label: 'Moderate',
       body: 'Meaningful, and manageable. A real effect on health, income or the local environment, of a kind that can be put right through ordinary work.' },
     { value: 3, label: 'Major',
-      body: 'Serious harm. Lasting damage to health, livelihoods or the environment — the kind a regulator or a journalist would take an interest in.' },
+      body: 'Serious harm. Lasting damage to health, livelihoods or the environment: the kind a regulator or a journalist would take an interest in.' },
     { value: 4, label: 'Severe',
       body: 'Grave harm. Life-changing or life-threatening for the people affected, or irreversible damage to the environment.' },
   ],
@@ -102,7 +102,7 @@ const SCALE_POSITIVE: ScaleDefinition = {
     { value: 2, label: 'Moderate',
       body: 'Meaningful. A real improvement to health, income or the local environment, of a kind ordinary work sustains.' },
     { value: 3, label: 'Major',
-      body: 'Substantial good. A lasting improvement to health, livelihoods or the environment — the kind a regulator or a journalist would take an interest in.' },
+      body: 'Substantial good. A lasting improvement to health, livelihoods or the environment: the kind a regulator or a journalist would take an interest in.' },
     // ⚠️ THE LABEL, NOT ONLY THE DESCRIPTION. "Severe benefit" is incoherent.
     { value: 4, label: 'Transformative',
       body: 'Life-changing for the people affected, or a lasting restoration of the environment.' },
@@ -121,8 +121,8 @@ export const SCOPE: ScaleDefinition = {
   points: [
     { value: 1, label: '', body: 'A few people, or one site.' },
     { value: 2, label: '', body: 'Many people, or several sites.' },
-    { value: 3, label: '', body: 'Widespread — a whole region, or an entire workforce.' },
-    { value: 4, label: '', body: 'Systemic — the whole supply chain or ecosystem.' },
+    { value: 3, label: '', body: 'Widespread: a whole region, or an entire workforce.' },
+    { value: 4, label: '', body: 'Systemic: the whole supply chain or ecosystem.' },
   ],
 }
 
@@ -186,7 +186,7 @@ export function dimensionScale(dim: DimensionKey, direction: Direction): ScaleDe
     case 'irremediability':
       if (direction === 'positive') {
         throw new Error(
-          'Irremediability does not apply to a positive impact (ESRS 1 ¶41) — there is nothing to ' +
+          'Irremediability does not apply to a positive impact (ESRS 1 ¶41): there is nothing to ' +
           'remediate. Reaching this means the ¶41 branching was bypassed upstream.')
       }
       return IRREMEDIABILITY

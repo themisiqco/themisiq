@@ -51,7 +51,7 @@ export const IRO1_FIELDS: readonly Iro1Field[] = [
     limb: 'ESRS 2 IRO-1 ¶35(a)',
     asks: 'A description of the methodologies and assumptions applied in the process, across own '
         + 'operations and the upstream and downstream value chain.',
-    help: 'How you actually went about it — who was involved, what you looked at, and how far up '
+    help: 'How you actually went about it: who was involved, what you looked at, and how far up '
         + 'and down the value chain the exercise reached.',
     short: 'how the assessment covered your value chain',
   },
@@ -62,7 +62,7 @@ export const IRO1_FIELDS: readonly Iro1Field[] = [
     limb: 'ESRS 2 IRO-1 ¶35(b)',
     asks: 'The activities, business relationships, geographies or other factors that give rise to a '
         + 'heightened risk of adverse impacts.',
-    help: 'Not a list of every risk — the places where risk clusters. A single supplier region, a '
+    help: 'Not a list of every risk: the places where risk clusters. A single supplier region, a '
         + 'particular contract type, one production step.',
     short: 'where negative-impact risk is concentrated',
   },
@@ -73,7 +73,7 @@ export const IRO1_FIELDS: readonly Iro1Field[] = [
     limb: 'ESRS 2 IRO-1 ¶35(b)',
     asks: 'How the process considers the prevention, mitigation and remediation of actual and '
         + 'potential adverse impacts.',
-    help: 'How these shaped the ASSESSMENT — whether a topic was judged less severe because it can '
+    help: 'How these shaped the ASSESSMENT: whether a topic was judged less severe because it can '
         + 'be put right, for instance. This is not what you intend to do about a topic; that is a '
         + 'different disclosure and does not belong here.',
     short: 'how remediation entered the judgement',
@@ -84,8 +84,8 @@ export const IRO1_FIELDS: readonly Iro1Field[] = [
     label: 'Link to a due diligence process',
     limb: 'ESRS 2 IRO-1 ¶35(c)',
     asks: 'Whether and how the process was informed by a sustainability due diligence process.',
-    help: 'If you run a due diligence process — supplier screening, human-rights work, a CS3D '
-        + 'programme — say whether it fed this assessment and how. "We have one but it did not '
+    help: 'If you run a due diligence process: supplier screening, human-rights work, a CS3D '
+        + 'programme, say whether it fed this assessment and how. "We have one but it did not '
         + 'feed this" is an answer.',
     short: 'the link to a due diligence process',
   },
@@ -95,7 +95,7 @@ export const IRO1_FIELDS: readonly Iro1Field[] = [
     label: 'Consultation with external experts',
     limb: 'ESRS 2 IRO-1 ¶35(c)',
     asks: 'Whether and how the undertaking consulted external experts.',
-    help: 'Experts consulted on METHOD — a consultancy, a scientific body, a legal adviser. '
+    help: 'Experts consulted on METHOD: a consultancy, a scientific body, a legal adviser. '
         + 'Deliberately not your stakeholder survey: that records affected parties giving their own '
         + 'view, which ¶35 names separately and which this platform already holds.',
     short: 'consultation with external experts',

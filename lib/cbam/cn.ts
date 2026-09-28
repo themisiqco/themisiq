@@ -36,7 +36,7 @@ export function normalizeCn(raw: string): string {
   const stripped = raw.replace(/\s+/g, '');
   if (!/^\d+$/.test(stripped)) {
     throw new Error(
-      `normalizeCn: "${raw}" is not a CN code — after removing whitespace it must contain digits only, ` +
+      `normalizeCn: "${raw}" is not a CN code: after removing whitespace it must contain digits only, ` +
         `but it resolved to "${stripped}". Do not strip or substitute characters to make it parse.`,
     );
   }

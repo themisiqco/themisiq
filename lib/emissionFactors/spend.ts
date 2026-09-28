@@ -206,7 +206,7 @@ export const SPEND_EF_SOURCES: Record<SpendSourceId, SpendFactorSource> = {
       'The multiplier series to use is the DIRECT PLUS INDIRECT greenhouse gas emissions intensity ' +
       'published in catalogue 16-509-X, in tonnes per thousand current dollars of production. ' +
       'That is a multiplier; table 38-10-0097 (Physical flow account for greenhouse gas emissions) ' +
-      'is one of its INPUTS and must not be used in its place — a physical flow account has no ' +
+      'is one of its INPUTS and must not be used in its place: a physical flow account has no ' +
       'monetary denominator, and deriving one from it by pairing with the supply and use tables ' +
       'would make the derivation ours rather than the publisher\'s. Every field above except ' +
       'publisher is null: no statcan.gc.ca page was fetched, so the catalogue edition, its release ' +

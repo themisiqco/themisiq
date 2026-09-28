@@ -446,7 +446,7 @@ export const FACTOR_EDITION_DISCLOSURE: Record<FactorEditionState, { label: stri
   changed: {
     label: 'Emission factors changed between years',
     detail:
-      'Emission factors changed between years — year-over-year movement reflects both operational ' +
+      'Emission factors changed between years: year-over-year movement reflects both operational ' +
       'change and the factor revision. You may wish to consider whether this affects your base-year ' +
       'recalculation policy.',
   },
@@ -458,7 +458,7 @@ export const FACTOR_EDITION_DISCLOSURE: Record<FactorEditionState, { label: stri
   unknown: {
     label: 'Emission-factor editions were not recorded for some years',
     detail:
-      'Emission-factor editions were not recorded for some years — year-over-year comparison cannot ' +
+      'Emission-factor editions were not recorded for some years: year-over-year comparison cannot ' +
       'be confirmed on a consistent factor basis. Years that applied no published emission factor ' +
       'table are not counted here; this refers to years where a published table was applied and the ' +
       'edition was not recorded.',

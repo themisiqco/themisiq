@@ -329,7 +329,7 @@ export function computeSeverity(input: SeverityInput): SeverityResult {
       if (raw !== null && raw !== undefined) {
         throw new SeverityInputError(
           `${d} carries both a value (${JSON.stringify(raw)}) and an abstention. A dimension is ` +
-          `either scored or recorded as "not enough visibility" (§6.1), never both — the database ` +
+          `either scored or recorded as "not enough visibility" (§6.1), never both: the database ` +
           `refuses this combination at the write. Nothing is assumed about which was meant.`,
         )
       }

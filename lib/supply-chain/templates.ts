@@ -293,9 +293,9 @@ export const TEMPLATES: Record<string, { sections: Section[] }> = {
         desc: 'Greenhouse gas emissions, energy use and reduction targets',
         questions: [
           { id: 's3_scope1', type: 'number', label: 'Scope 1 emissions (mt CO₂e)', hint: 'Direct emissions from owned/controlled sources. Enter 0 if not yet measured.' },
-          { id: 's3_scope2_lb', type: 'number', label: 'Scope 2 emissions — location-based (mt CO₂e)', hint: 'Based on grid average emission factors.' },
-          { id: 's3_scope2_mb', type: 'number', label: 'Scope 2 emissions — market-based (mt CO₂e)', hint: 'Based on contractual instruments. Enter 0 if not available.' },
-          { id: 's3_scope3', type: 'number', label: 'Scope 3 emissions — total (mt CO₂e)', hint: 'All value chain emissions combined. Enter 0 if not yet measured.' },
+          { id: 's3_scope2_lb', type: 'number', label: 'Scope 2 emissions: location-based (mt CO₂e)', hint: 'Based on grid average emission factors.' },
+          { id: 's3_scope2_mb', type: 'number', label: 'Scope 2 emissions: market-based (mt CO₂e)', hint: 'Based on contractual instruments. Enter 0 if not available.' },
+          { id: 's3_scope3', type: 'number', label: 'Scope 3 emissions: total (mt CO₂e)', hint: 'All value chain emissions combined. Enter 0 if not yet measured.' },
           { id: 's3cat1_allocated', type: 'number', label: 'Emissions attributable to purchases by your customer (mt CO₂e)', hint: 'Of your total footprint above, the share attributable to the goods/services THIS customer purchased from you this reporting year. This is what feeds their Scope 3 Category 1. Leave blank if you cannot allocate it.' },
           { id: 's3cat1_method', type: 'text', label: 'How did you allocate that figure?', hint: 'e.g. by share of revenue, by units shipped, or by mass. Helps your customer document the method for their auditor.' },
           { id: 's3cat1_quality', type: 'radio', label: 'Basis of the attributable figure', options: [

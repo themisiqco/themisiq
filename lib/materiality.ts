@@ -1124,18 +1124,18 @@ function interpret(kind: ItemKind, label: string, cls: Classification, cells: Sc
   const upside = kind === 'opportunity'
   switch (cls) {
     case 'persistent': {
-      if (upside) return `${label}: relevant across all three futures — a robust opportunity that does not depend on the policy path.`
+      if (upside) return `${label}: relevant across all three futures. A robust opportunity that does not depend on the policy path.`
       const pB = bandWord(paris?.band), hB = bandWord(high?.band)
       const bandPhrase = pB === hB ? `${pB} under every pathway` : `${pB} under the Paris-aligned pathway and ${hB} under high warming`
       const rising = (high?.score ?? 0) > (paris?.score ?? 0)
       return kind === 'physical'
-        ? `${label}: material across all three futures (${bandPhrase}) — a persistent physical exposure that ${rising ? 'intensifies as warming increases' : 'stays broadly level across the range'}.`
-        : `${label}: material across all three futures (${bandPhrase}) — a persistent transition exposure, most acute under the Paris-aligned, rapid-policy pathway and ${rising ? 'rising with warming' : 'easing as policy ambition weakens'}.`
+        ? `${label}: material across all three futures (${bandPhrase}). A persistent physical exposure that ${rising ? 'intensifies as warming increases' : 'stays broadly level across the range'}.`
+        : `${label}: material across all three futures (${bandPhrase}). A persistent transition exposure, most acute under the Paris-aligned, rapid-policy pathway and ${rising ? 'rising with warming' : 'easing as policy ambition weakens'}.`
     }
     case 'warming-contingent':
       return upside
         ? `${label}: strengthens under higher-warming futures (${bandWord(high?.band)} at ~4.4°C vs ${bandWord(paris?.band)} at ~1.8°C).`
-        : `${label}: rises with warming — ${bandWord(high?.band)} under the high-warming pathway vs ${bandWord(paris?.band)} under the Paris-aligned one. Exposure is driven by physical climate change.`
+        : `${label}: rises with warming, ${bandWord(high?.band)} under the high-warming pathway vs ${bandWord(paris?.band)} under the Paris-aligned one. Exposure is driven by physical climate change.`
     case 'policy-path-contingent':
       return upside
         ? `${label}: strengthens under faster-transition futures (${bandWord(paris?.band)} under the Paris-aligned pathway), i.e. it is unlocked by rapid decarbonisation.`
@@ -1228,7 +1228,7 @@ function computeResilience(
   // Assemble the qualitative statement from the rule outputs.
   const parts: string[] = []
   if (robustExposures.length) {
-    parts.push(`Across all three futures, ${joinList(robustExposures)} ${robustExposures.length === 1 ? 'remains a material risk — a robust exposure that warrants' : 'remain material risks — robust exposures that warrant'} attention regardless of the policy path.`)
+    parts.push(`Across all three futures, ${joinList(robustExposures)} ${robustExposures.length === 1 ? 'remains a material risk: a robust exposure that warrants' : 'remain material risks: robust exposures that warrant'} attention regardless of the policy path.`)
   } else {
     parts.push(`No single risk is material across all three futures, indicating exposures are scenario-dependent rather than structural.`)
   }
@@ -1243,12 +1243,12 @@ function computeResilience(
   if (warmingContingent.length) parts.push(`${joinList(warmingContingent)} ${warmingContingent.length === 1 ? 'rises' : 'rise'} with warming, biting hardest under the high-warming pathway (physical-risk driven).`)
   if (policyContingent.length) parts.push(`${joinList(policyContingent)} ${policyContingent.length === 1 ? 'is' : 'are'} most material under the Paris-aligned pathway, indicating sensitivity to the speed of decarbonisation policy rather than to warming itself.`)
   parts.push(
-    twoChannel === 'both' ? `The business faces meaningful stress under both transition-led and physical-led futures — resilience requires preparing for either rather than betting on a single pathway.`
+    twoChannel === 'both' ? `The business faces meaningful stress under both transition-led and physical-led futures: resilience requires preparing for either rather than betting on a single pathway.`
     : twoChannel === 'physical-led' ? `Stress is concentrated in higher-warming (physical-risk) futures.`
     : twoChannel === 'transition-led' ? `Stress is concentrated in rapid-policy (transition-risk) futures.`
     : `Risk exposure is limited across the range tested.`
   )
-  parts.push(`Measured on band severity, the risk profile shows a ${magnitude} shift across scenarios${inverts ? ' — driven by the inversion above rather than by any change in the number of material risks' : ''} (${parisRiskCount} material risk${parisRiskCount === 1 ? '' : 's'} under the Paris-aligned pathway, ${highRiskCount} under high warming)${!inverts && magnitude === 'limited' ? ', suggesting a relatively stable profile at screening level' : magnitude === 'large' ? ', so outcomes are materially scenario-dependent' : ''}.`)
+  parts.push(`Measured on band severity, the risk profile shows a ${magnitude} shift across scenarios${inverts ? ', driven by the inversion above rather than by any change in the number of material risks' : ''} (${parisRiskCount} material risk${parisRiskCount === 1 ? '' : 's'} under the Paris-aligned pathway, ${highRiskCount} under high warming)${!inverts && magnitude === 'limited' ? ', suggesting a relatively stable profile at screening level' : magnitude === 'large' ? ', so outcomes are materially scenario-dependent' : ''}.`)
   if (horizonTrend === 'rises') parts.push(`Exposure also tends to increase over the longer time horizon (toward 2050).`)
   parts.push(`This is a screening-level resilience read; the final determination of strategic resilience is a matter for management judgement, informed by entity-specific data.`)
 

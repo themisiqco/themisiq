@@ -47,14 +47,14 @@ describe('impactContext -- the option lists match their CHECK constraints', () =
 describe('impactContext -- label lookup never leaks a raw code', () => {
   it('5 valueChainLabel resolves every valid code', () => {
     expect(valueChainLabel('own_operations')).toBe('Our own operations')
-    expect(valueChainLabel('upstream')).toBe('Upstream — our suppliers')
-    expect(valueChainLabel('downstream')).toBe('Downstream — our customers and products')
+    expect(valueChainLabel('upstream')).toBe('Upstream, our suppliers')
+    expect(valueChainLabel('downstream')).toBe('Downstream, our customers and products')
   })
 
   it('6 timeHorizonLabel resolves every valid code', () => {
-    expect(timeHorizonLabel('short')).toBe('Short — within a year')
-    expect(timeHorizonLabel('medium')).toBe('Medium — one to five years')
-    expect(timeHorizonLabel('long')).toBe('Long — more than five years')
+    expect(timeHorizonLabel('short')).toBe('Short, within a year')
+    expect(timeHorizonLabel('medium')).toBe('Medium, one to five years')
+    expect(timeHorizonLabel('long')).toBe('Long, more than five years')
   })
 
   it('7 an UNRECOGNISED code returns null, NOT the code itself', () => {
@@ -76,20 +76,21 @@ describe('impactContext -- label lookup never leaks a raw code', () => {
   })
 
   it('9 the labels are EXACTLY what the two forms were already showing', () => {
-    // ⚠️ THE EXTRACTION CHECK. Copied from the deployed strings, not re-typed from the spec — which
-    // differs trivially ("Upstream, our suppliers" with a comma). These are customer-facing copy
-    // already in front of contributors, so the move had to be lossless, and this is what says it
-    // was. \u2014 is an EM dash (U+2014), written as an escape here so a copy-paste through a
-    // terminal cannot silently substitute a hyphen and make this test pass against wrong copy.
+    // ⚠️ THE EXTRACTION CHECK. It was copied from the deployed strings, which used an EM DASH where the
+    // spec had always used a comma ("Upstream, our suppliers"). The em-dash sweep of 27 Sep 2026 moved
+    // the deployed copy onto the comma, so these labels now match the spec as well as the screen — the
+    // drift the original note recorded as "differs trivially" is closed.
+    //
+    // These are customer-facing copy already in front of contributors, so this pins what they see.
     expect(VALUE_CHAIN_POSITIONS).toEqual([
       { code: 'own_operations', label: 'Our own operations' },
-      { code: 'upstream', label: 'Upstream \u2014 our suppliers' },
-      { code: 'downstream', label: 'Downstream \u2014 our customers and products' },
+      { code: 'upstream', label: 'Upstream, our suppliers' },
+      { code: 'downstream', label: 'Downstream, our customers and products' },
     ])
     expect(TIME_HORIZONS).toEqual([
-      { code: 'short', label: 'Short \u2014 within a year' },
-      { code: 'medium', label: 'Medium \u2014 one to five years' },
-      { code: 'long', label: 'Long \u2014 more than five years' },
+      { code: 'short', label: 'Short, within a year' },
+      { code: 'medium', label: 'Medium, one to five years' },
+      { code: 'long', label: 'Long, more than five years' },
     ])
   })
 })

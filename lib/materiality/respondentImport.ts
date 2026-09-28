@@ -160,13 +160,13 @@ export const isReady = (r: ImportRow) =>
 
 export function problemText(p: RowProblem, r: ImportRow): string {
   switch (p) {
-    case 'no_email':            return 'No email address — there would be nothing to send to.'
+    case 'no_email':            return 'No email address: there would be nothing to send to.'
     case 'bad_email':           return `“${r.email}” does not look like an email address.`
-    case 'no_name':             return 'No name — the respondent sees this as “Completing as”.'
+    case 'no_name':             return 'No name: the respondent sees this as “Completing as”.'
     case 'duplicate_existing':  return 'Already invited to this round.'
     case 'duplicate_in_file':   return 'Appears more than once in this file.'
-    case 'unmatched_category':  return `“${r.rawCategory}” is not a stakeholder category — choose one below.`
-    case 'name_is_a_pasted_row': return `The name cell contains more than a name — “${r.name}”. It looks like a whole row pasted into one cell. Fix it in your file and upload again; it is not split automatically, because guessing which part is the name would put the wrong text in this person’s invitation.`
+    case 'unmatched_category':  return `“${r.rawCategory}” is not a stakeholder category: choose one below.`
+    case 'name_is_a_pasted_row': return `The name cell contains more than a name: “${r.name}”. It looks like a whole row pasted into one cell. Fix it in your file and upload again; it is not split automatically, because guessing which part is the name would put the wrong text in this person’s invitation.`
   }
 }
 
@@ -225,7 +225,7 @@ export function categoryReference(
         ? 'Asked about conditions in your own workforce.'
         : c.labour_routing === 's2'
           ? 'Asked about conditions in their own organisation’s workforce, not yours.'
-          : 'Not asked the workforce topics — they cannot observe either workforce.',
+          : 'Not asked the workforce topics: they cannot observe either workforce.',
   }))
 }
 
@@ -238,12 +238,12 @@ export function categoryReference(
 
 /** Screen only — it says "here", which is meaningless in a downloaded file. */
 export const CATEGORY_COLUMNS_LINE =
-  'Three columns: name, email, and category. Fill the category column in or leave it blank — ' +
+  'Three columns: name, email, and category. Fill the category column in or leave it blank: ' +
   'you’ll confirm every person’s category here either way.'
 
 /** Template file only — "in ThemisIQ", because the reader is not looking at the screen. */
 export const CATEGORY_COLUMNS_LINE_FILE =
-  'Fill the category column in or leave it blank — you’ll confirm every person’s category in ' +
+  'Fill the category column in or leave it blank: you’ll confirm every person’s category in ' +
   'ThemisIQ either way.'
 
 /**
@@ -254,7 +254,7 @@ export const CATEGORY_COLUMNS_LINE_FILE =
  * dropdown exists, the file says this instead of implying the cell is guarded.
  */
 export const CATEGORY_TYPE_EXACTLY =
-  'If you fill the category column in, type a code from the list below EXACTLY as it appears — ' +
+  'If you fill the category column in, type a code from the list below EXACTLY as it appears: ' +
   'there is no dropdown in this file to check it for you. Anything unrecognised is not guessed at: ' +
   'it comes back for you to set in ThemisIQ.'
 
@@ -266,7 +266,7 @@ export const CATEGORY_TYPE_EXACTLY =
  * evidence about the undertaking.
  */
 export const CATEGORY_MEANING =
-  'A person’s category is their relationship to the company — your own employee, a contact at a ' +
+  'A person’s category is their relationship to the company: your own employee, a contact at a ' +
   'supplier, a customer, someone from a community near your sites. It decides which questions they ' +
   'see: people who can observe a workforce are asked about workforce conditions, and people who ' +
   'cannot are not asked at all rather than being recorded as having no view.'

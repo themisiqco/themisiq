@@ -333,19 +333,19 @@ export function describeYearStatus(y: SeriesYear): string | null {
         if (e.kind === "country") {
           // The shared sentence, trimmed of its trailing "Nothing from this location is included
           // in any total on this report." clause: this list already says that once, for all of them.
-          return `${e.locationName} — ${countryRefusalLabel(e.refusal).toLowerCase()}`;
+          return `${e.locationName}: ${countryRefusalLabel(e.refusal).toLowerCase()}`;
         }
         const country = COUNTRY_WORDS[e.country] ?? (e.country === "(unset)" ? "no country" : e.country);
         const unit = UNIT_WORDS[e.unit] ?? e.unit;
         const fuel = FUEL_WORDS[e.fuel] ?? e.fuel.replace(/_/g, " ");
-        return `${e.locationName} — its ${fuel} figure is in ${unit}, which we can't work out for ${country}`;
+        return `${e.locationName}: its ${fuel} figure is in ${unit}, which we can't work out for ${country}`;
       })
       .join("; ");
     const n = ex.length;
     return `${y.year} isn't shown: ${n} location${n === 1 ? " was" : "s were"} left out of that year's figures${detail ? ` (${detail})` : ""}. The rest of that year was measured normally, but a total missing a site can't be compared with one that isn't.`;
   }
 
-  return `${y.year} isn't shown: we can't confirm its figures are complete${y.unverifiableReason ? ` — ${y.unverifiableReason}` : ""}. We'd rather leave a gap than plot a number we can't stand behind.`;
+  return `${y.year} isn't shown: we can't confirm its figures are complete${y.unverifiableReason ? `: ${y.unverifiableReason}` : ""}. We'd rather leave a gap than plot a number we can't stand behind.`;
 }
 
 // ── SCOPE 3 COVERAGE, IN WORDS ──────────────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ export function scope3CoverageLabel(y: Pick<SeriesYear, "scope3InTotal" | "scope
 export function describeScope3Basis(y: SeriesYear): string | null {
   switch (y.scope3Basis) {
     case "covers_nothing":
-      return `${y.year} has a saved Scope 3 inventory that counts no categories yet — none has been answered relevant and calculated, so there is no Scope 3 figure to show for that year. It is not a missing record.`;
+      return `${y.year} has a saved Scope 3 inventory that counts no categories yet: none has been answered relevant and calculated, so there is no Scope 3 figure to show for that year. It is not a missing record.`;
     case "not_recorded":
       return `${y.year}'s Scope 3 figure is shown as it was saved. What it covers was not recorded, so it cannot be compared category by category with a later year.`;
     default:

@@ -83,7 +83,7 @@ export const IFRS_S2_SHORT = 'IFRS S2 · adopted jurisdiction by jurisdiction'
 // flattening those three is how the old six-jurisdiction list misled. Ends by handing the question
 // back to the reader, since this file cannot know where they report.
 export const IFRS_S2_STATUS_SENTENCE =
-  'IFRS S2 is not law by itself: the ISSB issues the standard and each jurisdiction decides whether and how to adopt it, so what you owe depends on where you report. Australia’s regime is mandatory and running. The UK has endorsed the standards as UK SRS S1 and S2, published 25 February 2026 for voluntary use, with the FCA proposing mandatory reporting for certain listed companies from 1 January 2027. The EU does not apply IFRS S2 — CSRD requires ESRS, which is interoperable with it but separate. Confirm the position in each jurisdiction where you report.'
+  'IFRS S2 is not law by itself: the ISSB issues the standard and each jurisdiction decides whether and how to adopt it, so what you owe depends on where you report. Australia’s regime is mandatory and running. The UK has endorsed the standards as UK SRS S1 and S2, published 25 February 2026 for voluntary use, with the FCA proposing mandatory reporting for certain listed companies from 1 January 2027. The EU does not apply IFRS S2: CSRD requires ESRS, which is interoperable with it but separate. Confirm the position in each jurisdiction where you report.'
 
 // ── OPEN: THE TWO SURFACES DISAGREE ABOUT WHO IFRS S2 REACHES ────────────────────────────────────
 //

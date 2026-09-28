@@ -53,7 +53,7 @@ export const NIS2_CITATION = 'Directive (EU) 2022/2555 (NIS2)'
 // Member States have finished is a claim with a clock on it, and this slot cannot carry an as-of
 // date. Reads as a sibling to CSRD's 'In force (scope simplified by Omnibus)' rather than to DORA's
 // 'Active since 17 January 2025', and that difference is the point.
-export const NIS2_TIMING = 'Applies through national law — transposition deadline was 17 October 2024'
+export const NIS2_TIMING = 'Applies through national law: transposition deadline was 17 October 2024'
 
 // The scope test, as prose for a body slot. BOTH LIMBS TOGETHER, because either alone over-calls:
 // sector without size catches a two-person consultancy, size without sector catches a large retailer
@@ -71,7 +71,7 @@ export const NIS2_TIMING = 'Applies through national law — transposition deadl
 // applies it to the reader. EVERY CONSTANT HERE HAS TO READ BOTH WAYS, since none controls where it
 // is rendered — check the composed output, not the literal.
 export const NIS2_SIZE_TEST =
-  'The Directive applies to entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds — 50 or more staff, or EUR 10,000,000 or more turnover.'
+  'The Directive applies to entities in an Annex I or Annex II sector that exceed the medium-enterprise thresholds: 50 or more staff, or EUR 10,000,000 or more turnover.'
 
 // WHAT DORA ACTUALLY DISPLACES, and — the load-bearing half — what it does not. Art. 4(1) disapplies
 // the RELEVANT PROVISIONS of the Directive to entities covered by a sector-specific Union act
@@ -99,7 +99,7 @@ export const NIS2_DORA_CARVE_OUT =
 // article number here on purpose: art. 21 and art. 23 are the two this file has verified, and
 // guessing a third is the exact move the header forbids.
 export const NIS2_CORE_DUTIES =
-  'Board-level accountability, cybersecurity risk-management measures under art. 21, and incident notification under art. 23 — a 24-hour early warning followed by a 72-hour notification.'
+  'Board-level accountability, cybersecurity risk-management measures under art. 21, and incident notification under art. 23: a 24-hour early warning followed by a 72-hour notification.'
 
 // THE DUTY THAT SURVIVES FOR A DORA FINANCIAL ENTITY. Art. 3(4), not art. 27 — see the secondary-
 // source warning at the head of this file, which exists because this is exactly the constant that

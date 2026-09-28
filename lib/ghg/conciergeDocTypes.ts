@@ -90,7 +90,7 @@ export const docTypeIsReadable = (docType: string): boolean =>
 // read (right), or quietly drop anything inconvenient (wrong). A stated reason separates them.
 export const JUDGEMENT_EXCLUDED: Record<string, string> = {
   service_record:
-    'Refrigerant accounting is a judgement call — Tier-2/3 method choice, leak and top-up assumptions — ' +
+    'Refrigerant accounting is a judgement call (Tier-2/3 method choice, leak and top-up assumptions) ' +
     'not a figure to lift off a page. A confident-looking number here would be worse than a blank.',
   renewable_cert:
     'A REC or PPA certificate states kWh CERTIFICATED, which is not kWh consumed. The extractor could ' +

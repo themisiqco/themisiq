@@ -41,8 +41,8 @@ export type CodedLabel = { code: string; label: string }
  */
 export const VALUE_CHAIN_POSITIONS: readonly CodedLabel[] = [
   { code: 'own_operations', label: 'Our own operations' },
-  { code: 'upstream', label: 'Upstream — our suppliers' },
-  { code: 'downstream', label: 'Downstream — our customers and products' },
+  { code: 'upstream', label: 'Upstream, our suppliers' },
+  { code: 'downstream', label: 'Downstream, our customers and products' },
 ] as const
 
 /**
@@ -59,9 +59,9 @@ export const VALUE_CHAIN_POSITIONS: readonly CodedLabel[] = [
  * Reviving it for the report means first tying the horizon to the reporting period.
  */
 export const TIME_HORIZONS: readonly CodedLabel[] = [
-  { code: 'short', label: 'Short — within a year' },
-  { code: 'medium', label: 'Medium — one to five years' },
-  { code: 'long', label: 'Long — more than five years' },
+  { code: 'short', label: 'Short, within a year' },
+  { code: 'medium', label: 'Medium, one to five years' },
+  { code: 'long', label: 'Long, more than five years' },
 ] as const
 
 /**

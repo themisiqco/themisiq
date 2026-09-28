@@ -50,7 +50,7 @@ export type SaveError = { code?: string | null; message?: string | null }
  * box — a failure that looks like nothing happened. An empty result is a result.
  */
 const NO_REASON =
-  'It was not saved, and the server gave no reason. Nothing is recorded — try again, and tell us if '
+  'It was not saved, and the server gave no reason. Nothing is recorded: try again, and tell us if '
   + 'it keeps happening.'
 
 const PREPARER =
@@ -61,13 +61,13 @@ const PREPARER =
 const CONTRIBUTOR =
   'Your answer was not saved. This assessment now states a different version of the ESRS standards '
   + 'from the one your part was set up under, and the two have to agree before determinations can '
-  + 'be recorded. Tell whoever sent you this link — they can correct it on the assessment itself. '
+  + 'be recorded. Tell whoever sent you this link: they can correct it on the assessment itself. '
   + 'Reloading this page will not clear it.'
 
 const ASSESSMENT_STALE =
   'The ESRS version was not changed. This assessment already holds recorded determinations keyed to '
   + 'the version it currently states, so moving it would leave that work behind. This page was '
-  + 'showing an earlier state — reload it to see what is actually recorded.'
+  + 'showing an earlier state: reload it to see what is actually recorded.'
 
 /** Everything else returns the server's own sentence: a ¶41 refusal says it better than a wrapper. */
 function verbatim(err: SaveError): string {

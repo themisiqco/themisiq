@@ -136,7 +136,7 @@ export function assessCompleteness(workings: unknown, locationsData: unknown): C
       return {
         dataStatus: "unverifiable",
         exclusions: null,
-        unverifiableReason: `${unpriceable.length} location${unpriceable.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out, and this year was saved before we started recording that — so we can't tell whether its figures include them`,
+        unverifiableReason: `${unpriceable.length} location${unpriceable.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out, and this year was saved before we started recording that, so we can't tell whether its figures include them`,
       };
     }
   } catch {

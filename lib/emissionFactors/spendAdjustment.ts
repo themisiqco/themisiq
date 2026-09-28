@@ -275,7 +275,7 @@ export function assertSingleFactorBasisConversion(adjustments: readonly SpendAdj
       .join('; ')
     throw new Error(
       `assertSingleFactorBasisConversion: ${priceYear.length} price-year transformations on one ` +
-      `figure. Each carries a CPI ratio and applying two multiplies it in twice — for Germany ` +
+      `figure. Each carries a CPI ratio and applying two multiplies it in twice, for Germany ` +
       `2019-2024 that is 1.43 rather than 1.195, a ~20% overstatement that looks entirely ` +
       `plausible. Apply exactly one. Found: ${named}`,
     )

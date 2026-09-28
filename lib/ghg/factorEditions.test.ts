@@ -664,22 +664,24 @@ describe('the trends page renders a DISTINCT output for each state', () => {
 
   it('G10 the copy is EXACTLY as specified, in one place, and label is detail\'s opening clause', () => {
     expect(FACTOR_EDITION_DISCLOSURE.changed!.detail).toBe(
-      'Emission factors changed between years — year-over-year movement reflects both operational ' +
+      'Emission factors changed between years: year-over-year movement reflects both operational ' +
       'change and the factor revision. You may wish to consider whether this affects your base-year ' +
       'recalculation policy.')
     // The trailing sentence was added when years with nothing to record stopped being counted here:
     // without it, 'some years' invited a customer to go looking for a year that has no gap in it.
     expect(FACTOR_EDITION_DISCLOSURE.unknown!.detail).toBe(
-      'Emission-factor editions were not recorded for some years — year-over-year comparison cannot ' +
+      'Emission-factor editions were not recorded for some years: year-over-year comparison cannot ' +
       'be confirmed on a consistent factor basis. Years that applied no published emission factor ' +
       'table are not counted here; this refers to years where a published table was applied and the ' +
       'edition was not recorded.')
 
-    // NOT A PARAPHRASE AND NOT A TRUNCATION: the label is the detail up to the em dash, verbatim, so
-    // the strip can never come to say something the panel below it does not.
+    // NOT A PARAPHRASE AND NOT A TRUNCATION: the label is the detail up to the separator, verbatim, so
+    // the strip can never come to say something the panel below it does not. The separator was an em
+    // dash until the sweep of 27 Sep 2026 and is a colon now; the relationship is what matters, and it
+    // is asserted here rather than computed in the module.
     for (const st of ['changed', 'unknown'] as const) {
       const d = FACTOR_EDITION_DISCLOSURE[st]!
-      expect(d.detail.startsWith(d.label + ' —'), `${st}: label must open detail verbatim`).toBe(true)
+      expect(d.detail.startsWith(d.label + ':'), `${st}: label must open detail verbatim`).toBe(true)
       expect(d.label, 'a strip label this long defeats the point').not.toContain('—')
     }
   })
