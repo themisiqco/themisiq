@@ -290,12 +290,15 @@ function GHGBot({ currentStep }: { currentStep: number }) {
 // and is NOT survivable over inputs — it strands whatever they typed behind a sheet of glass.
 // Rendering this in place of a fresh wizard means there is never any typed work to strand.
 //
-// THE COPY PROMISES NOTHING THE PRODUCT CANNOT HONOUR. It does not say work is preserved: on the
-// 'none' path there is nothing saved yet and nothing to preserve, and on the 'expired' path the
-// saved inventories are still readable, which is what it says instead. 'unknown' is not
-// merged into either — a read that failed is reported as a read that failed, with a retry,
-// rather than as a purchase the customer has not made.
-function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired' | 'none' | 'unknown'> }) {
+// THE COPY PROMISES NOTHING THE PRODUCT CANNOT HONOUR. On the 'expired' path the saved inventories
+// are still readable, which is what it says instead of promising preserved work. 'unknown' is not
+// merged into it: a read that failed is reported as a read that failed, with a retry, rather than as
+// a purchase the customer has not made.
+//
+// ⚠️ 'none' IS NOT IN THIS UNION ANY MORE. A visitor with no GHG row gets the wizard, not this wall.
+// See the entry gate for why. The union is narrowed rather than left holding an unreachable arm, so
+// that restoring the 'none' wall is a compile error here rather than a silent copy revival.
+function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired' | 'unknown'> }) {
   const copy = {
     expired: {
       title: 'Your GHG access has expired.',
@@ -303,13 +306,6 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
       cta: 'Renew GHG →',
       href: '/pricing?modules=ghg',
       secondary: { label: 'View your inventories', href: '/dashboard/ghg?view=list' },
-    },
-    none: {
-      title: 'Saving an inventory needs the GHG module.',
-      body: 'You can price it up in a couple of minutes. Once it is on your account, everything you enter here saves as you go, and stays available for the whole of your reporting year.',
-      cta: 'See GHG pricing →',
-      href: '/pricing?modules=ghg',
-      secondary: { label: 'Back to dashboard', href: '/dashboard' },
     },
     unknown: {
       title: 'We could not check your GHG access.',
@@ -610,30 +606,40 @@ const searchParams = useSearchParams()
     const loadId = searchParams.get('id')
     const viewParam = searchParams.get('view')
     if (loadId) { setMode('wizard'); return }
+    // ⚠️ THE DRAFT IS READ BEFORE THE SESSION, NOT AFTER, SINCE 'none' STOPPED WALLING. The old ordering
+    // was sound while a draft could only exist because handleSave had bounced someone to /login: by the
+    // time it mattered there was a session. handleSave now stashes for a SIGNED-OUT visitor and sends
+    // them to /pricing, so the person who comes back to this page is the one whose draft this is, and
+    // they are still signed out. Reading it after the session check would paint them a blank wizard
+    // while their figures sat in localStorage, and the alert that sent them there promises otherwise.
+    //
+    // IT DOES NOT FIGHT A FORM IN PROGRESS. This effect keys on [searchParams], so it runs on mount
+    // against an empty form, and clearGhgDraft() below makes any later run find nothing.
+    //
+    // STILL AHEAD OF THE LIST AND TRENDS PATHS, which is what it was before and for the same reason: a
+    // returning customer with saved inventories must get the work they were in the middle of, not a
+    // redirect to /trends.
+    const draft = readGhgDraft()
+    if (draft) {
+      // Merged OVER the defaults, never the reverse: a field the draft omits keeps the value the form
+      // already had. locations is spread over emptyLocation() the same way, so a location missing a
+      // field gets that field's default rather than undefined.
+      setInventory(prev => ({
+        ...prev,
+        ...draft,
+        locations: draft.locations
+          ? draft.locations.map((l, i) => ({ ...emptyLocation(String(i + 1), `Location ${i + 1}`), ...(l as object) }))
+          : prev.locations,
+      }))
+      // Cleared on RESTORE, not on save: see the note in lib/ghg/draft.ts. Leaving it would restore
+      // stale figures over a later edit on the next reload.
+      clearGhgDraft()
+      setDirty(true)   // it is unsaved work: the Save button must not read as already saved
+      setMode('wizard')
+      return
+    }
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { setMode('wizard'); return }
-      // ⚠️ THE RESTORE RUNS FOR A SIGNED-IN VISITOR, NOT A SIGNED-OUT ONE, AND THE ORDER IS THE POINT. A
-      // draft only exists because someone was bounced to /login by handleSave, so by the time it matters
-      // there IS a session. Restoring while signed out would also fight the form they are still typing in.
-      const draft = readGhgDraft()
-      if (draft) {
-        // Merged OVER the defaults, never the reverse: a field the draft omits keeps the value the form
-        // already had. locations is spread over emptyLocation() the same way, so a location missing a
-        // field gets that field's default rather than undefined.
-        setInventory(prev => ({
-          ...prev,
-          ...draft,
-          locations: draft.locations
-            ? draft.locations.map((l, i) => ({ ...emptyLocation(String(i + 1), `Location ${i + 1}`), ...(l as object) }))
-            : prev.locations,
-        }))
-        // Cleared on RESTORE, not on save — see the note in lib/ghg/draft.ts. Leaving it would restore
-        // stale figures over a later edit on the next reload.
-        clearGhgDraft()
-        setDirty(true)   // it is unsaved work: the Save button must not read as already saved
-        setMode('wizard')
-        return
-      }
       const { data } = await supabase
         .from('ghg_inventories')
         .select('id, company_name, reporting_year, updated_at')
@@ -1460,17 +1466,33 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // error. Found 26 Sep 2026 while checking whether copy promising "sign in when you save it" was true.
     //
     // ⚠️ THE STASH HAPPENS BEFORE THE ALERT, NOT AFTER. An alert is modal but a visitor can dismiss it and
-    // navigate; writing first means the draft is safe even if they never reach /login. Same ordering as
-    // lib/checkout.ts's unauthenticated branch: stash the intent, then move.
+    // navigate; writing first means the draft is safe even if they never reach /pricing. Same ordering
+    // as lib/checkout.ts's unauthenticated branch: stash the intent, then move.
     //
     // ⚠️ AND THE ALERT IS DELIBERATE, NOT LAZINESS. This function navigates immediately afterwards, so an
     // inline notice would be painted and destroyed in the same tick. alert() is the only thing that
     // reliably reaches the reader before a redirect, and this file already uses it for four other save
     // failures, so it is the register a Save failure speaks in here.
-    if (!session) {
-      saveGhgDraft(inventory, { anon: true })
-      alert('Sign in to save your inventory. Your figures will be kept while you do.')
-      window.location.href = `/login?next=${encodeURIComponent('/dashboard/ghg')}`
+    //
+    // ⚠️ ONE MESSAGE, TWO POPULATIONS, AND NEITHER GOES TO /login. A signed-out visitor and a signed-in
+    // one with no GHG row both need the same thing, the module, so both go to pricing. Sending the
+    // signed-out one to /login asks them to make an account before they know what it costs; sending the
+    // 'none' one there asks them to sign in when they already are. The copy says "choose a plan" rather
+    // than "sign up" for the same reason: one of the two readers already has an account.
+    //
+    // ⚠️ THE 'none' BRANCH RETURNS BEFORE THE COMPANIES LOOKUP, NOT MERELY BEFORE THE INVENTORY INSERT.
+    // enforce_ghg_location_allowance() refuses the ghg_inventories write, but NOTHING refuses the
+    // companies insert below, so falling through would leave an orphan company row behind on every
+    // refused Save: a row the customer never asked for, created by a Save that failed.
+    //
+    // ⚠️ `anon: !session`, NOT A HARDCODED true. lib/drafts.ts expires an anonymous draft two hours
+    // after it was WRITTEN, whoever later reads it, and does not expire a signed-in one. A signed-in
+    // 'none' visitor is a customer with working state, not a stranger, so stamping them anonymous would
+    // bin their figures two hours into a purchase decision.
+    if (!session || ghgAccess === 'none') {
+      saveGhgDraft(inventory, { anon: !session })
+      alert('Saving needs the GHG module. Your figures will be kept while you choose a plan.')
+      window.location.href = '/pricing?modules=ghg'
       return
     }
     // Resolve the company_id for this inventory's company_name.
@@ -2493,9 +2515,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         {/* Scope 3 is calculated from THIS inventory's energy, so the way to it belongs where the
             customer is reading those figures. One control, one rule: lib/moduleLinks.ts. */}
         <Scope3Control />
+        {/* ⚠️ NO PAYWALL ON THIS STEP, AND renderStep5 STILL HAS ONE. DO NOT "RESTORE CONSISTENCY" BY
+            PUTTING THIS ONE BACK. The totals and the workings ARE the calculator: they are the
+            customer's own figures, computed by lib/ghg/engine.ts in the customer's own browser, and
+            blurring them charged for arithmetic before showing any of it. The paid artefact is the
+            EXPORT, the framework reports and the assurance pack, and that step gates unchanged.
+            The two wrapper divs are kept rather than collapsed: `position: relative` may be load
+            bearing for a descendant, and `filter: none` never created a containing block, so paid
+            visitors see no change either way. */}
         <div style={{ position: 'relative' }}>
-          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
-          <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
+          <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: '2rem' }}>
               {activeFrameworks.map(fw => {
                 const totals = totals_ar6
@@ -3166,10 +3195,24 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
   // The loading arm renders the same "Loading…" this page already shows for `mode`, rather than
   // the wizard: showing the form and then replacing it with a wall is the flash useEntitlement.ts
   // documents, and it reads as access being taken away mid-session.
+  // ⚠️ 'none' NO LONGER WALLS. A visitor who has never bought runs the wizard and sees their Scope 1
+  // and Scope 2 figures, computed by lib/ghg/engine.ts in their own browser from their own data. The
+  // wall asked for money before the product had shown anything. The notice at the top of the wizard
+  // says saving and downloading need the module, and handleSave routes them to pricing with their
+  // figures stashed.
+  //
+  // THE TRIGGER IS UNTOUCHED. enforce_ghg_location_allowance() still refuses every ghg_inventories
+  // write without an active pass. This changes when the customer is TOLD, not what they can do.
+  //
+  // 'expired' AND 'unknown' STILL WALL, DELIBERATELY. An expired customer has saved inventories to
+  // read and a renewal path written for them, and dropping them into a blank wizard would bury both.
+  // A read that failed must not be answered with a form whose Save may or may not work. Only 'none'
+  // has nothing to lose and nothing to read.
+  //
   // Nested rather than two sibling ifs so the narrowing survives: after the outer test rules out
-  // 'active' and the inner one rules out 'loading', `ghgAccess` is exactly the three states the
-  // wall accepts, and a sixth state added later fails to compile here instead of rendering blank.
-  if (mode === 'wizard' && !inventoryId && ghgAccess !== 'active') {
+  // 'active' and 'none' and the inner one rules out 'loading', `ghgAccess` is exactly the two states
+  // the wall accepts, and a sixth state added later fails to compile here instead of rendering blank.
+  if (mode === 'wizard' && !inventoryId && ghgAccess !== 'active' && ghgAccess !== 'none') {
     if (ghgAccess === 'loading') {
       return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading…</div>
     }
@@ -3203,11 +3246,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2.5rem 2rem 120px' }}>
-        {/* READ-ON, SAVE-OFF. Only reachable with an existing inventory open — a new one hits the
-            entry wall above. It is a NOTICE, not a gate: nothing below is blurred or disabled,
-            because the customer can legitimately read, navigate and export from here, and the one
-            thing they cannot do is already refused by the trigger with its own message. Saying it
-            up front is the difference between a known limit and a lost afternoon. */}
+        {/* READ-ON, SAVE-OFF. A NOTICE, not a gate: nothing below is blurred or disabled, because the
+            customer can legitimately read, navigate and calculate from here, and the one thing they
+            cannot do is already refused by the trigger with its own message. Saying it up front is the
+            difference between a known limit and a lost afternoon.
+            ⚠️ THE 'none' ARM SPLITS ON inventoryId, AND THE SPLIT IS THE POINT. Since 'none' stopped
+            walling, this banner is the first thing a visitor with NO inventory reads, and "you can
+            read this inventory" names a record that does not exist. A fresh wizard is told what it
+            DOES do (results as you type) and what needs the module (saving, downloading). It gets no
+            bold lead-in either: the other three arms report something that went wrong, and nothing
+            has. */}
         {ghgAccess !== 'active' && ghgAccess !== 'loading' && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid var(--color-state-warn)33', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
@@ -3215,7 +3263,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
                 ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can read this inventory and everything in it. Saving changes is off until you renew.</>
                 : ghgAccess === 'unknown'
                 ? <><strong style={{ fontWeight: 600 }}>We could not check your GHG access.</strong> Reading is unaffected. Saving may not work until this clears.</>
-                : <><strong style={{ fontWeight: 600 }}>Saving needs the GHG module.</strong> You can read this inventory, but changes will not be kept.</>}
+                : inventoryId
+                ? <><strong style={{ fontWeight: 600 }}>Saving needs the GHG module.</strong> You can read this inventory, but changes will not be kept.</>
+                : <>Your results are calculated as you enter your data. Saving your inventory and downloading reports need the GHG module.</>}
             </span>
             {ghgAccess !== 'unknown' && (
               <a href="/pricing?modules=ghg" style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
