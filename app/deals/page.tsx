@@ -54,7 +54,7 @@ export default function DealsPage() {
       {/* ── 1. HERO ── */}
       <section style={{ borderTop: '4px solid var(--color-module-deals)', background: 'var(--color-module-deals-wash)', padding: '4.5rem 2.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <p style={moduleEyebrow}>Deals and Investment module</p>
+          <p style={moduleEyebrow}>Deals &amp; Investment module</p>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.1rem, 4vw, 3.1rem)', fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.75rem', maxWidth: '28ch' }}>
             Evaluate what a target company owes before you buy it, or arrive at your own sale already prepared.
           </h1>
@@ -67,9 +67,15 @@ export default function DealsPage() {
             are asked.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
+            <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Screen your first deal free</a>
             <a href={`/order?modules=${KEY}`} style={{ ...btnSecondary, textDecoration: 'none' }}>Order the module, ${price}/yr</a>
           </div>
+          {/* The free deal is enforce_deals_free_tier_cap(), one saved deal per unentitled user, and its
+              report opens through resolveReportGate's identity check. "Full report" holds because the
+              report's Save as PDF is not gated separately from that check. */}
+          <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginTop: '0.9rem' }}>
+            No account needed to start. Sign in to save your deal and open the full report.
+          </p>
         </div>
       </section>
 
@@ -135,9 +141,12 @@ export default function DealsPage() {
           Screen as many targets as you like. Add modules and the multi-module discount applies
           automatically: two modules −10%, three or more −20%.
         </p>
+        <p style={{ ...bodyCopy, marginTop: '0.75rem' }}>
+          Your first deal is free, full report included. The module unlocks unlimited targets.
+        </p>
         <div style={{ maxWidth: 420, marginTop: '2.5rem' }}>
           <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-deals)', borderRadius: 6, padding: '2rem' }}>
-            <div style={{ ...moduleEyebrow, marginBottom: 8 }}>Deals and Investment</div>
+            <div style={{ ...moduleEyebrow, marginBottom: 8 }}>Deals &amp; Investment</div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', fontWeight: 400, color: 'var(--color-ink)' }}>
               ${price}
               <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-ink-muted)' }}> / reporting year</span>
@@ -242,7 +251,7 @@ const FAQ: readonly Faq[] = [
   // Added 26 Sep 2026 with option B. The page previously said nothing about what a visitor gets without an
   // account, and the only "no account needed" claim on it is about /assess, not this wizard.
   { q: 'Do I need an account to screen a target?',
-    a: 'No. You can screen a target and see which frameworks apply and the main risk findings without an account. Sign in to see the cost estimate and save the target. Downloading the report needs the module.' },
+    a: 'You can fill in the screen without an account. Sign in to see the cost estimate and save the deal. Your first saved deal is free, full report included. Screening more targets needs the module.' },
   { q: 'How long does a screen take?',
     a: 'As long as it takes to enter a handful of figures about the company: turnover, total assets, headcount, sector, primary jurisdiction, deal value, location count and currency. The answer comes back from those, so there is nothing to send away and nothing to wait for. What takes longer is finding the figures, and where one is missing the screen names it rather than proceeding without it.' },
   { q: 'What if the target is close to a threshold?',

@@ -15,7 +15,7 @@ const MODULES_NAV: { href: string; label: string; labelShort: string; sub: strin
   // the pairing should be readable in the menu without opening either page.
   { href: '/materiality', label: 'Materiality Assessment', labelShort: 'Materiality Assessment', sub: 'CSRD · ESRS 1 · ESRS 2 · stakeholder engagement' },
   { href: '/supply-chain', label: 'Supply Chain', labelShort: 'Supply Chain', sub: 'Supplier Portal · CS3D · EcoVadis · ESRS S2' },
-  { href: '/deals', label: 'Deals & Investment', labelShort: 'Deals', sub: 'M&A diligence · PE · IFRS S2 · SB 253' },
+  { href: '/deals', label: 'Deals & Investment', labelShort: 'Deals', sub: 'M&A diligence · PE · CSRD · SB 253' },
   { href: '/people', label: 'People & Workforce', labelShort: 'People', sub: 'ESRS S1 · EU Pay Transparency · CA Pay Data' },
   { href: '/ai-governance', label: 'AI Governance', labelShort: 'AI Governance', sub: 'EU AI Act · NIST AI RMF · ISO 42001' },
   { href: '/cyber', label: 'Cyber Governance', labelShort: 'Cyber', sub: 'NIS2 · DORA · SEC cyber · ISO 27001' },

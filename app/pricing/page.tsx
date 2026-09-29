@@ -145,7 +145,7 @@ const MODULES: Module[] = [
     tags: [{ label: 'LP / investor', color: 'purple' }],
     cta: {
       headline: 'Ready to screen your next target?',
-      sub: 'Climate diligence in days. SB 253 liability assessed before you sign.',
+      sub: 'ESG diligence on a target before you sign. Your first deal is free.',
       btn: 'Screen a target →',
       href: '/deals',
     },

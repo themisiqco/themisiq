@@ -550,7 +550,8 @@ function DealsDashboardInner() {
   // that the tool does anything:
   //   shown without an account   the framework screening (step 2) and the risk findings (step 3)
   //   an account buys            the cost estimate (step 4), and saving the target
-  //   the module buys            the report export, the Excel pipeline, the shareable assessment
+  //   the free deal includes     its full report, viewable and saveable as PDF (resolveReportGate)
+  //   the module buys            further targets, the portfolio Excel export, share-with-target
   //
   // ⚠️ TWO FLAGS NOW, NOT ONE, AND THEY ARE NOT INTERCHANGEABLE. `resultsShown` governs steps 2 and 3;
   // `costShown` governs step 4 alone. A single boolean is what made the old all-or-nothing gate the
@@ -565,6 +566,35 @@ function DealsDashboardInner() {
   // still asked. It gates feature visibility in step 4 (the report link, the share controls), never
   // the free-deal cap, which resolveWizardGate decides on 'active' alone. See its use site.
   const hasDealsRow = access === 'active' || access === 'expired'
+
+  // "Is the deal on screen the one the free tier covers": the same identity question
+  // resolveReportGate asks, asked here only to decide whether to SHOW the report link. The report page
+  // still makes its own decision; this flag grants nothing. Two ways to be true:
+  //   'saved'  the lookup found the user's most recent deal, and it is this one
+  //   'none'   the user has a dealId but the lookup found nothing, which is the first insert in this
+  //            tab: handleSave's justSavedId skips the load effect once, so the lookup never re-ran.
+  //            A failed lookup also resolves to 'none'; the link then leads to the report page's own
+  //            gate, which paywalls anything that is not the free deal.
+  const isOwnFreeDeal = dealId !== null && (savedDeal.state === 'saved' ? savedDeal.id === dealId : savedDeal.state === 'none')
+
+  // The report is the finished document; this screen is where you go to it. It needs a saved deal
+  // because it loads by id, so the unsaved state matches the share block rather than offering a link
+  // that would open an empty page. ONE copy, rendered by both the module branch and the free-deal
+  // branch in step 4, so the two cannot describe the report differently. Called as reportLink(), the
+  // same pattern as signInPrompt() and for the same reason.
+  const reportLink = () => !dealId ? (
+    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>Save the deal to open its report.</div>
+  ) : (
+    <>
+      <a href={`/dashboard/deals/report?id=${dealId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
+        Open the full report →
+      </a>
+      <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, maxWidth: 520 }}>
+        Opens in a new tab. It has the findings, the applicable rules, the cost estimate and the
+        important notice, written out in full. Print it or save it as a PDF from there.
+      </div>
+    </>
+  )
 
   // Sends them to /login and back, with the form's contents surviving the round trip. Same shape as
   // startCheckout's unauthenticated branch in lib/checkout.ts: stash the intent, bounce, restore.
@@ -1195,22 +1225,7 @@ function DealsDashboardInner() {
           and should be made on its own. Named rather than inlined so it is greppable. */}
       {hasDealsRow ? (
         <div>
-          {/* The report is the finished document; this screen is where you go to it. It needs a
-              saved deal because it loads by id, so the unsaved state matches the share block
-              below rather than offering a link that would open an empty page. */}
-          {!dealId ? (
-            <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontStyle: 'italic' }}>Save the deal to open its report.</div>
-          ) : (
-            <>
-              <a href={`/dashboard/deals/report?id=${dealId}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', fontSize: 14, fontWeight: 500, padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', textDecoration: 'none' }}>
-                Open the full report →
-              </a>
-              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, maxWidth: 520 }}>
-                Opens in a new tab. It has the findings, the applicable rules, the cost estimate and the
-                important notice, written out in full. Print it or save it as a PDF from there.
-              </div>
-            </>
-          )}
+          {reportLink()}
 
           {/* Share with target — public /deals/[token] link. Gated on a saved deal with a token. */}
           <div style={{ marginTop: 24, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.25rem' }}>
@@ -1279,6 +1294,13 @@ function DealsDashboardInner() {
         </div>
       ) : (
         <div>
+          {/* THE FREE DEAL OPENS ITS REPORT, and has since resolveReportGate's identity check; until
+              29 Sep 2026 this branch never linked to it, so the report was reachable only by typing its
+              URL. Shown unsaved too, as the "save to open" hint, since saving is what earns the link.
+              Hidden when the deal on screen is not the free one, because the report page would
+              paywall it. The share controls stay module-only: the shareable assessment is a paid
+              deliverable. */}
+          {(!dealId || isOwnFreeDeal) && <div style={{ marginBottom: 16 }}>{reportLink()}</div>}
           {/* SETS THE EXPECTATION BEFORE THE WALL, not after it. Without this the first a user
               hears of the cap is being refused, and a limit discovered by hitting it reads as a
               fault. Sits above the upgrade panel because it is the fact; the panel is the offer.
@@ -1289,7 +1311,7 @@ function DealsDashboardInner() {
           <div className="tq-band" style={{ borderRadius: 14, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Unlock your full ESG diligence programme</div>
           <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>Screen a target&rsquo;s ESG risk, work out which reporting rules apply to it and what compliance would cost, and produce a diligence report for your investment committee.</div>
-          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock reports →</a>
+          <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing & unlock more targets →</a>
           </div>
         </div>
       )}
@@ -1356,8 +1378,8 @@ function DealsDashboardInner() {
           <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: 20, lineHeight: 1.6 }}>
             {gate.reason === 'free-deal-used' ? (
               <>
-                Screening one target is free. To screen another, and to keep a pipeline of them, with the
-                diligence report, the Excel export and the shareable assessment, unlock the Deals module.
+                Unlock the module to screen more targets, each with its full diligence report, plus the
+                portfolio Excel export and a shareable assessment for the target.
               </>
             ) : gate.reason === 'expired' ? (
               'Your saved targets are still here and you can keep working on them. Renewing lets you screen new targets again.'
