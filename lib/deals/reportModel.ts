@@ -23,9 +23,17 @@
 import {
   NEAR_BAND_PCT, UNITS_PER_EUR, isDealCurrency, resolveFieldsPrompt,
   FIELD_LABELS, FIELD_FORM_LABELS,
+  getFrameworkApplicability, getObligations, getComplianceCost, sectorRisks,
+  assessmentView, isRevenueDeclared, notAssessedNote as notAssessedNoteOf, partiallyAssessedNote,
+  routeNotMetNote, partialHeadingPhrase, nearThresholdNoneNote, obligationPriceLabel,
+  FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
+  CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
   type FrameworkApplicability, type LimbResult, type DealCurrency, type Obligations,
+  type SectorRisk,
 } from './assessment'
 import { NOT_PROVIDED } from '../notProvided'
+import { filenameDate } from '../filename'
+import { disclaimerParas } from '../disclaimer'
 
 // ─── Deal types ───────────────────────────────────────────────────────────────
 // ⚠️ `short` IS AN EXPLICIT FIELD, NOT A SUBSTRING OF `label`. The deal summary used to derive it with
@@ -583,3 +591,468 @@ export const canadaS211NoteReport = (s: Cs3dState): Cs3dNote =>
 
 export const canadaS211Token = (row: FrameworkApplicability | undefined): RegimeToken | null =>
   regimeTokenFor(CANADA_S211_LABELS, row)
+
+// ─── The report model ─────────────────────────────────────────────────────────
+//
+// EVERYTHING THE PRINTED REPORT SAYS, DERIVED ONCE. app/dashboard/deals/report/page.tsx renders it
+// on screen and lib/deals/reportPdf.ts draws it into a PDF; neither computes a figure or composes a
+// sentence of its own. Moved here from the report page on 29 Sep 2026, when the PDF became a second
+// renderer: the same reason this module exists at all, one level up.
+//
+// PLAIN DATA ONLY. No functions, no Maps, no React: strings, numbers, booleans and arrays of them, so
+// a renderer can walk it without importing the engine. Where the screen sets part of a sentence in
+// bold, the sentence is a Rich (plain runs and { strong } runs, in order), which a renderer can set
+// in any medium without re-splitting prose.
+//
+// STATIC COPY IS HERE TOO, not only the computed sentences. A heading or a table column written
+// separately in each renderer is two copies of the report's wording, which is the drift this model
+// exists to prevent.
+
+/** The deal columns the report reads. The page's row type carries more; these are all it needs. */
+export type DealReportDeal = {
+  id: string
+  target_name: string | null
+  sector: string | null
+  jurisdiction: string | null
+  deal_type: string | null
+  revenue: number | null
+  currency: string | null
+  deal_value: number | null
+  location_count: number | null
+  employee_count?: number | null
+  total_assets?: number | null
+  listed_ca_exchange?: boolean | null
+  has_ghg_data: boolean | null
+  has_esg_report: boolean | null
+}
+
+/** A sentence with bold runs: plain strings and { strong } runs, concatenated in order. */
+export type Rich = (string | { strong: string })[]
+
+/** An amber "we did not evaluate this" panel: a heading line and a body. */
+export type ReportPanel = { title: string; body: Rich }
+
+/** Chip keys. The renderer owns the colours; the model says which state applies. */
+export type StatusChip = 'applies' | 'verify' | 'nearBelow'
+export type SeverityChip = SectorRisk['severity']
+
+export type DealReportModel = {
+  reference: string
+  reportDate: string
+  cover: {
+    eyebrow: string
+    title: string
+    intro: string
+    rows: [string, string][]
+    derivedNote: Rich
+  }
+  applicable: {
+    title: string
+    s211Panel: ReportPanel | null
+    kind: 'not-evaluated' | 'none' | 'table'
+    notEvaluatedPanel: ReportPanel
+    noneSentence: string
+    intro: string
+    columns: [string, string]
+    rows: { framework: string; citation: string | null; near: string | null; verify: string | null; chip: StatusChip }[]
+    partialPanel: ReportPanel | null
+  }
+  nearThreshold: {
+    title: string
+    intro: Rich
+    kind: 'not-assessed' | 'none' | 'table'
+    notAssessedPanel: ReportPanel
+    noneSentence: string
+    columns: string[]
+    rows: { framework: string; chip: StatusChip; testsMet: string; decidingFigure: string; valueApplied: string; threshold: string; side: string }[]
+    belowNotes: { framework: string; sentence: string }[]
+  }
+  sizeTests: {
+    title: string
+    kind: 'none' | 'table'
+    noneSentence: string
+    intro: Rich
+    columns: string[]
+    rows: LimbRow[]
+    panels: ReportPanel[]
+  }
+  risks: {
+    title: string
+    kind: 'none' | 'table'
+    noneSentence: string
+    intro: string
+    unresolvedPanel: ReportPanel | null
+    columns: [string, string, string]
+    rows: { severity: SeverityChip; risk: string; detail: string; condition: string | null; cs3dLine: Rich | null; framework: string }[]
+  }
+  cost: {
+    title: string
+    intro: string
+    consultant: { label: string; figure: string; note: string }
+    themisIq: { label: string; figure: string; note: string }
+    disclosure: Rich
+    included: { columns: [string, string, string]; rows: { label: string; scopeNote: string | null; themisIq: string; consultant: string }[] }
+    recommended: { columns: [string, string, string]; rows: { label: string; themisIq: string; consultant: string }[] }
+    flagged: { columns: [string, string, string]; rows: { label: string; scopeNote: string | null; themisIq: string; consultant: string }[] }
+    scopeNote: string
+    exposure: Rich | null
+  }
+  dataRoom: {
+    title: string
+    columns: [string, string]
+    rows: { item: string; status: string; available: boolean }[]
+  }
+  fx: {
+    title: string
+    paras: Rich[]
+    rows: [string, string][]
+  }
+  notice: { title: string; paras: string[] }
+  footer: { line: string; note: string }
+}
+
+const consultantBand = (low: number, high: number) => `USD ${Math.round(low / 1000)}k–${Math.round(high / 1000)}k`
+
+/**
+ * The whole report for one deal, as of `generatedAt`. Pure: the same deal and instant give the same
+ * model, which is what lets the screen and the PDF be tested against each other.
+ */
+export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): DealReportModel {
+  const sector = deal.sector ?? ''
+  const jurisdiction = deal.jurisdiction ?? ''
+  const currency = deal.currency ?? 'USD'
+  const revenue = Number(deal.revenue) || 0
+  const dealValue = Number(deal.deal_value) || 0
+  const locationCount = Number(deal.location_count) || 0
+
+  const reportDate = generatedAt.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+  // A reference for THIS DOCUMENT, not for the deal record. The deal id alone names a row that
+  // outlives any one report: because this report is derived at generation, the same id names a
+  // different document tomorrow. Pairing the id prefix with the generation date makes the reference
+  // identify what the reader is holding. Eight characters matches the climate-risk and materiality
+  // reports; the date comes from the same instant as the footer date and the PDF filename.
+  const reference = `${String(deal.id).slice(0, 8)}-${filenameDate(generatedAt)}`
+
+  // The same gate the wizard uses: revenue is NOT part of it. Only two frameworks consult
+  // revenue; the rest resolve from jurisdiction and sector alone, and withholding them because
+  // revenue is blank would render an undeclared field as "no frameworks apply".
+  const evaluated = !!(sector && jurisdiction)
+  const applicability: FrameworkApplicability[] = evaluated
+    ? getFrameworkApplicability(jurisdiction, revenue, sector, deal.deal_type ?? 'ma', currency,
+        { total_assets: deal.total_assets ?? null, employee_count: deal.employee_count ?? null })
+    : []
+
+  // The flat legal in/out. Derived from `applicability` rather than by a second engine call: a
+  // test in assessment.test.ts pins these two as equal, so this cannot drift from the wizard.
+  const frameworks = applicability.filter(f => f.applies).map(f => f.framework)
+
+  const view = assessmentView(evaluated, applicability)
+  const revenueDeclared = isRevenueDeclared(revenue)
+  const nearThreshold = applicability.filter(f => f.status === 'near-threshold')
+  const nearByFramework = new Map(nearThreshold.map(f => [f.framework, f]))
+  const nearBelow = nearThreshold.filter(f => !f.applies)
+  // The UNEVALUATED population, not the union: this note says "size test incomplete", which is false
+  // of a routeNotMet row (its test completed). Its render gate, view.nearThreshold, already means
+  // "a limb went unevaluated", so passing the union let the names and the claim describe different rows.
+  const notAssessedNote = notAssessedNoteOf(
+    view.unevaluated.length ? view.unevaluated : undefined,
+    view.fieldsToResolve,
+  )
+
+  const limbRows = buildLimbRows(applicability)
+  const fxBasisRows = buildFxBasisRows(currency, applicability)
+  // `cs3d` supplies the SENTENCE printed beneath a finding; the ROW supplies the token's text and
+  // caveat flag. Both carry the same four outcomes since 11 Aug 2026, and they must not disagree.
+  // DIFFERS FROM THE WIZARD ON ONE STATE, deliberately: this document has no `citedNear` line, so
+  // 'near-threshold' gets its own note here rather than being deferred to one that does not exist.
+  // Its `body` may be null, meaning heading only; cs3dLine below owns that punctuation.
+  const cs3dNote = cs3dNoteReport(resolveCs3d(frameworks, applicability))
+  // Canada S-211, the second non-exhaustive regime, through the same functions with its own labels.
+  // Added 26 Sep 2026: without it a withheld S-211 row reached this document silently, which for a
+  // report an external deal team reads is the worst place for an unexplained absence.
+  const s211Note = canadaS211NoteReport(resolveCanadaS211(frameworks, applicability))
+  const mapFramework = makeMapFramework(frameworks, applicability.find(f => f.framework === 'CS3D'))
+
+  // Resolved against the deal's jurisdiction: a finding whose instrument is not established for
+  // this target carries the nexus that would bring it into scope, rather than asserting it.
+  const risks = sectorRisks(sector, jurisdiction)
+  const obligations = getObligations(locationCount, frameworks, sector)
+  const complianceCost = dealValue > 0 ? getComplianceCost(dealValue, sector, frameworks) : null
+  const activeTests = Object.values(THRESHOLD_TESTS).filter(isTestActive)
+  // A statutory citation belongs with the framework it justifies, not in a footnote pile.
+  const citationFor = (fw: string) => (isTestActive(THRESHOLD_TESTS[fw]) ? THRESHOLD_TESTS[fw].citation : null)
+
+  const obligationColumns = (first: string): [string, string, string] => [first, 'ThemisIQ', 'Consultant (reference)']
+
+  return {
+    reference,
+    reportDate,
+
+    cover: {
+      eyebrow: 'Prepared by ThemisIQ Compliance Inc.',
+      title: 'ESG Deal Due Diligence Report',
+      intro: `Sustainability-regulation screening of ${deal.target_name || 'the target company'} for deal, investment-committee and LP reporting: which disclosure regimes reach the target, which statutory size tests were applied, and what compliance is estimated to cost.`,
+      rows: [
+        ['Target company', deal.target_name || 'Not specified'],
+        ['Sector', sector || 'Not specified'],
+        ['Jurisdiction', jurisdiction || 'Not specified'],
+        ['Deal type', dealTypeLabel(deal.deal_type ?? '')],
+        // "USD 0" would assert a revenue figure we were never given. Say what is true instead.
+        // The magnitude is spelled out so a 1000x entry error is legible in the document.
+        ['Target annual revenue', revenueDeclared ? `${currency} ${revenue.toLocaleString()} (${spellMagnitude(revenue)})` : 'Not provided'],
+        // Spelled out for the same reason as revenue: it is typically the larger figure and
+        // carries the same 1000x entry risk, which is otherwise invisible in a bare numeral.
+        ['Deal / investment value', dealValue > 0 ? `${currency} ${dealValue.toLocaleString()} (${spellMagnitude(dealValue)})` : 'Not provided'],
+        ['Locations / sites', locationCount > 0 ? String(locationCount) : 'Not provided'],
+        ['Report generated', reportDate],
+      ],
+      derivedNote: [
+        { strong: 'This report is derived, not stored.' },
+        ` Every finding below is computed at the moment of generation from the deal record as it stood on ${reportDate}. It is not a snapshot of a past assessment: if the deal record changes, a report generated afterwards will differ.`,
+      ],
+    },
+
+    applicable: {
+      title: 'Applicable frameworks',
+      s211Panel: s211Note ? { title: s211Note.heading, body: s211Note.body ? [s211Note.body] : [] } : null,
+      kind: !evaluated ? 'not-evaluated' : view.frameworks === 'assessed-none' ? 'none' : 'table',
+      notEvaluatedPanel: {
+        title: 'NOT ASSESSED',
+        body: [
+          'Sector and jurisdiction are not both set on this deal, so nothing has been evaluated. An empty list here is ',
+          { strong: 'not' },
+          ' a finding that no framework applies.',
+        ],
+      },
+      noneSentence: 'None. No framework was triggered for this jurisdiction, sector and size.',
+      intro: 'Determined from the target’s jurisdiction, sector and, where a statute imposes one, its statutory size test. A framework listed here applies on the figures provided.',
+      columns: ['Framework', 'Status'],
+      rows: frameworks.map(fw => {
+        const near = nearByFramework.get(fw)
+        // A ROW THAT APPLIES AND STILL NEEDS CHECKING. `verify` is set where the engine settled
+        // applicability on one route while a condition it never asked about remains open: today,
+        // Canada S-211 reached by a stock-exchange listing, where the reporting duty also turns on
+        // goods. Same amber treatment a near-threshold row gets, because the reader's job is the same.
+        const verify = applicability.find(f => f.framework === fw)?.verify ?? null
+        return {
+          framework: fw,
+          citation: citationFor(fw),
+          near: near ? nearSentence(near) : null,
+          verify: verify || null,
+          chip: near || verify ? 'verify' : 'applies',
+        }
+      }),
+      // Partial assessment: the list stands, but naming what was withheld stops a reader inferring
+      // that the missing statutes were considered and excluded. The title keeps the UNION; the body
+      // explains WHY, which differs per population and cannot be said of both.
+      partialPanel: view.notAssessed.length > 0
+        ? {
+            title: `PARTIAL: ${view.notAssessed.join(', ')} ${partialHeadingPhrase(view)}`,
+            body: [
+              ...(view.unevaluated.length > 0 ? [partiallyAssessedNote(view.unevaluated, view.fieldsToResolve)] : []),
+              ...(view.routeNotMet.length > 0 ? [routeNotMetNote(view.routeNotMet)] : []),
+            ],
+          }
+        : null,
+    },
+
+    nearThreshold: {
+      title: 'Near-threshold frameworks',
+      intro: [
+        'Raised only where a ',
+        { strong: 'borderline figure decides the outcome' },
+        `: a figure within ${NEAR_PCT} of the trigger that, if it moved, would change whether the test is met. The legal answer is unchanged: a framework that applies still applies, and one that does not still does not.`,
+      ],
+      kind: view.nearThreshold === 'not-assessed' ? 'not-assessed' : view.nearThreshold === 'assessed-none' ? 'none' : 'table',
+      notAssessedPanel: { title: 'NEAR-THRESHOLD: NOT ASSESSED', body: [notAssessedNote] },
+      noneSentence: nearThresholdNoneNote(),
+      columns: ['Framework', 'Tests met', 'Deciding figure', 'Value applied', 'Threshold', 'Side'],
+      rows: nearThreshold.map(f => {
+        const dec = f.test?.limbs.filter(l => l.near && l.state !== 'not-assessed') ?? []
+        return {
+          framework: f.framework,
+          chip: f.applies ? 'verify' : 'nearBelow',
+          testsMet: f.test ? `${f.test.metCount} of ${f.test.requires}` : NOT_PROVIDED,
+          decidingFigure: dec.map(l => l.limb.measure.replace(/_/g, ' ')).join('; '),
+          valueApplied: dec.map(limbValueDisplay).join('; '),
+          threshold: dec.map(limbThresholdDisplay).join('; '),
+          side: f.side === 'above' ? 'Above' : 'Below',
+        }
+      }),
+      // Near-but-below never reaches the applicable list (it does not apply), so it is stated here
+      // or the reader never learns the target sits just under a trigger.
+      belowNotes: nearBelow.map(f => ({ framework: f.framework, sentence: nearSentence(f) })),
+    },
+
+    sizeTests: {
+      title: 'Size tests applied',
+      kind: limbRows.length === 0 ? 'none' : 'table',
+      noneSentence: 'No size-gated framework is in scope for this jurisdiction.',
+      intro: [
+        'Every limb of every statutory size test that was run, with the measure it applied. A result without its measure asserts nothing a reviewer can check. Where the figure collected stands in for a differently-defined statutory measure it is marked ',
+        { strong: 'PROXY' },
+        '.',
+      ],
+      columns: ['Framework', 'Figure tested', 'Measure required', 'Value applied', 'Threshold', 'Result'],
+      rows: limbRows,
+      panels: [
+        // A STANDING LIMITATION, in the same register as the two-year checks, and not a framework
+        // row: that version was measured and withdrawn on 26 Sep 2026 because it landed on every
+        // deal. Gated so it appears only where it is true and unresolved: not for a Canadian target,
+        // whose size test DID run, and not for a listed Yes, which settles applicability and carries
+        // its own VERIFY note. The heading is inside the constant, so its title is split from its body.
+        ...(showCanadaS211JurisdictionCaveat(deal.jurisdiction ?? '', deal.listed_ca_exchange)
+          ? [{
+              title: CANADA_S211_JURISDICTION_CAVEAT.split(':')[0].toUpperCase(),
+              body: [CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)],
+            }]
+          : []),
+        ...activeTests.filter(t => !t.lookbackModelled).map(t => ({
+          title: `TWO-YEAR CHECK NOT RUN: ${t.framework}`,
+          body: [
+            `The statute measures over ${t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a test in the prior year and has since dipped is `,
+            { strong: 'under-called' },
+            '. Such a target surfaces above as a borderline figure just below the trigger.',
+          ],
+        })),
+      ],
+    },
+
+    risks: {
+      title: 'ESG risk findings',
+      kind: risks.length === 0 ? 'none' : 'table',
+      noneSentence: sector ? 'No sector-specific ESG risk template is held for this sector.' : 'No sector is set on this deal, so no sector risk findings were produced.',
+      intro: `Sector-specific risks for ${sector}. The framework named on each finding resolves against the frameworks actually detected above, so a finding can never cite a statute this report withheld.`,
+      // UNEVALUATED only. A routeNotMet framework was fully evaluated AND still appears in the
+      // labels (its token is emitted, qualified), so both of this banner's claims would be false of
+      // it. Silence on a routeNotMet-only deal is correct: nothing vanished from the Framework column.
+      unresolvedPanel: view.unevaluated.length > 0
+        ? {
+            title: 'FRAMEWORK COLUMN PARTIALLY RESOLVED',
+            body: [`The ${view.unevaluated.join(' / ')} size test could not be completed, so ${view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. ${resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}`],
+          }
+        : null,
+      columns: ['Severity', 'Risk', 'Framework'],
+      rows: risks.map(r => {
+        const tokens = mapFramework(r.framework)
+        // Per-finding token check AND per-deal note: see the wizard's note on why both. The colon
+        // and full stop belong to the BODY, not the heading: a heading-only line must not trail
+        // punctuation introducing nothing.
+        const cs3dLine: Rich | null = cs3dNote && tokens.some(t => t.framework === 'CS3D' && t.qualified)
+          ? [{ strong: `${cs3dNote.heading}${cs3dNote.body ? ':' : ''}` }, cs3dNote.body ? ` ${cs3dNote.body}.` : '']
+          : null
+        return {
+          severity: r.severity,
+          risk: r.risk,
+          detail: r.detail,
+          condition: r.scope === 'conditional' ? r.condition : null,
+          cs3dLine,
+          framework: regimeLabel(tokens),
+        }
+      }),
+    },
+
+    cost: {
+      title: 'Compliance cost estimate',
+      // The analyst's question is what remediation costs and whether it moves the model: a
+      // diligence finding. Leading with ThemisIQ's own price made a finding read as a quote, so the
+      // market reference comes first and larger, and the ThemisIQ figure follows as one route.
+      intro: `An estimate of what it would cost to bring ${deal.target_name || 'the target'} into compliance with the regimes identified above, given as a market reference range with one priced alternative. Both figures are first-year, in USD, and neither is a quotation.`,
+      consultant: {
+        label: 'Traditional consultant, first year',
+        figure: consultantBand(obligations.consultantLow, obligations.consultantHigh),
+        note: 'Indicative market range, scaled per obligation for this target’s sector and site count.',
+      },
+      themisIq: {
+        label: 'ThemisIQ, scope-matched modules',
+        // In a printed document "Enter locations →" would instruct a reader who has nothing to click.
+        figure: themisIqFigure(obligations, 'Custom quote: location count not provided'),
+        note: 'One available route, priced for the modules this scope requires.',
+      },
+      // Inferable from the cover, but stating it where the price appears makes the report harder to
+      // fault. The consultant figures are benchmarks, NOT citations: the source note on
+      // CONSULTANT_RANGES says "Indicative benchmarks, not quotes", so this must not claim otherwise.
+      disclosure: [
+        { strong: 'Disclosure:' },
+        ' ThemisIQ Compliance Inc. prepared this report and also supplies the software priced in the second figure. The consultant range is an indicative benchmark drawn from market analysis, not a quotation obtained from any firm.',
+      ],
+      included: {
+        columns: obligationColumns('Included obligation'),
+        rows: obligations.included.map(o => ({
+          label: o.label,
+          scopeNote: o.scopeNote || null,
+          themisIq: obligationPriceLabel(o.pricing),
+          consultant: consultantBand(o.consultantLow, o.consultantHigh),
+        })),
+      },
+      recommended: {
+        columns: obligationColumns('Also recommended, not in the ThemisIQ total'),
+        rows: obligations.recommended.map(o => ({
+          label: o.label,
+          themisIq: obligationPriceLabel(o.pricing),
+          consultant: consultantBand(o.consultantLow, o.consultantHigh),
+        })),
+      },
+      flagged: {
+        columns: obligationColumns('Flagged: separate specialist, in neither total'),
+        rows: obligations.flagged.map(o => ({
+          label: o.label,
+          scopeNote: o.scopeNote || null,
+          themisIq: obligationPriceLabel(o.pricing),
+          consultant: 'Not included',
+        })),
+      },
+      // The cost table is driven by the APPLIES-filtered framework list, so a regime that abstains
+      // prices nothing. Stated because the omission is otherwise invisible: the reader sees a total,
+      // not the module that is missing from it.
+      scopeNote: 'This estimate covers only the regimes established as applying above. Where a framework is shown as not assessed, no module is priced for it.',
+      exposure: complianceCost
+        ? [
+            { strong: 'ESG value-at-risk exposure:' },
+            ` approximately ${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (${currency} ${Math.round(complianceCost.low).toLocaleString()}–${Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess. This is an indicative exposure, not a cost, and requires specialist confirmation.`,
+          ]
+        : null,
+    },
+
+    dataRoom: {
+      title: 'Data-room gaps',
+      columns: ['Item', 'Status'],
+      rows: [
+        { item: 'GHG inventory / emissions data', available: !!deal.has_ghg_data },
+        { item: 'ESG report or sustainability disclosure', available: !!deal.has_esg_report },
+      ].map(r => ({ ...r, status: r.available ? 'Available' : 'MISSING: request from target' })),
+    },
+
+    fx: {
+      title: 'FX basis for threshold tests',
+      paras: [
+        [
+          'Revenue and balance-sheet figures are converted into each threshold’s statutory currency for comparison. ',
+          { strong: 'The statutory figure itself is never converted' },
+          ', so every citation above can be checked against the legislation verbatim.',
+        ],
+        [
+          'Rates marked ',
+          { strong: 'transcribed' },
+          ' are copied verbatim from the source document and can be checked against it digit for digit. Rates marked ',
+          { strong: 'DERIVED' },
+          ' are computed by ThemisIQ from those figures and appear nowhere in the source.',
+        ],
+      ],
+      rows: [
+        ['Rate source', FX_SOURCE],
+        ['Rates as of', FX_AS_OF],
+        ['Deal currency', currency],
+        ...fxBasisRows.map(r => [r[0], r[1]] as [string, string]),
+        ['Size tests available', activeTests.map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ') || 'None'],
+      ],
+    },
+
+    notice: { title: 'Important Notice', paras: [...disclaimerParas('screening')] },
+
+    footer: {
+      line: `ThemisIQ Compliance Inc. · www.themisiq.co · Reference ${reference} · Generated ${reportDate}`,
+      note: `This assessment reflects the figures held for this deal on ${reportDate}. It is derived at generation, not stored, so a report generated on another date may differ.`,
+    },
+  }
+}

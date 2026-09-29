@@ -40,22 +40,9 @@ import { resolveReportGate, type SessionState, type ReportUpsell } from '../../.
 import { useReportTitle, reportTitle } from '../../../../lib/useReportTitle'
 import { filenameDate } from '../../../../lib/filename'
 import PaywallCard from '../../../components/PaywallCard'
-import { disclaimerParas } from '../../../../lib/disclaimer'
 import { FLAT_MODULE_PRICES } from '../../../../lib/pricing'
 import {
-  getFrameworkApplicability, getObligations, getComplianceCost, sectorRisks,
-  assessmentView, isRevenueDeclared, notAssessedNote as notAssessedNoteOf, partiallyAssessedNote,
-  routeNotMetNote, partialHeadingPhrase,
-  nearThresholdNoneNote, obligationPriceLabel, resolveFieldsPrompt,
-  FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
-  type FrameworkApplicability, type ResolvedRisk,
-  CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
-} from '../../../../lib/deals/assessment'
-import {
-  dealTypeLabel, spellMagnitude, NEAR_PCT, nearSentence,
-  buildLimbRows, buildFxBasisRows, limbValueDisplay, limbThresholdDisplay,
-  resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure, cs3dNoteReport, NOT_PROVIDED,
-  resolveCanadaS211, canadaS211NoteReport,
+  buildDealReportModel, type DealReportModel, type ReportPanel, type Rich,
 } from '../../../../lib/deals/reportModel'
 
 // ─── The deal row ─────────────────────────────────────────────────────────────
@@ -214,9 +201,9 @@ function DealsReportInner() {
   // or it contradicts the document it names.
   //
   // Held in state, not recomputed per render: two `new Date()` calls are two instants, and the whole
-  // point is that the footer and the filename cannot disagree. Both strings below derive from this.
+  // point is that the footer and the filename cannot disagree. The page title below and the report
+  // model (its footer date and reference) both derive from this.
   const [generatedAt] = useState(() => new Date())
-  const reportDate = generatedAt.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
 
   // Names the saved PDF. Null until the deal has loaded, so no title is built from an absent name.
   useReportTitle(deal
@@ -268,16 +255,13 @@ function DealsReportInner() {
   if (error) return <Centered>{error}</Centered>
   if (!deal) return <Centered>No deal data.</Centered>
 
-  // A reference for THIS DOCUMENT, not for the deal record. The deal id alone names a row that
-  // outlives any one report: because this report is derived at generation, the same id names a
-  // different document tomorrow. Pairing the id prefix with the generation date makes the reference
-  // identify what the reader is holding. Eight characters matches the climate-risk and materiality
-  // reports; the date comes from the same instant as the footer date and the PDF filename.
-  const reference = `${String(deal.id).slice(0, 8)}-${filenameDate(generatedAt)}`
+  // Built from the same instant as the page title, so the footer date, the reference and the
+  // saved file's name all agree. The reference's own reasoning is in buildDealReportModel.
+  const model = buildDealReportModel(deal, generatedAt)
   // `upsell` is 'none' for an entitled reader AND for one whose entitlement could not be read — see
   // resolveReportGate. Passed down rather than re-derived in DealReport, which would be a second
   // copy of the rule one component along.
-  return <DealReport deal={deal} reportDate={reportDate} reference={reference} upsell={gate.upsell} />
+  return <DealReport dealId={deal.id} model={model} upsell={gate.upsell} />
 }
 
 // ─── Small shared components & styles ─────────────────────────────────────────
@@ -321,73 +305,33 @@ function NotAssessed({ title, children }: { title: string; children: React.React
     </div>
   )
 }
+// A model panel through the one amber panel.
+function PanelBox({ panel }: { panel: ReportPanel }) {
+  return <NotAssessed title={panel.title}><RichText parts={panel.body} /></NotAssessed>
+}
+// The header row the three obligation tables share: a wide label column and two priced columns.
+function ObligationHead({ columns }: { columns: [string, string, string] }) {
+  return (
+    <thead>
+      <tr style={trh}>
+        <th style={th}>{columns[0]}</th>
+        <th style={{ ...th, width: 190 }}>{columns[1]}</th>
+        <th style={{ ...th, width: 140 }}>{columns[2]}</th>
+      </tr>
+    </thead>
+  )
+}
 
 // ─── The report ───────────────────────────────────────────────────────────────
-function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; reportDate: string; reference: string; upsell: ReportUpsell }) {
-  const sector = deal.sector ?? ''
-  const jurisdiction = deal.jurisdiction ?? ''
-  const currency = deal.currency ?? 'USD'
-  const revenue = Number(deal.revenue) || 0
-  const dealValue = Number(deal.deal_value) || 0
-  const locationCount = Number(deal.location_count) || 0
+// Sets a model sentence: plain runs as text, { strong } runs in the report's one bold weight.
+function RichText({ parts }: { parts: Rich }) {
+  return <>{parts.map((r, i) => typeof r === 'string' ? r : <strong key={i} style={{ fontWeight: 600 }}>{r.strong}</strong>)}</>
+}
 
-  // The same gate the wizard uses: revenue is NOT part of it. Only two frameworks consult
-  // revenue; the rest resolve from jurisdiction and sector alone, and withholding them because
-  // revenue is blank would render an undeclared field as "no frameworks apply".
-  const evaluated = !!(sector && jurisdiction)
-  const applicability: FrameworkApplicability[] = evaluated
-    ? getFrameworkApplicability(jurisdiction, revenue, sector, deal.deal_type ?? 'ma', currency,
-        { total_assets: deal.total_assets ?? null, employee_count: deal.employee_count ?? null })
-    : []
-
-  // The flat legal in/out. Derived from `applicability` rather than by a second engine call — a
-  // test in assessment.test.ts pins these two as equal, so this cannot drift from the wizard.
-  const frameworks = applicability.filter(f => f.applies).map(f => f.framework)
-
-  const view = assessmentView(evaluated, applicability)
-  const revenueDeclared = isRevenueDeclared(revenue)
-  const nearThreshold = applicability.filter(f => f.status === 'near-threshold')
-  const nearByFramework = new Map(nearThreshold.map(f => [f.framework, f]))
-  const nearBelow = nearThreshold.filter(f => !f.applies)
-  // The UNEVALUATED population, not the union: this note says "size test incomplete", which is false
-  // of a routeNotMet row (its test completed). Its render gate — view.nearThreshold — already means
-  // "a limb went unevaluated", so passing the union let the names and the claim describe different rows.
-  const notAssessedNote = notAssessedNoteOf(
-    view.unevaluated.length ? view.unevaluated : undefined,
-    view.fieldsToResolve,
-  )
-
-  const limbRows = buildLimbRows(applicability)
-  const fxBasisRows = buildFxBasisRows(currency, applicability)
-  // `cs3d` supplies the SENTENCE printed beneath a finding; the ROW supplies the token's text and
-  // caveat flag. Both carry the same four outcomes since 11 Aug 2026, and they must not disagree —
-  // on this page the near-threshold heading IS the token's constant, so they cannot.
-  const cs3d = resolveCs3d(frameworks, applicability)
-  // RENDERED, not re-derived — the exhaustive switch lives in reportModel beside `Cs3dState`.
-  // DIFFERS FROM THE WIZARD ON ONE STATE, deliberately: this document has no `citedNear` line, so
-  // 'near-threshold' gets its own note here rather than being deferred to one that does not exist.
-  // Its `body` may be null, meaning heading only — the render below owns that punctuation.
-  const cs3dNote = cs3dNoteReport(cs3d)
-  // Canada S-211, the second non-exhaustive regime, through the same functions with its own labels.
-  // Added 26 Sep 2026: without it a withheld S-211 row reached this document silently, which for a
-  // report an external deal team reads is the worst place for an unexplained absence.
-  const s211Note = canadaS211NoteReport(resolveCanadaS211(frameworks, applicability))
-  const cs3dRow = applicability.find(f => f.framework === 'CS3D')
-  const mapFramework = makeMapFramework(frameworks, cs3dRow)
-
-  // Resolved against the deal's jurisdiction — a finding whose instrument is not established for
-  // this target carries the nexus that would bring it into scope, rather than asserting it.
-  const risks: ResolvedRisk[] = sectorRisks(sector, jurisdiction)
-  const obligations = getObligations(locationCount, frameworks, sector)
-  const complianceCost = dealValue > 0 ? getComplianceCost(dealValue, sector, frameworks) : null
-  // In a printed document "Enter locations →" would instruct a reader who has nothing to click.
-  const themisIq = themisIqFigure(obligations, 'Custom quote: location count not provided')
-
-  const consultantRange = `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
-  const activeTests = Object.values(THRESHOLD_TESTS).filter(isTestActive)
-  // A statutory citation belongs with the framework it justifies, not in a footnote pile.
-  const citationFor = (fw: string) => (isTestActive(THRESHOLD_TESTS[fw]) ? THRESHOLD_TESTS[fw].citation : null)
-
+// ⚠️ RENDERS THE MODEL, DERIVES NOTHING. Every figure, sentence, heading and column label comes from
+// buildDealReportModel in lib/deals/reportModel.ts, which the PDF generator draws from too. A value
+// computed here is one the PDF cannot show, and the two documents would then disagree.
+function DealReport({ dealId, model: m, upsell }: { dealId: string; model: DealReportModel; upsell: ReportUpsell }) {
   return (
     <div className="report-root" style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#0d0d0d' }}>
       <div className="no-print" style={{ position: 'sticky', top: 0, background: 'var(--color-ink)', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
@@ -400,9 +344,9 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
               correcting a figure, not browsing the whole list. No arrow: this is a move sideways to
               the same target, not up to the collection. Same weight as its neighbour so neither
               competes with Save as PDF, which is still the main control on this bar.
-              Uses deal.id — the row this report was actually built from — rather than the URL
+              Uses dealId, the row this report was actually built from, rather than the URL
               param, which is not in scope in this component. */}
-          <a href={`/dashboard/deals?id=${deal.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>Edit this deal</a>
+          <a href={`/dashboard/deals?id=${dealId}`} style={{ fontSize: 13, fontWeight: 600, color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>Edit this deal</a>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · ESG deal due diligence report</div>
         </div>
         <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>⬇ Save as PDF (Cmd+P)</button>
@@ -413,147 +357,97 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         {/* 1 ── COVER */}
         <section className="page">
           <div style={{ height: 6, background: GRAD, marginBottom: 32, borderRadius: 2 }} />
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 12 }}>Prepared by ThemisIQ Compliance Inc.</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, lineHeight: 1.2, margin: '0 0 16px' }}>ESG Deal Due Diligence Report</h1>
-          <p style={{ fontSize: 15, color: '#555553', marginBottom: 36, lineHeight: 1.6 }}>
-            Sustainability-regulation screening of {deal.target_name || 'the target company'} for deal, investment-committee and LP reporting: which disclosure regimes reach the target, which statutory size tests were applied, and what compliance is estimated to cost.
-          </p>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-brand)', marginBottom: 12 }}>{m.cover.eyebrow}</div>
+          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '2.2rem', fontWeight: 400, lineHeight: 1.2, margin: '0 0 16px' }}>{m.cover.title}</h1>
+          <p style={{ fontSize: 15, color: '#555553', marginBottom: 36, lineHeight: 1.6 }}>{m.cover.intro}</p>
           <div style={{ borderTop: '1px solid #e8e7e4', borderBottom: '1px solid #e8e7e4', padding: '20px 0', marginBottom: 16 }}>
-            <Row k="Target company" v={deal.target_name || 'Not specified'} />
-            <Row k="Sector" v={sector || 'Not specified'} />
-            <Row k="Jurisdiction" v={jurisdiction || 'Not specified'} />
-            <Row k="Deal type" v={dealTypeLabel(deal.deal_type ?? '')} />
-            {/* "USD 0" would assert a revenue figure we were never given. Say what is true instead.
-                The magnitude is spelled out so a 1000x entry error is legible in the document. */}
-            <Row k="Target annual revenue" v={revenueDeclared ? `${currency} ${revenue.toLocaleString()} (${spellMagnitude(revenue)})` : 'Not provided'} />
-            {/* Spelled out for the same reason as revenue: it is typically the larger figure and
-                carries the same 1000x entry risk, which is otherwise invisible in a bare numeral. */}
-            <Row k="Deal / investment value" v={dealValue > 0 ? `${currency} ${dealValue.toLocaleString()} (${spellMagnitude(dealValue)})` : 'Not provided'} />
-            <Row k="Locations / sites" v={locationCount > 0 ? String(locationCount) : 'Not provided'} />
-            <Row k="Report generated" v={reportDate} />
+            {m.cover.rows.map(([k, v]) => <Row key={k} k={k} v={v} />)}
           </div>
           <div style={{ ...note, background: '#f8f7f5', borderRadius: 8, padding: '10px 12px' }}>
-            <strong style={{ fontWeight: 600 }}>This report is derived, not stored.</strong> Every finding below is computed at the moment of generation from the deal record as it stood on {reportDate}. It is not a snapshot of a past assessment: if the deal record changes, a report generated afterwards will differ.
+            <RichText parts={m.cover.derivedNote} />
           </div>
         </section>
 
         {/* 2 ── APPLICABLE FRAMEWORKS */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>Applicable frameworks</H>
+          <H>{m.applicable.title}</H>
           {/* ⚠️ STANDALONE, AND NOT ATTACHED TO A FINDING. CS3D's note rides on sector-risk findings whose
-              own `framework` string cites CS3D. NOTHING IN SECTOR_RISKS CITES 'Canada S-211' — checked
-              26 Sep 2026 — so the same per-finding gate would have been dead code. Placed at the head of
+              own `framework` string cites CS3D. NOTHING IN SECTOR_RISKS CITES 'Canada S-211' (checked
+              26 Sep 2026), so the same per-finding gate would have been dead code. Placed at the head of
               the frameworks section because that is where a reader looks for what was and was not
               determined, and because a withheld regime that appears nowhere is the failure this whole
               vocabulary exists to prevent. */}
-          {s211Note && (
-            <NotAssessed title={s211Note.heading}>{s211Note.body ?? null}</NotAssessed>
-          )}
-          {!evaluated ? (
-            <NotAssessed title="NOT ASSESSED">
-              Sector and jurisdiction are not both set on this deal, so nothing has been evaluated. An empty list here is <strong style={{ fontWeight: 600 }}>not</strong> a finding that no framework applies.
-            </NotAssessed>
-          ) : view.frameworks === 'assessed-none' ? (
-            <p style={p}>None. No framework was triggered for this jurisdiction, sector and size.</p>
+          {m.applicable.s211Panel && <PanelBox panel={m.applicable.s211Panel} />}
+          {m.applicable.kind === 'not-evaluated' ? (
+            <PanelBox panel={m.applicable.notEvaluatedPanel} />
+          ) : m.applicable.kind === 'none' ? (
+            <p style={p}>{m.applicable.noneSentence}</p>
           ) : (
             <>
-              <p style={note}>Determined from the target&rsquo;s jurisdiction, sector and, where a statute imposes one, its statutory size test. A framework listed here applies on the figures provided.</p>
+              <p style={note}>{m.applicable.intro}</p>
               <table style={tbl}>
                 <thead>
                   <tr style={trh}>
-                    <th style={th}>Framework</th>
-                    <th style={{ ...th, width: 170 }}>Status</th>
+                    <th style={th}>{m.applicable.columns[0]}</th>
+                    <th style={{ ...th, width: 170 }}>{m.applicable.columns[1]}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {frameworks.map(fw => {
-                    const near = nearByFramework.get(fw)
-                    const citation = citationFor(fw)
-                    const row = applicability.find(f => f.framework === fw)
-                    return (
-                      <tr key={fw} style={tr}>
-                        <td style={td}>
-                          <div style={{ fontWeight: 500 }}>{fw}</div>
-                          {citation && <p style={cite}>{citation}</p>}
-                          {near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{nearSentence(near)}</p>}
-                          {/* ⚠️ A ROW THAT APPLIES AND STILL NEEDS CHECKING. `verify` is set where the
-                              engine settled applicability on one route while a condition it never asked
-                              about remains open — today, Canada S-211 reached by a stock-exchange listing,
-                              where the reporting duty also turns on goods. Same amber treatment a
-                              near-threshold row gets, because the reader's job is the same. */}
-                          {row?.verify && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{row.verify}</p>}
-                        </td>
-                        <td style={td}><Chip s={near || row?.verify ? STATE.verify : STATE.applies} /></td>
-                      </tr>
-                    )
-                  })}
+                  {m.applicable.rows.map(r => (
+                    <tr key={r.framework} style={tr}>
+                      <td style={td}>
+                        <div style={{ fontWeight: 500 }}>{r.framework}</div>
+                        {r.citation && <p style={cite}>{r.citation}</p>}
+                        {r.near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.near}</p>}
+                        {r.verify && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.verify}</p>}
+                      </td>
+                      <td style={td}><Chip s={STATE[r.chip]} /></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-              {/* Partial assessment: the list above stands, but naming what was withheld stops a
-                  reader inferring that the missing statutes were considered and excluded. */}
-              {view.notAssessed.length > 0 && (
-                <NotAssessed title={`PARTIAL: ${view.notAssessed.join(', ')} ${partialHeadingPhrase(view)}`}>
-                  {/* Title keeps the UNION — "was anything withheld" is the only claim it makes, and
-                      it must name everything. The BODY explains WHY, which differs per population and
-                      cannot be said of both: one had a limb it could not settle, the other was fully
-                      evaluated and fell outside the modelled route. Only one is non-empty today. */}
-                  {view.unevaluated.length > 0 && partiallyAssessedNote(view.unevaluated, view.fieldsToResolve)}
-                  {view.routeNotMet.length > 0 && routeNotMetNote(view.routeNotMet)}
-                </NotAssessed>
-              )}
+              {m.applicable.partialPanel && <PanelBox panel={m.applicable.partialPanel} />}
             </>
           )}
         </section>
 
         {/* 3 ── NEAR-THRESHOLD FRAMEWORKS */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>Near-threshold frameworks</H>
-          <p style={note}>
-            Raised only where a <strong style={{ fontWeight: 600 }}>borderline figure decides the outcome</strong>: a figure within {NEAR_PCT} of the trigger that, if it moved, would change whether the test is met. The legal answer is unchanged: a framework that applies still applies, and one that does not still does not.
-          </p>
-          {view.nearThreshold === 'not-assessed' ? (
-            <NotAssessed title="NEAR-THRESHOLD: NOT ASSESSED">{notAssessedNote}</NotAssessed>
-          ) : view.nearThreshold === 'assessed-none' ? (
-            <p style={p}>{nearThresholdNoneNote()}</p>
+          <H>{m.nearThreshold.title}</H>
+          <p style={note}><RichText parts={m.nearThreshold.intro} /></p>
+          {m.nearThreshold.kind === 'not-assessed' ? (
+            <PanelBox panel={m.nearThreshold.notAssessedPanel} />
+          ) : m.nearThreshold.kind === 'none' ? (
+            <p style={p}>{m.nearThreshold.noneSentence}</p>
           ) : (
             <table style={tbl}>
               <thead>
                 <tr style={trh}>
-                  <th style={th}>Framework</th>
-                  <th style={th}>Tests met</th>
-                  <th style={th}>Deciding figure</th>
-                  <th style={th}>Value applied</th>
-                  <th style={th}>Threshold</th>
-                  <th style={{ ...th, width: 74 }}>Side</th>
+                  {m.nearThreshold.columns.map((c, i) => <th key={c} style={i === 5 ? { ...th, width: 74 } : th}>{c}</th>)}
                 </tr>
               </thead>
               <tbody>
-                {nearThreshold.map(f => {
-                  const dec = f.test?.limbs.filter(l => l.near && l.state !== 'not-assessed') ?? []
-                  return (
-                    <tr key={f.framework} style={tr}>
-                      <td style={td}>
-                        <div style={{ fontWeight: 500 }}>{f.framework}</div>
-                        <div style={{ marginTop: 4 }}><Chip s={f.applies ? STATE.verify : STATE.nearBelow} /></div>
-                      </td>
-                      <td style={td}>{f.test ? `${f.test.metCount} of ${f.test.requires}` : NOT_PROVIDED}</td>
-                      <td style={td}>{dec.map(l => l.limb.measure.replace(/_/g, ' ')).join('; ')}</td>
-                      <td style={td}>{dec.map(limbValueDisplay).join('; ')}</td>
-                      <td style={td}>{dec.map(limbThresholdDisplay).join('; ')}</td>
-                      <td style={td}>{f.side === 'above' ? 'Above' : 'Below'}</td>
-                    </tr>
-                  )
-                })}
+                {m.nearThreshold.rows.map(r => (
+                  <tr key={r.framework} style={tr}>
+                    <td style={td}>
+                      <div style={{ fontWeight: 500 }}>{r.framework}</div>
+                      <div style={{ marginTop: 4 }}><Chip s={STATE[r.chip]} /></div>
+                    </td>
+                    <td style={td}>{r.testsMet}</td>
+                    <td style={td}>{r.decidingFigure}</td>
+                    <td style={td}>{r.valueApplied}</td>
+                    <td style={td}>{r.threshold}</td>
+                    <td style={td}>{r.side}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
-          {/* Near-but-below never reaches the applicable list (it does not apply), so it is stated
-              here or the reader never learns the target sits just under a trigger. */}
-          {nearBelow.length > 0 && (
+          {m.nearThreshold.belowNotes.length > 0 && (
             <div style={{ marginTop: 4 }}>
-              {nearBelow.map(f => (
-                <p key={f.framework} style={{ ...note, color: 'var(--color-state-warn)' }}>
-                  <strong style={{ fontWeight: 600 }}>{f.framework}:</strong> {nearSentence(f)}
+              {m.nearThreshold.belowNotes.map(n => (
+                <p key={n.framework} style={{ ...note, color: 'var(--color-state-warn)' }}>
+                  <strong style={{ fontWeight: 600 }}>{n.framework}:</strong> {n.sentence}
                 </p>
               ))}
             </div>
@@ -562,27 +456,20 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
 
         {/* 4 ── THRESHOLD LIMBS APPLIED */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>Size tests applied</H>
-          {limbRows.length === 0 ? (
-            <p style={p}>No size-gated framework is in scope for this jurisdiction.</p>
+          <H>{m.sizeTests.title}</H>
+          {m.sizeTests.kind === 'none' ? (
+            <p style={p}>{m.sizeTests.noneSentence}</p>
           ) : (
             <>
-              <p style={note}>
-                Every limb of every statutory size test that was run, with the measure it applied. A result without its measure asserts nothing a reviewer can check. Where the figure collected stands in for a differently-defined statutory measure it is marked <strong style={{ fontWeight: 600 }}>PROXY</strong>.
-              </p>
+              <p style={note}><RichText parts={m.sizeTests.intro} /></p>
               <table style={tbl}>
                 <thead>
                   <tr style={trh}>
-                    <th style={th}>Framework</th>
-                    <th style={th}>Figure tested</th>
-                    <th style={th}>Measure required</th>
-                    <th style={th}>Value applied</th>
-                    <th style={th}>Threshold</th>
-                    <th style={{ ...th, width: 96 }}>Result</th>
+                    {m.sizeTests.columns.map((c, i) => <th key={c} style={i === 5 ? { ...th, width: 96 } : th}>{c}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {limbRows.map((r, i) => (
+                  {m.sizeTests.rows.map((r, i) => (
                     <tr key={i} style={tr}>
                       <td style={td}>{r.framework}</td>
                       <td style={td}>{r.measure}</td>
@@ -597,81 +484,48 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
                   ))}
                 </tbody>
               </table>
-              {/* ⚠️ A STANDING LIMITATION, IN THE SAME REGISTER AS THE TWO-YEAR CHECK BELOW, and not a
-                  framework row: that version was measured and withdrawn on 26 Sep 2026 because it landed
-                  on every deal. Gated so it appears only where it is true and unresolved — not for a
-                  Canadian target, whose size test DID run, and not for a listed Yes, which settles
-                  applicability and carries its own VERIFY note. The heading is inside the constant, which
-                  is why this is the one register entry whose title is split from its body. */}
-              {showCanadaS211JurisdictionCaveat(deal.jurisdiction ?? '', deal.listed_ca_exchange) && (
-                <NotAssessed title={CANADA_S211_JURISDICTION_CAVEAT.split(':')[0].toUpperCase()}>
-                  {CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)}
-                </NotAssessed>
-              )}
-              {activeTests.filter(t => !t.lookbackModelled).map(t => (
-                <NotAssessed key={t.framework} title={`TWO-YEAR CHECK NOT RUN: ${t.framework}`}>
-                  The statute measures over {t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a test in the prior year and has since dipped is <strong style={{ fontWeight: 600 }}>under-called</strong>. Such a target surfaces above as a borderline figure just below the trigger.
-                </NotAssessed>
-              ))}
+              {m.sizeTests.panels.map(panel => <PanelBox key={panel.title} panel={panel} />)}
             </>
           )}
         </section>
 
         {/* 5 ── ESG RISK FINDINGS */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>ESG risk findings</H>
-          {risks.length === 0 ? (
-            <p style={p}>{sector ? 'No sector-specific ESG risk template is held for this sector.' : 'No sector is set on this deal, so no sector risk findings were produced.'}</p>
+          <H>{m.risks.title}</H>
+          {m.risks.kind === 'none' ? (
+            <p style={p}>{m.risks.noneSentence}</p>
           ) : (
             <>
-              <p style={note}>Sector-specific risks for {sector}. The framework named on each finding resolves against the frameworks actually detected above, so a finding can never cite a statute this report withheld.</p>
-              {/* UNEVALUATED only. A routeNotMet framework was fully evaluated AND still appears in the
-                  labels below (its token is emitted, qualified), so both of this banner's claims would
-                  be false of it. Silence on a routeNotMet-only deal is correct: nothing vanished from
-                  the Framework column, and the PARTIAL panel above still names what is unresolved. */}
-              {view.unevaluated.length > 0 && (
-                <NotAssessed title="FRAMEWORK COLUMN PARTIALLY RESOLVED">
-                  The {view.unevaluated.join(' / ')} size test could not be completed, so {view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. {resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}
-                </NotAssessed>
-              )}
+              <p style={note}>{m.risks.intro}</p>
+              {m.risks.unresolvedPanel && <PanelBox panel={m.risks.unresolvedPanel} />}
               <table style={tbl}>
                 <thead>
                   <tr style={trh}>
-                    <th style={{ ...th, width: 84 }}>Severity</th>
-                    <th style={th}>Risk</th>
-                    <th style={{ ...th, width: 150 }}>Framework</th>
+                    <th style={{ ...th, width: 84 }}>{m.risks.columns[0]}</th>
+                    <th style={th}>{m.risks.columns[1]}</th>
+                    <th style={{ ...th, width: 150 }}>{m.risks.columns[2]}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {risks.map((r, i) => {
-                    const tokens = mapFramework(r.framework)
-                    const cfg = SEV[r.severity]
-                    return (
-                      <tr key={i} style={tr}>
-                        <td style={td}><Chip s={cfg} /></td>
-                        <td style={td}>
-                          <div style={{ fontWeight: 500 }}>{r.risk}</div>
-                          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginTop: 3 }}>{r.detail}</div>
-                          {/* Printed in the same amber-cite style as the CS3D qualification below,
-                              so a conditioned finding survives a greyscale print as text rather
-                              than as a colour a reader has to interpret. */}
-                          {r.scope === 'conditional' && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.condition}</p>
-                          )}
-                          {/* Per-finding token check AND per-deal note — see the wizard's note on
-                              why both. The colon and full stop belong to the BODY, not the heading:
-                              a heading-only line must not trail punctuation introducing nothing. */}
-                          {cs3dNote && tokens.some(t => t.framework === 'CS3D' && t.qualified) && (
-                            <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>
-                              <strong style={{ fontWeight: 600 }}>{cs3dNote.heading}{cs3dNote.body ? ':' : ''}</strong>
-                              {cs3dNote.body ? ` ${cs3dNote.body}.` : ''}
-                            </p>
-                          )}
-                        </td>
-                        <td style={td}>{regimeLabel(tokens)}</td>
-                      </tr>
-                    )
-                  })}
+                  {m.risks.rows.map((r, i) => (
+                    <tr key={i} style={tr}>
+                      <td style={td}><Chip s={SEV[r.severity]} /></td>
+                      <td style={td}>
+                        <div style={{ fontWeight: 500 }}>{r.risk}</div>
+                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginTop: 3 }}>{r.detail}</div>
+                        {/* Printed in the same amber-cite style as the CS3D qualification below,
+                            so a conditioned finding survives a greyscale print as text rather
+                            than as a colour a reader has to interpret. */}
+                        {r.condition !== null && (
+                          <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.condition}</p>
+                        )}
+                        {r.cs3dLine && (
+                          <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}><RichText parts={r.cs3dLine} /></p>
+                        )}
+                      </td>
+                      <td style={td}>{r.framework}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </>
@@ -680,181 +534,118 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
 
         {/* 6 ── COMPLIANCE COST ESTIMATE */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>Compliance cost estimate</H>
-          {/* The analyst's question is what remediation costs and whether it moves the model — a
-              diligence finding. Leading with ThemisIQ's own price made a finding read as a quote,
-              so the market reference comes first and larger, and the ThemisIQ figure follows as one
-              route rather than the headline. */}
-          <p style={note}>
-            An estimate of what it would cost to bring {deal.target_name || 'the target'} into compliance with the regimes identified above, given as a market reference range with one priced alternative. Both figures are first-year, in USD, and neither is a quotation.
-          </p>
+          <H>{m.cost.title}</H>
+          <p style={note}>{m.cost.intro}</p>
           <div className="print-stack" style={{ display: 'flex', gap: 14, marginBottom: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
             <div className="print-keep" style={{ flex: '1.6 1 300px', border: '1px solid #0d0d0d', borderRadius: 10, padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>Traditional consultant, first year</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.85rem', fontWeight: 400, lineHeight: 1.15 }}>{consultantRange}</div>
-              <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>Indicative market range, scaled per obligation for this target&rsquo;s sector and site count.</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>{m.cost.consultant.label}</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.85rem', fontWeight: 400, lineHeight: 1.15 }}>{m.cost.consultant.figure}</div>
+              <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>{m.cost.consultant.note}</div>
             </div>
             <div className="print-keep" style={{ flex: '1 1 220px', border: '1px solid #e8e7e4', borderRadius: 10, padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>ThemisIQ, scope-matched modules</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.15, color: '#555553' }}>{themisIq}</div>
-              <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>One available route, priced for the modules this scope requires.</div>
+              <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>{m.cost.themisIq.label}</div>
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.15, color: '#555553' }}>{m.cost.themisIq.figure}</div>
+              <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>{m.cost.themisIq.note}</div>
             </div>
           </div>
-          {/* Inferable from the cover, but stating it where the price appears makes the report
-              harder to fault. The consultant figures are benchmarks, NOT citations — the source
-              note on CONSULTANT_RANGES says "Indicative benchmarks, not quotes", so this must not
-              claim they were cited or obtained. */}
-          <p style={{ ...note, fontSize: 11, color: 'var(--color-ink-muted)' }}>
-            <strong style={{ fontWeight: 600 }}>Disclosure:</strong> ThemisIQ Compliance Inc. prepared this report and also supplies the software priced in the second figure. The consultant range is an indicative benchmark drawn from market analysis, not a quotation obtained from any firm.
-          </p>
+          <p style={{ ...note, fontSize: 11, color: 'var(--color-ink-muted)' }}><RichText parts={m.cost.disclosure} /></p>
 
           <table style={tbl}>
-            <thead>
-              <tr style={trh}>
-                <th style={th}>Included obligation</th>
-                <th style={{ ...th, width: 190 }}>ThemisIQ</th>
-                <th style={{ ...th, width: 140 }}>Consultant (reference)</th>
-              </tr>
-            </thead>
+            <ObligationHead columns={m.cost.included.columns} />
             <tbody>
-              {obligations.included.map((o, i) => (
+              {m.cost.included.rows.map((o, i) => (
                 <tr key={i} style={tr}>
                   <td style={td}>
                     <div style={{ fontWeight: 500 }}>{o.label}</div>
                     {o.scopeNote && <p style={cite}>{o.scopeNote}</p>}
                   </td>
-                  <td style={td}>{obligationPriceLabel(o.pricing)}</td>
-                  <td style={td}>USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</td>
+                  <td style={td}>{o.themisIq}</td>
+                  <td style={td}>{o.consultant}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           <table style={tbl}>
-            <thead>
-              <tr style={trh}>
-                <th style={th}>Also recommended, not in the ThemisIQ total</th>
-                <th style={{ ...th, width: 190 }}>ThemisIQ</th>
-                <th style={{ ...th, width: 140 }}>Consultant (reference)</th>
-              </tr>
-            </thead>
+            <ObligationHead columns={m.cost.recommended.columns} />
             <tbody>
-              {obligations.recommended.map((o, i) => (
+              {m.cost.recommended.rows.map((o, i) => (
                 <tr key={i} style={tr}>
                   <td style={td}>{o.label}</td>
-                  <td style={td}>{obligationPriceLabel(o.pricing)}</td>
-                  <td style={td}>USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</td>
+                  <td style={td}>{o.themisIq}</td>
+                  <td style={td}>{o.consultant}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {obligations.flagged.length > 0 && (
+          {m.cost.flagged.rows.length > 0 && (
             <table style={tbl}>
-              <thead>
-                <tr style={trh}>
-                  <th style={th}>Flagged: separate specialist, in neither total</th>
-                  <th style={{ ...th, width: 190 }}>ThemisIQ</th>
-                  <th style={{ ...th, width: 140 }}>Consultant (reference)</th>
-                </tr>
-              </thead>
+              <ObligationHead columns={m.cost.flagged.columns} />
               <tbody>
-                {obligations.flagged.map((o, i) => (
+                {m.cost.flagged.rows.map((o, i) => (
                   <tr key={i} style={tr}>
                     <td style={td}>
                       <div style={{ fontWeight: 500 }}>{o.label}</div>
                       {o.scopeNote && <p style={cite}>{o.scopeNote}</p>}
                     </td>
-                    <td style={td}>{obligationPriceLabel(o.pricing)}</td>
-                    <td style={td}>Not included</td>
+                    <td style={td}>{o.themisIq}</td>
+                    <td style={td}>{o.consultant}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
 
-          {/* The cost table is driven by the APPLIES-filtered framework list, so a regime that
-              abstains prices nothing. Stated here because the omission is otherwise invisible: the
-              reader sees a total, not the module that is missing from it. */}
-          <p style={note}>
-            This estimate covers only the regimes established as applying above. Where a framework is shown as not assessed, no module is priced for it.
-          </p>
+          <p style={note}>{m.cost.scopeNote}</p>
 
-          {complianceCost && (
-            <p style={note}>
-              <strong style={{ fontWeight: 600 }}>ESG value-at-risk exposure:</strong> approximately {(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value ({currency} {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess. This is an indicative exposure, not a cost, and requires specialist confirmation.
-            </p>
-          )}
+          {m.cost.exposure && <p style={note}><RichText parts={m.cost.exposure} /></p>}
         </section>
 
         {/* 7 ── DATA-ROOM GAPS */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>Data-room gaps</H>
+          <H>{m.dataRoom.title}</H>
           <table style={tbl}>
             <thead>
               <tr style={trh}>
-                <th style={th}>Item</th>
-                <th style={{ ...th, width: 250 }}>Status</th>
+                <th style={th}>{m.dataRoom.columns[0]}</th>
+                <th style={{ ...th, width: 250 }}>{m.dataRoom.columns[1]}</th>
               </tr>
             </thead>
             <tbody>
-              <tr style={tr}>
-                <td style={td}>GHG inventory / emissions data</td>
-                <td style={{ ...td, fontWeight: 500, color: deal.has_ghg_data ? '#0F6E56' : '#B91C1C' }}>{deal.has_ghg_data ? 'Available' : 'MISSING: request from target'}</td>
-              </tr>
-              <tr style={tr}>
-                <td style={td}>ESG report or sustainability disclosure</td>
-                <td style={{ ...td, fontWeight: 500, color: deal.has_esg_report ? '#0F6E56' : '#B91C1C' }}>{deal.has_esg_report ? 'Available' : 'MISSING: request from target'}</td>
-              </tr>
+              {m.dataRoom.rows.map(r => (
+                <tr key={r.item} style={tr}>
+                  <td style={td}>{r.item}</td>
+                  <td style={{ ...td, fontWeight: 500, color: r.available ? '#0F6E56' : '#B91C1C' }}>{r.status}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>
 
         {/* 8 ── FX BASIS */}
         <section className="page" style={{ marginTop: 40 }}>
-          <H>FX basis for threshold tests</H>
-          <p style={note}>
-            Revenue and balance-sheet figures are converted into each threshold&rsquo;s statutory currency for comparison. <strong style={{ fontWeight: 600 }}>The statutory figure itself is never converted</strong>, so every citation above can be checked against the legislation verbatim.
-          </p>
-          <p style={note}>
-            Rates marked <strong style={{ fontWeight: 600 }}>transcribed</strong> are copied verbatim from the source document and can be checked against it digit for digit. Rates marked <strong style={{ fontWeight: 600 }}>DERIVED</strong> are computed by ThemisIQ from those figures and appear nowhere in the source.
-          </p>
+          <H>{m.fx.title}</H>
+          {m.fx.paras.map((para, i) => <p key={i} style={note}><RichText parts={para} /></p>)}
           <table style={tbl}>
             <tbody>
-              <tr style={tr}>
-                <td style={{ ...td, width: 210, color: 'var(--color-ink-muted)' }}>Rate source</td>
-                <td style={td}>{FX_SOURCE}</td>
-              </tr>
-              <tr style={tr}>
-                <td style={{ ...td, color: 'var(--color-ink-muted)' }}>Rates as of</td>
-                <td style={td}>{FX_AS_OF}</td>
-              </tr>
-              <tr style={tr}>
-                <td style={{ ...td, color: 'var(--color-ink-muted)' }}>Deal currency</td>
-                <td style={td}>{currency}</td>
-              </tr>
-              {fxBasisRows.map((r, i) => (
+              {m.fx.rows.map(([k, v], i) => (
                 <tr key={i} style={tr}>
-                  <td style={{ ...td, color: 'var(--color-ink-muted)' }}>{r[0]}</td>
-                  <td style={td}>{r[1]}</td>
+                  <td style={i === 0 ? { ...td, width: 210, color: 'var(--color-ink-muted)' } : { ...td, color: 'var(--color-ink-muted)' }}>{k}</td>
+                  <td style={td}>{v}</td>
                 </tr>
               ))}
-              <tr style={tr}>
-                <td style={{ ...td, color: 'var(--color-ink-muted)' }}>Size tests available</td>
-                <td style={td}>{activeTests.map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ') || 'None'}</td>
-              </tr>
             </tbody>
           </table>
         </section>
 
         {/* 9 ── IMPORTANT NOTICE */}
         <section className="page" style={{ marginTop: 48 }}>
-          <H>Important Notice</H>
-          {disclaimerParas('screening').map((para, i) => (
+          <H>{m.notice.title}</H>
+          {m.notice.paras.map((para, i) => (
             <p key={'disc' + i} style={{ ...p, fontSize: 11, color: 'var(--color-ink-muted)' }}>{para}</p>
           ))}
         </section>
-
         {/* ── UPSELL — SCREEN ONLY, AND ONLY WHERE THERE IS SOMETHING TO SELL ────────────────────
             `.no-print`, deliberately. This document is printed and sent to counterparties, deal
             teams and investment committees; a "buy ThemisIQ" panel inside a saved PDF would travel
@@ -897,9 +688,9 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
         )}
 
         <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center', lineHeight: 1.7 }}>
-          ThemisIQ Compliance Inc. · www.themisiq.co · Reference {reference} · Generated {reportDate}
+          {m.footer.line}
           <br />
-          This assessment reflects the figures held for this deal on {reportDate}. It is derived at generation, not stored, so a report generated on another date may differ.
+          {m.footer.note}
         </div>
       </div>
 

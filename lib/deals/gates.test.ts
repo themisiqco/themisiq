@@ -360,7 +360,11 @@ describe('S. the surfaces defer to the resolver', () => {
     // worse than one that finds none, so both ends are pinned and the start is checked.
     const start = src.indexOf("{upsell !== 'none' && (")
     expect(start, 'the upsell block moved or was renamed').toBeGreaterThan(-1)
-    const end = src.lastIndexOf('ThemisIQ Compliance Inc.')     // the FOOTER line, not the cover
+    // The FOOTER, closing the slice. Since 29 Sep 2026 its wording lives in buildDealReportModel
+    // (lib/deals/reportModel.ts) and the page renders {m.footer.line}, which appears once in this
+    // file; the company-name anchor this used before is no longer in the page at all.
+    expect(src.split('{m.footer.line}').length - 1, 'the footer anchor must be unique').toBe(1)
+    const end = src.indexOf('{m.footer.line}')
     expect(end, 'the report footer must follow the upsell').toBeGreaterThan(start)
     const block = src.slice(start, end)
     expect(block.length, 'the upsell block is empty').toBeGreaterThan(200)
