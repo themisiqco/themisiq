@@ -285,7 +285,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
 // filled in, and the first notice was `alert('Save failed: …')` at the end. This is the same
 // refusal, moved to before the effort.
 //
-// IT REPLACES, IT DOES NOT OVERLAY. The mid-wizard PaywallOverlay blurs and sets
+// IT REPLACES, IT DOES NOT OVERLAY. Step 5's PaywallOverlay blurs and sets
 // pointerEvents:'none', which is survivable over a results panel the customer cannot edit anyway
 // and is NOT survivable over inputs — it strands whatever they typed behind a sheet of glass.
 // Rendering this in place of a fresh wizard means there is never any typed work to strand.
@@ -342,20 +342,54 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
   )
 }
 
-function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
+// ⚠️ ONE CALL SITE, AND IT IS STEP 5 ONLY. renderStep4 lost its copy of this when the totals and the
+// workings stopped being gated; do not put it back, and read the note there for why. Everything listed
+// under "What you unlock" must therefore be something step 4 does NOT already show.
+//
+// ⚠️ EVERY CLAIM IN HERE WAS CHECKED AGAINST THE CODE, AND THREE DID NOT SURVIVE. "Cancel anytime": no
+// subscriptions, Checkout runs in mode 'payment'. "Instant access": the entitlement is written by the
+// Stripe webhook, asynchronously to the redirect, and /dashboard reads neither purchase=success nor
+// session_id, so a customer can land back with nothing showing. "Priority support through your filing
+// deadline": that string existed nowhere else in app/, lib/ or docs/, so there was no support tier to
+// honour. A paywall is the worst place in a compliance product to keep a claim nobody can honour.
+//
+// onUnlock, NOT AN HREF, because the draft has to be stashed before the navigation. See
+// stashDraftAndGoToPricing.
+function PaywallOverlay({ frameworks, onUnlock }: { frameworks: string[]; onUnlock: () => void }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Your GHG inventory is complete.</div>
-        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 emissions have been calculated to {frameworks.join(', ')} standards, with full calculation workings ready for third-party assurance. Unlock your submission-ready reports with one click.</div>
+        {/* ⚠️ IT DOES NOT SAY THE INVENTORY IS COMPLETE, AND IT USED TO. Nothing on this page tests
+            completeness, and step 5 is reachable from the tab strip with one location and one figure
+            entered, so "Your GHG inventory is complete." was a claim the product could not check. The
+            headline now names what the module does instead, in the same register as the read-on banner
+            and the Save refusal, so all three say one thing. */}
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: '#0d0d0d', marginBottom: 8 }}>Download your reports with the GHG module.</div>
+        {/* "One click" is gone with it: the path from here is /pricing, the configurator, the consent
+            step, Stripe, and then the webhook. The last sentence is the draft promise, said where it can
+            be read BEFORE the button rather than in a modal after it. */}
+        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package and saving. Your figures are kept while you choose a plan.</div>
         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
           {[
-            'Submission-ready reports for all selected frameworks',
-            'Assurance-ready evidence uploads per emission source',
-            'Full calculation workings export (ISO 14064-3)',
-            'Unlimited updates throughout your reporting year',
-            'Priority support through your filing deadline',
+            // 12 MONTHS FROM PURCHASE, NOT "your reporting year", WHICH IS A DIFFERENT PERIOD THE TERM
+            // KNOWS NOTHING ABOUT. lib/entitlementTerm.ts grants ENTITLEMENT_TERM_DAYS = 365 from the
+            // purchase instant; inventory.reporting_year and fiscal_year_end_month are independent
+            // fields. The old line also advertised "unlimited" updates, which described the absence of
+            // a limit that never existed.
+            'Save and update your inventory for 12 months from purchase',
+            // "Downloadable", because step 4 already shows the figures and the workings for nothing.
+            // The old line said "submission-ready", which asserts a portal integration that does not
+            // exist anywhere in this codebase: generateExport writes a CSV per framework.
+            'A downloadable report for each framework you selected',
+            // ⚠️ "LINKS", NOT "ACCESS", AND THE NOUN IS THE WHOLE POINT. VerifierInvite's own copy was
+            // corrected away from "revoke access": a verifier link is a bearer credential, and revoking
+            // closes the page, not anything already downloaded. See the note above that paragraph. A
+            // paywall is the last place to re-make a claim the feature itself declines to make.
+            // Enforced server side by trg_enforce_verifier_invite_term (BEFORE INSERT on verifier_access,
+            // term_end > now()), so this line is true for whoever buys from here.
+            'An assurance package, plus verifier links you grant and revoke',
+            'Upload bills and records as evidence behind each figure',
           ].map(text => (
             <div key={text} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 8 }}>
               <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-brand)', flexShrink: 0, marginTop: 6 }} />
@@ -363,14 +397,21 @@ function PaywallOverlay({ frameworks }: { frameworks: string[] }) {
             </div>
           ))}
         </div>
-        <button onClick={() => window.location.href = '/signup?upgrade=true'} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, background: 'var(--color-brand)', color: 'var(--color-on-dark)' }}>
-          Unlock My Reports →
+        {/* Was /signup?upgrade=true, which read no `upgrade` param, carried no `next`, and therefore
+            defaulted a new account to /dashboard with no purchase started and the draft unrestored. */}
+        <button onClick={onUnlock} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, background: 'var(--color-brand)', color: 'var(--color-on-dark)' }}>
+          See GHG pricing →
         </button>
-        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Secure payment · Instant access · Cancel anytime</div>
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Secure payment through Stripe</div>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
           {['Your data is encrypted', 'Never sold or shared', 'PIPEDA compliant', 'Not used to train AI'].map(t => (
             <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#64fe3e', flexShrink: 0 }} />
+              {/* Was #64fe3e, the lime from the retired 2026 gradient. CLAUDE.md: there is no brand
+                  gradient, and it survives only as flat chart categories and in the unmigrated email
+                  templates. This is neither. All four chips are supported: /trust and /security for the
+                  encryption and the never-sold line, /trust for the AI-training line, /security and
+                  /trust for PIPEDA. */}
+              <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--color-state-ok)', flexShrink: 0 }} />
               <span style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>{t}</span>
             </div>
           ))}
@@ -593,10 +634,13 @@ const searchParams = useSearchParams()
   // different to a lapsed customer than to someone who never bought. This hook is what lets the
   // screen say the same thing BEFORE the work is done rather than after.
   const ghgAccess = useEntitlementAccess('ghg')
-  // Steps 4-5 keep the meaning they were written with — "a row exists" — so the existing
-  // PaywallOverlay behaviour is unchanged for both active and expired customers. Deliberate: this
-  // change adds a gate at entry, it does not re-gate the report and export surfaces.
+  // "A ROW EXISTS", INCLUDING AN EXPIRED ONE, and three surfaces read it: step 5's PaywallOverlay, the
+  // eleven DocUpload gates, and step 5's subtitle. Step 4 no longer does. An expired customer keeps all
+  // three, which is the meaning every caller was written against.
   const isPaid = ghgAccess === 'active' || ghgAccess === 'expired'
+  // The one read-on banner arm that is information rather than a warning: no plan, and no inventory to
+  // lose. Everything else that banner says reports a state a customer would want flagged.
+  const noticeIsNeutral = ghgAccess === 'none' && !inventoryId
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
   const { allowance: locationAllowance, loading: allowanceLoading } = useGhgLocationAllowance()
   const [showLocationWall, setShowLocationWall] = useState(false)
@@ -1453,6 +1497,33 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // Lock the company field once an inventory is saved AND linked to a company.
   const companyLocked = !!inventoryId && !!inventory.company_id
 
+  // ONE PATH TO PRICING FROM INSIDE THE WIZARD, AND THREE CALLERS SHARE IT: handleSave's refusal, the
+  // export overlay's button, and the unsaved-changes banner on steps 4 and 5. All three answer the same
+  // question with the same three moves: stash the draft with the right lifetime, say something if there
+  // is something to say, then navigate. Three copies would mean three copies of the `anon: !session`
+  // rule and of the stash-first ordering, and the second copy is where one of them quietly becomes
+  // `anon: true`.
+  //
+  // ⚠️ THE STASH IS FIRST, ALWAYS. An alert is modal but dismissable, and a visitor can navigate away
+  // from one; writing the draft before either the alert or the redirect means their figures are safe
+  // even if they never arrive at /pricing. Same ordering as lib/checkout.ts's unauthenticated branch.
+  //
+  // ⚠️ IT RESOLVES THE SESSION ITSELF rather than taking one. getSession() reads the persisted session
+  // rather than the network, so the second read on handleSave's path costs nothing. If the session
+  // lapsed between the two reads, `anon: true` is the safer of the two stamps, which is the direction
+  // this errs in: lib/drafts.ts gives an anonymous draft two hours and a signed-in one no expiry.
+  //
+  // ⚠️ NO MESSAGE FROM THE OVERLAY BUTTON, AND THAT IS NOT AN OVERSIGHT. handleSave alerts because a
+  // Save was REFUSED and the reader has to be told why. Clicking "See GHG pricing" refuses nothing: the
+  // navigation is what they asked for, and the only news is that their figures are kept, which the
+  // overlay says in copy they can read before clicking rather than in a modal after it.
+  const stashDraftAndGoToPricing = async (message?: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    saveGhgDraft(inventory, { anon: !session })
+    if (message) alert(message)
+    window.location.href = '/pricing?modules=ghg'
+  }
+
   const handleSave = async () => {
     if (isSaving) return
     lastSaveError.current = null
@@ -1485,14 +1556,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // companies insert below, so falling through would leave an orphan company row behind on every
     // refused Save: a row the customer never asked for, created by a Save that failed.
     //
-    // ⚠️ `anon: !session`, NOT A HARDCODED true. lib/drafts.ts expires an anonymous draft two hours
-    // after it was WRITTEN, whoever later reads it, and does not expire a signed-in one. A signed-in
-    // 'none' visitor is a customer with working state, not a stranger, so stamping them anonymous would
-    // bin their figures two hours into a purchase decision.
+    // The stash, the draft lifetime and the redirect are stashDraftAndGoToPricing's, shared with the
+    // export overlay's button and the unsaved-changes banner. See its header for the `anon: !session`
+    // rule and for the ordering.
     if (!session || ghgAccess === 'none') {
-      saveGhgDraft(inventory, { anon: !session })
-      alert('Saving needs the GHG module. Your figures will be kept while you choose a plan.')
-      window.location.href = '/pricing?modules=ghg'
+      await stashDraftAndGoToPricing('Saving needs the GHG module. Your figures will be kept while you choose a plan.')
       return
     }
     // Resolve the company_id for this inventory's company_name.
@@ -2870,9 +2938,12 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             </div>
           )
         })()}
-        <p style={sectionSub}>One inventory: {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. Unlock your paid plan to download.</p>
+        {/* ⚠️ THIS LINE RENDERS FOR EVERYONE, PAID INCLUDED, which is why it read oddly both ways: it
+            told a paying customer to unlock a plan they already hold. Branch, rather than hunting for
+            one sentence that is merely inoffensive to both. */}
+        <p style={sectionSub}>One inventory: {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. {isPaid ? 'Download any of them below.' : 'Downloading them needs the GHG module.'}</p>
         <div style={{ position: 'relative' }}>
-          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} />}
+          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} onUnlock={() => { void stashDraftAndGoToPricing() }} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' as const }}>
               {activeFrameworks.map(fw => (
@@ -3257,7 +3328,16 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
             bold lead-in either: the other three arms report something that went wrong, and nothing
             has. */}
         {ghgAccess !== 'active' && ghgAccess !== 'loading' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid var(--color-state-warn)33', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
+          /* ⚠️ AMBER FOR THE THREE ARMS THAT REPORT SOMETHING WRONG, NEUTRAL FOR THE ONE THAT DOES NOT.
+             Expired, unreadable, and save-off-on-a-saved-inventory are all states a customer would want
+             flagged. A first-time visitor on an empty form has done nothing wrong, and an amber bar over
+             their first screen reads as an alert. Tokens only, and deliberately NOT --color-state-info:
+             fuchsia is louder than the amber it would be replacing.
+             ⚠️ AND THE AMBER BORDER NOW RENDERS AT ALL. It was `var(--color-state-warn)33`, which does
+             NOT produce #A94E0D33: var() substitutes a TOKEN STREAM, so the custom property arrives as
+             one hash token and the `33` stays a separate number token. The shorthand was invalid at
+             computed-value time and the browser dropped it, so these banners have had no border. */
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: noticeIsNeutral ? 'var(--color-accent-neutral-wash)' : '#FEF3E2', border: noticeIsNeutral ? '0.5px solid var(--color-line)' : '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
               {ghgAccess === 'expired'
                 ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can read this inventory and everything in it. Saving changes is off until you renew.</>
@@ -3285,9 +3365,27 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
         {(step === 4 || step === 5) && dirty && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid var(--color-state-warn)33', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>You have unsaved changes: save your draft before {step === 5 ? 'exporting' : 'continuing'}.</span>
-            <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' as const }}>{isSaving ? 'Saving…' : 'Save draft'}</button>
+          /* ⚠️ IT DOES NOT TELL A 'none' VISITOR TO SAVE. Since 'none' stopped walling, this banner is
+             reachable by someone whose Save cannot succeed: the trigger refuses the write, so "save your
+             draft before exporting" names a step they cannot take. That arm says what is actually needed
+             and routes to the same place as the Save refusal, through the same helper, so the draft is
+             stashed either way. Paid and expired visitors see the banner they always saw: an expired
+             customer's Save is also refused, but by a term that can be renewed, and handleSave already
+             carries the wording for that.
+             Border: see the note on the read-on banner above for why the old `var(--color-state-warn)33`
+             rendered no border at all. */
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
+            {ghgAccess === 'none' ? (
+              <>
+                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>Saving needs the GHG module. Your figures will be kept while you choose a plan.</span>
+                <button onClick={() => { void stashDraftAndGoToPricing() }} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>See GHG pricing →</button>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>You have unsaved changes: save your draft before {step === 5 ? 'exporting' : 'continuing'}.</span>
+                <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: isSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' as const }}>{isSaving ? 'Saving…' : 'Save draft'}</button>
+              </>
+            )}
           </div>
         )}
         {step === 4 && renderStep4()}

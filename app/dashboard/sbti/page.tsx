@@ -1309,7 +1309,12 @@ export default function SbtiDashboard() {
                     </div>
 
                     {/* Honest-scoping note — a per-target ✓ is NOT full net-zero compliance. */}
-                    <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid var(--color-state-warn)33', borderRadius: 12, padding: '1rem 1.2rem' }}>
+                    {/* ⚠️ THE BORDER RENDERED AS NOTHING UNTIL NOW. It was `var(--color-state-warn)33`,
+                        which does NOT produce #A94E0D33: var() substitutes a TOKEN STREAM, so the custom
+                        property arrives as one hash token and the `33` stays a separate number token. The
+                        shorthand was invalid at computed-value time and the browser dropped it. Same fix
+                        as the two banners in app/dashboard/ghg/page.tsx. */}
+                    <div style={{ marginTop: 20, background: '#FEF3E2', border: '1px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 12, padding: '1rem 1.2rem' }}>
                       <div style={{ fontSize: 12, color: '#555553', fontWeight: 400, lineHeight: 1.65 }}>
                         <strong style={{ fontWeight: 600, color: '#0d0d0d' }}>These checks are per-target only.</strong> A ✓ confirms this scope&rsquo;s net-zero rules (≥{NET_ZERO.minAbsoluteReductionPct}% reduction, ≤{NET_ZERO.latestNetZeroYear}, absolute method). It does <strong style={{ fontWeight: 600 }}>not</strong> confirm full net-zero compliance, which also requires aggregate coverage of ≥90% of total emissions across all scopes, ≥90% Scope 3 coverage, and neutralisation of residual emissions via permanent removals, all assessed separately in a later step.
                       </div>
