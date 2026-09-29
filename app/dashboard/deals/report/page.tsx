@@ -688,13 +688,13 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           <p style={note}>
             An estimate of what it would cost to bring {deal.target_name || 'the target'} into compliance with the regimes identified above, given as a market reference range with one priced alternative. Both figures are first-year, in USD, and neither is a quotation.
           </p>
-          <div style={{ display: 'flex', gap: 14, marginBottom: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
-            <div style={{ flex: '1.6 1 300px', border: '1px solid #0d0d0d', borderRadius: 10, padding: '16px 18px' }}>
+          <div className="print-stack" style={{ display: 'flex', gap: 14, marginBottom: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
+            <div className="print-keep" style={{ flex: '1.6 1 300px', border: '1px solid #0d0d0d', borderRadius: 10, padding: '16px 18px' }}>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>Traditional consultant, first year</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.85rem', fontWeight: 400, lineHeight: 1.15 }}>{consultantRange}</div>
               <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>Indicative market range, scaled per obligation for this target&rsquo;s sector and site count.</div>
             </div>
-            <div style={{ flex: '1 1 220px', border: '1px solid #e8e7e4', borderRadius: 10, padding: '16px 18px' }}>
+            <div className="print-keep" style={{ flex: '1 1 220px', border: '1px solid #e8e7e4', borderRadius: 10, padding: '16px 18px' }}>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 6 }}>ThemisIQ, scope-matched modules</div>
               <div style={{ fontFamily: 'Georgia, serif', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.15, color: '#555553' }}>{themisIq}</div>
               <div style={{ fontSize: 11, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>One available route, priced for the modules this scope requires.</div>
@@ -909,25 +909,31 @@ function DealReport({ deal, reportDate, reference, upsell }: { deal: DealRow; re
           .no-print { display: none !important; }
           .report-body { padding: 0 !important; max-width: none !important; }
           body { background: white !important; }
-          /* Avoid breaking short sections across pages. Sections that cannot fit on one
-             page must be allowed to split: an unbreakable box taller than the page box
-             gets pushed whole and clipped, which silently drops content. */
+          /* BREAK PROTECTION ONLY ON THINGS A FEW LINES TALL. An unbreakable box that cannot fit
+             the space left on a page is pushed whole, and one taller than a page is clipped.
+             Safari (29 Sep 2026) rendered pages 1 to 3, ending on the amber two-year panels, then
+             blank pages; its saved PDF was blank throughout. The rule that kept every direct child
+             of a section whole was removed for that: it froze paragraphs and wrappers of any height,
+             and needed an exemption list to stop it freezing tables. Everything now flows by
+             default, and avoid is named per element: rows, headings, the amber callouts. */
           .page { page-break-inside: auto; break-inside: auto; }
-          .page > h2 { page-break-after: avoid; break-after: avoid; }
-          .page > *  { page-break-inside: avoid; break-inside: avoid; }
-          /* ...except anything that can ITSELF exceed a page box. The rule above would make a
-             long table — or the wrapper div some of them sit in, or a nested .page section —
-             unbreakable, reintroducing the same defect one level down. Those stay breakable
-             and the protection moves to the row. */
-          .page .page, .page table, .page tbody, .page div:has(table) {
-            page-break-inside: auto; break-inside: auto;
-          }
+          h2 { page-break-inside: avoid; break-inside: avoid; page-break-after: avoid; break-after: avoid; }
           .page tr { page-break-inside: avoid; break-inside: avoid; }
           .page thead { display: table-header-group; }   /* repeat the header on each page */
+          /* NotAssessed panels carry className "page", so inside a section they are .page .page. */
+          .page .page { page-break-inside: avoid; break-inside: avoid; }
           section.page { margin-top: 24px !important; }
-          h2 { page-break-after: avoid; }
+          /* STACKED IN PRINT, BY CLASS. Fragmenting a flex row is where print engines diverge most,
+             so a container marked print-stack prints as a block and its children stack; a child
+             marked print-keep stays whole. Today that is the cost row (:691) and its two cards.
+             The cover's Row is NOT marked: a label and a short value side by side cannot outgrow a
+             page. Classes, not a match on inline style text: that match also caught the .no-print
+             toolbar and, being more specific than .no-print, printed it. */
+          .print-stack { display: block !important; }
+          .print-keep { page-break-inside: avoid; break-inside: avoid; margin-bottom: 12px; }
         }
-        @page { size: A4; margin: 1.6cm 1.6cm 2cm; }
+        /* No size: the paper chosen in the print dialog applies (US Letter or A4). */
+        @page { margin: 1.6cm 1.6cm 2cm; }
       `}</style>
     </div>
   )

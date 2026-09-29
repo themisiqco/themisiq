@@ -328,7 +328,6 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/dashboard/cbam/report/exportXlsx.ts': 10,
   'app/dashboard/cbam/setup/page.tsx': 2,
   'app/dashboard/climate-risk/report/page.tsx': 2,
-  'app/dashboard/deals/report/page.tsx': 2,
   'app/dashboard/ghg/page.tsx': 3,
   'app/dashboard/materiality/report/page.tsx': 2,
   'app/dashboard/materiality/survey/[id]/respondents/import/page.tsx': 2,
