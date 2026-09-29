@@ -133,9 +133,24 @@ export default function DealsListPage() {
     }
   }
 
+  // WHICH WALL, FOR A READER WITHOUT DEALS. Copy and links only: the gate above (isPaid) is unchanged,
+  // and enforce_deals_free_tier_cap() is still what enforces. Decided on the reader's own rows, which
+  // this page already loads, so the wall waits for them rather than showing one version and then
+  // swapping to the other.
+  //   no saved deal, never bought or lapsed   the trigger lets them save one, so lead with that
+  //   a saved deal, never bought              the free deal is used; offer the way back to it
+  //   anything else (lapsed with deals, an unreadable entitlement, a failed load)
+  //                                           the plain wall, which claims nothing about their account
+  // The deal offered is the newest by updated_at, rows[0]: the same deal resolveReportGate and the
+  // wizard's wall treat as the free one.
+  const rowsKnown = !loading && !error
+  const freeDealOpen = rowsKnown && rows.length === 0 && (access === 'none' || access === 'expired')
+  const freeDeal = rowsKnown && access === 'none' ? rows[0] ?? null : null
+
   // Ordered before the paywall: an unresolved entitlement is not a refusal. The page's own
   // "Loading your deals…" state is already the right shape for waiting, so nothing new appears.
-  if (entLoading) return (
+  // An unentitled reader also waits for their rows, which decide which wall they see.
+  if (entLoading || (!isPaid && loading)) return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       <Nav />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 2.5rem' }}>
@@ -149,7 +164,11 @@ export default function DealsListPage() {
     <PaywallCard
       title="Unlock the Deals module"
       body="Screen a target's ESG risk, work out which reporting rules apply to it, and produce a diligence report for your investment committee."
-      href="/pricing?modules=deals"
+      {...(freeDealOpen
+        ? { cta: 'Screen your first deal free →', href: '/dashboard/deals',
+            secondary: { label: 'See pricing & unlock →', href: '/pricing?modules=deals' } }
+        : { href: '/pricing?modules=deals',
+            ...(freeDeal ? { secondary: { label: 'Open your free deal →', href: `/dashboard/deals?id=${freeDeal.id}` } } : {}) })}
     />
   )
 

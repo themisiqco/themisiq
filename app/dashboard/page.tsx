@@ -5,6 +5,7 @@ import { scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import { supabase } from '../../lib/supabase'
+import { useEntitlementAccess } from '../../lib/useEntitlement'
 import { FLAT_MODULE_PRICES } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED } from '../../lib/aiAct'
 
@@ -38,6 +39,13 @@ type DashboardModule = {
   sub: string
   desc: string
   href: string
+  /**
+   * Where the card goes for a user WITHOUT the module, when that should differ from `href`. Absent
+   * means `href` either way, which is every module but Deals.
+   */
+  lockedHref?: string
+  /** The locked card's footer lead, when neither 'Preview free' nor 'Locked' says it. Absent = those. */
+  lockedLead?: string
   color: string
   bg: string
   frameworks: string[]
@@ -191,6 +199,13 @@ const MODULES: DashboardModule[] = [
     // Lands on the list of saved targets, not a blank form: a firm screening several targets
     // needs to pick one, and a bare /dashboard/deals now starts a NEW deal.
     href: '/dashboard/deals/list',
+    // ⚠️ BUT NOT FOR A USER WITHOUT DEALS. The list page walls anyone not entitled, so the card led a
+    // new user to "Unlock the Deals module" and never to the wizard, where their first deal is free
+    // (enforce_deals_free_tier_cap). The wizard is the free tier's front door; a user who has already
+    // used the free deal meets the wizard's own wall there, which links back to that deal.
+    lockedHref: '/dashboard/deals',
+    // Says what the wizard gives an unentitled user: one saved deal, full report included.
+    lockedLead: 'First deal free',
     color: 'var(--color-module-deals-ink)',
     bg: 'var(--color-module-deals-wash)',
     frameworks: ['IFRS S2', 'TCFD', 'SB 253', 'SFDR'],
@@ -261,6 +276,18 @@ export default function Dashboard() {
       setLoading(false)
     })
   }, [])
+
+  // ⚠️ FOR THE DEALS CARD'S LINK ONLY. `unlocked` below is term-blind (any entitlement row counts),
+  // and it stays that way for every card and every other use on this page. The Deals LINK alone
+  // follows the term, through the same hook and the same `term_end > now` test the wizard and
+  // enforce_deals_free_tier_cap() use, so a lapsed customer goes to the wizard, whose wall tells them
+  // their access has expired and offers their saved deal, not to the list page's plain wall.
+  // 'loading' and 'unknown' fall back to the card's own `unlocked`: neither is a finding about the term.
+  const dealsAccess = useEntitlementAccess('deals')
+  const dealsLinkHeld = (unlocked: boolean) =>
+    dealsAccess === 'active' ? true
+      : dealsAccess === 'expired' || dealsAccess === 'none' ? false
+      : unlocked
 
   const getModuleSub = (moduleId: string) =>
     subscriptions.find(s => s.module_id === moduleId)
@@ -363,7 +390,7 @@ export default function Dashboard() {
 
               return (
                 <div key={mod.id} style={{ position: 'relative' }}>
-                  <a href={mod.href} style={{
+                  <a href={(mod.id === 'deals' ? dealsLinkHeld(unlocked) : unlocked) ? mod.href : (mod.lockedHref ?? mod.href)} style={{
                     display: 'block',
                     background: '#fff',
                     border: `1.5px solid ${unlocked ? `color-mix(in srgb, ${mod.color} 25%, transparent)` : '#e8e7e4'}`,
@@ -425,7 +452,7 @@ export default function Dashboard() {
                           // 'Preview free' only where a preview actually exists. A module that
                           // early-returns a paywall reads 'Locked' — promising a preview the page
                           // does not give is worse than saying nothing.
-                          const lead = mod.previewable ? 'Preview free' : 'Locked'
+                          const lead = mod.lockedLead ?? (mod.previewable ? 'Preview free' : 'Locked')
                           return (
                             <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{lead}{price !== null && <> · <span style={{ color: 'var(--color-brand)', fontWeight: 500 }}>unlock for ${price.toLocaleString('en-US')}/yr</span></>}</span>
                           )

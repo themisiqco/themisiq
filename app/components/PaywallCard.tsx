@@ -24,12 +24,15 @@ const GRAD = 'var(--color-brand)'
 // So Climate Risk is `risk` and Supply Chain is `supply`. AN UNRECOGNISED SLUG IS NOT AN ERROR —
 // /pricing silently falls back to selecting GHG — so a typo here reproduces the exact defect this
 // change exists to stop, just one page further along. Check a slug against that list, never guess.
+// `secondary` is OPTIONAL and absent everywhere but the Deals list, which offers the free first deal
+// (or the way back to it) beside the unlock. Absent, the card renders exactly as it always has.
 export default function PaywallCard({
   title,
   body,
   cta = 'See pricing & unlock →',
   href = '/pricing',
-}: { title: string; body: string; cta?: string; href?: string }) {
+  secondary,
+}: { title: string; body: string; cta?: string; href?: string; secondary?: { label: string; href: string } }) {
   return (
     <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <div style={{ background: '#0d0d0d', borderRadius: 16, padding: '2.5rem 2rem', maxWidth: 440, textAlign: 'center', boxShadow: '0 12px 40px rgba(13,13,13,0.18)' }}>
@@ -37,6 +40,9 @@ export default function PaywallCard({
         <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 400, fontSize: '1.6rem', color: '#fff', margin: '0 0 12px', lineHeight: 1.25 }}>{title}</h2>
         <p style={{ fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.6)', lineHeight: 1.65, margin: '0 0 24px' }}>{body}</p>
         <a href={href} style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>{cta}</a>
+        {secondary && (
+          <a href={secondary.href} style={{ display: 'block', marginTop: 16, fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.8)', textDecoration: 'underline', textUnderlineOffset: 3 }}>{secondary.label}</a>
+        )}
       </div>
     </div>
   )
