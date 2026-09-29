@@ -34,19 +34,16 @@ describe('buildDealReportModel: each fixture reaches its case', () => {
     expect(m.applicable.rows.map(r => r.framework)).not.toContain('SECR')
   })
 
-  it('not-assessed: every amber panel the report has prints, S-211 and the two-year checks included', () => {
+  it('not-assessed: every amber panel a UK deal can raise prints, the S-211 caveat included', () => {
     const m = build(NOT_ASSESSED_DEAL)
     expect(m.applicable.partialPanel?.title).toBe('PARTIAL: SECR NOT ASSESSED')
     expect(m.nearThreshold.kind).toBe('not-assessed')
-    expect(m.sizeTests.panels.map(p => p.title)).toEqual([
-      'CANADA S-211 NOT FULLY ASSESSED',
-      'TWO-YEAR CHECK NOT RUN: Canada S-211',
-      'TWO-YEAR CHECK NOT RUN: CS3D',
-    ])
+    // SECR is the only size test a UK deal runs, and its lookback is modelled, so no two-year panel.
+    expect(m.sizeTests.panels.map(p => p.title)).toEqual(['CANADA S-211 NOT FULLY ASSESSED'])
     expect(m.risks.unresolvedPanel?.title).toBe('FRAMEWORK COLUMN PARTIALLY RESOLVED')
     // No deal value and no locations: the cost section takes both "not provided" branches.
     expect(m.cost.exposure).toBeNull()
-    expect(m.cost.themisIq.figure).toBe('Custom quote: location count not provided')
+    expect(m.cost.themisIq.figure).toBe('Custom quote: headcount and location count not provided')
     expect(m.cover.rows).toContainEqual(['Deal / investment value', 'Not provided'])
   })
 
@@ -185,5 +182,31 @@ describe('the S-211 jurisdiction caveat', () => {
     expect(body.startsWith('The Act can also apply')).toBe(true)
     const cut = CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)
     expect(body.slice(1)).toBe(cut.slice(1))
+  })
+})
+
+describe('two-year panels: only for size tests this deal ran', () => {
+  const twoYear = (m: DealReportModel) => m.sizeTests.panels.map(p => p.title).filter(t => t.startsWith('TWO-YEAR'))
+
+  it('a UK deal runs no S-211 or CS3D test and gets neither panel', () => {
+    expect(twoYear(build(NEAR_THRESHOLD_DEAL))).toEqual([])
+    expect(twoYear(build(NOT_ASSESSED_DEAL))).toEqual([])
+  })
+
+  it('an EU deal whose CS3D test ran, without the lookback modelled, keeps its CS3D panel', () => {
+    const m = build(FX_DEAL)
+    expect(m.sizeTests.rows.some(r => r.framework === 'CS3D')).toBe(true)
+    expect(twoYear(m)).toEqual(['TWO-YEAR CHECK NOT RUN: CS3D'])
+  })
+
+  it('a Canadian deal whose S-211 test ran keeps its S-211 panel, and says "either of the two"', () => {
+    const m = build({ ...NEAR_THRESHOLD_DEAL, jurisdiction: 'Canada', currency: 'CAD' })
+    expect(twoYear(m)).toEqual(['TWO-YEAR CHECK NOT RUN: Canada S-211'])
+    const body = m.sizeTests.panels.find(p => p.title.endsWith('Canada S-211'))!.body[0] as string
+    expect(body).toContain('either of the two most recent financial years')
+  })
+
+  it('a US deal, which runs SB 253 with its lookback modelled, gets no two-year panel', () => {
+    expect(twoYear(build({ ...FX_DEAL, jurisdiction: 'USA' }))).toEqual([])
   })
 })

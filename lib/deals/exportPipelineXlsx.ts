@@ -186,11 +186,11 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     const pctLow: Cell = cost ? cost.pctLow : NO_VALUE
     const pctHigh: Cell = cost ? cost.pctHigh : NO_VALUE
 
-    // A null total has TWO distinct causes and they are not the same fact: no location count
-    // entered (we cannot pick a tier), or the Advisory tier (there is no self-serve price).
+    // A null total has TWO distinct causes and they are not the same fact: neither a headcount nor a
+    // location count entered (we cannot pick a band), or a band with no self-serve price.
     // Zero would assert "this costs nothing", which is never what either means.
-    const obligations = getObligations(locations, flatFrameworks, sector || undefined)
-    const themisIq: Cell = obligations.locationUnset ? 'LOCATIONS NOT PROVIDED'
+    const obligations = getObligations(locations, flatFrameworks, sector || undefined, employees)
+    const themisIq: Cell = obligations.locationUnset ? 'HEADCOUNT AND LOCATIONS NOT PROVIDED'
       : obligations.themisIqTotal == null ? 'QUOTE REQUIRED'
       : obligations.themisIqTotal
 
@@ -275,7 +275,7 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
       'The rule was not evaluated, usually because a size figure it depends on is missing. ' +
       'It is NOT a finding that the rule does not apply. The "figures needed" column says what would settle it.'],
     ['QUOTE REQUIRED', 'Above the self-serve range; priced on request rather than from the price list.'],
-    ['LOCATIONS NOT PROVIDED', 'The number of sites has not been entered, so no price band can be chosen.'],
+    ['HEADCOUNT AND LOCATIONS NOT PROVIDED', 'Neither the headcount nor the number of sites has been entered, so no price band can be chosen.'],
     ['SECTOR NOT SET', 'No sector, so no risk screen was run. It does not mean no risks were found.'],
     [],
     ['A caution on currency',

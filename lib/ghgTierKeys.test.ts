@@ -53,7 +53,12 @@ const sourceFiles = (): string[] => {
  * what the page shows. Batch 1 changes no behaviour. Phase 1 batch 5 deletes this entry with the
  * code it covers; if the entry is still here when the ladder is gone, T5 below fails.
  */
-const ALLOWED_TO_NAME_THE_KEYS = ['app/deals/[token]/page.tsx']
+//
+// EMPTY SINCE 29 Sep 2026. The share page's ladder is gone: its /order tier now comes from
+// ghgOrderTier in lib/deals/assessment.ts, one rule shared with the report's cost card, which bands
+// on headcount first. The list stays, empty, so a future exception has somewhere to be recorded with
+// its reason rather than a loosened guard.
+const ALLOWED_TO_NAME_THE_KEYS: string[] = []
 
 describe('the GHG tier keys are named in one place', () => {
   // The array-literal shape: any quoting, any spacing, across line breaks.

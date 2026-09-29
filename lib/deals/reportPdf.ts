@@ -536,7 +536,19 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
 
   // ── 9. important notice ────────────────────────────────────────────────────────────────────────
   heading(m.notice.title)
-  for (const p of m.notice.paras) para([p], { size: 8, colour: MUTED })
+  // THE CLOSING NOTE STAYS WITH THE NOTICE. para() checks room one line at a time, so when the
+  // notice ended near the foot of a page the note alone went over, and the document's last page was
+  // one sentence. So the last notice paragraph and the note reserve their combined height first:
+  // if they do not both fit, they move together and the notice's earlier paragraphs stay put.
+  const noticeLh = 8 * LEADING
+  const lastPara = m.notice.paras[m.notice.paras.length - 1]
+  m.notice.paras.forEach((p, i) => {
+    if (i === m.notice.paras.length - 1) {
+      const lines = (s: string) => wrap([s], contentWidth, 8, 'normal').length
+      room(lines(lastPara) * noticeLh + 6 + 10 + lines(m.footer.note) * noticeLh)
+    }
+    para([p], { size: 8, colour: MUTED })
+  })
   l.spacer(10)
   para([m.footer.note], { size: 8, colour: MUTED })
 

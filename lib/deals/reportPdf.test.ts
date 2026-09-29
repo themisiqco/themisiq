@@ -184,6 +184,23 @@ describe('generateDealReportPDF: smoke', () => {
     expect(below.map(d => `p${d.page} y=${d.y.toFixed(1)} "${d.text.slice(0, 50)}"`)).toEqual([])
   })
 
+  it('the closing note never starts a page on its own, wherever the notice ends', () => {
+    // Swept rather than sampled: extra one-line notice paragraphs walk the notice's end down the
+    // page line by line, so some count lands it at the foot. Without the reservation in
+    // generateDealReportPDF, that count sends the note over alone.
+    const base = model(FX_DEAL)
+    // One filler paragraph moves the end by a line plus its spacing (~17.6pt), so 40 steps cover a
+    // whole Letter page of content and must cross its foot at least once.
+    for (let extra = 0; extra <= 40; extra++) {
+      drawn = []
+      const m = { ...base, notice: { ...base.notice, paras: [...base.notice.paras, ...Array.from({ length: extra }, (_, i) => `Filler line ${i + 1}.`)] } }
+      generateDealReportPDF(m)
+      const note = drawn.findIndex(d => d.text.startsWith('This assessment reflects'))
+      expect(note, `note not drawn (extra ${extra})`).toBeGreaterThan(0)
+      expect(drawn[note].page, `note alone on page ${drawn[note].page} with ${extra} extra lines`).toBe(drawn[note - 1].page)
+    }
+  }, 20_000)
+
   it('the upsell and the toolbar never reach the PDF', () => {
     generateDealReportPDF(model(FX_DEAL))
     const all = drawn.map(d => d.text).join(' ')

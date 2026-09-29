@@ -459,7 +459,7 @@ function DealsDashboardInner() {
   const highRisks = establishedRisks.filter(r => r.severity === 'high')
   const mediumRisks = establishedRisks.filter(r => r.severity === 'medium')
   const complianceCost = deal.deal_value > 0 ? getComplianceCost(deal.deal_value, deal.sector, frameworks) : null
-  const obligations = getObligations(deal.location_count, frameworks, deal.sector)
+  const obligations = getObligations(deal.location_count, frameworks, deal.sector, deal.employee_count)
   // Compact ThemisIQ summed figure (included tier only) — shared by the Cost Estimate card,
   // the Export "Report summary", and the sticky "Deal summary" so all three stay consistent.
   const themisIqFigure = themisIqFigureOf(obligations)
@@ -1096,7 +1096,7 @@ function DealsDashboardInner() {
           <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-brand)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Across your pipeline</div>
             {obligations.locationUnset ? (
-              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Enter a location count to see your annual ThemisIQ price. One subscription covers your whole screening pipeline, not one deal.</div>
+              <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.6 }}>Enter a headcount or a location count to see your annual ThemisIQ price. One subscription covers your whole screening pipeline, not one deal.</div>
             ) : (
               <>
                 <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>

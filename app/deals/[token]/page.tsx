@@ -11,9 +11,9 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase' // anon public client (NEXT_PUBLIC_SUPABASE_ANON_KEY)
-import { getObligations, sectorRisks, type ResolvedRisk } from '../../../lib/deals/assessment'
+import { getObligations, ghgOrderTier, sectorRisks, type ResolvedRisk } from '../../../lib/deals/assessment'
 import { makeMapFramework, regimeLabel } from '../../../lib/deals/reportModel'
-import { GHG_TIERS, type Tier } from '../../../lib/pricing'
+import { GHG_TIERS } from '../../../lib/pricing'
 
 const GRAD = 'var(--color-brand)'
 
@@ -127,23 +127,46 @@ export default function DealAssessmentPage() {
   const obligations = getObligations(data.location_count ?? 0, frameworks, data.sector ?? undefined)
 
   const fmt = (n: number) => `USD ${n.toLocaleString()}`
-  const themisIqFigure = obligations.locationUnset
-    ? 'Custom quote'
-    : obligations.themisIqHasCustom
-      ? (obligations.themisIqTotal != null ? `~${fmt(obligations.themisIqTotal)} + custom` : 'Custom quote')
-      : `~${fmt(obligations.themisIqTotal ?? 0)}`
+  // ⚠️ THIS PAGE CANNOT KNOW THE GHG BAND, SO IT DOES NOT STATE ONE. GHG is banded by headcount, and
+  // deal_assessment_get does not return employee_count (privacy whitelist, deliberately kept), so
+  // getObligations here always takes its site-count fallback. The buyer's report may be priced on a
+  // headcount this page never sees, and the GHG line says the band is set at order.
+  //
+  // ⚠️ "FROM" IS A TRUE LOWER BOUND, SO IT IS THE CHEAPEST BAND, NOT THE SITE BAND. The site rule can
+  // land on Professional (4 to 15 sites) or a quote (16+), but a small-headcount target on many sites
+  // is still Essentials, so neither is a floor. The figure is the lowest priced GHG band, read from
+  // GHG_TIERS so a reprice moves it, plus every other included module's price, for every site count,
+  // no site count included. "+ custom" only where a NON-GHG module is itself a quote: the GHG quote is
+  // already covered by the floor. Written against the basis rather than assumed, so a headcount basis,
+  // should the RPC ever return one, prints the report's own "~" figure instead.
+  const ghgBandUnknownHere = obligations.ghgBasis.kind !== 'employees'
+  const ghgFloor = Math.min(...Object.values(GHG_TIERS).map(t => t.priceUSD).filter((p): p is number => p != null))
+  const others = obligations.included.filter(o => o.short !== 'GHG')
+  const othersPriced = others.reduce((sum, o) => sum + (o.pricing.kind === 'priced' ? o.pricing.priceUSD : 0), 0)
+  const othersCustom = others.some(o => o.pricing.kind === 'quote')
+  const themisIqFigure = ghgBandUnknownHere
+    ? `From ${fmt(ghgFloor + othersPriced)}${othersCustom ? ' + custom' : ''}`
+    : obligations.locationUnset || obligations.themisIqTotal == null
+      ? 'Custom quote'
+      : obligations.themisIqHasCustom
+        ? `~${fmt(obligations.themisIqTotal)} + custom`
+        : `~${fmt(obligations.themisIqTotal)}`
+  const SHARE_GHG_NOTE = 'Priced by headcount. Your exact band is confirmed when you order.'
+  const includedShown = obligations.included.map(o =>
+    o.short === 'GHG' && ghgBandUnknownHere ? { ...o, scopeNote: SHARE_GHG_NOTE } : o)
   const consultantRange = `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
   const includedModulesLabel = obligations.included.map(o => o.short).join(' + ') + ' modules'
 
   // CTA → the pre-configured /order screen. modules = pricing-page ids (/order converts them);
-  // tier = GHG tier from the deal's location_count using the SAME GHG_TIERS allowance thresholds
-  // getObligations uses (so /order's price matches this assessment's cost card); ref = deal token.
+  // tier = the band getObligations priced, through ghgOrderTier, so /order offers the plan this page's
+  // cost card shows; ref = deal token.
+  // ⚠️ ALWAYS THE SITE-COUNT RULE ON THIS PAGE. The band is headcount-first everywhere else, but
+  // deal_assessment_get does not return employee_count (a privacy whitelist: see the note above
+  // mapFramework), so getObligations gets none here and falls back to sites. Until 29 Sep 2026 this
+  // link used its own copy of the thresholds and sent 16+ sites to 'advisory' at $4,550 while the
+  // cost card read "Custom quote"; the shared rule sends it to the quote plan instead.
   const ctaModules = ['ghg', ...(obligations.included.some(o => o.short === 'supply chain') ? ['supply'] : [])].join(',')
-  const lc = data.location_count ?? 0
-  const ghgTier: Tier =
-    lc <= (GHG_TIERS.starter.locationAllowance ?? 3) ? 'starter'
-    : lc <= (GHG_TIERS.professional.locationAllowance ?? 15) ? 'professional'
-    : 'advisory'
+  const ghgTier = ghgOrderTier(obligations.ghgBasis)
   const ctaHref = `/order?modules=${ctaModules}&tier=${ghgTier}&ref=${encodeURIComponent(token)}`
 
   const sectorJur = [data.sector, data.jurisdiction].filter(Boolean).join(' · ')
@@ -248,7 +271,7 @@ export default function DealAssessmentPage() {
         {/* Included for this deal */}
         <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Included for this deal</div>
-          {obligations.included.map((o, i) => (
+          {includedShown.map((o, i) => (
             <div key={i} style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 13 }}>✓ {o.label}</div>
               {o.scopeNote && (

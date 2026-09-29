@@ -4,7 +4,7 @@
 // compute the identical assessment from one source — no drift. No React, no I/O, no state.
 // ThemisIQ prices come from lib/pricing.ts (single source of truth); consultant = cited ranges.
 
-import { GHG_TIERS, FLAT_MODULE_PRICES } from '../pricing'
+import { GHG_TIERS, FLAT_MODULE_PRICES, GHG_TIER_LABELS, ghgTierForEmployees, type GhgTier } from '../pricing'
 // Sector risk copy must not retype an AI Act date — see lib/aiAct.ts. Constants only, no I/O, so this
 // import does not compromise the purity note above.
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION } from '../aiAct'
@@ -321,8 +321,64 @@ export type Obligations = {
   themisIqHasCustom: boolean      // an included obligation is 'quote' (Advisory GHG, 16+ locations)
   consultantLow: number           // sum of included consultant lows
   consultantHigh: number          // sum of included consultant highs
-  locationUnset: boolean          // location_count unset/0 → prompt for the ThemisIQ figure
+  // ⚠️ NARROWED 29 Sep 2026: true only when NEITHER headcount NOR location count can price GHG. Before
+  // the employee bands it meant "no location count", which was then the only basis. A deal with a
+  // headcount and no sites is priced now, so it must not prompt for a figure it already has.
+  locationUnset: boolean
+  /** What the GHG band was chosen from, for the sentence the report prints beside it. */
+  ghgBasis: GhgPriceBasis
 }
+
+// ── GHG band: headcount first, sites as the fallback ────────────────────────────────────────────
+//
+// GHG plans are banded by EMPLOYEE COUNT (lib/pricing.ts GHG_TIERS), and a deal records one. So the
+// band comes from ghgTierForEmployees whenever a usable headcount is there, and from the old location
+// rule only when it is not. ONE rule, used by the report, the wizard, the pipeline export and the
+// share page's /order link, so the price a reader sees and the plan /order offers cannot disagree.
+//
+// ⚠️ A HEADCOUNT OF 0 DOES NOT SET A BAND. ghgTierForEmployees refuses counts below 1 on purpose
+// ("would sell a plan on a number nobody checked"), and a declared 0 is a holding company, not a
+// small customer. It falls back to sites, and the sentence says why.
+//
+// The location rule's thresholds are this file's, not GHG_TIERS' (see getObligations): up to 3 sites
+// is Essentials, up to 15 Professional, and above that no band is priced, which reads as a quote.
+const DEAL_REPORT_SMALL_MAX = 3
+const DEAL_REPORT_MID_MAX = 15
+
+export type GhgPriceBasis =
+  | { kind: 'employees'; employees: number; tier: GhgTier }
+  | { kind: 'sites'; sites: number; tier: GhgTier | null; headcountZero: boolean }
+  | { kind: 'none'; headcountZero: boolean }
+
+export const ghgPriceBasis = (employeeCount: number | null | undefined, locationCount: number | null | undefined): GhgPriceBasis => {
+  if (typeof employeeCount === 'number' && Number.isInteger(employeeCount) && employeeCount >= 1) {
+    return { kind: 'employees', employees: employeeCount, tier: ghgTierForEmployees(employeeCount) }
+  }
+  const headcountZero = employeeCount === 0
+  const sites = Number(locationCount) || 0
+  if (sites <= 0) return { kind: 'none', headcountZero }
+  return {
+    kind: 'sites', sites, headcountZero,
+    tier: sites <= DEAL_REPORT_SMALL_MAX ? 'starter' : sites <= DEAL_REPORT_MID_MAX ? 'professional' : null,
+  }
+}
+
+/** The sentence printed beside the GHG price, naming what the band was chosen from. */
+export const ghgPriceBasisNote = (b: GhgPriceBasis): string => {
+  const headcount = (zero: boolean) => (zero ? 'a headcount of 0 cannot set a plan band' : 'headcount not provided')
+  if (b.kind === 'employees') return `Priced on ${b.employees.toLocaleString('en-US')} employees (${GHG_TIER_LABELS[b.tier]} band).`
+  if (b.kind === 'sites') return `Priced on ${b.sites} ${b.sites === 1 ? 'site' : 'sites'}; ${headcount(b.headcountZero)}.`
+  return b.headcountZero
+    ? 'Not priced: a headcount of 0 cannot set a plan band, and no location count was provided.'
+    : 'Not priced: neither headcount nor location count was provided.'
+}
+
+/**
+ * The `tier` for an /order link. A basis with no priced band is sent as 'enterprise', the plan /order
+ * treats as a quote, so the checkout says "quote" where the report says "Custom quote". With no basis
+ * at all the link keeps the entry band, as it always has: /order falls back to it for any unknown tier.
+ */
+export const ghgOrderTier = (b: GhgPriceBasis): GhgTier => (b.kind === 'none' ? 'starter' : b.tier ?? 'enterprise')
 
 const priced = (priceUSD: number): ObligationPricing => ({ kind: 'priced', priceUSD })
 const BUNDLED: ObligationPricing = { kind: 'bundled' }
@@ -339,45 +395,30 @@ const tier = (t: Omit<ObligationTier, 'themisIqPrice'>): ObligationTier =>
 // ThemisIQ prices come from lib/pricing.ts (single source of truth); consultant = cited ranges.
 // Consultant ranges scale PER OBLIGATION (location × sector, independently) before summing —
 // never one blended factor on the total.
-export function getObligations(locationCount: number, frameworks: string[], sector?: string): Obligations {
-  const locationUnset = !locationCount || locationCount <= 0
+export function getObligations(
+  locationCount: number, frameworks: string[], sector?: string,
+  // Optional so a caller without it (the share page, whose RPC does not return headcount) keeps the
+  // location rule. Every caller that has it passes it: see ghgPriceBasis.
+  employeeCount?: number | null,
+): Obligations {
+  const ghgBasis = ghgPriceBasis(employeeCount, locationCount)
+  const locationUnset = ghgBasis.kind === 'none'
   const loc = CONSULTANT_LOCATION_FACTOR(locationCount)
   const sec = CONSULTANT_SECTOR_FACTOR(sector)
 
-  // GHG is ALWAYS included. The band shown here is estimated from LOCATION COUNT, which is a deal
-  // report's own heuristic and no longer the plan model.
-  //
-  // ⚠️ THESE THRESHOLDS ARE THIS FILE'S, NOT GHG_TIERS'. They read
-  // `GHG_TIERS.starter.locationAllowance ?? 3` until 28 Sep 2026, where the `?? 3` was a fallback
-  // behind a real value. Locations became unlimited on every plan, every locationAllowance went
-  // null, and the fallbacks stopped being fallbacks: they silently became the thresholds. Naming
-  // them here is not a behaviour change, it is the same numbers said out loud, so the next reader
-  // is not misled into thinking the plan model still drives this.
-  //
-  // ⚠️ AND THE TOP BRANCH IS AN EXPLICIT QUOTE NOW. It read `tierPricing(GHG_TIERS.advisory.priceUSD)`
-  // with a comment saying Advisory's null price meant "custom quote for 16+ locations". Advisory is
-  // a priced band since the employee reprice, so that branch began quoting $4,550 at a case written
-  // to refuse a figure. QUOTE says what was always meant.
-  //
-  // ⚠️ THE WHOLE LADDER IS ON BORROWED TIME. Plans are sized by EMPLOYEE COUNT and a deal record
-  // holds no headcount, so a location count cannot pick a band: a three-site manufacturer and a
-  // three-site software company are different plans. The decision is to drop the recommendation and
-  // show the band table instead, which is a change to what the report says and belongs with the
-  // surfaces batch, not here. Until then this prices small deals at the entry bands, which is the
-  // closest honest answer available from what a deal actually knows.
-  const DEAL_REPORT_SMALL_MAX = 3
-  const DEAL_REPORT_MID_MAX = 15
+  // GHG is ALWAYS included. The band comes from ghgPriceBasis above: headcount first, sites as the
+  // fallback. (The location rule is what this block used to be; its thresholds moved up beside the
+  // basis so the share page's /order link can use the same one.) A basis with no band is a QUOTE,
+  // and an Enterprise headcount is a quote because GHG_TIERS.enterprise has no price.
   const ghgPricing: ObligationPricing =
-    locationUnset ? QUOTE
-    : locationCount <= DEAL_REPORT_SMALL_MAX ? tierPricing(GHG_TIERS.starter.priceUSD)
-    : locationCount <= DEAL_REPORT_MID_MAX   ? tierPricing(GHG_TIERS.professional.priceUSD)
-    : QUOTE
+    ghgBasis.kind === 'none' || ghgBasis.tier == null ? QUOTE : tierPricing(GHG_TIERS[ghgBasis.tier].priceUSD)
 
   const included: ObligationTier[] = [
     // GHG consultant range scales by location AND sector (a heavy-sector inventory is more work).
     tier({ label: 'GHG inventory & Scope 3', short: 'GHG', pricing: ghgPricing,
       consultantLow: roundK(CONSULTANT_RANGES.ghg.low * loc * sec),
-      consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec) }),
+      consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec),
+      scopeNote: ghgPriceBasisNote(ghgBasis) }),
   ]
 
   // Supply chain — included when a genuine value-chain framework is detected (PCAF no longer triggers this).
@@ -426,6 +467,7 @@ export function getObligations(locationCount: number, frameworks: string[], sect
     consultantLow: included.reduce((a, o) => a + o.consultantLow, 0),
     consultantHigh: included.reduce((a, o) => a + o.consultantHigh, 0),
     locationUnset,
+    ghgBasis,
   }
 }
 

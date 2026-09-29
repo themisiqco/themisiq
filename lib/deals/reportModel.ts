@@ -831,7 +831,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
   // Resolved against the deal's jurisdiction: a finding whose instrument is not established for
   // this target carries the nexus that would bring it into scope, rather than asserting it.
   const risks = sectorRisks(sector, jurisdiction)
-  const obligations = getObligations(locationCount, frameworks, sector)
+  const obligations = getObligations(locationCount, frameworks, sector, deal.employee_count ?? null)
   const complianceCost = dealValue > 0 ? getComplianceCost(dealValue, sector, frameworks) : null
   const activeTests = Object.values(THRESHOLD_TESTS).filter(isTestActive)
   // A statutory citation belongs with the framework it justifies, not in a footnote pile.
@@ -964,7 +964,14 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
               body: [sentenceCase(CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2))],
             }]
           : []),
-        ...activeTests.filter(t => !t.lookbackModelled).map(t => ({
+        // ONLY THE TESTS THIS DEAL RAN (29 Sep 2026). This read every active test in THRESHOLD_TESTS, so
+        // a UK deal, which runs SECR alone, was told the S-211 and CS3D two-year checks were not run for
+        // it. A row carries `test` exactly when its size test was evaluated for this deal, and the
+        // outcome records whether that test's lookback is modelled.
+        ...applicability
+          .filter(f => f.test && !f.test.lookbackModelled)
+          .map(f => THRESHOLD_TESTS[f.framework])
+          .map(t => ({
           title: `TWO-YEAR CHECK NOT RUN: ${t.framework}`,
           body: [
             `The statute measures over ${t.lookback === 'either-of-two-most-recent-fy' ? 'either of the two most recent financial years' : 'the most recent financial year'}; only the most recent year is held. A target that met a test in the prior year and has since dipped is `,
@@ -1023,7 +1030,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
       themisIq: {
         label: 'ThemisIQ, scope-matched modules',
         // In a printed document "Enter locations →" would instruct a reader who has nothing to click.
-        figure: themisIqFigure(obligations, 'Custom quote: location count not provided'),
+        figure: themisIqFigure(obligations, 'Custom quote: headcount and location count not provided'),
         note: 'One available route, priced for the modules this scope requires.',
       },
       // Inferable from the cover, but stating it where the price appears makes the report harder to
