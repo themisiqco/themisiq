@@ -29,7 +29,7 @@
  * lib/brand.test.ts checks it against app/styles/themisiq-tokens.css.
  */
 
-import { INK_MUTED } from '../brand'
+import { INK_MUTED, STATE_WARN, STATE_WARN_WASH, STATE_OK, STATE_OK_WASH, STATE_ERROR, STATE_ERROR_WASH } from '../brand'
 
 /** The cover and page stock. Every ratio below is against this unless stated. */
 export const PAPER = '#f8f7f5'
@@ -79,3 +79,22 @@ export const ON_COVER_MUTED = '#9ca3af'
 
 /** 19.44:1 on INK. Cover title and table header text. ⚠️ 1.07:1 on PAPER. */
 export const ON_COVER = '#ffffff'
+
+// ── state: the Deals report's status colours (29 Sep 2026) ───────────────────────────────────────
+// Imported from lib/brand.ts rather than retyped, so lib/brand.test.ts keeps holding them to
+// app/styles/themisiq-tokens.css. Each text colour is drawn on PAPER and on its own wash (an amber
+// panel, a status chip), and lib/pdf/palette.test.ts checks it against both. The washes are fills,
+// never type. Colour is never the only signal: every chip and panel also carries a text label.
+
+/** Caution and incomplete: not-assessed panels, near-threshold and verify lines. */
+export const WARN = STATE_WARN
+/** Fill behind WARN text: amber panels and chips. Not type. */
+export const WARN_WASH = STATE_WARN_WASH
+/** Applies, met, available. */
+export const OK = STATE_OK
+/** Fill behind OK text: the APPLIES chip. Not type. */
+export const OK_WASH = STATE_OK_WASH
+/** Missing and critical: data-room gaps and the CRITICAL chip. */
+export const ERROR = STATE_ERROR
+/** Fill behind ERROR text: the CRITICAL chip. Not type. */
+export const ERROR_WASH = STATE_ERROR_WASH

@@ -42,7 +42,7 @@ import { filenameDate } from '../../../../lib/filename'
 import PaywallCard from '../../../components/PaywallCard'
 import { FLAT_MODULE_PRICES } from '../../../../lib/pricing'
 import {
-  buildDealReportModel, type DealReportModel, type ReportPanel, type Rich,
+  buildDealReportModel, CHIP_LABELS, type DealReportModel, type ReportPanel, type Rich,
 } from '../../../../lib/deals/reportModel'
 
 // ─── The deal row ─────────────────────────────────────────────────────────────
@@ -72,18 +72,18 @@ type DealRow = {
 // ─── Styled bits (print-friendly) ─────────────────────────────────────────────
 const GRAD = 'var(--color-brand)'
 const SEV = {
-  critical: { label: 'CRITICAL', color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
-  high:     { label: 'HIGH', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
-  medium:   { label: 'MEDIUM', color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
+  critical: { label: CHIP_LABELS.critical, color: '#B91C1C', bg: '#FCEBEB', border: '#B91C1C' },
+  high:     { label: CHIP_LABELS.high, color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'var(--color-state-warn)' },
+  medium:   { label: CHIP_LABELS.medium, color: '#0C447C', bg: '#E6F1FB', border: '#0C447C' },
 } as const
 
 // Status colours carry a TEXT label too, never colour alone — the three-state distinction
 // (applies / not applicable / not assessed) is the point of this module and must survive a
 // greyscale print.
 const STATE = {
-  applies:      { label: 'APPLIES', color: '#0F6E56', bg: '#E1F5EE', border: 'rgba(15,110,86,0.35)' },
-  verify:       { label: 'APPLIES: VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
-  nearBelow:    { label: 'NEAR THRESHOLD: VERIFY', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  applies:      { label: CHIP_LABELS.applies, color: '#0F6E56', bg: '#E1F5EE', border: 'rgba(15,110,86,0.35)' },
+  verify:       { label: CHIP_LABELS.verify, color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  nearBelow:    { label: CHIP_LABELS.nearBelow, color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
   notAssessed:  { label: 'NOT ASSESSED', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
 } as const
 
@@ -205,10 +205,13 @@ function DealsReportInner() {
   // model (its footer date and reference) both derive from this.
   const [generatedAt] = useState(() => new Date())
 
-  // Names the saved PDF. Null until the deal has loaded, so no title is built from an absent name.
-  useReportTitle(deal
+  // Names the saved PDF, both the generated one (DealReport's Save as PDF) and a browser print, which
+  // takes the page title. One string for both. Null until the deal has loaded, so no title is built
+  // from an absent name.
+  const fileTitle = deal
     ? reportTitle(deal.target_name, `ESG Diligence Report - ${filenameDate(generatedAt)}`)
-    : null)
+    : null
+  useReportTitle(fileTitle)
 
   // FIRST, because it is knowable without any fetch. It also has to precede the loading guard
   // below: the effect returns early on a missing id, so the free-tier scope never resolves in that
@@ -261,7 +264,7 @@ function DealsReportInner() {
   // `upsell` is 'none' for an entitled reader AND for one whose entitlement could not be read — see
   // resolveReportGate. Passed down rather than re-derived in DealReport, which would be a second
   // copy of the rule one component along.
-  return <DealReport dealId={deal.id} model={model} upsell={gate.upsell} />
+  return <DealReport dealId={deal.id} model={model} upsell={gate.upsell} fileTitle={fileTitle ?? 'ESG Diligence Report'} />
 }
 
 // ─── Small shared components & styles ─────────────────────────────────────────
@@ -331,7 +334,34 @@ function RichText({ parts }: { parts: Rich }) {
 // ⚠️ RENDERS THE MODEL, DERIVES NOTHING. Every figure, sentence, heading and column label comes from
 // buildDealReportModel in lib/deals/reportModel.ts, which the PDF generator draws from too. A value
 // computed here is one the PDF cannot show, and the two documents would then disagree.
-function DealReport({ dealId, model: m, upsell }: { dealId: string; model: DealReportModel; upsell: ReportUpsell }) {
+function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; model: DealReportModel; upsell: ReportUpsell; fileTitle: string }) {
+  // THE PDF IS GENERATED IN CODE, NOT PRINTED (29 Sep 2026). Safari saved window.print() output as
+  // blank pages even when its preview rendered, so the button builds the document with jsPDF from the
+  // same model this page renders. Browser print (Cmd+P) and the print CSS below still work as a
+  // second route. The generator is imported on click: it carries the embedded fonts and the
+  // wordmark, and a reader who never saves should not download them.
+  //
+  // ⚠️ THIS BUTTON IS INSIDE DealReport ON PURPOSE. DealReport mounts only once resolveReportGate has
+  // returned 'open', so the button cannot exist for a deal the reader may not open. See the header of
+  // lib/deals/reportPdf.ts before calling the generator from anywhere else.
+  const [pdf, setPdf] = useState<'idle' | 'building' | 'failed'>('idle')
+  const savePdf = async () => {
+    if (pdf === 'building') return
+    setPdf('building')
+    try {
+      const { generateDealReportPDF } = await import('../../../../lib/deals/reportPdf')
+      // Generation is synchronous and holds the main thread. Wait for one painted frame first, or a
+      // cached import resolves at once and "Preparing PDF..." never reaches the screen.
+      await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)))
+      generateDealReportPDF(m).save(`${fileTitle}.pdf`)
+      setPdf('idle')
+    } catch (e) {
+      // Logged in full for us, stated plainly for the reader, with the route that still works.
+      console.error('Deals report PDF could not be created:', e)
+      setPdf('failed')
+    }
+  }
+
   return (
     <div className="report-root" style={{ background: '#fff', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#0d0d0d' }}>
       <div className="no-print" style={{ position: 'sticky', top: 0, background: 'var(--color-ink)', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
@@ -349,8 +379,15 @@ function DealReport({ dealId, model: m, upsell }: { dealId: string; model: DealR
           <a href={`/dashboard/deals?id=${dealId}`} style={{ fontSize: 13, fontWeight: 600, color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>Edit this deal</a>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>ThemisIQ · ESG deal due diligence report</div>
         </div>
-        <button onClick={() => window.print()} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer' }}>⬇ Save as PDF (Cmd+P)</button>
+        <button onClick={savePdf} disabled={pdf === 'building'} aria-busy={pdf === 'building'} style={{ fontSize: 13, fontWeight: 500, padding: '8px 20px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: pdf === 'building' ? 'wait' : 'pointer', opacity: pdf === 'building' ? 0.75 : 1 }}>
+          {pdf === 'building' ? 'Preparing PDF...' : '⬇ Save as PDF'}
+        </button>
       </div>
+      {pdf === 'failed' && (
+        <div className="no-print" role="alert" style={{ background: '#FCEBEB', color: '#B91C1C', fontSize: 13, padding: '10px 24px', borderBottom: '0.5px solid rgba(185,28,28,0.2)' }}>
+          The PDF could not be created. Please try again, or use your browser&rsquo;s print.
+        </div>
+      )}
 
       <div className="report-body" style={{ maxWidth: 780, margin: '0 auto', padding: '3rem 3rem 4rem' }}>
 
@@ -637,6 +674,7 @@ function DealReport({ dealId, model: m, upsell }: { dealId: string; model: DealR
               ))}
             </tbody>
           </table>
+          {m.fx.sameCurrencyNote && <p style={note}>{m.fx.sameCurrencyNote}</p>}
         </section>
 
         {/* 9 ── IMPORTANT NOTICE */}

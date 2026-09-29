@@ -30,6 +30,7 @@ import * as palette from './palette'
 const ROOT = process.cwd()
 const LAYOUT = 'lib/pdf/layout.ts'
 const ASSURANCE = 'lib/assurancePdf.ts'
+const DEALS = 'lib/deals/reportPdf.ts'
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
 /**
@@ -68,8 +69,20 @@ const REVERSED: Record<string, string> = {
   ON_COVER: palette.INK,
 }
 
-/** Not type. A hairline rule has no contrast requirement. */
-const NON_TEXT = new Set(['PAPER', 'HAIRLINE'])
+/** Not type. A hairline rule has no contrast requirement, and a wash is a fill behind text. */
+const NON_TEXT = new Set(['PAPER', 'HAIRLINE', 'WARN_WASH', 'OK_WASH', 'ERROR_WASH'])
+
+/**
+ * State colours drawn on a wash as well as on PAPER. Checked against BOTH: an amber line in a table
+ * sits on the page, and the same amber sits on WARN_WASH inside a not-assessed panel.
+ */
+const ALSO_ON: Record<string, string> = {
+  WARN: palette.WARN_WASH,
+  OK: palette.OK_WASH,
+  ERROR: palette.ERROR_WASH,
+  // The body of a Deals report amber panel (lib/deals/reportPdf.ts panel()).
+  TABLE_INK: palette.WARN_WASH,
+}
 
 describe('the PDF palette', () => {
   it('every colour clears AA against the surface it is actually drawn on', () => {
@@ -77,10 +90,11 @@ describe('the PDF palette', () => {
     for (const [name, value] of Object.entries(palette)) {
       if (typeof value !== 'string' || !value.startsWith('#')) continue
       if (NON_TEXT.has(name)) continue
-      const ground = REVERSED[name] ?? palette.PAPER
-      const ratio = contrast(value, ground)
-      if (ratio < AA) {
-        failures.push(`${name} (${value}) is ${ratio.toFixed(2)}:1 on ${ground} — below ${AA}:1`)
+      for (const ground of [REVERSED[name] ?? palette.PAPER, ...(ALSO_ON[name] ? [ALSO_ON[name]] : [])]) {
+        const ratio = contrast(value, ground)
+        if (ratio < AA) {
+          failures.push(`${name} (${value}) is ${ratio.toFixed(2)}:1 on ${ground}, below ${AA}:1`)
+        }
       }
     }
     expect(failures, `PDF palette below AA:\n  ${failures.join('\n  ')}`).toEqual([])
@@ -106,7 +120,7 @@ describe('the PDF palette', () => {
     // So the invariant asserted is the one that is actually true: print TEXT comes from the print palette,
     // which is neutral by design and does not move when the brand does. A rule may be any colour.
     const offences: string[] = []
-    for (const file of [LAYOUT, ASSURANCE]) {
+    for (const file of [LAYOUT, ASSURANCE, DEALS]) {
       const src = read(file)
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
@@ -130,13 +144,13 @@ describe('the PDF palette', () => {
     // Both import from ./palette, so agreement is structural rather than coincidental — this
     // asserts that neither has quietly reintroduced a local declaration that shadows it.
     const disagreements: string[] = []
-    for (const [file, src] of [[LAYOUT, read(LAYOUT)], [ASSURANCE, read(ASSURANCE)]] as const) {
+    for (const [file, src] of [[LAYOUT, read(LAYOUT)], [ASSURANCE, read(ASSURANCE)], [DEALS, read(DEALS)]] as const) {
       for (const role of ['INK', 'PAPER', 'SECONDARY', 'MUTED', 'MUTE', 'TABLE_INK', 'HAIRLINE']) {
         const local = new RegExp(`^\\s*(?:export\\s+)?const\\s+${role}\\s*=\\s*'(#[0-9A-Fa-f]{3,8})'`, 'm')
         const m = src.match(local)
         if (m) disagreements.push(`${file} declares its own ${role} = '${m[1]}' instead of importing it`)
       }
-      if (!/from '\.\/palette'|from '\.\/pdf\/palette'/.test(src)) {
+      if (!/from '\.\/palette'|from '(\.\.?)\/pdf\/palette'/.test(src)) {
         disagreements.push(`${file} does not import from the shared palette`)
       }
     }
@@ -152,7 +166,7 @@ describe('the PDF palette', () => {
     // TABLE_INK with '#333333' does NOT fail this test; replacing two does. It catches drift
     // between copies, which is the defect that happened — not first use of a bare value.
     const offenders: string[] = []
-    for (const file of [LAYOUT, ASSURANCE]) {
+    for (const file of [LAYOUT, ASSURANCE, DEALS]) {
       const counts = new Map<string, number>()
       for (const line of read(file).split('\n')) {
         // Comments are where measurements are recorded — a ratio cited in prose is not a use.

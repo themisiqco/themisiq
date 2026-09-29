@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildDealReportModel, buildFxBasisRows, type DealReportModel, type Rich } from './reportModel'
-import { getFrameworkApplicability } from './assessment'
+import {
+  buildDealReportModel, buildFxBasisRows, fxSameCurrencyNote, fxNoConversionSentence,
+  type DealReportModel, type Rich,
+} from './reportModel'
+import { getFrameworkApplicability, CANADA_S211_JURISDICTION_CAVEAT } from './assessment'
 import {
   REPORT_FIXTURES, FIXTURE_GENERATED_AT,
   NEAR_THRESHOLD_DEAL, NOT_ASSESSED_DEAL, FX_DEAL,
@@ -139,5 +142,48 @@ describe('FX basis: rows describe conversions that ran, and nothing else', () =>
     const m = build({ ...FX_DEAL, currency: 'JPY' })
     expect(m.fx.rows.find(r => r[0] === 'Rate applied')?.[1]).toMatch(/^UNAVAILABLE/)
     expect(m.fx.paras).toHaveLength(2)
+  })
+})
+
+describe('FX basis: a mixed deal names what was compared as entered', () => {
+  // ⚠️ NO JURISDICTION PRODUCES THIS TODAY: every jurisdiction's money limbs share one currency. So
+  // the mixed case is built by joining the engine's own UK and EU rows for one GBP deal: SECR is tested
+  // in GBP as entered, CSRD and CS3D in EUR after conversion. The day a jurisdiction tests two
+  // currencies, this is the deal it produces.
+  const size = { total_assets: 700_000_000, employee_count: 6_000 }
+  const mixed = [
+    ...getFrameworkApplicability('UK', 1_600_000_000, 'Technology', 'ma', 'GBP', size),
+    ...getFrameworkApplicability('European Union', 1_600_000_000, 'Technology', 'ma', 'GBP', size),
+  ]
+
+  it('names each same-currency framework with its currency, in one line', () => {
+    expect(fxSameCurrencyNote('GBP', mixed)).toBe('Compared as entered, no conversion: SECR (GBP)')
+  })
+
+  it('still lists the conversions that ran, and no same-currency row', () => {
+    const labels = buildFxBasisRows('GBP', mixed).map(r => r[0])
+    expect(labels).toContain('Conversion GBP → EUR (CSRD, CS3D)')
+    expect(labels.some(l => l.startsWith('Conversion GBP → GBP'))).toBe(false)
+    expect(fxNoConversionSentence('GBP', mixed)).toBeNull()
+  })
+
+  it('a deal where nothing was converted keeps its plain sentence and gets no such line', () => {
+    const m = build(NEAR_THRESHOLD_DEAL)
+    expect(m.fx.paras[0][0]).toMatch(/^No currency conversion was needed/)
+    expect(m.fx.sameCurrencyNote).toBeNull()
+  })
+
+  it('a deal where everything was converted gets no such line either', () => {
+    expect(build(FX_DEAL).fx.sameCurrencyNote).toBeNull()
+  })
+})
+
+describe('the S-211 jurisdiction caveat', () => {
+  it('opens its panel with a capital, and is otherwise the constant verbatim', () => {
+    const panel = build(NOT_ASSESSED_DEAL).sizeTests.panels.find(p => p.title === 'CANADA S-211 NOT FULLY ASSESSED')
+    const body = panel!.body[0] as string
+    expect(body.startsWith('The Act can also apply')).toBe(true)
+    const cut = CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)
+    expect(body.slice(1)).toBe(cut.slice(1))
   })
 })

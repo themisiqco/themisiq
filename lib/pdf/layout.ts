@@ -14,6 +14,11 @@
  * "align" the two — they are different documents for different audiences, and the format is a
  * property of the audience, not of the codebase.
  *
+ * A4 IS THE DEFAULT, NOT THE ONLY SIZE (29 Sep 2026). createLayout takes an optional `format`, and
+ * the Deals diligence report (lib/deals/reportPdf.ts) passes 'letter' for the same reason the GHG
+ * pack is letter: its readers are chiefly North American. A caller that passes nothing gets A4, so
+ * the board report above is unchanged.
+ *
  * ⚠️ NOTHING ON A DARK FIELD. There is no reversed-out type anywhere in this module and none may be
  * added. Reversed type on a laser printer fills in, and this is a document people print, hole-punch
  * and take into a meeting. The cover is paper-coloured for the same reason.
@@ -141,23 +146,30 @@ export type Layout = {
   rule(): number
   spacer(pt: number): number
   keepTogether(estimatedHeight: number, fn: () => void): number
+  /**
+   * Hand the cursor back after something that drew and paginated on its own (jspdf-autotable).
+   * Sets y and re-reads the current page from the document, so the page count stays true.
+   */
+  moveTo(y: number): number
   footer(pageNumber: number, total: number): void
   newPage(): number
   coverPage(fields: CoverFields): number
 }
 
+export type PageFormat = 'a4' | 'letter'
+
 /**
- * Create an A4 document with Charis registered and the cursor at the top margin.
+ * Create a document (A4 unless told otherwise) with Charis registered and the cursor at the top margin.
  *
  * ⚠️ registerCharis IS CALLED HERE, ONCE, BEFORE ANY setFont. It writes into THIS document's
  * virtual file system, so a second document needs its own createLayout — see the note in
  * lib/fonts/charis.ts.
  */
-export function createLayout(): Layout {
+export function createLayout(options: { format?: PageFormat } = {}): Layout {
   // compress: true deflates the content and image streams. The wordmark raster is RGB plus an
   // alpha plane stored uncompressed — ~3.4 MB of a report that is otherwise mostly text — and
   // flat-colour artwork deflates hard. Costs a little CPU per document, once, at generation.
-  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true })
+  const doc = new jsPDF({ unit: 'pt', format: options.format ?? 'a4', orientation: 'portrait', compress: true })
   registerCharis(doc)
 
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -165,7 +177,7 @@ export function createLayout(): Layout {
   const contentWidth = pageWidth - MARGIN.left - MARGIN.right
   const bottomLimit = pageHeight - MARGIN.bottom
 
-  let y = MARGIN.top
+  let y: number = MARGIN.top
   let page = 1
 
   const newPage = (): number => {
@@ -276,6 +288,12 @@ export function createLayout(): Layout {
     return y
   }
 
+  const moveTo = (to: number): number => {
+    y = to
+    page = doc.getCurrentPageInfo().pageNumber
+    return y
+  }
+
   /**
    * The footer for ONE page, drawn at the current page. Call it per page after the content is
    * laid out — the total is not knowable until then:
@@ -381,6 +399,7 @@ export function createLayout(): Layout {
     rule,
     spacer,
     keepTogether,
+    moveTo,
     footer,
     newPage,
     coverPage,

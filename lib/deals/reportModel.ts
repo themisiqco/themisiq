@@ -177,8 +177,12 @@ export const buildLimbRows = (applicability: FrameworkApplicability[]): LimbRow[
 // the label claimed a step the value denied. Those rows are gone. Where no conversion ran anywhere,
 // fxNoConversionSentence says so in one sentence and the report drops the rate-source rows, which
 // would otherwise cite a source for a rate nothing used. In a MIXED deal (one threshold in the deal's
-// currency, another converted) the same-currency framework is now simply not listed here; its size
-// test row still shows the figure it was compared against.
+// currency, another converted) the same-currency frameworks are named once, under the table, by
+// fxSameCurrencyNote: "Compared as entered, no conversion: SECR (GBP)".
+//
+// ⚠️ NO JURISDICTION PRODUCES A MIXED DEAL TODAY (checked 29 Sep 2026): every jurisdiction's money
+// limbs share one currency (USA USD, European Union EUR, UK GBP, Canada CAD; the rest have none). The
+// note exists so the first jurisdiction to test two currencies does not silently lose the statement.
 export const FX_DISPLAY_DP = 6
 
 /** Which threshold currencies this deal's active money limbs used, and by which frameworks. */
@@ -206,6 +210,17 @@ export const fxNoConversionSentence = (currency: string, applicability: Framewor
   if (used.every(tc => tc === currency))
     return `No currency conversion was needed: all figures were tested in ${currency}, the currency they were entered in.`
   return null
+}
+
+/**
+ * In a mixed deal only, the frameworks compared in the deal's own currency, named in one line. Null
+ * where nothing was converted (fxNoConversionSentence covers that deal) and where nothing was compared
+ * as entered.
+ */
+export const fxSameCurrencyNote = (currency: string, applicability: FrameworkApplicability[]): string | null => {
+  if (!isDealCurrency(currency) || fxNoConversionSentence(currency, applicability) !== null) return null
+  const same = thresholdCurrencyUse(applicability).get(currency)
+  return same?.length ? `Compared as entered, no conversion: ${same.map(f => `${f} (${currency})`).join(', ')}` : null
 }
 
 export const buildFxBasisRows = (currency: string, applicability: FrameworkApplicability[]): string[][] => {
@@ -655,6 +670,20 @@ export type ReportPanel = { title: string; body: Rich }
 export type StatusChip = 'applies' | 'verify' | 'nearBelow'
 export type SeverityChip = SectorRisk['severity']
 
+/**
+ * What each chip SAYS. The colour is the renderer's; the words are the report's, so they live here
+ * where the screen and the PDF both read them. The label always carries the meaning on its own:
+ * a chip must survive a greyscale print.
+ */
+export const CHIP_LABELS: Record<StatusChip | SeverityChip, string> = {
+  applies: 'APPLIES',
+  verify: 'APPLIES: VERIFY',
+  nearBelow: 'NEAR THRESHOLD: VERIFY',
+  critical: 'CRITICAL',
+  high: 'HIGH',
+  medium: 'MEDIUM',
+}
+
 export type DealReportModel = {
   reference: string
   reportDate: string
@@ -725,10 +754,15 @@ export type DealReportModel = {
     title: string
     paras: Rich[]
     rows: [string, string][]
+    /** Mixed deals only: the frameworks compared in the deal's own currency, printed under the table. */
+    sameCurrencyNote: string | null
   }
   notice: { title: string; paras: string[] }
   footer: { line: string; note: string }
 }
+
+/** The first letter upper-cased, for text cut from mid-sentence that now opens a paragraph. */
+export const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
 const consultantBand = (low: number, high: number) => `USD ${Math.round(low / 1000)}k–${Math.round(high / 1000)}k`
 
@@ -781,6 +815,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
   const limbRows = buildLimbRows(applicability)
   const fxBasisRows = buildFxBasisRows(currency, applicability)
   const fxNone = fxNoConversionSentence(currency, applicability)
+  const fxSame = fxSameCurrencyNote(currency, applicability)
   // `cs3d` supplies the SENTENCE printed beneath a finding; the ROW supplies the token's text and
   // caveat flag. Both carry the same four outcomes since 11 Aug 2026, and they must not disagree.
   // DIFFERS FROM THE WIZARD ON ONE STATE, deliberately: this document has no `citedNear` line, so
@@ -924,7 +959,9 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         ...(showCanadaS211JurisdictionCaveat(deal.jurisdiction ?? '', deal.listed_ca_exchange)
           ? [{
               title: CANADA_S211_JURISDICTION_CAVEAT.split(':')[0].toUpperCase(),
-              body: [CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)],
+              // The constant is one sentence with its heading before the colon, so the cut body
+              // starts mid-sentence in lower case; it opens a panel here, so it is capitalised.
+              body: [sentenceCase(CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2))],
             }]
           : []),
         ...activeTests.filter(t => !t.lookbackModelled).map(t => ({
@@ -1067,6 +1104,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         ...fxBasisRows.map(r => [r[0], r[1]] as [string, string]),
         ['Size tests available', activeTests.map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ') || 'None'],
       ],
+      sameCurrencyNote: fxSame,
     },
 
     notice: { title: 'Important Notice', paras: [...disclaimerParas('screening')] },
