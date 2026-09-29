@@ -171,24 +171,50 @@ export const buildLimbRows = (applicability: FrameworkApplicability[]): LimbRow[
 // 6 dp for the derived cross-rate: the published figures carry at most 5 significant figures
 // (GBP 0.85973) and every pair lands between 0.5 and 1.5, so 6 dp preserve every digit the source
 // can support while cutting the float tail. Display only — the comparison uses full precision.
+//
+// ⚠️ ROWS DESCRIBE CONVERSIONS THAT RAN, AND NOTHING ELSE (29 Sep 2026). A threshold in the deal's own
+// currency used to get a row labelled "Conversion GBP → GBP (SECR)" whose value said no conversion ran:
+// the label claimed a step the value denied. Those rows are gone. Where no conversion ran anywhere,
+// fxNoConversionSentence says so in one sentence and the report drops the rate-source rows, which
+// would otherwise cite a source for a rate nothing used. In a MIXED deal (one threshold in the deal's
+// currency, another converted) the same-currency framework is now simply not listed here; its size
+// test row still shows the figure it was compared against.
 export const FX_DISPLAY_DP = 6
 
-export const buildFxBasisRows = (currency: string, applicability: FrameworkApplicability[]): string[][] => {
-  const thresholdCurrencyUse = new Map<DealCurrency, string[]>()
+/** Which threshold currencies this deal's active money limbs used, and by which frameworks. */
+const thresholdCurrencyUse = (applicability: FrameworkApplicability[]): Map<DealCurrency, string[]> => {
+  const use = new Map<DealCurrency, string[]>()
   for (const f of applicability)
     for (const l of f.test?.limbs ?? [])
       if (l.limb.unit.unit === 'currency') {
-        const names = thresholdCurrencyUse.get(l.limb.unit.currency) ?? []
+        const names = use.get(l.limb.unit.currency) ?? []
         if (!names.includes(f.framework)) names.push(f.framework)
-        thresholdCurrencyUse.set(l.limb.unit.currency, names)
+        use.set(l.limb.unit.currency, names)
       }
+  return use
+}
 
+/**
+ * The plain sentence for a deal where no currency conversion ran at all, or null where one did (or
+ * where the deal's currency has no published rate, which buildFxBasisRows reports as UNAVAILABLE).
+ */
+export const fxNoConversionSentence = (currency: string, applicability: FrameworkApplicability[]): string | null => {
+  if (!isDealCurrency(currency)) return null
+  const used = [...thresholdCurrencyUse(applicability).keys()]
+  if (used.length === 0)
+    return 'No currency conversion was needed: no size-gated framework with a money figure is in scope for this jurisdiction.'
+  if (used.every(tc => tc === currency))
+    return `No currency conversion was needed: all figures were tested in ${currency}, the currency they were entered in.`
+  return null
+}
+
+export const buildFxBasisRows = (currency: string, applicability: FrameworkApplicability[]): string[][] => {
   const dealCur = currency
   if (!isDealCurrency(dealCur))
     return [['Rate applied', `UNAVAILABLE: no published rate is held for ${dealCur}. Money limbs were not evaluated, so no framework was asserted or ruled out on a converted figure.`]]
-  const uses = [...thresholdCurrencyUse.entries()]
-  if (uses.length === 0)
-    return [['Conversion applied', 'None. No size-gated framework with a money figure is in scope for this jurisdiction.']]
+  // Same-currency uses are dropped here: no rate is applied to them, so they are not conversions.
+  const uses = [...thresholdCurrencyUse(applicability).entries()].filter(([tc]) => tc !== dealCur)
+  if (uses.length === 0) return []
 
   // EUR has NO transcribed figure. It is the base the source quotes everything against, and
   // UNITS_PER_EUR.EUR is 1 by definition — calling that "transcribed verbatim" would attribute a
@@ -200,18 +226,11 @@ export const buildFxBasisRows = (currency: string, applicability: FrameworkAppli
 
   const rows: string[][] = []
   const shown = new Set<DealCurrency>()
-  // The deal-currency figure is printed once, and only if some conversion actually used it.
-  if (uses.some(([tc]) => tc !== dealCur)) { rows.push(...published(dealCur)); shown.add(dealCur) }
+  // The deal-currency figure is printed once; every use left here is a real conversion that used it.
+  rows.push(...published(dealCur)); shown.add(dealCur)
 
   for (const [tc, frameworks] of uses) {
     const scope = frameworks.join(', ')
-    if (tc === dealCur) {
-      // No rate is applied at all here, so stating one — even 1.000000 — would assert a conversion
-      // step that never ran.
-      rows.push([`Conversion ${dealCur} → ${tc} (${scope})`,
-        `None. The threshold is denominated in ${tc} and the deal is entered in ${tc}, so the figure is compared exactly as entered. No rate is applied and no FX error can enter this comparison.`])
-      continue
-    }
     if (!shown.has(tc)) { rows.push(...published(tc)); shown.add(tc) }
     const rate = (UNITS_PER_EUR[tc] / UNITS_PER_EUR[dealCur]).toFixed(FX_DISPLAY_DP)
     // Which numbers are transcribed and which computed depends on whether EUR is one end of the
@@ -761,6 +780,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
 
   const limbRows = buildLimbRows(applicability)
   const fxBasisRows = buildFxBasisRows(currency, applicability)
+  const fxNone = fxNoConversionSentence(currency, applicability)
   // `cs3d` supplies the SENTENCE printed beneath a finding; the ROW supplies the token's text and
   // caveat flag. Both carry the same four outcomes since 11 Aug 2026, and they must not disagree.
   // DIFFERS FROM THE WIZARD ON ONE STATE, deliberately: this document has no `citedNear` line, so
@@ -1023,9 +1043,11 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
       ].map(r => ({ ...r, status: r.available ? 'Available' : 'MISSING: request from target' })),
     },
 
+    // Where no conversion ran, the section says that plainly. The two paragraphs describing how
+    // figures are converted, and the rate-source rows, would each describe a step that did not happen.
     fx: {
       title: 'FX basis for threshold tests',
-      paras: [
+      paras: fxNone ? [[fxNone]] : [
         [
           'Revenue and balance-sheet figures are converted into each threshold’s statutory currency for comparison. ',
           { strong: 'The statutory figure itself is never converted' },
@@ -1040,8 +1062,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         ],
       ],
       rows: [
-        ['Rate source', FX_SOURCE],
-        ['Rates as of', FX_AS_OF],
+        ...(fxNone ? [] : [['Rate source', FX_SOURCE], ['Rates as of', FX_AS_OF]] as [string, string][]),
         ['Deal currency', currency],
         ...fxBasisRows.map(r => [r[0], r[1]] as [string, string]),
         ['Size tests available', activeTests.map(t => `${t.framework} (${t.requires} of ${t.limbs.length})`).join(' · ') || 'None'],

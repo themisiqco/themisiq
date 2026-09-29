@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildDealReportModel, type DealReportModel, type Rich } from './reportModel'
+import { buildDealReportModel, buildFxBasisRows, type DealReportModel, type Rich } from './reportModel'
+import { getFrameworkApplicability } from './assessment'
 import {
   REPORT_FIXTURES, FIXTURE_GENERATED_AT,
   NEAR_THRESHOLD_DEAL, NOT_ASSESSED_DEAL, FX_DEAL,
@@ -99,5 +100,44 @@ describe('buildDealReportModel: shape', () => {
       'Applicable frameworks', 'Near-threshold frameworks', 'Size tests applied', 'ESG risk findings',
       'Compliance cost estimate', 'Data-room gaps', 'FX basis for threshold tests', 'Important Notice',
     ])
+  })
+})
+
+describe('FX basis: rows describe conversions that ran, and nothing else', () => {
+  it('a GBP deal tested only against GBP thresholds gets no conversion row', () => {
+    const m = build(NEAR_THRESHOLD_DEAL)
+    expect(m.fx.rows.map(r => r[0]).filter(l => l.startsWith('Conversion'))).toEqual([])
+    // At the source too, not only in the model's assembly.
+    const applicability = getFrameworkApplicability('UK', 34_500_000, 'Transport & Logistics', 'ma', 'GBP',
+      { total_assets: 17_200_000, employee_count: 240 })
+    expect(buildFxBasisRows('GBP', applicability)).toEqual([])
+  })
+
+  it('says plainly that nothing was converted, and cites no rate source for a rate nothing used', () => {
+    const m = build(NEAR_THRESHOLD_DEAL)
+    expect(m.fx.paras).toEqual([['No currency conversion was needed: all figures were tested in GBP, the currency they were entered in.']])
+    expect(m.fx.rows.map(r => r[0])).toEqual(['Deal currency', 'Size tests available'])
+  })
+
+  it('a deal with no money threshold in scope gets the same plain treatment, with its own reason', () => {
+    const m = build({ ...NEAR_THRESHOLD_DEAL, jurisdiction: 'Australia', currency: 'AUD' })
+    expect(m.fx.paras).toEqual([['No currency conversion was needed: no size-gated framework with a money figure is in scope for this jurisdiction.']])
+    expect(m.fx.rows.map(r => r[0])).toEqual(['Deal currency', 'Size tests available'])
+  })
+
+  it('the USD deal against EUR thresholds still gets its published rate and its USD → EUR row', () => {
+    const m = build(FX_DEAL)
+    expect(m.fx.rows.map(r => r[0])).toEqual([
+      'Rate source', 'Rates as of', 'Deal currency',
+      'Published rate: USD', 'Conversion USD → EUR (CSRD, CS3D)',
+      'Size tests available',
+    ])
+    expect(m.fx.paras).toHaveLength(2)
+  })
+
+  it('a currency with no published rate still reports UNAVAILABLE, not "no conversion needed"', () => {
+    const m = build({ ...FX_DEAL, currency: 'JPY' })
+    expect(m.fx.rows.find(r => r[0] === 'Rate applied')?.[1]).toMatch(/^UNAVAILABLE/)
+    expect(m.fx.paras).toHaveLength(2)
   })
 })
