@@ -1635,9 +1635,13 @@ function DealsDashboardInner() {
                     // those are the screening and findings anon is shown by decision.
                     ...(costShown ? [{ label: 'ThemisIQ est.', val: themisIqFigure }] : []),
                   ].map(({ label, val, urgent }: { label: string; val: React.ReactNode; urgent?: boolean }) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
+                    // A long value (a sector such as "Waste, Water & Environmental Services", or a long
+                    // target name) WRAPS, right-aligned, beside a label that never shrinks or wraps and
+                    // sits level with the value's first line. The shared line-height is what keeps the
+                    // 11px label and the 12px value on one line together.
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, lineHeight: '18px' }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', flexShrink: 0, minWidth: 76, whiteSpace: 'nowrap' }}>{label}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500, minWidth: 0, textAlign: 'right', overflowWrap: 'anywhere' }}>{val}</span>
                     </div>
                   ))}
                 </div>
