@@ -1,15 +1,18 @@
 'use client'
 
-// app/dashboard/s211/_components/ui.tsx
-// Shared pieces for the S-211 report builder: the access gate, the 404 view, the page frame, and the
-// field renderer. The builder is unpriced and gated by public.s211_access (lib/s211/access.ts); nothing here is linked
-// from the navigation, the dashboard or the sitemap.
+// app/dashboard/forced-labour/_components/ui.tsx
+// Shared pieces for the Forced Labour Reporting builder (the Canadian S-211 report): the access states,
+// the 404 view, the page frame, and the field renderer. Access: lib/s211/builderAccess.ts.
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { createContext, useContext, type CSSProperties, type ReactNode } from 'react'
 import Nav from '../../../components/Nav'
-import { s211Api } from '../../../../lib/s211/client'
-import { SOURCE_LABEL, PERSONAL_INFORMATION_WARNING, MONTHS, type Field, type Quote, type SectionContent } from '../../../../lib/s211/builderContent'
+import { SECTIONS, SOURCE_LABEL, PERSONAL_INFORMATION_WARNING, MONTHS, type Field, type Quote, type SectionContent } from '../../../../lib/s211/builderContent'
 import { toggleChecklist } from '../../../../lib/s211/defaults'
+import { useS211Access } from './useS211Access'
+import {
+  signInHref, BUILDER_ROOT, PREVIEW_ID, MODULE_NAME, ORDER_HREF, ORDER_LABEL, RENEW_LABEL,
+  SIGNED_OUT_MESSAGE, UNKNOWN_MESSAGE, PREVIEW_MESSAGE, READ_ONLY_MESSAGE, type BuilderState,
+} from '../../../../lib/s211/builderAccess'
 import { isIsoDate } from '../../../../lib/s211/sectionStatus'
 import type { SectionStatus } from '../../../../lib/s211/sectionStatus'
 
@@ -31,21 +34,14 @@ export const S = {
 }
 
 // ── Access ──────────────────────────────────────────────────────────────────────────────────────────
-type Access = 'loading' | 'allowed' | 'denied' | 'unreachable'
-export function useS211Access(): Access {
-  const [a, setA] = useState<Access>('loading')
-  useEffect(() => {
-    let live = true
-    void s211Api<{ allowed: boolean }>('/access').then(r => {
-      if (!live) return
-      setA(r.status === 200 ? 'allowed' : r.status === 0 ? 'unreachable' : 'denied')
-    })
-    return () => { live = false }
-  }, [])
-  return a
-}
+// One read of /api/s211/access per page, shared through context. The state is the database's
+// (lib/s211/builderAccess.ts says why it is not the client entitlement hook).
+const AccessContext = createContext<BuilderState>('loading')
+/** The builder state for the page being drawn: 'preview', 'read-only' or 'full' inside BuilderFrame. */
+export const useBuilderState = () => useContext(AccessContext)
 
-/** What anyone without S-211 access sees: the standard 404, and nothing about the builder. */
+
+/** A report that does not exist, or is not this user's: the standard 404. */
 export function NotFound404() {
   return (
     <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>
@@ -55,10 +51,49 @@ export function NotFound404() {
   )
 }
 
-/** The frame every builder page uses. Renders its children only for an allowed user. */
-export function BuilderFrame({ children, wide }: { children: ReactNode; wide?: boolean }) {
+function SignInPrompt() {
+  const path = typeof window === 'undefined' ? BUILDER_ROOT : window.location.pathname
+  return (
+    <div style={{ ...S.card, maxWidth: 560 }}>
+      <h1 style={S.h1}>{MODULE_NAME}</h1>
+      <p style={S.body}>{SIGNED_OUT_MESSAGE}</p>
+      <a href={signInHref(path)} style={{ ...S.button, display: 'inline-block', textDecoration: 'none' }}>Sign in</a>
+    </div>
+  )
+}
+
+/** Shown on a report's own pages to an account that has not bought the module. */
+export function PreviewNotice() {
+  return (
+    <div style={{ ...S.card, maxWidth: 640 }}>
+      <h1 style={S.h1}>{MODULE_NAME}</h1>
+      <p style={S.body}>{PREVIEW_MESSAGE}</p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <a href={ORDER_HREF} style={{ ...S.button, textDecoration: 'none' }}>{ORDER_LABEL}</a>
+        <a href={`${BUILDER_ROOT}/${PREVIEW_ID}/${SECTIONS[0].key}`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Read through the sections</a>
+      </div>
+    </div>
+  )
+}
+
+/** The banner on every page for an expired term. */
+export function ReadOnlyBanner({ extra }: { extra?: string }) {
+  return (
+    <div role="status" style={S.warn}>
+      <p style={{ margin: 0 }}>{READ_ONLY_MESSAGE}{extra ? ` ${extra}` : ''}</p>
+      <a href={ORDER_HREF} style={{ display: 'inline-block', marginTop: 8, fontWeight: 600 }}>{RENEW_LABEL}</a>
+    </div>
+  )
+}
+
+/**
+ * The frame every builder page uses. Signed out: a sign-in prompt. Access not checkable: says so.
+ * Otherwise the page, told its state through useBuilderState(). `report` pages (a report's home, its
+ * sections, its check page) show PreviewNotice to an account that has not bought the module, because
+ * there is no report of theirs to open.
+ */
+export function BuilderFrame({ children, wide, report }: { children: ReactNode; wide?: boolean; report?: boolean }) {
   const access = useS211Access()
-  if (access === 'denied') return <NotFound404 />
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-paper, #f8f7f5)' }}>
       <Nav />
@@ -66,7 +101,11 @@ export function BuilderFrame({ children, wide }: { children: ReactNode; wide?: b
       <div style={wide ? { ...S.page, maxWidth: 1140 } : S.page}>
         {access === 'loading' && <p style={S.muted}>Loading</p>}
         {access === 'unreachable' && <p style={S.error}>The server could not be reached. Check your connection and reload the page.</p>}
-        {access === 'allowed' && children}
+        {access === 'unknown' && <p style={S.error}>{UNKNOWN_MESSAGE}</p>}
+        {access === 'signed-out' && <SignInPrompt />}
+        {access === 'preview' && report && <PreviewNotice />}
+        {(access === 'full' || access === 'read-only' || (access === 'preview' && !report)) &&
+          <AccessContext.Provider value={access}>{children}</AccessContext.Provider>}
       </div>
     </div>
   )

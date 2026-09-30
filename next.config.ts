@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: '/impact-materiality', destination: '/materiality', permanent: true },
+      // The S-211 builder became Forced Labour Reporting on 30 Sep 2026 (Stage 5a). Its tables, lib/s211
+      // and /api/s211 keep the s211 names as the Canadian layer; only the public route moved.
+      { source: '/dashboard/s211', destination: '/dashboard/forced-labour', permanent: true },
+      { source: '/dashboard/s211/:path*', destination: '/dashboard/forced-labour/:path*', permanent: true },
     ]
   },
 

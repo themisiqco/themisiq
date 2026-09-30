@@ -14,7 +14,7 @@ import { generateS211ReportPDF } from '../../../../../../lib/s211/reportPdf'
 import type { SectionKey } from '../../../../../../lib/s211/builderContent'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const gate = await requireS211(req)
+  const gate = await requireS211(req, 'read')
   if (!gate.ok) return gate.response
   const { id } = await params
   const { data: report, error } = await gate.supabase.from('s211_reports').select('id, reporting_year').eq('id', id).maybeSingle()

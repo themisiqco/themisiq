@@ -13,7 +13,7 @@ import { isSectionKey } from '../../../../../../../lib/s211/builderContent'
 import { statusAfterEdit, markComplete, type SectionStatus } from '../../../../../../../lib/s211/sectionStatus'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; key: string }> }) {
-  const gate = await requireS211(req)
+  const gate = await requireS211(req, 'write')
   if (!gate.ok) return gate.response
   const { id, key } = await params
   if (!isSectionKey(key)) return notFound()

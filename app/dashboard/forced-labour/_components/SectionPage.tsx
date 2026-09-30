@@ -1,37 +1,45 @@
 'use client'
 
-// app/dashboard/s211/[id]/[section]/page.tsx
-// One section of an S-211 report per page. The layout is the same for all eleven: the Act's words, the
+// app/dashboard/forced-labour/_components/SectionPage.tsx
+// One section of an S-211 report per page, for both routes that show one:
+//   /dashboard/forced-labour/[id]/[section]       a report's section: full access edits, read-only reads
+//   /dashboard/forced-labour/preview/[section]    the walkthrough for an account that has not bought the
+//                                                 module: every word of the section, the fields disabled,
+//                                                 nothing loaded and nothing stored
+// What the account may do comes from useBuilderState() (lib/s211/builderAccess.ts); the database refuses
+// any write regardless. The layout is the same for all eleven: the Act's words, the
 // plain explanation, the prompts, "Nothing to report this year?", the examples, and Previous / Next /
 // Mark as complete. Sections 1, 9 and 11 add what only they need. Content: lib/s211/builderContent.ts.
 //
 // Autosave (lib/s211/autosave.ts): after a pause in typing and on leaving a field. The status is set by
 // the server (app/api/s211/reports/[id]/sections/[key]/route.ts), never here.
 
-import { use, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { s211Api } from '../../../../../lib/s211/client'
+import { s211Api } from '../../../../lib/s211/client'
 import {
-  SECTIONS, sectionDef, isSectionKey, KEY_TERMS, KEY_TERMS_EXPLANATION_LABEL, OECD_STEPS, OECD_STEPS_SOURCE_NOTE,
+  SECTIONS, sectionDef, KEY_TERMS, KEY_TERMS_EXPLANATION_LABEL, OECD_STEPS, OECD_STEPS_SOURCE_NOTE,
   BUILDER_NOTE_ON_SIGNING, EXAMPLES_LABEL, MONTHS, quotedExample,
   type SectionContent, type SectionKey,
-} from '../../../../../lib/s211/builderContent'
-import { NOTHING_TO_REPORT_KEY, asList, missingRequired, type SectionStatus } from '../../../../../lib/s211/sectionStatus'
-import { createAutosaver, autosaveLabel, type AutosaveState } from '../../../../../lib/s211/autosave'
-import { deriveFinancialYear, MAY_31_QUESTION } from '../../../../../lib/s211/financialYear'
-import { approvalBasisOptions, APPROVAL_BASIS_LABEL, APPROVAL_BASIS_NEEDS_REPORT_TYPE } from '../../../../../lib/s211/approval'
+} from '../../../../lib/s211/builderContent'
+import { NOTHING_TO_REPORT_KEY, asList, missingRequired, type SectionStatus } from '../../../../lib/s211/sectionStatus'
+import { createAutosaver, autosaveLabel, type AutosaveState } from '../../../../lib/s211/autosave'
+import { deriveFinancialYear, MAY_31_QUESTION } from '../../../../lib/s211/financialYear'
+import { approvalBasisOptions, APPROVAL_BASIS_LABEL, APPROVAL_BASIS_NEEDS_REPORT_TYPE } from '../../../../lib/s211/approval'
 import {
   assembleSteps, buildStepsContent, stepsDraftState, summaryEdited, describeStepsChanges, STEP_ITEM_LABEL, STALE_NOTICE, DRAFT_NOTICE,
   REBUILD_PANEL_INTRO, KEEP_MINE, REPLACE_WITH_NEW, type StepItem,
-} from '../../../../../lib/s211/stepsSummary'
-import { refreshAttestation, attestationEdited, attestationInputs, attestationNote } from '../../../../../lib/s211/attestation'
-import { signatureBlocks, entitiesCovered } from '../../../../../lib/s211/reportModel'
-import { isFirstVisit, recordVisit, browserStore } from '../../../../../lib/s211/visits'
+} from '../../../../lib/s211/stepsSummary'
+import { refreshAttestation, attestationEdited, attestationInputs, attestationNote } from '../../../../lib/s211/attestation'
+import { signatureBlocks, entitiesCovered } from '../../../../lib/s211/reportModel'
+import { isFirstVisit, recordVisit, browserStore } from '../../../../lib/s211/visits'
 import {
-  BuilderFrame, S, StatusPill, QuoteBlock, Disclosure, FieldInput, StepStatusRows, NotFound404, PersonalInformation,
-  ReplaceDraftPanel, STATUS_LABEL,
-} from '../../_components/ui'
-import type { ReportRecord, SectionRow } from '../../_components/types'
+  S, StatusPill, QuoteBlock, Disclosure, FieldInput, StepStatusRows, NotFound404, PersonalInformation,
+  ReplaceDraftPanel, ReadOnlyBanner, STATUS_LABEL, useBuilderState,
+} from './ui'
+import { defaultReportingYear } from '../../../../lib/s211/defaults'
+import { BUILDER_ROOT, PREVIEW_ID, ORDER_HREF, ORDER_LABEL, PREVIEW_SECTION_MESSAGE, canWrite } from '../../../../lib/s211/builderAccess'
+import type { ReportRecord, SectionRow } from './types'
 
 type Autosaver = ReturnType<typeof createAutosaver<SectionContent>>
 type Pending = { kind: 'steps' | 'attestation'; mine: string; next: SectionContent } | null
@@ -40,8 +48,23 @@ const FY_OVERRIDE_LINK = 'My financial year is different (for example a 52 to 53
 const MAY_31_EXAMPLE = 'For example, an entity with a May 31 year end, reporting in 2026, covers June 1, 2024 to May 31, 2025, unless it confirms otherwise.'
 const ATTESTATION_PANEL_INTRO = 'You have edited the attestation. A version with your latest answers filled in is shown beside yours. Copy anything you want to keep before you choose.'
 
-function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey }) {
+/** The report the preview walkthrough stands on: no answers, this year's reporting year. Never saved. */
+const PREVIEW_REPORT: ReportRecord = {
+  id: PREVIEW_ID, company_name: '', reporting_year: defaultReportingYear(new Date()), financial_year_end: null,
+  listed_in_canada: null, place_of_business_in_canada: null, does_business_in_canada: null, has_assets_in_canada: null,
+  recent_fy_assets: null, recent_fy_revenue: null, recent_fy_avg_employees: null, recent_fy_currency: null,
+  prior_fy_assets: null, prior_fy_revenue: null, prior_fy_avg_employees: null, prior_fy_currency: null,
+}
+
+/** The walkthrough's answers: none, except section 11's example attestation so the wording can be read. */
+const previewContent = (key: SectionKey): SectionContent =>
+  key === 'approval_attestation' ? refreshAttestation({}, attestationInputs({}, {})).content : {}
+
+export function SectionPage({ id, sectionKey, preview = false }: { id: string; sectionKey: SectionKey; preview?: boolean }) {
   const def = sectionDef(sectionKey)
+  // Full access edits; read-only and the preview show every field disabled and store nothing.
+  const writable = canWrite(useBuilderState()) && !preview
+  const base = preview ? `${BUILDER_ROOT}/${PREVIEW_ID}` : `${BUILDER_ROOT}/${id}`
   const idx = SECTIONS.findIndex(s => s.key === sectionKey)
   const prev = SECTIONS[idx - 1], next = SECTIONS[idx + 1]
 
@@ -50,19 +73,19 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
   const [firstVisit] = useState(() => isFirstVisit(browserStore(), id, sectionKey))
   useEffect(() => { recordVisit(browserStore(), id, sectionKey) }, [id, sectionKey])
 
-  const [report, setReport] = useState<ReportRecord | null>(null)
+  const [report, setReport] = useState<ReportRecord | null>(preview ? PREVIEW_REPORT : null)
   const [others, setOthers] = useState<Partial<Record<SectionKey, SectionContent>>>({})
   const [statuses, setStatuses] = useState<Partial<Record<SectionKey, SectionStatus>>>({})
-  const [content, setContent] = useState<SectionContent>({})
+  const [content, setContent] = useState<SectionContent>(() => (preview ? previewContent(sectionKey) : {}))
   const [status, setStatus] = useState<SectionStatus>('not_started')
-  const [loaded, setLoaded] = useState<'loading' | 'ok' | 'missing' | 'error'>('loading')
+  const [loaded, setLoaded] = useState<'loading' | 'ok' | 'missing' | 'error'>(preview ? 'ok' : 'loading')
   const [save, setSave] = useState<AutosaveState>({ kind: 'idle' })
   const [refusal, setRefusal] = useState<{ message: string; missing: string[] } | null>(null)
   const [showTerms, setShowTerms] = useState(false)
   const [showFyOverride, setShowFyOverride] = useState(false)
   const [pending, setPending] = useState<Pending>(null)
-  const contentRef = useRef<SectionContent>({})
-  const reportRef = useRef<ReportRecord | null>(null)
+  const contentRef = useRef<SectionContent>(content)
+  const reportRef = useRef<ReportRecord | null>(report)
   const autosaverRef = useRef<Autosaver | null>(null)
 
   // ── Saving ────────────────────────────────────────────────────────────────────────────────────────
@@ -94,6 +117,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
   }, [saveNow, sectionKey, id])
 
   const apply = (c: SectionContent) => {
+    if (!writable) return
     contentRef.current = c
     setContent(c)
     setRefusal(null)
@@ -118,6 +142,8 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
 
   // ── Loading ───────────────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
+    // Nothing to load for the walkthrough: its state was set up when the page mounted.
+    if (preview) return
     void s211Api<{ report: ReportRecord; sections: SectionRow[] }>(`/reports/${id}`).then(r => {
       if (r.status === 404) { setLoaded('missing'); return }
       if (!r.data) { setLoaded('error'); return }
@@ -133,10 +159,10 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
       if (sectionKey === 'approval_attestation') {
         const res = refreshAttestation(c, attestationInputs(c, map.report_details))
         c = res.content
-        if (res.offer) setPending({ kind: 'attestation', mine: String(c.attestation_text ?? ''), next: { ...c, attestation_text: res.offer, _attestation_built: res.offer } })
+        if (res.offer && writable) setPending({ kind: 'attestation', mine: String(c.attestation_text ?? ''), next: { ...c, attestation_text: res.offer, _attestation_built: res.offer } })
       }
       // Section 9: a first draft from sections 3 to 8, built once when nothing is there yet. Nothing to overwrite.
-      if (sectionKey === 'steps_taken' && typeof c._built_from !== 'string' && !(typeof c.steps_summary === 'string' && c.steps_summary.trim())) {
+      if (writable && sectionKey === 'steps_taken' && typeof c._built_from !== 'string' && !(typeof c.steps_summary === 'string' && c.steps_summary.trim())) {
         c = buildStepsContent(c, map)
       }
       if (sectionKey === 'report_details') setShowFyOverride(!!(c.financial_year_start || c.financial_year_end))
@@ -145,7 +171,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
       setStatus(mine?.status ?? 'not_started')
       setLoaded('ok')
     })
-  }, [id, sectionKey])
+  }, [id, sectionKey, preview, writable])
 
   // ── Complete / reopen ─────────────────────────────────────────────────────────────────────────────
   const complete = async () => {
@@ -193,12 +219,12 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
             const current = d.key === sectionKey
             return (
               <li key={d.key} style={{ marginBottom: 4 }}>
-                <Link href={`/dashboard/s211/${id}/${d.key}`} aria-current={current ? 'page' : undefined}
+                <Link href={`${base}/${d.key}`} aria-current={current ? 'page' : undefined}
                   style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', padding: '6px 8px', borderRadius: 8, textDecoration: 'none',
                     fontSize: 12.5, lineHeight: 1.35, color: 'var(--color-ink)', background: current ? '#E6F1F3' : 'transparent', fontWeight: current ? 600 : 400,
                     borderLeft: current ? '3px solid var(--color-brand)' : '3px solid transparent' }}>
                   <span>{d.number}. {d.title}</span>
-                  <StatusPill status={statuses[d.key] ?? 'not_started'} />
+                  {!preview && <StatusPill status={statuses[d.key] ?? 'not_started'} />}
                 </Link>
               </li>
             )
@@ -207,8 +233,8 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
       </div>
       <div className="s211-nav-jump">
         <label htmlFor="jump" style={S.label}>Jump to section</label>
-        <select id="jump" style={S.input} value={sectionKey} onChange={e => { window.location.href = `/dashboard/s211/${id}/${e.target.value}` }}>
-          {SECTIONS.map(d => <option key={d.key} value={d.key}>{d.number}. {d.title} ({STATUS_LABEL[statuses[d.key] ?? 'not_started']})</option>)}
+        <select id="jump" style={S.input} value={sectionKey} onChange={e => { window.location.href = `${base}/${e.target.value}` }}>
+          {SECTIONS.map(d => <option key={d.key} value={d.key}>{d.number}. {d.title}{preview ? '' : ` (${STATUS_LABEL[statuses[d.key] ?? 'not_started']})`}</option>)}
         </select>
       </div>
     </nav>
@@ -218,10 +244,19 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
     <div className="s211-layout">
       {nav}
       <main>
-        <p style={{ ...S.muted, margin: '0 0 6px' }}><Link href={`/dashboard/s211/${id}`}>Back to report overview</Link></p>
+        <p style={{ ...S.muted, margin: '0 0 6px' }}>
+          {preview ? <Link href={BUILDER_ROOT}>Back to Forced Labour Reporting</Link> : <Link href={base}>Back to report overview</Link>}
+        </p>
+        {preview && (
+          <div role="status" style={S.warn}>
+            <p style={{ margin: '0 0 8px' }}>{PREVIEW_SECTION_MESSAGE}</p>
+            <a href={ORDER_HREF} style={{ ...S.button, display: 'inline-block', textDecoration: 'none' }}>{ORDER_LABEL}</a>
+          </div>
+        )}
+        {!preview && !writable && <ReadOnlyBanner />}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <h1 style={S.h1}>{def.number}. {def.title}</h1>
-          <div style={{ marginTop: 8 }}><StatusPill status={status} /></div>
+          {!preview && <div style={{ marginTop: 8 }}><StatusPill status={status} /></div>}
         </div>
         {/* The same spacing on every section between this line and "What the Act asks". */}
         <p style={{ ...S.muted, margin: '0 0 20px' }}>{def.mapsTo}</p>
@@ -244,7 +279,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
           </Disclosure>
         )}
 
-        {pending && (
+        {pending && writable && (
           <ReplaceDraftPanel
             intro={pending.kind === 'steps' ? REBUILD_PANEL_INTRO : ATTESTATION_PANEL_INTRO}
             mine={pending.mine} next={String(pending.kind === 'steps' ? pending.next.steps_summary ?? '' : pending.next.attestation_text ?? '')}
@@ -259,7 +294,9 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
         )}
 
         <div style={{ ...S.card, marginTop: 6 }}>
-          {sectionKey === 'steps_taken' && steps && (
+          {/* Read-only and preview: every control in the card disabled at once. The database refuses a write anyway. */}
+          <fieldset disabled={!writable} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          {sectionKey === 'steps_taken' && steps && !preview && (
             <StepsPanel steps={steps} changes={stepsChanges} content={content} onRebuild={rebuild}
               onAppend={text => change('steps_summary', `${(content.steps_summary as string ?? '').trim()} ${text}`.trim())} />
           )}
@@ -275,7 +312,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
             return (
               <div key={f.key}>
                 {sectionKey === 'report_details' && f.key === 'financial_year_confirmed' && <FinancialYear fy={fy} />}
-                {sectionKey === 'approval_attestation' && f.key === 'approval_basis' && basisOptions.length === 0 && <p style={S.warn}>{APPROVAL_BASIS_NEEDS_REPORT_TYPE}</p>}
+                {!preview && sectionKey === 'approval_attestation' && f.key === 'approval_basis' && basisOptions.length === 0 && <p style={S.warn}>{APPROVAL_BASIS_NEEDS_REPORT_TYPE}</p>}
                 {sectionKey === 'approval_attestation' && f.key === 'approval_basis' && typeof content.approval_basis === 'string' && content.approval_basis && basisOptions.length > 0
                   && !basisOptions.includes(content.approval_basis as (typeof basisOptions)[number])
                   && <p style={S.warn}>The basis saved here does not match the report type chosen in section 1. Choose again.</p>}
@@ -292,7 +329,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
                   <div style={{ ...S.warn, marginTop: -8 }}>
                     <p style={{ margin: '0 0 8px' }}>{attestationNote(content.approval_basis)}</p>
                     {attestationEdited(content) && <p style={{ margin: '0 0 8px' }}>You have edited this text, so later changes to your answers will not change it without asking you.</p>}
-                    {(() => {
+                    {!preview && (() => {
                       const blocks = signatureBlocks(content, others.report_details ?? {})
                       return <>
                         <p style={{ margin: '0 0 4px' }}>{blocks.length > 1 ? `Printed under it: ${blocks.length} signature blocks, one for each entity whose governing body approved the report, each with the four lines the guidance lists:` : 'Printed under it: the signature block, with the four lines the guidance lists:'}</p>
@@ -323,6 +360,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
           {!def.nothingToReport && def.nothingToReportNote && <p style={{ ...S.hint, borderTop: '1px solid #e8e7e4', paddingTop: 12 }}>{def.nothingToReportNote}</p>}
 
           <p style={{ ...S.hint, marginTop: 12 }}>Suggested length: {def.characterGuidance} This is our suggestion. The guidance sets no level of detail.</p>
+          </fieldset>
         </div>
 
         <details style={{ ...S.card, padding: '10px 16px' }}>
@@ -340,13 +378,14 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
           </div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 10 }}>
-          {prev ? <Link href={`/dashboard/s211/${id}/${prev.key}`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Previous</Link> : <span />}
-          {next ? <Link href={`/dashboard/s211/${id}/${next.key}`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Next</Link>
-            : <Link href={`/dashboard/s211/${id}/check`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Check the report</Link>}
-          {status === 'complete'
+          {prev ? <Link href={`${base}/${prev.key}`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Previous</Link> : <span />}
+          {next ? <Link href={`${base}/${next.key}`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Next</Link>
+            : preview ? <a href={ORDER_HREF} style={{ ...S.button, textDecoration: 'none' }}>{ORDER_LABEL}</a>
+            : <Link href={`${base}/check`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Check the report</Link>}
+          {writable && (status === 'complete'
             ? <button type="button" style={S.buttonQuiet} onClick={reopen}>Reopen this section</button>
-            : <button type="button" style={S.button} onClick={complete}>Mark as complete</button>}
-          <span aria-live="polite" style={{ ...S.muted, color: save.kind === 'error' ? '#B91C1C' : 'var(--color-ink-muted)' }}>{autosaveLabel(save)}</span>
+            : <button type="button" style={S.button} onClick={complete}>Mark as complete</button>)}
+          {writable && <span aria-live="polite" style={{ ...S.muted, color: save.kind === 'error' ? '#B91C1C' : 'var(--color-ink-muted)' }}>{autosaveLabel(save)}</span>}
         </div>
       </main>
     </div>
@@ -423,9 +462,3 @@ function StepsPanel({ steps, changes, content, onRebuild, onAppend }: {
   )
 }
 
-export default function S211SectionPage({ params }: { params: Promise<{ id: string; section: string }> }) {
-  const { id, section } = use(params)
-  if (!isSectionKey(section)) return <NotFound404 />
-  // Keyed by section: moving between sections mounts a fresh page, so each reads its own first visit.
-  return <BuilderFrame wide><SectionPage key={section} id={id} sectionKey={section} /></BuilderFrame>
-}

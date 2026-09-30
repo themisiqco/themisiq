@@ -1,4 +1,4 @@
-// app/dashboard/s211/_components/types.ts
+// app/dashboard/forced-labour/_components/types.ts
 // Shapes the S-211 builder's pages read from the API.
 import type { SectionContent, SectionKey } from '../../../../lib/s211/builderContent'
 import type { SectionStatus } from '../../../../lib/s211/sectionStatus'

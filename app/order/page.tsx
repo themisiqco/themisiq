@@ -39,6 +39,7 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   'ai-governance': 'AI Governance',
   'people': 'People & Workforce',
   'cyber': 'Cyber Governance',
+  'forced-labour': 'Forced Labour Reporting',
 }
 
 const usd = (n: number) => `$${n.toLocaleString()}`

@@ -6,7 +6,7 @@ import { requireS211 } from '../../../../lib/s211/server'
 import { REPORT_LIST_COLUMNS } from '../../../../lib/s211/reportPatch'
 
 export async function GET(req: Request) {
-  const gate = await requireS211(req)
+  const gate = await requireS211(req, 'read')
   if (!gate.ok) return gate.response
   const { data, error } = await gate.supabase.from('s211_reports').select(REPORT_LIST_COLUMNS)
     .order('reporting_year', { ascending: false }).order('updated_at', { ascending: false })
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const gate = await requireS211(req)
+  const gate = await requireS211(req, 'write')
   if (!gate.ok) return gate.response
   const body = await req.json().catch(() => null) as { company_name?: unknown; reporting_year?: unknown } | null
   const company = typeof body?.company_name === 'string' ? body.company_name.trim() : ''

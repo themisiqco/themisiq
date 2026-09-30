@@ -102,6 +102,11 @@ export const EVIDENCE_BY_MODULE: Record<ModuleKey, EvidenceKind> = {
   deals: 'workings',
   'ai-governance': 'workings',
   cyber: 'workings',
+  // ⚠️ PLACEHOLDER FOR 5b. The report is a narrative the entity writes, not a score with workings, so the
+  // 'workings' paragraph ("Every score carries the inputs...") does not describe it. It is here only
+  // because the Record requires an entry; nothing renders it until the /forced-labour page exists, and
+  // 5b decides the claim.
+  'forced-labour': 'workings',
 }
 
 /**

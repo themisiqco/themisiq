@@ -81,8 +81,8 @@ describe('the builder content', () => {
 
   it('the builder is linked from nowhere: not the navigation, the dashboard, or the sitemap', () => {
     for (const f of ['app/components/Nav.tsx', 'app/components/Footer.tsx', 'app/dashboard/page.tsx', 'app/sitemap.ts'])
-      expect(read(f), f).not.toContain('/dashboard/s211')
-    expect(read('app/dashboard/s211/layout.tsx')).toContain('robots: { index: false, follow: false }')
+      expect(read(f), f).not.toContain('/dashboard/forced-labour')
+    expect(read('app/dashboard/forced-labour/layout.tsx')).toContain('robots: { index: false, follow: false }')
   })
 })
 
@@ -118,16 +118,18 @@ describe('review fixes: builder text', () => {
 })
 
 describe('review fixes: the builder pages (source checks)', () => {
-  const page = read('app/dashboard/s211/[id]/[section]/page.tsx')
-  const ui = read('app/dashboard/s211/_components/ui.tsx')
-  const check = read('app/dashboard/s211/[id]/check/page.tsx')
-  const home = read('app/dashboard/s211/[id]/page.tsx')
-  const list = read('app/dashboard/s211/page.tsx')
+  // The section page moved into a shared component in Stage 5a, used by the report and preview routes.
+  const page = read('app/dashboard/forced-labour/_components/SectionPage.tsx')
+  const route = read('app/dashboard/forced-labour/[id]/[section]/page.tsx')
+  const ui = read('app/dashboard/forced-labour/_components/ui.tsx')
+  const check = read('app/dashboard/forced-labour/[id]/check/page.tsx')
+  const home = read('app/dashboard/forced-labour/[id]/page.tsx')
+  const list = read('app/dashboard/forced-labour/page.tsx')
 
   it('the panels open on the first visit, read once before the visit is recorded (item A1)', () => {
     expect(page).toMatch(/useState\(\(\) => isFirstVisit\(/)
     expect(page).toContain('open={firstVisit}')
-    expect(page).toMatch(/<SectionPage key=\{section\}/)
+    expect(route).toMatch(/<SectionPage key=\{section\}/)
   })
 
   it('every section page has the section list, the jump menu and the way back (item B7)', () => {

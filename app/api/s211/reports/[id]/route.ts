@@ -6,7 +6,7 @@ import { requireS211, notFound } from '../../../../../lib/s211/server'
 import { cleanReportPatch, REPORT_COLUMNS } from '../../../../../lib/s211/reportPatch'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const gate = await requireS211(req)
+  const gate = await requireS211(req, 'read')
   if (!gate.ok) return gate.response
   const { id } = await params
   const { data: report, error } = await gate.supabase.from('s211_reports').select(REPORT_COLUMNS).eq('id', id).maybeSingle()
@@ -19,7 +19,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const gate = await requireS211(req)
+  const gate = await requireS211(req, 'write')
   if (!gate.ok) return gate.response
   const { id } = await params
   const cleaned = cleanReportPatch(await req.json().catch(() => null))

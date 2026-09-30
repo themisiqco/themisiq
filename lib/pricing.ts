@@ -45,6 +45,10 @@ export type ModuleKey =
   | 'deals'
   | 'ai-governance'
   | 'cyber'
+  // Forced Labour Reporting (Stage 5a, 30 Sep 2026). The first country is Canada's S-211 Act; its tables,
+  // lib/s211 and /api/s211 keep the s211 names as the Canadian layer. The key is country-neutral because
+  // the webhook writes it into entitlements for good.
+  | 'forced-labour'
 
 export const MODULES: { key: ModuleKey; name: string }[] = [
   { key: 'ghg',           name: 'GHG Inventory (Scope 1, 2 & 3)' },
@@ -56,6 +60,7 @@ export const MODULES: { key: ModuleKey; name: string }[] = [
   { key: 'deals',         name: 'Deals & Investment' },
   { key: 'ai-governance', name: 'AI Governance' },
   { key: 'cyber',         name: 'Cyber Governance' },
+  { key: 'forced-labour', name: 'Forced Labour Reporting' },
 ]
 
 export const ALL_MODULE_KEYS = MODULES.map((m) => m.key)
@@ -80,6 +85,8 @@ export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
   deals: 'deals',
   ai: 'ai-governance',
   cyber: 'cyber',
+  // Same spelling as the key: /order?modules=forced-labour.
+  'forced-labour': 'forced-labour',
 }
 
 // ── Tiers + founding offer ───────────────────────────────────────────────────
@@ -252,6 +259,8 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
   'cyber':         2900,
   'ai-governance': 2900,
   'people':        1499,
+  // One-time, 365-day term, exactly like People (decided 30 Sep 2026).
+  'forced-labour': 1499,
 }
 
 // Self-serve card is disabled ABOVE this; larger orders route to request-an-invoice

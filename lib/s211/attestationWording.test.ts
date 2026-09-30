@@ -44,7 +44,7 @@ describe('the adapted attestation wordings are ours, never labelled as Public Sa
   })
 
   it('the section page shows the note for the basis, not the fixed example note', () => {
-    const page = readFileSync(join(process.cwd(), 'app/dashboard/s211/[id]/[section]/page.tsx'), 'utf8')
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/forced-labour/_components/SectionPage.tsx'), 'utf8')
     expect(page).toContain('{attestationNote(content.approval_basis)}')
     expect(page).not.toContain('{ATTESTATION_EXAMPLE_NOTE}')
   })

@@ -3,7 +3,8 @@
 // access (lib/s211/server.ts). A 404 from any call means "not available to this account".
 import { supabase } from '../supabase'
 
-export type ApiResult<T> = { status: number; data: T | null; error: string | null }
+/** `state` is the access state a refused call names (lib/s211/server.ts), or null. */
+export type ApiResult<T> = { status: number; data: T | null; error: string | null; state: string | null }
 
 export async function s211Api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<ApiResult<T>> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -13,10 +14,13 @@ export async function s211Api<T>(path: string, init: { method?: string; body?: u
     const res = await fetch(`/api/s211${path}`, {
       method: init.method ?? 'GET', headers, ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
     })
-    const json = await res.json().catch(() => null) as (T & { error?: string }) | null
-    return { status: res.status, data: res.ok ? json : null, error: res.ok ? null : (json?.error ?? `Request failed (${res.status}).`) }
+    const json = await res.json().catch(() => null) as (T & { error?: string; state?: string }) | null
+    return {
+      status: res.status, data: res.ok ? json : null, error: res.ok ? null : (json?.error ?? `Request failed (${res.status}).`),
+      state: typeof json?.state === 'string' ? json.state : null,
+    }
   } catch {
-    return { status: 0, data: null, error: 'No connection.' }
+    return { status: 0, data: null, error: 'No connection.', state: null }
   }
 }
 

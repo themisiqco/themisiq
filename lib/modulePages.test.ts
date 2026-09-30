@@ -31,7 +31,15 @@ const PAGE_BY_MODULE: Record<ModuleKey, string> = {
   deals: 'app/deals/page.tsx',
   'ai-governance': 'app/ai-governance/page.tsx',
   cyber: 'app/cyber/page.tsx',
+  'forced-labour': 'app/forced-labour/page.tsx',
 }
+
+/**
+ * Keys whose marketing page is not built yet. Their page must NOT exist: when it is built, this test fails
+ * until the key moves out of here, so the page cannot ship without taking the shared claims below.
+ * 'forced-labour' is Stage 5b.
+ */
+const PAGE_PENDING: ModuleKey[] = ['forced-labour']
 
 /**
  * Pages that take the shared module claims. Climate Risk was built first, alone, so the shape could be
@@ -56,9 +64,11 @@ describe('the shared module-page claims cannot drift across the module pages', (
     const keys = MODULES.map(m => m.key).sort()
     expect(Object.keys(PAGE_BY_MODULE).sort(), 'PAGE_BY_MODULE has drifted from MODULES in lib/pricing.ts')
       .toEqual(keys)
-    const missing = Object.entries(PAGE_BY_MODULE).filter(([, p]) => !existsSync(join(ROOT, p)))
+    const missing = Object.entries(PAGE_BY_MODULE).filter(([k, p]) => !PAGE_PENDING.includes(k as ModuleKey) && !existsSync(join(ROOT, p)))
       .map(([k, p]) => `${k} -> ${p}`)
     expect(missing, missing.length === 0 ? '' : `page file not found:\n  ${missing.join('\n  ')}`).toEqual([])
+    const built = PAGE_PENDING.filter(k => existsSync(join(ROOT, PAGE_BY_MODULE[k])))
+    expect(built, `now built, so take it out of PAGE_PENDING: ${built.join(', ')}`).toEqual([])
   })
 
   it('the sub-line is one string, and it names a person rather than a product', () => {

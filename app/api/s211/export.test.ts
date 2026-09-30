@@ -21,18 +21,25 @@ const complete = () => Object.entries(SINGLE_REPORT.sections).map(([section_key,
 
 beforeEach(() => {
   h.signedIn = true
-  h.db = { tables: { s211_reports: [{ id: 'r1', user_id: 'u1', reporting_year: 2026 }], s211_report_sections: complete() }, calls: [], rpc: { s211_has_access: { data: true, error: null } } }
+  h.db = { tables: { s211_reports: [{ id: 'r1', user_id: 'u1', reporting_year: 2026 }], s211_report_sections: complete() }, calls: [], rpc: { s211_can_read: { data: true, error: null }, s211_can_write: { data: true, error: null } } }
 })
 
 describe('GET /api/s211/reports/[id]/export', () => {
-  it('refused by the access gate: the same 404, and no table is read', async () => {
-    h.db.rpc = { s211_has_access: { data: false, error: null } }
+  it('refused by the access gate: never bought is a 403, signed out a 401, and no table is read', async () => {
+    h.db.rpc = { s211_can_read: { data: false, error: null }, s211_can_write: { data: false, error: null } }
     const r = await get()
-    expect(r.status).toBe(404)
-    expect(await r.json()).toEqual({ error: 'Not found' })
+    expect(r.status).toBe(403)
+    expect((await r.json()).state).toBe('preview')
     expect(h.db.calls.filter(c => c.startsWith('from:'))).toEqual([])
     h.signedIn = false
-    expect((await get()).status).toBe(404)
+    expect((await get()).status).toBe(401)
+  })
+
+  it('an expired term can still export a finished report', async () => {
+    h.db.rpc = { s211_can_read: { data: true, error: null }, s211_can_write: { data: false, error: null } }
+    const r = await get()
+    expect(r.status).toBe(200)
+    expect(r.headers.get('Content-Type')).toBe('application/pdf')
   })
 
   it('a report that is not the user\'s is a 404', async () => {

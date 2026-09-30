@@ -1,6 +1,6 @@
 'use client'
 
-// app/dashboard/s211/[id]/page.tsx
+// app/dashboard/forced-labour/[id]/page.tsx
 // One S-211 report's home: whether the Act applies (lib/s211/entity.ts, lib/s211/obligation.ts), with
 // the reasons, then the eleven sections with their status. Gated; see ../_components/ui.tsx.
 
@@ -11,7 +11,8 @@ import { SECTIONS, type SectionKey } from '../../../../lib/s211/builderContent'
 import { completeCount, type SectionStatus } from '../../../../lib/s211/sectionStatus'
 import { evaluateS211Entity, type S211EntityInput, type S211YearFigures } from '../../../../lib/s211/entity'
 import { evaluateS211Obligation, S211_OUTCOME_LABEL, type S211Activities, type S211Answer } from '../../../../lib/s211/obligation'
-import { BuilderFrame, S, StatusPill } from '../_components/ui'
+import { BuilderFrame, ReadOnlyBanner, S, StatusPill, useBuilderState } from '../_components/ui'
+import { canWrite, READ_ONLY_EXPORT_NOTE } from '../../../../lib/s211/builderAccess'
 import type { ReportRecord, SectionRow } from '../_components/types'
 
 
@@ -34,6 +35,7 @@ const year = (r: ReportRecord, p: 'recent' | 'prior'): S211YearFigures | null =>
 }
 
 function Home({ id }: { id: string }) {
+  const writable = canWrite(useBuilderState())
   const [report, setReport] = useState<ReportRecord | null>(null)
   const [sections, setSections] = useState<SectionRow[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -100,7 +102,7 @@ function Home({ id }: { id: string }) {
     setSaveMsg(`Saved at ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`)
   }
 
-  if (missing) return <p style={S.muted}>This report was not found. <Link href="/dashboard/s211">Back to your reports</Link></p>
+  if (missing) return <p style={S.muted}>This report was not found. <Link href="/dashboard/forced-labour">Back to your reports</Link></p>
   if (error) return <p style={S.error}>{error}</p>
   if (!report || !result) return <p style={S.muted}>Loading</p>
 
@@ -117,9 +119,10 @@ function Home({ id }: { id: string }) {
 
   return (
     <>
-      <p style={{ ...S.muted, margin: 0 }}><Link href="/dashboard/s211">Your reports</Link></p>
+      <p style={{ ...S.muted, margin: 0 }}><Link href="/dashboard/forced-labour">Your reports</Link></p>
       <h1 style={S.h1}>{report.company_name}</h1>
       <p style={S.muted}>Reporting year {report.reporting_year}. {done} of 11 sections complete.</p>
+      {!writable && <ReadOnlyBanner extra={READ_ONLY_EXPORT_NOTE} />}
 
       <h2 style={S.h2}>Does the Act apply?</h2>
       <div style={S.card}>
@@ -136,8 +139,9 @@ function Home({ id }: { id: string }) {
       </div>
 
       <details style={{ ...S.card, padding: '10px 16px' }}>
-        <summary style={{ fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Answer or change the applicability questions</summary>
-        <div style={{ marginTop: 12 }}>
+        <summary style={{ fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{writable ? 'Answer or change the applicability questions' : 'The applicability answers'}</summary>
+        {/* Read-only: every control disabled at once. The database refuses a write anyway. */}
+        <fieldset disabled={!writable} style={{ border: 0, padding: 0, margin: '12px 0 0', minWidth: 0 }}>
           <p style={S.label}>Listing and presence in Canada</p>
           {triSelect('listed_in_canada', 'Listed on a stock exchange in Canada')}
           {triSelect('place_of_business_in_canada', 'Has a place of business in Canada')}
@@ -168,26 +172,26 @@ function Home({ id }: { id: string }) {
               </select>
             </label>
           ))}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 10 }}>
+          {writable && <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 10 }}>
             <button type="button" style={S.button} onClick={saveApplicability}>Save these answers</button>
             {saveMsg && <span style={S.muted}>{saveMsg}</span>}
-          </div>
-        </div>
+          </div>}
+        </fieldset>
       </details>
 
       <h2 style={S.h2}>Sections</h2>
       {SECTIONS.map(d => (
-        <Link key={d.key} href={`/dashboard/s211/${id}/${d.key}`} style={{ ...S.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, textDecoration: 'none', padding: '12px 16px' }}>
+        <Link key={d.key} href={`/dashboard/forced-labour/${id}/${d.key}`} style={{ ...S.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, textDecoration: 'none', padding: '12px 16px' }}>
           <span style={{ fontSize: 14, color: 'var(--color-ink)' }}>{d.number}. {d.title}{d.optional ? ' (optional)' : ''}</span>
           <StatusPill status={statuses[d.key] ?? 'not_started'} />
         </Link>
       ))}
-      <p style={{ marginTop: 18 }}><Link href={`/dashboard/s211/${id}/check`} style={{ ...S.buttonQuiet, textDecoration: 'none', display: 'inline-block' }}>Check the report before export</Link></p>
+      <p style={{ marginTop: 18 }}><Link href={`/dashboard/forced-labour/${id}/check`} style={{ ...S.buttonQuiet, textDecoration: 'none', display: 'inline-block' }}>Check the report before export</Link></p>
     </>
   )
 }
 
 export default function S211ReportHome({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  return <BuilderFrame><Home id={id} /></BuilderFrame>
+  return <BuilderFrame report><Home id={id} /></BuilderFrame>
 }

@@ -1,6 +1,6 @@
 'use client'
 
-// app/dashboard/s211/[id]/check/page.tsx
+// app/dashboard/forced-labour/[id]/check/page.tsx
 // The check page before export: what is not complete, where a "nothing to report" sentence stands in,
 // the personal-information rule and scan, and the export. What is listed comes from
 // lib/s211/checkReport.ts; what blocks export and what looks like personal information, from
@@ -14,11 +14,12 @@ import { exportGate, scanPersonalInformation, scanUndrawable, describeChars, PER
 import { checkReport, NOTHING_MISSING_LINE, type CheckRow, type SectionState } from '../../../../../lib/s211/checkReport'
 import { asList, labelsEndingSentence } from '../../../../../lib/s211/sectionStatus'
 import type { SectionContent, SectionKey } from '../../../../../lib/s211/builderContent'
-import { BuilderFrame, S, StatusPill, NotFound404, PersonalInformation } from '../../_components/ui'
+import { BuilderFrame, ReadOnlyBanner, S, StatusPill, NotFound404, PersonalInformation, useBuilderState } from '../../_components/ui'
+import { canWrite, ORDER_HREF, RENEW_LABEL } from '../../../../../lib/s211/builderAccess'
 import type { ReportRecord, SectionRow } from '../../_components/types'
 
 function SectionLink({ id, r }: { id: string; r: CheckRow }) {
-  return <Link href={`/dashboard/s211/${id}/${r.key}`} style={{ fontSize: 14, color: 'var(--color-ink)' }}>{r.number}. {r.title}</Link>
+  return <Link href={`/dashboard/forced-labour/${id}/${r.key}`} style={{ fontSize: 14, color: 'var(--color-ink)' }}>{r.number}. {r.title}</Link>
 }
 
 function StillToFill({ r }: { r: CheckRow }) {
@@ -34,6 +35,7 @@ function StillToFill({ r }: { r: CheckRow }) {
 }
 
 function Check({ id }: { id: string }) {
+  const writable = canWrite(useBuilderState())
   const [data, setData] = useState<{ report: ReportRecord; sections: SectionRow[] } | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'missing' | 'error'>('loading')
   useEffect(() => {
@@ -57,8 +59,9 @@ function Check({ id }: { id: string }) {
 
   return (
     <>
-      <p style={{ ...S.muted, margin: 0 }}><Link href={`/dashboard/s211/${id}`}>Back to report overview</Link></p>
+      <p style={{ ...S.muted, margin: 0 }}><Link href={`/dashboard/forced-labour/${id}`}>Back to report overview</Link></p>
       <h1 style={S.h1}>Check the report</h1>
+      {!writable && <ReadOnlyBanner />}
       <p style={S.muted}>{data.report.company_name}, reporting year {data.report.reporting_year}. A last look before the report is exported for approval and signing.</p>
 
       {c.warnings.map(w => <p key={w} style={S.warn}>{w}</p>)}
@@ -103,7 +106,7 @@ function Check({ id }: { id: string }) {
             <ul style={{ ...S.body, paddingLeft: 18 }}>
               {pi.map((h, i) => (
                 <li key={i} style={{ marginBottom: 6 }}>
-                  <Link href={`/dashboard/s211/${id}/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: &ldquo;{h.match}&rdquo; looks like {PERSONAL_INFO_KIND_LABEL[h.kind]}.
+                  <Link href={`/dashboard/forced-labour/${id}/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: &ldquo;{h.match}&rdquo; looks like {PERSONAL_INFO_KIND_LABEL[h.kind]}.
                 </li>
               ))}
             </ul>
@@ -117,7 +120,7 @@ function Check({ id }: { id: string }) {
           <ul style={{ ...S.body, paddingLeft: 18 }}>
             {undrawable.map((h, i) => (
               <li key={i} style={{ marginBottom: 8 }}>
-                <Link href={`/dashboard/s211/${id}/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: {describeChars(h.chars)}.
+                <Link href={`/dashboard/forced-labour/${id}/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: {describeChars(h.chars)}.
                 <span style={S.muted}> Printed as: &ldquo;{h.printedAs}&rdquo;</span>
               </li>
             ))}
@@ -133,6 +136,7 @@ function Check({ id }: { id: string }) {
 
 /** The download when nothing blocks it; otherwise exactly what does, each linked to its section. */
 function ExportArea({ id, gate }: { id: string; gate: ReturnType<typeof exportGate> }) {
+  const writable = canWrite(useBuilderState())
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<DownloadResult | null>(null)
   const blockers = result && !result.ok && result.blockers ? result.blockers : gate.blockers
@@ -147,12 +151,13 @@ function ExportArea({ id, gate }: { id: string; gate: ReturnType<typeof exportGa
       <ul style={{ ...S.body, paddingLeft: 18 }}>
         {blockers.map((b, i) => (
           <li key={i} style={{ marginBottom: 6 }}>
-            {b.section ? <Link href={`/dashboard/s211/${id}/${b.section}`}>{b.message}</Link> : b.message}
+            {b.section ? <Link href={`/dashboard/forced-labour/${id}/${b.section}`}>{b.message}</Link> : b.message}
             {b.missing.length > 0 && <span style={S.muted}> Still to fill in: {labelsEndingSentence(b.missing)}</span>}
           </li>
         ))}
       </ul>
       <p style={S.hint}>Optional section 10 never blocks the export.</p>
+      {!writable && <p style={S.body}>This report cannot be changed while your access has expired. <a href={ORDER_HREF}>{RENEW_LABEL}</a> to finish it.</p>}
     </>
   )
   return (
@@ -167,5 +172,5 @@ function ExportArea({ id, gate }: { id: string; gate: ReturnType<typeof exportGa
 
 export default function S211CheckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  return <BuilderFrame><Check id={id} /></BuilderFrame>
+  return <BuilderFrame report><Check id={id} /></BuilderFrame>
 }
