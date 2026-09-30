@@ -11,6 +11,7 @@ import { useEntitlementAccess } from '../../../lib/useEntitlement'
 import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../lib/drafts'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { INDUSTRY_CODES, INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
+import { NEW_SUPPLIER_SECTOR, hasValidSector, suppliersWithoutSector, sectorRequiredMessage, SECTOR_REJECTED_MESSAGE } from '../../../lib/supply-chain/sectorRequired'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
@@ -152,7 +153,8 @@ const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; fa
 
 const newSupplier = (): Supplier => ({
   id: Math.random().toString(36).slice(2),
-  name: '', country: 'Germany', sector: 'Professional Services',
+  // No sector until one is chosen: see lib/supply-chain/sectorRequired.ts.
+  name: '', country: 'Germany', sector: NEW_SUPPLIER_SECTOR,
   annual_spend: 0, currency: 'USD', tier: '1',
   has_assessment: false, risk_level: 'low', risk_score: 0, risk_factors: [], scope3_emissions: 0,
 })
@@ -370,6 +372,10 @@ function SupplyChainDashboardInner() {
       }
       const trimmed = registerName.trim()
       if (!trimmed) { setSaveError('Give this register a name so you can tell it from the others.'); return }
+      // The database rejects the whole register if any supplier's sector is not an EXIOBASE industry
+      // code (PT422). Refused here first, naming the suppliers, so the reason is stated and not guessed.
+      const noSector = suppliersWithoutSector(inventory.suppliers)
+      if (noSector.length > 0) { setSaveError(sectorRequiredMessage(noSector)); return }
 
       const payload = {
         user_id: session.user.id,
@@ -402,7 +408,11 @@ function SupplyChainDashboardInner() {
         // its own, so it is surfaced unprefixed — 'Save failed:' in front of copy explaining that
         // saving is unavailable reads as two messages disagreeing. Everything else stays generic:
         // a Postgres error is not customer copy, and an RLS denial in particular must not be shown.
-        setSaveError(error.code === 'PT402' ? error.message : 'Could not save this register. Please try again.')
+        // PT422 is the sector trigger's refusal. The check above should make it unreachable; if it is
+        // reached, say what was refused instead of "try again", which would fail the same way.
+        setSaveError(error.code === 'PT402' ? error.message
+          : error.code === 'PT422' ? SECTOR_REJECTED_MESSAGE
+          : 'Could not save this register. Please try again.')
         return
       }
       if (data) setRegisterId(data.id)
@@ -684,7 +694,10 @@ function SupplyChainDashboardInner() {
             </div>
             <div>
               <label style={labelStyle}>Sector</label>
-              <select style={inputStyle} value={inventory.suppliers[activeSupplier].sector} onChange={e => updateSupplier(activeSupplier, 'sector', e.target.value)}>
+              {/* A value that is not one of the options (nothing chosen yet, or a name from the retired
+                  list in an older draft) is shown as "Select sector", so the select never displays a
+                  sector the supplier does not have. */}
+              <select style={inputStyle} value={hasValidSector(inventory.suppliers[activeSupplier].sector) ? inventory.suppliers[activeSupplier].sector : ''} onChange={e => updateSupplier(activeSupplier, 'sector', e.target.value)}>
                 <option value="">Select sector</option>
                 {/* 163 EXIOBASE industries under our 20 display headings. The headings are ours and
                     carry no methodological claim; the names and codes beneath them are EXIOBASE's. */}
@@ -694,6 +707,9 @@ function SupplyChainDashboardInner() {
                   </optgroup>
                 ))}
               </select>
+              {!hasValidSector(inventory.suppliers[activeSupplier].sector) && (
+                <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4 }}>Required. The register cannot be saved until every supplier has a sector.</div>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Annual spend ({inventory.currency})</label>

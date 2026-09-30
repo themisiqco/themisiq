@@ -45,6 +45,12 @@ const REGULATORY_HOSTS = [
   'nist.gov',
   'iso.org',
   'epa.gov',
+  // Canadian federal hosts (30 Sep 2026), ahead of the S-211 module. 'gc.ca' already covers
+  // justice.gc.ca and laws-lois.justice.gc.ca by suffix; justice.gc.ca is named as well because it is
+  // the host the one Canadian source in the registry lives on, so a reader searching for it finds it.
+  'canada.ca',
+  'gc.ca',
+  'justice.gc.ca',
 ]
 
 const EXCLUDED_FILES = new Set([
@@ -159,6 +165,10 @@ describe('regulatory links live in lib/sources.ts', () => {
       ['NIST',        `  href: 'https://www.nist.gov/cyberframework'`],
       ['ISO',         `  href: 'https://www.iso.org/standard/27001'`],
       ['EPA',         `  href: 'https://www.epa.gov/egrid/power-profiler'`],
+      ['Canada.ca',   `  href: 'https://www.canada.ca/en/public-safety-canada.html'`],
+      ['Canada gc.ca', `  href: 'https://www.publicsafety.gc.ca/cnt/x-en.aspx'`],
+      ['Justice Laws', `  href: 'https://laws-lois.justice.gc.ca/eng/acts/F-10.6/page-1.html'`],
+      ['Justice',     `  href: 'https://justice.gc.ca/eng/'`],
     ]
     for (const [label, line] of plants) {
       expect(scanLines(line), `${label} planted in code was NOT caught`).not.toEqual([])
@@ -186,6 +196,8 @@ describe('regulatory links live in lib/sources.ts', () => {
     // would match and the guard would fire on hosts it has no business flagging.
     expect(scanLines(`  href: 'https://notarb.ca.gov/x'`)).toEqual([])
     expect(scanLines(`  href: 'https://myiso.org/x'`)).toEqual([])
+    expect(scanLines(`  href: 'https://mycanada.ca/x'`)).toEqual([])
+    expect(scanLines(`  href: 'https://notgc.ca/x'`)).toEqual([])
     // …while a real subdomain still matches.
     expect(scanLines(`  href: 'https://ww2.arb.ca.gov/x'`)).not.toEqual([])
   })
