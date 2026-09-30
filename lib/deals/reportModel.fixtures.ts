@@ -1,8 +1,10 @@
 // Fixture deals for the Deals report: buildDealReportModel's tests, and the PDF generator's smoke
-// test. Plain rows shaped like public.deals, so every fixture goes through the same derivation a
-// saved deal does. The three are chosen by what they make the report print, and the tests assert
-// that each one still does, so a threshold change that moves a fixture out of its case fails loudly
-// rather than quietly testing something else.
+// test. Each carries sales markets and an environmental-claims answer, as every deal saved from
+// 29 Sep 2026 can; a deal with neither recorded (every older deal) is tested separately. Plain rows
+// shaped like public.deals, so every fixture goes through the same derivation a saved deal does.
+// The three are chosen by what they make the report print, and the tests assert that each one
+// still does, so a threshold change that moves a fixture out of its case fails loudly rather than
+// quietly testing something else.
 
 import type { DealReportDeal } from './reportModel'
 
@@ -29,6 +31,10 @@ export const NEAR_THRESHOLD_DEAL: DealReportDeal = {
   listed_ca_exchange: false,
   has_ghg_data: false,
   has_esg_report: true,
+  // Sells in Canada too, so the S-211 caveat shows; reports no claims, so the note, not the finding.
+  sales_markets: ['GB', 'CA'],
+  sales_markets_not_sure: null,
+  env_claims: 'no',
 }
 
 /**
@@ -53,6 +59,11 @@ export const NOT_ASSESSED_DEAL: DealReportDeal = {
   listed_ca_exchange: null,
   has_ghg_data: false,
   has_esg_report: false,
+  // Markets and claims both "not sure": the S-211 caveat shows, and the claims finding is
+  // APPLIES: VERIFY with "Markets not confirmed" and no market lines.
+  sales_markets: null,
+  sales_markets_not_sure: true,
+  env_claims: 'not_sure',
 }
 
 /**
@@ -75,6 +86,11 @@ export const FX_DEAL: DealReportDeal = {
   listed_ca_exchange: false,
   has_ghg_data: true,
   has_esg_report: true,
+  // EU members, the US with California, and Brazil, with claims: EU ECGT and California AB 1305
+  // rows, a HIGH finding (the EU penalty scales with turnover), and a fallback line for Brazil.
+  sales_markets: ['FR', 'DE', 'US', 'US-CA', 'BR'],
+  sales_markets_not_sure: null,
+  env_claims: 'yes',
 }
 
 export const REPORT_FIXTURES = [

@@ -48,14 +48,18 @@ type Status = 'unverified' | 'resolves' | 'form-verified' | 'verified'
  * thresholds framing rests on, and EU_AI_ACT_URL's comment mentions "two application dates". Whether
  * those pages still say that needs a person. Do not read a green test as a verified file.
  *
- * ⚠️ ONLY TWO ARE `verified`. EPA_USEEIO_URL is the model: its comment records what the page said and
+ * ⚠️ ONLY THREE ARE `verified`. EPA_USEEIO_URL is the model: its comment records what the page said and
  * what it FAILED to say, which is why three fields on that source record are null. ISO_27001_URL was
  * opened by hand on 25 Sep 2026, settling that iso.org's /standard/<number> vanity path works and that
  * /standard/<catalogue-id>.html is the convention — which is what licenses `form-verified` for the
  * other two ISO links, since iso.org 403s every automated client regardless of headers.
+ * ECGT_DIRECTIVE_URL was opened on 29 Sep 2026 and resolves to Directive (EU) 2024/825 of 28 February
+ * 2024 on empowering consumers for the green transition, the directive the Deals claims finding cites.
  */
 const EXPECTED: Record<string, Status> = {
   EPA_USEEIO_URL: 'verified',
+  // Opened 29 Sep 2026: Directive (EU) 2024/825 of 28 February 2024. Linked from the Deals claims finding.
+  ECGT_DIRECTIVE_URL: 'verified',
   ISO_27001_URL: 'verified',
 
   // Added 26 Sep 2026 with the three framework cards that needed them, plus SASB. All five were opened by

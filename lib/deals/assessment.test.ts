@@ -14,13 +14,13 @@ import {
   isRevenueDeclared, assessmentView, notAssessedNote, partiallyAssessedNote, routeNotMetNote,
   partialHeadingPhrase,
   nearThresholdNoneNote, resolveFieldsPrompt, FIELD_LABELS, FIELD_FORM_LABELS,
-  getObligations, obligationPriceLabel, SECTOR_RISKS, JURISDICTIONS,
+  getObligations, obligationPriceLabel, SECTOR_RISKS, JURISDICTIONS, MARKET_FRAMEWORKS,
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
 import { REGIME_COLUMNS } from './exportPipelineXlsx'
 import {
   resolveCs3d, resolveCanadaS211, canadaS211NoteReport,
-  DEAL_TYPES, dealTypeShort, dealTypeLabel,
+  DEAL_TYPES, dealTypeShort, dealTypeLabel, themisIqFigure, NO_PRICED_OBLIGATION,
 } from './reportModel'
 
 // Tests assert the CONTRACT, never the current FX rates: cross-currency inputs are derived from
@@ -686,9 +686,11 @@ describe('assessmentView — per-framework, not per-section', () => {
     expect(assessmentView(false, [])).toEqual({ evaluated: false, notAssessed: [], unevaluated: [], routeNotMet: [], fieldsToResolve: [], frameworks: 'not-assessed', nearThreshold: 'not-assessed' })
   })
 
-  it('blank revenue + USA: frameworks resolve, only SB 253 is withheld', () => {
+  it('blank revenue + USA: nothing applies, only SB 253 is withheld', () => {
+    // Nothing applies: IFRS S2 and TCFD are market expectations since 29 Sep 2026, never APPLIES rows,
+    // so the only framework in play is the one that was withheld.
     const v = viewFor('USA', 0)
-    expect(v.frameworks).toBe('assessed-findings')
+    expect(v.frameworks).toBe('not-assessed')
     expect(v.notAssessed).toEqual(['SB 253'])
     expect(v.fieldsToResolve).toEqual(['revenue'])
     expect(v.nearThreshold).toBe('not-assessed')
@@ -698,7 +700,8 @@ describe('assessmentView — per-framework, not per-section', () => {
     for (const j of ['Australia', 'Other']) {
       const v = viewFor(j, 0)
       expect(v.notAssessed).toEqual([])
-      expect(v.frameworks).toBe('assessed-findings')
+      // Nothing applies and nothing is withheld: the market expectations are not findings.
+      expect(v.frameworks).toBe('assessed-none')
       expect(v.nearThreshold).toBe('assessed-none')
     }
   })
@@ -708,7 +711,8 @@ describe('assessmentView — per-framework, not per-section', () => {
     for (const j of ['European Union', 'Global']) {
       const v = viewFor(j, 0)
       expect(v.notAssessed).toContain('CSRD')
-      expect(v.frameworks).toBe('assessed-findings')   // the rest of the EU stack still resolves
+      // Nothing else applies: EU Taxonomy follows CSRD, and IFRS S2 / TCFD are market expectations.
+      expect(v.frameworks).toBe('not-assessed')
       expect(v.nearThreshold).toBe('not-assessed')     // one unassessed limb blocks any proximity claim
     }
   })
@@ -919,50 +923,54 @@ describe('not-assessed reads as a prompt, naming the field', () => {
 // ── Pricing ───────────────────────────────────────────────────────────────────────────────────
 
 describe('blank revenue resolves everything that does not need revenue', () => {
-  it('EU resolves CS3D/CSRD and prices supply chain at $2,900', () => {
+  it('EU with blank figures applies nothing yet: no supply chain, and GHG is only recommended', () => {
     const fws = getApplicableFrameworks('European Union', 0, 'Technology', 'ma', 'USD')
     // CSRD is absent: post-Omnibus it is size-gated, and with revenue and headcount blank it is
-    // not-assessed rather than applied. The rich form carries the caveat; the flat list is in/out.
-    // CS3D is absent for a different reason — it abstains until its size test lands.
-    expect(fws).toEqual(['EU Taxonomy', 'IFRS S2', 'TCFD'])
+    // not-assessed rather than applied. CS3D likewise. EU Taxonomy follows CSRD, so it is absent too,
+    // and IFRS S2 / TCFD are market expectations, which the flat list never carries.
+    expect(fws).toEqual([])
     const o = getObligations(1, fws, 'Technology')
-    // KNOCK-ON: supply chain was triggered by CS3D. With CS3D abstaining and CSRD unresolved,
-    // nothing triggers it, so it is no longer priced. Pricing follows the applies-filtered list.
-    expect(o.included.find(x => x.short === 'supply chain')).toBeUndefined()
-    expect(o.themisIqTotal).toBe(GHG_TIERS.starter.priceUSD)
+    expect(o.included).toEqual([])
+    expect(o.recommended.map(x => x.short)).toEqual(['GHG', 'climate risk'])
+    expect(o.themisIqTotal).toBeNull()
   })
 
-  it('USA resolves IFRS S2/TCFD, reports SB 253 not-assessed, and prices nothing extra', () => {
+  it('USA with blank revenue applies nothing: SB 253 not-assessed, GHG recommended, not included', () => {
     const fws = getApplicableFrameworks('USA', 0, 'Technology', 'ma', 'USD')
-    expect(fws).toEqual(['IFRS S2', 'TCFD'])
+    expect(fws).toEqual([])
     expect(find(getFrameworkApplicability('USA', 0, 'Technology', 'ma', 'USD'), 'SB 253')!.status).toBe('not-assessed')
-    expect(getObligations(1, fws, 'Technology').themisIqTotal).toBe(GHG_TIERS.starter.priceUSD)
+    const o = getObligations(1, fws, 'Technology')
+    expect(o.included).toEqual([])
+    expect(o.recommended[0].short).toBe('GHG')
   })
 })
 
 describe('bundled is not zero — included-free vs costs-zero', () => {
   const FS = getApplicableFrameworks('USA', 0, 'Financial Services', 'ma', 'USD')
 
-  it('financed emissions is bundled and renders as an inclusion', () => {
-    const fe = getObligations(1, FS, 'Financial Services').included.find(o => o.short === 'financed emissions')!
-    expect(fe.pricing).toEqual({ kind: 'bundled' })
-    expect(obligationPriceLabel(fe.pricing)).toBe('Included in GHG inventory')
+  // Financed emissions was the one bundled obligation, included whenever PCAF applied. PCAF is a
+  // market expectation since 29 Sep 2026 and the branch is gone; what remains to pin is that it adds
+  // nothing, and that a quote still never renders as zero.
+  it('PCAF is a market expectation for a financial-services deal and adds no obligation', () => {
+    expect(FS).not.toContain('PCAF')
+    expect(find(getFrameworkApplicability('USA', 0, 'Financial Services', 'ma', 'USD'), 'PCAF')!.status).toBe('market')
+    const o = getObligations(1, FS, 'Financial Services')
+    expect(o.included.some(x => x.short === 'financed emissions')).toBe(false)
+    expect(o.recommended.some(x => x.short === 'financed emissions')).toBe(false)
   })
 
-  it('bundled never sums and never forces a quote', () => {
-    const withFe = getObligations(1, FS, 'Financial Services')
-    expect(withFe.included.some(o => o.pricing.kind === 'bundled')).toBe(true)
-    expect(withFe.themisIqTotal).toBe(getObligations(1, ['IFRS S2'], 'Technology').themisIqTotal)
-    expect(withFe.themisIqHasCustom).toBe(false)
-  })
-
-  it('a quote-tier FS deal renders "Custom quote" and never a zero figure', () => {
-    const o = getObligations(20, FS, 'Financial Services')
+  it('a quote-tier deal renders "Custom quote" and never a zero figure', () => {
+    // 20 sites and no headcount is past the site ladder, so the GHG an applying SB 253 requires is a quote.
+    const o = getObligations(20, ['SB 253'], 'Financial Services')
     expect(o.themisIqTotal).toBeNull()
-    const figure = o.themisIqHasCustom
-      ? (o.themisIqTotal != null ? `~USD ${o.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
-      : `~USD ${(o.themisIqTotal ?? 0).toLocaleString()}`
+    const figure = themisIqFigure(o)
     expect(figure).toBe('Custom quote')
+    expect(figure).not.toContain('0')
+  })
+
+  it('a deal with nothing included says so, and never renders a zero figure', () => {
+    const figure = themisIqFigure(getObligations(1, FS, 'Financial Services'))
+    expect(figure).toBe(NO_PRICED_OBLIGATION)
     expect(figure).not.toContain('0')
   })
 
@@ -982,8 +990,8 @@ describe('bundled is not zero — included-free vs costs-zero', () => {
   })
 })
 
-describe('pricing is unchanged by the multi-limb work', () => {
-  it('supply-chain pricing depends only on CS3D/CSRD/SFDR, which are untouched this change', () => {
+describe('what drives each price', () => {
+  it('supply chain follows CS3D/CSRD/SFDR; GHG is included only when an inventory regime applies', () => {
     for (const j of ['USA', 'UK', 'European Union', 'Global', 'Canada'])
       for (const s of ['Technology', 'Financial Services'])
         for (const loc of [1, 10, 20]) {
@@ -994,16 +1002,21 @@ describe('pricing is unchanged by the multi-limb work', () => {
           const sfdr = j === 'European Union' && s === 'Financial Services'
           // The deal report's own ladder, named in lib/deals/assessment.ts: 3 and 15 locations.
           // Above 15 it quotes rather than pricing, which is why this arm is null.
-          const ghg = loc <= 3 ? GHG_TIERS.starter.priceUSD : loc <= 15 ? GHG_TIERS.professional.priceUSD : null
+          // GHG only where SB 253 (USA, revenue over USD 1bn) or SECR (UK, 2 of 3 met) applies: CSRD
+          // needs over 1,000 employees and this fixture has 300.
+          const inventory = j === 'USA' || j === 'UK'
+          const ghg = !inventory ? 0 : loc <= 3 ? GHG_TIERS.starter.priceUSD : loc <= 15 ? GHG_TIERS.professional.priceUSD : null
           const supply = sfdr ? 2900 : 0
-          expect(o.themisIqTotal).toBe(ghg == null ? (supply || null) : ghg + supply)
+          expect(o.themisIqTotal).toBe(ghg == null ? (supply || null) : (ghg + supply) || null)
         }
   })
 
-  it('SECR moving to 2-of-3 does not move any price', () => {
-    for (const size of [{}, { employee_count: 300 }, { employee_count: 10, total_assets: 0 }])
-      expect(getObligations(10, getApplicableFrameworks('UK', 50_000_000, 'Technology', 'ma', 'GBP', size), 'Technology').themisIqTotal)
-        .toBe(GHG_TIERS.professional.priceUSD)
+  it('a UK deal is priced for GHG exactly when SECR applies', () => {
+    const total = (size: { employee_count?: number; total_assets?: number }) =>
+      getObligations(10, getApplicableFrameworks('UK', 50_000_000, 'Technology', 'ma', 'GBP', size), 'Technology').themisIqTotal
+    expect(total({ employee_count: 300 })).toBe(GHG_TIERS.professional.priceUSD)   // turnover and staff: 2 of 3
+    expect(total({})).toBeNull()                                                   // unresolved: not assessed
+    expect(total({ employee_count: 10, total_assets: 0 })).toBeNull()              // 1 of 3: not met
   })
 })
 
@@ -1027,7 +1040,7 @@ describe('flat form stays the applies-filtered rich form', () => {
   it('leaves non-size-gated frameworks untouched by currency and size', () => {
     for (const c of DEAL_CURRENCIES)
       expect(getApplicableFrameworks('European Union', 2_000_000, 'Financial Services', 'ma', c))
-        .toEqual(['SFDR', 'EU Taxonomy', 'IFRS S2', 'TCFD', 'PCAF'])
+        .toEqual(['SFDR'])   // APPLIES: VERIFY; EU Taxonomy needs CSRD, the rest are market
   })
 })
 
@@ -1049,16 +1062,25 @@ const ALL_SECTORS = [...Object.keys(SECTOR_RISKS), 'Other']
 // inputs a deal can carry. Uses the RICH form deliberately: it returns a row for each framework it
 // EVALUATED, including ones that turned out not to apply, which is the full vocabulary the export
 // has to have a column for.
-function everyFrameworkTheEngineCanEmit(): string[] {
-  const seen = new Set<string>()
+// The rows a deal can produce, as { framework, status }. The last size clears CSRD, which EU
+// Taxonomy follows; the markets and claims inputs are what bring in the EU ECGT and AB 1305 rows.
+function everyRowTheEngineCanEmit(): { framework: string; status: string }[] {
+  const seen = new Map<string, string>()
+  const claims = [{}, { sales_markets: ['FR', 'US-CA'], env_claims: 'yes' }]
   for (const jurisdiction of ALL_JURISDICTIONS)
     for (const sector of ALL_SECTORS)
       for (const revenue of [0, 2_000_000, 50_000_000, 2_000_000_000])
-        for (const size of [{}, { employee_count: 300, total_assets: 50_000_000 }, { employee_count: 0, total_assets: 0 }])
-          for (const currency of DEAL_CURRENCIES)
-            getFrameworkApplicability(jurisdiction, revenue, sector, 'ma', currency, size)
-              .forEach(r => seen.add(r.framework))
-  return [...seen].sort()
+        for (const size of [{}, { employee_count: 300, total_assets: 50_000_000 }, { employee_count: 0, total_assets: 0 }, { employee_count: 6_000, total_assets: 3_000_000_000 }])
+          for (const c of claims)
+            for (const currency of DEAL_CURRENCIES)
+              getFrameworkApplicability(jurisdiction, revenue, sector, 'ma', currency, { ...size, ...c })
+                .forEach(r => seen.set(r.framework, r.status))
+  return [...seen].map(([framework, status]) => ({ framework, status }))
+}
+// Market expectations are listed in the "Market expectations" column, never given a TRUE / FALSE
+// column of their own (see REGIME_COLUMNS), so only the others need one.
+function everyFrameworkTheEngineCanEmit(): string[] {
+  return everyRowTheEngineCanEmit().filter(r => r.status !== 'market').map(r => r.framework).sort()
 }
 
 describe('pipeline export: every rule the engine can emit needs its own spreadsheet column', () => {
@@ -1098,7 +1120,7 @@ describe('pipeline export: every rule the engine can emit needs its own spreadsh
 // THE HAZARD. The engine matches jurisdiction by EXACT EQUALITY — `jurisdiction === 'UK'` and eight
 // siblings. A value that hits no branch does not error and does not return empty: it falls through
 // to the universal baseline (IFRS S2, TCFD), and makeMapFramework then has no REGIME_CANDIDATE to
-// license, so it renders REGIME_FALLBACK — 'GHG Protocol / IFRS S2'. On app/deals/[token]/page.tsx
+// license, so it renders REGIME_FALLBACK: 'GHG Protocol'. On app/deals/[token]/page.tsx
 // that is shown TO THE TARGET COMPANY as its regulatory position. A methodology and a standard, in
 // place of the statutes that actually reach it, reading exactly like a real answer.
 //   'United Kingdom' does this. So does free text, and so would a jurisdiction added to the wizard's
@@ -1113,6 +1135,9 @@ describe('pipeline export: every rule the engine can emit needs its own spreadsh
 // the baseline it emits for every input including a typo? Five of the seven do. Australia and Other
 // do not, and are recorded below as such — deliberately, so that if either ever gains a regime the
 // table is where it gets noticed.
+// The market expectations every jurisdiction lists (IFRS S2, TCFD). Market rows since 29 Sep 2026,
+// so they are in the RICH rows and never in the flat APPLIES list; this block reads the rich rows so
+// the baseline is still there to prove the engine ran.
 const UNIVERSAL_BASELINE = ['IFRS S2', 'TCFD']
 
 // Every canonical jurisdiction → the frameworks the engine must emit BEYOND the baseline, at inputs
@@ -1121,9 +1146,9 @@ const UNIVERSAL_BASELINE = ['IFRS S2', 'TCFD']
 const JURISDICTION_COVERAGE: Record<string, string[]> = {
   'USA':            ['SB 253'],
   'European Union': ['CSRD', 'EU Taxonomy', 'CS3D'],
-  'UK':             ['SECR', 'UK SRS (S1/S2)'],
+  'UK':             ['SECR', 'UK SRS (S1/S2)'],   // UK SRS as a market row, but UK-only, so it still distinguishes
   'Canada':         ['Canada S-211'],
-  'Global':         ['EU Taxonomy'],
+  'Global':         ['CSRD', 'CS3D'],              // both abstain for a non-EU target; their rows are what Global produces
   'Australia':      [],
   'Other':          [],
 }
@@ -1131,8 +1156,8 @@ const JURISDICTION_COVERAGE: Record<string, string[]> = {
 // Large enough to clear every threshold in THRESHOLD_TESTS, so a missing framework is a missing
 // BRANCH rather than an unmet limb.
 const bigDeal = (jurisdiction: string) =>
-  getApplicableFrameworks(jurisdiction, 5_000_000_000, 'Technology', 'ma', 'USD',
-    { total_assets: 3_000_000_000, employee_count: 6_000 })
+  getFrameworkApplicability(jurisdiction, 5_000_000_000, 'Technology', 'ma', 'USD',
+    { total_assets: 3_000_000_000, employee_count: 6_000 }).map(r => r.framework)
 
 describe('every jurisdiction the wizard offers is one the engine knows', () => {
   it('the coverage table and the wizard dropdown describe the same set', () => {
@@ -1355,5 +1380,56 @@ describe('Canada S-211 reaches an entity by listing OR by size, and never confid
     expect(limb.measureNote).toContain('AVERAGE')
     expect(limb.amount).toBe(250)
     expect(limb.comparison, 's.2(b) is "at least"').toBe('gte')
+  })
+})
+
+// ── NO APPLIES WITHOUT A BASIS (29 Sep 2026) ─────────────────────────────────────────────────────
+//
+// Until 29 Sep 2026 a framework with no active size test fell through `plain()` to an unconditional
+// APPLIES: IFRS S2 and TCFD on every deal, UK SRS on every UK deal, SFDR and the FCA rules on every
+// financial-services deal in their jurisdiction. `plain()` is gone. This sweep is what keeps it gone:
+// across every input a deal can carry, an APPLIES row must say why it applies.
+describe('every APPLIES row has a basis', () => {
+  const sizes = [{}, { employee_count: 300, total_assets: 50_000_000 }, { employee_count: 6_000, total_assets: 3_000_000_000 },
+                 { employee_count: 50, total_assets: 1_000_000, listed_ca_exchange: true }]
+  const everyRow = () => {
+    const rows: FrameworkApplicability[] = []
+    for (const jurisdiction of [...JURISDICTIONS, 'Japan'])
+      for (const sector of [...Object.keys(SECTOR_RISKS), 'Other'])
+        for (const revenue of [0, 50_000_000, 2_000_000_000])
+          for (const size of sizes)
+            rows.push(...getFrameworkApplicability(jurisdiction, revenue, sector, 'ma', 'USD', size))
+    return rows
+  }
+
+  it('a size test, a verify condition or a stated rule, never a default', () => {
+    const rows = everyRow()
+    expect(rows.length).toBeGreaterThan(1000)
+    const bare = rows.filter(r => r.applies && !r.test && !r.verify && !r.rule).map(r => r.framework)
+    expect([...new Set(bare)], 'a framework reached APPLIES with nothing behind it').toEqual([])
+  })
+
+  it('a market expectation is never an APPLIES row, and a status of market never applies', () => {
+    const rows = everyRow()
+    expect(rows.some(r => r.status === 'market')).toBe(true)
+    expect(rows.filter(r => r.status === 'market' && r.applies)).toEqual([])
+    for (const f of ['IFRS S2', 'TCFD', 'PCAF', 'UK SRS (S1/S2)'])
+      expect(rows.filter(r => r.framework === f && r.status !== 'market'), `${f} outside market`).toEqual([])
+  })
+
+  it('EU Taxonomy appears only beside an applying CSRD', () => {
+    for (const jurisdiction of ['European Union', 'Global'])
+      for (const size of sizes) {
+        const rows = getFrameworkApplicability(jurisdiction, 2_000_000_000, 'Technology', 'ma', 'EUR', size)
+        const csrd = rows.find(r => r.framework === 'CSRD')
+        expect(rows.some(r => r.framework === 'EU Taxonomy')).toBe(!!csrd?.applies)
+      }
+  })
+})
+
+describe('MARKET_FRAMEWORKS is exactly what the engine lists as market', () => {
+  it('no more, no fewer', () => {
+    const market = [...new Set(everyRowTheEngineCanEmit().filter(r => r.status === 'market').map(r => r.framework))].sort()
+    expect(market).toEqual([...MARKET_FRAMEWORKS].sort())
   })
 })

@@ -410,7 +410,8 @@ describe('S. the surfaces defer to the resolver', () => {
     expect(src, 'step 1 findings must be withheld').toContain('{resultsShown && <>')
     expect(src, 'the sign-in prompt must replace them').toContain('{!resultsShown && signInPrompt()}')
     expect(src, 'the data-room GAPS panel is a finding')
-      .toContain('{resultsShown && (!deal.has_ghg_data || !deal.has_esg_report) && (')
+      // Widened 29 Sep 2026 to include the environmental-claims evidence row; still gated on resultsShown.
+      .toContain('{resultsShown && (!deal.has_ghg_data || !deal.has_esg_report || !!wm.risks.claims) && (')
     expect(src, 'steps 2 and 3 read resultsShown, step 4 reads costShown')
       .toContain("steps[step].needs === 'results' && !resultsShown ? signInPrompt()")
     expect(src, 'the cost step gets its OWN prompt, not the results one')

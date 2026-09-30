@@ -31,12 +31,18 @@
 //     browser with sessionStorage disabled loses the draft and the form comes back blank. Losing a
 //     draft is recoverable; leaking a target's figures into a log is not.
 
+import { isEnvClaims, type EnvClaims } from './markets'
+import { isMarketCode } from './claimsRules'
+
 /** The wizard's own form shape, all optional — see the merge note on parseDealDraft. */
 export type DealDraft = {
   target_name?: string
   sector?: string
   revenue?: number
   employee_count?: number | null
+  // Tri-state and NULL is an answer: "not sure". Dropped by the parse until 29 Sep 2026, so a user who
+  // answered it and then signed in came back to "not sure" whatever they had chosen.
+  listed_ca_exchange?: boolean | null
   total_assets?: number | null
   jurisdiction?: string
   deal_type?: string
@@ -46,6 +52,10 @@ export type DealDraft = {
   has_ghg_data?: boolean
   has_esg_report?: boolean
   notes?: string
+  // Sales markets and environmental claims (29 Sep 2026). NULL is an answer here too: "not recorded".
+  sales_markets?: string[] | null
+  sales_markets_not_sure?: boolean | null
+  env_claims?: EnvClaims | null
 }
 
 export const DEAL_DRAFT_KEY = 'themisiq:pendingDeal'
@@ -94,6 +104,7 @@ export function parseDealDraft(raw: string | null | undefined): DealDraft | null
   assign('revenue', num(o.revenue))
   assign('employee_count', nullableNum(o.employee_count))
   assign('total_assets', nullableNum(o.total_assets))
+  assign('listed_ca_exchange', o.listed_ca_exchange === null ? null : bool(o.listed_ca_exchange))
   assign('jurisdiction', str(o.jurisdiction))
   assign('deal_type', str(o.deal_type))
   assign('deal_value', num(o.deal_value))
@@ -102,6 +113,13 @@ export function parseDealDraft(raw: string | null | undefined): DealDraft | null
   assign('has_ghg_data', bool(o.has_ghg_data))
   assign('has_esg_report', bool(o.has_esg_report))
   assign('notes', str(o.notes))
+  // Each market code is checked against the product's country list (plus California); an unknown
+  // one is dropped rather than carried into the save, and a list with none left becomes NULL.
+  assign('sales_markets', o.sales_markets === null ? null
+    : Array.isArray(o.sales_markets) ? (o.sales_markets.filter(isMarketCode).length ? o.sales_markets.filter(isMarketCode) : null)
+    : undefined)
+  assign('sales_markets_not_sure', o.sales_markets_not_sure === null ? null : bool(o.sales_markets_not_sure))
+  assign('env_claims', o.env_claims === null ? null : isEnvClaims(o.env_claims) ? o.env_claims : undefined)
 
   // AN EMPTY OBJECT IS NOT A DRAFT. Every field failed its type check, or there were none — either
   // way there is nothing to restore, and returning {} would have the caller announce that it

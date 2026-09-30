@@ -165,6 +165,15 @@ export const NIS2_COMMISSION_URL = 'https://digital-strategy.ec.europa.eu/en/pol
 // @source-status: resolves 2026-09-25
 export const CBAM_REGULATION_URL = 'https://eur-lex.europa.eu/eli/reg/2023/956/oj'
 
+// ── Environmental claims ─────────────────────────────────────────────────────────────────────────
+// The Empowering Consumers for the Green Transition Directive, Directive (EU) 2024/825, as an ELI
+// URI: the legal text, linked from the EU line of the Deals environmental-claims finding
+// (lib/deals/claimsRules.ts). Meant to open the directive itself on EUR-Lex, not a summary.
+// VERIFIED 29 Sep 2026 by opening it: resolves to Directive (EU) 2024/825 of 28 February 2024 on
+// empowering consumers for the green transition, the directive this constant is meant to open.
+// @source-status: verified 2026-09-29
+export const ECGT_DIRECTIVE_URL = 'https://eur-lex.europa.eu/eli/dir/2024/825/oj'
+
 // The Commission's CBAM page, which is where the implementing regulations, sector rules and default
 // values actually live — the regulation alone does not carry them. VERIFIED 200 on 25 Sep 2026.
 // ⚠️ NOTE THE PATH HAS NO /taxation SEGMENT. The obvious

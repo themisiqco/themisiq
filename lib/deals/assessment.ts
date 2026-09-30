@@ -5,6 +5,7 @@
 // ThemisIQ prices come from lib/pricing.ts (single source of truth); consultant = cited ranges.
 
 import { GHG_TIERS, FLAT_MODULE_PRICES, GHG_TIER_LABELS, ghgTierForEmployees, type GhgTier } from '../pricing'
+import { claimsFrameworkRows, EU_MEMBER_CODES, marketsRecorded, type MarketsInput } from './markets'
 // Sector risk copy must not retype an AI Act date — see lib/aiAct.ts. Constants only, no I/O, so this
 // import does not compromise the purity note above.
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION } from '../aiAct'
@@ -45,13 +46,24 @@ export type DealInput = {
 // the sentence was rewritten — lib/deals/sectorRisks.test.ts lists those ten by name and holds their
 // legal references instead of their wording.
 export type SectorRiskCondition = {
+  /**
+   * What a ticked sales market settles (29 Sep 2026).
+   *   'market'  presence in the market IS the nexus (goods, routes, systems or property there), so a
+   *             ticked market establishes the finding for the target's activity there.
+   *   'scope'   presence is necessary and not enough: a reporting, supervisory or turnover test still
+   *             decides (CSRD reach, SFDR marketing, ECB supervision, a Modern Slavery threshold), so a
+   *             ticked market is stated and the finding stays conditioned.
+   */
+  reach: 'market' | 'scope'
+  /** The markets that meet it, where they differ from `establishedIn` (EU ETS routes: the EEA). */
+  regions?: Region[]
   /** Jurisdictions — spelled as the deal form spells them — where this is ESTABLISHED, not conditioned. */
   establishedIn: string[]
   /** Heading for the conditioned note, e.g. 'Conditioned on EU market access.' */
   label: string
   /** The nexus test: what brings a target established elsewhere into scope. */
   nexus: string
-  /** What this screen has not established, e.g. 'whether your goods reach the EU market'. */
+  /** What this screen has not established, in the third person: 'whether the target’s goods reach the EU market'. */
   unresolved: string
   /** The instrument assertion, moved out of `detail`. Appended when established. Absent where the
    *  finding never asserted one and only its framework token was out of jurisdiction. */
@@ -66,67 +78,71 @@ export type SectorRisk = {
   conditional?: SectorRiskCondition
 }
 
+// 'Investor expectation (IFRS S2 / TCFD)' (29 Sep 2026): IFRS S2 and TCFD are market expectations,
+// not duties, so a finding that rests on them says so in the same words as the report's market
+// section. The ' / ' inside the brackets is not a token separator: makeMapFramework splits outside
+// brackets only, so the label passes through whole.
 export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   'Energy & Utilities': [
     { risk: 'High Scope 1 emissions exposure', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Energy companies typically carry 60-80% of portfolio Scope 1 emissions, requiring full consolidation into the buyer\'s GHG inventory under prevailing emissions-accounting standards.' },
-    { risk: 'Stranded asset risk', severity: 'critical', framework: 'IFRS S2 / TCFD', detail: 'Fossil fuel assets face material impairment risk under 1.5°C transition scenarios. Requires IFRS S2 climate scenario analysis.' },
-    { risk: 'Physical climate risk exposure', severity: 'high', framework: 'TCFD / IFRS S2', detail: 'Energy infrastructure faces acute and chronic physical climate risk. Requires asset-level climate risk assessment.' },
+    { risk: 'Stranded asset risk', severity: 'critical', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'Fossil fuel assets face material impairment risk under 1.5°C transition scenarios. Requires IFRS S2 climate scenario analysis.' },
+    { risk: 'Physical climate risk exposure', severity: 'high', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'Energy infrastructure faces acute and chronic physical climate risk. Requires asset-level climate risk assessment.' },
   ],
   'Financial Services': [
     { risk: 'Financed emissions (Scope 3 Cat.15)', severity: 'critical', framework: 'PCAF / CSRD', detail: 'Financed emissions typically represent 95%+ of a financial institution\'s carbon footprint. PCAF methodology required.' },
     { risk: 'SFDR portfolio alignment', severity: 'high', framework: 'SFDR / EU Taxonomy', detail: 'Portfolio sustainability characteristics affect fund marketability and investor selection.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the manager is established.', unresolved: 'whether you market products in the EU', consequence: 'EU financial products must disclose sustainability characteristics. Article 8/9 classification impacts fund marketability.' } },
-    { risk: 'Physical risk in loan book', severity: 'high', framework: 'ECB / TCFD', detail: 'Mortgage and commercial real estate portfolios face material physical climate risk.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU banking supervision.', nexus: 'The ECB guidelines bind significant institutions under EU banking supervision; an institution supervised elsewhere carries the same portfolio risk under its own regulator.', unresolved: 'whether you fall under EU banking supervision', consequence: 'ECB guidelines on climate and environmental risk apply to supervised institutions.' } },
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the manager is established.', unresolved: 'whether the target markets products in the EU', consequence: 'EU financial products must disclose sustainability characteristics. Article 8/9 classification impacts fund marketability.' } },
+    { risk: 'Physical risk in loan book', severity: 'high', framework: 'ECB / Investor expectation (TCFD)', detail: 'Mortgage and commercial real estate portfolios face material physical climate risk.',
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU banking supervision.', nexus: 'The ECB guidelines bind significant institutions under EU banking supervision; an institution supervised elsewhere carries the same portfolio risk under its own regulator.', unresolved: 'whether the target falls under EU banking supervision', consequence: 'ECB guidelines on climate and environmental risk apply to supervised institutions.' } },
   ],
   'Real Estate': [
     { risk: 'Embodied carbon in portfolio', severity: 'high', framework: 'CSRD / CRREM', detail: 'Building portfolios face stranding risk against decarbonisation pathways. CRREM analysis is the standard way to test it.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU property holdings.', nexus: 'CRREM’s EU pathways apply to assets held in EU markets; assets elsewhere are tested against the pathway for their own market.', unresolved: 'whether you hold EU property', consequence: 'EU carbon reduction pathways apply to the EU-held portion of the portfolio.' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU property holdings.', nexus: 'CRREM’s EU pathways apply to assets held in EU markets; assets elsewhere are tested against the pathway for their own market.', unresolved: 'whether the target holds EU property', consequence: 'EU carbon reduction pathways apply to the EU-held portion of the portfolio.' } },
     { risk: 'Energy efficiency compliance', severity: 'high', framework: 'EU EPC / MEES', detail: 'Building portfolios carry regulatory exposure where minimum energy-performance ratings apply, and non-compliant assets can become unlettable.',
-      conditional: { establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK property holdings.', nexus: 'Both regimes attach to the property, not to the owner, and a company established elsewhere is reached through the assets it holds in those markets.', unresolved: 'whether you hold EU or UK property', consequence: 'The EU Energy Performance of Buildings Directive and UK MEES require minimum EPC ratings. Non-compliant assets face rental prohibition.' } },
-    { risk: 'Physical flood and heat risk', severity: 'critical', framework: 'TCFD / IFRS S2', detail: 'Real estate assets face material physical climate risk. Asset-level flood mapping and heat stress analysis required.' },
+      conditional: { reach: 'market', establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK property holdings.', nexus: 'Both regimes attach to the property, not to the owner, and a company established elsewhere is reached through the assets it holds in those markets.', unresolved: 'whether the target holds EU or UK property', consequence: 'The EU Energy Performance of Buildings Directive and UK MEES require minimum EPC ratings. Non-compliant assets face rental prohibition.' } },
+    { risk: 'Physical flood and heat risk', severity: 'critical', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'Real estate assets face material physical climate risk. Asset-level flood mapping and heat stress analysis required.' },
   ],
   'Technology': [
     { risk: 'Data centre energy intensity', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Data centre operations carry significant Scope 2 exposure. PPA and renewable energy coverage assessment needed.' },
     { risk: 'AI governance exposure', severity: 'medium', framework: 'EU AI Act', detail: 'Technology products may contain high-risk AI systems.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'The AI Act reaches providers and deployers placing a system on the EU market, and systems whose output is used in the EU, wherever the company is established.', unresolved: 'EU availability of your systems', consequence: `Conformity assessment applies from ${AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and from ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law (${AI_ACT_CITATION}).` } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'The AI Act reaches providers and deployers placing a system on the EU market, and systems whose output is used in the EU, wherever the company is established.', unresolved: 'EU availability of the target’s systems', consequence: `Conformity assessment applies from ${AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and from ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law (${AI_ACT_CITATION}).` } },
     // `detail` keeps its CS3D sentence: "in-scope companies" is self-limiting, so it asserts nothing
     // about THIS target. The conditional here covers the ESRS S2 token beside it, which is not.
     { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2', detail: `Hardware products may rely on conflict minerals. CS3D due diligence obligations apply to in-scope companies from ${CS3D_APPLIES_FROM} (${CS3D_CITATION}).`,
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you' } },
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches the target' } },
   ],
   'Healthcare & Pharma': [
     { risk: 'Cold chain emissions', severity: 'medium', framework: 'SB 253 / GHG Protocol', detail: 'Pharmaceutical cold chain carries significant Scope 3 Cat.4 emissions from refrigerant leakage and transport.' },
     { risk: 'Pharmaceutical waste', severity: 'medium', framework: 'CSRD / GRI', detail: 'Pharmaceutical manufacturing generates hazardous waste requiring environmental liability assessment.' },
     { risk: 'Clinical trial supply chain', severity: 'medium', framework: 'CS3D / ESRS S2', detail: 'Clinical trial operations in emerging markets carry human rights and labour standards risk.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you' } },
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches the target' } },
   ],
   'Industrials & Manufacturing': [
     { risk: 'Scope 1 process emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Industrial manufacturing typically carries significant Scope 1 process emissions requiring full GHG inventory.' },
     { risk: 'Carbon border adjustment exposure', severity: 'high', framework: 'EU CBAM', detail: 'Iron and steel, cement, aluminium, fertilisers, hydrogen and electricity carry a carbon-border cost when they enter the EU.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether goods you produce enter the EU', consequence: 'The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether goods the target produces enter the EU', consequence: 'The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' } },
     { risk: 'Chemical and hazardous materials', severity: 'high', framework: 'REACH / CSRD', detail: 'Industrial operations may carry significant environmental liability from chemical usage and historical contamination.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'REACH attaches to substances manufactured in or imported into the EU, so a manufacturer established elsewhere is reached through what it ships there.', unresolved: 'whether your substances or articles enter the EU' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'REACH attaches to substances manufactured in or imported into the EU, so a manufacturer established elsewhere is reached through what it ships there.', unresolved: 'whether the target’s substances or articles enter the EU' } },
   ],
   'Consumer & Retail': [
     { risk: 'Scope 3 Cat.1 supplier emissions', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Consumer goods companies typically carry 70-90% of emissions in Scope 3 Cat.1. Supplier engagement programme needed.' },
     { risk: 'Deforestation exposure', severity: 'high', framework: 'EU EUDR', detail: 'Consumer goods with exposure to cattle, soy, palm oil, cocoa, coffee, wood or rubber carry deforestation risk in their sourcing.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it. A company incorporated elsewhere is reached through that placement.', unresolved: 'whether your goods reach the EU market', consequence: 'The EU Deforestation Regulation applies to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it. A company incorporated elsewhere is reached through that placement.', unresolved: 'whether the target’s goods reach the EU market', consequence: 'The EU Deforestation Regulation applies to large and medium operators from 30 December 2026 and to micro and small enterprises from 30 June 2027 (Regulation (EU) 2023/1115 as amended by (EU) 2025/2650).' } },
     { risk: 'Labour rights in supply chain', severity: 'high', framework: 'CS3D / Modern Slavery', detail: 'Consumer goods supply chains carry significant forced labour and child labour risk in sourcing countries.',
-      conditional: { establishedIn: ['UK', 'Australia'], label: 'Conditioned on UK or Australian turnover.', nexus: 'The UK and Australian Modern Slavery Acts attach to carrying on business in those markets above a turnover threshold, wherever the company is incorporated.', unresolved: 'whether you carry on business there above the threshold' } },
+      conditional: { reach: 'scope', establishedIn: ['UK', 'Australia'], label: 'Conditioned on UK or Australian turnover.', nexus: 'The UK and Australian Modern Slavery Acts attach to carrying on business in those markets above a turnover threshold, wherever the company is incorporated.', unresolved: 'whether the target carries on business there above the threshold' } },
   ],
   'Agriculture & Food': [
     { risk: 'Land use change emissions', severity: 'critical', framework: 'GHG Protocol / SB 253', detail: 'Agricultural operations may carry significant land use change (LUC) emissions requiring scope 3 Cat.11 assessment.' },
     { risk: 'Deforestation and biodiversity', severity: 'critical', framework: 'EU EUDR / TNFD', detail: 'Agricultural supply chains carry deforestation and nature-related risk, and TNFD nature disclosure expectations are emerging across markets.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it. A company incorporated elsewhere is reached through that placement.', unresolved: 'whether your commodities reach the EU market', consequence: 'The EU Deforestation Regulation applies to the listed commodities placed on the EU market.' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'EUDR applies to operators and traders placing the listed commodities on the EU market, or exporting them from it. A company incorporated elsewhere is reached through that placement.', unresolved: 'whether the target’s commodities reach the EU market', consequence: 'The EU Deforestation Regulation applies to the listed commodities placed on the EU market.' } },
     { risk: 'Water risk', severity: 'high', framework: 'CSRD / CDP Water', detail: 'Agricultural operations in water-stressed regions face material operational and regulatory risk.' },
   ],
   'Transport & Logistics': [
     { risk: 'Fleet decarbonisation liability', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Transport fleet carries significant Scope 1 emissions.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU routes.', nexus: 'FuelEU Maritime and the ETS extension attach to voyages into, out of and within the EU, whichever state the operator is established in.', unresolved: 'whether your routes touch the EU', consequence: 'EU FuelEU Maritime and ETS expansion add compliance cost.' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU routes.', nexus: 'FuelEU Maritime and the ETS extension attach to voyages into, out of and within the EU, whichever state the operator is established in.', unresolved: 'whether the target’s routes touch the EU', consequence: 'EU FuelEU Maritime and ETS expansion add compliance cost.' } },
     { risk: 'Aviation and shipping ETS exposure', severity: 'high', framework: 'EU ETS', detail: 'Aviation and maritime fleets carry carbon-cost exposure that requires detailed fleet assessment.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EEA routes.', nexus: 'EU ETS reaches flights and voyages into, out of and within the EEA, whichever flag or state the operator sits under.', unresolved: 'whether your routes touch the EEA', consequence: 'EU ETS now covers aviation and maritime.' } },
-    { risk: 'Infrastructure physical risk', severity: 'medium', framework: 'TCFD / IFRS S2', detail: 'Transport infrastructure faces physical climate risk from flooding, extreme heat and storm events.' },
+      conditional: { reach: 'market', regions: ['EEA'], establishedIn: ['European Union'], label: 'Conditioned on EEA routes.', nexus: 'EU ETS reaches flights and voyages into, out of and within the EEA, whichever flag or state the operator sits under.', unresolved: 'whether the target’s routes touch the EEA', consequence: 'EU ETS now covers aviation and maritime.' } },
+    { risk: 'Infrastructure physical risk', severity: 'medium', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'Transport infrastructure faces physical climate risk from flooding, extreme heat and storm events.' },
   ],
   'Mining & Metals': [
     { risk: 'Scope 1 extraction emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Mining operations carry significant Scope 1 methane and process emissions requiring full GHG inventory.' },
@@ -139,16 +155,16 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   ],
   'Construction & Materials': [
     { risk: 'Embodied carbon in products', severity: 'high', framework: 'CSRD / EU Taxonomy', detail: 'Cement and steel production carry significant process emissions.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'The EU Taxonomy is reported by entities already inside CSRD or SFDR scope, so it reaches a company through one of those obligations rather than directly.', unresolved: 'whether an EU reporting obligation reaches you', consequence: 'EU Taxonomy alignment assessment required.' } },
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'The EU Taxonomy is reported by entities already inside CSRD or SFDR scope, so it reaches a company through one of those obligations rather than directly.', unresolved: 'whether an EU reporting obligation reaches the target', consequence: 'EU Taxonomy alignment assessment required.' } },
     { risk: 'EU CBAM exposure', severity: 'high', framework: 'EU CBAM', detail: 'Cement, steel and aluminium carry a carbon-border cost when they enter the EU.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether materials you produce enter the EU', consequence: 'The EU Carbon Border Adjustment Mechanism definitive period began in 2026.' } },
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether materials the target produces enter the EU', consequence: 'The EU Carbon Border Adjustment Mechanism definitive period began in 2026.' } },
     { risk: 'Site biodiversity and land use', severity: 'medium', framework: 'CSRD / TNFD', detail: 'Construction projects face emerging biodiversity disclosure requirements under TNFD.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS E4 is a CSRD standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches you', consequence: 'CSRD ESRS E4 adds a biodiversity disclosure requirement for companies in CSRD scope.' } },
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS E4 is a CSRD standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches the target', consequence: 'CSRD ESRS E4 adds a biodiversity disclosure requirement for companies in CSRD scope.' } },
   ],
   'Professional Services': [
     { risk: 'Scope 2 and business travel emissions', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Professional services firms carry Scope 2 and Scope 3 Cat.6 business travel emissions.' },
     { risk: 'Client portfolio ESG exposure', severity: 'medium', framework: 'CSRD / SFDR', detail: 'Advisory and consulting firms may carry reputational and legal exposure from ESG advice provided to clients.',
-      conditional: { establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the adviser is established.', unresolved: 'whether your clients market products in the EU' } },
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the adviser is established.', unresolved: 'whether the target’s clients market products in the EU' } },
   ],
 }
 
@@ -171,8 +187,33 @@ export type ResolvedRisk =
 // One sentence, composed ONCE. The four surfaces render it; none of them writes it. Three separate
 // literals is how CS3D's "not assessed" wording drifted before CS3D_NOT_ASSESSED_LABEL existed.
 export const CONDITION_SCREEN_NOTE = 'This screen records a primary jurisdiction only, so '
+/** Today's wording: markets "not sure", or never recorded. */
 export const conditionSentence = (c: SectorRiskCondition): string =>
   `${c.label} ${c.nexus} ${CONDITION_SCREEN_NOTE}${c.unresolved} is not established here. Confirm before ruling it out.`
+
+// ── Markets settle what a primary jurisdiction cannot (29 Sep 2026) ─────────────────────────────
+// A condition's regions, as sales-market codes, with the words each is printed in.
+export type Region = 'European Union' | 'EEA' | 'UK' | 'Australia'
+const REGION: Record<Region, { codes: readonly string[]; place: string; adjective: string }> = {
+  'European Union': { codes: EU_MEMBER_CODES, place: 'the EU', adjective: 'EU' },
+  EEA: { codes: [...EU_MEMBER_CODES, 'IS', 'LI', 'NO'], place: 'the EEA', adjective: 'EEA' },
+  UK: { codes: ['GB'], place: 'the UK', adjective: 'UK' },
+  Australia: { codes: ['AU'], place: 'Australia', adjective: 'Australian' },
+}
+const regionsOf = (c: SectorRiskCondition): Region[] =>
+  c.regions ?? c.establishedIn.filter((j): j is Region => j in REGION)
+const orList = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`)
+const andList = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`)
+
+/** A 'market' condition met by a ticked market: appended to the finding, which is then established. */
+export const conditionMetSentence = (ticked: Region[]): string =>
+  `The target sells into or operates in ${andList(ticked.map(r => REGION[r].place))}, so this applies to its ${ticked.length === 1 ? `${REGION[ticked[0]].adjective} activity` : 'activity there'}.`
+/** A 'scope' condition whose market is ticked: the market is stated, the deciding test is not settled. */
+export const conditionScopeSentence = (c: SectorRiskCondition, ticked: Region[]): string =>
+  `${c.label} ${c.nexus} The target sells into or operates in ${andList(ticked.map(r => REGION[r].place))}, which this needs; ${c.unresolved} is not established here. Confirm before ruling it out.`
+/** Markets recorded, and none of the condition's among them. */
+export const conditionAbsentSentence = (c: SectorRiskCondition): string =>
+  `${c.label} ${c.nexus} The target does not report ${orList(regionsOf(c).map(r => REGION[r].adjective))} sales or operations. Confirm before ruling it out.`
 
 // ⚠️ KNOWN ISSUE — SECTOR RISKS AND FRAMEWORKS DISAGREE ABOUT 'Global'. NOT FIXED HERE.
 //
@@ -191,18 +232,32 @@ export const conditionSentence = (c: SectorRiskCondition): string =>
 // installation or a route inside the EEA. Resolving that means deciding whether 'Global' asserts or
 // abstains for those two, and that changes the applicable-frameworks list a customer may already
 // have exported — out of scope for this change, recorded so the next reader is not surprised.
-export function sectorRisks(sector: string | null | undefined, jurisdiction: string | null | undefined): ResolvedRisk[] {
+export function sectorRisks(
+  sector: string | null | undefined, jurisdiction: string | null | undefined,
+  // The deal's sales markets (29 Sep 2026). Absent, as on the share page whose RPC does not return
+  // them, every condition keeps its primary-jurisdiction wording.
+  markets?: MarketsInput,
+): ResolvedRisk[] {
   const template = (sector && SECTOR_RISKS[sector]) || []
+  const codes = new Set(markets?.sales_markets ?? [])
+  const recorded = !!markets && marketsRecorded(markets)
   return template.map((r): ResolvedRisk => {
     const base = { risk: r.risk, severity: r.severity, framework: r.framework }
     if (!r.conditional) return { ...base, detail: r.detail, scope: 'established' }
+    const c = r.conditional
+    const withConsequence = c.consequence ? `${r.detail} ${c.consequence}` : r.detail
     // A missing jurisdiction is not a match. Nothing was established, so nothing is asserted.
-    const established = !!jurisdiction && r.conditional.establishedIn.includes(jurisdiction)
-    if (established) {
-      const detail = r.conditional.consequence ? `${r.detail} ${r.conditional.consequence}` : r.detail
-      return { ...base, detail, scope: 'established' }
+    if (!!jurisdiction && c.establishedIn.includes(jurisdiction)) return { ...base, detail: withConsequence, scope: 'established' }
+    const ticked = regionsOf(c).filter(reg => REGION[reg].codes.some(code => codes.has(code)))
+    if (ticked.length && c.reach === 'market') {
+      return { ...base, detail: `${withConsequence} ${conditionMetSentence(ticked)}`, scope: 'established' }
     }
-    return { ...base, detail: r.detail, scope: 'conditional', condition: conditionSentence(r.conditional) }
+    if (ticked.length) return { ...base, detail: r.detail, scope: 'conditional', condition: conditionScopeSentence(c, ticked) }
+    // Recorded without it, and not "not sure": the absence is itself a fact the target reported.
+    if (recorded && markets?.sales_markets_not_sure !== true) {
+      return { ...base, detail: r.detail, scope: 'conditional', condition: conditionAbsentSentence(c) }
+    }
+    return { ...base, detail: r.detail, scope: 'conditional', condition: conditionSentence(c) }
   })
 }
 
@@ -261,6 +316,20 @@ export const DEFAULT_PIPELINE_TARGETS = 10
 // VERIFIED strings only (getApplicableFrameworks emits these) — no phantoms.
 // PCAF is NOT here: financed emissions (Cat.15) is its own obligation, not supply chain.
 export const SUPPLY_CHAIN_TRIGGERS = ['CS3D', 'CSRD', 'SFDR']
+
+// Regimes whose own rule requires the target to measure its GHG emissions, so that applying one of
+// them makes a GHG inventory an included obligation rather than a recommendation:
+//   SB 253  Scope 1, 2 and 3 emissions reporting (Cal. Health & Safety Code s.38532)
+//   CSRD    ESRS E1 climate disclosures, which include gross Scope 1, 2 and 3 emissions
+//   SECR    Scope 1 and 2 emissions and energy use in the directors' report
+// Deliberately NOT here: EU and UK ETS (installation-level monitoring under an emissions permit, not
+// an organisational inventory), CS3D (a transition plan, not an inventory), SFDR (the adverse-impact
+// indicators are about investees). Add a regime only with the rule that requires the inventory.
+export const GHG_INVENTORY_REGIMES = ['SB 253', 'CSRD', 'SECR']
+export const CLIMATE_RISK_REASON =
+  'Recommended on every deal: physical and transition exposure is a diligence question whatever the target must report, and it is the analysis the IFRS S2 and TCFD market expectations ask for.'
+export const GHG_RECOMMENDED_REASON =
+  'No regime found to apply requires a GHG inventory. Recommended because investors and lenders routinely ask for one.'
 
 // Consultant benchmarks scale with engagement complexity. ThemisIQ price also
 // scales (GHG_TIERS), so the GAP narrows at high facility counts — intentional.
@@ -413,13 +482,18 @@ export function getObligations(
   const ghgPricing: ObligationPricing =
     ghgBasis.kind === 'none' || ghgBasis.tier == null ? QUOTE : tierPricing(GHG_TIERS[ghgBasis.tier].priceUSD)
 
-  const included: ObligationTier[] = [
-    // GHG consultant range scales by location AND sector (a heavy-sector inventory is more work).
-    tier({ label: 'GHG inventory & Scope 3', short: 'GHG', pricing: ghgPricing,
-      consultantLow: roundK(CONSULTANT_RANGES.ghg.low * loc * sec),
-      consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec),
-      scopeNote: ghgPriceBasisNote(ghgBasis) }),
-  ]
+  // ⚠️ GHG IS INCLUDED ONLY WHEN A REGIME FOUND TO APPLY REQUIRES AN INVENTORY (29 Sep 2026). It was
+  // included on every deal, so a US target with SB 253 not met was still priced for "GHG inventory &
+  // Scope 3" as though something required it. `frameworks` is the flat APPLIES list (size-tested
+  // APPLIES, and APPLIES: VERIFY); market expectations never reach it. Where nothing in it requires an
+  // inventory, the same module moves to "Also recommended" with its reason, still priced by its band.
+  // GHG consultant range scales by location AND sector (a heavy-sector inventory is more work).
+  const ghgRequired = GHG_INVENTORY_REGIMES.some(f => frameworks.includes(f))
+  const ghgTier = tier({ label: 'GHG inventory & Scope 3', short: 'GHG', pricing: ghgPricing,
+    consultantLow: roundK(CONSULTANT_RANGES.ghg.low * loc * sec),
+    consultantHigh: roundK(CONSULTANT_RANGES.ghg.high * loc * sec),
+    scopeNote: ghgRequired ? ghgPriceBasisNote(ghgBasis) : `${GHG_RECOMMENDED_REASON} ${ghgPriceBasisNote(ghgBasis)}` })
+  const included: ObligationTier[] = ghgRequired ? [ghgTier] : []
 
   // Supply chain — included when a genuine value-chain framework is detected (PCAF no longer triggers this).
   // Consultant range scales by location only (value-chain breadth), not sector.
@@ -429,24 +503,22 @@ export function getObligations(
       consultantHigh: roundK(CONSULTANT_RANGES.supplyChain.high * loc) }))
   }
 
-  // Financed emissions (PCAF, Scope 3 Cat.15) — Financial Services. A REAL included ThemisIQ scope,
-  // delivered inside the GHG module, so it is BUNDLED — not priced at zero. It therefore sums into
-  // nothing and never renders as a currency figure. (Pricing it 0 made a quote-tier FS deal read
-  // "~USD 0 + custom" instead of "Custom quote": a free inclusion masquerading as a zero cost.)
-  // Portfolio-driven: consultant range scales by NEITHER location nor sector.
-  if (frameworks.includes('PCAF')) {
-    included.push(tier({ label: 'Financed emissions (PCAF, Scope 3 Cat.15)', short: 'financed emissions', pricing: BUNDLED,
-      consultantLow: roundK(CONSULTANT_RANGES.financedEmissions.low),
-      consultantHigh: roundK(CONSULTANT_RANGES.financedEmissions.high),
-      scopeNote: 'Included in the GHG module (PCAF-aligned engine); consultants bill this separately.' }))
-  }
+  // Financed emissions (PCAF) was an included, bundled obligation whenever PCAF was in the APPLIES
+  // list. PCAF became a market expectation on 29 Sep 2026, so it can never be there, and the branch
+  // was removed rather than left unreachable. The 'bundled' pricing kind stays for the next scope
+  // that is genuinely included at no separate charge.
 
-  // Recommended (NOT summed) — Climate Risk is always relevant (IFRS S2 / TCFD always emitted).
+  // Recommended (NOT summed). Climate risk on every deal: physical and transition exposure is a
+  // diligence question whatever the target's reporting duties, and it is the analysis the IFRS S2 and
+  // TCFD market expectations ask for. (It rested on IFRS S2 / TCFD being "always emitted" as APPLIES,
+  // which stopped being true on 29 Sep 2026; the recommendation did not depend on that.)
   // Consultant range scales by location only, not sector.
   const recommended: ObligationTier[] = [
+    ...(ghgRequired ? [] : [ghgTier]),
     tier({ label: 'Climate risk assessment: physical and transition (IFRS S2 / TCFD)', short: 'climate risk', pricing: priced(FLAT_MODULE_PRICES['climate-risk']),
       consultantLow: roundK(CONSULTANT_RANGES.climateRisk.low * loc),
-      consultantHigh: roundK(CONSULTANT_RANGES.climateRisk.high * loc) }),
+      consultantHigh: roundK(CONSULTANT_RANGES.climateRisk.high * loc),
+      scopeNote: CLIMATE_RISK_REASON }),
   ]
 
   // Flagged (NOT summed into either figure) — honest caveats for scopes needing a separate specialist.
@@ -635,6 +707,23 @@ export const CANADA_S211_JURISDICTION_CAVEAT =
 // test and the caveat would be describing a route that WAS reached; and not a listed Yes, because that
 // settles applicability outright and carries its own VERIFY note about goods. A caveat on a deal it does
 // not apply to is the noise that made the framework-row version wrong.
+/**
+ * The caveat as printed, heading and body split at the constant's colon (29 Sep 2026). With Canada
+ * among the target's sales markets, "this assessment records one primary jurisdiction" is no longer
+ * the whole truth: the market is known, and what is not run is the size test, which this engine
+ * applies only to a Canadian target. Otherwise the body is today's sentence.
+ */
+export const CANADA_S211_MARKET_SENTENCE =
+  'The target sells into or operates in Canada, so this applies to its Canadian business if it meets the Act’s size tests, which this assessment runs only for a Canadian target.'
+export const canadaS211CaveatText = (m: MarketsInput): { heading: string; body: string } => {
+  const heading = CANADA_S211_JURISDICTION_CAVEAT.split(':')[0]
+  const cut = CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)
+  const body = cut.charAt(0).toUpperCase() + cut.slice(1)
+  if (!(m.sales_markets ?? []).includes('CA')) return { heading, body }
+  const firstSentence = body.slice(0, body.indexOf('. ') + 1)
+  return { heading, body: `${firstSentence} ${CANADA_S211_MARKET_SENTENCE}` }
+}
+
 export const showCanadaS211JurisdictionCaveat = (
   jurisdiction: string, listedCaExchange?: boolean | null,
 ): boolean => jurisdiction !== 'Canada' && listedCaExchange !== true
@@ -753,7 +842,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
       { measure: 'turnover', amount: 450_000_000, unit: { unit: 'currency', currency: 'EUR' },
         source: 'revenue', exactMeasure: false, comparison: 'gt',
         basis: 'Net turnover of more than EUR 450,000,000 (Accounting Directive art. 3, as amended by Omnibus I).',
-        measureNote: 'The Directive measures NET turnover, and for a parent the consolidated figure. The figure applied is the deal’s single revenue input, converted at the dated ECB rate in FX_SOURCE.' },
+        measureNote: 'The Directive measures NET turnover, and for a parent the consolidated figure. The figure applied is the deal’s single revenue input, converted at the dated ECB reference rate shown in the FX basis section.' },
     ],
   },
   // POST-OMNIBUS. Directive (EU) 2024/1760 (CS3D) as amended by Directive (EU) 2026/470 (Omnibus I).
@@ -795,7 +884,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
       { measure: 'turnover', amount: 1_500_000_000, unit: { unit: 'currency', currency: 'EUR' },
         source: 'revenue', exactMeasure: false, comparison: 'gt',
         basis: 'Net worldwide turnover of more than EUR 1,500,000,000 (Directive (EU) 2024/1760 art. 2(1)(a), as amended by Omnibus I).',
-        measureNote: 'The Directive measures NET WORLDWIDE turnover. The figure applied is the deal’s single revenue input, converted at the dated ECB rate in FX_SOURCE.' },
+        measureNote: 'The Directive measures NET WORLDWIDE turnover. The figure applied is the deal’s single revenue input, converted at the dated ECB reference rate shown in the FX basis section.' },
     ],
   },
 }
@@ -1157,7 +1246,11 @@ export const evaluateTest = (test: ThresholdTest, size: DealSize): { status: Fra
   }
 }
 
-export type FrameworkStatus = 'applies' | 'near-threshold' | 'not-applicable' | 'not-assessed'
+// 'market' (29 Sep 2026): expected by investors, lenders or customers, NOT required by law for this
+// target on the information given. Always `applies: false`, so a market row can never reach
+// getApplicableFrameworks' flat list, and therefore never prices an obligation or licenses a regime
+// token on a risk finding.
+export type FrameworkStatus = 'applies' | 'near-threshold' | 'not-applicable' | 'not-assessed' | 'market'
 export type FrameworkApplicability = {
   framework: string
   // Authoritative in/out — the ONLY thing getApplicableFrameworks filters on. Near-ness never
@@ -1173,6 +1266,15 @@ export type FrameworkApplicability = {
   // asserts and qualifies.
   verify?: string
   test?: ThresholdOutcome           // per-limb detail behind the decision
+  // ⚠️ THE BASIS OF AN APPLIES ROW THAT HAS NO SIZE TEST. Every `applies: true` row must carry one of
+  // `test` (a statutory size test ran), `verify` (applies on a named rule, with a condition to check)
+  // or `rule` (applies by a rule this function states). Nothing may reach APPLIES by default any more:
+  // until 29 Sep 2026 a framework with no active test fell through to an unconditional APPLIES, which
+  // is how IFRS S2 and TCFD came to be asserted against every deal. assessment.test.ts fails on a row
+  // that breaks this.
+  rule?: string
+  // A market row's own sentence, where it needs more than the section's introduction (UK SRS).
+  note?: string
   // Why the framework's applicability could not be ESTABLISHED FROM THE MODELLED TEST. That covers an
   // abstention no size test can answer (no EU-footprint field, no entity-type field) AND a
   // NON-EXHAUSTIVE test whose modelled route was evaluated and NOT met — the route is settled, the
@@ -1196,7 +1298,7 @@ export type FrameworkApplicability = {
 // statute does not apply stops looking. Same three-state treatment resolveCs3d gives CS3D
 // (lib/deals/reportModel.ts).
 export const CSRD_NON_EU_REASON =
-  'CSRD also reaches non-EU parents through EU subsidiaries and branches on separate thresholds; this assessment does not capture the target’s EU footprint, so applicability cannot be resolved here.'
+  'CSRD also reaches non-EU parents through EU subsidiaries and branches on separate thresholds, measured on EU-generated turnover and on the subsidiaries’ and branches’ own figures; this assessment does not collect the target’s EU footprint in those terms, so applicability cannot be resolved here.'
 
 export const csrdNonEuAbstention = (): FrameworkApplicability => ({
   framework: 'CSRD', applies: false, status: 'not-assessed', reason: CSRD_NON_EU_REASON,
@@ -1237,6 +1339,35 @@ export const cs3dPendingAbstention = (): FrameworkApplicability => ({
   framework: 'CS3D', applies: false, status: 'not-assessed', reason: CS3D_PENDING_REASON,
 })
 
+// ── Rule-based rows: the condition each one leaves open ──────────────────────────────────────────
+// Each applies on a jurisdiction or sector rule, and each binds only a class of firm this assessment
+// does not identify, so it is APPLIES: VERIFY with the condition stated. Wording approved 29 Sep 2026.
+export const SFDR_VERIFY = 'Applies if the target is an EU financial market participant or financial adviser.'
+export const FCA_CLIMATE_VERIFY = 'Applies to UK asset managers above GBP 5bn AUM and asset owners above GBP 1.5bn.'
+export const UK_SDR_VERIFY = 'Naming and marketing rules apply to UK fund managers using sustainability terms.'
+export const ANTI_GREENWASHING_VERIFY = 'Applies if the target is FCA-authorised.'
+export const ETS_VERIFY =
+  'Applies if the target operates covered installations or activities (e.g. combustion above 20MW thermal input, specified industrial processes, aviation, maritime).'
+export const EU_TAXONOMY_RULE =
+  'Applies because CSRD applies: undertakings reporting under CSRD disclose Taxonomy alignment (Regulation (EU) 2020/852, Article 8).'
+/**
+ * The frameworks this engine lists as market expectations, never as APPLIES rows. One list, used by
+ * the engine's market() rows below (assessment.test.ts pins that they agree) and by surfaces that
+ * read a `frameworks` snapshot saved before 29 Sep 2026, when these four were stored as applying.
+ */
+export const MARKET_FRAMEWORKS = ['IFRS S2', 'TCFD', 'PCAF', 'UK SRS (S1/S2)'] as const
+const MARKET_SET = new Set<string>(MARKET_FRAMEWORKS)
+
+/**
+ * A stored `frameworks` list without the market expectations. For display of a snapshot only: it
+ * changes nothing stored, and a live derivation never needs it (market rows never reach that list).
+ */
+export const withoutMarketExpectations = (frameworks: unknown): string[] =>
+  Array.isArray(frameworks) ? frameworks.filter((f): f is string => typeof f === 'string' && !MARKET_SET.has(f)) : []
+
+export const UK_SRS_NOTE =
+  'Endorsed for voluntary use February 2026. The FCA proposes mandatory climate reporting (S2) for UK-listed companies for periods from 1 January 2027 (CP26/5).'
+
 const applyTest = (test: ThresholdTest, size: DealSize): FrameworkApplicability => {
   const { status, applies, outcome } = evaluateTest(test, size)
   // Near-threshold is a PRESENTATION of a decided outcome, never a replacement for it: the marker
@@ -1271,6 +1402,11 @@ export const getFrameworkApplicability = (
     total_assets?: number | null
     employee_count?: number | null
     listed_ca_exchange?: boolean | null
+    // Sales markets and environmental claims (29 Sep 2026). NULL or absent = never asked, and then
+    // no claims row is produced: see claimsFrameworkRows in ./markets.
+    sales_markets?: string[] | null
+    sales_markets_not_sure?: boolean | null
+    env_claims?: string | null
   } = {},
 ): FrameworkApplicability[] => {
   const out: FrameworkApplicability[] = []
@@ -1279,36 +1415,56 @@ export const getFrameworkApplicability = (
     total_assets: size.total_assets ?? null,
     employee_count: size.employee_count ?? null,
   }
-  // One push for every framework: routed through its size test where one is defined AND ready,
-  // otherwise jurisdiction/sector-only. A `pending` test cannot change behaviour.
-  const plain = (framework: string) => {
+  // ⚠️ SIZE-TESTED FRAMEWORKS ONLY. This replaced `plain()`, which returned an unconditional
+  // APPLIES for any framework whose size test was absent or pending: IFRS S2 and TCFD were asserted
+  // against every deal that way, UK SRS against every UK deal, and SFDR, UK SDR and the rest against
+  // every financial-services deal in their jurisdiction. A framework with no active test is now NOT
+  // ASSESSED, with its reason, never APPLIES. Frameworks that apply on a rule rather than a size test
+  // are pushed explicitly below with their `rule` or `verify`, and market expectations with market().
+  const sized = (framework: string) => {
     const t = THRESHOLD_TESTS[framework]
-    out.push(isTestActive(t) ? applyTest(t, dealSize) : { framework, applies: true, status: 'applies' })
+    out.push(isTestActive(t) ? applyTest(t, dealSize) : {
+      framework, applies: false, status: 'not-assessed',
+      reason: `${framework} has no size test in this assessment yet, so its applicability is not resolved here`,
+    })
   }
+  const verify = (framework: string, condition: string) =>
+    out.push({ framework, applies: true, status: 'applies', verify: condition })
+  const market = (framework: string, note?: string) =>
+    out.push({ framework, applies: false, status: 'market', ...(note ? { note } : {}) })
 
   // US — California SB 253 (statutory trigger is USD 1bn total annual revenue, doing business in CA)
-  if (jurisdiction === 'USA') plain('SB 253')
+  if (jurisdiction === 'USA') sized('SB 253')
 
   // EU — the CSRD size test is the EU-UNDERTAKING test, so it is applied ONLY to an EU target.
   // 'Global' keeps CSRD in scope but abstains: in scope to consider, not resolvable here.
-  if (jurisdiction === 'European Union') plain('CSRD')
+  if (jurisdiction === 'European Union') sized('CSRD')
   else if (jurisdiction === 'Global') out.push(csrdNonEuAbstention())
-  if (jurisdiction === 'European Union' && sector === 'Financial Services') plain('SFDR')
-  if (['European Union', 'Global'].includes(jurisdiction)) plain('EU Taxonomy')
+  // SFDR binds financial market participants and financial advisers, which a sector of "Financial
+  // Services" suggests and does not establish.
+  if (jurisdiction === 'European Union' && sector === 'Financial Services') verify('SFDR', SFDR_VERIFY)
+  // EU Taxonomy disclosure is owed by undertakings that report under CSRD, so it applies exactly when
+  // CSRD applies on this deal: not on jurisdiction, and not for a Global target whose CSRD abstains.
+  if (out.some(f => f.framework === 'CSRD' && f.applies)) {
+    out.push({ framework: 'EU Taxonomy', applies: true, status: 'applies', rule: EU_TAXONOMY_RULE })
+  }
   // CS3D — the art. 2(1)(a) limbs are the EU-COMPANY test, so they are applied ONLY to an EU target.
   // 'Global' keeps CS3D in scope but abstains: art. 2(2) measures turnover generated IN THE UNION,
   // which this assessment does not collect. Same split as CSRD above.
-  if (jurisdiction === 'European Union') plain('CS3D')
+  if (jurisdiction === 'European Union') sized('CS3D')
   else if (jurisdiction === 'Global') out.push(cs3dNonEuAbstention())
 
   // UK — distinct regime, NOT CSRD
   if (jurisdiction === 'UK') {
-    plain('SECR')            // large UK cos: Scope 1+2 mandatory (DEFRA factors). 2-of-3, not turnover-only.
-    plain('UK SRS (S1/S2)')                               // IFRS S1/S2 endorsement — voluntary now, proposed mandatory for listed FY2027+
+    sized('SECR')            // large UK cos: Scope 1+2 mandatory (DEFRA factors). 2-of-3, not turnover-only.
+    // Endorsed for voluntary use, not yet mandatory: a market expectation, with the pending FCA
+    // proposal stated so a reader knows it may not stay one.
+    market('UK SRS (S1/S2)', UK_SRS_NOTE)
     if (sector === 'Financial Services') {
-      plain('FCA climate disclosure (TCFD)')                // FCA-regulated managers / insurers / pensions
-      plain('UK SDR')                                        // sustainability disclosure + investment labels
-      plain('Anti-greenwashing rule')                        // applies to all FCA-authorised firms making ESG claims
+      // Each binds a class of FCA-regulated firm that a sector label does not establish.
+      verify('FCA climate disclosure (TCFD)', FCA_CLIMATE_VERIFY)
+      verify('UK SDR', UK_SDR_VERIFY)
+      verify('Anti-greenwashing rule', ANTI_GREENWASHING_VERIFY)
     }
   }
 
@@ -1336,7 +1492,7 @@ export const getFrameworkApplicability = (
   if (size.listed_ca_exchange === true) {
     out.push({ framework: 'Canada S-211', applies: true, status: 'applies', verify: CANADA_S211_LISTING_VERIFY })
   } else if (jurisdiction === 'Canada') {
-    plain('Canada S-211')
+    sized('Canada S-211')
   }
   // ⚠️ NO ROW FOR A NON-CANADIAN TARGET, AND THAT IS THE DECISION RATHER THAN THE GAP. The Act can reach
   // a company doing business in Canada wherever it is based, which this assessment cannot establish from a
@@ -1345,13 +1501,22 @@ export const getFrameworkApplicability = (
   // limitation: CANADA_S211_JURISDICTION_CAVEAT, gated by showCanadaS211JurisdictionCaveat, rendered in
   // the report's limitations register and the wizard's step 2.
 
-  // Investor baseline (expected regardless of jurisdiction)
-  plain('IFRS S2')
-  plain('TCFD')
-  if (sector === 'Financial Services') plain('PCAF')
+  // Environmental-claims regimes named by market (EU ECGT, California AB 1305): APPLIES on a reported
+  // claim, APPLIES: VERIFY on "not sure", nothing when claims are "no" or never asked. Each carries its
+  // `rule` or `verify`. The finding with the penalties is built in ./claimsRules for the report.
+  out.push(...claimsFrameworkRows(size))
+
+  // Market expectations, every jurisdiction. Investors, lenders and customers ask for these; no
+  // statute this assessment tests requires them of this target. PCAF is the financed-emissions
+  // standard, so it is expected of financial-services targets only.
+  market('IFRS S2')
+  market('TCFD')
+  if (sector === 'Financial Services') market('PCAF')
+  // Emissions trading binds operators of covered installations and activities, which a heavy-industry
+  // sector suggests and does not establish.
   if (['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals'].includes(sector)) {
-    if (jurisdiction === 'UK') plain('UK ETS')
-    else if (['European Union', 'Global'].includes(jurisdiction)) plain('EU ETS')
+    if (jurisdiction === 'UK') verify('UK ETS', ETS_VERIFY)
+    else if (['European Union', 'Global'].includes(jurisdiction)) verify('EU ETS', ETS_VERIFY)
   }
 
   return out
@@ -1368,7 +1533,7 @@ export const getFrameworkApplicability = (
 // the dropdown that produces the values — which put the list in one consumer and the interpretation
 // in another, with nothing holding them together. The engine matches by EXACT EQUALITY
 // (`jurisdiction === 'UK'` and eight siblings), and a value hitting no branch does not error: it
-// falls through to the universal baseline and renders as REGIME_FALLBACK — 'GHG Protocol / IFRS S2'
+// falls through to the universal baseline and renders as REGIME_FALLBACK: 'GHG Protocol'
 // — on the target-facing /deals/[token] page, reading exactly like a real answer.
 //
 // So the list and the branches must agree, and agreement is now testable: see the jurisdiction
@@ -1384,6 +1549,11 @@ export const getApplicableFrameworks = (
     total_assets?: number | null
     employee_count?: number | null
     listed_ca_exchange?: boolean | null
+    // Sales markets and environmental claims (29 Sep 2026). NULL or absent = never asked, and then
+    // no claims row is produced: see claimsFrameworkRows in ./markets.
+    sales_markets?: string[] | null
+    sales_markets_not_sure?: boolean | null
+    env_claims?: string | null
   } = {},
 ): string[] =>
   getFrameworkApplicability(jurisdiction, revenue, sector, dealType, currency, size)

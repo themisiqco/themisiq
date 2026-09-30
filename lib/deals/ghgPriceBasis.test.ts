@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getObligations, ghgPriceBasis, ghgPriceBasisNote, ghgOrderTier } from './assessment'
+import { getObligations, ghgPriceBasis, ghgPriceBasisNote, ghgOrderTier, GHG_RECOMMENDED_REASON } from './assessment'
 import { GHG_TIERS } from '../pricing'
 import { buildDealReportModel } from './reportModel'
 import { NEAR_THRESHOLD_DEAL, FIXTURE_GENERATED_AT } from './reportModel.fixtures'
@@ -8,8 +8,11 @@ import { NEAR_THRESHOLD_DEAL, FIXTURE_GENERATED_AT } from './reportModel.fixture
 // when there is no usable headcount. Asserted against GHG_TIERS rather than literal prices, so a
 // reprice moves these tests with it; the bands themselves are what is pinned.
 
+// SB 253 applying is what makes GHG an INCLUDED obligation (GHG_INVENTORY_REGIMES); these tests are
+// about the band, so they hold that constant.
+const REQ = ['SB 253']
 const ghg = (employees: number | null, sites: number) =>
-  getObligations(sites, [], 'Technology', employees).included.find(o => o.short === 'GHG')!
+  getObligations(sites, REQ, 'Technology', employees).included.find(o => o.short === 'GHG')!
 
 describe('GHG band from headcount', () => {
   it.each([
@@ -23,7 +26,7 @@ describe('GHG band from headcount', () => {
   })
 
   it('600 employees is Enterprise, which is a quote, not a figure', () => {
-    const o = getObligations(2, [], 'Technology', 600)
+    const o = getObligations(2, REQ, 'Technology', 600)
     expect(o.included[0].pricing).toEqual({ kind: 'quote' })
     expect(o.themisIqTotal).toBeNull()
     expect(o.themisIqHasCustom).toBe(true)
@@ -35,7 +38,7 @@ describe('GHG band from headcount', () => {
   })
 
   it('a headcount with no location count is still priced, and does not prompt for one', () => {
-    const o = getObligations(0, [], 'Technology', 20)
+    const o = getObligations(0, REQ, 'Technology', 20)
     expect(o.locationUnset).toBe(false)
     expect(o.themisIqTotal).toBe(GHG_TIERS.professional.priceUSD)
   })
@@ -61,7 +64,7 @@ describe('GHG band falls back to sites when headcount is blank', () => {
   })
 
   it('with neither, nothing is priced and the figure is withheld', () => {
-    const o = getObligations(0, [], 'Technology', null)
+    const o = getObligations(0, REQ, 'Technology', null)
     expect(o.locationUnset).toBe(true)
     expect(o.included[0].pricing).toEqual({ kind: 'quote' })
     expect(o.included[0].scopeNote).toBe('Not priced: neither headcount nor location count was provided.')
@@ -84,9 +87,12 @@ describe('the /order tier agrees with the priced band', () => {
 
 describe('the report says which basis priced it', () => {
   it('the near-threshold fixture, 240 employees on 8 sites, is priced on its headcount', () => {
+    // SECR is near but NOT met on this fixture, so no inventory regime applies and GHG is recommended
+    // rather than included: the reason comes first, then the basis.
     const m = buildDealReportModel(NEAR_THRESHOLD_DEAL, FIXTURE_GENERATED_AT)
-    const row = m.cost.included.rows.find(r => r.label === 'GHG inventory & Scope 3')!
-    expect(row.scopeNote).toBe('Priced on 240 employees (Business band).')
+    expect(m.cost.included.rows.some(r => r.label === 'GHG inventory & Scope 3')).toBe(false)
+    const row = m.cost.recommended.rows.find(r => r.label === 'GHG inventory & Scope 3')!
+    expect(row.scopeNote).toBe(`${GHG_RECOMMENDED_REASON} Priced on 240 employees (Business band).`)
     expect(row.themisIq).toContain(GHG_TIERS.business.priceUSD!.toLocaleString())
   })
 

@@ -11,7 +11,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase' // anon public client (NEXT_PUBLIC_SUPABASE_ANON_KEY)
-import { getObligations, ghgOrderTier, sectorRisks, type ResolvedRisk } from '../../../lib/deals/assessment'
+import { getObligations, ghgOrderTier, sectorRisks, withoutMarketExpectations, type ResolvedRisk } from '../../../lib/deals/assessment'
 import { makeMapFramework, regimeLabel } from '../../../lib/deals/reportModel'
 import { GHG_TIERS } from '../../../lib/pricing'
 
@@ -107,7 +107,11 @@ export default function DealAssessmentPage() {
   // at. So the snapshot stands, and the page DATES it (see snapshotDate below) — a reader can then
   // judge whether to rely on it. The wizard's share gate is what stops an empty snapshot being
   // shared in the first place.
-  const frameworks = Array.isArray(data.frameworks) ? data.frameworks : []
+  // ⚠️ THE MARKET EXPECTATIONS ARE LEFT OUT OF THE SNAPSHOT (29 Sep 2026). A deal saved before today
+  // stored IFRS S2, TCFD, PCAF and UK SRS as applying; they are market expectations now, and this page
+  // cannot re-derive (deal_assessment_get returns no size figures), so it filters what it draws.
+  // Display only: nothing stored changes, and the RPC is not widened.
+  const frameworks = withoutMarketExpectations(data.frameworks)
   // Resolved against the target's own jurisdiction — this page is read BY the target, so an
   // instrument asserted against a company it does not reach is the worst place for it to appear.
   const risks: ResolvedRisk[] = sectorRisks(data.sector, data.jurisdiction)
@@ -139,13 +143,23 @@ export default function DealAssessmentPage() {
   // no site count included. "+ custom" only where a NON-GHG module is itself a quote: the GHG quote is
   // already covered by the floor. Written against the basis rather than assumed, so a headcount basis,
   // should the RPC ever return one, prints the report's own "~" figure instead.
+  //
+  // ⚠️ THE FLOOR IS ADDED ONLY WHEN GHG IS INCLUDED (29 Sep 2026). GHG is an included obligation only
+  // where a regime found to apply requires an inventory; otherwise it is recommended, and adding its
+  // price to the headline would charge for a module this assessment does not say is needed. With
+  // nothing included there is no headline to state, and the line says what the cheapest
+  // recommendation starts at instead.
   const ghgBandUnknownHere = obligations.ghgBasis.kind !== 'employees'
   const ghgFloor = Math.min(...Object.values(GHG_TIERS).map(t => t.priceUSD).filter((p): p is number => p != null))
+  const ghgIncluded = obligations.included.some(o => o.short === 'GHG')
   const others = obligations.included.filter(o => o.short !== 'GHG')
   const othersPriced = others.reduce((sum, o) => sum + (o.pricing.kind === 'priced' ? o.pricing.priceUSD : 0), 0)
   const othersCustom = others.some(o => o.pricing.kind === 'quote')
-  const themisIqFigure = ghgBandUnknownHere
-    ? `From ${fmt(ghgFloor + othersPriced)}${othersCustom ? ' + custom' : ''}`
+  const nothingIncluded = obligations.included.length === 0
+  const themisIqFigure = nothingIncluded
+    ? `No priced obligation. Recommended modules from ${fmt(ghgFloor)}.`
+    : ghgBandUnknownHere
+    ? `From ${fmt((ghgIncluded ? ghgFloor : 0) + othersPriced)}${othersCustom ? ' + custom' : ''}`
     : obligations.locationUnset || obligations.themisIqTotal == null
       ? 'Custom quote'
       : obligations.themisIqHasCustom
@@ -154,8 +168,15 @@ export default function DealAssessmentPage() {
   const SHARE_GHG_NOTE = 'Priced by headcount. Your exact band is confirmed when you order.'
   const includedShown = obligations.included.map(o =>
     o.short === 'GHG' && ghgBandUnknownHere ? { ...o, scopeNote: SHARE_GHG_NOTE } : o)
-  const consultantRange = `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
-  const includedModulesLabel = obligations.included.map(o => o.short).join(' + ') + ' modules'
+  const consultantRange = nothingIncluded
+    ? 'No included obligation'
+    : `USD ${Math.round(obligations.consultantLow / 1000)}k–${Math.round(obligations.consultantHigh / 1000)}k`
+  const includedModulesLabel = nothingIncluded ? 'Recommended modules below' : obligations.included.map(o => o.short).join(' + ') + ' modules'
+  // A recommended GHG row carries the same unknown band as an included one on this page: its site
+  // price is not a floor, so it shows the lowest band, as "from".
+  const recommendedPrice = (o: (typeof obligations.recommended)[number]) =>
+    o.short === 'GHG' && ghgBandUnknownHere ? `+ from ${fmt(ghgFloor)}`
+      : o.themisIqPrice != null ? `+ ${fmt(o.themisIqPrice)}` : '+ Custom'
 
   // CTA → the pre-configured /order screen. modules = pricing-page ids (/order converts them);
   // tier = the band getObligations priced, through ghgOrderTier, so /order offers the plan this page's
@@ -268,7 +289,8 @@ export default function DealAssessmentPage() {
         </div>
         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 8, marginBottom: 16, lineHeight: 1.6 }}>Benchmark figures shown in USD. <strong style={{ fontWeight: 600 }}>How we benchmark:</strong> per-obligation market ranges for standalone ESG due-diligence workstreams, scaled by number of locations and sector intensity — indicative, not a quote.</div>
 
-        {/* Included for this deal */}
+        {/* Included for this deal. Not drawn when nothing is included: the figure above says so. */}
+        {!nothingIncluded && (
         <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#0F6E56', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Included for this deal</div>
           {includedShown.map((o, i) => (
@@ -280,6 +302,7 @@ export default function DealAssessmentPage() {
             </div>
           ))}
         </div>
+        )}
 
         {/* Also recommended — NOT summed into the ThemisIQ total */}
         {obligations.recommended.map((o, i) => (
@@ -289,7 +312,7 @@ export default function DealAssessmentPage() {
               <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{o.themisIqPrice != null ? `+ ${fmt(o.themisIqPrice)}` : '+ Custom'}</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{recommendedPrice(o)}</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
             </div>
           </div>

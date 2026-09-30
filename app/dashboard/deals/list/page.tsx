@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import Nav from '../../../components/Nav'
+import { getApplicableFrameworks } from '../../../../lib/deals/assessment'
 import PaywallCard from '../../../components/PaywallCard'
 // useEntitlementAccess, NOT useEntitlementState: `isPaid` is TRUE for an expired customer by
 // contract, so this list stayed open to someone whose term had run out while the trigger refused
@@ -29,16 +30,44 @@ import { btnPrimary } from '@/app/components/buttonStyles'
 
 const GRAD = 'var(--color-brand)'
 
-// Only the columns this list renders. Deliberately not select('*') — the wizard does that
-// because it hydrates a whole form; a list has no use for notes, deal_value or the share token.
+// Only the columns this list renders or derives from. Deliberately not select('*'): a list has no
+// use for notes, deal_value or the share token.
+// ⚠️ FRAMEWORKS ARE DERIVED HERE, NOT READ FROM THE STORED `frameworks` SNAPSHOT (29 Sep 2026). The
+// snapshot is written at save time, so a deal saved before an engine change kept its old list: every
+// deal saved before today still named IFRS S2 and TCFD as applying. The engine inputs are selected
+// instead, and the list is the engine's answer now, as the report and the pipeline export give it.
+const LIST_SELECT =
+  'id, target_name, sector, jurisdiction, revenue, currency, deal_type, employee_count, total_assets, ' +
+  'listed_ca_exchange, sales_markets, sales_markets_not_sure, env_claims, updated_at'
 type DealRow = {
   id: string
   target_name: string | null
   sector: string | null
   jurisdiction: string | null
-  frameworks: string[] | null
+  revenue: number | string | null
+  currency: string | null
+  deal_type: string | null
+  employee_count: number | null
+  total_assets: number | string | null
+  listed_ca_exchange: boolean | null
+  sales_markets: string[] | null
+  sales_markets_not_sure: boolean | null
+  env_claims: string | null
   updated_at: string
 }
+
+/** The frameworks that apply to this deal on the engine as it is today. */
+const liveFrameworks = (d: DealRow): string[] =>
+  d.sector && d.jurisdiction
+    ? getApplicableFrameworks(d.jurisdiction, Number(d.revenue) || 0, d.sector, d.deal_type ?? 'ma', d.currency ?? 'USD', {
+        total_assets: d.total_assets == null ? null : Number(d.total_assets),
+        employee_count: d.employee_count,
+        listed_ca_exchange: d.listed_ca_exchange,
+        sales_markets: d.sales_markets,
+        sales_markets_not_sure: d.sales_markets_not_sure,
+        env_claims: d.env_claims,
+      })
+    : []
 
 // Date AND time. Two unnamed deals edited the same afternoon are otherwise identical rows,
 // and the timestamp is what tells them apart.
@@ -94,12 +123,12 @@ export default function DealsListPage() {
       // deal resolves to no row rather than to a forbidden error.
       const { data, error: err } = await supabase
         .from('deals')
-        .select('id, target_name, sector, jurisdiction, frameworks, updated_at')
+        .select(LIST_SELECT)
         .eq('user_id', session.user.id)
         .order('updated_at', { ascending: false })
       if (cancelled) return
       if (err) { setError(err.message || 'Could not load your deals.'); setLoading(false); return }
-      setRows((data ?? []) as DealRow[])
+      setRows((data ?? []) as unknown as DealRow[])
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -243,7 +272,7 @@ export default function DealsListPage() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {rows.map(d => {
-                const fw = frameworkSummary(d.frameworks)
+                const fw = frameworkSummary(liveFrameworks(d))
                 const meta = [d.sector, d.jurisdiction].filter(Boolean).join(' · ')
                 return (
                   <div key={d.id} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 14, padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>

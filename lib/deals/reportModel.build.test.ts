@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   buildDealReportModel, buildFxBasisRows, fxSameCurrencyNote, fxNoConversionSentence,
-  type DealReportModel, type Rich,
+  makeMapFramework, type DealReportModel, type Rich,
 } from './reportModel'
-import { getFrameworkApplicability, CANADA_S211_JURISDICTION_CAVEAT } from './assessment'
+import {
+  getFrameworkApplicability, CANADA_S211_JURISDICTION_CAVEAT, GHG_RECOMMENDED_REASON, withoutMarketExpectations, SECTOR_RISKS,
+  SFDR_VERIFY, FCA_CLIMATE_VERIFY, UK_SDR_VERIFY, ANTI_GREENWASHING_VERIFY, ETS_VERIFY, EU_TAXONOMY_RULE, UK_SRS_NOTE,
+} from './assessment'
 import {
   REPORT_FIXTURES, FIXTURE_GENERATED_AT,
   NEAR_THRESHOLD_DEAL, NOT_ASSESSED_DEAL, FX_DEAL,
@@ -43,7 +48,9 @@ describe('buildDealReportModel: each fixture reaches its case', () => {
     expect(m.risks.unresolvedPanel?.title).toBe('FRAMEWORK COLUMN PARTIALLY RESOLVED')
     // No deal value and no locations: the cost section takes both "not provided" branches.
     expect(m.cost.exposure).toBeNull()
-    expect(m.cost.themisIq.figure).toBe('Custom quote: headcount and location count not provided')
+    // Nothing applies (SECR unresolved), so nothing is included: the card says so rather than
+    // prompting for a headcount that would price nothing.
+    expect(m.cost.themisIq.figure).toBe('No priced obligation')
     expect(m.cover.rows).toContainEqual(['Deal / investment value', 'Not provided'])
   })
 
@@ -208,5 +215,140 @@ describe('two-year panels: only for size tests this deal ran', () => {
 
   it('a US deal, which runs SB 253 with its lookback modelled, gets no two-year panel', () => {
     expect(twoYear(build({ ...FX_DEAL, jurisdiction: 'USA' }))).toEqual([])
+  })
+})
+
+// ── Framework statuses (29 Sep 2026) ───────────────────────────────────────────────────────────
+describe('framework statuses: applies, applies-verify and market', () => {
+  const applying = (m: DealReportModel) => m.applicable.rows.map(r => r.framework)
+  const marketNames = (m: DealReportModel) => m.market.rows.map(r => r.framework)
+
+  it.each(REPORT_FIXTURES)('$name lists IFRS S2 and TCFD as market expectations, never as applying', ({ deal }) => {
+    const m = build(deal)
+    expect(m.market.title).toBe('Investor and market expectations')
+    expect(m.market.intro).toBe('Not legal requirements for this target on the information provided. Investors, lenders and customers increasingly expect them.')
+    expect(marketNames(m)).toEqual(expect.arrayContaining(['IFRS S2', 'TCFD']))
+    expect(m.market.rows.every(r => r.chip === 'market')).toBe(true)
+    expect(applying(m)).not.toContain('IFRS S2')
+    expect(applying(m)).not.toContain('TCFD')
+  })
+
+  it('DEALS TEST USA: USD 100M, 250 staff, Energy & Utilities, SB 253 not met', () => {
+    const m = build({
+      ...FX_DEAL, target_name: 'Deals Test USA', jurisdiction: 'USA', currency: 'USD', sector: 'Energy & Utilities',
+      revenue: 100_000_000, employee_count: 250, total_assets: 80_000_000, location_count: 2, deal_value: 300_000_000,
+      sales_markets: ['US'], sales_markets_not_sure: null, env_claims: 'no',
+    })
+    expect(m.applicable.rows).toEqual([])                      // no APPLIES rows at all
+    expect(m.applicable.kind).toBe('none')
+    expect(m.sizeTests.rows.find(r => r.framework === 'SB 253')?.state).toBe('not-met')
+    expect(marketNames(m)).toEqual(['IFRS S2', 'TCFD'])
+    // GHG is recommended, not included, and says why.
+    expect(m.cost.included.rows).toEqual([])
+    const ghg = m.cost.recommended.rows.find(r => r.label === 'GHG inventory & Scope 3')!
+    expect(ghg.scopeNote!.startsWith(GHG_RECOMMENDED_REASON)).toBe(true)
+    // Nothing included: the cards say so rather than printing zeros.
+    expect(m.cost.themisIq.figure).toBe('No priced obligation')
+    expect(m.cost.consultant.figure).toBe('No included obligation')
+    expect(m.cost.intro).toContain('carries a priced obligation, so there is no compliance cost to estimate')
+  })
+
+  it('UK financial services: SECR applies, the FCA rules are APPLIES: VERIFY, UK SRS and PCAF are market', () => {
+    const m = build({
+      ...NEAR_THRESHOLD_DEAL, sector: 'Financial Services', revenue: 60_000_000, employee_count: 300, total_assets: 25_000_000,
+    })
+    const row = (f: string) => m.applicable.rows.find(r => r.framework === f)
+    expect(row('SECR')).toMatchObject({ chip: 'applies', verify: null })
+    expect(row('FCA climate disclosure (TCFD)')).toMatchObject({ chip: 'verify', verify: FCA_CLIMATE_VERIFY })
+    expect(row('UK SDR')).toMatchObject({ chip: 'verify', verify: UK_SDR_VERIFY })
+    expect(row('Anti-greenwashing rule')).toMatchObject({ chip: 'verify', verify: ANTI_GREENWASHING_VERIFY })
+    expect(m.market.rows.find(r => r.framework === 'UK SRS (S1/S2)')?.note).toBe(UK_SRS_NOTE)
+    expect(marketNames(m)).toEqual(expect.arrayContaining(['IFRS S2', 'TCFD', 'PCAF']))
+    // SECR requires a GHG inventory, so GHG is included; financed emissions is not an obligation.
+    expect(m.cost.included.rows.map(r => r.label)).toEqual(['GHG inventory & Scope 3'])
+  })
+
+  it('EU heavy industry: CSRD and EU Taxonomy apply, EU ETS is APPLIES: VERIFY, GHG and supply chain included', () => {
+    const m = build({
+      ...FX_DEAL, currency: 'EUR', sector: 'Energy & Utilities', revenue: 900_000_000, employee_count: 3_000, total_assets: 1_000_000_000,
+    })
+    const row = (f: string) => m.applicable.rows.find(r => r.framework === f)
+    expect(row('CSRD')?.chip).toBe('applies')
+    expect(row('EU Taxonomy')).toMatchObject({ chip: 'applies', basis: EU_TAXONOMY_RULE })
+    expect(row('EU ETS')).toMatchObject({ chip: 'verify', verify: ETS_VERIFY })
+    expect(m.cost.included.rows.map(r => r.label)).toEqual(['GHG inventory & Scope 3', 'Supply chain / Scope 3'])
+  })
+
+  it('EU financial services: SFDR is APPLIES: VERIFY with its condition', () => {
+    const m = build({ ...FX_DEAL, sector: 'Financial Services' })
+    expect(m.applicable.rows.find(r => r.framework === 'SFDR')).toMatchObject({ chip: 'verify', verify: SFDR_VERIFY })
+  })
+})
+
+// ── Final fixes before shipping (29 Sep 2026) ────────────────────────────────────────────────────
+describe('the share page leaves market expectations out of a stored frameworks list', () => {
+  it('a deal saved with IFRS S2 and TCFD shows neither, and keeps everything else in order', () => {
+    expect(withoutMarketExpectations(['SB 253', 'IFRS S2', 'TCFD', 'EU Taxonomy', 'PCAF', 'UK SRS (S1/S2)']))
+      .toEqual(['SB 253', 'EU Taxonomy'])
+    expect(withoutMarketExpectations(null)).toEqual([])
+    expect(withoutMarketExpectations(['IFRS S2', 42])).toEqual([])
+  })
+
+  it('the share page applies it to what it draws', () => {
+    const src = readFileSync(join(process.cwd(), 'app/deals/[token]/page.tsx'), 'utf8')
+    expect(src).toContain('const frameworks = withoutMarketExpectations(data.frameworks)')
+  })
+})
+
+describe('risk findings name IFRS S2 / TCFD as an investor expectation', () => {
+  const LABEL = 'Investor expectation (IFRS S2 / TCFD)'
+  it('the four templates carry the label, and no template names IFRS S2 or TCFD bare', () => {
+    const all = Object.values(SECTOR_RISKS).flat()
+    expect(all.filter(r => r.framework === LABEL).map(r => r.risk).sort()).toEqual(
+      ['Infrastructure physical risk', 'Physical climate risk exposure', 'Physical flood and heat risk', 'Stranded asset risk'])
+    for (const r of all) expect(r.framework, r.risk).not.toMatch(/^(IFRS S2|TCFD)( \/ (IFRS S2|TCFD))?$/)
+  })
+
+  it('the loan-book finding pairs the ECB with TCFD as an investor expectation', () => {
+    const loanBook = Object.values(SECTOR_RISKS).flat().find(r => r.risk === 'Physical risk in loan book')!
+    expect(loanBook.framework).toBe('ECB / Investor expectation (TCFD)')
+    // Two tokens: the ECB, and the expectation, each printed whole.
+    expect(makeMapFramework([], undefined)(loanBook.framework).map(t => t.text)).toEqual(['ECB', 'Investor expectation (TCFD)'])
+    // And no template names TCFD or IFRS S2 outside an investor-expectation label.
+    for (const r of Object.values(SECTOR_RISKS).flat())
+      for (const tok of r.framework.split(/ \/ (?![^()]*\))/))
+        expect(tok, r.risk).not.toMatch(/^(IFRS S2|TCFD)$/)
+  })
+
+  it('the label prints whole: the bracketed " / " is not a token separator', () => {
+    expect(makeMapFramework([], undefined)(LABEL)).toEqual([{ text: LABEL }])
+    // A real separator still splits.
+    expect(makeMapFramework(['SECR'], undefined)('EU Taxonomy / SECR').map(t => t.text)).toEqual(['EU Taxonomy', 'SECR'])
+  })
+})
+
+describe('no identifier reaches customer-facing copy', () => {
+  // Fields holding keys a renderer switches on, not text it prints.
+  const KEY_FIELDS = new Set(['chip', 'severity', 'kind', 'state', 'key'])
+  const copyOf = (v: unknown): string[] =>
+    typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(copyOf)
+      : v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => (KEY_FIELDS.has(k) ? [] : copyOf(x))) : []
+  const LEAKS = /\b[A-Z][A-Z0-9]+_[A-Z0-9_]+\b|\b[a-z]+[A-Z][A-Za-z]+\b|\$\{|\bundefined\b|\bNaN\b|\bnull\b|\[object/
+
+  it('across jurisdictions, sectors, sizes and claims answers (URLs excepted)', () => {
+    const found = new Set<string>()
+    for (const jurisdiction of ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other'])
+      for (const sector of [...Object.keys(SECTOR_RISKS), 'Other'])
+        for (const claims of [{}, { sales_markets: ['FR', 'US-CA', 'BR', 'GB', 'CA', 'AU'], env_claims: 'yes' }, { sales_markets: null, sales_markets_not_sure: true, env_claims: 'not_sure' }])
+          for (const sized of [true, false]) {
+            const m = build({ ...FX_DEAL, jurisdiction, sector, ...claims,
+              employee_count: sized ? 3000 : null, total_assets: sized ? 1e9 : null, listed_ca_exchange: sized ? true : null })
+            for (const s of copyOf(m)) {
+              const text = s.replace(/https?:\/\/\S+/g, '')
+              const hit = text.match(LEAKS)
+              if (hit) found.add(`${hit[0]} in "${text.slice(0, 80)}"`)
+            }
+          }
+    expect([...found]).toEqual([])
   })
 })

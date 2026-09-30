@@ -44,6 +44,7 @@ import {
   CHIP_LABELS,
   type DealReportModel, type Rich, type ReportPanel, type StatusChip, type SeverityChip,
 } from './reportModel'
+import type { ClaimsLine } from './claimsRules'
 
 // ── typed text the font cannot draw ──────────────────────────────────────────────────────────────
 
@@ -117,6 +118,8 @@ const CHIP: Record<StatusChip | SeverityChip, ChipStyle> = {
   applies: { label: CHIP_LABELS.applies, text: OK, fill: OK_WASH },
   verify: { label: CHIP_LABELS.verify, text: WARN, fill: WARN_WASH },
   nearBelow: { label: CHIP_LABELS.nearBelow, text: WARN, fill: WARN_WASH },
+  // Outlined and neutral: an expectation, not a finding about the law.
+  market: { label: CHIP_LABELS.market, text: SECONDARY, fill: null },
   critical: { label: CHIP_LABELS.critical, text: ERROR, fill: ERROR_WASH },
   high: { label: CHIP_LABELS.high, text: WARN, fill: WARN_WASH },
   // No wash of its own in the print palette: outlined, and the word carries it.
@@ -325,6 +328,44 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
     l.moveTo(finalY + 10)
   }
 
+  /**
+   * The environmental-claims finding. Its header (severity chip, title, status chip) stays with the
+   * first market's block, and each market's block is kept whole, so the finding may break BETWEEN
+   * markets but never inside one. Source URLs print as plain text: a PDF is read on paper as often
+   * as on screen, and a printed link must still say where it goes.
+   */
+  const claimsFinding = (cf: NonNullable<DealReportModel['risks']['claims']>) => {
+    const lh = NOTE * LEADING
+    const blockOf = (ln: ClaimsLine): Rich[] => [
+      [{ strong: `${ln.market}: ${ln.law}` }],
+      ...(ln.regulator ? [[`Regulator: ${ln.regulator}`]] : []),
+      ...(ln.status ? [[`Status: ${ln.status}`]] : []),
+      ...(ln.scope ? [[`Scope: ${ln.scope}`]] : []),
+      [`Maximum penalty: ${ln.maxPenalty}`],
+      [`Source: ${ln.source} (verified ${ln.lastVerified})`],
+    ]
+    const height = (paras: Rich[]) => paras.reduce((h, p) => h + wrap(p, contentWidth, NOTE, 'normal').length * lh + 1, 0) + 8
+    const blocks = cf.lines.map(blockOf)
+    const headH = 18 + (cf.notConfirmed ? height([[cf.notConfirmed]]) : 0)
+    room(headH + (blocks[0] ? height(blocks[0]) : 0))
+    let x = left
+    const top = l.y()
+    chip(cf.severity, x, top)
+    x += width(safe(CHIP[cf.severity].label), 6.5, 'bold') + 14
+    setType(9.5, 'bold', INK)
+    doc.text(safe(cf.title), x, top, { baseline: 'top' })
+    x += doc.getTextWidth(safe(cf.title)) + 8
+    chip(cf.chip, x, top)
+    l.moveTo(top + 18)
+    if (cf.notConfirmed) para([cf.notConfirmed], { size: NOTE, colour: WARN, after: 4 })
+    blocks.forEach((b, i) => {
+      if (i > 0) room(height(b))
+      b.forEach((p, j) => para(p, { size: NOTE, colour: j === 0 ? INK : SECONDARY, after: 1 }))
+      l.spacer(7)
+    })
+    if (cf.fallback) para([cf.fallback], { size: NOTE, colour: SECONDARY })
+  }
+
   // ── 1. cover ───────────────────────────────────────────────────────────────────────────────────
   doc.setFillColor(PAPER)
   doc.rect(0, 0, pageWidth, pageHeight, 'F')
@@ -376,6 +417,7 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
         { paras: [
           plain(r.framework, 'bold', INK),
           ...(r.citation ? [plain(r.citation, 'italic', SECONDARY)] : []),
+          ...(r.basis ? [plain(r.basis, 'normal', SECONDARY)] : []),
           ...(r.near ? [plain(r.near, 'normal', WARN)] : []),
           ...(r.verify ? [plain(r.verify, 'normal', WARN)] : []),
         ] },
@@ -385,6 +427,22 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
     if (a.partialPanel) panel(a.partialPanel)
   }
   l.spacer(SECTION_GAP)
+
+  // ── 2b. investor and market expectations ───────────────────────────────────────────────────────
+  // Its own section, never mixed into the one above: a market row applies to nobody by law.
+  const mk = m.market
+  if (mk.rows.length) {
+    heading(mk.title)
+    para([mk.intro], { size: NOTE, colour: SECONDARY })
+    table(
+      [{ header: a.columns[0] }, { header: a.columns[1], width: 130 }],
+      mk.rows.map(r => [
+        { paras: [plain(r.framework, 'bold', INK), ...(r.note ? [plain(r.note, 'italic', SECONDARY)] : [])] },
+        { chip: r.chip },
+      ]),
+    )
+    l.spacer(SECTION_GAP)
+  }
 
   // ── 3. near-threshold frameworks ───────────────────────────────────────────────────────────────
   const n = m.nearThreshold
@@ -429,6 +487,7 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
     )
     for (const p of s.panels) panel(p)
   }
+  if (s.marketsNote) para([s.marketsNote], { size: NOTE, colour: SECONDARY })
   l.spacer(SECTION_GAP)
 
   // ── 5. ESG risk findings ───────────────────────────────────────────────────────────────────────
@@ -452,6 +511,8 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
       ]),
     )
   }
+  if (r5.claims) claimsFinding(r5.claims)
+  if (r5.claimsNote) para([r5.claimsNote], { size: NOTE, colour: SECONDARY })
   l.spacer(SECTION_GAP)
 
   // ── 6. compliance cost estimate ────────────────────────────────────────────────────────────────
@@ -492,13 +553,16 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
   para(c.disclosure, { size: 8, colour: MUTED, after: 8 })
   const obligationCols = (cols: [string, string, string]): Col[] =>
     [{ header: cols[0] }, { header: cols[1], width: 150 }, { header: cols[2], width: 110 }]
-  table(obligationCols(c.included.columns), c.included.rows.map(o => [
-    { paras: [plain(o.label, 'bold', INK), ...(o.scopeNote ? [plain(o.scopeNote, 'italic', SECONDARY)] : [])] },
-    { paras: [plain(o.themisIq)] },
-    { paras: [plain(o.consultant)] },
-  ]))
+  // Nothing included: the introduction and both cards already say so; no empty table beneath them.
+  if (c.included.rows.length) {
+    table(obligationCols(c.included.columns), c.included.rows.map(o => [
+      { paras: [plain(o.label, 'bold', INK), ...(o.scopeNote ? [plain(o.scopeNote, 'italic', SECONDARY)] : [])] },
+      { paras: [plain(o.themisIq)] },
+      { paras: [plain(o.consultant)] },
+    ]))
+  }
   table(obligationCols(c.recommended.columns), c.recommended.rows.map(o => [
-    { paras: [plain(o.label)] },
+    { paras: [plain(o.label), ...(o.scopeNote ? [plain(o.scopeNote, 'italic', SECONDARY)] : [])] },
     { paras: [plain(o.themisIq)] },
     { paras: [plain(o.consultant)] },
   ]))

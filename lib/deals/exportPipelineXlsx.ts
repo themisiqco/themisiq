@@ -24,6 +24,8 @@ import {
   getComplianceCost, getObligations, sectorRisks, FIELD_LABELS,
 } from './assessment'
 import { filenameDate, filenameSafe } from '../filename'
+import { marketsRecorded } from './markets'
+import { marketName } from './claimsRules'
 
 // A worksheet cell primitive. A JS number becomes a NUMERIC cell in SheetJS; a string becomes
 // text. That difference is the whole point of the absence strings below — do not stringify numbers.
@@ -34,7 +36,8 @@ type Cell = string | number | boolean
 // three. Fetched at export time so the list page's own load stays narrow.
 export const PIPELINE_SELECT =
   'id, target_name, sector, jurisdiction, revenue, currency, employee_count, total_assets, ' +
-  'deal_type, deal_value, location_count, has_ghg_data, has_esg_report, frameworks, updated_at, created_at'
+  'deal_type, deal_value, location_count, has_ghg_data, has_esg_report, frameworks, updated_at, created_at, ' +
+  'listed_ca_exchange, sales_markets, sales_markets_not_sure, env_claims'
 
 export type PipelineDealRow = {
   id: string
@@ -53,16 +56,26 @@ export type PipelineDealRow = {
   frameworks: string[] | null
   updated_at: string
   created_at: string
+  // NULL = never asked. Passed to the engine, which was given none of them until 29 Sep 2026, so a
+  // target listed on a Canadian exchange read FALSE for Canada S-211 here while the wizard said VERIFY.
+  listed_ca_exchange: boolean | null
+  sales_markets: string[] | null
+  sales_markets_not_sure: boolean | null
+  env_claims: string | null
 }
 
 // The closed vocabulary of rule names the engine can emit, as one column each — this is the part
 // that pivots. Any name NOT in this list lands in the "Other rules" column rather than being
 // dropped, so adding a framework to the engine degrades to a visible catch-all instead of silently
 // vanishing from the sheet.
+//
+// ⚠️ MARKET EXPECTATIONS HAVE NO TRUE / FALSE COLUMN (29 Sep 2026). IFRS S2, TCFD, PCAF and UK SRS are
+// never APPLIES rows now, so a boolean column would read FALSE on every target, which a pivot reads as
+// "checked, does not apply". They are listed together in the "Market expectations" column instead.
 export const REGIME_COLUMNS = [
   'SB 253', 'SECR', 'CSRD', 'CS3D', 'EU Taxonomy', 'SFDR', 'EU ETS', 'UK ETS',
-  'UK SRS (S1/S2)', 'UK SDR', 'FCA climate disclosure (TCFD)', 'Anti-greenwashing rule',
-  'Canada S-211', 'IFRS S2', 'TCFD', 'PCAF',
+  'UK SDR', 'FCA climate disclosure (TCFD)', 'Anti-greenwashing rule',
+  'Canada S-211', 'EU Empowering Consumers Directive (ECGT)', 'California AB 1305',
 ] as const
 
 // Plain-language deal-type labels. Falls back to the stored code rather than blanking it.
@@ -103,7 +116,9 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     'Revenue (target currency)', 'Deal value (target currency)', 'Employees',
     'Balance-sheet total (target currency)', 'Locations',
     // Regimes — the pivotable block
-    ...REGIME_COLUMNS.map(String), 'Other rules',
+    ...REGIME_COLUMNS.map(String), 'Other rules', 'Market expectations',
+    // Where it sells, and whether it makes environmental claims: the answers behind the claims rows.
+    'Sales markets', 'Environmental claims',
     // Near threshold
     'Near a threshold: rule', 'Near a threshold: side',
     // Not assessed
@@ -136,7 +151,8 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // Re-derived here, not read from d.frameworks. Pure and synchronous.
     const applicability = screened
       ? getFrameworkApplicability(jurisdiction, revenue, sector, d.deal_type ?? 'ma', currency,
-          { total_assets: assets, employee_count: employees })
+          { total_assets: assets, employee_count: employees, listed_ca_exchange: d.listed_ca_exchange,
+            sales_markets: d.sales_markets, sales_markets_not_sure: d.sales_markets_not_sure, env_claims: d.env_claims })
       : []
     const view = assessmentView(screened, applicability)
     const applied = new Set(applicability.filter((f) => f.applies).map((f) => f.framework))
@@ -151,6 +167,13 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
       : applied.has(name))
     const knownNames = new Set<string>(REGIME_COLUMNS as readonly string[])
     const others = [...applied].filter((f) => !knownNames.has(f))
+    const marketCell: Cell = !screened ? 'NOT ASSESSED'
+      : applicability.filter((f) => f.status === 'market').map((f) => f.framework).join(', ') || 'None'
+    // NOT RECORDED, never blank or "None": a deal saved before the question existed was not asked.
+    const salesMarkets: Cell = !marketsRecorded(d) ? 'NOT RECORDED'
+      : [...(d.sales_markets ?? []).map(marketName), ...(d.sales_markets_not_sure ? ['Not sure'] : [])].join(', ')
+    const envClaims: Cell = d.env_claims === 'yes' ? 'Yes' : d.env_claims === 'no' ? 'No'
+      : d.env_claims === 'not_sure' ? 'Not sure' : 'NOT RECORDED'
 
     // At most ONE near-threshold rule per target, so this fits in two cells rather than a list.
     // ⚠️ THAT HOLDS ONLY BECAUSE the three active size tests are mutually exclusive by
@@ -175,7 +198,8 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // percentage of, so the band is undefined — not zero.
     const flatFrameworks = screened
       ? getApplicableFrameworks(jurisdiction, revenue, sector, d.deal_type ?? 'ma', currency,
-          { total_assets: assets, employee_count: employees })
+          { total_assets: assets, employee_count: employees, listed_ca_exchange: d.listed_ca_exchange,
+            sales_markets: d.sales_markets, sales_markets_not_sure: d.sales_markets_not_sure, env_claims: d.env_claims })
       : []
     const NO_VALUE = 'DEAL VALUE NOT PROVIDED'
     const cost = dealValue != null && dealValue > 0 ? getComplianceCost(dealValue, sector, flatFrameworks) : null
@@ -190,7 +214,10 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // location count entered (we cannot pick a band), or a band with no self-serve price.
     // Zero would assert "this costs nothing", which is never what either means.
     const obligations = getObligations(locations, flatFrameworks, sector || undefined, employees)
-    const themisIq: Cell = obligations.locationUnset ? 'HEADCOUNT AND LOCATIONS NOT PROVIDED'
+    // Nothing included first: with no applying regime that needs a priced module there is no total,
+    // and "QUOTE REQUIRED" would claim a price exists on request.
+    const themisIq: Cell = obligations.included.length === 0 ? 'NO PRICED OBLIGATION'
+      : obligations.locationUnset ? 'HEADCOUNT AND LOCATIONS NOT PROVIDED'
       : obligations.themisIqTotal == null ? 'QUOTE REQUIRED'
       : obligations.themisIqTotal
 
@@ -201,7 +228,7 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
     // counts — so a gate written at the other three surfaces would have left these columns counting
     // findings the wizard and the report had marked conditional, and the spreadsheet is the one
     // artefact a reader sorts and filters without seeing the finding text.
-    const risks = sector ? sectorRisks(sector, jurisdiction) : null
+    const risks = sector ? sectorRisks(sector, jurisdiction, d) : null
     const established = risks?.filter((r) => r.scope === 'established') ?? null
     const conditional = risks?.filter((r) => r.scope === 'conditional') ?? null
     // Severity counts are ESTABLISHED ONLY: a conditioned finding has not been shown to reach this
@@ -231,6 +258,8 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
       locations > 0 ? locations : 'NOT PROVIDED',
       ...regimeCells,
       others.length > 0 ? others.join(', ') : 'None',
+      marketCell,
+      salesMarkets, envClaims,
       nearRule, nearSide,
       cantAssess, figuresNeeded,
       costLow, costHigh, pctLow, pctHigh, themisIq,
@@ -249,7 +278,8 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
   wsData['!cols'] = [
     { wch: 28 }, { wch: 26 }, { wch: 16 }, { wch: 20 }, { wch: 9 }, { wch: 13 }, { wch: 14 },
     { wch: 22 }, { wch: 24 }, { wch: 11 }, { wch: 28 }, { wch: 10 },
-    ...REGIME_COLUMNS.map(() => ({ wch: 14 })), { wch: 22 },
+    ...REGIME_COLUMNS.map(() => ({ wch: 14 })), { wch: 22 }, { wch: 28 },
+    { wch: 30 }, { wch: 14 },
     { wch: 22 }, { wch: 20 },
     { wch: 26 }, { wch: 32 },
     { wch: 24 }, { wch: 24 }, { wch: 24 }, { wch: 24 }, { wch: 22 },
@@ -275,6 +305,9 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
       'The rule was not evaluated, usually because a size figure it depends on is missing. ' +
       'It is NOT a finding that the rule does not apply. The "figures needed" column says what would settle it.'],
     ['QUOTE REQUIRED', 'Above the self-serve range; priced on request rather than from the price list.'],
+    ['NO PRICED OBLIGATION', 'No rule found to apply requires a priced module. Modules may still be recommended; see the target’s report.'],
+    ['NOT RECORDED', 'The question was not asked when this target was saved (sales markets and environmental claims before 29 September 2026), or was left blank.'],
+    ['Market expectations', 'Expected by investors, lenders and customers, not required by law for this target on the information provided. Listed, never TRUE or FALSE.'],
     ['HEADCOUNT AND LOCATIONS NOT PROVIDED', 'Neither the headcount nor the number of sites has been entered, so no price band can be chosen.'],
     ['SECTOR NOT SET', 'No sector, so no risk screen was run. It does not mean no risks were found.'],
     [],

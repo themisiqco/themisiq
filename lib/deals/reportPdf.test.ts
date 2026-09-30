@@ -108,7 +108,7 @@ describe('typed text the font cannot draw', () => {
 
 describe('generateDealReportPDF: smoke', () => {
   const HEADINGS = (m: DealReportModel) => [
-    m.applicable.title, m.nearThreshold.title, m.sizeTests.title, m.risks.title,
+    m.applicable.title, m.market.title, m.nearThreshold.title, m.sizeTests.title, m.risks.title,
     m.cost.title, m.dataRoom.title, m.fx.title, m.notice.title,
   ]
 
@@ -200,6 +200,52 @@ describe('generateDealReportPDF: smoke', () => {
       expect(drawn[note].page, `note alone on page ${drawn[note].page} with ${extra} extra lines`).toBe(drawn[note - 1].page)
     }
   }, 20_000)
+
+  it('draws the claims finding: every market line, its source as plain text, and the fallback', () => {
+    const m = model(FX_DEAL)
+    generateDealReportPDF(m)
+    const all = drawn.map(d => d.text).join(' ')
+    const c = m.risks.claims!
+    expect(all).toContain(c.title)
+    for (const ln of c.lines) {
+      expect(all).toContain(`${ln.market}: ${ln.law}`)
+      expect(all).toContain(`Maximum penalty: ${ln.maxPenalty}`)
+    }
+    // A URL is wrapped by character where it is wider than the line, so compare with spaces removed.
+    expect(all.replace(/\s/g, '')).toContain(c.lines[0].source.replace(/\s/g, ''))
+    expect(all).toContain(c.fallback!.slice(0, 40))
+  })
+
+  it('a deal with nothing included draws no "Included obligation" table', () => {
+    const m = model({ ...FX_DEAL, jurisdiction: 'USA', revenue: 100_000_000, employee_count: 250 })
+    expect(m.cost.included.rows).toEqual([])
+    generateDealReportPDF(m)
+    const texts = drawn.map(d => d.text)
+    expect(texts).not.toContain(m.cost.included.columns[0])
+    expect(texts).toContain(m.cost.themisIq.figure)
+  })
+
+  it('the claims finding keeps its header with the first market, and never splits a market, wherever it lands', () => {
+    // Filler risk rows walk the finding down the page a row at a time, so some count puts its header,
+    // and some count each market block, at the foot of a page.
+    const base = model(FX_DEAL)
+    const c = base.risks.claims!
+    const filler = { severity: 'medium' as const, risk: 'Filler', detail: 'One line of detail.', condition: null, cs3dLine: null, framework: 'GHG Protocol' }
+    for (let extra = 0; extra <= 28; extra++) {
+      drawn = []
+      generateDealReportPDF({ ...base, risks: { ...base.risks, rows: [...base.risks.rows, ...Array(extra).fill(filler)] } })
+      const title = drawn.findIndex(d => d.text === c.title)
+      const first = drawn.findIndex((d, k) => k > title && d.text.startsWith(`${c.lines[0].market}:`))
+      expect(drawn[first].page, `header parted from its first market (extra ${extra})`).toBe(drawn[title].page)
+      for (const ln of c.lines) {
+        const start = drawn.findIndex((d, k) => k > title && d.text.startsWith(`${ln.market}:`))
+        const end = drawn.findIndex((d, k) => k > start && d.text.startsWith('Source:'))
+        expect(drawn[end].page, `${ln.market} split across pages (extra ${extra})`).toBe(drawn[start].page)
+      }
+    }
+    // 29 PDFs: about a second alone, but it passed 20s under the full parallel suite. A coarser step
+    // would be faster and could skip the one position where a block splits, which is what it is for.
+  }, 90_000)
 
   it('the upsell and the toolbar never reach the PDF', () => {
     generateDealReportPDF(model(FX_DEAL))

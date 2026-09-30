@@ -85,20 +85,18 @@ export const IFRS_S2_SHORT = 'IFRS S2 · adopted jurisdiction by jurisdiction'
 export const IFRS_S2_STATUS_SENTENCE =
   'IFRS S2 is not law by itself: the ISSB issues the standard and each jurisdiction decides whether and how to adopt it, so what you owe depends on where you report. Australia’s regime is mandatory and running. The UK has endorsed the standards as UK SRS S1 and S2, published 25 February 2026 for voluntary use, with the FCA proposing mandatory reporting for certain listed companies from 1 January 2027. The EU does not apply IFRS S2: CSRD requires ESRS, which is interoperable with it but separate. Confirm the position in each jurisdiction where you report.'
 
-// ── OPEN: THE TWO SURFACES DISAGREE ABOUT WHO IFRS S2 REACHES ────────────────────────────────────
+// ── THE TWO SURFACES STILL MAKE DIFFERENT CLAIMS ABOUT IFRS S2, NOW BY DESIGN ───────────────────
 //
-// NOT RESOLVED HERE, and recorded so the next reader is not surprised.
+// DEALS TREATS IFRS S2 AS A MARKET EXPECTATION SINCE 2026-09-29. lib/deals/assessment.ts lists it for
+// every deal under "Investor and market expectations" (status 'market', MARKET_FRAMEWORKS), never as
+// an APPLIES row, and never as a reason to price anything. The old unconditional `plain('IFRS S2')`
+// APPLIES, which this note used to describe, is gone.
 //
-// app/assess/page.tsx gates its IFRS S2 entry on
+// app/assess/page.tsx still lists IFRS S2 in its 'regulatory' group, gated on
 //     hasEU || hasUK || hasAU || jur.includes('canada') || jur.includes('apac')
-// which EXCLUDES the USA and Global. lib/deals/assessment.ts:1175 emits `plain('IFRS S2')`
-// UNCONDITIONALLY, commented "Investor baseline (expected regardless of jurisdiction)".
+// so for an EU, UK, Australian or Canadian company /assess presents it as a regulatory item while
+// Deals presents it as an expectation. IFRS_S2_STATUS_SENTENCE above, which /assess prints, is
+// accurate for both: IFRS S2 is not law by itself, and the EU applies ESRS, not IFRS S2.
 //
-// So for a US target the Deals engine asserts IFRS S2 and /assess withholds it. Both readings are
-// defensible — an investor baseline is a real thing and is not the same claim as a reporting duty —
-// but they are different claims wearing one name, and nothing in either file says which is meant.
-// Resolving it means deciding whether the token means "you must report under this" or "your
-// investors will expect this", and that changes what at least one surface tells a customer.
-//
-// THIS FILE CANNOT SETTLE IT. It carries display strings; that is a logic question, and it belongs
-// with whoever next touches the gate or THRESHOLD_TESTS.
+// Whether /assess should move it to its 'market' group is a separate decision about that page; this
+// file carries display strings and cannot settle it.

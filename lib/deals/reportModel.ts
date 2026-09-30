@@ -27,11 +27,14 @@ import {
   assessmentView, isRevenueDeclared, notAssessedNote as notAssessedNoteOf, partiallyAssessedNote,
   routeNotMetNote, partialHeadingPhrase, nearThresholdNoneNote, obligationPriceLabel,
   FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
-  CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
+  showCanadaS211JurisdictionCaveat, canadaS211CaveatText,
   type FrameworkApplicability, type LimbResult, type DealCurrency, type Obligations,
   type SectorRisk,
 } from './assessment'
 import { NOT_PROVIDED } from '../notProvided'
+import { GHG_TIERS } from '../pricing'
+import { canadaCaveatForMarkets, MARKETS_UNRECORDED_LINE, FRAMEWORK_CITATIONS } from './markets'
+import { assessClaims, CLAIMS_DATA_ROOM_ITEM, type ClaimsLine } from './claimsRules'
 import { filenameDate } from '../filename'
 import { disclaimerParas } from '../disclaimer'
 
@@ -296,18 +299,18 @@ export const REGIME_CANDIDATES: { token: string; licensedBy: string }[] = [
   { token: 'SB 253',         licensedBy: 'SB 253' },
   { token: 'CSRD',           licensedBy: 'CSRD' },
   { token: 'ESRS E1',        licensedBy: 'CSRD' },          // climate standard under CSRD
-  { token: 'UK SRS (S1/S2)', licensedBy: 'UK SRS (S1/S2)' },
+  // 'UK SRS (S1/S2)' was a candidate here, licensed by itself. It became a market expectation on
+  // 29 Sep 2026 and so can never be in the APPLIES list that licenses a token; the candidate was dead.
   { token: 'SECR',           licensedBy: 'SECR' },
 ]
 // Used when NO candidate is licensed (sub-threshold USA, Canada/Australia/Other, or frameworks not
-// yet computed). Names a methodology and the investor-baseline standard that getApplicableFrameworks
-// emits unconditionally — never a statute.
-// 'IFRS S2' IS a framework name the engine emits, so it carries identity; 'GHG Protocol' is a
-// methodology with no row behind it, so it is display-only. That asymmetry is the point of the
-// optional field: a fallback label must not imply a row exists to check.
+// yet computed). Names a methodology only: never a statute, and never a claim that one applies.
+// Display-only, with no `framework`, because no row stands behind a methodology.
+// ⚠️ WAS 'GHG Protocol / IFRS S2' UNTIL 29 Sep 2026. IFRS S2 is a market expectation now, never an
+// APPLIES row, and a risk finding's Framework column naming it beside a methodology read as a
+// regulatory citation. It is listed where it belongs, under "Investor and market expectations".
 export const REGIME_FALLBACK: RegimeToken[] = [
   { text: 'GHG Protocol' },
-  { text: 'IFRS S2', framework: 'IFRS S2' },
 ]
 
 // CS3D is an activity-triggered instrument, so it gets FOUR states, not the binary the regime
@@ -441,7 +444,7 @@ export const CS3D_LABELS: RegimeLabels = {
   notAssessedLabel: CS3D_NOT_ASSESSED_LABEL,
   nearThresholdLabel: CS3D_NEAR_THRESHOLD_LABEL,
   notAssessedHeading: CS3D_NOT_ASSESSED_HEADING,
-  noRowReason: 'CS3D reaches non-EU companies through EU-facing activity; this assessment does not capture the target’s markets, so applicability cannot be resolved here',
+  noRowReason: 'CS3D reaches non-EU companies through net turnover generated in the EU; this assessment does not collect that figure, so applicability cannot be resolved here',
   unresolvedReason: 'CS3D applicability was not resolved by this assessment',
 }
 
@@ -565,7 +568,9 @@ export const makeMapFramework = (frameworks: string[], cs3dRow: FrameworkApplica
   const cs3d = cs3dToken(cs3dRow)
   const out = fw
     // The INPUT side: SECTOR_RISKS templates still hold ' / '-joined strings, so this split stays.
-    .split(' / ')
+    // OUTSIDE BRACKETS ONLY: 'Investor expectation (IFRS S2 / TCFD)' is one label, and splitting
+    // inside it would print "Investor expectation (IFRS S2" and "TCFD)" as two.
+    .split(/ \/ (?![^()]*\))/)
     .flatMap((tok): RegimeToken[] =>
       (tok === 'SB 253' || tok === 'SB253' || tok === 'CSRD') ? regime
       : tok === 'CS3D' ? (cs3d ? [cs3d] : [])
@@ -584,8 +589,33 @@ export const makeMapFramework = (frameworks: string[], cs3dRow: FrameworkApplica
 // Shared by the cost card, the export summary, the sticky deal summary and the printed report, so
 // all four state the same number. `locationUnset` is a prompt on screen; in a printed document
 // there is nothing to click, so the caller supplies what an unset count should read as.
+// NOTHING INCLUDED comes first: with no applying regime that needs a priced module, there is no
+// ThemisIQ total to state, and "~USD 0" would read as "free" while a headcount prompt would ask for a
+// figure that prices nothing. The recommended modules carry their own prices.
+/**
+ * A money range to 2 significant figures, both ends in the unit the higher one needs: "USD 0.6M–1.2M",
+ * "GBP 240k–480k". The value-at-risk band is an indicative exposure, and eight digits of precision
+ * on it claimed an accuracy the estimate does not have (29 Sep 2026).
+ */
+export const compactMoneyRange = (currency: string, low: number, high: number): string => {
+  const [div, unit] = high >= 1e6 ? [1e6, 'M'] : high >= 1e3 ? [1e3, 'k'] : [1, '']
+  const sig = (n: number) => String(Number((n / div).toPrecision(2)))
+  return `${currency} ${sig(low)}${unit}–${sig(high)}${unit}`
+}
+
+// The headline alone: the ThemisIQ card's note already says the recommended modules are priced
+// below, so saying it twice was one sentence printed two ways (29 Sep 2026).
+export const NO_PRICED_OBLIGATION = 'No priced obligation'
+
+// A GHG row priced on neither headcount nor sites still has a floor: the cheapest band, from
+// GHG_TIERS. "Custom quote" there read as though the price were above the list rather than unknown.
+const GHG_FLOOR = Math.min(...Object.values(GHG_TIERS).map(t => t.priceUSD).filter((p): p is number => p != null))
+/** The price an obligation row shows, in the report, the PDF and the wizard alike. */
+export const obligationRowPrice = (o: Obligations['included'][number], obligations: Obligations): string =>
+  o.short === 'GHG' && obligations.ghgBasis.kind === 'none' ? `From USD ${GHG_FLOOR.toLocaleString('en-US')}` : obligationPriceLabel(o.pricing)
 export const themisIqFigure = (o: Obligations, unsetLabel = 'Enter locations →'): string =>
-  o.locationUnset ? unsetLabel
+  o.included.length === 0 ? NO_PRICED_OBLIGATION
+  : o.locationUnset ? unsetLabel
     : o.themisIqHasCustom
       ? (o.themisIqTotal != null ? `~USD ${o.themisIqTotal.toLocaleString()} + custom` : 'Custom quote')
       : `~USD ${(o.themisIqTotal ?? 0).toLocaleString()}`
@@ -656,6 +686,10 @@ export type DealReportDeal = {
   employee_count?: number | null
   total_assets?: number | null
   listed_ca_exchange?: boolean | null
+  // NULL or absent = never asked (every deal saved before 29 Sep 2026).
+  sales_markets?: string[] | null
+  sales_markets_not_sure?: boolean | null
+  env_claims?: string | null
   has_ghg_data: boolean | null
   has_esg_report: boolean | null
 }
@@ -667,7 +701,7 @@ export type Rich = (string | { strong: string })[]
 export type ReportPanel = { title: string; body: Rich }
 
 /** Chip keys. The renderer owns the colours; the model says which state applies. */
-export type StatusChip = 'applies' | 'verify' | 'nearBelow'
+export type StatusChip = 'applies' | 'verify' | 'nearBelow' | 'market'
 export type SeverityChip = SectorRisk['severity']
 
 /**
@@ -679,6 +713,7 @@ export const CHIP_LABELS: Record<StatusChip | SeverityChip, string> = {
   applies: 'APPLIES',
   verify: 'APPLIES: VERIFY',
   nearBelow: 'NEAR THRESHOLD: VERIFY',
+  market: 'MARKET EXPECTATION',
   critical: 'CRITICAL',
   high: 'HIGH',
   medium: 'MEDIUM',
@@ -702,8 +737,16 @@ export type DealReportModel = {
     noneSentence: string
     intro: string
     columns: [string, string]
-    rows: { framework: string; citation: string | null; near: string | null; verify: string | null; chip: StatusChip }[]
+    // `citation` names the instrument (a statute, or a directive); `basis` says why it applies to this
+    // deal, for a row that applies on a stated rule rather than a size test. Either, both, or neither.
+    rows: { framework: string; citation: string | null; basis: string | null; near: string | null; verify: string | null; chip: StatusChip }[]
     partialPanel: ReportPanel | null
+  }
+  /** Expected by investors, lenders or customers; not required by law for this target. */
+  market: {
+    title: string
+    intro: string
+    rows: { framework: string; note: string | null; chip: 'market' }[]
   }
   nearThreshold: {
     title: string
@@ -723,6 +766,8 @@ export type DealReportModel = {
     columns: string[]
     rows: LimbRow[]
     panels: ReportPanel[]
+    /** In place of the S-211 caveat on a deal whose sales markets were never recorded. */
+    marketsNote: string | null
   }
   risks: {
     title: string
@@ -730,6 +775,17 @@ export type DealReportModel = {
     noneSentence: string
     intro: string
     unresolvedPanel: ReportPanel | null
+    /** Environmental claims liability, when the claims and markets answers raise it. */
+    claims: {
+      title: string
+      chip: 'applies' | 'verify'
+      severity: SeverityChip
+      lines: ClaimsLine[]
+      fallback: string | null
+      notConfirmed: string | null
+    } | null
+    /** When there is no claims finding, the one line saying why (never silence). */
+    claimsNote: string | null
     columns: [string, string, string]
     rows: { severity: SeverityChip; risk: string; detail: string; condition: string | null; cs3dLine: Rich | null; framework: string }[]
   }
@@ -740,7 +796,7 @@ export type DealReportModel = {
     themisIq: { label: string; figure: string; note: string }
     disclosure: Rich
     included: { columns: [string, string, string]; rows: { label: string; scopeNote: string | null; themisIq: string; consultant: string }[] }
-    recommended: { columns: [string, string, string]; rows: { label: string; themisIq: string; consultant: string }[] }
+    recommended: { columns: [string, string, string]; rows: { label: string; scopeNote: string | null; themisIq: string; consultant: string }[] }
     flagged: { columns: [string, string, string]; rows: { label: string; scopeNote: string | null; themisIq: string; consultant: string }[] }
     scopeNote: string
     exposure: Rich | null
@@ -792,7 +848,10 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
   const evaluated = !!(sector && jurisdiction)
   const applicability: FrameworkApplicability[] = evaluated
     ? getFrameworkApplicability(jurisdiction, revenue, sector, deal.deal_type ?? 'ma', currency,
-        { total_assets: deal.total_assets ?? null, employee_count: deal.employee_count ?? null })
+        { total_assets: deal.total_assets ?? null, employee_count: deal.employee_count ?? null,
+          listed_ca_exchange: deal.listed_ca_exchange ?? null,
+          sales_markets: deal.sales_markets ?? null, sales_markets_not_sure: deal.sales_markets_not_sure ?? null,
+          env_claims: deal.env_claims ?? null })
     : []
 
   // The flat legal in/out. Derived from `applicability` rather than by a second engine call: a
@@ -822,6 +881,11 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
   // 'near-threshold' gets its own note here rather than being deferred to one that does not exist.
   // Its `body` may be null, meaning heading only; cs3dLine below owns that punctuation.
   const cs3dNote = cs3dNoteReport(resolveCs3d(frameworks, applicability))
+  // Sales markets and claims (29 Sep 2026). The caveat state is 'hide' outright where the old
+  // jurisdiction rule already hid it (a Canadian target, or a listed Yes).
+  const s211Caveat = showCanadaS211JurisdictionCaveat(deal.jurisdiction ?? '', deal.listed_ca_exchange)
+    ? canadaCaveatForMarkets(deal) : 'hide'
+  const claims = assessClaims(deal)
   // Canada S-211, the second non-exhaustive regime, through the same functions with its own labels.
   // Added 26 Sep 2026: without it a withheld S-211 row reached this document silently, which for a
   // report an external deal team reads is the worst place for an unexplained absence.
@@ -830,7 +894,8 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
 
   // Resolved against the deal's jurisdiction: a finding whose instrument is not established for
   // this target carries the nexus that would bring it into scope, rather than asserting it.
-  const risks = sectorRisks(sector, jurisdiction)
+  // With the sales markets, so a ticked EU market settles an EU-market condition (see sectorRisks).
+  const risks = sectorRisks(sector, jurisdiction, deal)
   const obligations = getObligations(locationCount, frameworks, sector, deal.employee_count ?? null)
   const complianceCost = dealValue > 0 ? getComplianceCost(dealValue, sector, frameworks) : null
   const activeTests = Object.values(THRESHOLD_TESTS).filter(isTestActive)
@@ -891,7 +956,11 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         const verify = applicability.find(f => f.framework === fw)?.verify ?? null
         return {
           framework: fw,
-          citation: citationFor(fw),
+          // A size-tested row cites its statute; a rule-based row cites its instrument where one is
+          // stated (EU ECGT: Directive (EU) 2024/825) and prints its basis (EU Taxonomy, via CSRD), so
+          // no APPLIES row is printed without a reason.
+          citation: citationFor(fw) ?? FRAMEWORK_CITATIONS[fw] ?? null,
+          basis: applicability.find(f => f.framework === fw)?.rule ?? null,
           near: near ? nearSentence(near) : null,
           verify: verify || null,
           chip: near || verify ? 'verify' : 'applies',
@@ -909,6 +978,15 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
             ],
           }
         : null,
+    },
+
+    // Investor and market expectations: after Applicable frameworks, never mixed into it. A market
+    // row applies to nobody by law, so it prices nothing and cites nothing; it is listed so a reader
+    // knows what investors, lenders and customers will ask for anyway.
+    market: {
+      title: 'Investor and market expectations',
+      intro: 'Not legal requirements for this target on the information provided. Investors, lenders and customers increasingly expect them.',
+      rows: applicability.filter(f => f.status === 'market').map(f => ({ framework: f.framework, note: f.note ?? null, chip: 'market' as const })),
     },
 
     nearThreshold: {
@@ -956,12 +1034,16 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         // deal. Gated so it appears only where it is true and unresolved: not for a Canadian target,
         // whose size test DID run, and not for a listed Yes, which settles applicability and carries
         // its own VERIFY note. The heading is inside the constant, so its title is split from its body.
-        ...(showCanadaS211JurisdictionCaveat(deal.jurisdiction ?? '', deal.listed_ca_exchange)
+        // ⚠️ AND ONLY WHERE CANADA IS IN PLAY (29 Sep 2026): Canada among the target's markets, or its
+        // markets not confirmed. On a deal whose markets were never recorded, marketsNote says so in
+        // its place. See canadaCaveatForMarkets in ./markets.
+        ...(s211Caveat === 'show'
           ? [{
-              title: CANADA_S211_JURISDICTION_CAVEAT.split(':')[0].toUpperCase(),
+              title: canadaS211CaveatText(deal).heading.toUpperCase(),
               // The constant is one sentence with its heading before the colon, so the cut body
               // starts mid-sentence in lower case; it opens a panel here, so it is capitalised.
-              body: [sentenceCase(CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2))],
+              // Market-aware since 29 Sep 2026: with Canada ticked, the body says so. See canadaS211CaveatText.
+              body: [canadaS211CaveatText(deal).body],
             }]
           : []),
         // ONLY THE TESTS THIS DEAL RAN (29 Sep 2026). This read every active test in THRESHOLD_TESTS, so
@@ -980,6 +1062,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
           ],
         })),
       ],
+      marketsNote: s211Caveat === 'quiet' ? MARKETS_UNRECORDED_LINE : null,
     },
 
     risks: {
@@ -996,6 +1079,12 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
             body: [`The ${view.unevaluated.join(' / ')} size test could not be completed, so ${view.unevaluated.length === 1 ? 'it does' : 'they do'} not appear in any label below. ${resolveFieldsPrompt(view.fieldsToResolve, view.unevaluated)}`],
           }
         : null,
+      // Environmental claims liability is a finding of its own, not a SECTOR_RISKS template row: it
+      // turns on the target's markets and claims, not its sector, and it carries one line per market.
+      claims: claims.kind === 'finding'
+        ? { title: claims.title, chip: claims.status, severity: claims.severity, lines: claims.lines, fallback: claims.fallback, notConfirmed: claims.notConfirmed }
+        : null,
+      claimsNote: claims.kind === 'note' ? claims.text : null,
       columns: ['Severity', 'Risk', 'Framework'],
       rows: risks.map(r => {
         const tokens = mapFramework(r.framework)
@@ -1021,17 +1110,26 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
       // The analyst's question is what remediation costs and whether it moves the model: a
       // diligence finding. Leading with ThemisIQ's own price made a finding read as a quote, so the
       // market reference comes first and larger, and the ThemisIQ figure follows as one route.
-      intro: `An estimate of what it would cost to bring ${deal.target_name || 'the target'} into compliance with the regimes identified above, given as a market reference range with one priced alternative. Both figures are first-year, in USD, and neither is a quotation.`,
+      // NOTHING INCLUDED is its own wording, not a zero: no regime found to apply carries a priced
+      // obligation, so there is no compliance cost to estimate, and "USD 0k–0k" beside "~USD 0" would
+      // read as a finding that compliance is free rather than that nothing was found to require it.
+      intro: obligations.included.length === 0
+        ? `No regime found to apply to ${deal.target_name || 'the target'} carries a priced obligation, so there is no compliance cost to estimate. The modules below are recommended, not required.`
+        : `An estimate of what it would cost to bring ${deal.target_name || 'the target'} into compliance with the regimes identified above, given as a market reference range with one priced alternative. Both figures are first-year, in USD, and neither is a quotation.`,
       consultant: {
         label: 'Traditional consultant, first year',
-        figure: consultantBand(obligations.consultantLow, obligations.consultantHigh),
-        note: 'Indicative market range, scaled per obligation for this target’s sector and site count.',
+        figure: obligations.included.length === 0 ? 'No included obligation' : consultantBand(obligations.consultantLow, obligations.consultantHigh),
+        note: obligations.included.length === 0
+          ? 'Nothing found to apply needs a consultant workstream. Recommended modules show their consultant reference below.'
+          : 'Indicative market range, scaled per obligation for this target’s sector and site count.',
       },
       themisIq: {
         label: 'ThemisIQ, scope-matched modules',
         // In a printed document "Enter locations →" would instruct a reader who has nothing to click.
         figure: themisIqFigure(obligations, 'Custom quote: headcount and location count not provided'),
-        note: 'One available route, priced for the modules this scope requires.',
+        note: obligations.included.length === 0
+          ? 'Recommended modules are priced individually below.'
+          : 'One available route, priced for the modules this scope requires.',
       },
       // Inferable from the cover, but stating it where the price appears makes the report harder to
       // fault. The consultant figures are benchmarks, NOT citations: the source note on
@@ -1045,7 +1143,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         rows: obligations.included.map(o => ({
           label: o.label,
           scopeNote: o.scopeNote || null,
-          themisIq: obligationPriceLabel(o.pricing),
+          themisIq: obligationRowPrice(o, obligations),
           consultant: consultantBand(o.consultantLow, o.consultantHigh),
         })),
       },
@@ -1053,7 +1151,8 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         columns: obligationColumns('Also recommended, not in the ThemisIQ total'),
         rows: obligations.recommended.map(o => ({
           label: o.label,
-          themisIq: obligationPriceLabel(o.pricing),
+          scopeNote: o.scopeNote || null,
+          themisIq: obligationRowPrice(o, obligations),
           consultant: consultantBand(o.consultantLow, o.consultantHigh),
         })),
       },
@@ -1062,7 +1161,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         rows: obligations.flagged.map(o => ({
           label: o.label,
           scopeNote: o.scopeNote || null,
-          themisIq: obligationPriceLabel(o.pricing),
+          themisIq: obligationRowPrice(o, obligations),
           consultant: 'Not included',
         })),
       },
@@ -1073,7 +1172,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
       exposure: complianceCost
         ? [
             { strong: 'ESG value-at-risk exposure:' },
-            ` approximately ${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (${currency} ${Math.round(complianceCost.low).toLocaleString()}–${Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess. This is an indicative exposure, not a cost, and requires specialist confirmation.`,
+            ` approximately ${(complianceCost.pctLow * 100).toFixed(2)}%–${(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (${compactMoneyRange(currency, complianceCost.low, complianceCost.high)}) carries ESG-related risk to assess. This is an indicative exposure, not a cost, and requires specialist confirmation.`,
           ]
         : null,
     },
@@ -1084,6 +1183,10 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
       rows: [
         { item: 'GHG inventory / emissions data', available: !!deal.has_ghg_data },
         { item: 'ESG report or sustainability disclosure', available: !!deal.has_esg_report },
+        // Whenever the claims finding shows: the claims themselves and their evidence are what a
+        // regulator in any of those markets would ask for first. No column records it, so it is
+        // always a request.
+        ...(claims.kind === 'finding' ? [{ item: CLAIMS_DATA_ROOM_ITEM, available: false }] : []),
       ].map(r => ({ ...r, status: r.available ? 'Available' : 'MISSING: request from target' })),
     },
 

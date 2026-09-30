@@ -208,7 +208,9 @@ const MODULES: DashboardModule[] = [
     lockedLead: 'First deal free',
     color: 'var(--color-module-deals-ink)',
     bg: 'var(--color-module-deals-wash)',
-    frameworks: ['IFRS S2', 'TCFD', 'SB 253', 'SFDR'],
+    // The statutes the Deals engine size-tests, not IFRS S2 / TCFD: those are market expectations
+    // since 29 Sep 2026, and a card tag reads as what the module assesses.
+    frameworks: ['SB 253', 'CSRD', 'SECR'],
     urgency: null,
     previewable: true,
   },

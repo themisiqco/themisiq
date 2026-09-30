@@ -14,6 +14,9 @@ import { supabase } from '../../../lib/supabase'
 // user walled" or "may they see results" has reintroduced the drift the extraction removed.
 import { resolveWizardGate, type FreeTierDeal, type SessionState } from '../../../lib/deals/gates'
 import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
+import { canadaCaveatForMarkets, isEnvClaims, type EnvClaims } from '../../../lib/deals/markets'
+import { isMarketCode, CLAIMS_DATA_ROOM_ITEM } from '../../../lib/deals/claimsRules'
+import MarketPicker from './MarketPicker'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import {
@@ -23,7 +26,7 @@ import {
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
   CANADA_S211_LISTING_QUESTION, CANADA_S211_LISTING_HINT,
-  CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
+  canadaS211CaveatText, showCanadaS211JurisdictionCaveat,
 } from '../../../lib/deals/assessment'
 // Presentation model shared with app/dashboard/deals/report/page.tsx. These wizard screens and the
 // printed report phrase one assessment the same way — neither re-derives it, so they cannot state
@@ -31,7 +34,7 @@ import {
 import {
   DEAL_TYPES, dealTypeShort, NOT_PROVIDED, spellMagnitude, NEAR_PCT, nearSentence,
   resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf, cs3dNoteWizard,
-  resolveCanadaS211, canadaS211NoteWizard,
+  resolveCanadaS211, canadaS211NoteWizard, buildDealReportModel, CHIP_LABELS, obligationRowPrice, compactMoneyRange, type DealReportModel,
 } from '../../../lib/deals/reportModel'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -46,7 +49,7 @@ const SECTORS = [
 // JURISDICTIONS MOVED TO lib/deals/assessment.ts — it is imported below with the rest of the engine.
 // The list belongs beside the branches that match on it: declaring it here put the vocabulary in the
 // dropdown and its interpretation in the engine, with nothing able to check that the two agreed. A
-// value the engine does not know degrades silently to 'GHG Protocol / IFRS S2' on the target-facing
+// value the engine does not know degrades silently to 'GHG Protocol' on the target-facing
 // share page rather than erroring.
 
 // Sector-based ESG risk flags
@@ -67,6 +70,37 @@ const SEVERITY_CONFIG = {
 }
 
 const STEP_NAMES = ['Deal Setup', 'ESG Screening', 'Risk Findings', 'Cost Estimate', 'Report']
+
+// The environmental-claims finding on the wizard's findings step: the same model object the report
+// renders, in this screen's styles. Sources are links here, as on the report page.
+function WizardClaimsFinding({ c }: { c: NonNullable<DealReportModel['risks']['claims']> }) {
+  const sev = c.severity === 'high'
+    ? { background: '#FEF3E2', color: 'var(--color-state-warn)' }
+    : { background: '#f8f7f5', color: '#555553' }
+  return (
+    <div style={{ marginTop: 16, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem 1.25rem' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, ...sev }}>{CHIP_LABELS[c.severity]}</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{c.title}</span>
+        {c.chip === 'verify'
+          ? <span style={verifyChip}>{CHIP_LABELS.verify}</span>
+          : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#E1F5EE', color: '#0F6E56' }}>{CHIP_LABELS.applies}</span>}
+      </div>
+      {c.notConfirmed && <div style={{ fontSize: 12, color: 'var(--color-state-warn)', lineHeight: 1.6 }}>{c.notConfirmed}</div>}
+      {c.lines.map(l => (
+        <div key={l.market} style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 8, marginTop: 8, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 600, color: '#0d0d0d' }}>{l.market}: {l.law}</div>
+          {l.regulator && <div>Regulator: {l.regulator}</div>}
+          {l.status && <div>Status: {l.status}</div>}
+          {l.scope && <div>Scope: {l.scope}</div>}
+          <div>Maximum penalty: {l.maxPenalty}</div>
+          <div>Source: {l.sourceUrl ? <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', wordBreak: 'break-all' }}>{l.source}</a> : l.source} (verified {l.lastVerified})</div>
+        </div>
+      ))}
+      {c.fallback && <div style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 8, marginTop: 8, fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{c.fallback}</div>}
+    </div>
+  )
+}
 
 const verifyChip: React.CSSProperties = { fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-state-warn)', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 35%, transparent)' }
 
@@ -132,6 +166,11 @@ function DealsDashboardInner() {
     employee_count: null as number | null,
     listed_ca_exchange: null as boolean | null,
     total_assets: null as number | null,
+    // NULL = not answered, and stays NULL on save, so the report can say "not recorded" rather than
+    // read a default as an answer. See 20260929_deals_sales_markets_env_claims.sql.
+    sales_markets: null as string[] | null,
+    sales_markets_not_sure: null as boolean | null,
+    env_claims: null as EnvClaims | null,
     jurisdiction: 'USA',
     deal_type: 'ma',
     deal_value: 0,
@@ -277,6 +316,11 @@ function DealsDashboardInner() {
         employee_count: data.employee_count == null ? null : Number(data.employee_count),
         listed_ca_exchange: typeof data.listed_ca_exchange === 'boolean' ? data.listed_ca_exchange : null,
         total_assets: data.total_assets == null ? null : Number(data.total_assets),
+        // Unknown codes are dropped on load rather than carried back into the next save.
+        sales_markets: Array.isArray(data.sales_markets) && data.sales_markets.filter(isMarketCode).length
+          ? data.sales_markets.filter(isMarketCode) : null,
+        sales_markets_not_sure: data.sales_markets_not_sure === true ? true : null,
+        env_claims: isEnvClaims(data.env_claims) ? data.env_claims : null,
         jurisdiction: data.jurisdiction ?? 'USA',
         deal_type: data.deal_type ?? 'ma',
         deal_value: Number(data.deal_value) || 0,
@@ -307,7 +351,8 @@ function DealsDashboardInner() {
       // deal.currency is load-bearing here: revenue is entered in it, and the SB 253 / SECR
       // triggers are denominated in USD / GBP respectively. Omitting it treats every deal as USD.
       const detected = getApplicableFrameworks(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
-        { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange })
+        { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange,
+          sales_markets: deal.sales_markets, sales_markets_not_sure: deal.sales_markets_not_sure, env_claims: deal.env_claims })
       setFrameworks(detected)
     } else {
       setFrameworks([])
@@ -315,7 +360,8 @@ function DealsDashboardInner() {
     // listed_ca_exchange IS IN HERE, and was missing when the field was added on 26 Sep 2026: without it
     // the persisted `frameworks` list kept its pre-answer value while the derived `applicability` below
     // recomputed on every render, so the two views of one deal disagreed about whether S-211 applied.
-  }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type, deal.currency, deal.total_assets, deal.employee_count, deal.listed_ca_exchange])
+  }, [deal.sector, deal.jurisdiction, deal.revenue, deal.deal_type, deal.currency, deal.total_assets, deal.employee_count, deal.listed_ca_exchange,
+      deal.sales_markets, deal.sales_markets_not_sure, deal.env_claims])
 
   const update = (field: string, value: any) => { setDeal(prev => ({ ...prev, [field]: value })); setSaved(false); setDirty(true) }
 
@@ -343,6 +389,10 @@ function DealsDashboardInner() {
         revenue: deal.revenue,
         employee_count: deal.employee_count,   // null when undeclared — never coerced to 0
         listed_ca_exchange: deal.listed_ca_exchange,   // null when unanswered — never coerced to false
+        // NULL when unanswered, never [] or false or 'no': those would each be an answer.
+        sales_markets: deal.sales_markets && deal.sales_markets.length ? deal.sales_markets : null,
+        sales_markets_not_sure: deal.sales_markets_not_sure === true ? true : null,
+        env_claims: deal.env_claims,
         total_assets: deal.total_assets,
         jurisdiction: deal.jurisdiction,
         deal_type: deal.deal_type,
@@ -391,7 +441,11 @@ function DealsDashboardInner() {
   // established here comes back on the 'conditional' arm carrying the nexus that would bring this
   // target into scope — it is still shown, because dropping it would trade a false positive for the
   // false negative that stops a buyer looking.
-  const risks = sectorRisks(deal.sector, deal.jurisdiction)
+  const risks = sectorRisks(deal.sector, deal.jurisdiction, deal)
+  // The report's own model, for the parts of these screens that must read exactly as the report does:
+  // the market expectations, the environmental-claims finding and the lines that stand in for them.
+  // Built from the form as it stands, so it follows every edit; the id is only the reference's prefix.
+  const wm: DealReportModel = buildDealReportModel({ ...deal, id: dealId ?? 'draft' }, new Date())
   const establishedRisks = risks.filter(r => r.scope === 'established')
   const conditionalRisks = risks.filter(r => r.scope === 'conditional')
   // Rich applicability, computed from the SAME guard as the `frameworks` effect above so the two
@@ -400,7 +454,8 @@ function DealsDashboardInner() {
   const evaluated = !!(deal.sector && deal.jurisdiction)   // revenue is NOT part of this gate
   const applicability: FrameworkApplicability[] = evaluated
     ? getFrameworkApplicability(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
-        { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange })
+        { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange,
+          sales_markets: deal.sales_markets, sales_markets_not_sure: deal.sales_markets_not_sure, env_claims: deal.env_claims })
     : []
   const nearThreshold = applicability.filter(f => f.status === 'near-threshold')
   const nearByFramework = new Map(nearThreshold.map(f => [f.framework, f]))
@@ -732,6 +787,29 @@ function DealsDashboardInner() {
               {CANADA_S211_LISTING_HINT}
             </div>
         </div>
+        {/* SALES MARKETS AND ENVIRONMENTAL CLAIMS (29 Sep 2026). Together they decide which greenwashing
+            rules can reach the target (lib/deals/claimsRules.ts) and whether the Canada S-211 caveat is
+            worth showing. Both optional: left blank, the report says they were not recorded. */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle}>Where does the target sell or operate?</label>
+          <MarketPicker markets={deal.sales_markets} notSure={deal.sales_markets_not_sure}
+            onChange={(markets, notSure) => { update('sales_markets', markets); update('sales_markets_not_sure', notSure) }} />
+        </div>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle}>Does the target make public environmental claims? (e.g. net zero, carbon neutral, offsets, recyclable, eco-friendly)</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {([['Yes', 'yes'], ['No', 'no'], ['Not sure', 'not_sure']] as const).map(([lbl, val]) => (
+              <button key={val} type="button" onClick={() => update('env_claims', deal.env_claims === val ? null : val)}
+                aria-pressed={deal.env_claims === val}
+                style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  background: deal.env_claims === val ? 'var(--tq-mod-wash, var(--color-brand-wash))' : 'var(--color-accent-neutral-wash)',
+                  color: 'var(--color-ink)',
+                  border: `0.5px solid ${deal.env_claims === val ? 'var(--tq-mod, var(--color-brand))' : 'var(--color-line)'}` }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
         <div>
           <label style={labelStyle}>Number of locations / sites</label>
           <input style={inputStyle} type="number" value={deal.location_count || ''} onChange={e => update('location_count', Number(e.target.value))} placeholder="0" />
@@ -795,10 +873,13 @@ function DealsDashboardInner() {
           limitations register of its own, so putting it there would have introduced one.
           Gated identically to the report, through the same predicate, so the two surfaces cannot disagree
           about when it applies: not Canada, and not a listed Yes. */}
-      {showCanadaS211JurisdictionCaveat(deal.jurisdiction, deal.listed_ca_exchange) && (
+      {wm.sizeTests.marketsNote && (
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 12 }}>{wm.sizeTests.marketsNote}</div>
+      )}
+      {showCanadaS211JurisdictionCaveat(deal.jurisdiction, deal.listed_ca_exchange) && canadaCaveatForMarkets(deal) === 'show' && (
         <div style={{ background: 'var(--color-accent-amber-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-amber) 20%, transparent)', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 12, fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
-          <strong style={{ fontWeight: 600 }}>{CANADA_S211_JURISDICTION_CAVEAT.split(':')[0]}:</strong>
-          {CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 1)}
+          <strong style={{ fontWeight: 600 }}>{canadaS211CaveatText(deal).heading}:</strong>{' '}
+          {canadaS211CaveatText(deal).body}
         </div>
       )}
       {frameworksState === 'not-assessed' && (!view.evaluated || view.unevaluated.length > 0) ? (
@@ -827,6 +908,8 @@ function DealsDashboardInner() {
                   {/* Applies, with a condition this assessment never asked about — see `verify` in
                       lib/deals/assessment.ts. Same amber line a near-threshold row gets. */}
                   {row?.verify && <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.55, marginTop: 5 }}>{row.verify}</div>}
+                  {/* Applies on a stated rule rather than a size test (EU Taxonomy, EU ECGT, AB 1305). */}
+                  {row?.rule && <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.55, marginTop: 5 }}>{row.rule}</div>}
                 </div>
                 {/* APPLIES is retained alongside VERIFY — near-ness annotates the finding, it does not soften it. */}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
@@ -893,6 +976,26 @@ function DealsDashboardInner() {
         </div>
       )}
 
+      {/* INVESTOR AND MARKET EXPECTATIONS, as in the report: expected by investors, lenders and
+          customers, not required by law for this target, and never listed among the frameworks above. */}
+      {wm.market.rows.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 4 }}>{wm.market.title}</div>
+          <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginBottom: 10 }}>{wm.market.intro}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {wm.market.rows.map(r => (
+              <div key={r.framework} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 14px', background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{r.framework}</div>
+                  {r.note && <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.55, marginTop: 5 }}>{r.note}</div>}
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#f8f7f5', color: '#555553', border: '0.5px solid #e8e7e4', flexShrink: 0 }}>{CHIP_LABELS.market}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       </>}
 
       {/* ── INPUT, NOT A FINDING — stays open to a signed-out visitor. These two toggles are the
@@ -919,12 +1022,13 @@ function DealsDashboardInner() {
       </div>
 
       {/* THE FINDING the toggles above produce, so it is withheld with the rest of them. */}
-      {resultsShown && (!deal.has_ghg_data || !deal.has_esg_report) && (
+      {resultsShown && (!deal.has_ghg_data || !deal.has_esg_report || !!wm.risks.claims) && (
         <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '1rem' }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ Data room gaps identified</div>
           <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>
             {!deal.has_ghg_data && '· Request verified GHG inventory (Scope 1, 2, 3) from target before closing\n'}
-            {!deal.has_esg_report && '· Request latest ESG report or sustainability disclosure from target'}
+            {!deal.has_esg_report && '· Request latest ESG report or sustainability disclosure from target\n'}
+            {wm.risks.claims && `· Request ${CLAIMS_DATA_ROOM_ITEM.toLowerCase()} from target`}
           </div>
         </div>
       )}
@@ -1050,6 +1154,11 @@ function DealsDashboardInner() {
           </div>
         </>
       )}
+      {/* ENVIRONMENTAL CLAIMS, as in the report: a finding of its own, driven by markets and claims. */}
+      {wm.risks.claims && <WizardClaimsFinding c={wm.risks.claims} />}
+      {wm.risks.claimsNote && (
+        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, marginTop: 12 }}>{wm.risks.claimsNote}</div>
+      )}
     </div>
   )
 
@@ -1133,7 +1242,7 @@ function DealsDashboardInner() {
                 <div style={{ fontSize: 13, color: '#555553' }}>{o.label}</div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.pricing.kind === 'priced' ? `+ ${obligationPriceLabel(o.pricing)}` : obligationPriceLabel(o.pricing)}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#0d0d0d' }}>{o.pricing.kind === 'priced' ? `+ ${obligationPriceLabel(o.pricing)}` : obligationRowPrice(o, obligations)}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>consultant USD {Math.round(o.consultantLow / 1000)}k–{Math.round(o.consultantHigh / 1000)}k</div>
               </div>
             </div>
@@ -1154,7 +1263,7 @@ function DealsDashboardInner() {
           <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '0.85rem 1.25rem', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#B91C1C', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>ESG value-at-risk exposure</div>
             <div style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
-              ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~{deal.currency} {Math.round(complianceCost.low).toLocaleString()}–{Math.round(complianceCost.high).toLocaleString()}) carries ESG-related risk to assess.
+              ~{(complianceCost.pctLow * 100).toFixed(2)}%–{(complianceCost.pctHigh * 100).toFixed(2)}% of deal value (~{compactMoneyRange(deal.currency, complianceCost.low, complianceCost.high)}) carries ESG-related risk to assess.
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 4 }}>
               {deal.sector || NOT_PROVIDED}, {deal.jurisdiction}, {frameworks.length} applicable frameworks · indicative exposure, not a cost · requires specialist confirmation.

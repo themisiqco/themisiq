@@ -84,6 +84,9 @@ const STATE = {
   applies:      { label: CHIP_LABELS.applies, color: '#0F6E56', bg: '#E1F5EE', border: 'rgba(15,110,86,0.35)' },
   verify:       { label: CHIP_LABELS.verify, color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
   nearBelow:    { label: CHIP_LABELS.nearBelow, color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
+  // Neutral on purpose: an expectation, not a finding about the law. The section that shows it is
+  // rendered from Stage B; the entry exists so every StatusChip has a style.
+  market:       { label: CHIP_LABELS.market, color: '#555553', bg: '#f8f7f5', border: '#e8e7e4' },
   notAssessed:  { label: 'NOT ASSESSED', color: 'var(--color-state-warn)', bg: '#FEF3E2', border: 'color-mix(in srgb, var(--color-state-warn) 35%, transparent)' },
 } as const
 
@@ -308,6 +311,33 @@ function NotAssessed({ title, children }: { title: string; children: React.React
     </div>
   )
 }
+// The environmental-claims finding: severity, status, then one block per researched market and the
+// fallback for the rest. Source URLs are links here and plain text in the PDF.
+function ClaimsFinding({ c }: { c: NonNullable<DealReportModel['risks']['claims']> }) {
+  return (
+    // Not one unbreakable box: a finding across five markets can outgrow the space left on a page.
+    // Each market's block is kept whole instead (.page .page in the print CSS), so it breaks between them.
+    <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '14px 16px', margin: '4px 0 16px' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+        <Chip s={SEV[c.severity]} />
+        <span style={{ fontWeight: 600, fontSize: 13 }}>{c.title}</span>
+        <Chip s={STATE[c.chip]} />
+      </div>
+      {c.notConfirmed && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{c.notConfirmed}</p>}
+      {c.lines.map(l => (
+        <div key={l.market} className="page" style={{ borderTop: '0.5px solid #e8e7e4', paddingTop: 8, marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 600 }}>{l.market}: {l.law}</div>
+          {l.regulator && <div>Regulator: {l.regulator}</div>}
+          {l.status && <div>Status: {l.status}</div>}
+          {l.scope && <div>Scope: {l.scope}</div>}
+          <div>Maximum penalty: {l.maxPenalty}</div>
+          <div style={{ color: '#555553' }}>Source: {l.sourceUrl ? <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', wordBreak: 'break-all' }}>{l.source}</a> : l.source} (verified {l.lastVerified})</div>
+        </div>
+      ))}
+      {c.fallback && <p style={{ ...note, borderTop: '0.5px solid #e8e7e4', paddingTop: 8, marginTop: 8 }}>{c.fallback}</p>}
+    </div>
+  )
+}
 // A model panel through the one amber panel.
 function PanelBox({ panel }: { panel: ReportPanel }) {
   return <NotAssessed title={panel.title}><RichText parts={panel.body} /></NotAssessed>
@@ -435,6 +465,7 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
                       <td style={td}>
                         <div style={{ fontWeight: 500 }}>{r.framework}</div>
                         {r.citation && <p style={cite}>{r.citation}</p>}
+                        {r.basis && <p style={{ ...cite, fontStyle: 'normal' }}>{r.basis}</p>}
                         {r.near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.near}</p>}
                         {r.verify && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.verify}</p>}
                       </td>
@@ -447,6 +478,34 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
             </>
           )}
         </section>
+
+        {/* 2b ── INVESTOR AND MARKET EXPECTATIONS. Never mixed into the section above: a market row
+            applies to nobody by law, prices nothing and licenses no citation. */}
+        {m.market.rows.length > 0 && (
+          <section className="page" style={{ marginTop: 40 }}>
+            <H>{m.market.title}</H>
+            <p style={note}>{m.market.intro}</p>
+            <table style={tbl}>
+              <thead>
+                <tr style={trh}>
+                  <th style={th}>{m.applicable.columns[0]}</th>
+                  <th style={{ ...th, width: 170 }}>{m.applicable.columns[1]}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {m.market.rows.map(r => (
+                  <tr key={r.framework} style={tr}>
+                    <td style={td}>
+                      <div style={{ fontWeight: 500 }}>{r.framework}</div>
+                      {r.note && <p style={cite}>{r.note}</p>}
+                    </td>
+                    <td style={td}><Chip s={STATE[r.chip]} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
 
         {/* 3 ── NEAR-THRESHOLD FRAMEWORKS */}
         <section className="page" style={{ marginTop: 40 }}>
@@ -524,6 +583,7 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
               {m.sizeTests.panels.map(panel => <PanelBox key={panel.title} panel={panel} />)}
             </>
           )}
+          {m.sizeTests.marketsNote && <p style={note}>{m.sizeTests.marketsNote}</p>}
         </section>
 
         {/* 5 ── ESG RISK FINDINGS */}
@@ -567,6 +627,9 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
               </table>
             </>
           )}
+          {/* Environmental claims: a finding of its own, driven by markets and claims, not sector. */}
+          {m.risks.claims && <ClaimsFinding c={m.risks.claims} />}
+          {m.risks.claimsNote && <p style={note}>{m.risks.claimsNote}</p>}
         </section>
 
         {/* 6 ── COMPLIANCE COST ESTIMATE */}
@@ -587,6 +650,9 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
           </div>
           <p style={{ ...note, fontSize: 11, color: 'var(--color-ink-muted)' }}><RichText parts={m.cost.disclosure} /></p>
 
+          {/* Nothing included: the intro and both cards already say so, and an empty table under
+              them would read as a list that failed to load. */}
+          {m.cost.included.rows.length > 0 && (
           <table style={tbl}>
             <ObligationHead columns={m.cost.included.columns} />
             <tbody>
@@ -602,13 +668,17 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
               ))}
             </tbody>
           </table>
+          )}
 
           <table style={tbl}>
             <ObligationHead columns={m.cost.recommended.columns} />
             <tbody>
               {m.cost.recommended.rows.map((o, i) => (
                 <tr key={i} style={tr}>
-                  <td style={td}>{o.label}</td>
+                  <td style={td}>
+                    <div>{o.label}</div>
+                    {o.scopeNote && <p style={cite}>{o.scopeNote}</p>}
+                  </td>
                   <td style={td}>{o.themisIq}</td>
                   <td style={td}>{o.consultant}</td>
                 </tr>
