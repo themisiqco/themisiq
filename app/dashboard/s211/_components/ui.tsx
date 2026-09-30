@@ -2,7 +2,7 @@
 
 // app/dashboard/s211/_components/ui.tsx
 // Shared pieces for the S-211 report builder: the access gate, the 404 view, the page frame, and the
-// field renderer. The builder is unpriced and allow-listed (lib/s211/access.ts); nothing here is linked
+// field renderer. The builder is unpriced and gated by public.s211_access (lib/s211/access.ts); nothing here is linked
 // from the navigation, the dashboard or the sitemap.
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
@@ -45,7 +45,7 @@ export function useS211Access(): Access {
   return a
 }
 
-/** What anyone not on the allow-list sees: the standard 404, and nothing about the builder. */
+/** What anyone without S-211 access sees: the standard 404, and nothing about the builder. */
 export function NotFound404() {
   return (
     <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif' }}>

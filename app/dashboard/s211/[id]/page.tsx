@@ -2,7 +2,7 @@
 
 // app/dashboard/s211/[id]/page.tsx
 // One S-211 report's home: whether the Act applies (lib/s211/entity.ts, lib/s211/obligation.ts), with
-// the reasons, then the eleven sections with their status. Allow-listed; see ../_components/ui.tsx.
+// the reasons, then the eleven sections with their status. Gated; see ../_components/ui.tsx.
 
 import { use, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'

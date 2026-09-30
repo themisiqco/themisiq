@@ -1,5 +1,5 @@
 // app/dashboard/s211/layout.tsx
-// The S-211 report builder: unpriced and allow-listed (lib/s211/access.ts). Kept out of search
+// The S-211 report builder: unpriced and gated by public.s211_access (lib/s211/access.ts). Kept out of search
 // engines, and linked from nowhere: not the navigation, the dashboard or the sitemap.
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'

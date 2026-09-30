@@ -1,13 +1,16 @@
 // app/api/s211/gate.test.ts
-// The S-211 routes, gated: signed out, signed in but not listed, and listed. Supabase is replaced by an
-// in-memory fake that records every call, so a refused request can be shown to have touched nothing.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+// The S-211 routes, gated: signed out, a junk token, signed in and refused by public.s211_has_access(),
+// the function failing, and allowed. Supabase is replaced by an in-memory fake that records every call,
+// so a refused request can be shown to have touched no table.
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fakeSupabase, type FakeDb } from '../../../lib/s211/testing/fakeSupabase'
 
-const h = vi.hoisted(() => ({ userId: 'user-listed' as string | null, db: null as unknown as FakeDb }))
+// auth: 'ok' signs in as h.userId; 'missing' is a request with no token; 'junk' a token Supabase rejects.
+const h = vi.hoisted(() => ({ userId: 'user-allowed', auth: 'ok' as 'ok' | 'missing' | 'junk', db: null as unknown as FakeDb }))
 vi.mock('../../../lib/supabaseAuthed', () => ({
   getAuthedClient: async () => {
-    if (!h.userId) throw new Error('Missing access token')
+    if (h.auth === 'missing') throw new Error('Missing access token')
+    if (h.auth === 'junk') throw new Error('Invalid or expired session')
     return { supabase: fakeSupabase(h.db), userId: h.userId, email: undefined }
   },
   bearerFrom: () => 'tok',
@@ -21,25 +24,31 @@ import { PUT as putSection } from './reports/[id]/sections/[key]/route'
 
 const req = (body?: unknown) => new Request('http://x/api/s211', { method: body === undefined ? 'GET' : 'POST', body: body === undefined ? undefined : JSON.stringify(body) })
 const ctx = <T,>(p: T) => ({ params: Promise.resolve(p) })
-const ENV = 'S211_PREVIEW_USER_IDS'
-let saved: string | undefined
+const setAccess = (reply: NonNullable<FakeDb['rpc']>[string] | undefined) => {
+  h.db.rpc = reply === undefined ? {} : { s211_has_access: reply }
+}
 
 beforeEach(() => {
-  saved = process.env[ENV]
-  process.env[ENV] = 'user-listed, other-listed'
-  h.userId = 'user-listed'
-  h.db = { tables: { s211_reports: [{ id: 'r1', user_id: 'user-listed', company_name: 'Harrowgate', reporting_year: 2026 }], s211_report_sections: [] }, calls: [] }
+  h.userId = 'user-allowed'
+  h.auth = 'ok'
+  h.db = { tables: { s211_reports: [{ id: 'r1', user_id: 'user-allowed', company_name: 'Harrowgate', reporting_year: 2026 }], s211_report_sections: [] }, calls: [] }
+  setAccess({ data: true, error: null })
 })
-afterEach(() => { if (saved === undefined) delete process.env[ENV]; else process.env[ENV] = saved })
 
-describe('refused: a 404, and the database is not touched', () => {
-  const cases: [string, () => void][] = [
-    ['signed out', () => { h.userId = null }],
-    ['signed in, not on the list', () => { h.userId = 'someone-else' }],
-    ['the variable unset', () => { delete process.env[ENV] }],
-    ['the variable empty', () => { process.env[ENV] = '' }],
+describe('refused: the same 404 every time, and no s211 table is touched', () => {
+  const cases: [string, () => void, string[]][] = [
+    // Not signed in, or a token Supabase rejects: refused before the database is asked anything.
+    ['signed out', () => { h.auth = 'missing' }, []],
+    ['a junk token', () => { h.auth = 'junk' }, []],
+    // Signed in: the function is asked, and only the function.
+    ['the function answers false', () => setAccess({ data: false, error: null }), ['rpc:s211_has_access']],
+    ['the function answers null', () => setAccess({ data: null, error: null }), ['rpc:s211_has_access']],
+    ['the function answers something that is not true', () => setAccess({ data: 'true', error: null }), ['rpc:s211_has_access']],
+    ['the function returns an error', () => setAccess({ data: true, error: { message: 'permission denied for function s211_has_access' } }), ['rpc:s211_has_access']],
+    ['the function is missing', () => setAccess(undefined), ['rpc:s211_has_access']],
+    ['the call throws', () => setAccess('throw'), ['rpc:s211_has_access']],
   ]
-  for (const [name, setup] of cases) {
+  for (const [name, setup, calls] of cases) {
     it(name, async () => {
       setup()
       const responses = await Promise.all([
@@ -51,9 +60,21 @@ describe('refused: a 404, and the database is not touched', () => {
         expect(r.status).toBe(404)
         expect(await r.json()).toEqual({ error: 'Not found' })
       }
-      expect(h.db.calls).toEqual([])
+      // One call per route at most, and never a table.
+      expect(h.db.calls.filter(c => c.startsWith('from:'))).toEqual([])
+      expect([...new Set(h.db.calls)]).toEqual(calls)
     })
   }
+
+  it('a refusal is indistinguishable from signed out: same status, same body, same headers that matter', async () => {
+    h.auth = 'missing'
+    const out = await access(req())
+    h.auth = 'ok'; setAccess({ data: false, error: null })
+    const refused = await access(req())
+    expect(refused.status).toBe(out.status)
+    expect(await refused.text()).toBe(await out.text())
+    expect(refused.headers.get('content-type')).toBe(out.headers.get('content-type'))
+  })
 })
 
 describe('allowed', () => {
@@ -63,9 +84,9 @@ describe('allowed', () => {
     expect(await r.json()).toEqual({ allowed: true })
   })
 
-  it('another listed user is let in too', async () => {
-    h.userId = 'other-listed'
-    expect((await access(req())).status).toBe(200)
+  it('asks the function as the user, then reaches the tables', async () => {
+    await listReports(req())
+    expect(h.db.calls).toEqual(['rpc:s211_has_access', 'from:s211_reports'])
   })
 
   it('creates a report, refusing a blank name or a year before the Act\'s first reports', async () => {
@@ -73,7 +94,7 @@ describe('allowed', () => {
     expect((await createReport(req({ company_name: 'X', reporting_year: 2023 }))).status).toBe(400)
     const ok = await createReport(req({ company_name: ' Harrowgate Retail ', reporting_year: 2026 }))
     expect(ok.status).toBe(201)
-    expect(h.db.tables.s211_reports.at(-1)).toMatchObject({ user_id: 'user-listed', company_name: 'Harrowgate Retail', reporting_year: 2026 })
+    expect(h.db.tables.s211_reports.at(-1)).toMatchObject({ user_id: 'user-allowed', company_name: 'Harrowgate Retail', reporting_year: 2026 })
   })
 
   it('a report that is not the user\'s (no row under RLS) is a 404', async () => {
@@ -89,7 +110,7 @@ describe('allowed', () => {
     expect((await patchReport(req({ recent_fy_currency: 'dollars' }), ctx({ id: 'r1' }))).status).toBe(400)
     const r = await patchReport(req({ listed_in_canada: false, recent_fy_revenue: 45e6, recent_fy_currency: 'usd', user_id: 'attacker', status: 'final' }), ctx({ id: 'r1' }))
     expect(r.status).toBe(200)
-    expect(h.db.tables.s211_reports[0]).toMatchObject({ user_id: 'user-listed', listed_in_canada: false, recent_fy_revenue: 45e6, recent_fy_currency: 'USD' })
+    expect(h.db.tables.s211_reports[0]).toMatchObject({ user_id: 'user-allowed', listed_in_canada: false, recent_fy_revenue: 45e6, recent_fy_currency: 'USD' })
     expect(h.db.tables.s211_reports[0].status).toBeUndefined()
   })
 })

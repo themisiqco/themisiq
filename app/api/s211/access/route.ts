@@ -1,5 +1,5 @@
 // app/api/s211/access/route.ts
-// GET: 200 { allowed: true } for a signed-in user on the S-211 preview allow-list; 404 for anyone else.
+// GET: 200 { allowed: true } for a signed-in user public.s211_has_access() lets in; 404 for anyone else.
 // The builder's pages call this before rendering anything. See lib/s211/server.ts.
 import { NextResponse } from 'next/server'
 import { requireS211 } from '../../../../lib/s211/server'

@@ -1,8 +1,8 @@
 'use client'
 
 // app/dashboard/s211/page.tsx
-// S-211 report builder: the user's reports, and a form to start one. Allow-listed; see
-// app/dashboard/s211/_components/ui.tsx and lib/s211/access.ts.
+// S-211 report builder: the user's reports, and a form to start one. Gated by public.s211_access;
+// see app/dashboard/s211/_components/ui.tsx and lib/s211/access.ts.
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'

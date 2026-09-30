@@ -3,7 +3,10 @@
 // rows per table and records every call, so a test can assert that a refused request touched nothing.
 
 type Row = Record<string, unknown>
-export type FakeDb = { tables: Record<string, Row[]>; calls: string[] }
+// rpc: what each database function answers. 'throw' makes the call itself throw. A function with no
+// entry answers { data: null, error } as PostgREST does for an unknown function.
+export type RpcReply = { data: unknown; error: { message: string } | null } | 'throw'
+export type FakeDb = { tables: Record<string, Row[]>; calls: string[]; rpc?: Record<string, RpcReply> }
 
 export function fakeSupabase(db: FakeDb) {
   const from = (table: string) => {
@@ -37,5 +40,11 @@ export function fakeSupabase(db: FakeDb) {
     }
     return api
   }
-  return { from }
+  const rpc = async (fn: string) => {
+    db.calls.push(`rpc:${fn}`)
+    const reply = db.rpc?.[fn]
+    if (reply === 'throw') throw new Error('network')
+    return reply ?? { data: null, error: { message: `Could not find the function public.${fn}` } }
+  }
+  return { from, rpc }
 }

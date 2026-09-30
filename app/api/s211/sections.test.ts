@@ -17,8 +17,7 @@ const put = (key: string, body: unknown) =>
 const stored = (key: string) => h.db.tables.s211_report_sections.find(r => r.section_key === key)
 
 beforeEach(() => {
-  process.env.S211_PREVIEW_USER_IDS = 'u1'
-  h.db = { tables: { s211_reports: [{ id: 'r1', user_id: 'u1' }], s211_report_sections: [] }, calls: [] }
+  h.db = { tables: { s211_reports: [{ id: 'r1', user_id: 'u1' }], s211_report_sections: [] }, calls: [], rpc: { s211_has_access: { data: true, error: null } } }
 })
 
 describe('saving a section', () => {
