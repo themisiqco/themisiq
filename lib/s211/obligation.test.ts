@@ -115,8 +115,8 @@ describe('only sells and distributes', () => {
     expect(S211_SELL_DISTRIBUTE_REASON).toBe('Section 9(a) of the Act applies to an entity selling or distributing goods, so the Act reaches it. Public Safety Canada’s guidance takes a narrower position, quoted here; it is guidance and not the statute.')
   })
 
-  it('the note on the withdrawn commitment: the earlier sentence quoted, the current page date, and that filing is the entity’s judgement', () => {
-    expect(S211_ENFORCEMENT_COMMITMENT_WITHDRAWN).toBe('Earlier versions of the guidance added: "Public Safety Canada will not seek enforcement action in those instances." The current version, dated 2025-12-18, no longer says so. Whether to file voluntarily is therefore a judgement for the entity.')
+  it('the note on the withdrawn commitment: the earlier sentence quoted, the current page date, and that filing is the entity’s judgment', () => {
+    expect(S211_ENFORCEMENT_COMMITMENT_WITHDRAWN).toBe('Earlier versions of the guidance added: "Public Safety Canada will not seek enforcement action in those instances." The current version, dated 2025-12-18, no longer says so. Whether to file voluntarily is therefore a judgment for the entity.')
     expect(S211_ACT_9A_QUOTED).toBe(`${S211_ACT_SECTION_9.leadIn} ${S211_ACT_SECTION_9.paragraphs[0].text}`)
   })
 

@@ -72,6 +72,7 @@ const EXPECTED: Record<string, Status> = {
   SASB_STANDARDS_URL: 'verified',
   CANADA_S211_URL: 'verified',
   S211_GUIDANCE_URL: 'verified',
+  S211_TEMPLATE_URL: 'verified',
 
   ISO_14064_3_URL: 'form-verified',
   ISO_42001_URL: 'form-verified',

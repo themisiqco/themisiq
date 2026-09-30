@@ -1,5 +1,5 @@
 // lib/s211/entity.ts
-// Whether an organisation is an "entity" under the Fighting Against Forced Labour and Child Labour in
+// Whether an organization is an "entity" under the Fighting Against Forced Labour and Child Labour in
 // Supply Chains Act, s.2. Pure: no React, no I/O, and no import from the Deals engine.
 //
 // EXTRACTED FROM lib/deals/assessment.ts ON 30 SEP 2026. The three thresholds and the citation used to
@@ -11,7 +11,7 @@
 // ⚠️ STEP 1 ONLY. Being an entity is not the same as having to report: Part 2 applies to an entity by
 // what it does with goods (s.9). lib/s211/obligation.ts answers that, from this file's result.
 //
-// ⚠️ THE THIRD ROUTE IS NOT MODELLED. s.2 also reaches an organisation "prescribed by regulations".
+// ⚠️ THE THIRD ROUTE IS NOT MODELLED. s.2 also reaches an organization "prescribed by regulations".
 // No input here can establish or exclude that, and S211_NOT_MODELLED says so on every result.
 
 import { FX_AS_OF, isFxCurrency, convertFx } from '../fx'
@@ -27,7 +27,7 @@ export const S211_THRESHOLDS = {
   requires: 2,
 } as const
 
-export const S211_NOT_MODELLED = 'An organisation prescribed by regulations is also an entity. That route is not assessed here.'
+export const S211_NOT_MODELLED = 'An organization prescribed by regulations is also an entity. That route is not assessed here.'
 
 /** One financial year's figures, from consolidated financial statements. null = not provided. */
 export type S211YearFigures = {

@@ -351,3 +351,16 @@ export const CANADA_S211_URL = 'https://laws-lois.justice.gc.ca/eng/acts/F-10.6/
 // @source-status: verified 2026-09-30
 export const S211_GUIDANCE_URL =
   'https://www.publicsafety.gc.ca/cnt/cntrng-crm/frcd-lbr-cndn-spply-chns/prpr-rprt-en.aspx'
+
+// Intent: the International Reporting Template on Modern Slavery, Forced Labour and Child Labour, which
+// the governments of Canada, the United Kingdom and Australia developed together and Public Safety
+// Canada publishes. It groups the three countries' reporting requirements into seven areas and names
+// the provision of each country's Act behind each area. lib/s211/requirements.ts transcribes the seven
+// area headings and one sentence on goal plans.
+// ⚠️ OPTIONAL, AND NOT THE ACT. The guidance calls it an "optional template". It asks for things the
+// Canadian Act does not (services as well as goods, the number of incidents found, training given to
+// suppliers), so nothing in it is to be presented as a Canadian requirement.
+// The page showed "Date modified: 2026-07-28" and the template "Version 1" of July 2025 when read.
+// @source-status: verified 2026-09-30
+export const S211_TEMPLATE_URL =
+  'https://www.publicsafety.gc.ca/cnt/cntrng-crm/frcd-lbr-cndn-spply-chns/ntrntnl-rprtng-frcd-lbr-chld-lbr-tmplt-en.aspx'

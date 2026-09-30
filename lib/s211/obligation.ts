@@ -1,18 +1,18 @@
 // lib/s211/obligation.ts
 // Whether an entity has to report under Part 2 of the Fighting Against Forced Labour and Child Labour
 // in Supply Chains Act. Pure: it takes the entity test's result (lib/s211/entity.ts) and five answers
-// about what the organisation does with goods.
+// about what the organization does with goods.
 //
 // ⚠️ THE ACT AND THE GUIDANCE DIFFER, AND THIS FOLLOWS THE ACT AND QUOTES THE GUIDANCE. Section 9(a)
 // applies Part 2 to an entity "producing, selling or distributing goods". Public Safety Canada's
 // guidance lists producing, importing and controlling only, and says "Entities solely involved in
 // distributing and selling are not expected to report under the Act."
-//   An organisation that only sells and distributes therefore gets its OWN outcome,
+//   An organization that only sells and distributes therefore gets its OWN outcome,
 // 'within_act_not_expected': inside the Act, and not expected to report under the current guidance. It
 // is neither 'must-report' (the regulator says it does not expect a report) nor 'does-not-have-to-
 // report' (the statute reaches it, and a reader told that stops looking). The result carries s.9(a)
 // and the guidance sentence verbatim, and says that the earlier commitment not to enforce has been
-// withdrawn, so filing voluntarily is a judgement for the entity. Decision of 30 Sep 2026.
+// withdrawn, so filing voluntarily is a judgment for the entity. Decision of 30 Sep 2026.
 //
 // ⚠️ "VERY MINOR DEALINGS" IS QUOTED, NOT APPLIED. The guidance reads producing and importing as
 // excluding them, and says to judge by scale, frequency and relevance. No answer here can establish
@@ -26,7 +26,7 @@ import {
 
 export type S211Answer = 'yes' | 'no' | 'not-sure'
 
-/** What the organisation does with goods. One answer each; the first three are s.9(a). */
+/** What the organization does with goods. One answer each; the first three are s.9(a). */
 export type S211Activities = {
   /** s.9(a): producing goods in Canada or elsewhere. */
   producesGoods: S211Answer
@@ -79,7 +79,7 @@ export const S211_ACT_9A_QUOTED = `${S211_ACT_SECTION_9.leadIn} ${S211_ACT_SECTI
 // The guidance page is dated 18 December 2025. The sentence it dropped is quoted from its earlier
 // versions; see S211_GUIDANCE_PRIOR_NO_ENFORCEMENT in lib/s211/requirements.ts for where that was read.
 export const S211_ENFORCEMENT_COMMITMENT_WITHDRAWN =
-  `Earlier versions of the guidance added: "${S211_GUIDANCE_PRIOR_NO_ENFORCEMENT}" The current version, dated ${S211_GUIDANCE_PAGE_MODIFIED}, no longer says so. Whether to file voluntarily is therefore a judgement for the entity.`
+  `Earlier versions of the guidance added: "${S211_GUIDANCE_PRIOR_NO_ENFORCEMENT}" The current version, dated ${S211_GUIDANCE_PAGE_MODIFIED}, no longer says so. Whether to file voluntarily is therefore a judgment for the entity.`
 export const S211_NOT_AN_ENTITY_REASON = 'It is not an entity under section 2, so Part 2 of the Act does not apply to it.'
 export const S211_NO_ACTIVITY_REASON = 'It does none of the things section 9 of the Act lists: producing, selling, distributing or importing goods, or controlling an entity that does.'
 export const S211_ENTITY_UNSETTLED_REASON = 'Whether it is an entity under section 2 is not settled, so the reporting obligation cannot be settled either.'

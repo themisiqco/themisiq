@@ -48,6 +48,20 @@ describe('the model only says what Charis can draw', () => {
   // the fallback's job, tested below, and must not hide a gap in the report's own wording.
   it('across jurisdictions, sectors, currencies and missing fields', () => {
     const offences = new Map<string, string>()
+    // SHARED WORK (30 Sep 2026). Most strings recur across the 2,208 models (every model carries the same
+    // headings, notices and labels), so each distinct string is checked once, not once per model. The
+    // fixed labels are checked once, before the loop. Every combination still builds its own model, and
+    // every string any model emits is still checked: only repeats of an already-checked string are skipped.
+    const checked = new Set<string>()
+    const check = (s: string) => {
+      if (checked.has(s)) return
+      checked.add(s)
+      for (const ch of s)
+        if (ch !== '\n' && !canDraw(ch.codePointAt(0)!))
+          offences.set(`U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')} (${ch})`, s.slice(0, 80))
+    }
+    for (const s of [...Object.values(CHIP_LABELS), SUBSTITUTION_NOTE]) check(s)
+    let models = 0
     const base = { ...FX_DEAL, target_name: 'Target Co' }
     const sectors = [...Object.keys(SECTOR_RISKS), 'Other', null]
     for (const jurisdiction of [...JURISDICTIONS, null])
@@ -61,13 +75,14 @@ describe('the model only says what Charis can draw', () => {
               deal_value: sized ? base.deal_value : 0,
               location_count: sized ? base.location_count : 0,
             })
-            for (const s of [...stringsOf(m), ...Object.values(CHIP_LABELS), SUBSTITUTION_NOTE])
-              for (const ch of s)
-                if (ch !== '\n' && !canDraw(ch.codePointAt(0)!))
-                  offences.set(`U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')} (${ch})`, s.slice(0, 80))
+            models++
+            for (const s of stringsOf(m)) check(s)
           }
+    // The sweep still covers every combination: 8 jurisdictions (7 and null) x every sector x 6 currencies x 2.
+    expect(models).toBe((JURISDICTIONS.length + 1) * sectors.length * (DEAL_CURRENCIES.length + 1) * 2)
     expect([...offences].map(([c, where]) => `${c} in "${where}"`)).toEqual([])
-  })
+    // About 1.3s alone and 2.3s under the full local suite; Vercel's build machine timed out at the default 5s.
+  }, 60_000)
 })
 
 describe('typed text the font cannot draw', () => {
@@ -199,7 +214,8 @@ describe('generateDealReportPDF: smoke', () => {
       expect(note, `note not drawn (extra ${extra})`).toBeGreaterThan(0)
       expect(drawn[note].page, `note alone on page ${drawn[note].page} with ${extra} extra lines`).toBe(drawn[note - 1].page)
     }
-  }, 20_000)
+    // 41 PDFs: 5.4s under the full local suite, so 20s was under 4x that; sized for Vercel's slower build machine.
+  }, 60_000)
 
   it('draws the claims finding: every market line, its source as plain text, and the fallback', () => {
     const m = model(FX_DEAL)
