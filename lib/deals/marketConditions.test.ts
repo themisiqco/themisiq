@@ -5,7 +5,7 @@ import {
   sectorRisks, SECTOR_RISKS, CONDITION_SCREEN_NOTE, canadaS211CaveatText,
   CANADA_S211_JURISDICTION_CAVEAT,
 } from './assessment'
-import { buildDealReportModel, compactMoneyRange, NO_PRICED_OBLIGATION, GLOBAL_FIGURES_NOTE, type DealReportModel } from './reportModel'
+import { buildDealReportModel, compactMoneyRange, NO_PRICED_OBLIGATION, GLOBAL_FIGURES_NOTE, guidanceParagraph, type DealReportModel } from './reportModel'
 import { NOT_ASSESSED_DEAL, FX_DEAL, FIXTURE_GENERATED_AT } from './reportModel.fixtures'
 import { EU_ECGT_FRAMEWORK, EU_MEMBER_CODES, homeMarkets, startingMarkets, marketsOnJurisdictionChange, draftMarkets } from './markets'
 import { parseDealDraft } from './draft'
@@ -168,7 +168,10 @@ describe('Canada S-211 for a non-Canadian target selling into Canada', () => {
 
   it('figures above the thresholds: the size test runs and S-211 APPLIES', () => {
     const m = usTarget({ revenue: 100_000_000, employee_count: 300, total_assets: 50_000_000 })
-    expect(m.applicable.rows.find(r => r.framework === 'Canada S-211')?.chip).toBe('applies')
+    // APPLIES: VERIFY since 30 Sep 2026: the size test establishes an entity, and the row says the
+    // goods question is still open. It still applies; the chip says there is something to confirm.
+    expect(m.applicable.rows.find(r => r.framework === 'Canada S-211')?.chip).toBe('verify')
+    expect(m.applicable.rows.find(r => r.framework === 'Canada S-211')?.verify).toContain('Meeting the size test makes the company an entity under s.2.')
     expect(s211(m).length).toBe(3)
     for (const r of s211(m)) {
       expect(r.isProxy).toBe(true)
@@ -238,5 +241,56 @@ describe('the pre-tick follows the jurisdiction until the user edits the markets
   it('Global names no home market, and the pre-tick clears rather than lingering', () => {
     const start = startingMarkets({ sales_markets: null, sales_markets_not_sure: null }, 'USA')
     expect(marketsOnJurisdictionChange(start, 'Global')).toEqual({ sales_markets: null, auto: true })
+  })
+})
+
+// ── The Canada S-211 note and its guidance, as they print (30 Sep 2026) ────────────────────────────
+describe('the Canada S-211 row: a short note, and the guidance apart from it', () => {
+  const canadian = (sector: string) => buildDealReportModel({ ...FX_DEAL, sector, jurisdiction: 'Canada', currency: 'CAD', revenue: 50e6,
+    total_assets: 30e6, employee_count: 260, listed_ca_exchange: false, sales_markets: ['CA'], sales_markets_not_sure: null } as typeof FX_DEAL, FIXTURE_GENERATED_AT)
+    .applicable.rows.find(r => r.framework === 'Canada S-211')!
+
+  it('a bank: the note is the two short sentences plus the control sentence, and the guidance is a separate field', () => {
+    const r = canadian('Banking & Lending')
+    expect(r.chip).toBe('verify')
+    expect(r.verify).toBe('Meeting the size test makes the company an entity under s.2. The reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada. This assessment does not ask about goods, so confirm that before relying on this result. For a business in this sector, the duty would usually arise only through controlling an entity that produces, sells, distributes or imports goods (s.9(c)).')
+    expect(r.guidance?.quotes).toHaveLength(2)
+    expect(r.verify).not.toContain(r.guidance!.quotes[0])
+  })
+
+  it('a manufacturer: the note alone, and no guidance block', () => {
+    const r = canadian('Industrials & Manufacturing')
+    expect(r.verify).toMatch(/^Meeting the size test .* before relying on this result\.$/)
+    expect(r.guidance).toBeNull()
+  })
+
+  it('the PDF paragraph: the source, then each quotation in quotes, as its own paragraph after the note', () => {
+    const g = canadian('Insurance').guidance!
+    expect(guidanceParagraph(g)).toBe(`Public Safety Canada, Guidance for entities: "${g.quotes[0]}" "${g.quotes[1]}"`)
+    const pdf = readFileSync(join(process.cwd(), 'lib/deals/reportPdf.ts'), 'utf8')
+    const verifyAt = pdf.indexOf("...(r.verify ? [plain(r.verify, 'normal', WARN)] : []),")
+    const guidanceAt = pdf.indexOf("...(r.guidance ? [plain(guidanceParagraph(r.guidance), 'normal', SECONDARY)] : []),")
+    expect(verifyAt).toBeGreaterThan(-1)
+    expect(guidanceAt).toBeGreaterThan(verifyAt)
+  })
+
+  it('the wizard: amber on the note only; the guidance behind a collapsed disclosure, in normal colour, with its source link', () => {
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/deals/page.tsx'), 'utf8')
+    const block = src.slice(src.indexOf('{row?.guidance && ('), src.indexOf('{row?.guidance && (') + 1200)
+    expect(block).toContain('<details')
+    expect(block).not.toContain('<details open')
+    expect(block).toContain('<summary')
+    expect(block).toContain('{CANADA_S211_GUIDANCE_DISCLOSURE}')
+    expect(block).toContain('href={row.guidance.url}')
+    expect(block).not.toContain('color-state-warn')
+  })
+
+  it('the on-screen report: the guidance is its own paragraph after the note, linked to its source', () => {
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/deals/report/page.tsx'), 'utf8')
+    const at = src.indexOf('{r.guidance && (')
+    expect(at).toBeGreaterThan(src.indexOf('{r.verify && <p'))
+    const block = src.slice(at, at + 600)
+    expect(block).toContain('href={r.guidance.url}')
+    expect(block).not.toContain('color-state-warn')
   })
 })

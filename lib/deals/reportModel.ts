@@ -28,7 +28,7 @@ import {
   routeNotMetNote, partialHeadingPhrase, nearThresholdNoneNote, obligationPriceLabel,
   FX_SOURCE, FX_AS_OF, THRESHOLD_TESTS, isTestActive,
   showCanadaS211JurisdictionCaveat, canadaS211CaveatText,
-  type FrameworkApplicability, type LimbResult, type DealCurrency, type Obligations,
+  type FrameworkApplicability, type FrameworkGuidance, type LimbResult, type DealCurrency, type Obligations,
   type SectorRisk,
 } from './assessment'
 import { NOT_PROVIDED } from '../notProvided'
@@ -562,6 +562,10 @@ export const regimeTokenFor = (labels: RegimeLabels, row: FrameworkApplicability
 // Joins tokens for display. THE ONLY PLACE ' / ' IS WRITTEN ON THE OUTPUT SIDE — the separator used
 // to appear three times: here, in the input split below, and in a consumer re-splitting this
 // function's own result to recover identities. That round-trip is what RegimeToken removes.
+/** The guidance paragraph as one line of text, for the PDF: the source, then each quotation in quotes. */
+export const guidanceParagraph = (g: FrameworkGuidance): string =>
+  `${g.source}: ${g.quotes.map(q => `"${q}"`).join(' ')}`
+
 export const regimeLabel = (tokens: RegimeToken[]): string => tokens.map(t => t.text).join(' / ')
 
 export const makeMapFramework = (frameworks: string[], cs3dRow: FrameworkApplicability | undefined) => (fw: string): RegimeToken[] => {
@@ -743,7 +747,8 @@ export type DealReportModel = {
     columns: [string, string]
     // `citation` names the instrument (a statute, or a directive); `basis` says why it applies to this
     // deal, for a row that applies on a stated rule rather than a size test. Either, both, or neither.
-    rows: { framework: string; citation: string | null; basis: string | null; near: string | null; verify: string | null; chip: StatusChip }[]
+    // `guidance`: verbatim guidance behind a `verify` note, printed as its own cited paragraph after it.
+    rows: { framework: string; citation: string | null; basis: string | null; near: string | null; verify: string | null; guidance: FrameworkGuidance | null; chip: StatusChip }[]
     partialPanel: ReportPanel | null
   }
   /** Expected by investors, lenders or customers; not required by law for this target. */
@@ -959,6 +964,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         // Canada S-211 reached by a stock-exchange listing, where the reporting duty also turns on
         // goods. Same amber treatment a near-threshold row gets, because the reader's job is the same.
         const verify = applicability.find(f => f.framework === fw)?.verify ?? null
+        const guidance = applicability.find(f => f.framework === fw)?.guidance ?? null
         return {
           framework: fw,
           // A size-tested row cites its statute; a rule-based row cites its instrument where one is
@@ -968,6 +974,7 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
           basis: applicability.find(f => f.framework === fw)?.rule ?? null,
           near: near ? nearSentence(near) : null,
           verify: verify || null,
+          guidance,
           chip: near || verify ? 'verify' : 'applies',
         }
       }),

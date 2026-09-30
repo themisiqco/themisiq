@@ -8,13 +8,18 @@ import { GHG_TIERS, FLAT_MODULE_PRICES, GHG_TIER_LABELS, ghgTierForEmployees, ty
 import { claimsFrameworkRows, EU_MEMBER_CODES, marketsRecorded, type MarketsInput } from './markets'
 import {
   SECTORS, LEGACY_SECTORS, SECTOR_TEMPLATE_SOURCE, HEAVY_SECTORS, ETS_SECTORS, FINANCIAL_SECTORS,
-  FINANCIAL_RULE_SECTORS, FLAG_SECTORS, normalizeSector, type Sector,
+  FINANCIAL_RULE_SECTORS, FLAG_SECTORS, S211_NO_GOODS_SECTORS, normalizeSector, type Sector,
 } from './sectors'
 // Sector risk copy must not retype an AI Act date — see lib/aiAct.ts. Constants only, no I/O, so this
 // import does not compromise the purity note above.
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION } from '../aiAct'
 import { CS3D_APPLIES_FROM, CS3D_CITATION } from '../cs3d'
 import { ECB_UNITS_PER_EUR } from '../fx'
+// The S-211 thresholds and citation are lib/s211/entity.ts's (30 Sep 2026); this engine evaluates them
+// with its own one-year test, below.
+import { S211_THRESHOLDS, S211_ENTITY_CITATION } from '../s211/entity'
+import { S211_GUIDANCE_GOODS, S211_GUIDANCE_SUPPORT_SERVICES } from '../s211/requirements'
+import { S211_GUIDANCE_URL } from '../sources'
 
 // Fields the assessment functions read off a deal. The functions take explicit primitive
 // params (below); this type documents the deal shape both surfaces hydrate from.
@@ -878,8 +883,49 @@ export const CANADA_S211_ROUTE_NOT_MET_REASON =
 // producing, selling or distributing goods, or importing goods into Canada. This assessment collects
 // sector and revenue and asks nothing about goods, so a listing establishes the entity limb and not the
 // duty. Reporting a bare APPLIES would state as settled something the form never asked about.
+// EVERY S-211 NOTE IS A FULL SENTENCE (30 Sep 2026): a capital to open and a full stop to close, as the
+// other verify notes always were. These two were written as lower-case fragments with no full stop, and
+// the sector note was then joined on with ". ", so a row read "...relying on this" with nothing after
+// it, or carried one sentence inside another. lib/deals/assessment.test.ts checks the form.
 export const CANADA_S211_LISTING_VERIFY =
-  'a Canadian listing makes the company an entity under s.2, but the reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada; this assessment does not ask about goods, so confirm that before relying on this'
+  'A Canadian listing makes the company an entity under s.2. The reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada. This assessment does not ask about goods, so confirm that before relying on this result.'
+
+// THE SAME GAP ON THE SIZE ROUTE (30 Sep 2026). Meeting two of the three size conditions makes the
+// target an entity; it says nothing about goods either. Until that day a sized row read a bare APPLIES
+// for every sector, a bank exactly as a manufacturer. The row now carries this, so it establishes
+// "entity" and not "must report", whatever the sector.
+export const CANADA_S211_SIZE_VERIFY =
+  'Meeting the size test makes the company an entity under s.2. The reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada. This assessment does not ask about goods, so confirm that before relying on this result.'
+// For the sectors in S211_NO_GOODS_SECTORS, a further sentence after whichever of the two the row carries.
+export const CANADA_S211_NO_GOODS_SECTOR_NOTE =
+  'For a business in this sector, the duty would usually arise only through controlling an entity that produces, sells, distributes or imports goods (s.9(c)).'
+/** The `verify` text for a Canada S-211 row that applies: the route's note, plus the sector sentence where it fits. */
+export const canadaS211Verify = (route: 'listing' | 'size', sector: string | null | undefined): string => {
+  const base = route === 'listing' ? CANADA_S211_LISTING_VERIFY : CANADA_S211_SIZE_VERIFY
+  return S211_NO_GOODS_SECTORS.has(normalizeSector(sector) ?? '') ? `${base} ${CANADA_S211_NO_GOODS_SECTOR_NOTE}` : base
+}
+
+// ── The guidance behind the sector sentence, QUOTED APART FROM IT ───────────────────────────────────
+// The two sentences are Public Safety Canada's, verbatim, from lib/s211/requirements.ts. They used to
+// sit inside the note itself, which made one amber sentence of some 900 characters. They are carried
+// beside the note now: behind a disclosure in the wizard, and as a separate cited paragraph in the
+// report and the PDF. Note what they do and do not say: software services and insurance plans are
+// excluded from "goods"; financial services are named as not captured by "producing and importing".
+// Neither says financial services "are not goods", and nothing here says it for them.
+export type FrameworkGuidance = {
+  /** Who said it and where, for the citation line. */
+  source: string
+  /** Official page. Always a constant from lib/sources.ts. */
+  url: string
+  /** Verbatim, in the source's order. */
+  quotes: string[]
+}
+export const CANADA_S211_GUIDANCE_SOURCE = 'Public Safety Canada, Guidance for entities'
+export const CANADA_S211_GUIDANCE_DISCLOSURE = 'Show Public Safety Canada guidance'
+export const canadaS211Guidance = (sector: string | null | undefined): FrameworkGuidance | undefined =>
+  S211_NO_GOODS_SECTORS.has(normalizeSector(sector) ?? '')
+    ? { source: CANADA_S211_GUIDANCE_SOURCE, url: S211_GUIDANCE_URL, quotes: [S211_GUIDANCE_GOODS, S211_GUIDANCE_SUPPORT_SERVICES] }
+    : undefined
 
 // ⚠️ A STANDING LIMITATION, NOT A FRAMEWORK ROW, AND THE DIFFERENCE WAS MEASURED. A
 // canadaS211NonCaAbstention() pushing a not-assessed row for every non-Canada jurisdiction was written
@@ -976,7 +1022,7 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
   // to change.
   'Canada S-211': {
     framework: 'Canada S-211',
-    requires: 2, semantics: 'n-of-m',
+    requires: S211_THRESHOLDS.requires, semantics: 'n-of-m',
     // s.2 gives three routes and this models one, so a failed size test is 'not-assessed' rather than
     // 'not-applicable'. See CANADA_S211_ROUTE_NOT_MET_REASON.
     exhaustive: false,
@@ -986,17 +1032,17 @@ export const THRESHOLD_TESTS: Record<string, ThresholdTest> = {
     // UNDER-calling a target that crossed a limb last year and dipped this year; the below-side
     // near-threshold flag is the mitigation, not a fix.
     lookback: 'either-of-two-most-recent-fy', lookbackModelled: false,
-    citation: 'Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211), s.2 "entity"',
+    citation: S211_ENTITY_CITATION,
     limbs: [
-      { measure: 'balance_sheet_total', amount: 20_000_000, unit: { unit: 'currency', currency: 'CAD' },
+      { measure: 'balance_sheet_total', amount: S211_THRESHOLDS.assetsCad, unit: { unit: 'currency', currency: 'CAD' },
         source: 'total_assets', exactMeasure: false, comparison: 'gte',
         basis: 'At least CAD 20,000,000 in assets, in either of the two most recent financial years.',
         measureNote: 'Assets per consolidated financial statements. LOOKBACK NOT MODELLED: most recent year only.' },
-      { measure: 'turnover', amount: 40_000_000, unit: { unit: 'currency', currency: 'CAD' },
+      { measure: 'turnover', amount: S211_THRESHOLDS.revenueCad, unit: { unit: 'currency', currency: 'CAD' },
         source: 'revenue', exactMeasure: false, comparison: 'gte',
         basis: 'At least CAD 40,000,000 in revenue, in either of the two most recent financial years.',
         measureNote: 'Revenue per consolidated financial statements. LOOKBACK NOT MODELLED: most recent year only.' },
-      { measure: 'employees', amount: 250, unit: { unit: 'count' },
+      { measure: 'employees', amount: S211_THRESHOLDS.averageEmployees, unit: { unit: 'count' },
         source: 'employee_count', exactMeasure: false, comparison: 'gte',
         basis: 'An average of at least 250 employees, in either of the two most recent financial years.',
         // ⚠️ AN AVERAGE, WHICH THIS LIMB DID NOT SAY UNTIL 26 SEP 2026. s.2(b) measures an average over
@@ -1452,6 +1498,9 @@ export type FrameworkApplicability = {
   // before relying on it. DISTINCT FROM `reason`, which means the opposite: reason withholds, verify
   // asserts and qualifies.
   verify?: string
+  // Verbatim guidance the `verify` note rests on, shown APART from it: a disclosure in the wizard, a
+  // separate cited paragraph in the report and PDF. Set only beside a `verify`.
+  guidance?: FrameworkGuidance
   test?: ThresholdOutcome           // per-limb detail behind the decision
   // ⚠️ THE BASIS OF AN APPLIES ROW THAT HAS NO SIZE TEST. Every `applies: true` row must carry one of
   // `test` (a statutory size test ran), `verify` (applies on a named rule, with a condition to check)
@@ -1681,10 +1730,19 @@ export const getFrameworkApplicability = (
   // No `reason` on this row: see the note beside CANADA_S211_ROUTE_NOT_MET_REASON. `reason` means the
   // applicability could not be established, and this row establishes it. `verify` is the field that
   // qualifies a settled row.
+  // A sized row that APPLIES takes the goods note too (30 Sep 2026): see CANADA_S211_SIZE_VERIFY. A row
+  // that does not apply (not assessed, near threshold) claims nothing about the duty and is left as is.
+  const guidance = canadaS211Guidance(sector)
+  const s211Guidance = guidance ? { guidance } : {}
+  const s211SizeVerify = () => {
+    const row = out[out.length - 1]
+    if (row.framework === 'Canada S-211' && row.applies) out[out.length - 1] = { ...row, verify: canadaS211Verify('size', sector), ...s211Guidance }
+  }
   if (size.listed_ca_exchange === true) {
-    out.push({ framework: 'Canada S-211', applies: true, status: 'applies', verify: CANADA_S211_LISTING_VERIFY })
+    out.push({ framework: 'Canada S-211', applies: true, status: 'applies', verify: canadaS211Verify('listing', sector), ...s211Guidance })
   } else if (jurisdiction === 'Canada') {
     sized('Canada S-211')
+    s211SizeVerify()
   } else if ((size.sales_markets ?? []).includes('CA')) {
     // DOING BUSINESS IN CANADA, FROM THE SALES MARKETS (29 Sep 2026). The Act reaches a company doing
     // business in Canada wherever it is based, and the target reports Canada among its markets, so the
@@ -1692,6 +1750,7 @@ export const getFrameworkApplicability = (
     // global figures, which is the proxy `globalFigures` makes the report state on every limb.
     sized('Canada S-211')
     out[out.length - 1] = { ...out[out.length - 1], globalFigures: true }
+    s211SizeVerify()
   }
   // NO ROW FOR A NON-CANADIAN TARGET WHOSE MARKETS DO NOT INCLUDE CANADA. Stating that as a withheld
   // FRAMEWORK ROW was tried and withdrawn on 26 Sep 2026: it landed on every deal and failed 13 tests.

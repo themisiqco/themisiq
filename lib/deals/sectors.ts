@@ -189,5 +189,20 @@ export const FINANCIAL_RULE_SECTORS = {
   ANTI_GREENWASHING: new Set(['Financial Services', 'Banking & Lending', 'Insurance', 'Asset Management & Private Capital']),
 } as const satisfies Record<string, ReadonlySet<string>>
 
+/**
+ * Sectors whose own business is typically not "goods" as Public Safety Canada's S-211 guidance reads
+ * the word: it excludes software services and insurance plans from goods, and says producing and
+ * importing do not capture financial services. For these the Canada S-211 row carries that guidance,
+ * verbatim, and says the duty would usually arise only through control (s.9(c)). THE ROW IS NEVER
+ * DROPPED: a bank that controls a goods business is reached. Decision of 30 Sep 2026: the four
+ * current sectors, and the two legacy values they replaced ('Financial Services' split into the three
+ * financial sectors; 'Professional Services' became Professional & Business Services), so a deal stored
+ * under an old name reads as its current counterpart does.
+ */
+export const S211_NO_GOODS_SECTORS: ReadonlySet<string> = new Set([
+  'Professional & Business Services', 'Banking & Lending', 'Insurance', 'Asset Management & Private Capital',
+  'Financial Services', 'Professional Services',
+])
+
 /** The FLAG (land-sector) caveat in the cost section. Old list: Agriculture & Food. */
 export const FLAG_SECTORS: ReadonlySet<string> = new Set(['Agriculture & Food', 'Agriculture, Food & Beverage'])

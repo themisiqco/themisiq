@@ -22,7 +22,7 @@ import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import {
   getObligations, getApplicableFrameworks, getFrameworkApplicability, getComplianceCost,
-  sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS,
+  sectorRisks, DEFAULT_PIPELINE_TARGETS, DEAL_CURRENCIES, JURISDICTIONS, CANADA_S211_GUIDANCE_DISCLOSURE,
   assessmentView, partiallyAssessedNote, routeNotMetNote, partialHeadingPhrase,
   obligationPriceLabel, resolveFieldsPrompt,
   type FrameworkApplicability,
@@ -939,6 +939,19 @@ function DealsDashboardInner() {
                   {/* Applies, with a condition this assessment never asked about — see `verify` in
                       lib/deals/assessment.ts. Same amber line a near-threshold row gets. */}
                   {row?.verify && <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.55, marginTop: 5 }}>{row.verify}</div>}
+                  {/* The guidance behind the note, collapsed by default and in normal text colour: amber is
+                      for the short note only. */}
+                  {row?.guidance && (
+                    <details style={{ marginTop: 5 }}>
+                      <summary style={{ fontSize: 11, color: '#555553', cursor: 'pointer' }}>{CANADA_S211_GUIDANCE_DISCLOSURE}</summary>
+                      {row.guidance.quotes.map(q => (
+                        <p key={q} style={{ fontSize: 11, color: '#555553', lineHeight: 1.55, margin: '5px 0 0' }}>&ldquo;{q}&rdquo;</p>
+                      ))}
+                      <p style={{ fontSize: 11, color: '#555553', lineHeight: 1.55, margin: '5px 0 0' }}>
+                        Source: <a href={row.guidance.url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>{row.guidance.source}</a>
+                      </p>
+                    </details>
+                  )}
                   {/* Applies on a stated rule rather than a size test (EU Taxonomy, EU ECGT, AB 1305). */}
                   {row?.rule && <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.55, marginTop: 5 }}>{row.rule}</div>}
                 </div>

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { S211_GUIDANCE_URL } from '../sources'
 // ⚠️ DERIVED, NEVER A LITERAL. These assertions carried 4900 and 11900 until 28 Sep 2026 and
 // went stale the moment the employee bands repriced GHG. Reading the same table the code reads
 // means a reprice moves the expectation with the product instead of failing on a dead number.
@@ -9,7 +10,8 @@ import {
   validateThresholdTests, type ThresholdTest,
   CSRD_NON_EU_REASON, csrdNonEuAbstention, CS3D_PENDING_REASON, cs3dPendingAbstention,
   CS3D_ROUTE_NOT_MET_REASON, CANADA_S211_ROUTE_NOT_MET_REASON,
-  CANADA_S211_LISTING_VERIFY, CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
+  CANADA_S211_LISTING_VERIFY, CANADA_S211_SIZE_VERIFY, CANADA_S211_NO_GOODS_SECTOR_NOTE, canadaS211Verify, canadaS211Guidance,
+  CANADA_S211_GUIDANCE_DISCLOSURE, CANADA_S211_LISTING_HINT, CANADA_S211_JURISDICTION_CAVEAT, showCanadaS211JurisdictionCaveat,
   NEAR_THRESHOLD_BAND, NEAR_BAND_PCT, FX_AS_OF, FX_SOURCE,
   isRevenueDeclared, assessmentView, notAssessedNote, partiallyAssessedNote, routeNotMetNote,
   partialHeadingPhrase,
@@ -1366,12 +1368,128 @@ describe('Canada S-211 reaches an entity by listing OR by size, and never confid
     const twoOfThree = find(getFrameworkApplicability('Canada', 50_000_000, 'Technology', 'ma', 'CAD',
       { total_assets: 25_000_000, employee_count: 10, listed_ca_exchange: false }), S211)!
     expect(twoOfThree.applies).toBe(true)
-    expect(twoOfThree.verify, 'the size route needs no verify note').toBeUndefined()
+    // CHANGED ON PURPOSE, 30 Sep 2026. This read "the size route needs no verify note". It does: meeting
+    // the size test establishes an entity, and the form asks nothing about goods on this route either.
+    expect(twoOfThree.verify, 'an applies-on-size row must say the goods question is still open').toBe(CANADA_S211_SIZE_VERIFY)
     const oneOfThree = find(getFrameworkApplicability('Canada', 50_000_000, 'Technology', 'ma', 'CAD',
       { total_assets: 1_000_000, employee_count: 10, listed_ca_exchange: false }), S211)!
     expect(oneOfThree.status).toBe('not-assessed')
     expect(oneOfThree.reason).toBe(CANADA_S211_ROUTE_NOT_MET_REASON)
     expect(oneOfThree.reason).not.toBe(CANADA_S211_LISTING_VERIFY)
+  })
+
+  // ── The goods note, on both routes and for every sector (30 Sep 2026) ───────────────────────────
+  const NO_GOODS = ['Professional & Business Services', 'Banking & Lending', 'Insurance', 'Asset Management & Private Capital']
+  const canadaRow = (sector: string, over = {}) => find(getFrameworkApplicability('Canada', 50_000_000, sector, 'ma', 'CAD',
+    { total_assets: 25_000_000, employee_count: 300, listed_ca_exchange: false, ...over }), S211)!
+
+  it('a sized row that applies says it establishes "entity", not "must report", for every sector', () => {
+    expect(CANADA_S211_SIZE_VERIFY).toBe('Meeting the size test makes the company an entity under s.2. The reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada. This assessment does not ask about goods, so confirm that before relying on this result.')
+    expect(CANADA_S211_LISTING_VERIFY).toBe('A Canadian listing makes the company an entity under s.2. The reporting duty also turns on producing, selling or distributing goods, or importing goods into Canada. This assessment does not ask about goods, so confirm that before relying on this result.')
+    for (const sector of [...SECTORS, 'Energy & Utilities', 'Financial Services', 'Technology', 'Other', '']) {
+      const row = canadaRow(sector)
+      expect(row.applies, sector).toBe(true)
+      expect(row.verify, sector).toContain(CANADA_S211_SIZE_VERIFY)
+    }
+  })
+
+  it('the four no-goods sectors also carry the control sentence, and the guidance APART from the note; no other sector does', () => {
+    expect(CANADA_S211_NO_GOODS_SECTOR_NOTE).toBe('For a business in this sector, the duty would usually arise only through controlling an entity that produces, sells, distributes or imports goods (s.9(c)).')
+    const GUIDANCE = {
+      source: 'Public Safety Canada, Guidance for entities',
+      url: S211_GUIDANCE_URL,
+      quotes: [
+        'Goods refers to tangible physical property that is the subject of trade and commerce, understood in the ordinary sense of the word. Real property, electricity, software services, and insurance plans are excluded from this definition.',
+        'The terms producing and importing are not intended to capture services that solely support the production or importation of goods, such as marketing, administrative services, financial services, and software services.',
+      ],
+    }
+    for (const sector of NO_GOODS) {
+      expect(canadaRow(sector).verify, sector).toBe(`${CANADA_S211_SIZE_VERIFY} ${CANADA_S211_NO_GOODS_SECTOR_NOTE}`)
+      expect(canadaRow(sector, { listed_ca_exchange: true }).verify, sector).toBe(`${CANADA_S211_LISTING_VERIFY} ${CANADA_S211_NO_GOODS_SECTOR_NOTE}`)
+      // The quotations are carried beside the note, never inside it.
+      expect(canadaRow(sector).guidance, sector).toEqual(GUIDANCE)
+      expect(canadaRow(sector, { listed_ca_exchange: true }).guidance, sector).toEqual(GUIDANCE)
+      expect(canadaRow(sector).verify, sector).not.toContain('Goods refers')
+      expect(canadaRow(sector).verify, sector).not.toContain('Public Safety Canada')
+    }
+    for (const sector of SECTORS.filter(s => !NO_GOODS.includes(s))) {
+      expect(canadaRow(sector).verify, sector).toBe(CANADA_S211_SIZE_VERIFY)
+      expect(canadaRow(sector, { listed_ca_exchange: true }).verify, sector).toBe(CANADA_S211_LISTING_VERIFY)
+      expect(canadaRow(sector).guidance, sector).toBeUndefined()
+    }
+    expect(canadaS211Guidance('Technology & Software')).toBeUndefined()
+    // The two legacy values they replaced read as their current counterparts do, on both routes.
+    for (const [legacy, current] of [['Financial Services', 'Banking & Lending'], ['Professional Services', 'Professional & Business Services']]) {
+      expect(canadaRow(legacy).verify, legacy).toBe(canadaRow(current).verify)
+      expect(canadaRow(legacy).verify, legacy).toBe(`${CANADA_S211_SIZE_VERIFY} ${CANADA_S211_NO_GOODS_SECTOR_NOTE}`)
+      expect(canadaRow(legacy, { listed_ca_exchange: true }).verify, legacy).toBe(`${CANADA_S211_LISTING_VERIFY} ${CANADA_S211_NO_GOODS_SECTOR_NOTE}`)
+      expect(canadaRow(legacy).guidance, legacy).toEqual(canadaRow(current).guidance)
+      expect(canadaS211Verify('size', legacy)).toBe(canadaS211Verify('size', current))
+      expect(canadaS211Verify('listing', legacy)).toBe(canadaS211Verify('listing', current))
+    }
+    // No other legacy value takes the sector note.
+    for (const legacy of ['Energy & Utilities', 'Technology', 'Consumer & Retail', 'Agriculture & Food', 'Other'])
+      expect(canadaS211Verify('size', legacy), legacy).toBe(CANADA_S211_SIZE_VERIFY)
+  })
+
+  // ── Form: every S-211 note is a sentence ─────────────────────────────────────────────────────────
+  // The two verify notes were lower-case fragments with no full stop, and the sector note was joined on
+  // with ". ", so a row ended "...relying on this" or ran one sentence into another.
+  it('every S-211 note starts with a capital letter and ends with a full stop, on every route and sector', () => {
+    const notes: [string, string][] = [
+      ['CANADA_S211_LISTING_VERIFY', CANADA_S211_LISTING_VERIFY],
+      ['CANADA_S211_SIZE_VERIFY', CANADA_S211_SIZE_VERIFY],
+      ['CANADA_S211_NO_GOODS_SECTOR_NOTE', CANADA_S211_NO_GOODS_SECTOR_NOTE],
+      ['CANADA_S211_JURISDICTION_CAVEAT', CANADA_S211_JURISDICTION_CAVEAT],
+      ['CANADA_S211_LISTING_HINT', CANADA_S211_LISTING_HINT],
+    ]
+    for (const route of ['listing', 'size'] as const)
+      for (const sector of [...SECTORS, 'Financial Services', 'Professional Services', 'Energy & Utilities', 'Other', '', null])
+        notes.push([`canadaS211Verify(${route}, ${sector})`, canadaS211Verify(route, sector)])
+    // And what the engine actually puts on a row, which is what prints.
+    for (const sector of [...SECTORS, 'Financial Services', 'Professional Services'])
+      for (const over of [{}, { listed_ca_exchange: true }]) notes.push([`row ${sector}`, canadaRow(sector, over).verify!])
+    for (const [name, note] of notes) {
+      expect(note, name).toMatch(/^[A-Z]/)
+      expect(note, name).toMatch(/\.$/)
+      // No sentence run into the next, no doubled stop, no stray space before one.
+      expect(note, name).not.toMatch(/\.\.|\s\.|\.[A-Za-z]{2}|[a-z]\. [a-z]/)
+      // Every sentence inside it opens with a capital.
+      for (const sentence of note.split(/(?<=\.)\s+/)) expect(sentence, `${name}: ${sentence}`).toMatch(/^[A-Z]/)
+    }
+    // The guidance quotations are whole sentences too.
+    for (const q of canadaS211Guidance('Insurance')!.quotes) { expect(q).toMatch(/^[A-Z]/); expect(q).toMatch(/\.$/) }
+    expect(CANADA_S211_GUIDANCE_DISCLOSURE).toBe('Show Public Safety Canada guidance')
+  })
+
+  // CANADA_S211_ROUTE_NOT_MET_REASON is deliberately NOT in that list: it is a `reason`, a lower-case
+  // fragment a heading is prepended to ("CS3D not assessed: below the size route..."), like every
+  // other reason constant. This pins that it stays one.
+  it('the route reason is a fragment by design, completed by its heading', () => {
+    expect(CANADA_S211_ROUTE_NOT_MET_REASON).toMatch(/^below the size route assessed here;/)
+  })
+
+  it('the row is NEVER dropped by sector: a bank and a manufacturer both get one, with the same status', () => {
+    for (const over of [{}, { listed_ca_exchange: true }, { total_assets: 1_000_000, employee_count: 10 }]) {
+      const statuses = [...NO_GOODS, 'Industrials & Manufacturing'].map(s => canadaRow(s, over)?.status)
+      expect(new Set(statuses).size, JSON.stringify(over)).toBe(1)
+      expect(statuses[0]).toBeDefined()
+    }
+  })
+
+  it('a sized row that does NOT apply carries no goods note: it claims nothing about the duty', () => {
+    const row = canadaRow('Insurance', { total_assets: 1_000_000, employee_count: 10 })
+    expect(row.status).toBe('not-assessed')
+    expect(row.verify).toBeUndefined()
+  })
+
+  it('a non-Canadian target selling into Canada gets the same note on its sized row', () => {
+    const row = find(getFrameworkApplicability('USA', 80_000_000, 'Banking & Lending', 'ma', 'USD',
+      { total_assets: 40_000_000, employee_count: 400, listed_ca_exchange: false, sales_markets: ['US', 'CA'] }), S211)!
+    expect(row.applies).toBe(true)
+    expect(row.globalFigures).toBe(true)
+    expect(row.verify).toBe(`${CANADA_S211_SIZE_VERIFY} ${CANADA_S211_NO_GOODS_SECTOR_NOTE}`)
+    expect(row.guidance?.quotes).toHaveLength(2)
   })
 
   it('the employees limb states the statutory measure, as the other three tests do', () => {

@@ -468,6 +468,13 @@ function DealReport({ dealId, model: m, upsell, fileTitle }: { dealId: string; m
                         {r.basis && <p style={{ ...cite, fontStyle: 'normal' }}>{r.basis}</p>}
                         {r.near && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.near}</p>}
                         {r.verify && <p style={{ ...cite, fontStyle: 'normal', color: 'var(--color-state-warn)' }}>{r.verify}</p>}
+                        {/* The guidance the note rests on: its own paragraph, cited, in normal text colour. */}
+                        {r.guidance && (
+                          <p style={{ ...cite, fontStyle: 'normal' }}>
+                            <a href={r.guidance.url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>{r.guidance.source}</a>
+                            {': '}{r.guidance.quotes.map(q => `"${q}"`).join(' ')}
+                          </p>
+                        )}
                       </td>
                       <td style={td}><Chip s={STATE[r.chip]} /></td>
                     </tr>

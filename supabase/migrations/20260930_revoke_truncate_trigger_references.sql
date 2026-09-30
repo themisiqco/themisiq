@@ -1,0 +1,124 @@
+-- supabase/migrations/20260930_revoke_truncate_trigger_references.sql
+-- Takes TRUNCATE, TRIGGER, REFERENCES and MAINTAIN away from anon and authenticated on every table in
+-- public, and stops new tables from being given them.
+--
+-- Run in production on 2026-09-30 (verified).
+--
+-- WHAT RAN IS WHAT IS BELOW. The file was first written for three privileges; MAINTAIN was added to
+-- both statements before it was run, and this file was brought into line afterwards. Recorded results:
+--   table owners            all postgres (90 tables)
+--   the extras query        zero rows
+--   postgres's defaults     no longer grant anything to anon or authenticated
+--   supabase_admin          defaults unchanged; it owns no table in public
+--   SELECT/INSERT/UPDATE/DELETE counts identical before and after:
+--     anon SELECT 33; authenticated DELETE 29, INSERT 40, SELECT 86, UPDATE 37
+--
+-- WHY. On 30 Sep 2026 the s211_reports migration was run and its own verification showed
+-- authenticated holding REFERENCES, TRIGGER and TRUNCATE beside the four privileges it had been
+-- granted. A query across public then found the same extras on about 60 tables, including TRUNCATE for
+-- BOTH anon and authenticated on nine of them (the three concierge tables among them).
+--
+-- THE CAUSE IS A DEFAULT, NOT A MIGRATION. db/dumps/schema_public_20260927_1928.sql records:
+--     ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+--       GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLES TO anon;            (and TO authenticated)
+-- Every table in public is created by postgres (all 89 tables and both views in that dump are owned by
+-- postgres, because migrations are run by hand in the SQL editor), so every new table starts with
+-- those privileges for both roles. A later `grant select, ...` ADDS to them; only a REVOKE removes
+-- them. The migrations that open with `revoke all ... from anon` or `from authenticated` are the ones
+-- whose tables came out clean, which is why the extras are uneven across tables.
+--
+-- WHAT THE FOUR PRIVILEGES ARE, AND WHY NOTHING NEEDS THEM:
+--   TRUNCATE    empties a table. ROW LEVEL SECURITY DOES NOT APPLY TO TRUNCATE. PostgREST exposes no
+--               verb for it, so it is not reachable through the API today; it becomes reachable the day
+--               any SECURITY INVOKER function issues one.
+--   TRIGGER     lets the role create a trigger on the table.
+--   REFERENCES  lets the role create a foreign key pointing at the table.
+--   MAINTAIN    PostgreSQL 17: VACUUM, ANALYZE, REINDEX, CLUSTER, REFRESH MATERIALIZED VIEW and LOCK
+--               TABLE. ⚠️ information_schema.role_table_grants DOES NOT LIST IT, which is why the query
+--               that found the other three did not show it; the schema dump did, on 66 tables for anon.
+--   Triggers and foreign keys are created only in migrations, which run as postgres. Searched on
+--   30 Sep 2026 across app/, lib/, scripts/, db/sql/ and supabase/: the only TRUNCATE statement is in
+--   20260914_exiobase_sectors.sql section 5, a one-off run by hand as postgres. No function in the
+--   schema dump truncates. There is no supabase/functions directory. The scripts that connect use the
+--   anon key to READ (cbam-harness.ts, gen-cbam-defaults.ts) or the service role (erase-account.mjs);
+--   none issues DDL. So neither role uses any of the first three. MAINTAIN was not searched for in the
+--   same way before the run: no application path issues VACUUM, ANALYZE, REINDEX or LOCK TABLE through
+--   the API, which has no verb for them.
+--
+-- WHAT THIS DOES NOT TOUCH:
+--   SELECT, INSERT, UPDATE, DELETE. Not one of those grants changes, on any table.
+--   service_role. It keeps what it has; the same default gives it the same three, and it is trusted.
+--   supabase_admin's defaults. That role's default in public is GRANT ALL ON TABLES to anon and
+--     authenticated. It is not changed here: postgres cannot alter another role's defaults, and no
+--     table in public is owned by supabase_admin. Pre-flight A below confirms that still holds. If it
+--     ever creates a table in public, that table starts wide open to both roles.
+--
+-- ── PRE-FLIGHT, run BEFORE this file and keep the output ──────────────────────────────────────────
+--   A. Who owns the tables (the ALTER DEFAULT PRIVILEGES below is FOR ROLE postgres only).
+--   select tableowner, count(*) from pg_tables where schemaname = 'public' group by 1 order by 1;
+--   -- expect one row: postgres. Any other owner: STOP, and tell me which.
+--
+--   B. The defaults as they stand (the "before" for verification 2).
+--   select pg_get_userbyid(d.defaclrole) as creating_role,
+--          case when a.grantee = 0 then 'PUBLIC' else pg_get_userbyid(a.grantee) end as grantee,
+--          string_agg(a.privilege_type, ', ' order by a.privilege_type) as privileges
+--   from pg_default_acl d
+--   join pg_namespace n on n.oid = d.defaclnamespace
+--   cross join lateral aclexplode(d.defaclacl) a
+--   where n.nspname = 'public' and d.defaclobjtype = 'r'
+--   group by 1, 2 order by 1, 2;
+--   -- before the run, for creating_role postgres: anon and authenticated each MAINTAIN, REFERENCES,
+--   -- TRIGGER, TRUNCATE. For supabase_admin: anon and authenticated each the full set.
+--
+-- Safe to run twice: revoking a privilege a role does not hold is a no-op.
+
+begin;
+
+-- 1. Every existing table and view in public. Only these four privileges; nothing else moves.
+revoke truncate, trigger, references, maintain on all tables in schema public from anon, authenticated;
+
+-- 2. Every table postgres creates in public from now on. Without this, the next CREATE TABLE puts
+--    them straight back, which is how s211_reports acquired them.
+alter default privileges for role postgres in schema public
+  revoke truncate, trigger, references, maintain on tables from anon, authenticated;
+
+commit;
+
+-- ── VERIFY AFTER RUNNING ──────────────────────────────────────────────────────────────────────────
+--   1. The extras are gone. Expect ZERO ROWS. (This view cannot show MAINTAIN; 1b does.)
+--   select table_name, grantee,
+--          string_agg(privilege_type, ', ' order by privilege_type) as extra_privileges
+--   from information_schema.role_table_grants
+--   where table_schema = 'public'
+--     and grantee in ('authenticated', 'anon')
+--     and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES')
+--   group by table_name, grantee
+--   order by table_name, grantee;
+--
+--   1b. MAINTAIN is gone too. Expect ZERO ROWS.
+--   select c.relname, r.role
+--   from pg_class c cross join (values ('anon'), ('authenticated')) as r(role)
+--   where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p', 'v', 'm')
+--     and has_table_privilege(r.role, c.oid, 'MAINTAIN')
+--   order by 1, 2;
+--
+--   2. The defaults after the change. Same query as pre-flight B.
+--   -- expect, for creating_role postgres: NO ROW for anon and NO ROW for authenticated, and
+--   -- service_role unchanged (MAINTAIN, REFERENCES, TRIGGER, TRUNCATE). supabase_admin's rows unchanged.
+--
+--   3. Nothing else moved. Run this BEFORE and AFTER and compare: the two results must be identical.
+--   select grantee, privilege_type, count(*) as tables
+--   from information_schema.role_table_grants
+--   where table_schema = 'public' and grantee in ('authenticated', 'anon')
+--     and privilege_type in ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
+--   group by 1, 2 order by 1, 2;
+--
+--   4. A new table now starts clean. Optional, and it cleans up after itself.
+--   begin;
+--   create table public._grant_probe (id int);
+--   select grantee, string_agg(privilege_type, ', ' order by privilege_type)
+--   from information_schema.role_table_grants
+--   where table_schema = 'public' and table_name = '_grant_probe' and grantee in ('anon', 'authenticated')
+--   group by 1;
+--   -- expect ZERO ROWS.
+--   rollback;

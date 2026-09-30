@@ -335,5 +335,19 @@ export const SASB_STANDARDS_URL = 'https://www.ifrs.org/issued-standards/sasb-st
 // framework name). Section 2 carries the "entity" definition the Deals threshold test is built from.
 // ⚠️ THE JUSTICE LAWS PAGE, NOT A SUMMARY. The size limbs are numbers in the definition, so the test's
 // citation has to reach the definition itself.
-// @source-status: verified 2026-09-26
+// The same page carries s.9 (which entities Part 2 applies to), s.10 (control) and s.11 (the annual
+// report), which lib/s211/requirements.ts transcribes. Read again on 30 Sep 2026, when it showed "Act
+// current to 2026-09-21 and last amended on 2024-01-01".
+// @source-status: verified 2026-09-30
 export const CANADA_S211_URL = 'https://laws-lois.justice.gc.ca/eng/acts/F-10.6/page-1.html'
+
+// Intent: Public Safety Canada's "Guidance for entities" on preparing a report under the same Act. It is
+// the page lib/s211/requirements.ts is transcribed from: the example attestation and its signature
+// lines, the mandatory information a report must contain (the steps taken, and requirements (a) to
+// (g)), and the two-step test for who is an entity and who must report.
+// ⚠️ GUIDANCE, NOT THE STATUTE. It restates sections 2 and 11; CANADA_S211_URL above is the Act. The
+// page showed "Date modified: 2025-12-18" when read; a later date there means the transcription in
+// lib/s211/requirements.ts has to be compared with it again.
+// @source-status: verified 2026-09-30
+export const S211_GUIDANCE_URL =
+  'https://www.publicsafety.gc.ca/cnt/cntrng-crm/frcd-lbr-cndn-spply-chns/prpr-rprt-en.aspx'

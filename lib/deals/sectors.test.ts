@@ -33,6 +33,9 @@ const CHANGED_ON_PURPOSE = { heavy: ['Construction & Materials'], ets: ['Constru
 // THE SECOND ONE (Stage 3b, 29 Sep 2026). The Financial Services 'Financed emissions' label changed from
 // 'PCAF / CSRD' to 'Investor expectation (PCAF) / CSRD': PCAF is a market expectation and is not printed
 // bare. Detail, severity and conditionals are unchanged. No production deal carried Financial Services.
+// THE FOURTH (30 Sep 2026). Financial Services and Professional Services take the Canada S-211 sector
+// note their current counterparts take, on a Canadian deal whose S-211 row applies. Every old value
+// also gained the goods note on the size route that day. Neither changes a framework list or a price.
 // THE THIRD ONE (Stage 3b follow-up, 29 Sep 2026). Transport & Logistics 'Fleet decarbonisation liability'
 // was split into the universal Scope 1 finding and 'EU route fuel and carbon costs', which carries the
 // EU-route conditional. No production deal carried Transport & Logistics (sector counts of 29 Sep 2026).

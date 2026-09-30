@@ -41,7 +41,7 @@ import {
   WARN, WARN_WASH, OK, OK_WASH, ERROR, ERROR_WASH,
 } from '../pdf/palette'
 import {
-  CHIP_LABELS,
+  CHIP_LABELS, guidanceParagraph,
   type DealReportModel, type Rich, type ReportPanel, type StatusChip, type SeverityChip,
 } from './reportModel'
 import type { ClaimsLine } from './claimsRules'
@@ -420,6 +420,8 @@ export function generateDealReportPDF(m: DealReportModel): jsPDF {
           ...(r.basis ? [plain(r.basis, 'normal', SECONDARY)] : []),
           ...(r.near ? [plain(r.near, 'normal', WARN)] : []),
           ...(r.verify ? [plain(r.verify, 'normal', WARN)] : []),
+          // The guidance the note rests on: its own paragraph, cited, in the ordinary secondary colour.
+          ...(r.guidance ? [plain(guidanceParagraph(r.guidance), 'normal', SECONDARY)] : []),
         ] },
         { chip: r.chip },
       ]),
