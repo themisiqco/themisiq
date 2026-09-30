@@ -34,6 +34,7 @@ import type jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { createLayout, MARGIN, type Layout } from '../pdf/layout'
 import { CHARIS_FAMILY } from '../fonts/charis'
+import { charisCanDraw, fallbackText } from '../pdf/drawable'
 import { THEMISIQ_WORDMARK_DATA_URI, WORDMARK_ASPECT } from '../pdf/logo'
 import { BRAND } from '../brand'
 import {
@@ -49,40 +50,10 @@ import type { ClaimsLine } from './claimsRules'
 // ── typed text the font cannot draw ──────────────────────────────────────────────────────────────
 
 type FaceStyle = 'normal' | 'bold' | 'italic'
-const FACES: FaceStyle[] = ['normal', 'bold', 'italic']
 
-/**
- * Can every embedded face draw this code point? Read from the cmap jsPDF itself parsed out of the
- * embedded bytes, so it is the same answer the renderer will act on. All three faces, because a
- * string may be set in any of them.
- */
-export const charisCanDraw = (doc: jsPDF): ((cp: number) => boolean) => {
-  const maps = FACES.map(style => {
-    const font = (doc as unknown as { internal: { getFont: (f: string, s: string) => { metadata?: { cmap?: { unicode?: { codeMap?: Record<number, number | undefined> } } } } } })
-      .internal.getFont(CHARIS_FAMILY, style)
-    const codeMap = font.metadata?.cmap?.unicode?.codeMap
-    if (!codeMap) throw new Error(`Charis ${style} is not registered on this document, so its coverage cannot be read.`)
-    return codeMap
-  })
-  return (cp: number) => maps.every(m => !!m[cp])
-}
-
-/**
- * The drawable form of `s`. A character the font can draw is kept as typed, accents and all: "é" is
- * in the subset and prints as "é". One it cannot draw is decomposed (NFD) and its combining marks
- * removed, so "ș" prints as "s"; if the base is still undrawable, as with "Ł" or "北", it prints "?".
- * A character is never simply removed.
- */
-export const fallbackText = (s: string, canDraw: (cp: number) => boolean): string => {
-  let out = ''
-  for (const ch of s) {
-    const cp = ch.codePointAt(0)!
-    if (ch === '\n' || canDraw(cp)) { out += ch; continue }
-    const base = ch.normalize('NFD').replace(/[̀-ͯ]/g, '')
-    out += base && [...base].every(c => canDraw(c.codePointAt(0)!)) ? base : '?'
-  }
-  return out
-}
+// charisCanDraw and fallbackText moved to lib/pdf/drawable.ts (30 Sep 2026), shared with the S-211
+// report. Re-exported so this module's callers and tests are unchanged.
+export { charisCanDraw, fallbackText }
 
 /** Every string in the model, for the one pass that decides whether the cover owes a note. */
 const stringsOf = (v: unknown): string[] =>

@@ -529,12 +529,29 @@ export const SECTIONS: readonly SectionDef[] = [
       { key: 'approval_basis', label: 'Basis of approval', type: 'choice', source: 'act', required: true, options: ['single', 'joint_each', 'joint_controlling'],
         hint: 'The Act requires the statement to say which. The choices depend on the report type in section 1.' },
       { key: 'approval_date', label: 'Date the governing body approved the report', type: 'date', source: 'act', required: true, hint: '' },
-      { key: 'signatory_name', label: 'Full name of the member who signs', type: 'text', source: 'guidance', required: true,
+      // Under 11(4)(b)(ii) the approving body is the controlling entity's, which the report need not cover
+      // ("the entity, if any, that controls each entity included in the report"), so it is named here
+      // rather than assumed to be the reporting entity in section 1.
+      { key: 'controlling_entity', label: 'Legal name of the controlling entity whose governing body approved the report', type: 'text', source: 'act',
+        required: c => c.approval_basis === 'joint_controlling', showWhen: c => c.approval_basis === 'joint_controlling',
+        hint: 'Often the reporting entity. It need not be one of the entities the report covers.' },
+      // One signature block per approving body: s.11(5)(b) asks for "the signature of one or more
+      // members of the governing body of each entity that approved the report". Under 11(4)(a) and (b)(ii)
+      // one body approved, so one signer; under (b)(i) each entity's body approved, so one signer each.
+      { key: 'signatory_name', label: 'Full name of the member who signs', type: 'text', source: 'guidance',
+        required: c => c.approval_basis !== 'joint_each', showWhen: c => c.approval_basis !== 'joint_each',
         hint: 'The only person named in the report.' },
-      { key: 'signatory_title', label: 'Their title', type: 'text', source: 'guidance', required: true, hint: 'For example "Chair of the Board".' },
+      { key: 'signatory_title', label: 'Their title', type: 'text', source: 'guidance',
+        required: c => c.approval_basis !== 'joint_each', showWhen: c => c.approval_basis !== 'joint_each', hint: 'For example "Chair of the Board".' },
+      { key: 'entity_signatories', label: 'The member who signs for each entity', type: 'rows', source: 'act',
+        columns: [{ key: 'entity', label: 'Entity (legal name, as in section 1)' }, { key: 'name', label: 'Full name of the member who signs' }, { key: 'title', label: 'Their title' }],
+        required: c => c.approval_basis === 'joint_each', showWhen: c => c.approval_basis === 'joint_each', requiredColumns: ['entity', 'name', 'title'],
+        hint: 'Each entity\'s governing body approved the report, so a member of each signs it. One row per entity covered. These are the only people named in the report.' },
       { key: 'attestation_text', label: 'Attestation', type: 'textarea', maxChars: 1200, source: 'guidance', required: true,
         hint: 'Pre-filled with Public Safety Canada\'s example. You may edit it.' },
-      { key: 'authority_to_bind', label: 'The signer has the authority to bind the entity', type: 'confirm', source: 'guidance', required: true, hint: '' },
+      { key: 'authority_to_bind', label: 'The signer has the authority to bind the entity', type: 'confirm', source: 'guidance', required: true, hint: '',
+        labelWhen: c => (c.approval_basis === 'joint_each' ? 'Each signer has the authority to bind the entity they sign for'
+          : c.approval_basis === 'joint_controlling' ? 'The signer has the authority to bind the controlling entity' : 'The signer has the authority to bind the entity') },
     ],
     controlledEntities: null,
     strongExample: 'Approved by the Board of Directors of Harrowgate Outdoor Equipment Inc. on April 14, 2026 under subparagraph 11(4)(b)(ii) of the Act, as the governing body of the entity that controls each entity included in this report. Signed by a named director, with the title "Chair of the Board", the date, and the statement "I have the authority to bind Harrowgate Outdoor Equipment Inc."',

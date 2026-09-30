@@ -1945,3 +1945,16 @@ change on the next run, so the tree cannot be kept clean by discarding it. Eithe
 next Next.js version produce a small diff, or add it to `.gitignore` and accept that the guidance it
 carries stops being reviewed. It has been excluded from every stage line by hand so far, which works and
 relies on somebody remembering.
+
+---
+
+## S-211 report builder
+
+### Wider Latin coverage (Latin Extended-A/B) via a second Charis SIL subset
+
+Logged 30 Sep 2026. Wider Latin coverage (Latin Extended-A/B) via a second Charis SIL subset; warning on
+the check page covers the gap meanwhile. The embedded subset (`lib/fonts/charis.ts`) covers Basic Latin
+and Latin-1, so Polish, Czech and Turkish letters (Ł, č, ş) print without their accents or as "?". The
+check page names each affected field before export (`scanUndrawable` in `lib/s211/exportCheck.ts`).
+Keep the Deals report on the current subset: register the wider one under its own family name for the
+S-211 renderer only, and give it its own coverage list and test beside `lib/pdf/charisCoverage.ts`.

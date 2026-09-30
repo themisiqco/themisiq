@@ -13,7 +13,7 @@ import Link from 'next/link'
 import { s211Api } from '../../../../../lib/s211/client'
 import {
   SECTIONS, sectionDef, isSectionKey, KEY_TERMS, KEY_TERMS_EXPLANATION_LABEL, OECD_STEPS, OECD_STEPS_SOURCE_NOTE,
-  ATTESTATION_EXAMPLE_NOTE, BUILDER_NOTE_ON_SIGNING, EXAMPLES_LABEL, MONTHS, quotedExample,
+  BUILDER_NOTE_ON_SIGNING, EXAMPLES_LABEL, MONTHS, quotedExample,
   type SectionContent, type SectionKey,
 } from '../../../../../lib/s211/builderContent'
 import { NOTHING_TO_REPORT_KEY, asList, missingRequired, type SectionStatus } from '../../../../../lib/s211/sectionStatus'
@@ -24,7 +24,8 @@ import {
   assembleSteps, buildStepsContent, stepsDraftState, summaryEdited, describeStepsChanges, STEP_ITEM_LABEL, STALE_NOTICE, DRAFT_NOTICE,
   REBUILD_PANEL_INTRO, KEEP_MINE, REPLACE_WITH_NEW, type StepItem,
 } from '../../../../../lib/s211/stepsSummary'
-import { refreshAttestation, signatureLines, attestationEdited } from '../../../../../lib/s211/attestation'
+import { refreshAttestation, attestationEdited, attestationInputs, attestationNote } from '../../../../../lib/s211/attestation'
+import { signatureBlocks, entitiesCovered } from '../../../../../lib/s211/reportModel'
 import { isFirstVisit, recordVisit, browserStore } from '../../../../../lib/s211/visits'
 import {
   BuilderFrame, S, StatusPill, QuoteBlock, Disclosure, FieldInput, StepStatusRows, NotFound404, PersonalInformation,
@@ -100,9 +101,14 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
   }
   const change = (key: string, value: unknown) => {
     let c = { ...contentRef.current, [key]: value }
+    // Section 11, approval by each entity's governing body: start one signer row per entity covered.
+    if (sectionKey === 'approval_attestation' && key === 'approval_basis' && value === 'joint_each'
+      && !(Array.isArray(c.entity_signatories) && c.entity_signatories.length)) {
+      c = { ...c, entity_signatories: entitiesCovered(others.report_details ?? {}).map(entity => ({ entity, name: '', title: '' })) }
+    }
     // Section 11: the attestation follows the signer's title while it is unedited (lib/s211/attestation.ts).
-    if (sectionKey === 'approval_attestation' && key === 'signatory_title') {
-      const r = refreshAttestation(c, { title: c.signatory_title, reportType: others.report_details?.report_type, legalName: others.report_details?.legal_name })
+    if (sectionKey === 'approval_attestation' && (key === 'signatory_title' || key === 'approval_basis' || key === 'controlling_entity')) {
+      const r = refreshAttestation(c, attestationInputs(c, others.report_details))
       c = r.content
       if (r.offer) setPending({ kind: 'attestation', mine: String(c.attestation_text ?? ''), next: { ...c, attestation_text: r.offer, _attestation_built: r.offer } })
     }
@@ -125,7 +131,7 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
       // Section 11: the attestation starts as Public Safety Canada's example with its placeholders filled
       // from the answers. Shown, not saved, until the user changes something.
       if (sectionKey === 'approval_attestation') {
-        const res = refreshAttestation(c, { title: c.signatory_title, reportType: map.report_details?.report_type, legalName: map.report_details?.legal_name })
+        const res = refreshAttestation(c, attestationInputs(c, map.report_details))
         c = res.content
         if (res.offer) setPending({ kind: 'attestation', mine: String(c.attestation_text ?? ''), next: { ...c, attestation_text: res.offer, _attestation_built: res.offer } })
       }
@@ -284,10 +290,17 @@ function SectionPage({ id, sectionKey }: { id: string; sectionKey: SectionKey })
                 )}
                 {sectionKey === 'approval_attestation' && f.key === 'attestation_text' && (
                   <div style={{ ...S.warn, marginTop: -8 }}>
-                    <p style={{ margin: '0 0 8px' }}>{ATTESTATION_EXAMPLE_NOTE}</p>
+                    <p style={{ margin: '0 0 8px' }}>{attestationNote(content.approval_basis)}</p>
                     {attestationEdited(content) && <p style={{ margin: '0 0 8px' }}>You have edited this text, so later changes to your answers will not change it without asking you.</p>}
-                    <p style={{ margin: '0 0 4px' }}>The signature block printed under it, as the guidance lists it, with your entity&rsquo;s name:</p>
-                    <ul style={{ margin: '0 0 8px', paddingLeft: 18 }}>{signatureLines(others.report_details?.legal_name).map(l => <li key={l}>{l}</li>)}</ul>
+                    {(() => {
+                      const blocks = signatureBlocks(content, others.report_details ?? {})
+                      return <>
+                        <p style={{ margin: '0 0 4px' }}>{blocks.length > 1 ? `Printed under it: ${blocks.length} signature blocks, one for each entity whose governing body approved the report, each with the four lines the guidance lists:` : 'Printed under it: the signature block, with the four lines the guidance lists:'}</p>
+                        <ul style={{ margin: '0 0 8px', paddingLeft: 18 }}>
+                          {blocks.map((b, i) => <li key={i}>{b.rows.map(r => r.label).join(', ')}, and &ldquo;{b.statement}&rdquo;</li>)}
+                        </ul>
+                      </>
+                    })()}
                     <p style={{ margin: 0 }}>{BUILDER_NOTE_ON_SIGNING}</p>
                   </div>
                 )}

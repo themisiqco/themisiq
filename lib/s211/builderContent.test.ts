@@ -151,6 +151,14 @@ describe('review fixes: the builder pages (source checks)', () => {
     expect(check).not.toMatch(/\.join\('; '\)/)
   })
 
+  it('the check page downloads the PDF through the gated export route, and lists what blocks it (Stage 4)', () => {
+    expect(check).toContain('Download PDF')
+    expect(check).toContain('s211Download(`/reports/${id}/export`)')
+    expect(check).toContain('exportGate(sections)')
+    expect(check).toContain('scanPersonalInformation(')
+    expect(check).not.toContain('window.open')
+  })
+
   it('the home page labels the Act s.9(a) and shows notes after the quotations; the list page offers the next report due (items C14, C15, C17)', () => {
     expect(home).toContain("'The Act, s.9(a)'")
     expect(home.indexOf('obligation.guidanceQuoted.map')).toBeLessThan(home.indexOf('obligation.notes.map'))
