@@ -139,6 +139,9 @@ export type LimbRow = {
   isProxy: boolean
 }
 
+/** On every limb of a test run for a market the target is not established in (Canada S-211 via sales markets). */
+export const GLOBAL_FIGURES_NOTE = 'The figures applied are the target’s global figures, not its Canadian business alone.'
+
 export const buildLimbRows = (applicability: FrameworkApplicability[]): LimbRow[] =>
   applicability
     .filter(f => f.test)
@@ -155,8 +158,8 @@ export const buildLimbRows = (applicability: FrameworkApplicability[]): LimbRow[
         state: l.state,
         basisOfValue: l.state === 'not-assessed'
           ? `Not provided. Enter ${FIELD_LABELS[l.limb.source]}`
-          : `${FIELD_FORM_LABELS[l.limb.source]}${l.limb.exactMeasure ? '' : `: PROXY. ${l.limb.measureNote ?? ''}`}`,
-        isProxy: l.state !== 'not-assessed' && !l.limb.exactMeasure,
+          : `${FIELD_FORM_LABELS[l.limb.source]}${l.limb.exactMeasure && !f.globalFigures ? '' : `: PROXY. ${[l.limb.measureNote, f.globalFigures ? GLOBAL_FIGURES_NOTE : null].filter(Boolean).join(' ')}`}`,
+        isProxy: l.state !== 'not-assessed' && (!l.limb.exactMeasure || !!f.globalFigures),
       }
     }))
 
@@ -1039,11 +1042,11 @@ export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): D
         // its place. See canadaCaveatForMarkets in ./markets.
         ...(s211Caveat === 'show'
           ? [{
-              title: canadaS211CaveatText(deal).heading.toUpperCase(),
+              title: canadaS211CaveatText().heading.toUpperCase(),
               // The constant is one sentence with its heading before the colon, so the cut body
               // starts mid-sentence in lower case; it opens a panel here, so it is capitalised.
               // Market-aware since 29 Sep 2026: with Canada ticked, the body says so. See canadaS211CaveatText.
-              body: [canadaS211CaveatText(deal).body],
+              body: [canadaS211CaveatText().body],
             }]
           : []),
         // ONLY THE TESTS THIS DEAL RAN (29 Sep 2026). This read every active test in THRESHOLD_TESTS, so

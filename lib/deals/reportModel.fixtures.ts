@@ -31,9 +31,11 @@ export const NEAR_THRESHOLD_DEAL: DealReportDeal = {
   listed_ca_exchange: false,
   has_ghg_data: false,
   has_esg_report: true,
-  // Sells in Canada too, so the S-211 caveat shows; reports no claims, so the note, not the finding.
-  sales_markets: ['GB', 'CA'],
-  sales_markets_not_sure: null,
+  // The UK, and "not sure" beyond it, so the S-211 caveat shows (Canada not confirmed either way) and
+  // nothing is converted. With Canada ticked the S-211 size test would run instead, in CAD.
+  // Reports no claims, so the note, not the finding.
+  sales_markets: ['GB'],
+  sales_markets_not_sure: true,
   env_claims: 'no',
 }
 

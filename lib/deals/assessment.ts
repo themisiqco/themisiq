@@ -708,20 +708,15 @@ export const CANADA_S211_JURISDICTION_CAVEAT =
 // settles applicability outright and carries its own VERIFY note about goods. A caveat on a deal it does
 // not apply to is the noise that made the framework-row version wrong.
 /**
- * The caveat as printed, heading and body split at the constant's colon (29 Sep 2026). With Canada
- * among the target's sales markets, "this assessment records one primary jurisdiction" is no longer
- * the whole truth: the market is known, and what is not run is the size test, which this engine
- * applies only to a Canadian target. Otherwise the body is today's sentence.
+ * The caveat as printed, heading and body split at the constant's colon. It is shown only where
+ * Canada is not confirmed either way (markets "not sure"): with Canada ticked the size test runs on
+ * the deal's figures instead (see the S-211 routing in getFrameworkApplicability), so there is no
+ * longer a Canada-ticked wording to give.
  */
-export const CANADA_S211_MARKET_SENTENCE =
-  'The target sells into or operates in Canada, so this applies to its Canadian business if it meets the Act’s size tests, which this assessment runs only for a Canadian target.'
-export const canadaS211CaveatText = (m: MarketsInput): { heading: string; body: string } => {
+export const canadaS211CaveatText = (): { heading: string; body: string } => {
   const heading = CANADA_S211_JURISDICTION_CAVEAT.split(':')[0]
   const cut = CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 2)
-  const body = cut.charAt(0).toUpperCase() + cut.slice(1)
-  if (!(m.sales_markets ?? []).includes('CA')) return { heading, body }
-  const firstSentence = body.slice(0, body.indexOf('. ') + 1)
-  return { heading, body: `${firstSentence} ${CANADA_S211_MARKET_SENTENCE}` }
+  return { heading, body: cut.charAt(0).toUpperCase() + cut.slice(1) }
 }
 
 export const showCanadaS211JurisdictionCaveat = (
@@ -1275,6 +1270,10 @@ export type FrameworkApplicability = {
   rule?: string
   // A market row's own sentence, where it needs more than the section's introduction (UK SRS).
   note?: string
+  // The size test ran on the deal's WHOLE figures for a market the target is not established in: Canada
+  // S-211 for a non-Canadian target selling into Canada. The Act measures the business in Canada; the
+  // deal records one set of global figures, so every limb is a proxy and the report says so.
+  globalFigures?: true
   // Why the framework's applicability could not be ESTABLISHED FROM THE MODELLED TEST. That covers an
   // abstention no size test can answer (no EU-footprint field, no entity-type field) AND a
   // NON-EXHAUSTIVE test whose modelled route was evaluated and NOT met — the route is settled, the
@@ -1493,13 +1492,18 @@ export const getFrameworkApplicability = (
     out.push({ framework: 'Canada S-211', applies: true, status: 'applies', verify: CANADA_S211_LISTING_VERIFY })
   } else if (jurisdiction === 'Canada') {
     sized('Canada S-211')
+  } else if ((size.sales_markets ?? []).includes('CA')) {
+    // DOING BUSINESS IN CANADA, FROM THE SALES MARKETS (29 Sep 2026). The Act reaches a company doing
+    // business in Canada wherever it is based, and the target reports Canada among its markets, so the
+    // same size test runs: same limbs, same thresholds, same non-exhaustive treatment. On the deal's
+    // global figures, which is the proxy `globalFigures` makes the report state on every limb.
+    sized('Canada S-211')
+    out[out.length - 1] = { ...out[out.length - 1], globalFigures: true }
   }
-  // ⚠️ NO ROW FOR A NON-CANADIAN TARGET, AND THAT IS THE DECISION RATHER THAN THE GAP. The Act can reach
-  // a company doing business in Canada wherever it is based, which this assessment cannot establish from a
-  // single primary jurisdiction. Stating that as a withheld FRAMEWORK ROW was tried and withdrawn on
-  // 26 Sep 2026 — it landed on every deal and failed 13 tests. It is stated once instead, as a standing
-  // limitation: CANADA_S211_JURISDICTION_CAVEAT, gated by showCanadaS211JurisdictionCaveat, rendered in
-  // the report's limitations register and the wizard's step 2.
+  // NO ROW FOR A NON-CANADIAN TARGET WHOSE MARKETS DO NOT INCLUDE CANADA. Stating that as a withheld
+  // FRAMEWORK ROW was tried and withdrawn on 26 Sep 2026: it landed on every deal and failed 13 tests.
+  // Where Canada is not confirmed either way (markets "not sure"), CANADA_S211_JURISDICTION_CAVEAT says
+  // so once, gated by showCanadaS211JurisdictionCaveat and canadaCaveatForMarkets.
 
   // Environmental-claims regimes named by market (EU ECGT, California AB 1305): APPLIES on a reported
   // claim, APPLIES: VERIFY on "not sure", nothing when claims are "no" or never asked. Each carries its

@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
-  sectorRisks, SECTOR_RISKS, CONDITION_SCREEN_NOTE, canadaS211CaveatText, CANADA_S211_MARKET_SENTENCE,
+  sectorRisks, SECTOR_RISKS, CONDITION_SCREEN_NOTE, canadaS211CaveatText,
   CANADA_S211_JURISDICTION_CAVEAT,
 } from './assessment'
-import { buildDealReportModel, compactMoneyRange, NO_PRICED_OBLIGATION } from './reportModel'
+import { buildDealReportModel, compactMoneyRange, NO_PRICED_OBLIGATION, GLOBAL_FIGURES_NOTE, type DealReportModel } from './reportModel'
 import { NOT_ASSESSED_DEAL, FX_DEAL, FIXTURE_GENERATED_AT } from './reportModel.fixtures'
-import { EU_ECGT_FRAMEWORK } from './markets'
+import { EU_ECGT_FRAMEWORK, EU_MEMBER_CODES, homeMarkets, startingMarkets, marketsOnJurisdictionChange, draftMarkets } from './markets'
+import { parseDealDraft } from './draft'
 
 // Pre-ship fixes from the sample review (29 Sep 2026): market-aware conditions, third-person wording,
 // the nothing-included headline, the GHG floor, the ECGT name and the value-at-risk rounding.
@@ -76,16 +79,11 @@ describe('no second person in any condition', () => {
   })
 })
 
-describe('the Canada S-211 caveat, with Canada ticked', () => {
-  it('states the market and what is not run', () => {
-    const t = canadaS211CaveatText({ sales_markets: ['CA'] })
-    expect(t.body).toContain(CANADA_S211_MARKET_SENTENCE)
-    expect(t.body).not.toContain('records one primary jurisdiction')
-  })
-
-  it('keeps today’s sentence when markets are not sure', () => {
-    const t = canadaS211CaveatText({ sales_markets: null, sales_markets_not_sure: true })
+describe('the Canada S-211 caveat text', () => {
+  it('is today’s sentence, capitalised; it is shown only for markets "not sure" (see canadaCaveatForMarkets)', () => {
+    const t = canadaS211CaveatText()
     expect(t.body.slice(1)).toBe(CANADA_S211_JURISDICTION_CAVEAT.slice(CANADA_S211_JURISDICTION_CAVEAT.indexOf(':') + 3))
+    expect(t.body.charAt(0)).toBe('T')
   })
 })
 
@@ -126,5 +124,119 @@ describe('value-at-risk rounding', () => {
     const text = m.cost.exposure!.map(p => (typeof p === 'string' ? p : p.strong)).join('')
     expect(text).toMatch(/\(USD \d+(\.\d)?M–\d+(\.\d)?M\)/)
     expect(text).not.toMatch(/\d{1,3},\d{3},\d{3}/)
+  })
+})
+
+// ── Home market pre-tick, and Canada S-211 through the sales markets (29 Sep 2026) ────────────────
+describe('the picker starts with the home market', () => {
+  it('each jurisdiction’s home market; Global and Other none', () => {
+    expect(homeMarkets('USA')).toEqual(['US'])
+    expect(homeMarkets('UK')).toEqual(['GB'])
+    expect(homeMarkets('Canada')).toEqual(['CA'])
+    expect(homeMarkets('Australia')).toEqual(['AU'])
+    expect(homeMarkets('European Union')).toEqual([...EU_MEMBER_CODES])   // the EU group, ticked whole
+    expect(homeMarkets('Global')).toBeNull()
+    expect(homeMarkets('Other')).toBeNull()
+  })
+
+  it('a new USA deal starts with US ticked, as a pre-tick that may follow the jurisdiction', () => {
+    expect(startingMarkets({ sales_markets: null, sales_markets_not_sure: null }, 'USA')).toEqual({ sales_markets: ['US'], auto: true })
+  })
+
+  it('a saved answer is never altered, "not sure" included', () => {
+    expect(startingMarkets({ sales_markets: ['CA', 'FR'], sales_markets_not_sure: null }, 'USA')).toEqual({ sales_markets: ['CA', 'FR'], auto: false })
+    expect(startingMarkets({ sales_markets: null, sales_markets_not_sure: true }, 'USA')).toEqual({ sales_markets: null, auto: false })
+    expect(startingMarkets({ sales_markets: null, sales_markets_not_sure: null }, 'Global')).toEqual({ sales_markets: null, auto: false })
+  })
+
+  it('the wizard wires it: new deal, load, draft, jurisdiction change, and the first edit', () => {
+    const src = readFileSync(join(process.cwd(), 'app/dashboard/deals/page.tsx'), 'utf8')
+    expect(src).toContain("sales_markets: homeMarkets('USA') as string[] | null")
+    expect(src).toContain('const loadedMarkets = startingMarkets({')
+    expect(src).toContain('marketsOnJurisdictionChange({ sales_markets: deal.sales_markets, auto: marketsAuto }, e.target.value)')
+    expect(src).toContain('sales_markets: draftMarkets({ sales_markets: deal.sales_markets, auto: marketsAuto })')
+    expect(src).toContain("setMarketsAuto(false); update('sales_markets', markets)")
+  })
+})
+
+describe('Canada S-211 for a non-Canadian target selling into Canada', () => {
+  const usTarget = (over: Record<string, unknown>) => buildDealReportModel({
+    ...FX_DEAL, jurisdiction: 'USA', currency: 'USD', listed_ca_exchange: null,
+    sales_markets: ['US', 'CA'], sales_markets_not_sure: null, ...over,
+  } as typeof FX_DEAL, FIXTURE_GENERATED_AT)
+  const s211 = (m: DealReportModel) => m.sizeTests.rows.filter(r => r.framework === 'Canada S-211')
+
+  it('figures above the thresholds: the size test runs and S-211 APPLIES', () => {
+    const m = usTarget({ revenue: 100_000_000, employee_count: 300, total_assets: 50_000_000 })
+    expect(m.applicable.rows.find(r => r.framework === 'Canada S-211')?.chip).toBe('applies')
+    expect(s211(m).length).toBe(3)
+    for (const r of s211(m)) {
+      expect(r.isProxy).toBe(true)
+      expect(r.basisOfValue).toContain(GLOBAL_FIGURES_NOTE)
+    }
+  })
+
+  it('figures below: every limb NOT MET, and S-211 does not apply', () => {
+    const m = usTarget({ revenue: 5_000_000, employee_count: 20, total_assets: 1_000_000 })
+    expect(m.applicable.rows.some(r => r.framework === 'Canada S-211')).toBe(false)
+    expect(s211(m).map(r => r.result)).toEqual(['NOT MET', 'NOT MET', 'NOT MET'])
+  })
+
+  it('markets "not sure": no size test, the caveat instead, in today’s wording', () => {
+    const m = usTarget({ sales_markets: null, sales_markets_not_sure: true, revenue: 100_000_000, employee_count: 300, total_assets: 50_000_000 })
+    expect(s211(m)).toEqual([])
+    const caveat = m.sizeTests.panels.find(p => p.title === 'CANADA S-211 NOT FULLY ASSESSED')
+    expect(caveat?.body[0]).toBe(canadaS211CaveatText().body)
+  })
+
+  it('markets without Canada: no size test and no caveat', () => {
+    const m = usTarget({ sales_markets: ['US', 'MX'], revenue: 100_000_000, employee_count: 300, total_assets: 50_000_000 })
+    expect(s211(m)).toEqual([])
+    expect(m.sizeTests.panels.some(p => p.title === 'CANADA S-211 NOT FULLY ASSESSED')).toBe(false)
+  })
+
+  it('a listing Yes still takes the listing route first', () => {
+    const m = usTarget({ listed_ca_exchange: true, revenue: 5_000_000, employee_count: 20, total_assets: 1_000_000 })
+    expect(m.applicable.rows.find(r => r.framework === 'Canada S-211')?.chip).toBe('verify')
+    expect(s211(m)).toEqual([])
+  })
+
+  it('a Canadian target’s own limbs carry no global-figures note', () => {
+    const m = usTarget({ jurisdiction: 'Canada', currency: 'CAD', revenue: 100_000_000, employee_count: 300, total_assets: 50_000_000 })
+    for (const r of s211(m)) expect(r.basisOfValue).not.toContain(GLOBAL_FIGURES_NOTE)
+  })
+})
+
+describe('the pre-tick follows the jurisdiction until the user edits the markets', () => {
+  it('new deal, USA, then UK: markets are [GB]', () => {
+    const start = startingMarkets({ sales_markets: null, sales_markets_not_sure: null }, 'USA')
+    expect(start).toEqual({ sales_markets: ['US'], auto: true })
+    expect(marketsOnJurisdictionChange(start, 'UK')).toEqual({ sales_markets: ['GB'], auto: true })
+  })
+
+  it('the same sequence through the sign-in draft: USA, sign in, then UK gives [GB]', () => {
+    // THE BUG FOUND ON LOCALHOST. The draft stored the pre-tick ['US'] as a list, so the restore read it
+    // as an answer and UK left United States ticked. It stores NULL for a pre-tick now.
+    const start = startingMarkets({ sales_markets: null, sales_markets_not_sure: null }, 'USA')
+    const draft = parseDealDraft(JSON.stringify({ target_name: 'X', jurisdiction: 'USA', sales_markets: draftMarkets(start) }))!
+    const restored = startingMarkets({ sales_markets: draft.sales_markets ?? null, sales_markets_not_sure: draft.sales_markets_not_sure ?? null }, draft.jurisdiction)
+    expect(restored).toEqual({ sales_markets: ['US'], auto: true })
+    expect(marketsOnJurisdictionChange(restored, 'UK').sales_markets).toEqual(['GB'])
+  })
+
+  it('what the old draft did, for the record: a stored US list reads as an answer and does not move', () => {
+    const restored = startingMarkets({ sales_markets: ['US'], sales_markets_not_sure: null }, 'USA')
+    expect(marketsOnJurisdictionChange(restored, 'UK').sales_markets).toEqual(['US'])
+  })
+
+  it('once the user ticks or unticks, the markets are theirs and stay put', () => {
+    const edited = { sales_markets: ['US', 'CA'], auto: false }
+    expect(marketsOnJurisdictionChange(edited, 'UK')).toBe(edited)
+    expect(draftMarkets(edited)).toEqual(['US', 'CA'])
+  })
+
+  it('Global names no home market, and the pre-tick clears rather than lingering', () => {
+    const start = startingMarkets({ sales_markets: null, sales_markets_not_sure: null }, 'USA')
+    expect(marketsOnJurisdictionChange(start, 'Global')).toEqual({ sales_markets: null, auto: true })
   })
 })

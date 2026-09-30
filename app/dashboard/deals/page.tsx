@@ -14,7 +14,7 @@ import { supabase } from '../../../lib/supabase'
 // user walled" or "may they see results" has reintroduced the drift the extraction removed.
 import { resolveWizardGate, type FreeTierDeal, type SessionState } from '../../../lib/deals/gates'
 import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
-import { canadaCaveatForMarkets, isEnvClaims, type EnvClaims } from '../../../lib/deals/markets'
+import { canadaCaveatForMarkets, isEnvClaims, homeMarkets, startingMarkets, marketsOnJurisdictionChange, draftMarkets, type EnvClaims } from '../../../lib/deals/markets'
 import { isMarketCode, CLAIMS_DATA_ROOM_ITEM } from '../../../lib/deals/claimsRules'
 import MarketPicker from './MarketPicker'
 import { sectionHead } from '@/app/components/headingStyles'
@@ -168,7 +168,8 @@ function DealsDashboardInner() {
     total_assets: null as number | null,
     // NULL = not answered, and stays NULL on save, so the report can say "not recorded" rather than
     // read a default as an answer. See 20260929_deals_sales_markets_env_claims.sql.
-    sales_markets: null as string[] | null,
+    // Starts with the home market of the default jurisdiction (USA), ticked; see startingMarkets.
+    sales_markets: homeMarkets('USA') as string[] | null,
     sales_markets_not_sure: null as boolean | null,
     env_claims: null as EnvClaims | null,
     jurisdiction: 'USA',
@@ -190,6 +191,9 @@ function DealsDashboardInner() {
   // new deal — gating on it would warn someone who has entered nothing. `dirty` starts false and
   // only a real edit sets it, matching GHG's flag of the same name.
   const [dirty, setDirty] = useState(false)
+  // Is `deal.sales_markets` a pre-ticked home market rather than the user's answer? While it is, it
+  // follows a change of jurisdiction; the first edit to the markets makes it the user's.
+  const [marketsAuto, setMarketsAuto] = useState(true)
   // Share-link state (C4) — kept SEPARATE from the deal object so they never enter handleSave's
   // row payload; token/share_enabled are DB-owned (token auto-generated, share_enabled toggled here).
   const [dealToken, setDealToken] = useState<string | null>(null)
@@ -290,7 +294,13 @@ function DealsDashboardInner() {
         // this tab. Merged OVER the defaults, never under — see parseDealDraft's own note.
         const draft = takeDealDraft()
         if (draft) {
-          setDeal(d => ({ ...d, ...draft }))
+          // The draft's markets are an answer if it recorded any; otherwise the home market of the
+          // draft's jurisdiction ('USA' is the form's default), still following it.
+          const start = startingMarkets(
+            { sales_markets: draft.sales_markets ?? null, sales_markets_not_sure: draft.sales_markets_not_sure ?? null },
+            draft.jurisdiction ?? 'USA')
+          setMarketsAuto(start.auto)
+          setDeal(d => ({ ...d, ...draft, sales_markets: start.sales_markets }))
           // `dirty`, not `saved`: they have unsaved work in the form again, which is the same state
           // they were in before the bounce. Marking it saved would let them close the tab believing
           // the draft had been stored.
@@ -309,6 +319,14 @@ function DealsDashboardInner() {
       setDealToken(data.token ?? null)      // token isn't secret to the owner; drives the share UI
       setSavedSector(data.sector ?? '')     // what the link would serve right now
       setShareEnabled(!!data.share_enabled)
+      // Unknown codes are dropped on load rather than carried into the next save; then the saved answer
+      // stands as saved, or, if the markets were never recorded, the home market is pre-ticked.
+      const loadedMarkets = startingMarkets({
+        sales_markets: Array.isArray(data.sales_markets) && data.sales_markets.filter(isMarketCode).length
+          ? data.sales_markets.filter(isMarketCode) : null,
+        sales_markets_not_sure: data.sales_markets_not_sure === true ? true : null,
+      }, data.jurisdiction)
+      setMarketsAuto(loadedMarkets.auto)
       setDeal({
         target_name: data.target_name ?? '',
         sector: data.sector ?? '',
@@ -317,8 +335,8 @@ function DealsDashboardInner() {
         listed_ca_exchange: typeof data.listed_ca_exchange === 'boolean' ? data.listed_ca_exchange : null,
         total_assets: data.total_assets == null ? null : Number(data.total_assets),
         // Unknown codes are dropped on load rather than carried back into the next save.
-        sales_markets: Array.isArray(data.sales_markets) && data.sales_markets.filter(isMarketCode).length
-          ? data.sales_markets.filter(isMarketCode) : null,
+        // A saved answer as saved; never asked (NULL in both columns) starts with the home market.
+        sales_markets: loadedMarkets.sales_markets,
         sales_markets_not_sure: data.sales_markets_not_sure === true ? true : null,
         env_claims: isEnvClaims(data.env_claims) ? data.env_claims : null,
         jurisdiction: data.jurisdiction ?? 'USA',
@@ -656,7 +674,8 @@ function DealsDashboardInner() {
   // `next` returns to the bare wizard — NOT to a ?id=, which does not exist yet — and the load
   // effect's no-id branch is what picks the draft back up.
   const signInForResults = () => {
-    saveDealDraft(deal)
+    // A pre-tick is stored as NULL, not as an answer: see draftMarkets.
+    saveDealDraft({ ...deal, sales_markets: draftMarkets({ sales_markets: deal.sales_markets, auto: marketsAuto }) })
     window.location.href = `/login?next=${encodeURIComponent('/dashboard/deals')}`
   }
 
@@ -787,13 +806,29 @@ function DealsDashboardInner() {
               {CANADA_S211_LISTING_HINT}
             </div>
         </div>
+        {/* Primary jurisdiction sits directly above the markets it pre-ticks, with locations beside it. */}
+        <div>
+          <label style={labelStyle}>Primary jurisdiction</label>
+          <select style={inputStyle} value={deal.jurisdiction} onChange={e => {
+            update('jurisdiction', e.target.value)
+            // A pre-ticked home market follows the jurisdiction; an answer the user gave does not.
+            const next = marketsOnJurisdictionChange({ sales_markets: deal.sales_markets, auto: marketsAuto }, e.target.value)
+            if (next.sales_markets !== deal.sales_markets) update('sales_markets', next.sales_markets)
+          }}>
+            {JURISDICTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Number of locations / sites</label>
+          <input style={inputStyle} type="number" value={deal.location_count || ''} onChange={e => update('location_count', Number(e.target.value))} placeholder="0" />
+        </div>
         {/* SALES MARKETS AND ENVIRONMENTAL CLAIMS (29 Sep 2026). Together they decide which greenwashing
             rules can reach the target (lib/deals/claimsRules.ts) and whether the Canada S-211 caveat is
             worth showing. Both optional: left blank, the report says they were not recorded. */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Where does the target sell or operate?</label>
           <MarketPicker markets={deal.sales_markets} notSure={deal.sales_markets_not_sure}
-            onChange={(markets, notSure) => { update('sales_markets', markets); update('sales_markets_not_sure', notSure) }} />
+            onChange={(markets, notSure) => { setMarketsAuto(false); update('sales_markets', markets); update('sales_markets_not_sure', notSure) }} />
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Does the target make public environmental claims? (e.g. net zero, carbon neutral, offsets, recyclable, eco-friendly)</label>
@@ -809,16 +844,6 @@ function DealsDashboardInner() {
               </button>
             ))}
           </div>
-        </div>
-        <div>
-          <label style={labelStyle}>Number of locations / sites</label>
-          <input style={inputStyle} type="number" value={deal.location_count || ''} onChange={e => update('location_count', Number(e.target.value))} placeholder="0" />
-        </div>
-        <div>
-          <label style={labelStyle}>Primary jurisdiction</label>
-          <select style={inputStyle} value={deal.jurisdiction} onChange={e => update('jurisdiction', e.target.value)}>
-            {JURISDICTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-          </select>
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Deal type</label>
@@ -878,8 +903,8 @@ function DealsDashboardInner() {
       )}
       {showCanadaS211JurisdictionCaveat(deal.jurisdiction, deal.listed_ca_exchange) && canadaCaveatForMarkets(deal) === 'show' && (
         <div style={{ background: 'var(--color-accent-amber-wash)', border: '0.5px solid color-mix(in srgb, var(--color-accent-amber) 20%, transparent)', borderRadius: 12, padding: '1rem 1.25rem', marginBottom: 12, fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
-          <strong style={{ fontWeight: 600 }}>{canadaS211CaveatText(deal).heading}:</strong>{' '}
-          {canadaS211CaveatText(deal).body}
+          <strong style={{ fontWeight: 600 }}>{canadaS211CaveatText().heading}:</strong>{' '}
+          {canadaS211CaveatText().body}
         </div>
       )}
       {frameworksState === 'not-assessed' && (!view.evaluated || view.unevaluated.length > 0) ? (

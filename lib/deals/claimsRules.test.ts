@@ -202,9 +202,11 @@ describe('in the report model', () => {
 describe('the Canada S-211 jurisdiction caveat follows the markets', () => {
   const titles = (m: DealReportModel) => m.sizeTests.panels.map(p => p.title)
 
-  it('shows when Canada is a market', () => {
-    expect(canadaCaveatForMarkets({ sales_markets: ['GB', 'CA'] })).toBe('show')
-    expect(titles(ukDeal({ sales_markets: ['CA'] }))).toContain(CANADA_CAVEAT)
+  it('is gone when Canada is a market: the size test runs instead', () => {
+    expect(canadaCaveatForMarkets({ sales_markets: ['GB', 'CA'] })).toBe('hide')
+    const m = ukDeal({ sales_markets: ['CA'], sales_markets_not_sure: null })
+    expect(titles(m)).not.toContain(CANADA_CAVEAT)
+    expect(m.sizeTests.rows.some(r => r.framework === 'Canada S-211')).toBe(true)
   })
 
   it('shows when markets are "not sure"', () => {

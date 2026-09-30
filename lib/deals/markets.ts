@@ -38,6 +38,46 @@ export const marketsRecorded = (m: MarketsInput): boolean =>
 /** The line printed where a market-specific finding or caveat would go, when markets were not recorded. */
 export const MARKETS_UNRECORDED_LINE = 'Sales markets not recorded; market-specific rules not assessed.'
 
+// ── The home market: a first answer for the picker (29 Sep 2026) ─────────────────────────────────
+//
+// A target sells where it is established, almost always, so the picker starts with that market
+// ticked rather than empty. ONLY WHERE NOTHING WAS RECORDED: a saved answer, including "not sure", is
+// the user's and is never altered. Global and Other name no market, so nothing is pre-ticked.
+const HOME_MARKETS: Record<string, readonly string[]> = {
+  USA: ['US'],
+  UK: ['GB'],
+  Canada: ['CA'],
+  'European Union': EU_MEMBER_CODES,
+  Australia: ['AU'],
+}
+export const homeMarkets = (jurisdiction: string | null | undefined): string[] | null =>
+  jurisdiction && HOME_MARKETS[jurisdiction] ? [...HOME_MARKETS[jurisdiction]] : null
+
+/**
+ * What the picker starts with. `auto` is true when the value is a pre-tick rather than an answer: the
+ * wizard lets it follow a change of jurisdiction until the user edits the markets themselves.
+ */
+export const startingMarkets = (m: MarketsInput, jurisdiction: string | null | undefined): { sales_markets: string[] | null; auto: boolean } => {
+  if (marketsRecorded(m)) return { sales_markets: m.sales_markets ?? null, auto: false }
+  const home = homeMarkets(jurisdiction)
+  return { sales_markets: home, auto: home !== null }
+}
+
+/** The picker's value, and whether it is still a pre-tick (`auto`) rather than the user's answer. */
+export type MarketsState = { sales_markets: string[] | null; auto: boolean }
+
+/** A change of jurisdiction moves a pre-tick to the new home market, and leaves an answer alone. */
+export const marketsOnJurisdictionChange = (s: MarketsState, jurisdiction: string): MarketsState =>
+  s.auto ? { sales_markets: homeMarkets(jurisdiction), auto: true } : s
+
+/**
+ * The markets a sign-in draft stores. ⚠️ NULL WHILE THEY ARE STILL A PRE-TICK (29 Sep 2026). The draft
+ * used to store the pre-tick as a list, so after the round trip through /login startingMarkets read it
+ * as a recorded answer and it stopped following the jurisdiction: USA to UK left United States ticked.
+ * Stored as NULL, the restore pre-ticks again from the draft's jurisdiction and keeps following it.
+ */
+export const draftMarkets = (s: MarketsState): string[] | null => (s.auto ? null : s.sales_markets)
+
 // ── environmental claims ─────────────────────────────────────────────────────────────────────────
 
 export type EnvClaims = 'yes' | 'no' | 'not_sure'
@@ -52,9 +92,12 @@ export type ClaimsInput = MarketsInput & { env_claims?: string | null }
 // the markets, or markets not confirmed. On a deal whose markets were never recorded it gives way to
 // MARKETS_UNRECORDED_LINE, which says why nothing market-specific was assessed.
 export type CaveatState = 'show' | 'quiet' | 'hide'
+// ⚠️ CANADA TICKED NOW HIDES IT (29 Sep 2026): the size test runs on the deal's figures instead, and
+// the Size tests section shows its limbs. "Not sure" is the one case left where nothing is known.
 export const canadaCaveatForMarkets = (m: MarketsInput): CaveatState =>
   !marketsRecorded(m) ? 'quiet'
-    : (m.sales_markets ?? []).includes('CA') || m.sales_markets_not_sure === true ? 'show'
+    : (m.sales_markets ?? []).includes('CA') ? 'hide'
+    : m.sales_markets_not_sure === true ? 'show'
     : 'hide'
 
 // ── the two framework rows ───────────────────────────────────────────────────────────────────────
