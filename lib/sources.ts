@@ -51,7 +51,7 @@
 // documents a posture belongs there too, beside the reasoning it evidences. See the re-export note
 // below, and the two deliberate exclusions:
 //
-//   · THE ECB FX REFERENCE PDF (lib/deals/assessment.ts, inside FX_SOURCE) STAYS WHERE IT IS. Its
+//   · THE ECB FX REFERENCE PDF (lib/fx.ts, inside FX_SOURCE) STAYS OUT OF THIS REGISTRY. Its
 //     path encodes the fixing date — .../2026/07/20260701.pdf — so it is not a stable source link but
 //     a DATED ARTEFACT that must move whenever FX_AS_OF moves. That file's own comment already says
 //     to bump both in the same edit. Lifting it into a registry would separate the URL from the date

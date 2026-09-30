@@ -62,7 +62,9 @@ const EXCLUDED_FILES = new Set([
   // a stable source link but an artefact that must move whenever FX_AS_OF moves. lib/sources.ts
   // records the reasoning: lifting it into a registry would separate the URL from the date it dates,
   // and that file's own comment already says to bump both in one edit.
-  'lib/deals/assessment.ts',
+  // The rates moved from lib/deals/assessment.ts to lib/fx.ts on 30 Sep 2026 and the exemption moved
+  // with them, so the Deals engine is now scanned like any other file.
+  'lib/fx.ts',
   // The SBTi CNZS criteria PDF, cited in a provenance comment beside the figures it sources.
   'lib/sbti/params.ts',
 ])
@@ -208,10 +210,13 @@ describe('regulatory links live in lib/sources.ts', () => {
     // is what would be flagged, and it must not be — the path encodes FX_AS_OF and belongs beside the
     // rate table it dates. Removing the exclusion should therefore be a deliberate act, and this test
     // is what makes it a visible one.
-    const src = readFileSync(join(ROOT, 'lib/deals/assessment.ts'), 'utf8')
+    const src = readFileSync(join(ROOT, 'lib/fx.ts'), 'utf8')
     expect(scanLines(src), 'the ECB PDF no longer appears — check FX_SOURCE before deleting this test')
       .not.toEqual([])
-    expect(EXCLUDED_FILES.has('lib/deals/assessment.ts')).toBe(true)
+    expect(EXCLUDED_FILES.has('lib/fx.ts')).toBe(true)
+    // The Deals engine lost its exemption when the rates left it, and holds no regulatory URL in code.
+    expect(EXCLUDED_FILES.has('lib/deals/assessment.ts')).toBe(false)
+    expect(scanLines(readFileSync(join(ROOT, 'lib/deals/assessment.ts'), 'utf8'))).toEqual([])
   })
 
   it('the registry itself would fire — its exclusion is load-bearing from day one', () => {

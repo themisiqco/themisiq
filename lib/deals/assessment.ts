@@ -14,6 +14,7 @@ import {
 // import does not compromise the purity note above.
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION } from '../aiAct'
 import { CS3D_APPLIES_FROM, CS3D_CITATION } from '../cs3d'
+import { ECB_UNITS_PER_EUR } from '../fx'
 
 // Fields the assessment functions read off a deal. The functions take explicit primitive
 // params (below); this type documents the deal shape both surfaces hydrate from.
@@ -755,28 +756,23 @@ export type DealCurrency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD'
 // this list, so the UI and the FX table below cannot drift apart.
 export const DEAL_CURRENCIES: DealCurrency[] = ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
 
-export const FX_AS_OF = '2026-07-01'
-export const FX_SOURCE = 'ECB euro foreign exchange reference rates, 1 July 2026 (14:15 CET daily fixing). https://www.ecb.europa.eu/stats/exchange/eurofxref/shared/pdf/2026/07/20260701.pdf'
+// THE RATES, THEIR DATE AND THEIR SOURCE LIVE IN lib/fx.ts (30 Sep 2026), so another module can convert
+// at the same dated rates without importing this engine. Re-exported here because the report model, the
+// marketing page and /assess all read them from this file. The table is the ECB's own quotation, units
+// per 1 EUR, transcribed verbatim from the document FX_SOURCE names; see lib/fx.ts for how it is held
+// and refreshed.
+export { FX_AS_OF, FX_SOURCE } from '../fx'
 
-// Units of each currency per 1 EUR — the ECB's OWN quotation convention, TRANSCRIBED VERBATIM from
-// the document named in FX_SOURCE. Every number below appears literally in that PDF, so a reviewer
-// confirms this table by comparing digit for digit against the source; nothing has to be re-derived
-// to check it. That is the whole reason the table is EUR-base rather than USD-cross-rated: a stored
-// cross-rate is a computed number with no published figure behind it, and a cross-rate rounded to
-// 2dp cannot be reconciled at all against a source that publishes 4–5 significant figures.
-//
-// WIDTHS ARE NOT NORMALISED. GBP is published to five decimal places and the others to four; they
-// are held exactly as printed. Padding or trimming a digit to make the column tidy would be a
-// silent edit to a transcribed figure.
-//
-// Refresh: re-transcribe from the new day's document and bump FX_AS_OF and the FX_SOURCE URL in
-// the SAME edit as the rates, never separately.
+// The Deals view of that table: the five currencies the deal form offers, and no others. lib/fx.ts
+// holds more; widening THIS would widen the form's dropdown and the FX basis block with it.
+// Written out, not derived from DEAL_CURRENCIES: the Record type makes a missing currency a compile
+// error, and the key order is the one this table always had.
 export const UNITS_PER_EUR: Record<DealCurrency, number> = {
-  EUR: 1,          // the base, by definition — not a published figure
-  USD: 1.1383,
-  GBP: 0.85973,
-  CAD: 1.6191,
-  AUD: 1.6518,
+  EUR: ECB_UNITS_PER_EUR.EUR,
+  USD: ECB_UNITS_PER_EUR.USD,
+  GBP: ECB_UNITS_PER_EUR.GBP,
+  CAD: ECB_UNITS_PER_EUR.CAD,
+  AUD: ECB_UNITS_PER_EUR.AUD,
 }
 
 export const isDealCurrency = (c: string): c is DealCurrency => (DEAL_CURRENCIES as string[]).includes(c)

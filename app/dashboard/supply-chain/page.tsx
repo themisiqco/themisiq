@@ -12,18 +12,19 @@ import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../li
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { INDUSTRY_CODES, INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
 import { NEW_SUPPLIER_SECTOR, hasValidSector, suppliersWithoutSector, sectorRequiredMessage, SECTOR_REJECTED_MESSAGE } from '../../../lib/supply-chain/sectorRequired'
+import { COUNTRIES, scoreSupplierRisk, normalizeCurrency, SCORE_BASIS_NOTE, type RiskLevel } from '../../../lib/supply-chain/riskScore'
+import { registerTotalSpend, excludedNote, TOTAL_SPEND_LABEL } from '../../../lib/supply-chain/totalSpend'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
 
 // Floor 2023, preserving the window this module already offered. There is no factor-table reason
-// here — SECTOR_RISK carries a flat spend factor with no year dimension — so this is a product
-// choice about how far back a supplier register is worth keeping, not a limit of the data.
+// here (no spend factor with a year dimension is held), so this is a product choice about how far
+// back a supplier register is worth keeping, not a limit of the data.
 const YEAR_FLOOR = 2023
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type RiskLevel = 'critical' | 'high' | 'medium' | 'low'
 type Framework = 'cs3d' | 'ecovadis' | 'modern_slavery' | 'cdp_c12' | 'esrs_s2' | 'scope3'
 
 interface Supplier {
@@ -51,111 +52,26 @@ interface SupplyChainInventory {
 }
 
 // ─── Risk Engine ──────────────────────────────────────────────────────────────
+//
+// The score itself is lib/supply-chain/riskScore.ts (30 Sep 2026): the country table, the weights,
+// the bands and the currency comparison, pure and tested. This wrapper adds the one thing the page
+// holds beside it, the Scope 3 estimate.
+//
+// ⚠️ NO SCOPE 3 ESTIMATE IS PRODUCED, AND IT IS null, NOT ZERO. The only spend factors this module
+// ever held were a hand-typed column keyed on the retired sector names, with no source recorded; the
+// dropdown stores EXIOBASE codes, so no supplier matched it, and the table was removed with the
+// sector risk ratings it shared. null is what the screen and the export already render as "no
+// estimate", never as a figure.
+const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; factors: string[]; scope3: number | null } =>
+  ({ ...scoreSupplierRisk(supplier), scope3: null })
 
-const COUNTRY_RISK: Record<string, { risk: number; label: string }> = {
-  // Critical risk
-  'Bangladesh': { risk: 4, label: 'Critical (labour rights, safety)' },
-  'Myanmar': { risk: 4, label: 'Critical (conflict, forced labour)' },
-  'North Korea': { risk: 4, label: 'Critical (forced labour)' },
-  'Eritrea': { risk: 4, label: 'Critical (forced labour)' },
-  'Uzbekistan': { risk: 3, label: 'High (cotton forced labour risk)' },
-  'China': { risk: 3, label: 'High (Xinjiang forced labour risk)' },
-  'Pakistan': { risk: 3, label: 'High (labour rights gaps)' },
-  'Cambodia': { risk: 3, label: 'High (garment sector risks)' },
-  'Vietnam': { risk: 2, label: 'Medium (improving but gaps remain)' },
-  'India': { risk: 2, label: 'Medium (sector-dependent risk)' },
-  'Brazil': { risk: 2, label: 'Medium (deforestation, labour risk)' },
-  'Mexico': { risk: 2, label: 'Medium (labour rights, security)' },
-  'Turkey': { risk: 2, label: 'Medium (labour rights concerns)' },
-  'Indonesia': { risk: 2, label: 'Medium (palm oil, deforestation)' },
-  'Thailand': { risk: 2, label: 'Medium (migrant labour risk)' },
-  // Low risk
-  'Germany': { risk: 1, label: 'Low (strong regulatory framework)' },
-  'France': { risk: 1, label: 'Low (strong regulatory framework)' },
-  'UK': { risk: 1, label: 'Low (Modern Slavery Act compliance)' },
-  'Netherlands': { risk: 1, label: 'Low (strong regulatory framework)' },
-  'Sweden': { risk: 1, label: 'Low (strong regulatory framework)' },
-  'Denmark': { risk: 1, label: 'Low (strong regulatory framework)' },
-  'USA': { risk: 1, label: 'Low (regulated market)' },
-  'Canada': { risk: 1, label: 'Low (regulated market)' },
-  'Australia': { risk: 1, label: 'Low (Modern Slavery Act)' },
-  'Japan': { risk: 1, label: 'Low (regulated market)' },
-  'South Korea': { risk: 1, label: 'Low (regulated market)' },
-}
-
-const SECTOR_RISK: Record<string, { risk: number; label: string; ef: number }> = {
-  'Agriculture & Food': { risk: 3, label: 'High (land use, labour, water)', ef: 2.8 },
-  'Garments & Textiles': { risk: 4, label: 'Critical (labour, chemicals)', ef: 1.2 },
-  'Electronics & Technology': { risk: 3, label: 'High (minerals, e-waste)', ef: 0.4 },
-  'Construction & Materials': { risk: 3, label: 'High (safety, environment)', ef: 3.1 },
-  'Chemicals': { risk: 3, label: 'High (environmental, safety)', ef: 1.8 },
-  'Mining & Metals': { risk: 4, label: 'Critical (environment, safety)', ef: 4.2 },
-  'Transport & Logistics': { risk: 2, label: 'Medium (safety, emissions)', ef: 0.9 },
-  'Professional Services': { risk: 1, label: 'Low (standard risks only)', ef: 0.1 },
-  'IT & Software': { risk: 1, label: 'Low (data privacy focus)', ef: 0.05 },
-  'Financial Services': { risk: 1, label: 'Low (regulated sector)', ef: 0.08 },
-  'Healthcare & Pharma': { risk: 2, label: 'Medium (quality, safety)', ef: 0.3 },
-  'Energy & Utilities': { risk: 3, label: 'High (environmental impact)', ef: 2.1 },
-  'Retail & Distribution': { risk: 2, label: 'Medium (labour, packaging)', ef: 0.4 },
-  'Other Manufacturing': { risk: 2, label: 'Medium (sector-dependent)', ef: 1.1 },
-}
-
-const COUNTRIES = Object.keys(COUNTRY_RISK).sort()
-const SECTORS = Object.keys(SECTOR_RISK).sort()
-
-// ⚠️ SECTOR_RISK IS KEYED ON THE RETIRED INTERNAL VOCABULARY AND THE DROPDOWN NOW EMITS EXIOBASE
-// CODES, SO EVERY LOOKUP MISSES. That is deliberate and the miss is surfaced rather than absorbed.
-// The table stays because its RISK ratings are a separate piece of work from its `ef` column and
-// come out separately; what must not happen is `ef` quietly becoming 0.5 for every supplier, which
-// is what the old `|| { ..., ef: 0.5 }` fallback did. A factor of 0.5 against a range running to
-// 4.2 is a wrong number that renders identically to a right one.
-//   The RISK half keeps its 2-out-of-5 default so the score does not silently drop five points for
-// every supplier at once, but the default is now NAMED in risk_factors instead of being invisible
-// below the `>= 3` threshold that used to hide it.
-//   scope3 becomes null. Null is not zero and is not rendered as a figure.
-const scoreSupplier = (supplier: Supplier): { risk: RiskLevel; score: number; factors: string[]; scope3: number | null } => {
-  const countryData = COUNTRY_RISK[supplier.country] || { risk: 2, label: 'Unknown (assess manually)' }
-  const sectorData = SECTOR_RISK[supplier.sector]
-
-  const factors: string[] = []
-  let score = 0
-
-  // Country risk (40%)
-  score += countryData.risk * 2.5
-  if (countryData.risk >= 3) factors.push(`Country risk: ${countryData.label}`)
-
-  // Sector risk (40%)
-  score += (sectorData?.risk ?? 2) * 2.5
-  if (!sectorData) factors.push('Sector risk not rated (no risk profile held for this sector yet)')
-  else if (sectorData.risk >= 3) factors.push(`Sector risk: ${sectorData.label}`)
-
-  // Spend concentration (10%)
-  if (supplier.annual_spend > 1000000) { score += 1; factors.push('High spend concentration (strategic dependency)') }
-  if (supplier.annual_spend > 5000000) { score += 1; factors.push('Very high spend (enhanced due diligence required)') }
-
-  // Tier risk (10%)
-  if (supplier.tier === '2') { score += 0.5; factors.push('Tier 2 supplier (limited visibility)') }
-  if (supplier.tier === '3') { score += 1; factors.push('Tier 3 supplier (very limited visibility)') }
-
-  // No assessment
-  if (!supplier.has_assessment) { score += 0.5; factors.push('No sustainability assessment on file') }
-
-  const risk: RiskLevel = score >= 7 ? 'critical' : score >= 5 ? 'high' : score >= 3 ? 'medium' : 'low'
-
-  // Scope 3 Cat.1 spend-based estimate (kg CO2e per $ spend × annual spend / 1000 = mt).
-  // null when no factor is held for this sector — see the header. Zero spend is still zero.
-  const scope3 = sectorData === undefined
-    ? null
-    : supplier.annual_spend > 0 ? (supplier.annual_spend * sectorData.ef) / 1000 : 0
-
-  return { risk, score: Math.round(score * 10) / 10, factors, scope3 }
-}
-
-const newSupplier = (): Supplier => ({
+// A manually added supplier's spend is in the REGISTER's currency: that is what the form's label
+// says, and until 30 Sep 2026 every one was stored as USD whatever the register's currency was.
+const newSupplier = (currency: string): Supplier => ({
   id: Math.random().toString(36).slice(2),
   // No sector until one is chosen: see lib/supply-chain/sectorRequired.ts.
   name: '', country: 'Germany', sector: NEW_SUPPLIER_SECTOR,
-  annual_spend: 0, currency: 'USD', tier: '1',
+  annual_spend: 0, currency, tier: '1',
   has_assessment: false, risk_level: 'low', risk_score: 0, risk_factors: [], scope3_emissions: 0,
 })
 
@@ -437,7 +353,7 @@ function SupplyChainDashboardInner() {
     }))
 
   const addSupplier = () => {
-    const s = newSupplier()
+    const s = newSupplier(inventory.currency)
     setInventory(prev => ({ ...prev, suppliers: [...prev.suppliers, s] }))
     setActiveSupplier(inventory.suppliers.length)
   }
@@ -476,13 +392,12 @@ function SupplyChainDashboardInner() {
           const sector = String(row['Sector'] || row['sector'] || row['Category'] || '').trim()
 
           // ⚠️ NO DEFAULT SECTOR, AND THAT IS THE WHOLE POINT OF THIS CHECK. A file with no sector
-          // column used to make every row 'Professional Services' — the lowest factor in
-          // SECTOR_RISK, against a range topping out 40x higher — producing a complete,
-          // confident-looking register priced at the bottom of the scale with nothing on screen
-          // saying a substitution had happened. An unrecognised string was quieter still: it reached
-          // scoreSupplier's 'Unknown — assess manually' fallback, which prices at 0.5 and does say
-          // so, but only in a per-supplier risk-factor list the customer has no reason to re-read
-          // after an import they were told nothing about.
+          // column used to make every row 'Professional Services', the lowest factor in the spend
+          // table this module then held, producing a complete, confident-looking register priced at
+          // the bottom of the scale with nothing on screen saying a substitution had happened. An
+          // unrecognised string was quieter still: it took a fallback factor that was named only in
+          // a per-supplier risk-factor list the customer has no reason to re-read after an import
+          // they were told nothing about.
           // Object.hasOwn, not `in`: 'constructor' and 'toString' are `in` every object literal.
           if (!sector) {
             rejected.push(`row ${line}: no sector`)
@@ -499,7 +414,9 @@ function SupplyChainDashboardInner() {
             country: row['Country'] || row['country'] || 'Germany',
             sector,
             annual_spend: Number(row['Annual Spend'] || row['annual_spend'] || row['Spend'] || 0),
-            currency: row['Currency'] || row['currency'] || 'USD',
+            // ISO code, upper-cased; blank takes the register's currency, as a manually added supplier
+            // does. An unrecognised code is kept as typed and its spend is reported as not compared.
+            currency: normalizeCurrency(row['Currency'] ?? row['currency'], inventory.currency),
             tier: (row['Tier'] || row['tier'] || '1') as '1' | '2' | '3',
             has_assessment: (row['Has Assessment'] || row['has_assessment'] || 'false').toLowerCase() === 'true',
             risk_level: 'low', risk_score: 0, risk_factors: [], scope3_emissions: 0,
@@ -549,7 +466,11 @@ function SupplyChainDashboardInner() {
   const totalScope3 = unpricedCount > 0
     ? null
     : inventory.suppliers.reduce((sum, s) => sum + (s.scope3_emissions ?? 0), 0)
-  const totalSpend = inventory.suppliers.reduce((sum, s) => sum + s.annual_spend, 0)
+  // Each supplier's spend converted to the register's currency before it is added; a supplier whose
+  // currency has no reference rate is left out and named. See lib/supply-chain/totalSpend.ts.
+  const spendTotal = registerTotalSpend(inventory.suppliers, inventory.currency)
+  const totalSpend = spendTotal.total
+  const spendExcluded = excludedNote(spendTotal)
   const needsAssessment = inventory.suppliers.filter(s => !s.has_assessment && (s.risk_level === 'critical' || s.risk_level === 'high')).length
 
   const generateExport = () => {
@@ -558,7 +479,8 @@ function SupplyChainDashboardInner() {
       ['Company', inventory.company],
       ['Reporting Year', inventory.reporting_year],
       ['Total Suppliers', inventory.suppliers.length],
-      ['Total Annual Spend', `${inventory.currency} ${totalSpend.toLocaleString()}`],
+      [TOTAL_SPEND_LABEL, `${inventory.currency} ${Math.round(totalSpend).toLocaleString()}`],
+      ...(spendExcluded ? [['', spendExcluded]] : []),
       ['Total Scope 3 Cat.1 (estimated)', totalScope3 === null
         ? `Not available: ${unpricedCount} of ${inventory.suppliers.length} suppliers have no spend factor for their sector`
         // CSV_DP: the per-supplier rows below sum to this cell to within their own rounding, and a
@@ -576,6 +498,7 @@ function SupplyChainDashboardInner() {
         !s.has_assessment && (s.risk_level === 'critical' || s.risk_level === 'high') ? 'YES' : 'No',
       ]),
       [''],
+      ['Risk score basis', SCORE_BASIS_NOTE],
       ['Generated by ThemisIQ · www.themisiq.co · EU CS3D · ESRS S2 · Scope 3 Cat.1 · EcoVadis · Modern Slavery Act'],
     ]
     const blob = csvBlob(rows)
@@ -712,7 +635,7 @@ function SupplyChainDashboardInner() {
               )}
             </div>
             <div>
-              <label style={labelStyle}>Annual spend ({inventory.currency})</label>
+              <label style={labelStyle}>Annual spend ({inventory.suppliers[activeSupplier].currency})</label>
               <input style={inputStyle} type="number" value={inventory.suppliers[activeSupplier].annual_spend || ''} onChange={e => updateSupplier(activeSupplier, 'annual_spend', Number(e.target.value))} placeholder="0" />
             </div>
             <div>
@@ -734,8 +657,9 @@ function SupplyChainDashboardInner() {
               </div>
             </div>
 
-            {/* Live risk preview */}
-            {inventory.suppliers[activeSupplier].risk_factors.length > 0 && (
+            {/* Live risk preview. ALWAYS shown: a supplier with no factor raised still has a score,
+                and hiding the box for it hid the score exactly where it was lowest. */}
+            {(
               <div style={{ gridColumn: '1 / -1', background: RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].bg, border: `1px solid ${RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].border}`, borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].color, marginBottom: 6 }}>
                   ⚡ Risk score: {inventory.suppliers[activeSupplier].risk_score}/10, {RISK_CONFIG[inventory.suppliers[activeSupplier].risk_level].label}
@@ -743,6 +667,12 @@ function SupplyChainDashboardInner() {
                 {inventory.suppliers[activeSupplier].risk_factors.map((f, i) => (
                   <div key={i} style={{ fontSize: 11, color: '#555553', marginBottom: 3 }}>• {f}</div>
                 ))}
+                {inventory.suppliers[activeSupplier].risk_factors.length === 0 && (
+                  <div style={{ fontSize: 11, color: '#555553', marginBottom: 3 }}>No risk factor raised.</div>
+                )}
+                <div style={{ fontSize: 10, color: '#555553', marginTop: 6, lineHeight: 1.6 }}>
+                  Scored on country, assessment on file, annual spend and tier. Country ratings are this module&rsquo;s internal list and cite no published source.
+                </div>
                 {inventory.suppliers[activeSupplier].scope3_emissions === null ? (
                   <div style={{ fontSize: 11, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
                     No spend factor is held for this sector yet, so no Scope 3 Cat.1 estimate is shown.
@@ -845,10 +775,10 @@ function SupplyChainDashboardInner() {
               <div className="tq-summary-label" style={{ marginBottom: 8 }}>Total Scope 3 Category 1 (spend-based estimate)</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>
                 {/* ⚠️ THIS LINE SAID "DEFRA/Exiobase sector emission factors", WHICH WAS FALSE: no DEFRA
-                    factor exists in the codebase, and this register prices a supplier only from the ef
-                    column of SECTOR_RISK above — a hand-typed table keyed on the retired sector names,
-                    with no source recorded. The dropdown now stores EXIOBASE codes, so in practice no
-                    supplier matches it. The line now states what happened to THESE suppliers. */}
+                    factor exists in the codebase, and this register priced a supplier only from a
+                    hand-typed table keyed on the retired sector names, with no source recorded. That
+                    table was removed on 30 Sep 2026, so no supplier is priced. The line states what
+                    happened to THESE suppliers. */}
                 GHG Protocol spend-based method ·{' '}
                 {unpricedCount === inventory.suppliers.length
                   ? 'no emission factor is applied to any supplier yet, so no estimate is calculated'
@@ -1075,13 +1005,17 @@ function SupplyChainDashboardInner() {
                     { label: 'Critical/High risk', val: critical + high, urgent: (critical + high) > 0 },
                     { label: 'Need assessment', val: needsAssessment, urgent: needsAssessment > 0 },
                     { label: 'Scope 3 Cat.1', val: totalScope3 === null ? 'not available' : `${totalScope3.toFixed(1)} mt` },
-                    { label: 'Total spend', val: totalSpend > 0 ? `${inventory.currency} ${(totalSpend / 1000000).toFixed(1)}M` : '—' },
+                    { label: TOTAL_SPEND_LABEL, val: totalSpend > 0 ? `${inventory.currency} ${(totalSpend / 1000000).toFixed(1)}M` : spendExcluded ? 'Not available' : 'No spend entered' },
                   ].map(({ label, val, urgent }) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    // flex-start and a gap: the total's label is long and wraps, and must not crowd its value.
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, lineHeight: '18px' }}>
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</span>
-                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500 }}>{val}</span>
+                      <span style={{ fontSize: 12, color: urgent && val ? 'var(--color-state-warn)' : 'var(--color-ink)', fontWeight: 500, flexShrink: 0, textAlign: 'right' }}>{val}</span>
                     </div>
                   ))}
+                  {spendExcluded && (
+                    <div style={{ fontSize: 10, color: 'var(--color-state-warn)', lineHeight: 1.5 }}>{spendExcluded}</div>
+                  )}
                 </div>
                 </div>
               </div>

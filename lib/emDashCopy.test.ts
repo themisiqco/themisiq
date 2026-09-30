@@ -295,7 +295,9 @@ export function renderedDashes(file: string): number {
  * 'Not quantified' in lib/ghg/workingsCells.ts — not a punctuation edit, which is why they are counted
  * apart from the sweep budget. Lower this when a surface adopts the words.
  */
-const GLYPH_COUNT = 73
+// 73 on 27 Sep 2026. 72 on 30 Sep 2026: the Supply Chain register's total spend now reads 'No spend
+// entered' or 'Not available' where it printed the glyph.
+const GLYPH_COUNT = 72
 
 const SWEEP_BUDGET: Record<string, number> = {
   // ⚠️ WHAT IS LEFT UNDER app/api/ IS READ BY NOBODY, 27 Sep 2026. The prefix exemption is gone; the six
