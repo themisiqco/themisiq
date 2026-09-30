@@ -17,6 +17,7 @@ import { saveDealDraft, takeDealDraft } from '../../../lib/deals/draft'
 import { canadaCaveatForMarkets, isEnvClaims, homeMarkets, startingMarkets, marketsOnJurisdictionChange, draftMarkets, type EnvClaims } from '../../../lib/deals/markets'
 import { isMarketCode, CLAIMS_DATA_ROOM_ITEM } from '../../../lib/deals/claimsRules'
 import MarketPicker from './MarketPicker'
+import { SECTORS, VISIBLE_SECTORS, LEGACY_SECTOR_VALUES, normalizeSector } from '../../../lib/deals/sectors'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnStep, btnStepDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import {
@@ -39,12 +40,10 @@ import {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const SECTORS = [
-  'Energy & Utilities', 'Financial Services', 'Real Estate', 'Technology',
-  'Healthcare & Pharma', 'Industrials & Manufacturing', 'Consumer & Retail',
-  'Agriculture & Food', 'Transport & Logistics', 'Mining & Metals',
-  'Construction & Materials', 'Professional Services', 'Other',
-]
+// The sector list lives in lib/deals/sectors.ts (29 Sep 2026), with the values it replaced.
+// A share link may be created for a current sector or a legacy one: five production deals still carry
+// 'Technology', and re-saving should not be the price of sharing them.
+const SHAREABLE_SECTORS = [...SECTORS, ...LEGACY_SECTOR_VALUES]
 
 // JURISDICTIONS MOVED TO lib/deals/assessment.ts — it is imported below with the rest of the engine.
 // The list belongs beside the branches that match on it: declaring it here put the vocabulary in the
@@ -365,7 +364,7 @@ function DealsDashboardInner() {
     // NOT gated on revenue: only SB 253 and SECR consult it. The other thirteen frameworks resolve
     // from jurisdiction and sector alone, and withholding them because revenue is blank made an
     // undeclared field read as "no frameworks apply". The engine marks the two it cannot evaluate.
-    if (deal.sector && deal.jurisdiction) {
+    if (normalizeSector(deal.sector) && deal.jurisdiction) {
       // deal.currency is load-bearing here: revenue is entered in it, and the SB 253 / SECR
       // triggers are denominated in USD / GBP respectively. Omitting it treats every deal as USD.
       const detected = getApplicableFrameworks(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
@@ -469,7 +468,7 @@ function DealsDashboardInner() {
   // Rich applicability, computed from the SAME guard as the `frameworks` effect above so the two
   // views of the same deal cannot disagree. `frameworks` stays the persisted legal in/out; this adds
   // the near-threshold detail the flat string[] deliberately does not carry.
-  const evaluated = !!(deal.sector && deal.jurisdiction)   // revenue is NOT part of this gate
+  const evaluated = !!(normalizeSector(deal.sector) && deal.jurisdiction)   // revenue is NOT part of this gate
   const applicability: FrameworkApplicability[] = evaluated
     ? getFrameworkApplicability(deal.jurisdiction, deal.revenue, deal.sector, deal.deal_type, deal.currency,
         { total_assets: deal.total_assets, employee_count: deal.employee_count, listed_ca_exchange: deal.listed_ca_exchange,
@@ -552,7 +551,7 @@ function DealsDashboardInner() {
   // A sector typed but not saved is correctly still a blocker — the link would serve the row
   // without it — and toggleShare's error message tells those two causes apart.
   const shareBlockers: string[] = [
-    ...(savedSector ? [] : ['a sector']),
+    ...(normalizeSector(savedSector) ? [] : ['a sector']),
   ]
 
   // Absolute public URL for the target-facing route (matches the verifier linkFor pattern).
@@ -577,14 +576,14 @@ function DealsDashboardInner() {
         return
       }
 
-      // CREATING a link is gated on the STORED sector. `.in('sector', SECTORS)` rather than a
+      // CREATING a link is gated on the STORED sector. `.in('sector', SHAREABLE_SECTORS)` rather than a
       // not-empty test: it is unambiguous about how an empty string encodes, and it additionally
       // rejects anything that is not a real sector.
       const { data, error } = await supabase
         .from('deals')
         .update({ share_enabled: true })
         .eq('id', dealId)
-        .in('sector', SECTORS)
+        .in('sector', SHAREABLE_SECTORS)
         .select('id')
       if (error) { console.error('Share toggle failed:', error); setShareError('Could not create the link: ' + error.message); return }
       if (!data || data.length === 0) {
@@ -733,7 +732,14 @@ function DealsDashboardInner() {
           <label style={labelStyle}>Sector</label>
           <select style={inputStyle} value={deal.sector} onChange={e => update('sector', e.target.value)}>
             <option value="">Select sector</option>
-            {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+            {/* A stored value the list does not offer (an earlier-list value, or a sector not yet
+                offered) is shown as itself, so the form never displays a sector the deal does not
+                have. Choosing an offered sector replaces it on the next save. */}
+            {normalizeSector(deal.sector) && !(VISIBLE_SECTORS as readonly string[]).includes(deal.sector) && (
+              <option value={deal.sector}>{deal.sector}{LEGACY_SECTOR_VALUES.includes(deal.sector) ? ' (earlier list)' : ''}</option>
+            )}
+            {/* Only sectors with templates (SECTOR_READY in lib/deals/sectors.ts). */}
+            {VISIBLE_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div>

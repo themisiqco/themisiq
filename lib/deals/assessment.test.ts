@@ -18,6 +18,7 @@ import {
   type DealCurrency, type FrameworkApplicability, type DealSize, type ThresholdLimb,
 } from './assessment'
 import { REGIME_COLUMNS } from './exportPipelineXlsx'
+import { SECTORS } from './sectors'
 import {
   resolveCs3d, resolveCanadaS211, canadaS211NoteReport,
   DEAL_TYPES, dealTypeShort, dealTypeLabel, themisIqFigure, NO_PRICED_OBLIGATION,
@@ -1056,7 +1057,8 @@ describe('flat form stays the applies-filtered rich form', () => {
 // SECTOR_RISKS so the sweep cannot fall behind a sector being added; 'Other' is the form's
 // no-template option and has no SECTOR_RISKS entry, so it is named here.
 const ALL_JURISDICTIONS = ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other']
-const ALL_SECTORS = [...Object.keys(SECTOR_RISKS), 'Other']
+// The old template keys and the current list (29 Sep 2026): both are values a deal can carry.
+const ALL_SECTORS = [...new Set([...Object.keys(SECTOR_RISKS), 'Other', ...SECTORS])]
 
 // Every framework name the engine can put in front of a user, across every combination of the
 // inputs a deal can carry. Uses the RICH form deliberately: it returns a row for each framework it
@@ -1395,7 +1397,7 @@ describe('every APPLIES row has a basis', () => {
   const everyRow = () => {
     const rows: FrameworkApplicability[] = []
     for (const jurisdiction of [...JURISDICTIONS, 'Japan'])
-      for (const sector of [...Object.keys(SECTOR_RISKS), 'Other'])
+      for (const sector of ALL_SECTORS)
         for (const revenue of [0, 50_000_000, 2_000_000_000])
           for (const size of sizes)
             rows.push(...getFrameworkApplicability(jurisdiction, revenue, sector, 'ma', 'USD', size))

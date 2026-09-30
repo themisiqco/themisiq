@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import Nav from '../../../components/Nav'
 import { getApplicableFrameworks } from '../../../../lib/deals/assessment'
+import { normalizeSector } from '../../../../lib/deals/sectors'
 import PaywallCard from '../../../components/PaywallCard'
 // useEntitlementAccess, NOT useEntitlementState: `isPaid` is TRUE for an expired customer by
 // contract, so this list stayed open to someone whose term had run out while the trigger refused
@@ -58,8 +59,8 @@ type DealRow = {
 
 /** The frameworks that apply to this deal on the engine as it is today. */
 const liveFrameworks = (d: DealRow): string[] =>
-  d.sector && d.jurisdiction
-    ? getApplicableFrameworks(d.jurisdiction, Number(d.revenue) || 0, d.sector, d.deal_type ?? 'ma', d.currency ?? 'USD', {
+  normalizeSector(d.sector) && d.jurisdiction
+    ? getApplicableFrameworks(d.jurisdiction, Number(d.revenue) || 0, normalizeSector(d.sector)!, d.deal_type ?? 'ma', d.currency ?? 'USD', {
         total_assets: d.total_assets == null ? null : Number(d.total_assets),
         employee_count: d.employee_count,
         listed_ca_exchange: d.listed_ca_exchange,

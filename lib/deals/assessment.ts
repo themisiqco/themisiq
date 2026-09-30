@@ -6,6 +6,10 @@
 
 import { GHG_TIERS, FLAT_MODULE_PRICES, GHG_TIER_LABELS, ghgTierForEmployees, type GhgTier } from '../pricing'
 import { claimsFrameworkRows, EU_MEMBER_CODES, marketsRecorded, type MarketsInput } from './markets'
+import {
+  SECTORS, LEGACY_SECTORS, SECTOR_TEMPLATE_SOURCE, HEAVY_SECTORS, ETS_SECTORS, FINANCIAL_SECTORS,
+  FINANCIAL_RULE_SECTORS, FLAG_SECTORS, normalizeSector, type Sector,
+} from './sectors'
 // Sector risk copy must not retype an AI Act date — see lib/aiAct.ts. Constants only, no I/O, so this
 // import does not compromise the purity note above.
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_CITATION } from '../aiAct'
@@ -168,6 +172,19 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
   ],
 }
 
+// ─── Which templates a stored sector gets (29 Sep 2026) ──────────────────────────
+// A current sector: the templates SECTOR_TEMPLATE_SOURCE names, unchanged. A legacy value (the list
+// before 29 Sep 2026): its own whole set, exactly as before. Blank, unknown or "Other": none.
+export const sectorTemplates = (stored: unknown): SectorRisk[] => {
+  const sector = normalizeSector(stored)
+  if (!sector) return []
+  if (sector in LEGACY_SECTORS) return SECTOR_RISKS[sector] ?? []
+  const source = (SECTOR_TEMPLATE_SOURCE as Record<string, { from: string; risks?: readonly string[] } | null>)[sector]
+  if (!source) return SECTORS.includes(sector as Sector) ? [] : (SECTOR_RISKS[sector] ?? [])
+  const all = SECTOR_RISKS[source.from] ?? []
+  return source.risks ? all.filter(r => source.risks!.includes(r.risk)) : all
+}
+
 // ─── Resolving a sector risk against the deal's jurisdiction ────────────────────
 //
 // THE ONE CHOKE POINT. Four surfaces consume sector risks — the wizard, the printed report, the
@@ -238,7 +255,7 @@ export function sectorRisks(
   // them, every condition keeps its primary-jurisdiction wording.
   markets?: MarketsInput,
 ): ResolvedRisk[] {
-  const template = (sector && SECTOR_RISKS[sector]) || []
+  const template = sectorTemplates(sector)
   const codes = new Set(markets?.sales_markets ?? [])
   const recorded = !!markets && marketsRecorded(markets)
   return template.map((r): ResolvedRisk => {
@@ -263,8 +280,8 @@ export function sectorRisks(
 
 // Compliance cost estimates by deal size and sector complexity
 export const getComplianceCost = (dealValue: number, sector: string, frameworks: string[]): { low: number; high: number; pctLow: number; pctHigh: number; items: { item: string; cost: string }[] } => {
-  const isHighEmissions = ['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals', 'Transport & Logistics', 'Agriculture & Food'].includes(sector)
-  const isFinancial = sector === 'Financial Services'
+  const isHighEmissions = HEAVY_SECTORS.has(normalizeSector(sector) ?? '')
+  const isFinancial = FINANCIAL_SECTORS.has(normalizeSector(sector) ?? '')
   const fwCount = frameworks.length
 
   // ESG due diligence is a slice of all-in DD (~0.2–4% of deal value). Focused ESG scope lands low in that band.
@@ -343,10 +360,10 @@ const CONSULTANT_LOCATION_FACTOR = (locationCount: number): number =>
 // Financial Services carries critical risk (financed emissions) but a light own-ops GHG inventory
 // (its heavy work is the separately-priced PCAF line). Coupling cost to severity would misprice those
 // sectors and invent per-sector precision we can't cite. Keep this coarse and effort-based.
-const HEAVY_SECTORS = ['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals', 'Transport & Logistics', 'Agriculture & Food']
+// HEAVY_SECTORS lives in ./sectors, extended from this file's old literal list with the new sectors.
 // One modest, defensible bump for Scope 1-intensive sectors' GHG line only (see included[] above).
 const CONSULTANT_SECTOR_FACTOR = (sector?: string): number =>
-  sector && HEAVY_SECTORS.includes(sector) ? 1.25 : 1.0
+  HEAVY_SECTORS.has(normalizeSector(sector) ?? '') ? 1.25 : 1.0
 // Round a scaled consultant figure to the nearest 1000 so the "k" display stays clean.
 const roundK = (x: number): number => Math.round(x / 1000) * 1000
 
@@ -523,7 +540,7 @@ export function getObligations(
 
   // Flagged (NOT summed into either figure) — honest caveats for scopes needing a separate specialist.
   const flagged: ObligationTier[] = []
-  if (sector === 'Agriculture & Food') {
+  if (FLAG_SECTORS.has(normalizeSector(sector) ?? '')) {
     flagged.push(tier({ label: 'Forest, Land & Agriculture (FLAG)', short: 'FLAG', pricing: EXCLUDED, consultantLow: 0, consultantHigh: 0,
       scopeNote: 'Covered via SBTi science-based target-setting where applicable. Land-sector inventory assessed separately.' }))
   }
@@ -1409,6 +1426,8 @@ export const getFrameworkApplicability = (
   } = {},
 ): FrameworkApplicability[] => {
   const out: FrameworkApplicability[] = []
+  // The sector as the rules read it: blank or whitespace-only is no sector.
+  const sectorKey = normalizeSector(sector) ?? ''
   const dealSize: DealSize = {
     revenue, currency,
     total_assets: size.total_assets ?? null,
@@ -1441,7 +1460,7 @@ export const getFrameworkApplicability = (
   else if (jurisdiction === 'Global') out.push(csrdNonEuAbstention())
   // SFDR binds financial market participants and financial advisers, which a sector of "Financial
   // Services" suggests and does not establish.
-  if (jurisdiction === 'European Union' && sector === 'Financial Services') verify('SFDR', SFDR_VERIFY)
+  if (jurisdiction === 'European Union' && FINANCIAL_RULE_SECTORS.SFDR.has(sectorKey)) verify('SFDR', SFDR_VERIFY)
   // EU Taxonomy disclosure is owed by undertakings that report under CSRD, so it applies exactly when
   // CSRD applies on this deal: not on jurisdiction, and not for a Global target whose CSRD abstains.
   if (out.some(f => f.framework === 'CSRD' && f.applies)) {
@@ -1459,12 +1478,11 @@ export const getFrameworkApplicability = (
     // Endorsed for voluntary use, not yet mandatory: a market expectation, with the pending FCA
     // proposal stated so a reader knows it may not stay one.
     market('UK SRS (S1/S2)', UK_SRS_NOTE)
-    if (sector === 'Financial Services') {
-      // Each binds a class of FCA-regulated firm that a sector label does not establish.
-      verify('FCA climate disclosure (TCFD)', FCA_CLIMATE_VERIFY)
-      verify('UK SDR', UK_SDR_VERIFY)
-      verify('Anti-greenwashing rule', ANTI_GREENWASHING_VERIFY)
-    }
+    // Each binds a class of FCA-regulated firm that a sector label does not establish, and each is
+    // attached only to the financial sectors it can reach (FINANCIAL_RULE_SECTORS in ./sectors).
+    if (FINANCIAL_RULE_SECTORS.FCA_CLIMATE.has(sectorKey)) verify('FCA climate disclosure (TCFD)', FCA_CLIMATE_VERIFY)
+    if (FINANCIAL_RULE_SECTORS.UK_SDR.has(sectorKey)) verify('UK SDR', UK_SDR_VERIFY)
+    if (FINANCIAL_RULE_SECTORS.ANTI_GREENWASHING.has(sectorKey)) verify('Anti-greenwashing rule', ANTI_GREENWASHING_VERIFY)
   }
 
   // Canada — S-211 forced/child labour supply-chain reporting. NOT a supply-chain MODULE trigger (it is
@@ -1515,10 +1533,10 @@ export const getFrameworkApplicability = (
   // standard, so it is expected of financial-services targets only.
   market('IFRS S2')
   market('TCFD')
-  if (sector === 'Financial Services') market('PCAF')
+  if (FINANCIAL_RULE_SECTORS.PCAF.has(sectorKey)) market('PCAF')
   // Emissions trading binds operators of covered installations and activities, which a heavy-industry
   // sector suggests and does not establish.
-  if (['Energy & Utilities', 'Industrials & Manufacturing', 'Mining & Metals'].includes(sector)) {
+  if (ETS_SECTORS.has(sectorKey)) {
     if (jurisdiction === 'UK') verify('UK ETS', ETS_VERIFY)
     else if (['European Union', 'Global'].includes(jurisdiction)) verify('EU ETS', ETS_VERIFY)
   }

@@ -34,6 +34,7 @@ import {
 import { NOT_PROVIDED } from '../notProvided'
 import { GHG_TIERS } from '../pricing'
 import { canadaCaveatForMarkets, MARKETS_UNRECORDED_LINE, FRAMEWORK_CITATIONS } from './markets'
+import { normalizeSector } from './sectors'
 import { assessClaims, CLAIMS_DATA_ROOM_ITEM, type ClaimsLine } from './claimsRules'
 import { filenameDate } from '../filename'
 import { disclaimerParas } from '../disclaimer'
@@ -830,7 +831,8 @@ const consultantBand = (low: number, high: number) => `USD ${Math.round(low / 10
  * model, which is what lets the screen and the PDF be tested against each other.
  */
 export function buildDealReportModel(deal: DealReportDeal, generatedAt: Date): DealReportModel {
-  const sector = deal.sector ?? ''
+  // Blank or whitespace-only is no sector, exactly like NULL (three production deals carry '').
+  const sector = normalizeSector(deal.sector) ?? ''
   const jurisdiction = deal.jurisdiction ?? ''
   const currency = deal.currency ?? 'USD'
   const revenue = Number(deal.revenue) || 0

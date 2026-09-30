@@ -25,6 +25,7 @@ import {
 } from './assessment'
 import { filenameDate, filenameSafe } from '../filename'
 import { marketsRecorded } from './markets'
+import { normalizeSector } from './sectors'
 import { marketName } from './claimsRules'
 
 // A worksheet cell primitive. A JS number becomes a NUMERIC cell in SheetJS; a string becomes
@@ -138,7 +139,7 @@ export async function exportPipelineXlsx(input: PipelineExportInput): Promise<vo
   ]
 
   const rows: Cell[][] = deals.map((d) => {
-    const sector = (d.sector ?? '').trim()
+    const sector = normalizeSector(d.sector) ?? ''
     const jurisdiction = (d.jurisdiction ?? '').trim()
     const currency = (d.currency ?? 'USD').trim()
     const revenue = num(d.revenue) ?? 0
