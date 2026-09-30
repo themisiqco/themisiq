@@ -8,7 +8,9 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import Nav from '../../../components/Nav'
 import { s211Api } from '../../../../lib/s211/client'
-import { SOURCE_LABEL, PERSONAL_INFORMATION_WARNING, type Field, type Quote } from '../../../../lib/s211/builderContent'
+import { SOURCE_LABEL, PERSONAL_INFORMATION_WARNING, MONTHS, type Field, type Quote, type SectionContent } from '../../../../lib/s211/builderContent'
+import { toggleChecklist } from '../../../../lib/s211/defaults'
+import { isIsoDate } from '../../../../lib/s211/sectionStatus'
 import type { SectionStatus } from '../../../../lib/s211/sectionStatus'
 
 // ── Styles ──────────────────────────────────────────────────────────────────────────────────────────
@@ -54,13 +56,14 @@ export function NotFound404() {
 }
 
 /** The frame every builder page uses. Renders its children only for an allowed user. */
-export function BuilderFrame({ children }: { children: ReactNode }) {
+export function BuilderFrame({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const access = useS211Access()
   if (access === 'denied') return <NotFound404 />
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-paper, #f8f7f5)' }}>
       <Nav />
-      <div style={S.page}>
+      <style>{BUILDER_CSS}</style>
+      <div style={wide ? { ...S.page, maxWidth: 1140 } : S.page}>
         {access === 'loading' && <p style={S.muted}>Loading</p>}
         {access === 'unreachable' && <p style={S.error}>The server could not be reached. Check your connection and reload the page.</p>}
         {access === 'allowed' && children}
@@ -98,19 +101,23 @@ export function Disclosure({ title, open, onToggle, children }: { title: string;
 
 // ── The field renderer ──────────────────────────────────────────────────────────────────────────────
 type Row = Record<string, string>
-export function FieldInput({ field, value, onChange, onBlur, options }: {
+export function FieldInput({ field, value, onChange, onBlur, options, content }: {
   field: Field; value: unknown; onChange: (v: unknown) => void; onBlur: () => void
   /** Overrides field.options, with labels: section 11's approval basis. */
   options?: { value: string; label: string }[]
+  /** The section's answers, for a label or check that depends on them. */
+  content?: SectionContent
 }) {
   const id = `f-${field.key}`
   const str = typeof value === 'string' ? value : ''
-  const opts = options ?? (field.options ?? []).map(o => ({ value: o, label: o }))
+  const opts = options ?? (field.options ?? []).map(o => ({ value: o, label: field.optionLabels?.[o] ?? o }))
   const len = str.length
+  const label = field.labelWhen && content ? field.labelWhen(content) : field.label
+  const invalid = field.validate && content ? field.validate(content) : null
   const head = (
     <>
       <label htmlFor={id} style={S.label}>
-        {field.label}
+        {label}
         {field.source !== 'act' && <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--color-ink-muted)' }}> [{SOURCE_LABEL[field.source]}]</span>}
       </label>
       {field.hint && <p style={S.hint}>{field.hint}</p>}
@@ -131,12 +138,27 @@ export function FieldInput({ field, value, onChange, onBlur, options }: {
       control = <input id={id} style={{ ...S.input, maxWidth: 220 }} type="number" min={0} value={typeof value === 'number' ? value : ''}
         onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))} onBlur={onBlur} />
       break
+    case 'month':
+      control = <select id={id} style={{ ...S.input, maxWidth: 220 }} value={typeof value === 'number' ? String(value) : ''}
+        onChange={e => { onChange(e.target.value === '' ? null : Number(e.target.value)); setTimeout(onBlur, 0) }}>
+        <option value="">Choose a month</option>
+        {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+      </select>
+      break
     case 'date':
-      control = <input id={id} style={{ ...S.input, maxWidth: 220 }} type="date" value={str} onChange={e => onChange(e.target.value)} onBlur={onBlur} />
+      // A text box, not a date picker: Safari paints an empty date picker with today's date in grey,
+      // which reads as an answer. Empty stays visibly empty; the format is in the placeholder.
+      control = <>
+        <input id={id} style={{ ...S.input, maxWidth: 220 }} inputMode="numeric" placeholder="YYYY-MM-DD" value={str} maxLength={10}
+          onChange={e => onChange(e.target.value.trim())} onBlur={onBlur} />
+        {str !== '' && !isIsoDate(str) && <div style={{ ...S.hint, color: '#B91C1C', margin: '4px 0 0' }}>Enter the date as YYYY-MM-DD, for example 2026-04-14.</div>}
+      </>
       break
     case 'confirm':
-      control = <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
-        <input id={id} type="checkbox" checked={value === true} onChange={e => { onChange(e.target.checked); setTimeout(onBlur, 0) }} /> Yes
+      // A checkbox, which can be ticked and unticked. Never a radio button, which cannot be cleared.
+      control = <label htmlFor={id} style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+        <input id={id} type="checkbox" style={{ width: 18, height: 18, accentColor: 'var(--color-brand)' }} checked={value === true}
+          onChange={e => { onChange(e.target.checked); setTimeout(onBlur, 0) }} /> Tick to confirm
       </label>
       break
     case 'yn': case 'ynp': case 'choice': {
@@ -158,7 +180,7 @@ export function FieldInput({ field, value, onChange, onBlur, options }: {
         {opts.map(o => (
           <label key={o.value} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, lineHeight: 1.5 }}>
             <input type="checkbox" style={{ marginTop: 3 }} checked={picked.includes(o.value)}
-              onChange={e => { onChange(e.target.checked ? [...picked, o.value] : picked.filter(p => p !== o.value)); setTimeout(onBlur, 0) }} /> {o.label}
+              onChange={e => { onChange(toggleChecklist(picked, o.value, e.target.checked, field.exclusiveOption)); setTimeout(onBlur, 0) }} /> {o.label}
           </label>
         ))}
       </div>
@@ -168,7 +190,6 @@ export function FieldInput({ field, value, onChange, onBlur, options }: {
       control = <>
         <textarea id={id} style={{ ...S.input, minHeight: 80 }} value={Array.isArray(value) ? (value as string[]).join('\n') : ''}
           onChange={e => onChange(e.target.value.split('\n'))} onBlur={() => { onChange((Array.isArray(value) ? value as string[] : []).map(s => s.trim()).filter(Boolean)); setTimeout(onBlur, 0) }} />
-        <div style={{ ...S.hint, margin: '2px 0 0' }}>One per line.</div>
       </>
       break
     }
@@ -192,10 +213,48 @@ export function FieldInput({ field, value, onChange, onBlur, options }: {
       break
     }
   }
-  return <div style={{ marginBottom: 18 }}>{head}{control}</div>
+  return <div style={{ marginBottom: 18 }}>{head}{control}{invalid && <div style={{ ...S.hint, color: '#B91C1C', margin: '4px 0 0' }}>{invalid}</div>}</div>
 }
 
-/** Section 3's six OECD steps: fixed rows, a status for each. */
+/**
+ * The choice offered when a new draft would replace text the user has edited (section 9's summary,
+ * section 11's attestation): both versions side by side, so parts can be copied across, and two
+ * buttons. Never a browser confirm() box.
+ */
+export function ReplaceDraftPanel({ intro, mine, next, keepLabel, replaceLabel, onKeep, onReplace }: {
+  intro: string; mine: string; next: string; keepLabel: string; replaceLabel: string; onKeep: () => void; onReplace: () => void
+}) {
+  const box: CSSProperties = { ...S.input, minHeight: 160, fontSize: 13, lineHeight: 1.55, background: '#fff' }
+  return (
+    <div role="dialog" aria-label="Choose which version to keep" style={{ ...S.warn, padding: 16 }}>
+      <p style={{ margin: '0 0 10px' }}>{intro}</p>
+      <div className="s211-replace-grid">
+        <label style={{ fontSize: 12.5, fontWeight: 600 }}>Your version<textarea readOnly style={{ ...box, marginTop: 4 }} value={mine} /></label>
+        <label style={{ fontSize: 12.5, fontWeight: 600 }}>New draft<textarea readOnly style={{ ...box, marginTop: 4 }} value={next} /></label>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+        <button type="button" style={S.buttonQuiet} onClick={onKeep}>{keepLabel}</button>
+        <button type="button" style={S.button} onClick={onReplace}>{replaceLabel}</button>
+      </div>
+    </div>
+  )
+}
+
+/** Layout rules inline styles cannot express: the section menu's two forms, and the side-by-side panel. */
+export const BUILDER_CSS = `
+.s211-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
+.s211-nav-side { display: none; }
+.s211-nav-jump { display: block; margin-bottom: 14px; }
+.s211-replace-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 1000px) {
+  .s211-layout { grid-template-columns: 230px minmax(0, 1fr); }
+  .s211-nav-side { display: block; position: sticky; top: 16px; align-self: start; }
+  .s211-nav-jump { display: none; }
+}
+@media (min-width: 720px) { .s211-replace-grid { grid-template-columns: 1fr 1fr; } }
+`
+
+/** Section 3's six OECD steps: fixed rows, a status for each. Plain text, one source note above (the page). */
 export function StepStatusRows({ steps, value, onChange, onBlur }: { steps: readonly string[]; value: unknown; onChange: (v: unknown) => void; onBlur: () => void }) {
   const rows = Array.isArray(value) ? (value as Row[]) : []
   const statusOf = (step: string) => rows.find(r => r.step === step)?.status ?? ''
@@ -207,7 +266,7 @@ export function StepStatusRows({ steps, value, onChange, onBlur }: { steps: read
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {steps.map(step => (
         <div key={step} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>&ldquo;{step}&rdquo;</span>
+          <span style={{ fontSize: 13.5, lineHeight: 1.5 }}>{step}</span>
           <select style={{ ...S.input, width: 150 }} value={statusOf(step)} onChange={e => set(step, e.target.value)}>
             <option value="">Not answered</option><option>Yes</option><option>No</option><option>In progress</option>
           </select>

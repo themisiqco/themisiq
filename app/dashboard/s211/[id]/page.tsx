@@ -22,6 +22,8 @@ const ACTIVITY_QUESTIONS: [keyof S211Activities, string][] = [
   ['importsGoods', 'Does it import into Canada goods produced outside Canada?'],
   ['controlsEntityWithGoodsActivity', 'Does it control an entity that does any of these?'],
 ]
+// Only s.9(a) is ever quoted on this page (lib/s211/obligation.ts, S211_ACT_9A_QUOTED).
+const ACT_9A_LABEL = 'The Act, s.9(a)'
 const ENTITY_LABEL = { entity: 'An entity under the Act', 'not-entity': 'Not an entity under the Act', undetermined: 'Not yet determined' } as const
 
 const tri = (v: boolean | null) => (v === true ? 'yes' : v === false ? 'no' : '')
@@ -125,8 +127,10 @@ function Home({ id }: { id: string }) {
         <ul style={{ ...S.muted, margin: '0 0 10px', paddingLeft: 18 }}>{result.entity.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
         <p style={{ ...S.body, margin: '0 0 4px' }}><strong>Reporting obligation:</strong> {S211_OUTCOME_LABEL[result.obligation.outcome]}</p>
         <ul style={{ ...S.muted, margin: 0, paddingLeft: 18 }}>{result.obligation.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
-        {result.obligation.actQuoted && <p style={{ ...S.muted, margin: '8px 0 0' }}>The Act, s.9: &ldquo;{result.obligation.actQuoted}&rdquo;</p>}
+        {/* The Act's words and the current guidance first; notes about earlier versions of the guidance after. */}
+        {result.obligation.actQuoted && <p style={{ ...S.muted, margin: '8px 0 0' }}>{ACT_9A_LABEL}: &ldquo;{result.obligation.actQuoted}&rdquo;</p>}
         {result.obligation.guidanceQuoted.map((q, i) => <p key={i} style={{ ...S.muted, margin: '8px 0 0' }}>Public Safety Canada guidance: &ldquo;{q}&rdquo;</p>)}
+        {result.obligation.notes.map((n, i) => <p key={i} style={{ ...S.muted, margin: '8px 0 0' }}>{n}</p>)}
         {result.unanswered > 0 && <p style={{ ...S.hint, marginTop: 10 }}>{result.unanswered} of the questions about goods are not answered yet. Until they are, they are treated as &ldquo;not sure&rdquo;.</p>}
         <p style={{ ...S.hint, marginTop: 10 }}>This is a screening result from your answers below. It is not legal advice. The guidance encourages entities that are unsure to seek advice from their legal counsel.</p>
       </div>

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { evaluateS211Entity, S211_THRESHOLDS, S211_ENTITY_CITATION, S211_LOOKBACK_NOT_RUN, S211_NOT_MODELLED, type S211EntityInput, type S211YearFigures } from './entity'
+import { evaluateS211Entity, metConditionsSentence, S211_THRESHOLDS, S211_ENTITY_CITATION, S211_LOOKBACK_NOT_RUN, S211_NOT_MODELLED, type S211EntityInput, type S211YearFigures } from './entity'
 import { THRESHOLD_TESTS } from '../deals/assessment'
 import { ECB_UNITS_PER_EUR } from '../fx'
 
@@ -34,7 +34,8 @@ describe('the size route: a Canada nexus and 2 of 3 in either of the two most re
     const r = run({ mostRecentYear: ONE, priorYear: TWO })
     expect(r).toMatchObject({ outcome: 'entity', route: 'size', lookbackRun: true })
     expect(r.years.map(y => [y.year, y.metCount, y.met])).toEqual([['most-recent', 1, false], ['prior', 2, true]])
-    expect(r.reasons).toContain('Meets 2 of the 3 size conditions in the prior financial year.')
+    // The conditions met are named, with the figures (review item C10).
+    expect(r.reasons).toContain('Assets of CAD 25,000,000 (at least CAD 20 million) and revenue of CAD 45,000,000 (at least CAD 40 million) in the prior financial year.')
   })
 
   it('2 of 3 met in the most recent year only: an entity', () => {
@@ -101,7 +102,7 @@ describe('figures in another currency are converted to CAD at the dated ECB rate
   })
 
   it('CAD figures are not converted and carry no note', () => {
-    expect(run({ mostRecentYear: BIG }).years[0].limbs[0]).toEqual({ measure: 'assets', value: 25e6, threshold: 20e6, met: true, note: null })
+    expect(run({ mostRecentYear: BIG }).years[0].limbs[0]).toEqual({ measure: 'assets', value: 25e6, threshold: 20e6, met: true, note: null, entered: 25e6, currency: 'CAD' })
   })
 
   it('a currency with no rate: the money conditions are not compared, and the outcome is not guessed', () => {
@@ -194,5 +195,31 @@ describe('the Deals engine reads the same thresholds', () => {
   it('this file does not import the Deals engine', () => {
     const imports = readFileSync(join(process.cwd(), 'lib/s211/entity.ts'), 'utf8').split('\n').filter(l => l.startsWith('import '))
     expect(imports).toEqual(["import { FX_AS_OF, isFxCurrency, convertFx } from '../fx'"])
+  })
+})
+
+describe('the conditions met, named with their figures', () => {
+  it('all three, in CAD: each figure, its threshold, and the year', () => {
+    const r = run({ mostRecentYear: BIG, priorYear: NONE })
+    expect(metConditionsSentence(r.years[0])).toBe(
+      'Assets of CAD 25,000,000 (at least CAD 20 million), revenue of CAD 45,000,000 (at least CAD 40 million) and an average of 300 employees (at least 250) in the most recent financial year.')
+  })
+
+  it('a figure equal to the threshold meets it, so the sentence says "at least", never "over"', () => {
+    const r = run({ mostRecentYear: cad(20e6, 40e6, 10), priorYear: NONE })
+    expect(r.outcome).toBe('entity')
+    const s = metConditionsSentence(r.years[0])
+    expect(s).toBe('Assets of CAD 20,000,000 (at least CAD 20 million) and revenue of CAD 40,000,000 (at least CAD 40 million) in the most recent financial year.')
+    expect(s).not.toMatch(/\bover\b/)
+  })
+
+  it('a converted figure shows the amount entered, then the CAD value it was compared as', () => {
+    const r = run({ mostRecentYear: { assets: 15e6, revenue: 29e6, averageEmployees: 10, currency: 'USD' }, priorYear: NONE })
+    expect(metConditionsSentence(r.years[0])).toMatch(/^Assets of USD 15,000,000 \(CAD [\d,]+, at least CAD 20 million\) and revenue of USD 29,000,000 \(CAD [\d,]+, at least CAD 40 million\) in the most recent financial year\.$/)
+  })
+
+  it('the entity reasons carry the figures sentence for the year relied on', () => {
+    const r = run({ mostRecentYear: TWO, priorYear: NONE })
+    expect(r.reasons).toContain('Assets of CAD 25,000,000 (at least CAD 20 million) and revenue of CAD 45,000,000 (at least CAD 40 million) in the most recent financial year.')
   })
 })

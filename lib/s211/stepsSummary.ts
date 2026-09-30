@@ -25,7 +25,9 @@ export type StepItem =
 
 export const STEP_ITEM_LABEL: Record<StepItem, string> = {
   policy: 'Policies adopted or in place',
-  supplier_terms: 'Supplier terms requiring the policy',
+  // Not "requiring the policy": this label also appears in the in-progress sentence, which is shown when no
+  // written policy may exist (review item A6).
+  supplier_terms: 'Contracts or purchase terms',
   due_diligence: 'Due diligence carried out',
   risk_assessment: 'Risks assessed',
   risk_areas: 'Risk areas identified',
@@ -42,6 +44,19 @@ const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1
 const rows = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter(r => r && typeof r === 'object') as Record<string, unknown>[] : [])
 const checked = (v: unknown): string[] => (Array.isArray(v) ? v.map(str).filter(Boolean) : [])
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
+/** An OECD step as it reads inside our own sentence: lower-case start, and no abbreviation in brackets. */
+const stepPhrase = (s: string) => lower(s).replace(/\s*\([A-Z]{2,}\)/g, '')
+
+/**
+ * How each "where the policy applies" option reads inside the policy sentence. Exported so the test can
+ * check every phrase against the option it renders.
+ */
+export const SCOPE_PHRASE: Readonly<Record<string, string>> = {
+  'Own operations': 'our own operations',
+  'Direct suppliers': 'direct suppliers',
+  'Indirect suppliers': 'indirect suppliers',
+  'Controlled entities': 'entities we control',
+}
 
 export type StepsAssembly = {
   /** Items that were done in the year, in report order, each with its sentence. */
@@ -59,21 +74,27 @@ export function assembleSteps(a: Answers): StepsAssembly {
   const wip: StepsAssembly['inProgress'] = []
   const T = (section: SectionKey, field: string): Trace => ({ section, field })
   const underWay = (item: StepItem, sources: Trace[]) =>
-    wip.push({ item, sources, text: `Work under way at the end of the financial year, not yet complete: ${lower(STEP_ITEM_LABEL[item])}.` })
+    wip.push({ item, sources, text: `At the end of the financial year we still had work under way on: ${lower(STEP_ITEM_LABEL[item])}.` })
 
   // Section 3
-  if (s3.has_policy === 'Yes') {
+  const hasPolicy = s3.has_policy === 'Yes'
+  if (hasPolicy) {
     const names = rows(s3.policy_list).map(r => str(r.name)).filter(Boolean)
-    out.push({ item: 'policy', sources: [T('policies_due_diligence', 'has_policy'), ...(names.length ? [T('policies_due_diligence', 'policy_list')] : [])],
-      text: names.length ? `We had a policy covering forced labour and child labour in place: ${list(names)}.` : 'We had a policy covering forced labour and child labour in place.' })
+    const scope = checked(s3.policy_applies_to).map(o => SCOPE_PHRASE[o]).filter(Boolean)
+    const scoped = scope.length ? `, applying to ${list(scope)}` : ''
+    out.push({ item: 'policy',
+      sources: [T('policies_due_diligence', 'has_policy'), ...(scope.length ? [T('policies_due_diligence', 'policy_applies_to')] : []), ...(names.length ? [T('policies_due_diligence', 'policy_list')] : [])],
+      text: `We had a policy covering forced labour and child labour in place${scoped}${names.length ? `: ${list(names)}` : ''}.` })
   } else if (s3.has_policy === 'In progress') underWay('policy', [T('policies_due_diligence', 'has_policy')])
-  if (s3.supplier_terms === 'Yes') out.push({ item: 'supplier_terms', sources: [T('policies_due_diligence', 'supplier_terms')],
-    text: 'Our contracts or purchase terms required suppliers to follow the policy.' })
+  // "the policy" only when a written policy is ticked. Otherwise the terms are to a code or standard.
+  if (s3.supplier_terms === 'Yes') out.push({ item: 'supplier_terms', sources: [T('policies_due_diligence', 'supplier_terms'), T('policies_due_diligence', 'has_policy')],
+    text: hasPolicy ? 'Our contracts or purchase terms required suppliers to follow the policy.'
+      : 'Our contracts or purchase terms required suppliers to follow a code of conduct or sourcing standard.' })
   else if (s3.supplier_terms === 'In progress') underWay('supplier_terms', [T('policies_due_diligence', 'supplier_terms')])
   const ddDone = rows(s3.due_diligence_steps).filter(r => str(r.status) === 'Yes').map(r => str(r.step)).filter(Boolean)
   const ddWip = rows(s3.due_diligence_steps).filter(r => str(r.status) === 'In progress').map(r => str(r.step)).filter(Boolean)
   if (ddDone.length) out.push({ item: 'due_diligence', sources: [T('policies_due_diligence', 'due_diligence_steps')],
-    text: `We carried out due diligence, covering these steps: ${list(ddDone.map(lower))}.` })
+    text: `We carried out due diligence, covering ${ddDone.length === 1 ? 'this step' : 'these steps'}: ${list(ddDone.map(stepPhrase))}.` })
   else if (ddWip.length) underWay('due_diligence', [T('policies_due_diligence', 'due_diligence_steps')])
 
   // Section 4
@@ -90,7 +111,7 @@ export function assembleSteps(a: Answers): StepsAssembly {
   if (s5.remediation_taken === 'Yes') out.push({ item: 'remediation', sources: [T('remediation', 'remediation_taken')],
     text: 'We took measures to remediate forced labour or child labour.' })
   if (s5.grievance_mechanism === 'Yes') out.push({ item: 'grievance', sources: [T('remediation', 'grievance_mechanism')],
-    text: 'A channel was available for workers or others to report concerns.' })
+    text: 'We had a channel for workers or others to report concerns.' })
   else if (s5.grievance_mechanism === 'In progress') underWay('grievance', [T('remediation', 'grievance_mechanism')])
 
   // Section 6
@@ -144,7 +165,9 @@ export const summaryEdited = (s9: SectionContent): boolean =>
   typeof s9._built_summary === 'string' && typeof s9.steps_summary === 'string' && s9.steps_summary.trim() !== s9._built_summary.trim()
 
 export const STALE_NOTICE = 'Your earlier answers have changed since this summary was written.'
-export const REBUILD_CONFIRM = 'Rebuilding replaces the summary with a new draft, and your edits to it will be lost. Rebuild anyway?'
+export const REBUILD_PANEL_INTRO = 'You have edited the summary. A new draft is shown beside your version. Copy anything you want to keep before you choose.'
+export const KEEP_MINE = 'Keep my version'
+export const REPLACE_WITH_NEW = 'Replace with a new draft'
 export const DRAFT_NOTICE = 'Built from your answers in sections 3 to 8. Read and edit it before marking this section complete.'
 
 /** The section 9 content after (re)building the draft from the answers now. */
@@ -152,5 +175,44 @@ export function buildStepsContent(s9: SectionContent, a: Answers, ticked?: reado
   const assembly = assembleSteps(a)
   const items = ticked ?? assembly.checklist
   const text = summaryText(assembly, items)
-  return { ...s9, steps_checklist: [...items], steps_summary: text, _built_summary: text, _built_from: stepsFingerprint(a) }
+  return {
+    ...s9, steps_checklist: [...items], steps_summary: text, _built_summary: text, _built_from: stepsFingerprint(a),
+    // What the draft was built from, item by item, so a later change can be described, not just detected.
+    _built_texts: Object.fromEntries(assembly.sentences.map(x => [x.item, x.text])),
+  }
+}
+
+/** Which section each item comes from, and how a change to it is described. */
+const ITEM_SECTION: Record<StepItem, number> = {
+  policy: 3, supplier_terms: 3, due_diligence: 3, risk_assessment: 4, risk_areas: 4,
+  remediation: 5, grievance: 5, income_remediation: 6, training: 7, effectiveness: 8,
+}
+const ITEM_SAYS: Record<StepItem, string> = {
+  policy: 'a written policy was in place',
+  supplier_terms: 'contracts or purchase terms required suppliers to follow a policy or standard',
+  due_diligence: 'due diligence steps were taken',
+  risk_assessment: 'the risks were assessed',
+  risk_areas: 'risk areas were identified',
+  remediation: 'remediation measures were taken',
+  grievance: 'a channel for reporting concerns was available',
+  income_remediation: 'measures were taken to remediate lost income',
+  training: 'training was provided',
+  effectiveness: 'the effectiveness of the actions was checked',
+}
+
+/**
+ * What changed since the draft was built, in words: an item that has appeared, one that has gone (and so
+ * left the checklist on its own), and one whose details changed. Empty when nothing has.
+ */
+export function describeStepsChanges(s9: SectionContent, a: Answers): string[] {
+  const built = (s9._built_texts && typeof s9._built_texts === 'object' ? s9._built_texts : {}) as Record<string, string>
+  const now = Object.fromEntries(assembleSteps(a).sentences.map(x => [x.item, x.text])) as Record<string, string>
+  const out: string[] = []
+  for (const item of Object.keys(ITEM_SECTION) as StepItem[]) {
+    const n = ITEM_SECTION[item]
+    if (now[item] && !built[item]) out.push(`Section ${n} now says ${ITEM_SAYS[item]}. Rebuild to include it.`)
+    else if (!now[item] && built[item]) out.push(`Section ${n} no longer says ${ITEM_SAYS[item]}, so it has been taken off the checklist. Rebuild to take it out of the summary.`)
+    else if (now[item] && built[item] && now[item] !== built[item]) out.push(`Section ${n} has new details for \u201C${STEP_ITEM_LABEL[item]}\u201D. Rebuild to update the summary.`)
+  }
+  return out
 }

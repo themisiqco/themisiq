@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { SECTIONS, SECTION_KEYS, KEY_TERMS, letteredLines, ATTESTATION_DEFAULT } from './builderContent'
+import { SECTIONS, SECTION_KEYS, KEY_TERMS, letteredLines, ATTESTATION_DEFAULT, MONTHS, OECD_STEPS, OECD_STEPS_SOURCE_NOTE, quotedExample, sectionDef } from './builderContent'
 import * as R from './requirements'
 
 // The one word the house style bans, assembled so this file does not contain it.
@@ -20,7 +20,9 @@ describe('the builder content', () => {
   it('every Act quotation is built from a verified constant in requirements.ts', () => {
     const para = (l: string) => R.S211_ACT_SECTION_11_3.paragraphs.find(p => p.letter === l)!.text
     expect(SECTIONS[0].actQuote!.lines).toEqual(letteredLines(R.S211_ACT_SECTION_11_2))
-    expect(SECTIONS.slice(1, 8).map(s => s.actQuote!.lines[0])).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(para))
+    // Sections 2 to 8: the s.11(3) lead-in, from the verified constant, above the lettered paragraph.
+    expect(SECTIONS.slice(1, 8).map(s => s.actQuote!.lines)).toEqual(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(l => [R.S211_ACT_SECTION_11_3.leadIn, `(${l}) ${para(l)}`]))
     expect(SECTIONS[8].actQuote!.lines).toEqual([R.S211_ACT_SECTION_11_1])
     expect(SECTIONS[9].actQuote).toBeNull()
     expect(SECTIONS[10].actQuote!.lines).toEqual([...letteredLines(R.S211_ACT_SECTION_11_4), '', ...letteredLines(R.S211_ACT_SECTION_11_5)])
@@ -81,5 +83,77 @@ describe('the builder content', () => {
     for (const f of ['app/components/Nav.tsx', 'app/components/Footer.tsx', 'app/dashboard/page.tsx', 'app/sitemap.ts'])
       expect(read(f), f).not.toContain('/dashboard/s211')
     expect(read('app/dashboard/s211/layout.tsx')).toContain('robots: { index: false, follow: false }')
+  })
+})
+
+describe('review fixes: builder text', () => {
+  const field = (k: Parameters<typeof sectionDef>[0], f: string) => sectionDef(k).fields.find(x => x.key === f)!
+
+  it('an example that quotes text gets single marks inside, never a doubled opening mark (review item A2)', () => {
+    expect(quotedExample('"Harrowgate Group", 2025.')).toBe('\u201C\u2018Harrowgate Group\u2019, 2025.\u201D')
+    expect(quotedExample('No quotation inside.')).toBe('\u201CNo quotation inside.\u201D')
+    for (const d of SECTIONS) expect(quotedExample(d.weakExample), d.key).not.toMatch(/\u201C\u201C|\u201C"|""/)
+  })
+
+  it('section 1: month names, the plain-terms sentence, the radio labels, and the override behind a link (items E22 to E28)', () => {
+    expect(MONTHS).toHaveLength(12)
+    expect(field('report_details', 'year_end_month').type).toBe('month')
+    expect(sectionDef('report_details').plainTerms).toContain('The report due by May 31 covers the entity\u2019s most recent completed financial year.'.replace('\u2019', "'"))
+    expect(field('report_details', 'report_type').optionLabels).toEqual({ single: 'Single report', joint: 'Joint report' })
+    expect(sectionDef('report_details').fields.filter(f => f.revealedBy === 'fy_override').map(f => f.key)).toEqual(['financial_year_start', 'financial_year_end'])
+    expect(field('report_details', 'other_jurisdictions').exclusiveOption).toBe('None')
+  })
+
+  it('section 3: the new hint, and the OECD steps come from the constant with one source note (items F32, F33)', () => {
+    expect(SECTIONS.flatMap(d => d.fields).map(f => f.hint)).toContain('Name the process, which role or team runs it (a job title, not a person\'s name) and how often.')
+    expect(OECD_STEPS).toBe(R.S211_GUIDANCE_B_OECD_STEPS)
+    expect(OECD_STEPS_SOURCE_NOTE).toBe('The six steps in the OECD Due Diligence Guidance for Responsible Business Conduct, as listed in Public Safety Canada\'s guidance.')
+    expect(field('policies_due_diligence', 'due_diligence_steps').hint).toContain('The Act does not require an entity to follow it.')
+  })
+
+  it('section 11: authority to bind is a tick box, and the length note (items H40, H41)', () => {
+    expect(field('approval_attestation', 'authority_to_bind').type).toBe('confirm')
+    expect(sectionDef('approval_attestation').characterGuidance).toBe('Keep edits close to the length of the example.')
+  })
+})
+
+describe('review fixes: the builder pages (source checks)', () => {
+  const page = read('app/dashboard/s211/[id]/[section]/page.tsx')
+  const ui = read('app/dashboard/s211/_components/ui.tsx')
+  const check = read('app/dashboard/s211/[id]/check/page.tsx')
+  const home = read('app/dashboard/s211/[id]/page.tsx')
+  const list = read('app/dashboard/s211/page.tsx')
+
+  it('the panels open on the first visit, read once before the visit is recorded (item A1)', () => {
+    expect(page).toMatch(/useState\(\(\) => isFirstVisit\(/)
+    expect(page).toContain('open={firstVisit}')
+    expect(page).toMatch(/<SectionPage key=\{section\}/)
+  })
+
+  it('every section page has the section list, the jump menu and the way back (item B7)', () => {
+    expect(page).toContain('className="s211-nav-side"')
+    expect(page).toContain('Jump to section')
+    expect(page).toContain('Back to report overview')
+    expect(ui).toMatch(/\.s211-nav-side \{[^}]*position: sticky/)
+  })
+
+  it('no browser confirm: an in-page panel with the two named choices (item G39)', () => {
+    const code = (src: string) => src.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
+    for (const src of [page, ui]) expect(code(src)).not.toMatch(/window\.confirm|\bconfirm\(/)
+    expect(page).toContain('<ReplaceDraftPanel')
+    expect(page).toContain('keepLabel={KEEP_MINE} replaceLabel={REPLACE_WITH_NEW}')
+  })
+
+  it('the check page links every section, lists section 10 apart, and shows the placeholder warning (items B8, B9, A5)', () => {
+    expect(check).toContain('checkReport(')
+    expect(check).toContain('Optional sections not used')
+    expect(check).toContain('c.warnings.map')
+    expect(check).not.toMatch(/\.join\('; '\)/)
+  })
+
+  it('the home page labels the Act s.9(a) and shows notes after the quotations; the list page offers the next report due (items C14, C15, C17)', () => {
+    expect(home).toContain("'The Act, s.9(a)'")
+    expect(home.indexOf('obligation.guidanceQuoted.map')).toBeLessThan(home.indexOf('obligation.notes.map'))
+    expect(list).toContain('defaultReportingYear(new Date())')
   })
 })

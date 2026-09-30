@@ -41,9 +41,9 @@ describe('the texts this rests on', () => {
   it('the four outcomes are named as asked', () => {
     expect(S211_OUTCOME_LABEL).toEqual({
       'must-report': 'Must report',
-      within_act_not_expected: 'Within the Act (s.9(a) covers selling and distributing goods), but not expected to report under current Public Safety Canada guidance.',
+      within_act_not_expected: 'Not expected to report (within the Act, but covered by the guidance for selling and distributing only).',
       'does-not-have-to-report': 'Does not have to report',
-      undetermined: 'Undetermined',
+      undetermined: 'Not yet determined',
     })
   })
 
@@ -59,7 +59,7 @@ describe('each activity, for an entity', () => {
   it('produces goods: must report under s.9(a), with the very-minor-dealings guidance quoted', () => {
     const r = run({ producesGoods: 'yes' })
     expect(r).toMatchObject({ outcome: 'must-report', actParagraphs: ['a'], guidanceCaveat: null })
-    expect(r.reasons).toEqual(['It is an entity under section 2.', 'It produces goods, which section 9(a) of the Act covers.'])
+    expect(r.reasons).toEqual(['It meets the Act\u2019s definition of an entity (section 2).', 'It produces goods, which section 9(a) of the Act covers.'])
     expect(r.guidanceQuoted).toEqual([...S211_GUIDANCE_VERY_MINOR_DEALINGS])
   })
 
@@ -104,7 +104,10 @@ describe('only sells and distributes', () => {
       expect(r.actParagraphs).toEqual(['a'])
       // s.9(a) and the guidance sentence, both verbatim.
       expect(r.actQuoted).toBe('This Part applies to any entity producing, selling or distributing goods in Canada or elsewhere;')
-      expect(r.reasons).toContain(S211_ENFORCEMENT_COMMITMENT_WITHDRAWN)
+      // The note on earlier versions of the guidance is kept apart from the reasons, and shown after the
+      // Act's words and the current guidance (review item C15).
+      expect(r.reasons).not.toContain(S211_ENFORCEMENT_COMMITMENT_WITHDRAWN)
+      expect(r.notes).toEqual([S211_ENFORCEMENT_COMMITMENT_WITHDRAWN])
       expect(r.guidanceCaveat).toBe('Entities solely involved in distributing and selling are not expected to report under the Act.')
       expect(r.guidanceQuoted).toEqual([S211_GUIDANCE_SELL_DISTRIBUTE_ONLY])
       expect(r.reasons).toContain(S211_SELL_DISTRIBUTE_REASON)
@@ -112,7 +115,7 @@ describe('only sells and distributes', () => {
   }
 
   it('the reason says the Act reaches it and that the guidance is not the statute', () => {
-    expect(S211_SELL_DISTRIBUTE_REASON).toBe('Section 9(a) of the Act applies to an entity selling or distributing goods, so the Act reaches it. Public Safety Canada’s guidance takes a narrower position, quoted here; it is guidance and not the statute.')
+    expect(S211_SELL_DISTRIBUTE_REASON).toBe('Section 9(a) of the Act applies to an entity selling or distributing goods, so the entity falls within the Act. Public Safety Canada’s guidance takes a narrower position, quoted here; it is guidance and not the statute.')
   })
 
   it('the note on the withdrawn commitment: the earlier sentence quoted, the current page date, and that filing is the entity’s judgment', () => {

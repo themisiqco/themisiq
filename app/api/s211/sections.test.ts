@@ -43,7 +43,7 @@ describe('saving a section', () => {
     expect(r.status).toBe(422)
     const body = await r.json()
     expect(body.missing).toEqual(['What the training covers, and how it is reviewed'])
-    expect(body.error).toBe('This section cannot be marked complete yet. Fill in: What the training covers, and how it is reviewed.')
+    expect(body.error).toBe('This section cannot be marked complete yet. Fill in \u201CWhat the training covers, and how it is reviewed\u201D.')
     expect(stored('training')).toBeUndefined()
   })
 

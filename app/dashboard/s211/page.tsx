@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { s211Api } from '../../../lib/s211/client'
+import { defaultReportingYear } from '../../../lib/s211/defaults'
 import { BuilderFrame, S } from './_components/ui'
 
 type ReportRow = { id: string; company_name: string; reporting_year: number; status: string; updated_at: string }
@@ -15,7 +16,7 @@ function ReportsList() {
   const [reports, setReports] = useState<ReportRow[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [company, setCompany] = useState('')
-  const [year, setYear] = useState(String(new Date().getFullYear()))
+  const [year, setYear] = useState(() => String(defaultReportingYear(new Date())))
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 

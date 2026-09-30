@@ -43,9 +43,9 @@ export type S211Activities = {
 export type S211ObligationOutcome = 'must-report' | 'within_act_not_expected' | 'does-not-have-to-report' | 'undetermined'
 export const S211_OUTCOME_LABEL: Record<S211ObligationOutcome, string> = {
   'must-report': 'Must report',
-  within_act_not_expected: 'Within the Act (s.9(a) covers selling and distributing goods), but not expected to report under current Public Safety Canada guidance.',
+  within_act_not_expected: 'Not expected to report (within the Act, but covered by the guidance for selling and distributing only).',
   'does-not-have-to-report': 'Does not have to report',
-  undetermined: 'Undetermined',
+  undetermined: 'Not yet determined',
 }
 
 export type S211ObligationResult = {
@@ -60,6 +60,8 @@ export type S211ObligationResult = {
   reasons: string[]
   /** Guidance text a reader of this result should see, verbatim. */
   guidanceQuoted: string[]
+  /** Shown AFTER the quotations: context a reader needs once they have read the Act and the guidance. */
+  notes: string[]
 }
 
 const ACTIVITY_NAME: Record<keyof S211Activities, string> = {
@@ -73,13 +75,14 @@ const KEYS = Object.keys(ACTIVITY_NAME) as (keyof S211Activities)[]
 const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`)
 
 export const S211_SELL_DISTRIBUTE_REASON =
-  'Section 9(a) of the Act applies to an entity selling or distributing goods, so the Act reaches it. Public Safety Canada’s guidance takes a narrower position, quoted here; it is guidance and not the statute.'
+  'Section 9(a) of the Act applies to an entity selling or distributing goods, so the entity falls within the Act. Public Safety Canada’s guidance takes a narrower position, quoted here; it is guidance and not the statute.'
 /** s.9(a) as one sentence: the Act's lead-in and paragraph (a), both verbatim. */
 export const S211_ACT_9A_QUOTED = `${S211_ACT_SECTION_9.leadIn} ${S211_ACT_SECTION_9.paragraphs[0].text}`
 // The guidance page is dated 18 December 2025. The sentence it dropped is quoted from its earlier
 // versions; see S211_GUIDANCE_PRIOR_NO_ENFORCEMENT in lib/s211/requirements.ts for where that was read.
 export const S211_ENFORCEMENT_COMMITMENT_WITHDRAWN =
   `Earlier versions of the guidance added: "${S211_GUIDANCE_PRIOR_NO_ENFORCEMENT}" The current version, dated ${S211_GUIDANCE_PAGE_MODIFIED}, no longer says so. Whether to file voluntarily is therefore a judgment for the entity.`
+export const ENTITY_MET_REASON = 'It meets the Act\u2019s definition of an entity (section 2).'
 export const S211_NOT_AN_ENTITY_REASON = 'It is not an entity under section 2, so Part 2 of the Act does not apply to it.'
 export const S211_NO_ACTIVITY_REASON = 'It does none of the things section 9 of the Act lists: producing, selling, distributing or importing goods, or controlling an entity that does.'
 export const S211_ENTITY_UNSETTLED_REASON = 'Whether it is an entity under section 2 is not settled, so the reporting obligation cannot be settled either.'
@@ -93,7 +96,7 @@ export function evaluateS211Obligation(entity: Pick<S211EntityResult, 'outcome'>
     ...(a.controlsEntityWithGoodsActivity === 'yes' ? ['c' as const] : []),
   ]
   const result = (outcome: S211ObligationOutcome, reasons: string[], extra: Partial<S211ObligationResult> = {}): S211ObligationResult =>
-    ({ outcome, actParagraphs: paragraphs, guidanceCaveat: null, actQuoted: null, reasons, guidanceQuoted: [], ...extra })
+    ({ outcome, actParagraphs: paragraphs, guidanceCaveat: null, actQuoted: null, reasons, guidanceQuoted: [], notes: [], ...extra })
 
   // Not an entity: Part 2 does not apply, whatever it does with goods.
   if (entity.outcome === 'not-entity') return result('does-not-have-to-report', [S211_NOT_AN_ENTITY_REASON])
@@ -119,7 +122,7 @@ export function evaluateS211Obligation(entity: Pick<S211EntityResult, 'outcome'>
   const beyondSelling = a.producesGoods === 'yes' || a.importsGoods === 'yes' || a.controlsEntityWithGoodsActivity === 'yes'
   if (beyondSelling) {
     const producesOrImports = a.producesGoods === 'yes' || a.importsGoods === 'yes'
-    return result('must-report', ['It is an entity under section 2.', does, ...unsure],
+    return result('must-report', [ENTITY_MET_REASON, does, ...unsure],
       { guidanceQuoted: producesOrImports ? [...S211_GUIDANCE_VERY_MINOR_DEALINGS] : [] })
   }
 
@@ -127,7 +130,9 @@ export function evaluateS211Obligation(entity: Pick<S211EntityResult, 'outcome'>
   // current guidance; and the earlier commitment not to enforce is gone.
   // If another activity is "not sure", "solely" is itself unsettled, and that is said.
   return result('within_act_not_expected', [
-    'It is an entity under section 2.', does, S211_SELL_DISTRIBUTE_REASON, S211_ENFORCEMENT_COMMITMENT_WITHDRAWN,
+    ENTITY_MET_REASON, does, S211_SELL_DISTRIBUTE_REASON,
     ...(notSure.length ? [`${unsure[0]} The guidance’s position covers an entity that ONLY sells and distributes, which is not settled here.`] : []),
-  ], { guidanceCaveat: S211_GUIDANCE_SELL_DISTRIBUTE_ONLY, actQuoted: S211_ACT_9A_QUOTED, guidanceQuoted: [S211_GUIDANCE_SELL_DISTRIBUTE_ONLY] })
+  ], { guidanceCaveat: S211_GUIDANCE_SELL_DISTRIBUTE_ONLY, actQuoted: S211_ACT_9A_QUOTED, guidanceQuoted: [S211_GUIDANCE_SELL_DISTRIBUTE_ONLY],
+    // After the Act and the current guidance, as a note: the earlier versions said more.
+    notes: [S211_ENFORCEMENT_COMMITMENT_WITHDRAWN] })
 }

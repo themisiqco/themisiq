@@ -58,6 +58,7 @@ export type SectionContent = Record<string, unknown>
 
 export type FieldType =
   | 'text' | 'textarea' | 'number' | 'date'
+  | 'month'     // January to December, stored as 1 to 12
   | 'yn'        // Yes / No
   | 'ynp'       // Yes / No / In progress
   | 'choice'    // one of `options`
@@ -81,6 +82,18 @@ export type Field = {
   waivedByNothingToReport?: boolean
   /** Shown only when this returns true. */
   showWhen?: (c: SectionContent) => boolean
+  /** Display labels for `options`, where the stored value is a key. */
+  optionLabels?: Readonly<Record<string, string>>
+  /** A label that depends on other answers. */
+  labelWhen?: (c: SectionContent) => string
+  /** A checklist option that clears every other, and is cleared by any other ("None"). */
+  exclusiveOption?: string
+  /** For 'rows': a row counts only when every one of these columns is filled. */
+  requiredColumns?: readonly string[]
+  /** An answer that is present but not acceptable. Returns the message to show, or null. */
+  validate?: (c: SectionContent) => string | null
+  /** Kept behind a link until the user asks for it (or already has a value). */
+  revealedBy?: 'fy_override'
 }
 
 export type Quote = { lines: string[]; ref: string }
@@ -127,6 +140,16 @@ const controlledField = (max: number): Field => ({
   hint: 'If the reporting entity controls other entities, describe what they did too. Leave blank if it controls none.',
 })
 const NO_NAMES = 'Use a job title or committee name only. Do not name anyone.'
+export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const
+const daysIn = (month: number) => [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 31
+/**
+ * An example shown in quotation marks: double quotation marks outside, and any quotation inside it
+ * turned to single marks, so a quotation within a quotation never prints as ""Harrowgate Group".
+ */
+export const quotedExample = (text: string): string =>
+  `\u201C${text.replace(/"([^"]*)"/g, '\u2018$1\u2019')}\u201D`
+/** A paragraph of s.11(3), with the subsection's own lead-in above it so it reads as a sentence. */
+const s113 = (letter: string): Quote => act([S211_ACT_SECTION_11_3.leadIn, `(${letter}) ${para(letter)}`], `Act, s.11(3)(${letter})`)
 
 // ── Key terms ───────────────────────────────────────────────────────────────────────────────────────
 export type KeyTerm = { term: string; quote: Quote; explanation: string }
@@ -158,23 +181,32 @@ export const SECTIONS: readonly SectionDef[] = [
     key: 'report_details', number: 1, title: 'Reporting entity and report details',
     actQuote: act(letteredLines(S211_ACT_SECTION_11_2), 'Act, s.11(2)'),
     mapsTo: 'Act s.11(2). Template: administrative reporting requirements.',
-    plainTerms: 'This section says who the report is from and which year it covers. A report can cover one entity, or several entities in the same group (a joint report). The reporting year is the entity\'s previous financial year.',
+    plainTerms: 'This section says who the report is from and which year it covers. A report can cover one entity, or several entities in the same group (a joint report). The report due by May 31 covers the entity\'s most recent completed financial year.',
     readersLookFor: 'Public Safety Canada matches the report to the entity\'s questionnaire, so the legal name and financial year must agree with it. Reviewers and investors check that a joint report names every entity it covers.',
     context: [guidance(S211_GUIDANCE_FINANCIAL_YEAR), guidance(S211_GUIDANCE_JOINT_REPORT[1]), guidance(S211_GUIDANCE_JOINT_REPORT[3])],
     fields: [
       { key: 'legal_name', label: 'Legal name of the reporting entity', type: 'text', source: 'guidance', required: true,
         hint: 'The full legal name, as registered.' },
-      { key: 'year_end_month', label: 'Financial year end: month', type: 'number', source: 'good-practice', required: true,
-        hint: 'A number from 1 to 12. The builder works out the financial year the report covers.' },
+      { key: 'year_end_month', label: 'Financial year end: month', type: 'month', source: 'good-practice', required: true,
+        hint: 'The builder works out the financial year the report covers.' },
       { key: 'year_end_day', label: 'Financial year end: day', type: 'number', source: 'good-practice', required: true,
-        hint: 'A number from 1 to 31.' },
+        hint: 'The day of the month.',
+        validate: c => {
+          const d = c.year_end_day, m = c.year_end_month
+          if (typeof d !== 'number') return null
+          if (!Number.isInteger(d) || d < 1) return 'Enter a day of the month, such as 31.'
+          if (typeof m === 'number' && d > daysIn(m)) return `${MONTHS[m - 1]} has no day ${d}.`
+          if (d > 31) return 'Enter a day of the month, such as 31.'
+          return null
+        } },
       { key: 'financial_year_confirmed', label: 'I confirm the financial year shown above', type: 'confirm', source: 'good-practice', required: true,
         hint: 'Check the dates before confirming. Correct them below if they are wrong.' },
-      { key: 'financial_year_start', label: 'Financial year start (if different)', type: 'date', source: 'good-practice',
-        hint: 'Fill in only if the dates shown are not right for this report.' },
-      { key: 'financial_year_end', label: 'Financial year end (if different)', type: 'date', source: 'good-practice',
-        hint: 'Fill in only if the dates shown are not right for this report.' },
+      { key: 'financial_year_start', label: 'Financial year start', type: 'date', source: 'good-practice', revealedBy: 'fy_override',
+        hint: 'Only if the dates shown are not right for this report.' },
+      { key: 'financial_year_end', label: 'Financial year end', type: 'date', source: 'good-practice', revealedBy: 'fy_override',
+        hint: 'Only if the dates shown are not right for this report.' },
       { key: 'report_type', label: 'Single or joint report', type: 'choice', options: ['single', 'joint'], source: 'act', required: true,
+        optionLabels: { single: 'Single report', joint: 'Joint report' },
         hint: 'Choose joint only if the information applies to every entity covered.' },
       { key: 'joint_entities', label: 'Legal name of each entity covered', type: 'list', source: 'guidance',
         required: c => c.report_type === 'joint', showWhen: c => c.report_type === 'joint',
@@ -188,19 +220,20 @@ export const SECTIONS: readonly SectionDef[] = [
         required: c => c.is_revised === 'Yes', showWhen: c => c.is_revised === 'Yes',
         hint: 'Required by s.12(2) for a revised report.' },
       { key: 'other_jurisdictions', label: 'Does the entity also report under these laws?', type: 'checklist', source: 'guidance',
-        options: ['UK Modern Slavery Act 2015', 'Australia Modern Slavery Act 2018', 'Other', 'None'],
-        hint: 'The questionnaire asks this. It is not a report requirement.' },
+        options: ['UK Modern Slavery Act 2015', 'Australia Modern Slavery Act 2018', 'Other', 'None'], exclusiveOption: 'None',
+        hint: 'Tick all that apply. The questionnaire asks this. It is not a report requirement.' },
     ],
     controlledEntities: null,
     strongExample: 'Legal name: Harrowgate Outdoor Equipment Inc. Financial year: January 1, 2025 to December 31, 2025. Joint report covering Harrowgate Outdoor Equipment Inc. and its subsidiary Harrowgate Retail Ltd. Not a revised report.',
     weakExample: '"Harrowgate Group", 2025.',
+    // Printed through quotedExample(), which turns the inner quotation marks to single ones.
     weakWhy: 'A trading name is not a legal name, the year has no dates, and a reader cannot tell which entities are covered.',
     nothingToReport: null, nothingToReportNote: null,
     characterGuidance: 'Names and dates only. No narrative.',
   },
   {
     key: 'structure_activities_supply_chains', number: 2, title: 'Structure, activities and supply chains',
-    actQuote: act([para('a')], 'Act, s.11(3)(a)'),
+    actQuote: s113('a'),
     mapsTo: 'Act s.11(3)(a). Template area 1.',
     plainTerms: 'Describe what the entity is, what it does with goods, and where those goods and their inputs come from. This sets the scene for everything else: a reader cannot judge the entity\'s risks without knowing what it makes or imports and from where.',
     readersLookFor: 'The legal form and size of the entity, the goods it produces or imports, the countries involved, and how far down the supply chain the entity can see. Reviewers notice when a report describes the business but says nothing about suppliers.',
@@ -241,7 +274,7 @@ export const SECTIONS: readonly SectionDef[] = [
   },
   {
     key: 'policies_due_diligence', number: 3, title: 'Policies and due diligence processes',
-    actQuote: act([para('b')], 'Act, s.11(3)(b)'),
+    actQuote: s113('b'),
     mapsTo: 'Act s.11(3)(b). Template areas 2 and 4.',
     plainTerms: 'A policy is a written commitment, such as a supplier code of conduct. Due diligence is what the entity does to find and respond to problems in its operations and supply chain. The Act asks for both: what the entity has committed to, and what it actually does.',
     readersLookFor: 'Whether policies exist, who approved them, whether they reach suppliers, and whether anything checks that they are followed. A policy with no process behind it reads as a statement of intent.',
@@ -250,16 +283,19 @@ export const SECTIONS: readonly SectionDef[] = [
       { key: 'has_policy', label: 'A written policy covering forced labour and child labour', type: 'ynp', options: YNP, source: 'act', required: true,
         hint: 'For example a supplier code of conduct or a responsible sourcing policy.' },
       { key: 'policy_list', label: 'Policies', type: 'rows', source: 'act',
-        columns: [{ key: 'name', label: 'Policy' }, { key: 'year', label: 'Year adopted or last reviewed' }, { key: 'approved_by', label: 'Approved by (a body or role)' }],
-        hint: 'One row per policy.' },
+        columns: [{ key: 'name', label: 'Policy' }, { key: 'year', label: 'Date adopted or last updated' }, { key: 'approved_by', label: 'Approved by (a body or role)' }],
+        required: c => c.has_policy === 'Yes', requiredColumns: ['name', 'year'],
+        hint: 'One row per policy. Each row needs the policy name and the date it was adopted or last updated.' },
       { key: 'policy_applies_to', label: 'Where the policy applies', type: 'checklist', source: 'good-practice',
         options: ['Own operations', 'Direct suppliers', 'Indirect suppliers', 'Controlled entities'], hint: 'Tick all that apply.' },
-      { key: 'supplier_terms', label: 'Contracts or purchase terms that require suppliers to follow the policy', type: 'ynp', options: YNP, source: 'good-practice', hint: '' },
-      { key: 'due_diligence_steps', label: 'Due diligence steps taken (OECD Due Diligence Guidance, as the guidance lists them)', type: 'rows', source: 'guidance',
+      { key: 'supplier_terms', label: 'Contracts or purchase terms that require suppliers to follow the policy', type: 'ynp', options: YNP, source: 'good-practice', hint: '',
+        labelWhen: c => (c.has_policy === 'Yes' ? 'Contracts or purchase terms that require suppliers to follow the policy'
+          : 'Contracts or purchase terms that require suppliers to follow a code of conduct or sourcing standard') },
+      { key: 'due_diligence_steps', label: 'Due diligence steps taken', type: 'rows', source: 'guidance',
         columns: [{ key: 'step', label: 'Step' }, { key: 'status', label: 'Yes / No / In progress' }],
         hint: 'The OECD guidance is voluntary. The Act does not require an entity to follow it.' },
       { key: 'due_diligence_description', label: 'What the entity did in the year', type: 'textarea', maxChars: 1500, source: 'act', required: true, waivedByNothingToReport: true,
-        hint: 'Name the process, who runs it and how often.' },
+        hint: 'Name the process, which role or team runs it (a job title, not a person\'s name) and how often.' },
       { key: 'responsible_role', label: 'Who is accountable', type: 'text', source: 'guidance', hint: NO_NAMES },
       { key: 'policy_topics', label: 'Topics the policies cover', type: 'checklist', source: 'template',
         options: ['Worker-paid recruitment fees', 'Confiscation of identity documents', 'Freedom of movement', 'Compulsory overtime'], hint: 'Tick those your policies address.' },
@@ -281,7 +317,7 @@ export const SECTIONS: readonly SectionDef[] = [
   },
   {
     key: 'risks', number: 4, title: 'Parts of the business and supply chains at risk, and the steps taken to assess and manage that risk',
-    actQuote: act([para('c')], 'Act, s.11(3)(c)'),
+    actQuote: s113('c'),
     mapsTo: 'Act s.11(3)(c). Template area 3.',
     plainTerms: 'Say where forced labour or child labour could occur in the entity\'s own operations and its supply chain, and what the entity did to find out and respond. Naming a risk is not an admission that it has happened.',
     readersLookFor: 'Specific risks tied to specific goods, countries or supply chain steps, and the method used to find them. A report that says "we identified no risks" without saying how it looked is unlikely to be credible to a reader.',
@@ -312,7 +348,7 @@ export const SECTIONS: readonly SectionDef[] = [
   },
   {
     key: 'remediation', number: 5, title: 'Measures taken to remediate forced labour or child labour',
-    actQuote: act([para('d')], 'Act, s.11(3)(d)'),
+    actQuote: s113('d'),
     mapsTo: 'Act s.11(3)(d). Template area 4.',
     plainTerms: 'Remediation means putting right harm that has happened. If the entity found forced labour or child labour in its operations or supply chain, this section says what it did for the people affected. It also covers the channels through which a problem can be reported.',
     readersLookFor: 'Whether there is a way to raise a concern, whether anyone has used it, and what happened next. Readers look for what changed for the workers affected, not only for whether a supplier was dropped.',
@@ -340,7 +376,7 @@ export const SECTIONS: readonly SectionDef[] = [
   },
   {
     key: 'remediation_income_loss', number: 6, title: 'Measures taken to remediate the loss of income to the most vulnerable families',
-    actQuote: act([para('e')], 'Act, s.11(3)(e)'),
+    actQuote: s113('e'),
     mapsTo: 'Act s.11(3)(e). Template area 4.',
     plainTerms: 'Steps to remove forced labour or child labour can leave a family with less income. For example, a child who stops working no longer brings in a wage. This section asks whether the entity\'s own measures caused that kind of loss, and what it did about it.',
     readersLookFor: 'That the entity understood the question. Many reports answer it with a general statement about fair wages, which is a different subject. Readers look for a clear yes or no, and the reasoning.',
@@ -365,7 +401,7 @@ export const SECTIONS: readonly SectionDef[] = [
   },
   {
     key: 'training', number: 7, title: 'Training provided to employees',
-    actQuote: act([para('f')], 'Act, s.11(3)(f)'),
+    actQuote: s113('f'),
     mapsTo: 'Act s.11(3)(f). Template area 5.',
     plainTerms: 'Say what training the entity\'s own employees received on forced labour and child labour: who was trained, on what, and how often.',
     readersLookFor: 'Whether the people who choose and manage suppliers were trained, how many people completed the training, and whether it is repeated. A single mention of "awareness" with no numbers tells a reader little.',
@@ -396,7 +432,7 @@ export const SECTIONS: readonly SectionDef[] = [
   },
   {
     key: 'effectiveness', number: 8, title: 'How the entity assesses its effectiveness',
-    actQuote: act([para('g')], 'Act, s.11(3)(g)'),
+    actQuote: s113('g'),
     mapsTo: 'Act s.11(3)(g). Template area 6.',
     plainTerms: 'Say how the entity checks whether its actions are working. The Act asks about the method of checking, not the results.',
     readersLookFor: 'Measures that can be tracked from one year to the next, and goals with dates. Readers compare this section with last year\'s report to see whether the entity did what it said it would.',
@@ -505,7 +541,7 @@ export const SECTIONS: readonly SectionDef[] = [
     weakExample: 'Approved by management. No signature.',
     weakWhy: 'Management is not the governing body, the basis for approval is missing, and an unsigned report will not be published.',
     nothingToReport: null, nothingToReportNote: null,
-    characterGuidance: 'The example attestation is about 560 characters. Keep edits close to that length.',
+    characterGuidance: 'Keep edits close to the length of the example.',
   },
 ]
 
@@ -521,4 +557,6 @@ export const BUILDER_NOTE_ON_SIGNING =
 
 // ── Section 2 context used by the OECD step rows in section 3 ───────────────────────────────────────
 export const OECD_STEPS = S211_GUIDANCE_B_OECD_STEPS
+/** The one source note above the six steps in section 3, which print without quotation marks. */
+export const OECD_STEPS_SOURCE_NOTE = 'The six steps in the OECD Due Diligence Guidance for Responsible Business Conduct, as listed in Public Safety Canada\'s guidance.'
 export const EXAMPLES_LABEL = 'Fictional examples. No company named here exists.'

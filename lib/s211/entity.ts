@@ -59,6 +59,9 @@ export type S211Limb = {
   met: Tri
   /** Why `met` is null, or that the figure was converted. */
   note: string | null
+  /** The figure as entered, and its currency (money limbs), for the sentence that names it. */
+  entered?: number | null
+  currency?: string
 }
 export type S211YearResult = { year: 'most-recent' | 'prior'; limbs: S211Limb[]; metCount: number; unknownCount: number; met: Tri }
 
@@ -82,10 +85,10 @@ const any3 = (a: Tri, b: Tri, c: Tri): Tri =>
 
 const moneyLimb = (measure: 'assets' | 'revenue', raw: number | null, currency: string, threshold: number): S211Limb => {
   if (raw === null || !Number.isFinite(raw)) return { measure, value: null, threshold, met: null, note: 'Not provided.' }
-  if (currency === 'CAD') return { measure, value: raw, threshold, met: raw >= threshold, note: null }
-  if (!isFxCurrency(currency)) return { measure, value: null, threshold, met: null, note: `Not compared: no reference rate for ${currency || 'a blank currency'}.` }
+  if (currency === 'CAD') return { measure, value: raw, threshold, met: raw >= threshold, note: null, entered: raw, currency }
+  if (!isFxCurrency(currency)) return { measure, value: null, threshold, met: null, note: `Not compared: no reference rate for ${currency || 'a blank currency'}.`, entered: raw, currency }
   const value = convertFx(raw, currency, 'CAD')
-  return { measure, value, threshold, met: value >= threshold, note: `Converted from ${currency} at the ECB reference rate of ${FX_AS_OF}.` }
+  return { measure, value, threshold, met: value >= threshold, note: `Converted from ${currency} at the ECB reference rate of ${FX_AS_OF}.`, entered: raw, currency }
 }
 
 const testYear = (year: S211YearResult['year'], f: S211YearFigures): S211YearResult => {
@@ -105,6 +108,27 @@ const testYear = (year: S211YearResult['year'], f: S211YearFigures): S211YearRes
 }
 
 const YEAR_NAME = { 'most-recent': 'the most recent financial year', prior: 'the prior financial year' } as const
+
+const whole = (n: number) => Math.round(n).toLocaleString('en-CA')
+const MILLIONS = { assets: 'CAD 20 million', revenue: 'CAD 40 million' } as const
+/**
+ * The conditions a year met, with the figures: "Assets of CAD 25,000,000 (at least CAD 20 million) and
+ * revenue of CAD 50,000,000 (at least CAD 40 million) in the most recent financial year." A figure in
+ * another currency is given as entered and as converted. "At least", as the Act says: a figure equal to
+ * the threshold meets it, and "over" would then be false.
+ */
+export function metConditionsSentence(y: S211YearResult): string {
+  const parts = y.limbs.filter(l => l.met === true).map(l => {
+    if (l.measure === 'employees') return `an average of ${whole(l.value!)} employees (at least ${S211_THRESHOLDS.averageEmployees})`
+    const noun = l.measure === 'assets' ? 'assets' : 'revenue'
+    const figure = l.currency && l.currency !== 'CAD' && l.entered != null
+      ? `${l.currency} ${whole(l.entered)} (CAD ${whole(l.value!)}, at least ${MILLIONS[l.measure]})`
+      : `CAD ${whole(l.value!)} (at least ${MILLIONS[l.measure]})`
+    return `${noun} of ${figure}`
+  })
+  const joined = parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return `${joined.charAt(0).toUpperCase()}${joined.slice(1)} in ${YEAR_NAME[y.year]}.`
+}
 export const S211_LOOKBACK_NOT_RUN =
   'The Act tests either of the two most recent financial years. Figures for one year only were provided, so the lookback was not run.'
 
@@ -130,7 +154,7 @@ export function evaluateS211Entity(input: S211EntityInput): S211EntityResult {
   const sizeMet: Tri = metYear ? true : lookbackRun && years.every(y => y.met === false) ? false : null
 
   const sizeSentence = (): string => {
-    if (metYear) return `Meets ${metYear.metCount} of the 3 size conditions in ${YEAR_NAME[metYear.year]}.`
+    if (metYear) return metConditionsSentence(metYear)
     if (years.length === 0) return 'No financial-year figures were provided, so the size conditions were not tested.'
     return years.map(y => y.met === false
       ? `Meets ${y.metCount} of the 3 size conditions in ${YEAR_NAME[y.year]}, fewer than the 2 required.`

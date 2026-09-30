@@ -39,7 +39,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   let status: SectionStatus
   if (action === 'complete') {
     const r = markComplete(key, c)
-    if (!r.ok) return NextResponse.json({ error: r.message, missing: r.missing }, { status: 422 })
+    if (!r.ok) return NextResponse.json({ error: r.message, missing: r.missing, invalid: r.invalid }, { status: 422 })
     status = 'complete'
   } else if (action === 'reopen') {
     status = 'in_progress'
