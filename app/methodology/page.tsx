@@ -358,6 +358,26 @@ const METHODOLOGIES = [
     ],
   },
   {
+    module: 'Forced Labour Reporting',
+    color: '#BA3E71',
+    bg: '#FAEFF4',
+    standard: 'Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211)',
+    sections: [
+      {
+        title: 'Applicability',
+        content: 'The entity test follows section 2 of the Act: an entity listed on a stock exchange in Canada at any size, or one with a place of business, business or assets in Canada that meets at least two of three size conditions (CAD 20 million in assets, CAD 40 million in revenue, an average of 250 employees) in either of its two most recent financial years. Figures in another currency are converted to Canadian dollars at the dated ECB reference rate. Whether the entity must report then follows section 9, what it does with goods, with Public Safety Canada\u2019s guidance on entities that only sell or distribute quoted beside the Act. The result is a screening, not legal advice.',
+      },
+      {
+        title: 'Report content',
+        content: 'The report is built in the order of section 11 of the Act, one section per requirement, from the user\u2019s own answers. Each section shows the Act\u2019s words and Public Safety Canada\u2019s guidance, transcribed word for word from the source and dated. The summary of steps taken is drafted from the answers to the other sections and edited by the user; the report prints the user\u2019s version.',
+      },
+      {
+        title: 'Export checks',
+        content: 'The PDF is produced only when every required section is complete and the attestation has no placeholder left. Before export the report text is checked for e-mail addresses, telephone numbers, street addresses and Social Insurance Number patterns, and for characters the report\u2019s typeface cannot print. These are warnings for the user to review; the check cannot recognize names.',
+      },
+    ],
+  },
+  {
     module: 'Deals & Investment',
     color: '#0C447C',
     bg: '#E6F1FB',

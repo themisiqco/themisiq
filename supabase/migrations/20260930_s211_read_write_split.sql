@@ -2,8 +2,7 @@
 -- Forced Labour Reporting, Stage 5a: reading and writing S-211 reports are decided separately, from the
 -- 'forced-labour' entitlement as well as the s211_access preview list.
 --
--- Written 30 Sep 2026. NOT RUN when written. Whoever runs it replaces this line with the date and the
--- result of the verification queries at the foot of the file.
+-- Run in production on 2026-09-30 (verified).
 --
 -- ⚠️ RUN 20260930_s211_access_gate.sql FIRST. This file replaces the two FOR ALL policies it created.
 --

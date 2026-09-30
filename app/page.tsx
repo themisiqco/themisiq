@@ -400,6 +400,9 @@ const MODULES_HOME = [
   { name: 'People and Workforce', key: 'people', href: '/people',
     desc: 'Human capital reporting, pay equity, health and safety.',
     chips: ['ESRS S1', 'Pay Transparency', 'CSRD'] },
+  { name: 'Forced Labour Reporting', key: 'labour', href: '/forced-labour',
+    desc: 'Supply chain reports, country by country. Available now: Canada (S-211). Prepared section by section and downloaded as a PDF for approval and signing.',
+    chips: ['Canada S-211'] },
 ] as const
 
 /**

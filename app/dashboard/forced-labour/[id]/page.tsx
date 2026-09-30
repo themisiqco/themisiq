@@ -9,30 +9,24 @@ import Link from 'next/link'
 import { s211Api } from '../../../../lib/s211/client'
 import { SECTIONS, type SectionKey } from '../../../../lib/s211/builderContent'
 import { completeCount, type SectionStatus } from '../../../../lib/s211/sectionStatus'
-import { evaluateS211Entity, type S211EntityInput, type S211YearFigures } from '../../../../lib/s211/entity'
-import { evaluateS211Obligation, S211_OUTCOME_LABEL, type S211Activities, type S211Answer } from '../../../../lib/s211/obligation'
+import { evaluateApplicability, formToReportPatch, formToActivities, toTri, PRESENCE_QUESTIONS, ACTIVITY_QUESTIONS, YEARS, type ApplicabilityForm } from '../../../../lib/s211/applicability'
+import { ApplicabilityQuestions, ApplicabilityResult } from '../_components/Applicability'
 import { BuilderFrame, ReadOnlyBanner, S, StatusPill, useBuilderState } from '../_components/ui'
 import { canWrite, READ_ONLY_EXPORT_NOTE } from '../../../../lib/s211/builderAccess'
 import type { ReportRecord, SectionRow } from '../_components/types'
 
 
-const ACTIVITY_QUESTIONS: [keyof S211Activities, string][] = [
-  ['producesGoods', 'Does it produce goods, in Canada or elsewhere?'],
-  ['sellsGoods', 'Does it sell goods, in Canada or elsewhere?'],
-  ['distributesGoods', 'Does it distribute goods, in Canada or elsewhere?'],
-  ['importsGoods', 'Does it import into Canada goods produced outside Canada?'],
-  ['controlsEntityWithGoodsActivity', 'Does it control an entity that does any of these?'],
-]
-// Only s.9(a) is ever quoted on this page (lib/s211/obligation.ts, S211_ACT_9A_QUOTED).
-const ACT_9A_LABEL = 'The Act, s.9(a)'
-const ENTITY_LABEL = { entity: 'An entity under the Act', 'not-entity': 'Not an entity under the Act', undetermined: 'Not yet determined' } as const
-
-const tri = (v: boolean | null) => (v === true ? 'yes' : v === false ? 'no' : '')
-const fromTri = (s: string) => (s === 'yes' ? true : s === 'no' ? false : null)
-const year = (r: ReportRecord, p: 'recent' | 'prior'): S211YearFigures | null => {
-  const a = r[`${p}_fy_assets`], v = r[`${p}_fy_revenue`], e = r[`${p}_fy_avg_employees`]
-  return a === null && v === null && e === null ? null : { assets: a, revenue: v, averageEmployees: e, currency: r[`${p}_fy_currency`] ?? 'CAD' }
-}
+/** The saved report and section 1's goods answers, as the applicability form holds them. */
+const formOf = (rep: ReportRecord, acts: Record<string, string>): ApplicabilityForm => ({
+  ...Object.fromEntries(PRESENCE_QUESTIONS.map(([k]) => [k, toTri(rep[k as keyof ReportRecord] as boolean | null)])),
+  ...Object.fromEntries(YEARS.flatMap(p => [
+    [`${p}_fy_assets`, rep[`${p}_fy_assets`]?.toString() ?? ''], [`${p}_fy_revenue`, rep[`${p}_fy_revenue`]?.toString() ?? ''],
+    [`${p}_fy_avg_employees`, rep[`${p}_fy_avg_employees`]?.toString() ?? ''], [`${p}_fy_currency`, rep[`${p}_fy_currency`] ?? 'CAD'],
+  ])),
+  ...Object.fromEntries(ACTIVITY_QUESTIONS.map(([k]) => [k, acts[k] ?? ''])),
+})
+const actsOf = (sections: SectionRow[]) =>
+  (sections.find(s => s.section_key === 'report_details')?.content?._applicability ?? {}) as Record<string, string>
 
 function Home({ id }: { id: string }) {
   const writable = canWrite(useBuilderState())
@@ -48,52 +42,22 @@ function Home({ id }: { id: string }) {
       if (r.status === 404) { setMissing(true); return }
       if (!r.data) { setError(r.error); return }
       setReport(r.data.report); setSections(r.data.sections)
-      const rep = r.data.report
-      const acts = (r.data.sections.find(s => s.section_key === 'report_details')?.content?._applicability ?? {}) as Record<string, string>
-      setForm({
-        listed_in_canada: tri(rep.listed_in_canada), place_of_business_in_canada: tri(rep.place_of_business_in_canada),
-        does_business_in_canada: tri(rep.does_business_in_canada), has_assets_in_canada: tri(rep.has_assets_in_canada),
-        ...Object.fromEntries((['recent', 'prior'] as const).flatMap(p => [
-          [`${p}_fy_assets`, rep[`${p}_fy_assets`]?.toString() ?? ''], [`${p}_fy_revenue`, rep[`${p}_fy_revenue`]?.toString() ?? ''],
-          [`${p}_fy_avg_employees`, rep[`${p}_fy_avg_employees`]?.toString() ?? ''], [`${p}_fy_currency`, rep[`${p}_fy_currency`] ?? 'CAD'],
-        ])),
-        ...Object.fromEntries(ACTIVITY_QUESTIONS.map(([k]) => [k, acts[k] ?? ''])),
-      })
+      setForm(formOf(r.data.report, actsOf(r.data.sections)))
     })
   }, [id])
 
   const statuses = useMemo(() => Object.fromEntries(sections.map(s => [s.section_key, s.status])) as Partial<Record<SectionKey, SectionStatus>>, [sections])
 
-  const result = useMemo(() => {
-    if (!report) return null
-    const input: S211EntityInput = {
-      listedInCanada: report.listed_in_canada, placeOfBusinessInCanada: report.place_of_business_in_canada,
-      doesBusinessInCanada: report.does_business_in_canada, hasAssetsInCanada: report.has_assets_in_canada,
-      mostRecentYear: year(report, 'recent'), priorYear: year(report, 'prior'),
-    }
-    const entity = evaluateS211Entity(input)
-    const acts = (sections.find(s => s.section_key === 'report_details')?.content?._applicability ?? {}) as Record<string, string>
-    const answers = Object.fromEntries(ACTIVITY_QUESTIONS.map(([k]) => [k, (acts[k] || 'not-sure') as S211Answer])) as S211Activities
-    const unanswered = ACTIVITY_QUESTIONS.filter(([k]) => !acts[k]).length
-    return { entity, obligation: evaluateS211Obligation(entity, answers), unanswered }
-  }, [report, sections])
+  // The result is of the SAVED answers, so it never shows a finding for edits not yet saved.
+  const result = useMemo(() => (report ? evaluateApplicability(formOf(report, actsOf(sections))) : null), [report, sections])
 
   const saveApplicability = async () => {
     if (!report) return
     setSaveMsg('Saving')
-    const num = (k: string) => (form[k] === '' ? null : Number(form[k]))
-    const patch = {
-      listed_in_canada: fromTri(form.listed_in_canada), place_of_business_in_canada: fromTri(form.place_of_business_in_canada),
-      does_business_in_canada: fromTri(form.does_business_in_canada), has_assets_in_canada: fromTri(form.has_assets_in_canada),
-      ...Object.fromEntries((['recent', 'prior'] as const).flatMap(p => [
-        [`${p}_fy_assets`, num(`${p}_fy_assets`)], [`${p}_fy_revenue`, num(`${p}_fy_revenue`)],
-        [`${p}_fy_avg_employees`, num(`${p}_fy_avg_employees`)], [`${p}_fy_currency`, form[`${p}_fy_currency`] || null],
-      ])),
-    }
-    const r1 = await s211Api<{ report: ReportRecord }>(`/reports/${id}`, { method: 'PATCH', body: patch })
+    const r1 = await s211Api<{ report: ReportRecord }>(`/reports/${id}`, { method: 'PATCH', body: formToReportPatch(form) })
     if (!r1.data) { setSaveMsg(r1.error ?? 'Not saved: check your connection'); return }
     const details = sections.find(s => s.section_key === 'report_details')?.content ?? {}
-    const _applicability = Object.fromEntries(ACTIVITY_QUESTIONS.map(([k]) => [k, form[k] ?? '']))
+    const _applicability = formToActivities(form)
     const r2 = await s211Api<{ section: SectionRow }>(`/reports/${id}/sections/report_details`, { method: 'PUT', body: { content: { ...details, _applicability } } })
     if (!r2.data) { setSaveMsg(r2.error ?? 'Not saved: check your connection'); return }
     setReport(r1.data.report)
@@ -107,14 +71,6 @@ function Home({ id }: { id: string }) {
   if (!report || !result) return <p style={S.muted}>Loading</p>
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
-  const triSelect = (k: string, label: string) => (
-    <label key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 160px', gap: 10, alignItems: 'center', fontSize: 13.5, marginBottom: 8 }}>
-      {label}
-      <select style={S.input} value={form[k] ?? ''} onChange={e => set(k, e.target.value)}>
-        <option value="">Not answered</option><option value="yes">Yes</option><option value="no">No</option>
-      </select>
-    </label>
-  )
   const done = completeCount(statuses)
 
   return (
@@ -125,53 +81,13 @@ function Home({ id }: { id: string }) {
       {!writable && <ReadOnlyBanner extra={READ_ONLY_EXPORT_NOTE} />}
 
       <h2 style={S.h2}>Does the Act apply?</h2>
-      <div style={S.card}>
-        <p style={{ ...S.body, margin: '0 0 4px' }}><strong>Entity test:</strong> {ENTITY_LABEL[result.entity.outcome]}</p>
-        <ul style={{ ...S.muted, margin: '0 0 10px', paddingLeft: 18 }}>{result.entity.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
-        <p style={{ ...S.body, margin: '0 0 4px' }}><strong>Reporting obligation:</strong> {S211_OUTCOME_LABEL[result.obligation.outcome]}</p>
-        <ul style={{ ...S.muted, margin: 0, paddingLeft: 18 }}>{result.obligation.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>
-        {/* The Act's words and the current guidance first; notes about earlier versions of the guidance after. */}
-        {result.obligation.actQuoted && <p style={{ ...S.muted, margin: '8px 0 0' }}>{ACT_9A_LABEL}: &ldquo;{result.obligation.actQuoted}&rdquo;</p>}
-        {result.obligation.guidanceQuoted.map((q, i) => <p key={i} style={{ ...S.muted, margin: '8px 0 0' }}>Public Safety Canada guidance: &ldquo;{q}&rdquo;</p>)}
-        {result.obligation.notes.map((n, i) => <p key={i} style={{ ...S.muted, margin: '8px 0 0' }}>{n}</p>)}
-        {result.unanswered > 0 && <p style={{ ...S.hint, marginTop: 10 }}>{result.unanswered} of the questions about goods are not answered yet. Until they are, they are treated as &ldquo;not sure&rdquo;.</p>}
-        <p style={{ ...S.hint, marginTop: 10 }}>This is a screening result from your answers below. It is not legal advice. The guidance encourages entities that are unsure to seek advice from their legal counsel.</p>
-      </div>
+      <ApplicabilityResult result={result} />
 
       <details style={{ ...S.card, padding: '10px 16px' }}>
         <summary style={{ fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{writable ? 'Answer or change the applicability questions' : 'The applicability answers'}</summary>
         {/* Read-only: every control disabled at once. The database refuses a write anyway. */}
         <fieldset disabled={!writable} style={{ border: 0, padding: 0, margin: '12px 0 0', minWidth: 0 }}>
-          <p style={S.label}>Listing and presence in Canada</p>
-          {triSelect('listed_in_canada', 'Listed on a stock exchange in Canada')}
-          {triSelect('place_of_business_in_canada', 'Has a place of business in Canada')}
-          {triSelect('does_business_in_canada', 'Does business in Canada')}
-          {triSelect('has_assets_in_canada', 'Has assets in Canada')}
-          {(['recent', 'prior'] as const).map(p => (
-            <div key={p} style={{ marginTop: 12 }}>
-              <p style={S.label}>{p === 'recent' ? 'Most recent financial year' : 'The financial year before it'}</p>
-              <p style={S.hint}>From consolidated financial statements. Leave blank if you do not have the figure.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 8 }}>
-                {[['assets', 'Assets'], ['revenue', 'Revenue'], ['avg_employees', 'Average employees']].map(([k, l]) => (
-                  <label key={k} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{l}
-                    <input style={{ ...S.input, marginTop: 3 }} type="number" min={0} value={form[`${p}_fy_${k}`] ?? ''} onChange={e => set(`${p}_fy_${k}`, e.target.value)} />
-                  </label>
-                ))}
-                <label style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Currency
-                  <input style={{ ...S.input, marginTop: 3 }} maxLength={3} value={form[`${p}_fy_currency`] ?? ''} onChange={e => set(`${p}_fy_currency`, e.target.value.toUpperCase())} />
-                </label>
-              </div>
-            </div>
-          ))}
-          <p style={{ ...S.label, marginTop: 14 }}>What the entity does with goods</p>
-          {ACTIVITY_QUESTIONS.map(([k, q]) => (
-            <label key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 160px', gap: 10, alignItems: 'center', fontSize: 13.5, marginBottom: 8 }}>
-              {q}
-              <select style={S.input} value={form[k] ?? ''} onChange={e => set(k, e.target.value)}>
-                <option value="">Not answered</option><option value="yes">Yes</option><option value="no">No</option><option value="not-sure">Not sure</option>
-              </select>
-            </label>
-          ))}
+          <ApplicabilityQuestions form={form} onChange={set} />
           {writable && <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 10 }}>
             <button type="button" style={S.button} onClick={saveApplicability}>Save these answers</button>
             {saveMsg && <span style={S.muted}>{saveMsg}</span>}

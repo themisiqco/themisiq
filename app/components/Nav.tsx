@@ -20,6 +20,7 @@ const MODULES_NAV: { href: string; label: string; labelShort: string; sub: strin
   { href: '/ai-governance', label: 'AI Governance', labelShort: 'AI Governance', sub: 'EU AI Act · NIST AI RMF · ISO 42001' },
   { href: '/cyber', label: 'Cyber Governance', labelShort: 'Cyber', sub: 'NIS2 · DORA · SEC cyber · ISO 27001' },
   { href: '/cbam', label: 'CBAM', labelShort: 'CBAM', sub: 'Regulation (EU) 2023/956 · verifier-ready' },
+  { href: '/forced-labour', label: 'Forced Labour Reporting', labelShort: 'Forced Labour', sub: 'Supply chain reports, country by country. Available now: Canada (S-211).' },
 ]
 
 const GRAD = 'var(--color-brand)'

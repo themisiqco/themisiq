@@ -38,7 +38,7 @@ export const sectionTitle: CSSProperties = {
   color: '#0d0d0d',
 }
 
-/** Dashboard step heading, fluid. 7 module dashboards. */
+/** Dashboard step heading, fluid. Used by the module dashboards. */
 export const sectionHead: CSSProperties = {
   fontFamily: 'var(--font-display)',
   fontSize: 'clamp(1.4rem, 2.5vw, 1.8rem)',

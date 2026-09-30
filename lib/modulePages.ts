@@ -1,7 +1,7 @@
 import type { ModuleKey } from './pricing'
 
 /**
- * The claims every module marketing page shares, held once so they cannot drift across seven pages.
+ * The claims every module marketing page shares, held once so they cannot drift across the module pages.
  * Same reason as lib/auditTrailNotice.ts and lib/verifierDocNotice.ts: one claim, several consumers.
  */
 
@@ -86,11 +86,17 @@ export const CSRD_BOTH_HALVES =
  *   So the modules with an audit log are exactly the modules with a verifier, and the other five get a
  * claim about workings, which is true and is not smaller than it sounds.
  *
- * ⚠️ A Record<ModuleKey, …> ON PURPOSE. A tenth module fails tsc here rather than defaulting to the
+ * ⚠️ A Record<ModuleKey, …> ON PURPOSE. A new module fails tsc here rather than defaulting to the
  * safe-looking answer, which would be the wrong way round: defaulting to 'workings' would silently
  * withhold a true verifier claim, and defaulting to 'verifier' would make a false one.
  */
-export type EvidenceKind = 'verifier' | 'workings'
+/**
+ * 'sources' (30 Sep 2026, Forced Labour Reporting): the output is a narrative report the entity files,
+ * not a score, so neither a verifier nor a workings claim describes it. What stands behind it is that
+ * the report says only what the user entered, and that every quotation of the law is transcribed and
+ * dated (lib/s211/requirements.ts, pinned by requirements.test.ts).
+ */
+export type EvidenceKind = 'verifier' | 'workings' | 'sources'
 
 export const EVIDENCE_BY_MODULE: Record<ModuleKey, EvidenceKind> = {
   ghg: 'verifier',
@@ -102,11 +108,7 @@ export const EVIDENCE_BY_MODULE: Record<ModuleKey, EvidenceKind> = {
   deals: 'workings',
   'ai-governance': 'workings',
   cyber: 'workings',
-  // ⚠️ PLACEHOLDER FOR 5b. The report is a narrative the entity writes, not a score with workings, so the
-  // 'workings' paragraph ("Every score carries the inputs...") does not describe it. It is here only
-  // because the Record requires an entry; nothing renders it until the /forced-labour page exists, and
-  // 5b decides the claim.
-  'forced-labour': 'workings',
+  'forced-labour': 'sources',
 }
 
 /**
@@ -117,11 +119,19 @@ export const EVIDENCE_BY_MODULE: Record<ModuleKey, EvidenceKind> = {
  * hand-written paragraphs would make a wrong claim likely; this makes it impossible.
  */
 export function evidenceClaim(key: ModuleKey): string {
-  return EVIDENCE_BY_MODULE[key] === 'verifier'
-    ? 'Your verifier can check the figures back to their source, through access you grant and can revoke. '
-      + 'That covers Scope 1 and 2, CBAM, and Scope 3 Category 1 where you have opted in for that grant.'
-    : 'Nothing is a black box. Every score carries the inputs and the method that produced it, so a '
-      + 'reviewer can follow the reasoning rather than taking the number on trust.'
+  switch (EVIDENCE_BY_MODULE[key]) {
+    case 'verifier':
+      return 'Your verifier can check the figures back to their source, through access you grant and can revoke. '
+        + 'That covers Scope 1 and 2, CBAM, and Scope 3 Category 1 where you have opted in for that grant.'
+    case 'sources':
+      // Country-neutral since Stage 5c: true of Canada today, and the rule for every country added.
+      return 'Every sentence the report says about your organization comes from your own answers. Every '
+        + 'quotation of the law or its official guidance is transcribed word for word from the source, '
+        + 'with the date it was read.'
+    default:
+      return 'Nothing is a black box. Every score carries the inputs and the method that produced it, so a '
+        + 'reviewer can follow the reasoning rather than taking the number on trust.'
+  }
 }
 
 /** True where a page may render a verifier claim at all. Exported so a test can assert the negative. */

@@ -24,7 +24,7 @@ import { ESRS_TOPIC_COUNT_WORD } from '@/lib/csrd'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
+type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber' | 'forced-labour'
 
 interface Module {
   id: ModuleId
@@ -177,6 +177,19 @@ const MODULES: Module[] = [
       href: '/cyber',
     },
   },
+  {
+    id: 'forced-labour',
+    name: 'Forced Labour Reporting',
+    description: 'Supply chain reports, country by country. Available now: Canada (S-211).',
+    // The Act, s.11(1): "on or before May 31 of each year" (S211_ACT_SECTION_11_1).
+    tags: [{ label: 'Due May 31', color: 'orange' }],
+    cta: {
+      headline: 'Does Canada\u2019s S-211 Act apply to you?',
+      sub: 'Answer the questions the Act turns on and see the result. Free, and no account needed.',
+      btn: 'Check if Canada\u2019s Act applies (free) →',
+      href: '/forced-labour/canada/check',
+    },
+  },
 ]
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -207,7 +220,8 @@ const tag = (label: string, color: string): React.CSSProperties => ({
 
 function PricingPageInner() {
   const searchParams = useSearchParams()
-  const VALID_MODULE_IDS: ModuleId[] = ['ghg', 'cbam', 'risk', 'supply', 'people', 'deals', 'ai', 'cyber']
+  // 'impact' was missing until 30 Sep 2026, so ?modules=impact did not preselect Materiality.
+  const VALID_MODULE_IDS: ModuleId[] = ['ghg', 'cbam', 'risk', 'impact', 'supply', 'people', 'deals', 'ai', 'cyber', 'forced-labour']
   const initialModules = (() => {
     const param = searchParams.get('modules')
     if (!param) return new Set<ModuleId>(['ghg'])

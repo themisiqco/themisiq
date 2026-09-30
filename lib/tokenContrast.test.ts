@@ -141,7 +141,7 @@ const TEXT_FAMILY = /^--color-ink(-[a-z0-9-]+)?$/
 const IDENTITY_ONLY = new Set(['ai', 'people'])
 
 /** Modules that HAVE an -ink companion. Grows as step 6 declares them; must match the layer exactly. */
-const HAS_INK = new Set<string>(['cbam', 'cyber', 'deals', 'ghg', 'supply'])
+const HAS_INK = new Set<string>(['cbam', 'cyber', 'deals', 'ghg', 'labour', 'supply'])
 
 /**
  * Modules that need a companion and do not have one yet. This is the swap's remaining work, written as
@@ -154,7 +154,7 @@ const HAS_INK = new Set<string>(['cbam', 'cyber', 'deals', 'ghg', 'supply'])
  */
 // ⚠️ EMPTY, AND THAT IS THE COLOURWAY SWAP LANDING. All five moved to HAS_INK on 26 Sep 2026 in the same
 // commit as the values they exist for. Kept rather than deleted: the partition check below needs a home
-// for a module that has neither a companion nor a decision, and a ninth module would land here.
+// for a module that has neither a companion nor a decision, and a new module would land here.
 const PENDING_STEP_6 = new Set<string>([])
 
 /**
@@ -287,7 +287,7 @@ describe('app/styles/themisiq-tokens.css is legible against itself', () => {
   })
 
   it('every module is classified: has a companion, identity-only by decision, or pending', () => {
-    // The partition is what keeps the three sets honest. A ninth module belongs to none of them until
+    // The partition is what keeps the three sets honest. A new module belongs to none of them until
     // someone classifies it, and that is a failure rather than a silent pass.
     const keys = moduleKeys()
     const declared = new Set(keys.filter(k => T[`--color-module-${k}-ink`]))
@@ -356,7 +356,7 @@ describe('app/styles/themisiq-tokens.css is legible against itself', () => {
     // ⚠️ THE DEFECT IS THE COMBINATION, WHICH IS WHY IT IS ASSERTED RATHER THAN PRE-EMPTED. A module
     // may set --tq-mod, or may have a value that cannot carry text — not both. Today every module
     // satisfies it on the second arm. The instant a colourway value lands in the token layer without
-    // its companion, this fires and names the block to change. It covers ALL EIGHT modules, not only
+    // its companion, this fires and names the block to change. It covers EVERY module, not only
     // the two identity-only ones: cbam, cyber, supply and deals all set --tq-mod and all fall below
     // 3.0:1 under the 2026 colourway too. See docs/colourway-2026.md.
     const wired = tqMod()
@@ -382,7 +382,7 @@ describe('app/styles/themisiq-tokens.css is legible against itself', () => {
   })
 
   it('every module whose own value cannot carry text has a companion, and --tq-mod uses it', () => {
-    // Three assertions, all vacuous today because all eight values clear 4.5:1, and all three fire
+    // Three assertions, all vacuous today because every value clears 4.5:1, and all three fire
     // during the swap. They are what makes a HALF-DONE swap fail rather than ship: values moved but no
     // companions declared; companions declared but [data-module] still pointing at the fill; a
     // companion declined for a module that is not identity-only.

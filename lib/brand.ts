@@ -160,6 +160,7 @@ export const MODULE = {
   climate: { color: '#004AAD', wash: '#E6EFFB' },                  // Climate Risk — fill carries text
   people:  { color: '#FFDE59', wash: '#F1EEE5' },                  // People — identity only
   ai:      { color: '#F47068', wash: '#F9EBEA' },                  // AI Governance — identity only
+  labour:  { color: '#D581A4', wash: '#FAEFF4', ink: '#BA3E71' },  // Forced Labour Reporting: rose, 335.0
 } as const satisfies Record<string, ModuleHue>
 
 export type ModuleHueKey = keyof typeof MODULE

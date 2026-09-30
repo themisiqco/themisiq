@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
       // and /api/s211 keep the s211 names as the Canadian layer; only the public route moved.
       { source: '/dashboard/s211', destination: '/dashboard/forced-labour', permanent: true },
       { source: '/dashboard/s211/:path*', destination: '/dashboard/forced-labour/:path*', permanent: true },
+      // Stage 5c: the module is multi-country, so Canada's free check lives under /forced-labour/canada.
+      { source: '/forced-labour/check', destination: '/forced-labour/canada/check', permanent: true },
     ]
   },
 

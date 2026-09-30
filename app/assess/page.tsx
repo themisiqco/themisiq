@@ -20,6 +20,7 @@ import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVE
 // threshold is never restated in another currency. FX_AS_OF/FX_SOURCE are printed in the copy so a
 // reader can see which fixing a borderline call was made on.
 import { convertCurrency, FX_AS_OF } from '../../lib/deals/assessment'
+import { S211_THRESHOLDS } from '../../lib/s211/entity'
 import ThemisIQLogo from '../components/ThemisIQLogo'
 // The obligation → module mapping, its link vocabulary and its prices. NONE of this is restated
 // here: the shorthand comes from obligationModulesParam (which inverts LEGACY_PRICING_PAGE_ID, so a
@@ -499,6 +500,41 @@ export function computeObligations(a: Answers): Obligation[] {
   // deferred" — the Government said it would revisit, so re-check before relying on this.
   if (msUK || msAU) regs.push({ name: 'Modern Slavery Act: UK and Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue. The 2023 statutory review recommended lowering this to AUD 50,000,000, but the Government declined to adopt that recommendation in its December 2024 response and retained AUD 100,000,000, saying it would revisit the threshold once other reforms are scoped. The current bar is AUD 100,000,000. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
 
+  // ── Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211) ──────
+  // s.2 "entity": a Canadian stock-exchange listing at any size, OR a Canada nexus with at least two of
+  // three size conditions in either of the two most recent financial years (S211_THRESHOLDS, CAD).
+  // This form holds two of the three (revenue and headcount) and not assets, so it says what it can
+  // settle and names what it cannot. Revenue is converted from the USD answer at the dated ECB rate,
+  // as the Modern Slavery rule above does. Whether the entity must REPORT also turns on what it does
+  // with goods (s.9), which this form does not ask: /forced-labour/canada/check asks it, free.
+  if (jur.includes('canada')) {
+    // ⚠️ INDEX 0 IS 'Under $50M', A BAND, NOT A FIGURE, AND IT STRADDLES THE LINE: CAD 40 million is about
+    // USD 29 million, inside that band. So index 0 settles nothing (null), as empAtLeast does for a
+    // headcount band that straddles its threshold. From index 1 ('$50M') every band is above the line.
+    const s211Rev: boolean | null = a.revenue === UNANSWERED || a.revenue === 0
+      ? null
+      : convertCurrency(revUSD, 'USD', 'CAD') >= S211_THRESHOLDS.revenueCad
+    const s211Emp = empAtLeast(S211_THRESHOLDS.averageEmployees)
+    const both = s211Rev === true && s211Emp === true
+    const sizeLine = `The Act covers an entity with a place of business, business or assets in Canada that meets at least two of three conditions in either of its two most recent financial years: CAD ${(S211_THRESHOLDS.assetsCad / 1e6).toFixed(0)} million in assets, CAD ${(S211_THRESHOLDS.revenueCad / 1e6).toFixed(0)} million in revenue, an average of ${S211_THRESHOLDS.averageEmployees} employees. An entity listed on a stock exchange in Canada is covered at any size.`
+    // No answer here settles "not covered": revenue is never below the line at any band this form offers
+    // above 'Under $50M', and assets and a Canadian listing are not asked. So the entry is either likely,
+    // or names what would settle it.
+    const settled = both
+      ? 'Your revenue and headcount meet two of the three conditions.'
+      : 'Your answers do not settle two of the three conditions this form can test, so whether you are covered turns on figures it does not ask for: your assets, your exact revenue, or your average headcount.'
+    regs.push({
+      name: 'Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211)', obligationId: 'canada-s211',
+      jurisdiction: 'Canada', group: 'regulatory',
+      urgency: both ? 'high' : 'monitor',
+      urgency_label: both ? 'LIKELY IN SCOPE' : 'CHECK YOUR FIGURES',
+      timing: 'Annual · on or before May 31',
+      module: 'Forced Labour Reporting',
+      what: `${sizeLine} ${settled} A covered entity must report if it produces, sells, distributes or imports goods, or controls an entity that does. ${fxNote}`,
+      action: 'Run the free applicability check at /forced-labour/canada/check, which asks about assets and goods and quotes the Act and Public Safety Canada\u2019s guidance.',
+    })
+  }
+
   // ── MARKET-DRIVEN ───────────────────────────────────────────────────────────
   // Nothing below carries a statutory penalty. These fire on who is ASKING — the ownership answer
   // and the driver answer — not on a jurisdiction, a size limb or a sector.
@@ -631,7 +667,7 @@ export default function AssessPage() {
 
     { id: 'revenue' as keyof Answers, title: "What is your company's global annual revenue?", sub: 'Determines eligibility for SB 253 ($1B), SB 261 ($500M), ESRS/CSRD, and Modern Slavery Act thresholds.', type: 'slider' },
     { id: 'employees' as keyof Answers, title: 'How many employees does your company have globally?', sub: 'Determines CSRD/ESRS scope, EU Pay Transparency, and California Pay Data Reporting thresholds.', type: 'options', options: [{ value: 'under50', label: 'Under 50', sub: 'Small organisation' }, { value: '50_249', label: '50–249', sub: 'NIS2 important entity threshold' }, { value: '250_499', label: '250–499', sub: 'ESRS mid-size · EU Pay Transparency (every 3 years)' }, { value: '500_999', label: '500–999', sub: 'ESRS large entity · EU Pay Transparency annual' }, { value: '1000_4999', label: '1,000–4,999', sub: 'Full ESRS scope · EU AI Act · NIS2 essential entity' }, { value: '5000plus', label: '5,000+', sub: 'All obligations apply · SEC human capital disclosure' }] },
-    { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: 'California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: 'United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: 'European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: 'United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: 'Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: 'Canada', sub: 'IFRS S2 adoption, federal modern slavery' }, { value: 'apac', label: 'Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: 'Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
+    { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: 'California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: 'United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: 'European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: 'United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: 'Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: 'Canada', sub: 'IFRS S2 adoption, forced labour reporting (S-211)' }, { value: 'apac', label: 'Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: 'Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
     { id: 'sectors' as keyof Answers, title: 'Which sectors best describe your business?', sub: 'Determines NIS2 essential/important entity status, DORA applicability, and EU AI Act high-risk categories.', type: 'multiselect', options: [{ value: 'financial', label: 'Financial services', sub: 'DORA, NIS2 essential, SR 11-7' }, { value: 'energy', label: 'Energy / utilities', sub: 'NIS2 essential, SB 253, ESRS' }, { value: 'health', label: 'Healthcare', sub: 'NIS2 essential, EU AI Act high-risk' }, { value: 'manufacturing', label: 'Manufacturing / industrial', sub: 'SB 253, ESRS E1, NIS2 important' }, { value: 'tech', label: 'Technology / digital', sub: 'EU AI Act, NIS2, DORA (if fintech)' }, { value: 'transport', label: 'Transport / logistics', sub: 'NIS2 essential, Scope 3 Cat.4' }, { value: 'retail', label: 'Retail / consumer', sub: 'Supply chain, SB 253, ESRS' }, { value: 'other', label: 'Professional services', sub: 'ESRS, CDP, GRI' }] },
     // Two questions, not one. SUBTITLES DESCRIBE THE OPTION, NEVER THE OUTCOME — the old ones made
     // determinations before the visitor had answered, and got them wrong: 'EU publicly listed ·

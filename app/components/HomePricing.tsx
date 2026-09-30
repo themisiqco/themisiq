@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '@/lib/pricingCopy'
 
-type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber'
+type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber' | 'forced-labour'
 
 const GRAD = 'var(--color-brand)'
 
@@ -22,6 +22,7 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
   { id: 'deals', name: 'Deals & Investment', frameworks: 'SB 253 · SECR · Canada S-211 · CSRD · CS3D', href: '/deals' },
   { id: 'ai', name: 'AI Governance', frameworks: 'EU AI Act · NIST AI RMF · ISO 42001', href: '/ai-governance' },
   { id: 'cyber', name: 'Cyber Governance', frameworks: 'NIS2 · DORA · SEC Cyber · ISO 27001 · NIST CSF', href: '/cyber' },
+  { id: 'forced-labour', name: 'Forced Labour Reporting', frameworks: 'Supply chain reports, country by country. Available now: Canada (S-211).', href: '/forced-labour' },
 ]
 
 const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string }> = {
@@ -37,6 +38,7 @@ const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string
   deals:  { headline: 'Ready to screen your next target?', btn: 'Screen a target →', href: '/deals' },
   ai:     { headline: 'Do you know which AI systems are high-risk?', btn: 'Start your AI inventory →', href: '/ai-governance' },
   cyber:  { headline: 'Are you NIS2 and DORA compliant?', btn: 'Check your cyber readiness →', href: '/cyber' },
+  'forced-labour': { headline: 'Does Canada\u2019s S-211 Act apply to you?', btn: 'Check if Canada\u2019s Act applies (free) →', href: '/forced-labour/canada/check' },
 }
 
 export default function HomePricing() {

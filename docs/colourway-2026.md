@@ -96,6 +96,25 @@ with an exception nobody can date.
 its figures verified exactly as supplied. If the margin ever matters more than the band, it is a one-line
 change in `app/styles/themisiq-tokens.css` and `lib/brand.ts`.
 
+## Forced Labour Reporting is a tenth value, also outside the colourway
+
+Added 30 Sep 2026 with the module. The colourway had no value left for it: its one spare, `#67B8C1`, sits
+at about 186° beside GHG and CBAM, which is why Cyber moved off it. The widest clear gap on the wheel that
+no module or state colour occupies was 325° to 345°, between `--color-state-info` (`#B5179E`, 308.7°) and
+AI Governance (`#F47068`, 3.4°).
+
+| Token | Value | Measured |
+|---|---|---|
+| `--color-module-labour` | `#D581A4` | hue 335.0°, 2.80:1 on paper: not text |
+| `--color-module-labour-ink` | `#BA3E71` | 5.23:1 on paper, 4.66:1 on its wash |
+| `--color-module-labour-wash` | `#FAEFF4` | 1.12:1 against paper; `--color-ink-muted` reads at 5.14:1 on it |
+
+The companion is derived the way Cyber's was: the fill's hue and saturation, darkened into the 5.22 to 5.24
+band on paper that every other companion sits in. Its nearest foreground neighbours are `--color-state-info`
+26.6° away and `--color-state-error` 24.7° away, both outside the 20° gate in `lib/tokenContrast.test.ts`,
+so it collides with nothing and needs no entry in `KNOWN_COLLISIONS`. The key is `labour` because the
+token pattern allows one word after `module-`.
+
 ## The original hold, kept for the record
 
 Held 25 Sep 2026, on the strength of the measurements below. Three facts, stated plainly, because they

@@ -79,8 +79,20 @@ describe('the builder content', () => {
     expect(ours.length).toBeGreaterThan(100)
   })
 
-  it('the builder is linked from nowhere: not the navigation, the dashboard, or the sitemap', () => {
-    for (const f of ['app/components/Nav.tsx', 'app/components/Footer.tsx', 'app/dashboard/page.tsx', 'app/sitemap.ts'])
+  // Stage 5b (30 Sep 2026): the module is public. The public page and the free check are linked from the
+  // site; the builder itself is linked only from the dashboard card, and stays out of search engines.
+  it('the public page is linked from the navigation, footer, sitemap, homepage and the related pages', () => {
+    // Since Stage 5c the general links go to the module overview and the Canadian ones to its country page.
+    for (const f of ['app/components/Nav.tsx', 'app/components/Footer.tsx', 'app/sitemap.ts', 'app/page.tsx'])
+      expect(read(f), f).toMatch(/['"]\/forced-labour['"]/)
+    for (const f of ['app/frameworks/page.tsx', 'app/dashboard/deals/page.tsx', 'app/supply-chain/page.tsx'])
+      expect(read(f), f).toMatch(/['"]\/forced-labour\/canada['"]/)
+    expect(read('app/sitemap.ts')).toContain("'/forced-labour/canada/check'")
+  })
+
+  it('the builder is linked from the dashboard card only, and stays out of search engines', () => {
+    expect(read('app/dashboard/page.tsx')).toContain("href: '/dashboard/forced-labour'")
+    for (const f of ['app/components/Nav.tsx', 'app/components/Footer.tsx', 'app/sitemap.ts', 'app/page.tsx'])
       expect(read(f), f).not.toContain('/dashboard/forced-labour')
     expect(read('app/dashboard/forced-labour/layout.tsx')).toContain('robots: { index: false, follow: false }')
   })
@@ -162,8 +174,12 @@ describe('review fixes: the builder pages (source checks)', () => {
   })
 
   it('the home page labels the Act s.9(a) and shows notes after the quotations; the list page offers the next report due (items C14, C15, C17)', () => {
-    expect(home).toContain("'The Act, s.9(a)'")
-    expect(home.indexOf('obligation.guidanceQuoted.map')).toBeLessThan(home.indexOf('obligation.notes.map'))
+    // Since Stage 5b the result card is shared with the free check (_components/Applicability.tsx).
+    const card = read('app/dashboard/forced-labour/_components/Applicability.tsx')
+    expect(read('lib/s211/applicability.ts')).toContain("ACT_9A_LABEL = 'The Act, s.9(a)'")
+    expect(card.indexOf('obligation.guidanceQuoted.map')).toBeLessThan(card.indexOf('obligation.notes.map'))
+    expect(home).toContain('<ApplicabilityResult result={result} />')
+    expect(read('app/forced-labour/canada/check/page.tsx')).toContain('<ApplicabilityResult result={result} />')
     expect(list).toContain('defaultReportingYear(new Date())')
   })
 })

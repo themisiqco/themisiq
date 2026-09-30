@@ -10,8 +10,11 @@ import Link from 'next/link'
 import { s211Api } from '../../../lib/s211/client'
 import { defaultReportingYear } from '../../../lib/s211/defaults'
 import { SECTIONS } from '../../../lib/s211/builderContent'
+import { CANADA_CHECK, COUNTRIES, STATUS_LABEL } from '../../../lib/forcedLabour/countries'
 import { BUILDER_ROOT, PREVIEW_ID, ORDER_HREF, ORDER_LABEL, READ_ONLY_EXPORT_NOTE, canWrite } from '../../../lib/s211/builderAccess'
 import { BuilderFrame, ReadOnlyBanner, S, useBuilderState } from './_components/ui'
+import { DRAFT_KEYS, readDraft, clearDraft } from '../../../lib/drafts'
+import { parseApplicabilityDraft, formToReportPatch, formToActivities } from '../../../lib/s211/applicability'
 
 type ReportRow = { id: string; company_name: string; reporting_year: number; status: string; updated_at: string }
 
@@ -28,6 +31,7 @@ function Preview() {
       </p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '16px 0 8px' }}>
         <a href={ORDER_HREF} style={{ ...S.button, textDecoration: 'none' }}>{ORDER_LABEL}</a>
+        <a href={CANADA_CHECK} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Check if Canada&rsquo;s Act applies (free)</a>
         <a href={`${BUILDER_ROOT}/${PREVIEW_ID}/${SECTIONS[0].key}`} style={{ ...S.buttonQuiet, textDecoration: 'none' }}>Read through the sections</a>
       </div>
       <p style={S.muted}>One flat annual price. The read-through shows every section with its questions; answering them, saving a report and downloading it come with the module.</p>
@@ -56,12 +60,22 @@ function ReportsList() {
     })
   }, [])
 
+  // Answers from the free check (/forced-labour/canada/check), if this browser holds them: written into the
+  // report once it exists, then cleared, so the first report starts pre-filled. Read once, on mount.
+  const [checkDraft] = useState(() => readDraft(DRAFT_KEYS.forcedLabourCheck, parseApplicabilityDraft))
+
   const create = async () => {
     setCreating(true); setCreateError(null)
     const r = await s211Api<{ report: ReportRow }>('/reports', { method: 'POST', body: { company_name: company, reporting_year: Number(year) } })
-    setCreating(false)
-    if (r.data) window.location.href = `${BUILDER_ROOT}/${r.data.report.id}`
-    else setCreateError(r.error)
+    if (!r.data) { setCreating(false); setCreateError(r.error); return }
+    const id = r.data.report.id
+    if (checkDraft) {
+      // The report exists whatever happens next; a failure here only means the answers are entered by hand.
+      const p = await s211Api(`/reports/${id}`, { method: 'PATCH', body: formToReportPatch(checkDraft) })
+      const a = await s211Api(`/reports/${id}/sections/report_details`, { method: 'PUT', body: { content: { _applicability: formToActivities(checkDraft) } } })
+      if (p.data && a.data) clearDraft(DRAFT_KEYS.forcedLabourCheck)
+    }
+    window.location.href = `${BUILDER_ROOT}/${id}`
   }
 
   return (
@@ -86,12 +100,23 @@ function ReportsList() {
       {writable && <>
       <h2 style={S.h2}>Start a report</h2>
       <div style={S.card}>
+        {/* Presentation only (Stage 5c): reports are Canadian by definition and nothing new is stored. A
+            country that is not yet available is listed and cannot be chosen. */}
+        <label htmlFor="country" style={S.label}>Country</label>
+        <select id="country" style={{ ...S.input, maxWidth: 360, marginBottom: 14 }} value="canada" onChange={() => {}}>
+          {COUNTRIES.map(c => (
+            <option key={c.key} value={c.key} disabled={c.status !== 'available'}>
+              {c.name}: {c.law}{c.status === 'available' ? '' : ` (${STATUS_LABEL[c.status].toLowerCase()})`}
+            </option>
+          ))}
+        </select>
         <label htmlFor="company" style={S.label}>Company name</label>
         <p style={S.hint}>You will give the full legal name in section 1.</p>
         <input id="company" style={{ ...S.input, marginBottom: 14 }} value={company} maxLength={300} onChange={e => setCompany(e.target.value)} />
         <label htmlFor="year" style={S.label}>Reporting year</label>
         <p style={S.hint}>The year the report is due, by May 31. A report due in 2026 covers the financial year before it.</p>
         <input id="year" style={{ ...S.input, maxWidth: 140, marginBottom: 14 }} type="number" min={2024} value={year} onChange={e => setYear(e.target.value)} />
+        {checkDraft && <p style={S.hint}>Your answers from the free applicability check will be added to this report.</p>}
         {createError && <p style={S.error}>{createError}</p>}
         <div><button type="button" style={S.button} disabled={creating} onClick={create}>{creating ? 'Starting' : 'Start the report'}</button></div>
       </div>

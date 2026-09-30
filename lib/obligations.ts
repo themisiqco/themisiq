@@ -57,6 +57,7 @@ export type ObligationId =
   | 'ca-pay-data'
   | 'sec-item-101'
   | 'modern-slavery'
+  | 'canada-s211'
   | 'cdp'
   | 'ecovadis'
   | 'lp-lender-esg'
@@ -218,6 +219,18 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     modules: ['supply-chain'],
     does: {
       'supply-chain': 'Sends the modern-slavery questionnaire: policy, risk assessment, recruitment fees, ILO 138 minimum age, grievance mechanism, training, and risk-scores which suppliers to send it to first by country, sector and spend.',
+    },
+  },
+
+  // Canada's Act (S-211). Kept apart from 'modern-slavery' because the laws differ in who they reach and
+  // what they ask, and a different module answers each: this report is Forced Labour Reporting's, the
+  // UK and Australian statements' supplier data is Supply Chain's.
+  'canada-s211': {
+    id: 'canada-s211',
+    name: 'Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211)',
+    modules: ['forced-labour'],
+    does: {
+      'forced-labour': 'Tests whether the Act applies, then builds the annual report section by section and produces the PDF for approval and signing. The online questionnaire is still completed on Public Safety Canada\u2019s site.',
     },
   },
 

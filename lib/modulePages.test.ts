@@ -5,7 +5,7 @@ import { MODULE_SUBLINE, EVIDENCE_BY_MODULE, evidenceClaim, hasVerifierSurface }
 import { MODULES, type ModuleKey } from './pricing'
 
 /**
- * The claims the seven module marketing pages share. Two things are asserted: that the sub-line is
+ * The claims the module marketing pages share. Two things are asserted: that the sub-line is
  * imported rather than retyped, and that a page cannot make a verifier claim it has no surface for.
  *
  * ⚠️ THE VERIFIER HALF IS THE ONE THAT MATTERS. "Your verifier can check the figures back to source" is
@@ -37,9 +37,9 @@ const PAGE_BY_MODULE: Record<ModuleKey, string> = {
 /**
  * Keys whose marketing page is not built yet. Their page must NOT exist: when it is built, this test fails
  * until the key moves out of here, so the page cannot ship without taking the shared claims below.
- * 'forced-labour' is Stage 5b.
+ * Empty since Stage 5b built /forced-labour (30 Sep 2026); kept for the next module.
  */
-const PAGE_PENDING: ModuleKey[] = ['forced-labour']
+const PAGE_PENDING: ModuleKey[] = []
 
 /**
  * Pages that take the shared module claims. Climate Risk was built first, alone, so the shape could be
@@ -55,7 +55,7 @@ const PAGE_PENDING: ModuleKey[] = ['forced-labour']
  * of the layout. What this list tracks is the SHARED CLAIMS, which is what the test below actually checks,
  * and the old wording would have made adding that key assert something untrue.
  */
-const CONVERTED: ModuleKey[] = ['ai-governance', 'cbam', 'climate-risk', 'cyber', 'deals', 'double-materiality', 'ghg', 'people', 'supply-chain']
+const CONVERTED: ModuleKey[] = ['ai-governance', 'cbam', 'climate-risk', 'cyber', 'deals', 'double-materiality', 'forced-labour', 'ghg', 'people', 'supply-chain']
 
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
 
@@ -96,7 +96,7 @@ describe('the shared module-page claims cannot drift across the module pages', (
       }
     }
     expect(bad, bad.length === 0 ? '' :
-      `${bad.join('\n  ')}\n\nThe repetition across seven pages is deliberate, which is exactly why it ` +
+      `${bad.join('\n  ')}\n\nThe repetition across the module pages is deliberate, which is exactly why it ` +
       'cannot be seven strings: app/components/buttonStyles.ts exists because thirteen files each ' +
       'declared their own identical button and a miss was invisible.').toEqual([])
   })

@@ -38,6 +38,9 @@ import {
   resolveCanadaS211, canadaS211NoteWizard, buildDealReportModel, CHIP_LABELS, obligationRowPrice, compactMoneyRange, type DealReportModel,
 } from '../../../lib/deals/reportModel'
 
+// The framework name the Deals engine gives the S-211 row (lib/deals/assessment.ts).
+const DEALS_S211_FRAMEWORK = 'Canada S-211'
+
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 // The sector list lives in lib/deals/sectors.ts (29 Sep 2026), with the values it replaced.
@@ -954,6 +957,11 @@ function DealsDashboardInner() {
                   )}
                   {/* Applies on a stated rule rather than a size test (EU Taxonomy, EU ECGT, AB 1305). */}
                   {row?.rule && <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.55, marginTop: 5 }}>{row.rule}</div>}
+                  {/* The Act reaches the target: the report it owes is what Forced Labour Reporting prepares.
+                      Only on an APPLIES row, never on a near-threshold or not-assessed one. */}
+                  {fw === DEALS_S211_FRAMEWORK && row?.applies && (
+                    <a href="/forced-labour/canada" style={{ display: 'inline-block', fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginTop: 6 }}>Prepare the report with Forced Labour Reporting →</a>
+                  )}
                 </div>
                 {/* APPLIES is retained alongside VERIFY — near-ness annotates the finding, it does not soften it. */}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

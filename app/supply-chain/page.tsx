@@ -217,7 +217,9 @@ const ARRIVALS = [
  */
 const COVERS = [
   ['A supplier portal', 'Your suppliers can use it without an account, and each question explains what it means and why you are asking.'],
-  ['Questionnaire templates', 'EcoVadis, CS3D, Modern Slavery and Scope 3, plus a custom questionnaire for anything the four do not cover.'],
+  // The pointer to Forced Labour Reporting says only where the S-211 report is prepared. It does not say the
+  // questionnaire answers flow into it: the two modules share no data today.
+  ['Questionnaire templates', <>EcoVadis, CS3D, Modern Slavery and Scope 3, plus a custom questionnaire for anything the four do not cover. The annual report Canada&rsquo;s S-211 Act asks for is prepared in <a href="/forced-labour/canada" style={{ color: 'var(--color-brand)' }}>Forced Labour Reporting</a>.</>],
   ['Risk mapping', 'Human rights and supply chain risk, mapped from the answers rather than assumed from the sector.'],
   ['Primary data for Scope 3', 'Feeds Category 1 with the basis recorded per supplier, including whether their own figure was third-party assured.'],
 ] as const

@@ -190,3 +190,11 @@ describe('the optional International Reporting Template', () => {
     expect(R.S211_GUIDANCE_TEMPLATE_OPTIONAL).toContain('this optional template')
   })
 })
+
+describe('s.13, publishing the report (added 30 Sep 2026)', () => {
+  it('is recorded word for word', async () => {
+    const R = await import('./requirements')
+    expect(R.S211_ACT_SECTION_13_1).toBe('An entity must, on providing the Minister with a report under section 11 or a revised report under section 12, make the report available to the public, including by publishing it in a prominent place on its website.')
+    expect(R.S211_ACT_SECTION_13_2).toBe('Any entity that is incorporated under the Canada Business Corporations Act or any other Act of Parliament must provide the report or revised report to each shareholder, along with its annual financial statements.')
+  })
+})

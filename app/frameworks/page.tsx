@@ -174,7 +174,7 @@ const groups: Group[] = [
       // prescribed by regulation. lib/deals/assessment.ts:577-597 models the size route alone, so the body
       // below says "or" rather than implying the numbers are the whole definition. See the report of
       // 26 Sep 2026 against the statute.
-      { name: 'Canada S-211', body: 'The Canadian forced and child labour reporting Act, reached by a stock-exchange listing or by size.', maps: 'The two-of-three size test on assets, revenue and employees, with the near-threshold margin flagged on both sides.', href: CANADA_S211_URL, covers: [{ href: '/deals' }] },
+      { name: 'Canada S-211', body: 'The Canadian forced and child labour reporting Act, reached by a stock-exchange listing or by size.', maps: 'Forced Labour Reporting tests whether the Act applies and builds the annual report. Deals applies the two-of-three size test to a target, with the near-threshold margin flagged on both sides.', href: CANADA_S211_URL, covers: [{ href: '/forced-labour/canada', label: 'Prepare the report' }, { href: '/deals', label: 'Test a deal target' }] },
     ],
   },
   {

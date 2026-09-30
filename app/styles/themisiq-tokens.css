@@ -1,7 +1,7 @@
 /* ThemisIQ — token layer v3 (Tailwind 4)
  * Primary: deep teal #095C6B.
  * Structure follows the category convention: white base, near-black text,
- * one saturated brand accent. The eight module hues are a wayfinding layer
+ * one saturated brand accent. The module hues are a wayfinding layer
  * underneath the brand, not part of it.
  *
  * There are no gradients and no filled dark panels anywhere in this system. That read as an absolute
@@ -45,9 +45,10 @@
      companion is recorded there and is not guessable from the hex.
 
      ⚠️ THE FILL IS NOT TEXT. Only --color-module-climate clears body AA on paper. Fill ratios, measured:
-     climate 8.13, ghg 3.46, ai 2.85, cyber 2.28, supply 1.76, deals 1.71, cbam 1.63, people 1.33. Five
-     of the eight are below even the 3:1 non-text threshold, so a fill must not carry text OR a graphic
-     that means something. That is what the -ink companions are for. */
+     climate 8.13, ghg 3.46, cyber 3.07, ai 2.85, labour 2.80, supply 1.76, deals 1.71, cbam 1.63,
+     people 1.33 (re-measured 30 Sep 2026; cyber read 2.28 here before it moved). Most are below even the
+     3:1 non-text threshold, so a fill must not carry text OR a graphic that means something. That is
+     what the -ink companions are for. */
   --color-module-ghg:          #0097B2; /* GHG Emissions      fill 3.46:1 — not text */
   --color-module-ghg-wash:     #E6F0F1;
   --color-module-ghg-ink:      #00778C; /* 5.23 on paper, 4.51 on its wash */
@@ -81,6 +82,13 @@
   --color-module-people-wash:  #F1EEE5;
   --color-module-ai:           #F47068; /* AI Governance      fill 2.85:1 — identity only */
   --color-module-ai-wash:      #F9EBEA;
+  /* Forced Labour Reporting (30 Sep 2026), a tenth value outside the Canva colourway, like Cyber. Rose at
+     335°, in the gap between --color-state-info (308.7°) and AI Governance (3.4°): 26° and 28° away, so
+     neither the fill nor the companion collides with them. The companion is derived as Cyber's was: same
+     hue and saturation, darkened to the 5.23 band on paper. docs/colourway-2026.md records it. */
+  --color-module-labour:       #D581A4; /* Forced Labour      fill 2.80:1, not text. hue 335.0 */
+  --color-module-labour-wash:  #FAEFF4;
+  --color-module-labour-ink:   #BA3E71; /* 5.23 on paper, 4.66 on its wash */
 
   /* ── STATE ────────────────────────────────────────────────────────────────────────────────────
      WHAT A SURFACE IS TELLING YOU, AS OPPOSED TO WHICH MODULE IT BELONGS TO.
@@ -454,6 +462,9 @@ h3 { font-size: var(--text-xl); }
 }
 [data-module="cyber"] {
   --tq-mod: var(--color-module-cyber-ink);   --tq-mod-wash: var(--color-module-cyber-wash);
+}
+[data-module="labour"] {
+  --tq-mod: var(--color-module-labour-ink);  --tq-mod-wash: var(--color-module-labour-wash);
 }
 [data-module="climate"] {
   --tq-mod: var(--color-module-climate); --tq-mod-wash: var(--color-module-climate-wash);
@@ -875,7 +886,7 @@ h3 { font-size: var(--text-xl); }
 
 /* ================================================================
    Status — deliberately NOT hue-coded
-   Eight module hues use up the colour wheel, so a red/amber/green
+   The module hues use up the colour wheel, so a red/amber/green
    status set would collide with Cyber, People and AI Governance.
    Status is carried by the chip's form instead, which also survives
    colour-blindness and greyscale printing of workpapers.

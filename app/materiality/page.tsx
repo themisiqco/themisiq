@@ -657,7 +657,7 @@ export default function Page() {
       </section>
 
       {/* ═══ 13 · CLOSING BAND ════════════════════════════════════════════════════════════════════
-      Shared with the seven module pages, from the same token, so the bands cannot drift. The secondary
+      Shared with the module pages, from the same token, so the bands cannot drift. The secondary
       button is /climate-risk rather than /advisory: on THIS page the most useful second action is the
       other half, which is the same reasoning as section 4. */}
       <ClosingBand

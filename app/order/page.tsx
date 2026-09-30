@@ -39,7 +39,8 @@ const MODULE_LABELS: Record<ModuleKey, string> = {
   'ai-governance': 'AI Governance',
   'people': 'People & Workforce',
   'cyber': 'Cyber Governance',
-  'forced-labour': 'Forced Labour Reporting',
+  // Stage 5c: says what the price buys today, and names no other country.
+  'forced-labour': 'Forced Labour Reporting (includes the Canada report)',
 }
 
 const usd = (n: number) => `$${n.toLocaleString()}`

@@ -6,13 +6,13 @@ import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import { supabase } from '../../lib/supabase'
 import { useEntitlementAccess } from '../../lib/useEntitlement'
-import { FLAT_MODULE_PRICES } from '../../lib/pricing'
+import { FLAT_MODULE_PRICES, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED } from '../../lib/aiAct'
 
 const GRAD = 'var(--color-brand)'
 
 // Locked-card price lookup: dashboard module id → FLAT_MODULE_PRICES key.
-// Only the six flat-priced modules appear here; ghg/scope3/sbti/portal have no
+// Only the flat-priced modules appear here; ghg/scope3/sbti/portal have no
 // flat price (GHG is tier-banded) and intentionally render "Preview free" only.
 const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
   cbam: 'cbam',
@@ -23,6 +23,7 @@ const ID_TO_PRICE_KEY: Record<string, keyof typeof FLAT_MODULE_PRICES> = {
   cyber: 'cyber',
   deals: 'deals',
   people: 'people',
+  forced_labour: 'forced-labour',
 }
 
 // `previewable` records whether the module's page renders anything to a customer with
@@ -214,6 +215,19 @@ const MODULES: DashboardModule[] = [
     urgency: null,
     previewable: true,
   },
+  {
+    id: 'forced_labour',
+    name: 'Forced Labour Reporting',
+    sub: 'Supply chain reports, country by country. Available now: Canada (S-211).',
+    desc: 'Prepare the report section by section and download it as a PDF, ready for your governing body to approve and sign.',
+    href: '/dashboard/forced-labour',
+    color: 'var(--color-module-labour-ink)',
+    bg: 'var(--color-module-labour-wash)',
+    frameworks: ['Canada S-211'],
+    urgency: null,
+    // The builder's preview state: every section readable, the fields disabled, nothing stored.
+    previewable: true,
+  },
 ]
 
 const TIER_CONFIG = {
@@ -249,7 +263,9 @@ export default function Dashboard() {
       // Map canonical module_key (entitlements) -> this dashboard's card id(s).
       // Note: Scope 3 now lives under GHG -- the 'ghg' entitlement unlocks the Scope 3 card,
       // while 'supply-chain' unlocks the Supply Chain + Supplier Portal cards.
-      const KEY_TO_CARD_IDS: Record<string, string[]> = {
+      // Typed against ModuleKey since 30 Sep 2026 (Forced Labour Reporting), so a module added to
+      // pricing.ts fails the build here instead of being bought and invisible.
+      const KEY_TO_CARD_IDS: Record<ModuleKey, string[]> & Record<string, string[] | undefined> = {
         'ghg': ['ghg', 'scope3', 'sbti'],
         'cbam': ['cbam'],
         'climate-risk': ['climate_risk'],
@@ -261,6 +277,7 @@ export default function Dashboard() {
         'deals': ['deals'],
         'ai-governance': ['ai'],
         'cyber': ['cyber'],
+        'forced-labour': ['forced_labour'],
       }
       const cardIds = new Set<string>()
       ;(ents || []).forEach((e: any) => {

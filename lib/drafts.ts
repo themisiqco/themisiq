@@ -41,6 +41,10 @@ export const DRAFT_KEYS = {
   // Added 26 Sep 2026 with the signed-out Save fix. See lib/ghg/draft.ts for why this one is
   // localStorage where lib/deals/draft.ts is sessionStorage.
   ghg:          'themisiq:draft:ghg',
+  // Added 30 Sep 2026: the free Forced Labour applicability check. Written on every change and read
+  // without clearing (not useDraftAutosave, which clears on mount), because the draft is consumed by
+  // the builder when the first report is created, not by the page that wrote it. See lib/s211/applicability.ts.
+  forcedLabourCheck: 'themisiq:draft:forced-labour-check',
 } as const
 
 // The envelope. `payload` is the tool's own inventory; everything beside it exists so a reader can

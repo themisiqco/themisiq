@@ -262,6 +262,15 @@ export const S211_ACT_SECTION_11_2 = {
     { letter: 'b', text: 'by being party to a joint report in respect of more than one entity.' },
   ],
 } as const
+/**
+ * s.13: making the report public. Read from CANADA_S211_URL on 30 Sep 2026 (the page showed "Act current
+ * to 2026-09-21"), for the /forced-labour page's answer on what the entity still does itself. Added in
+ * Stage 5b; no earlier constant was changed.
+ */
+export const S211_ACT_SECTION_13_1 =
+  'An entity must, on providing the Minister with a report under section 11 or a revised report under section 12, make the report available to the public, including by publishing it in a prominent place on its website.'
+export const S211_ACT_SECTION_13_2 =
+  'Any entity that is incorporated under the Canada Business Corporations Act or any other Act of Parliament must provide the report or revised report to each shareholder, along with its annual financial statements.'
 /** s.11(4): who must approve the report. */
 export const S211_ACT_SECTION_11_4 = {
   leadIn: 'The report must be approved,',
