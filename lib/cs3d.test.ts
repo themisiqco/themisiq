@@ -49,6 +49,15 @@ const FORBIDDEN = [
 // real regression walks in. Two of the three dates could be guarded; the third could not, and saying
 // so is better than guarding it wrongly or pretending it was guarded.
 
+// A FORBIDDEN date that another regime also uses, allowed ONLY on a line that cites that regime.
+// Narrower than dropping the pattern, which is what 26 February 2026 above needed: the CS3D art. 16
+// date stays guarded everywhere else. Added 29 Sep 2026 with the Stage 3b sector templates, where the
+// reviewed PPWR finding in lib/deals/assessment.ts reads "From 1 January 2030 grouped, transport and
+// e-commerce packaging is capped..." and cites Regulation (EU) 2025/40 on the same line.
+const OTHER_REGIME_LINES: { pattern: string; cites: string }[] = [
+  { pattern: '1 January 2030', cites: 'Regulation (EU) 2025/40' },
+]
+
 const EXCLUDED_FILES = new Set([
   'lib/cs3d.ts',        // the single source — this is where the dates are SUPPOSED to be
   'lib/cs3d.test.ts',   // this file names them to forbid them
@@ -79,6 +88,7 @@ describe('CS3D dates live in exactly one place', () => {
         const lines = stripTsComments(readFileSync(file, 'utf8')).split('\n')
         lines.forEach((line, i) => {
           for (const pattern of FORBIDDEN) {
+            if (OTHER_REGIME_LINES.some(o => o.pattern === pattern && line.includes(o.cites))) continue
             if (line.includes(pattern)) offences.push(`${rel}:${i + 1} — "${pattern}"`)
           }
         })

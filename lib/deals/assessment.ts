@@ -80,6 +80,13 @@ export type SectorRisk = {
   /** MECHANISM ONLY. Must assert no instrument — anything conditional belongs in `conditional`. */
   detail: string
   conditional?: SectorRiskCondition
+  /**
+   * TIME-SENSITIVE (29 Sep 2026). Set only where the printed text states something that will go stale
+   * on a known kind of event: a proposal adopted, a postponement given a date, a phase-in reached.
+   * The date the wording was last checked against its sources, 'YYYY-MM-DD'. Never printed; the one
+   * test in lib/deals/sectorTemplates.test.ts lists every template carrying it, so they can be found.
+   */
+  lastVerified?: string
 }
 
 // 'Investor expectation (IFRS S2 / TCFD)' (29 Sep 2026): IFRS S2 and TCFD are market expectations,
@@ -93,7 +100,10 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
     { risk: 'Physical climate risk exposure', severity: 'high', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'Energy infrastructure faces acute and chronic physical climate risk. Requires asset-level climate risk assessment.' },
   ],
   'Financial Services': [
-    { risk: 'Financed emissions (Scope 3 Cat.15)', severity: 'critical', framework: 'PCAF / CSRD', detail: 'Financed emissions typically represent 95%+ of a financial institution\'s carbon footprint. PCAF methodology required.' },
+    // 'Investor expectation (PCAF)' (29 Sep 2026): PCAF is a market expectation (MARKET_FRAMEWORKS), so it
+    // is not printed bare, as IFRS S2 and TCFD are not. A deliberate change to a legacy value's output;
+    // no production deal carried Financial Services on that date.
+    { risk: 'Financed emissions (Scope 3 Cat.15)', severity: 'critical', framework: 'Investor expectation (PCAF) / CSRD', detail: 'Financed emissions typically represent 95%+ of a financial institution\'s carbon footprint. PCAF methodology required.' },
     { risk: 'SFDR portfolio alignment', severity: 'high', framework: 'SFDR / EU Taxonomy', detail: 'Portfolio sustainability characteristics affect fund marketability and investor selection.',
       conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the manager is established.', unresolved: 'whether the target markets products in the EU', consequence: 'EU financial products must disclose sustainability characteristics. Article 8/9 classification impacts fund marketability.' } },
     { risk: 'Physical risk in loan book', severity: 'high', framework: 'ECB / Investor expectation (TCFD)', detail: 'Mortgage and commercial real estate portfolios face material physical climate risk.',
@@ -142,7 +152,13 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
     { risk: 'Water risk', severity: 'high', framework: 'CSRD / CDP Water', detail: 'Agricultural operations in water-stressed regions face material operational and regulatory risk.' },
   ],
   'Transport & Logistics': [
-    { risk: 'Fleet decarbonisation liability', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Transport fleet carries significant Scope 1 emissions.',
+    // SPLIT 29 Sep 2026 (Stage 3b follow-up). This finding was conditioned WHOLE on EU routes, so a fleet
+    // operating elsewhere had its Scope 1 finding marked conditional and dropped from every severity
+    // count, although the emissions are true anywhere. Now (a) the universal Scope 1 finding, unconditioned,
+    // and (b) the EU-route cost, conditioned, with the old consequence word for word. A deliberate change
+    // to a legacy value's output; no production deal carried Transport & Logistics on that date.
+    { risk: 'Fleet decarbonisation liability', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Transport fleet carries significant Scope 1 emissions.' },
+    { risk: 'EU route fuel and carbon costs', severity: 'high', framework: 'FuelEU Maritime / EU ETS', detail: 'Fleets on EU routes carry fuel-standard and carbon-pricing costs on top of the emissions themselves.',
       conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU routes.', nexus: 'FuelEU Maritime and the ETS extension attach to voyages into, out of and within the EU, whichever state the operator is established in.', unresolved: 'whether the target’s routes touch the EU', consequence: 'EU FuelEU Maritime and ETS expansion add compliance cost.' } },
     { risk: 'Aviation and shipping ETS exposure', severity: 'high', framework: 'EU ETS', detail: 'Aviation and maritime fleets carry carbon-cost exposure that requires detailed fleet assessment.',
       conditional: { reach: 'market', regions: ['EEA'], establishedIn: ['European Union'], label: 'Conditioned on EEA routes.', nexus: 'EU ETS reaches flights and voyages into, out of and within the EEA, whichever flag or state the operator sits under.', unresolved: 'whether the target’s routes touch the EEA', consequence: 'EU ETS now covers aviation and maritime.' } },
@@ -169,6 +185,169 @@ export const SECTOR_RISKS: Record<string, SectorRisk[]> = {
     { risk: 'Scope 2 and business travel emissions', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'Professional services firms carry Scope 2 and Scope 3 Cat.6 business travel emissions.' },
     { risk: 'Client portfolio ESG exposure', severity: 'medium', framework: 'CSRD / SFDR', detail: 'Advisory and consulting firms may carry reputational and legal exposure from ESG advice provided to clients.',
       conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on marketing financial products in the EU.', nexus: 'SFDR attaches to the product and to the manager marketing it in the EU, not to where the adviser is established.', unresolved: 'whether the target’s clients market products in the EU' } },
+  ],
+
+  // ─── Templates for the sector list of 29 Sep 2026 (Stage 3b) ─────────────────────────────────────
+  //
+  // Wired from scratch/sector-templates-draft.md as reviewed on 29 Sep 2026. Keyed by the NEW sector
+  // name; SECTOR_TEMPLATE_SOURCE points each sector here. The legacy keys above are untouched, so a deal
+  // stored under 'Energy & Utilities' keeps the old Energy templates exactly.
+  //
+  // New framework labels (EU Methane Regulation, EU Battery Regulation, EU CRMA, EU vehicle CO2
+  // standards, PPWR, UK pEPR, EED data centres, Solvency II, EU Landfill Directive, UWWTD, UK ETS)
+  // PASS THROUGH as printed text, like EU CBAM and REACH: makeMapFramework resolves only SB 253, CSRD
+  // and CS3D against framework rows. The legal assertion lives in `conditional.consequence`.
+  //
+  // Research notes and anything still marked "check" stay in these comments and are never printed.
+
+  'Oil & Gas': [
+    // Reworded from Energy & Utilities 'High Scope 1 emissions exposure'.
+    { risk: 'High Scope 1 emissions exposure', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'The target\'s production, processing and refining operations typically generate large Scope 1 emissions from combustion, flaring and venting. These need full consolidation into the buyer\'s GHG inventory under prevailing emissions-accounting standards.' },
+    // Reworded from Energy & Utilities 'Stranded asset risk'.
+    { risk: 'Stranded asset risk', severity: 'critical', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'The target\'s reserves, fields and processing infrastructure face material impairment risk under 1.5°C transition scenarios. Long-lived assets may not recover their carrying value before demand falls. This requires IFRS S2 climate scenario analysis.' },
+    // Reworded from Energy & Utilities 'Physical climate risk exposure'.
+    { risk: 'Physical climate risk exposure', severity: 'high', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'The target\'s offshore platforms, coastal terminals, refineries and pipelines face acute and chronic physical climate risk from storms, flooding, heat and permafrost thaw. This requires an asset-level climate risk assessment.' },
+    // NEW. Regulation (EU) 2024/1787, https://eur-lex.europa.eu/eli/reg/2024/1787/oj. VERIFIED 2026-09-29:
+    // import equivalence from 1 Jan 2027; methane intensity in supply contracts from 5 Aug 2028; maximum
+    // values to follow. Check, not printed: the import articles (Art. 27 to 29 in the first draft). The US
+    // EPA Waste Emissions Charge is left out on purpose.
+    { risk: 'Methane emissions and import requirements', severity: 'critical', framework: 'EU Methane Regulation', lastVerified: '2026-09-29',
+      detail: 'The target\'s wells, compressors, pipelines and storage leak and vent methane, a gas with a far higher short-term warming effect than CO2. Measurement-based reporting and leak detection and repair are becoming the expected standard, and buyers of the target\'s gas increasingly ask for source-level methane data.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU operations or EU market access.', nexus: 'The regulation binds operators in the EU directly, and reaches producers elsewhere through the importers placing their oil, gas or coal on the EU market.', unresolved: 'whether the target operates in the EU or its oil, gas or coal reaches the EU market', consequence: 'EU operators face measurement, reporting and leak detection and repair duties and a ban on routine venting and flaring. From 1 January 2027 importers must show that their supply meets equivalent monitoring, reporting and verification standards, and from 5 August 2028 supply contracts must carry the methane intensity of the supply, with maximum methane intensity values to follow (Regulation (EU) 2024/1787).' } },
+  ],
+  'Power & Utilities (incl. renewables)': [
+    // Reworded from Energy & Utilities 'High Scope 1 emissions exposure'. Check, not printed: an F-gas
+    // note on SF6 in new switchgear (Regulation (EU) 2024/573), dates unverified.
+    { risk: 'Scope 1 emissions from generation and networks', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'Where the target runs fossil-fired generation, combustion emissions make Scope 1 the dominant line in its inventory. Network operators carry SF6 leakage from switchgear, and transmission and distribution losses that are reported as Scope 2. All of it needs consolidation into the buyer\'s GHG inventory under prevailing emissions-accounting standards.' },
+    // Reworded from Energy & Utilities 'Physical climate risk exposure'.
+    { risk: 'Physical climate risk to generation and network assets', severity: 'high', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'The target\'s plants, substations and lines face acute and chronic physical climate risk from flooding, heat, wildfire and storms. Heat also lowers thermal plant efficiency, and drought reduces hydro output and cooling-water supply. This requires an asset-level climate risk assessment.' },
+    // Adapted from Energy & Utilities 'Stranded asset risk'. HIGH, not CRITICAL: only the unabated fossil
+    // portion strands outright; renewables and networks lose value rather than being written off.
+    { risk: 'Transition asset risk across generation, renewables and networks', severity: 'high', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'Any unabated fossil generation in the target\'s fleet faces early closure and impairment under 1.5°C transition scenarios. Renewable assets face falling capture prices as more capacity with the same output profile connects. Network assets depend on regulated returns being reset for grid build-out. This requires IFRS S2 climate scenario analysis across each asset class.' },
+  ],
+  'Chemicals': [
+    // Adapted from Industrials & Manufacturing 'Scope 1 process emissions'.
+    { risk: 'Scope 1 process emissions', severity: 'critical', framework: 'SB 253 / CSRD', detail: 'The target\'s chemical processes release Scope 1 emissions from the reactions themselves, not only from fuel. Examples are CO2 from ammonia and hydrogen production and N2O from nitric and adipic acid. These need a full GHG inventory that separates process emissions from combustion.' },
+    // Adapted from Industrials & Manufacturing 'Carbon border adjustment exposure'; label, nexus and
+    // consequence as there. VERIFIED 2026-09-29 against Regulation (EU) 2023/956, Annex I: fertilisers
+    // CN 2808, 2814, 2834 21, 3102, 3105; hydrogen CN 2804 10.
+    { risk: 'Carbon border adjustment exposure (fertilisers and hydrogen)', severity: 'high', framework: 'EU CBAM',
+      detail: 'The target\'s fertilisers (ammonia, nitric acid, urea and mixed nitrogen products) and hydrogen carry a carbon-border cost when they enter the EU. Embedded emissions must be calculated at installation level and passed to the importer.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'CBAM applies to the declarant importing covered goods into the EU. It reaches a producer established elsewhere through that import route, not through where it operates.', unresolved: 'whether fertilisers or hydrogen the target produces enter the EU', consequence: 'The definitive period began 1 January 2026, with a 50-tonne annual net-mass exemption for all but electricity and hydrogen (Regulation (EU) 2023/956 as amended by (EU) 2025/2083).' } },
+    // Adapted from Industrials & Manufacturing 'Chemical and hazardous materials'. REACH Art. 6,
+    // https://eur-lex.europa.eu/eli/reg/2006/1907/oj. Check, not printed: any named PFAS restriction or date.
+    { risk: 'REACH registration and substance restrictions', severity: 'high', framework: 'REACH / CSRD',
+      detail: 'The target\'s substances need registration dossiers, and some may be candidates for authorisation or restriction, which can remove a product line from a market. Historical site contamination adds environmental liability on top.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'REACH attaches to substances manufactured in or imported into the EU, so a manufacturer established elsewhere is reached through what it ships there.', unresolved: 'whether the target’s substances enter the EU', consequence: 'Substances manufactured in or imported into the EU at one tonne or more a year must be registered with ECHA (Regulation (EC) No 1907/2006, Art. 6).' } },
+  ],
+  'Automotive & Transport Equipment': [
+    // NEW. https://eur-lex.europa.eu/eli/reg/2023/1542/oj. VERIFIED 2026-09-29: passport date, turnover
+    // threshold, due-diligence date, amending regulation. Check, not printed: Art. 7, 47 to 52 and 77.
+    { risk: 'EU Battery Regulation duties', severity: 'high', framework: 'EU Battery Regulation',
+      detail: 'The target\'s electric-vehicle and industrial batteries carry lifecycle duties that cover carbon footprint, recycled content, labelling and supply-chain due diligence for the raw materials inside them. Meeting them depends on data from cell and material suppliers several tiers up the chain.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'The regulation attaches to batteries placed on the EU market, including batteries inside vehicles. A manufacturer elsewhere is reached through what it sells there.', unresolved: 'whether the target’s batteries or battery-powered vehicles reach the EU market', consequence: 'EV and industrial batteries need a digital battery passport from 18 February 2027 and a carbon footprint declaration as the delegated acts apply. Economic operators with net turnover above EUR 40 million must run raw-material due diligence from 18 August 2027 (Regulation (EU) 2023/1542, as amended by Regulation (EU) 2025/1561).' } },
+    // NEW. https://eur-lex.europa.eu/eli/reg/2024/1252/oj. VERIFIED 2026-09-29: "at least every three
+    // years". Check, NOT PRINTED: the article number (Art. 24 in the first draft), the date of the first
+    // assessment, and the large-company definition.
+    { risk: 'Critical minerals supply risk', severity: 'high', framework: 'EU CRMA / CS3D',
+      detail: 'The target\'s batteries, electric motors and electronics depend on critical minerals from concentrated and sometimes conflict-affected sources. That carries both supply-continuity risk and human-rights exposure in extraction and refining. Buyers and customers increasingly expect mapped supply chains and supply-risk assessments.',
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU size and activity tests.', nexus: 'The Critical Raw Materials Act’s supply-risk duties fall on large companies making strategic technologies such as batteries and electric motors in the EU. CS3D reaches companies above its own size thresholds. Presence alone settles neither.', unresolved: 'whether the target meets the CRMA large-company test or the CS3D thresholds', consequence: `Large EU manufacturers of strategic technologies must carry out a risk assessment of their supply chain for the strategic raw materials they use at least every three years (Regulation (EU) 2024/1252). CS3D due diligence applies to in-scope companies from ${CS3D_APPLIES_FROM} (${CS3D_CITATION}).` } },
+    // NEW, SPLIT 29 Sep 2026: (a) the universal use-phase finding, unconditioned; (b) the EU standards,
+    // conditioned. CRITICAL with the manufacturer wording on both: the template cannot tell a carmaker
+    // from a component supplier, who would read HIGH.
+    { risk: 'Use-phase emissions', severity: 'critical', framework: 'SB 253 / CSRD',
+      detail: 'For a vehicle manufacturer, emissions from the use of the vehicles it sells (Scope 3 Cat.11) typically far exceed its own operations. The powertrain mix therefore drives both the target\'s reported footprint and its exposure to vehicle emission rules in the markets it sells into.' },
+    // https://eur-lex.europa.eu/eli/reg/2019/631/oj. VERIFIED 2026-09-29. TIME-SENSITIVE: "is pending"
+    // must be rechecked; adoption of the December 2025 proposal (90%) makes the 100% sentence wrong. US
+    // EPA vehicle standards left out on purpose.
+    { risk: 'EU vehicle CO2 standards', severity: 'critical', framework: 'EU vehicle CO2 standards', lastVerified: '2026-09-29',
+      detail: 'Fleet-average CO2 targets price every gram above target across the new vehicles a manufacturer registers, so its powertrain mix sets the penalty.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'The standards apply to manufacturers registering new cars and vans in the EU, wherever the manufacturer is established.', unresolved: 'whether the target’s vehicles are registered in the EU', consequence: 'New cars and vans registered in the EU are subject to fleet-wide CO2 targets, with excess-emissions premiums for manufacturers above target. Compliance for 2025 to 2027 is assessed on the three-year average (Regulation (EU) 2025/1214). The targets tighten to a 100% reduction for new cars from 2035 (Regulation (EU) 2019/631 as amended by (EU) 2023/851). A Commission proposal of December 2025 to lower the 2035 target to 90% is pending.' } },
+  ],
+  'Retail & E-commerce': [
+    // Reworded from Consumer & Retail 'Scope 3 Cat.1 supplier emissions'. The 70-90% figure is left out:
+    // its source for retailers is not established.
+    { risk: 'Scope 3 Cat.1 purchased goods emissions', severity: 'high', framework: 'SB 253 / CSRD', detail: 'Most of the target\'s footprint typically sits in the goods it buys for resale (Scope 3 Cat.1), with delivery and returns logistics (Cat.4 and Cat.9) adding to it. Measuring it depends on supplier data across a large and changing product range, and a supplier engagement programme is usually needed.' },
+    // Adapted from Consumer & Retail 'Labour rights in supply chain'; conditional as there. Check, not
+    // printed: the EU Forced Labour Regulation (EU) 2024/3015, a candidate template of its own.
+    { risk: 'Labour rights in supply chain', severity: 'high', framework: 'CS3D / Modern Slavery',
+      detail: 'The target\'s private-label and third-party products carry forced labour and child labour risk in sourcing countries, and marketplace models reduce visibility of who made the goods. Retailers are increasingly expected to trace high-risk categories such as apparel, electronics and seasonal goods to origin.',
+      conditional: { reach: 'scope', establishedIn: ['UK', 'Australia'], label: 'Conditioned on UK or Australian turnover.', nexus: 'The UK and Australian Modern Slavery Acts attach to carrying on business in those markets above a turnover threshold, wherever the company is incorporated.', unresolved: 'whether the target carries on business there above the threshold' } },
+    // NEW. https://eur-lex.europa.eu/eli/reg/2025/40/oj; UK: Producer Responsibility Obligations
+    // (Packaging and Packaging Waste) Regulations 2024, legislation.gov.uk. VERIFIED 2026-09-29.
+    { risk: 'Packaging and packaging waste', severity: 'medium', framework: 'PPWR / UK pEPR',
+      detail: 'The target places large volumes of primary and transit packaging on the market, including e-commerce shipping packaging. Rules on recyclability, recycled content, empty space and producer fees are turning packaging into a recurring cost and a redesign task.',
+      conditional: { reach: 'market', establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK market access.', nexus: 'Both regimes attach to packaging placed on the market there, including by distance sellers established elsewhere.', unresolved: 'whether the target places packaged goods on the EU or UK market', consequence: 'The EU Packaging and Packaging Waste Regulation applies from 12 August 2026, banning double walls, false bottoms and unnecessary layers (Art. 10(2)). From 1 January 2030 grouped, transport and e-commerce packaging is capped at a 50% empty-space ratio (Art. 24), and recycled-content minimums apply to plastic packaging (Regulation (EU) 2025/40). UK packaging extended producer responsibility fees apply to obligated producers from 2025.' } },
+  ],
+  'Hospitality, Leisure & Travel': [
+    // NEW. Check, not printed: the EU F-gas Regulation (EU) 2024/573 equipment bans.
+    { risk: 'Building energy and refrigerant emissions', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'The target\'s hotels, venues and kitchens run around the clock on heating, cooling and hot water, making Scope 1 and 2 building energy the core of its own footprint. Refrigerant leakage from cooling and kitchen equipment is often unmeasured and can be material because of the gases\' high warming effect.' },
+    // NEW.
+    { risk: 'Physical climate risk to destinations and assets', severity: 'high', framework: 'Investor expectation (IFRS S2 / TCFD)', detail: 'The target\'s properties and destinations face physical climate risk from flooding, storms, wildfire, heat and water stress. Demand risk comes on top of asset damage: shorter snow seasons or summer heat can move revenue away from a location for good. This requires an asset-level climate risk assessment that includes revenue seasonality.' },
+    // NEW. Conditional as Consumer & Retail 'Labour rights in supply chain'.
+    { risk: 'Labour rights in outsourced and seasonal workforce', severity: 'high', framework: 'Modern Slavery / CS3D',
+      detail: 'The target relies on agency, outsourced and seasonal workers in housekeeping, catering, security and construction, where recruitment fees, withheld documents and excessive hours are known risks. Visibility is low where services are subcontracted.',
+      conditional: { reach: 'scope', establishedIn: ['UK', 'Australia'], label: 'Conditioned on UK or Australian turnover.', nexus: 'The UK and Australian Modern Slavery Acts attach to carrying on business in those markets above a turnover threshold, wherever the company is incorporated.', unresolved: 'whether the target carries on business there above the threshold' } },
+  ],
+  'Telecommunications & Media': [
+    // Adapted from Technology 'Data centre energy intensity'. SPLIT 29 Sep 2026: (a) the universal Scope 2
+    // finding, unconditioned; (b) the EU reporting duty, conditioned.
+    { risk: 'Network and data centre energy intensity', severity: 'medium', framework: 'SB 253 / CSRD', detail: 'The target\'s mobile and fixed networks and its data centres run continuously, giving it significant Scope 2 exposure that grows with traffic. Renewable power purchase agreements and energy-efficiency programmes need assessment site by site.' },
+    // https://eur-lex.europa.eu/eli/dir/2023/1791/oj. VERIFIED 2026-09-29: Art. 12, 500 kW, Delegated
+    // Regulation (EU) 2024/1364, annual reports by 15 May.
+    { risk: 'EED data centre reporting', severity: 'medium', framework: 'EED data centres',
+      detail: 'Large data centres carry annual energy and water performance reporting, which needs metered IT load, cooling and water data site by site.',
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU data centres of 500 kW and above.', nexus: 'The reporting duty attaches to data centres located in the EU above an IT power threshold, not to the operator’s home state.', unresolved: 'whether the target operates EU data centres of 500 kW and above', consequence: 'Operators of EU data centres with an installed IT power demand of at least 500 kW must report energy and water performance to a European database each year by 15 May (Directive (EU) 2023/1791, Art. 12; Delegated Regulation (EU) 2024/1364).' } },
+    // Adapted from Technology 'AI governance exposure'; conditional as there. Check, not printed: the
+    // Art. 50 transparency duty and its date after the 2026 amendment.
+    { risk: 'AI governance exposure', severity: 'medium', framework: 'EU AI Act',
+      detail: 'The target\'s recommender systems, content moderation, customer-service automation and generated content may include AI systems that carry transparency and risk-management duties. Media businesses also face labelling expectations for AI-generated or manipulated content.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU market access.', nexus: 'The AI Act reaches providers and deployers placing a system on the EU market, and systems whose output is used in the EU, wherever the company is established.', unresolved: 'EU availability of the target’s systems', consequence: `Conformity assessment applies from ${AI_ACT_HIGH_RISK_STANDALONE} for stand-alone systems, and from ${AI_ACT_HIGH_RISK_EMBEDDED} where the AI is built into a product already covered by EU product-safety law (${AI_ACT_CITATION}).` } },
+    // Adapted from Technology 'Supply chain minerals risk'; conditional as there. The CS3D sentence is
+    // self-limiting ("in-scope companies"), as in the source.
+    { risk: 'Supply chain minerals risk', severity: 'high', framework: 'CS3D / ESRS S2',
+      detail: `The target's network equipment, handsets and set-top devices rely on tin, tantalum, tungsten, gold and cobalt from conflict-affected and high-risk sources. Where the target buys equipment rather than making it, the risk sits with its vendors and needs contractual due diligence. CS3D due diligence obligations apply to in-scope companies from ${CS3D_APPLIES_FROM} (${CS3D_CITATION}).`,
+      conditional: { reach: 'scope', establishedIn: ['European Union'], label: 'Conditioned on EU reporting scope.', nexus: 'ESRS S2 is a CSRD reporting standard, so it reaches a company through its own or its parent’s CSRD obligation rather than directly.', unresolved: 'whether CSRD reaches the target' } },
+  ],
+  'Insurance': [
+    // Adapted from Financial Services 'Financed emissions (Scope 3 Cat.15)'. PCAF, The Global GHG
+    // Accounting and Reporting Standard, Part C: Insurance-Associated Emissions (2025, second version),
+    // carbonaccountingfinancials.com/standard. VERIFIED 2026-09-29. The 95%+ figure is left out: it is a
+    // banking figure.
+    { risk: 'Insurance-associated and investment emissions', severity: 'critical', framework: 'Investor expectation (PCAF) / CSRD', detail: 'The target\'s footprint typically sits in its investment portfolio and in the emissions of the businesses and assets it insures, not in its own operations. Both are measured with the PCAF methods for financed and insurance-associated emissions, and the underwriting data those methods need is often incomplete.' },
+    // NEW. https://eur-lex.europa.eu/eli/dir/2009/138/oj; PRA SS5/25, bankofengland.co.uk. VERIFIED
+    // 2026-09-29. Check, not printed: the exact SS5/25 URL.
+    { risk: 'Underwriting and catastrophe exposure to physical climate risk', severity: 'critical', framework: 'Solvency II / Investor expectation (IFRS S2 / TCFD)',
+      detail: 'The target\'s property and casualty book is exposed to rising frequency and severity of floods, storms, wildfire and heat. That drives claims, reinsurance cost and capital requirements. Catastrophe models built on historical losses may understate current risk, and some regions are becoming hard to insure at viable prices. This requires climate scenario analysis of the underwriting book as well as the investments.',
+      conditional: { reach: 'scope', establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK insurance supervision.', nexus: 'The prudential climate expectations bind insurers authorised and supervised in the EU or UK. An insurer supervised elsewhere carries the same book risk under its own regulator.', unresolved: 'whether the target is an insurer supervised in the EU or UK', consequence: 'From January 2027, EU insurers must assess sustainability risks, including climate change scenarios, in their own risk and solvency assessment (Directive 2009/138/EC as amended by Directive (EU) 2025/2). UK insurers are subject to the PRA\'s Supervisory Statement SS5/25 on managing climate-related risks, which replaced SS3/19 on 3 December 2025.' } },
+  ],
+  'Waste, Water & Environmental Services': [
+    // NEW, SPLIT 29 Sep 2026: (a) the universal methane finding, unconditioned; (b) the EU directive's
+    // obligations, conditioned. US landfill methane rules (40 CFR Part 60 subparts XXX and Cf) left out on
+    // purpose.
+    { risk: 'Landfill methane', severity: 'critical', framework: 'SB 253 / CSRD',
+      detail: 'The target\'s landfills generate methane from decomposing organic waste for decades after the waste is placed, making it the largest Scope 1 source for most waste operators. Reported figures rest on modelled gas generation and assumed capture rates. Closed sites keep emitting and keep their aftercare liabilities.' },
+    // https://eur-lex.europa.eu/eli/dir/1999/31/oj. VERIFIED 2026-09-29: 10% by 2035; amending Directive
+    // (EU) 2018/850.
+    { risk: 'EU Landfill Directive obligations', severity: 'high', framework: 'EU Landfill Directive',
+      detail: 'Landfill operators carry gas-collection and aftercare obligations that run for decades after a site closes, while caps on landfilled waste shrink the volumes a site can take.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU landfill operations.', nexus: 'The directive attaches to landfills located in the EU.', unresolved: 'whether the target operates EU landfills', consequence: 'EU landfills must collect and treat landfill gas, meet aftercare obligations, and operate within a cap limiting municipal waste landfilled to 10% by 2035 (Council Directive 1999/31/EC as amended by Directive (EU) 2018/850).' } },
+    // NEW, and DATED. The ONLY route by which this sector reaches the ETS: it is NOT in ETS_SECTORS
+    // (decision of 29 Sep 2026). https://eur-lex.europa.eu/eli/dir/2003/87/oj; COM(2026) 616, 17 July
+    // 2026; DESNZ, 26 August 2026. VERIFIED 2026-09-29. TIME-SENSITIVE: "not yet adopted" and "no new
+    // date" must be rechecked.
+    { risk: 'ETS coverage of waste incineration', severity: 'high', framework: 'EU ETS / UK ETS', lastVerified: '2026-09-29',
+      detail: 'The target\'s energy-from-waste and incineration plants emit CO2 from the fossil content of the waste they burn, chiefly plastics. Municipal waste incineration is already monitored and reported for carbon pricing, and inclusion in emissions trading is under review. Its fossil CO2 therefore needs measuring now, before it is priced.',
+      conditional: { reach: 'market', establishedIn: ['European Union', 'UK'], label: 'Conditioned on EU or UK incineration operations.', nexus: 'Both schemes attach to installations located in their territory, whoever owns them.', unresolved: 'whether the target operates incineration plants in the EU or UK', consequence: 'Municipal waste incinerators above 20 MW have monitored and reported their emissions since 1 January 2024. On 17 July 2026 the Commission proposed bringing non-hazardous waste incineration into the EU ETS from 2031, phased in from 25% of verified emissions in 2031 to 100% from 2034, for installations above 3 tonnes per hour, with a possible national opt-out to 2035. Member States seeking the opt-out must show by 31 July 2029 that they qualify. The proposal (COM(2026) 616) is not yet adopted. The UK had planned to bring energy from waste into the UK ETS from 2028; on 26 August 2026 the government postponed this with no new date. Voluntary monitoring and reporting runs from 2026.' } },
+    // NEW, SPLIT 29 Sep 2026: (a) the universal process-emissions finding, unconditioned; (b) the EU
+    // directive's obligations, conditioned.
+    { risk: 'Wastewater process emissions', severity: 'medium', framework: 'SB 253 / CSRD',
+      detail: 'The target\'s wastewater treatment processes emit methane and N2O, which are often estimated from default factors rather than measured. Reported figures can move materially once they are monitored.' },
+    // https://eur-lex.europa.eu/eli/dir/2024/3019/oj. VERIFIED 2026-09-29. Check, not printed: the
+    // transposition deadline.
+    { risk: 'EU wastewater treatment obligations', severity: 'high', framework: 'UWWTD',
+      detail: 'The target\'s wastewater treatment plants face tighter discharge standards, removal of micropollutants and energy-efficiency targets, which drive large capital programmes.',
+      conditional: { reach: 'market', establishedIn: ['European Union'], label: 'Conditioned on EU treatment operations.', nexus: 'The directive attaches to agglomerations and plants located in the EU.', unresolved: 'whether the target operates EU wastewater treatment', consequence: 'The recast Urban Wastewater Treatment Directive requires treatment plants of 10,000 population equivalent and above to reach energy neutrality by 2045, and plants of 150,000 population equivalent and above to remove micropollutants by 2045. Producers of medicines and cosmetics must fund at least 80% of that quaternary treatment (Directive (EU) 2024/3019).' } },
   ],
 }
 

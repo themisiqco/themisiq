@@ -300,13 +300,32 @@ describe('the share page leaves market expectations out of a stored frameworks l
   })
 })
 
-describe('risk findings name IFRS S2 / TCFD as an investor expectation', () => {
+describe('risk findings name IFRS S2 / TCFD / PCAF as an investor expectation', () => {
   const LABEL = 'Investor expectation (IFRS S2 / TCFD)'
-  it('the four templates carry the label, and no template names IFRS S2 or TCFD bare', () => {
-    const all = Object.values(SECTOR_RISKS).flat()
-    expect(all.filter(r => r.framework === LABEL).map(r => r.risk).sort()).toEqual(
-      ['Infrastructure physical risk', 'Physical climate risk exposure', 'Physical flood and heat risk', 'Stranded asset risk'])
-    for (const r of all) expect(r.framework, r.risk).not.toMatch(/^(IFRS S2|TCFD)( \/ (IFRS S2|TCFD))?$/)
+  it('the templates carry the label, and no template names IFRS S2 or TCFD bare', () => {
+    const labelled = Object.entries(SECTOR_RISKS).flatMap(([sector, rs]) => rs.filter(r => r.framework === LABEL).map(r => `${sector}: ${r.risk}`))
+    expect(labelled.sort()).toEqual([
+      // The four from before 29 Sep 2026.
+      'Energy & Utilities: Physical climate risk exposure', 'Energy & Utilities: Stranded asset risk',
+      'Real Estate: Physical flood and heat risk', 'Transport & Logistics: Infrastructure physical risk',
+      // Stage 3b.
+      'Hospitality, Leisure & Travel: Physical climate risk to destinations and assets',
+      'Oil & Gas: Physical climate risk exposure', 'Oil & Gas: Stranded asset risk',
+      'Power & Utilities (incl. renewables): Physical climate risk to generation and network assets',
+      'Power & Utilities (incl. renewables): Transition asset risk across generation, renewables and networks',
+    ].sort())
+    for (const r of Object.values(SECTOR_RISKS).flat()) expect(r.framework, r.risk).not.toMatch(/^(IFRS S2|TCFD)( \/ (IFRS S2|TCFD))?$/)
+  })
+
+  // PCAF joined the rule on 29 Sep 2026: it is in MARKET_FRAMEWORKS beside IFRS S2 and TCFD. The legacy
+  // Financial Services 'Financed emissions' template was relabelled from 'PCAF / CSRD' the same day.
+  it('the PCAF findings carry "Investor expectation (PCAF)", and nothing names PCAF bare', () => {
+    const pcaf = Object.entries(SECTOR_RISKS).flatMap(([sector, rs]) => rs.filter(r => r.framework.includes('PCAF')).map(r => `${sector}: ${r.risk}: ${r.framework}`))
+    expect(pcaf.sort()).toEqual([
+      'Financial Services: Financed emissions (Scope 3 Cat.15): Investor expectation (PCAF) / CSRD',
+      'Insurance: Insurance-associated and investment emissions: Investor expectation (PCAF) / CSRD',
+    ])
+    expect(makeMapFramework([], undefined)('Investor expectation (PCAF) / CSRD').map(t => t.text)[0]).toBe('Investor expectation (PCAF)')
   })
 
   it('the loan-book finding pairs the ECB with TCFD as an investor expectation', () => {
@@ -314,10 +333,10 @@ describe('risk findings name IFRS S2 / TCFD as an investor expectation', () => {
     expect(loanBook.framework).toBe('ECB / Investor expectation (TCFD)')
     // Two tokens: the ECB, and the expectation, each printed whole.
     expect(makeMapFramework([], undefined)(loanBook.framework).map(t => t.text)).toEqual(['ECB', 'Investor expectation (TCFD)'])
-    // And no template names TCFD or IFRS S2 outside an investor-expectation label.
+    // And no template names TCFD, IFRS S2 or PCAF outside an investor-expectation label.
     for (const r of Object.values(SECTOR_RISKS).flat())
       for (const tok of r.framework.split(/ \/ (?![^()]*\))/))
-        expect(tok, r.risk).not.toMatch(/^(IFRS S2|TCFD)$/)
+        expect(tok, r.risk).not.toMatch(/^(IFRS S2|TCFD|PCAF)$/)
   })
 
   it('the label prints whole: the bracketed " / " is not a token separator', () => {
@@ -334,6 +353,9 @@ describe('no identifier reaches customer-facing copy', () => {
     typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(copyOf)
       : v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => (KEY_FIELDS.has(k) ? [] : copyOf(x))) : []
   const LEAKS = /\b[A-Z][A-Z0-9]+_[A-Z0-9_]+\b|\b[a-z]+[A-Z][A-Za-z]+\b|\$\{|\bundefined\b|\bNaN\b|\bnull\b|\[object/
+  // Real words the camelCase arm matches, each named. 'pEPR' is the UK government's own short form for
+  // packaging extended producer responsibility, printed in the reviewed label 'PPWR / UK pEPR'.
+  const NOT_IDENTIFIERS = /\bpEPR\b/g
 
   it('across jurisdictions, sectors, sizes and claims answers (URLs excepted)', () => {
     const found = new Set<string>()
@@ -344,7 +366,7 @@ describe('no identifier reaches customer-facing copy', () => {
             const m = build({ ...FX_DEAL, jurisdiction, sector, ...claims,
               employee_count: sized ? 3000 : null, total_assets: sized ? 1e9 : null, listed_ca_exchange: sized ? true : null })
             for (const s of copyOf(m)) {
-              const text = s.replace(/https?:\/\/\S+/g, '')
+              const text = s.replace(/https?:\/\/\S+/g, '').replace(NOT_IDENTIFIERS, '')
               const hit = text.match(LEAKS)
               if (hit) found.add(`${hit[0]} in "${text.slice(0, 80)}"`)
             }

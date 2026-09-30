@@ -21,6 +21,14 @@ import { CS3D_APPLIES_FROM, CS3D_CITATION } from '../cs3d'
 const JURISDICTIONS = ['USA', 'European Union', 'UK', 'Canada', 'Australia', 'Global', 'Other']
 
 const ALL = Object.entries(SECTOR_RISKS).flatMap(([sector, rs]) => rs.map(r => ({ sector, ...r })))
+// The twelve keys that existed before 29 Sep 2026. Section 3 (reassembly) compares each of their
+// findings with the paragraph that shipped before the conditioning split, so it runs over these only:
+// the Stage 3b templates had no earlier paragraph, and four of them reuse an old title in a new sector
+// ('Stranded asset risk' under Oil & Gas), which a lookup by title alone would confuse.
+const ORIGINAL_SECTORS = ['Energy & Utilities', 'Financial Services', 'Real Estate', 'Technology', 'Healthcare & Pharma',
+  'Industrials & Manufacturing', 'Consumer & Retail', 'Agriculture & Food', 'Transport & Logistics', 'Mining & Metals',
+  'Construction & Materials', 'Professional Services']
+const ORIGINAL = ALL.filter(f => ORIGINAL_SECTORS.includes(f.sector))
 const find = (sector: string, jurisdiction: string | null, risk: string) => {
   const hit = sectorRisks(sector, jurisdiction).find(r => r.risk === risk)
   if (!hit) throw new Error(`sectorRisks dropped "${risk}" for ${sector} / ${jurisdiction}`)
@@ -28,9 +36,12 @@ const find = (sector: string, jurisdiction: string | null, risk: string) => {
 }
 
 describe('SECTOR_RISKS — the template itself', () => {
-  it('has 35 findings across 12 sectors', () => {
-    expect(ALL).toHaveLength(35)
-    expect(Object.keys(SECTOR_RISKS)).toHaveLength(12)
+  it('has the original 35 findings across 12 sectors plus one split out of them, and 31 across the 9 Stage 3b sectors', () => {
+    expect(ORIGINAL).toHaveLength(36)
+    expect(ORIGINAL.filter(f => !Object.keys(SPLIT_OUT).includes(f.risk))).toHaveLength(35)
+    expect(new Set(ORIGINAL.map(f => f.sector)).size).toBe(12)
+    expect(ALL).toHaveLength(67)
+    expect(Object.keys(SECTOR_RISKS)).toHaveLength(21)
   })
 
   // establishedIn is compared against the deal's stored jurisdiction with ===, so a value the form
@@ -223,6 +234,15 @@ const PREVIOUS_DETAIL: Record<string, string> = {
 // than conditioned. Excluded by name so the exclusion is visible rather than a missing key.
 const REWRITTEN_ON_PURPOSE = ['Conflict minerals and HRDD']
 
+// SPLIT ON PURPOSE (29 Sep 2026, Stage 3b follow-up). 'Fleet decarbonisation liability' was conditioned
+// WHOLE on EU routes, so a fleet operating elsewhere lost its Scope 1 finding from every severity count.
+// It is now the universal finding, unconditioned, plus the EU-route finding named here, which carries the
+// old conditional and consequence. Checked below: the two together still hold the paragraph that
+// shipped before. No production deal carried Transport & Logistics on that date.
+const SPLIT_OUT: Record<string, string> = {
+  'EU route fuel and carbon costs': 'Fleet decarbonisation liability',
+}
+
 // WHERE A CLEAN SPLIT WAS NOT POSSIBLE. In these ten the instrument was the SUBJECT of the mechanism
 // sentence — "EU Carbon Border Adjustment Mechanism covers iron and steel…", "…fall under the EU
 // Deforestation Regulation" — so the assertion could not be lifted off the end; the sentence had to
@@ -256,19 +276,19 @@ const references = (s: string): string[] => [
 
 describe('reassembly — an in-nexus reader sees the paragraph that shipped before', () => {
   it('covers every finding except the one deliberately rewritten', () => {
-    const covered = Object.keys(PREVIOUS_DETAIL).length + REWRITTEN_ON_PURPOSE.length
-    expect(covered).toBe(ALL.length)
+    const covered = Object.keys(PREVIOUS_DETAIL).length + REWRITTEN_ON_PURPOSE.length + Object.keys(SPLIT_OUT).length
+    expect(covered).toBe(ORIGINAL.length)
   })
 
   it('every REWRITTEN_MECHANISM entry names a real finding that has a conditional', () => {
     for (const risk of Object.keys(REWRITTEN_MECHANISM)) {
-      const f = ALL.find(f => f.risk === risk)
+      const f = ORIGINAL.find(f => f.risk === risk)
       expect(f, `REWRITTEN_MECHANISM names "${risk}", which is not a finding`).toBeDefined()
       expect(f!.conditional, `"${risk}" was rewritten but carries no conditional`).toBeDefined()
     }
   })
 
-  for (const f of ALL.filter(f => !REWRITTEN_ON_PURPOSE.includes(f.risk))) {
+  for (const f of ORIGINAL.filter(f => !REWRITTEN_ON_PURPOSE.includes(f.risk) && !SPLIT_OUT[f.risk] && !Object.values(SPLIT_OUT).includes(f.risk))) {
     it(`${f.sector} — ${f.risk}`, () => {
       const before = PREVIOUS_DETAIL[f.risk]
       expect(before, `no pre-change detail recorded for "${f.risk}"`).toBeDefined()
@@ -290,6 +310,22 @@ describe('reassembly — an in-nexus reader sees the paragraph that shipped befo
       expect(find(f.sector, jurisdiction, f.risk).detail).toBe(reassembled)
     })
   }
+
+  it('a split finding: the universal half keeps its mechanism unconditioned, the EU half keeps the old conditional and consequence', () => {
+    for (const [euRisk, universalRisk] of Object.entries(SPLIT_OUT)) {
+      const universal = ORIGINAL.find(f => f.risk === universalRisk)!
+      const eu = ORIGINAL.find(f => f.risk === euRisk)!
+      expect(universal.sector).toBe(eu.sector)
+      expect(universal.conditional).toBeUndefined()
+      expect(eu.conditional).toBeDefined()
+      // The paragraph an EU reader saw before is still all there, across the two findings.
+      expect(`${universal.detail} ${eu.conditional!.consequence}`).toBe(PREVIOUS_DETAIL[universalRisk])
+      // The universal half is established everywhere; the EU half only where its nexus is.
+      for (const j of JURISDICTIONS) expect(find(universal.sector, j, universalRisk).scope).toBe('established')
+      expect(find(eu.sector, 'USA', euRisk).scope).toBe('conditional')
+      expect(find(eu.sector, 'European Union', euRisk).scope).toBe('established')
+    }
+  })
 
   it('the rewritten finding no longer states voluntary guidance as an obligation', () => {
     const f = ALL.find(f => f.risk === 'Conflict minerals and HRDD')!

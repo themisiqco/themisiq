@@ -3,7 +3,8 @@
 //
 // DATA ONLY. No engine import, so the wizard, the engine and the export can all read it. The risk
 // templates themselves stay in lib/deals/assessment.ts (SECTOR_RISKS, keyed by the ORIGINAL sector
-// names); SECTOR_TEMPLATE_SOURCE below says which of them each sector uses.
+// names and, since Stage 3b, by the new names that have templates of their own);
+// SECTOR_TEMPLATE_SOURCE below says which of them each sector uses.
 //
 // ⚠️ EVERY VALUE STORED BEFORE 29 SEP 2026 MUST PRINT EXACTLY WHAT IT PRINTED BEFORE. Stored values are
 // not rewritten (LEGACY_SECTORS, decision of 29 Sep 2026), so a deal saved as 'Technology' or
@@ -68,42 +69,39 @@ export const normalizeSector = (v: unknown): string | null =>
 
 // ── Which templates each sector uses ─────────────────────────────────────────────────────────────
 //
-// `from` is a SECTOR_RISKS key (an original sector name); `risks`, where given, keeps only those
-// templates. Wired ONLY where a template applies UNCHANGED. A sector whose templates need adapting or
-// writing has none yet (null) and prints the "no template" sentence until they are researched.
-// A legacy value is not listed here: it keeps its own whole template set (see sectorTemplates).
+// `from` is a SECTOR_RISKS key; `risks`, where given, keeps only those templates. A sector with
+// templates written for it (Stage 3b, 29 Sep 2026) points at its own key. A sector whose old
+// templates apply UNCHANGED points at the old key. A legacy value is not listed here: it keeps its own
+// whole template set (see sectorTemplates), so 'Energy & Utilities' still prints the old Energy set
+// while Oil & Gas and Power & Utilities print their reworded ones.
 export const SECTOR_TEMPLATE_SOURCE: Readonly<Record<Sector, { from: string; risks?: readonly string[] } | null>> = {
-  'Oil & Gas': { from: 'Energy & Utilities' },                            // a methane template to follow
-  'Power & Utilities (incl. renewables)': {
-    from: 'Energy & Utilities',
-    // Stranded fossil assets is the one to adapt for renewables and networks, so it waits.
-    risks: ['High Scope 1 emissions exposure', 'Physical climate risk exposure'],
-  },
+  'Oil & Gas': { from: 'Oil & Gas' },
+  'Power & Utilities (incl. renewables)': { from: 'Power & Utilities (incl. renewables)' },
   'Mining & Metals': { from: 'Mining & Metals' },
-  'Chemicals': null,                                                      // adapted from Industrials
+  'Chemicals': { from: 'Chemicals' },
   'Construction & Materials': { from: 'Construction & Materials' },
   'Industrials & Manufacturing': { from: 'Industrials & Manufacturing' },
-  'Automotive & Transport Equipment': null,                               // new and adapted
+  'Automotive & Transport Equipment': { from: 'Automotive & Transport Equipment' },
   'Transport & Logistics': { from: 'Transport & Logistics' },
   'Agriculture, Food & Beverage': { from: 'Agriculture & Food' },
   'Consumer Goods & Apparel': { from: 'Consumer & Retail' },
-  'Retail & E-commerce': null,                                            // adapted from Consumer & Retail
-  'Hospitality, Leisure & Travel': null,                                  // new
+  'Retail & E-commerce': { from: 'Retail & E-commerce' },
+  'Hospitality, Leisure & Travel': { from: 'Hospitality, Leisure & Travel' },
   'Healthcare & Pharma': { from: 'Healthcare & Pharma' },
   'Technology & Software': { from: 'Technology' },
-  'Telecommunications & Media': null,                                     // adapted from Technology
+  'Telecommunications & Media': { from: 'Telecommunications & Media' },
   'Banking & Lending': {
     from: 'Financial Services',
     risks: ['Financed emissions (Scope 3 Cat.15)', 'Physical risk in loan book'],
   },
-  'Insurance': null,                                                      // adapted and new
+  'Insurance': { from: 'Insurance' },
   'Asset Management & Private Capital': {
     from: 'Financial Services',
     risks: ['Financed emissions (Scope 3 Cat.15)', 'SFDR portfolio alignment'],
   },
   'Real Estate': { from: 'Real Estate' },
   'Professional & Business Services': { from: 'Professional Services' },
-  'Waste, Water & Environmental Services': null,                          // new
+  'Waste, Water & Environmental Services': { from: 'Waste, Water & Environmental Services' },
   'Other (describe)': null,
 }
 
@@ -111,31 +109,32 @@ export const SECTOR_TEMPLATE_SOURCE: Readonly<Record<Sector, { from: string; ris
 //
 // ONE FLAG PER SECTOR (29 Sep 2026). A sector is offered only once it has at least one template, so a
 // user is never steered to a sector that would print "no template" where a close neighbour has
-// findings (a chemicals company picks Industrials & Manufacturing until Chemicals has its own).
-// Hidden sectors stay in SECTORS: stored values, rules and the share gate still know them. "Other
-// (describe)" is always offered. lib/deals/sectors.test.ts fails if a ready sector has no template.
+// findings. Since Stage 3b every sector has templates and all are offered; the flag stays so a sector
+// added later can be listed before its templates exist. A hidden sector stays in SECTORS: stored
+// values, rules and the share gate still know it. "Other (describe)" is always offered.
+// lib/deals/sectors.test.ts fails if a ready sector has no template.
 export const SECTOR_READY: Readonly<Record<Sector, boolean>> = {
   'Oil & Gas': true,
   'Power & Utilities (incl. renewables)': true,
   'Mining & Metals': true,
-  'Chemicals': false,
+  'Chemicals': true,
   'Construction & Materials': true,
   'Industrials & Manufacturing': true,
-  'Automotive & Transport Equipment': false,
+  'Automotive & Transport Equipment': true,
   'Transport & Logistics': true,
   'Agriculture, Food & Beverage': true,
   'Consumer Goods & Apparel': true,
-  'Retail & E-commerce': false,
-  'Hospitality, Leisure & Travel': false,
+  'Retail & E-commerce': true,
+  'Hospitality, Leisure & Travel': true,
   'Healthcare & Pharma': true,
   'Technology & Software': true,
-  'Telecommunications & Media': false,
+  'Telecommunications & Media': true,
   'Banking & Lending': true,
-  'Insurance': false,
+  'Insurance': true,
   'Asset Management & Private Capital': true,
   'Real Estate': true,
   'Professional & Business Services': true,
-  'Waste, Water & Environmental Services': false,
+  'Waste, Water & Environmental Services': true,
   'Other (describe)': true,
 }
 /** The sectors the wizard's dropdown offers, in SECTORS order. */

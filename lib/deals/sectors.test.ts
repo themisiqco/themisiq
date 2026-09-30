@@ -15,7 +15,9 @@ import { FX_DEAL, FIXTURE_GENERATED_AT } from './reportModel.fixtures'
 // change to the new sets which reaches an old value fails here rather than in a customer's report.
 // (Before this change, the report model and the cost figures for all 12 old values, 'Other', '' and
 // NULL, across five deal shapes, were recorded and compared after it: all 150 identical. Re-run after
-// Construction & Materials joined the heavy and ETS sets: its 10 entries differ, the other 140 do not.)
+// Construction & Materials joined the heavy and ETS sets: its 10 entries differ, the other 140 do not.
+// Re-run again for Stage 3b over all 34 values: the legacy values' only change is the Financial Services
+// 'Financed emissions' label, below; Energy & Utilities and the other ten are identical.)
 
 const OLD_VALUES = ['Energy & Utilities', 'Financial Services', 'Real Estate', 'Technology', 'Healthcare & Pharma',
   'Industrials & Manufacturing', 'Consumer & Retail', 'Agriculture & Food', 'Transport & Logistics', 'Mining & Metals',
@@ -28,6 +30,12 @@ const OLD_FLAG = ['Agriculture & Food']
 // 29 Sep 2026, knowing it changes that value's cost figures and adds the ETS verify row. No production
 // deal carried the value that day. It is the only old value whose rule lists moved.
 const CHANGED_ON_PURPOSE = { heavy: ['Construction & Materials'], ets: ['Construction & Materials'] }
+// THE SECOND ONE (Stage 3b, 29 Sep 2026). The Financial Services 'Financed emissions' label changed from
+// 'PCAF / CSRD' to 'Investor expectation (PCAF) / CSRD': PCAF is a market expectation and is not printed
+// bare. Detail, severity and conditionals are unchanged. No production deal carried Financial Services.
+// THE THIRD ONE (Stage 3b follow-up, 29 Sep 2026). Transport & Logistics 'Fleet decarbonisation liability'
+// was split into the universal Scope 1 finding and 'EU route fuel and carbon costs', which carries the
+// EU-route conditional. No production deal carried Transport & Logistics (sector counts of 29 Sep 2026).
 
 describe('every old stored value is treated exactly as before', () => {
   it.each(OLD_VALUES)('%s: same templates, same rule lists', v => {
@@ -37,6 +45,22 @@ describe('every old stored value is treated exactly as before', () => {
     expect(FINANCIAL_SECTORS.has(v), 'financial').toBe(OLD_FINANCIAL.includes(v))
     expect(FLAG_SECTORS.has(v), 'FLAG').toBe(OLD_FLAG.includes(v))
     for (const [rule, set] of Object.entries(FINANCIAL_RULE_SECTORS)) expect(set.has(v), rule).toBe(OLD_FINANCIAL.includes(v))
+  })
+
+  it('legacy Financial Services: the one label changed on purpose, nothing else in its templates', () => {
+    const [financed, ...rest] = sectorTemplates('Financial Services')
+    expect(financed.framework).toBe('Investor expectation (PCAF) / CSRD')
+    expect(financed.detail).toBe('Financed emissions typically represent 95%+ of a financial institution\'s carbon footprint. PCAF methodology required.')
+    expect(rest.map(r => r.framework)).toEqual(['SFDR / EU Taxonomy', 'ECB / Investor expectation (TCFD)'])
+  })
+
+  it('legacy Transport & Logistics: the fleet finding split on purpose, the other two unchanged', () => {
+    expect(sectorTemplates('Transport & Logistics').map(r => [r.risk, r.severity, r.framework, !!r.conditional])).toEqual([
+      ['Fleet decarbonisation liability', 'high', 'SB 253 / CSRD', false],
+      ['EU route fuel and carbon costs', 'high', 'FuelEU Maritime / EU ETS', true],
+      ['Aviation and shipping ETS exposure', 'high', 'EU ETS', true],
+      ['Infrastructure physical risk', 'medium', 'Investor expectation (IFRS S2 / TCFD)', false],
+    ])
   })
 
   it('legacy Financial Services keeps every financial rule it had, in the EU and the UK', () => {
@@ -76,19 +100,25 @@ describe('the new list', () => {
     }
   })
 
-  it('reuses templates unchanged, and gives none yet where they need adapting or writing', () => {
+  it('reuses old templates unchanged where they apply, and uses its own where they were written (Stage 3b)', () => {
     expect(sectorTemplates('Technology & Software')).toEqual(SECTOR_RISKS['Technology'])
-    expect(sectorTemplates('Oil & Gas')).toEqual(SECTOR_RISKS['Energy & Utilities'])
-    expect(sectorTemplates('Power & Utilities (incl. renewables)').map(r => r.risk)).toEqual(['High Scope 1 emissions exposure', 'Physical climate risk exposure'])
     expect(sectorTemplates('Banking & Lending').map(r => r.risk)).toEqual(['Financed emissions (Scope 3 Cat.15)', 'Physical risk in loan book'])
     expect(sectorTemplates('Asset Management & Private Capital').map(r => r.risk)).toEqual(['Financed emissions (Scope 3 Cat.15)', 'SFDR portfolio alignment'])
-    for (const s of ['Chemicals', 'Automotive & Transport Equipment', 'Retail & E-commerce', 'Hospitality, Leisure & Travel',
-      'Telecommunications & Media', 'Insurance', 'Waste, Water & Environmental Services', 'Other (describe)'])
-      expect(sectorTemplates(s), s).toEqual([])
+    for (const s of ['Oil & Gas', 'Power & Utilities (incl. renewables)', 'Chemicals', 'Automotive & Transport Equipment', 'Retail & E-commerce',
+      'Hospitality, Leisure & Travel', 'Telecommunications & Media', 'Insurance', 'Waste, Water & Environmental Services'])
+      expect(sectorTemplates(s), s).toBe(SECTOR_RISKS[s])
+    expect(sectorTemplates('Other (describe)')).toEqual([])
   })
 
-  it('a sector with no template yet prints the "no template" sentence', () => {
-    const m = buildDealReportModel({ ...FX_DEAL, sector: 'Chemicals' }, FIXTURE_GENERATED_AT)
+  it('Oil & Gas and Power & Utilities no longer print the old Energy wording; legacy Energy & Utilities still does', () => {
+    for (const s of ['Oil & Gas', 'Power & Utilities (incl. renewables)'])
+      for (const r of sectorTemplates(s)) expect(r.detail, `${s}: ${r.risk}`).not.toMatch(/^Energy (companies|infrastructure)|^Fossil fuel assets/)
+    expect(sectorTemplates('Energy & Utilities')).toBe(SECTOR_RISKS['Energy & Utilities'])
+    expect(sectorTemplates('Energy & Utilities')[0].detail).toMatch(/^Energy companies typically carry 60-80%/)
+  })
+
+  it('a sector with no template prints the "no template" sentence', () => {
+    const m = buildDealReportModel({ ...FX_DEAL, sector: 'Other (describe)' }, FIXTURE_GENERATED_AT)
     expect(m.risks.kind).toBe('none')
     expect(m.risks.noneSentence).toBe('No sector-specific ESG risk template is held for this sector.')
   })
@@ -155,13 +185,10 @@ describe('which sectors the wizard offers', () => {
     for (const s of VISIBLE_SECTORS) if (s !== OTHER_SECTOR) expect(sectorTemplates(s).length, s).toBeGreaterThan(0)
   })
 
-  it('hides exactly the sectors with no template yet, keeps them in SECTORS, and always offers Other (describe)', () => {
-    const hidden = SECTORS.filter(s => !SECTOR_READY[s])
-    expect(hidden).toEqual(['Chemicals', 'Automotive & Transport Equipment', 'Retail & E-commerce', 'Hospitality, Leisure & Travel',
-      'Telecommunications & Media', 'Insurance', 'Waste, Water & Environmental Services'])
-    for (const s of hidden) expect(sectorTemplates(s), s).toEqual([])
+  it('offers every sector since Stage 3b, Other (describe) included', () => {
+    expect(SECTORS.filter(s => !SECTOR_READY[s])).toEqual([])
+    expect(VISIBLE_SECTORS).toEqual(SECTORS)
     expect(VISIBLE_SECTORS).toContain(OTHER_SECTOR)
-    expect(VISIBLE_SECTORS).toEqual(SECTORS.filter(s => !hidden.includes(s)))
   })
 
   it('a chemicals target entered as Industrials & Manufacturing gets today\'s Industrials findings', () => {
