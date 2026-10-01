@@ -14,6 +14,7 @@ const BASE = 'https://www.themisiq.co'
 
 const ROUTES = [
   '/',
+  '/about',
   '/advisory',
   '/ai-governance',
   '/assess',

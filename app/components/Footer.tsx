@@ -35,6 +35,7 @@ export default function Footer() {
             { label: 'Frameworks we support', href: '/frameworks' },
           ] },
           { heading: 'Company', links: [
+            { label: 'About Us', href: '/about' },
             { label: 'Pricing', href: '/pricing' },
             { label: 'Refund Policy', href: '/refund-policy' },
             { label: 'Privacy Policy', href: '/privacy' },

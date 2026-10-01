@@ -844,6 +844,47 @@ h3 { font-size: var(--text-xl); }
   background: rgba(4, 24, 48, 0.25);
 }
 
+/* ⚠️ THE ABOUT PAGE'S CLOSING BAND: HEAVIER BELOW 900px, AND ONLY THERE. /about ends on the same photograph,
+   crop and .tq-close-wash, but its band carries a quote and an attribution and no buttons. Below 900px the
+   attribution's line runs the full width of the band and crosses the bright curtains on the right, the same
+   cause as the hero's mobile wash above, so it takes the hero's approach: the same breakpoint, a heavier wash
+   under it, desktop left on the shared 0.25. A modifier, not a change to .tq-close-wash: that class is the
+   homepage's and nine module pages' band, measured above at 0.25, and must not move with this one.
+
+   ⚠️ 0.35 IS THE LEAST THAT CLEARS 5:1 WITH ROOM. On 0.25 the attribution read 4.40:1 at 375px (a fail) and
+   4.52:1 at 414px. Tried below 900px, at 375 / 414px: 0.30 gave 4.82 / 4.96, 0.33 gave 5.02 / 5.17, 0.36 gave
+   5.31 / 5.46. 0.33 reaches 5:1 by 0.02, too thin for a figure that moves with the crop, so 0.35.
+
+   Lowest ratio against --color-on-dark #EAEDEE, copy hidden and the real composited background sampled per
+   pixel over each element's own rect, 1 Oct 2026, the same method as the table above (re-run on the homepage
+   band as a control, it reproduced that table: 12.25 / 9.22 at 375px, 8.31 / 7.14 at 1200px). Thresholds:
+   quote 3.0 as large text (24px and up), attribution 4.5 (14px).
+
+     viewport   wash   quote   attribution
+       375px    0.35    9.03      5.23        0.25: 8.29 / 4.40  ← fail
+       414px    0.35    8.44      5.38        0.25: 7.64 / 4.52
+       600px    0.35    8.36      6.04        0.25: 7.55 / 5.19
+       768px    0.35    9.48      8.86
+       900px    0.35    8.66      8.77
+      1024px    0.25    8.17      8.01        desktop, 0.25 unchanged
+      1100px    0.25    7.96      8.00
+      1200px    0.25    7.14      7.46
+      1280px    0.25    6.44      7.87        quote's lowest
+      1366px    0.25    8.28      7.87
+      1440px    0.25    7.05      7.78
+      1536px    0.25    7.05      7.87
+      1600px    0.25    7.05      7.99
+      1680px    0.25    6.94      7.98
+      1920px    0.25    6.75      5.80
+
+   Fifteen widths from 375 to 1920 were measured and all pass. The tightest is the attribution at 375px,
+   5.23:1, 1.16x over its threshold; the quote's lowest is 6.44:1 at 1280px. From 1024px up the figures are
+   the same as before the modifier, to the hundredth: the band at desktop widths did not change.
+*/
+@media (max-width: 900px) {
+  .tq-close-wash.tq-close-wash-about { background: rgba(4, 24, 48, 0.35); }
+}
+
 /* ================================================================
    DISABLED AND INACTIVE STATE — opacity is not a contrast-preserving device.
 
