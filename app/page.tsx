@@ -369,7 +369,7 @@ const ESSAY = [
   { who: 'Importer selling into Canada', what: 'Your forced labour report is due to Public Safety Canada by May 31, every year.',
     src: '/home/essay-canada.jpg', w: 800, h: 1000, alt: 'Shipping containers painted with the Canadian flag, stacked under a blue sky.',
     links: [{ label: 'Forced Labour Reporting', href: '/forced-labour' }] },
-  { who: 'Business preparing for sale', what: 'Buyers will ask which rules apply and what meeting them will cost.',
+  { who: 'Family office or M&A buyer', what: 'Your investment committee wants to know which reporting rules a target faces and what meeting them will cost.',
     src: '/home/essay-sale.jpg', w: 800, h: 1000, alt: 'Hands marking up printed financial reports and charts on a desk beside a calculator.',
     links: [{ label: 'Deals and Investment', href: '/deals' }] },
   { who: 'Employer with staff in the EU', what: 'Gender pay gap reporting under the Pay Transparency Directive starts in 2027 for employers with 150 or more staff, and reaches those with 100 or more by 2031.',
@@ -411,7 +411,7 @@ const MODULES_HOME = [
     desc: 'Embedded emissions for goods entering the EU, installation by installation.',
     chips: ['EU CBAM', 'CBAM Annex IV'] },
   { name: 'Deals and Investment', key: 'deals', href: '/deals',
-    desc: 'For M&A, family offices and companies getting ready to sell. Which rules apply, from what year, and what they cost to meet. Run it on a target before you buy, or on yourself before you are asked.',
+    desc: 'For family offices, private equity and M&A teams screening acquisition targets. Which sustainability reporting rules a target faces, from what year, and what they cost to meet.',
     chips: ['SB 253', 'SECR', 'Canada S-211', 'CSRD', 'CS3D'] },
   { name: 'AI Governance', key: 'ai', href: '/ai-governance',
     desc: 'Model inventory, risk register and policy management.',
@@ -428,7 +428,7 @@ const MODULES_HOME = [
 ] as const
 
 /**
- * Nineteen, and 'SASB' left and returned within the same day on 26 Sep 2026.
+ * 'SASB' left and returned within the same day on 26 Sep 2026.
  * ⚠️ IT WAS NEVER UNBACKED, AND THE AUDIT THAT SAID SO WAS WRONG. app/dashboard/people/page.tsx:285 has
  * offered 'SASB Human Capital' as a selectable framework throughout; the audit grepped lib/ and
  * app/frameworks/ and not app/dashboard/, and the section comment above had it right all along. It came
@@ -442,9 +442,10 @@ const MODULES_HOME = [
  * logged rather than done here because it changes what a chip IS.
  */
 const FRAMEWORKS = [
-  'SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'EcoVadis',
-  'TCFD', 'GHG Protocol', 'GRI', 'SBTi', 'NIST AI RMF', 'EU AI Act', 'ISO 42001', 'ISO 27001',
-  'NIST CSF', 'SASB', 'EU Pay Transparency', 'NIS2', 'DORA',
+  'SB 253 (California)', 'SB 261 (California)', 'ESRS E1 / CSRD', 'IFRS S2', 'CDP Climate', 'TCFD',
+  'GHG Protocol', 'SBTi', 'GRI', 'EU CBAM', 'UK SECR',
+  'EU CS3D', 'Canada S-211', 'Modern Slavery Act', 'EcoVadis', 'ESRS S1 / S2', 'EU Pay Transparency', 'SASB',
+  'EU AI Act', 'NIST AI RMF', 'ISO 42001', 'NIS2', 'DORA', 'ISO 27001', 'NIST CSF', 'SEC Cyber Rules',
 ] as const
 
 const WIDER = [

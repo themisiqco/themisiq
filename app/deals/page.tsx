@@ -56,15 +56,15 @@ export default function DealsPage() {
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <p style={moduleEyebrow}>Deals &amp; Investment module</p>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.1rem, 4vw, 3.1rem)', fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.015em', color: 'var(--color-ink)', marginBottom: '0.75rem', maxWidth: '28ch' }}>
-            Evaluate what a target company owes before you buy it, or arrive at your own sale already prepared.
+            Know what a target company owes in sustainability reporting before you buy it.
           </h1>
           <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.05rem, 1.9vw, 1.3rem)', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.45, marginBottom: '1.4rem' }}>
             {MODULE_SUBLINE}
           </p>
           <p style={{ ...bodyCopy, marginBottom: '2rem' }}>
-            For M&amp;A, family offices and companies getting ready to sell. Which rules apply, from what
-            year, and what they cost to meet. Run it on a target before you buy, or on yourself before you
-            are asked.
+            For family offices, private equity and M&amp;A teams screening acquisition targets. Which sustainability
+            reporting rules a target faces, from what year, and what they cost to meet. Sellers can run it on
+            themselves before a buyer asks.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <a href="/dashboard/deals" style={{ ...btnPrimary, textDecoration: 'none' }}>Screen your first deal free</a>
