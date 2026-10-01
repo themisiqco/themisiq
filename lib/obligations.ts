@@ -28,6 +28,7 @@ import {
   type GhgTier,
   type ModuleKey,
 } from './pricing'
+import { COUNTRIES, type Country, type CountryKey } from './forcedLabour/countries'
 
 // Module display names, keyed. Derived from MODULES rather than restated, for the same reason
 // SHORTHAND inverts LEGACY_PRICING_PAGE_ID instead of listing the shorthands again.
@@ -47,6 +48,7 @@ export type ObligationId =
   | 'sb253'
   | 'sb261'
   | 'ifrs-s2'
+  | 'csrd'
   | 'cbam'
   | 'cs3d'
   | 'eu-ai-act'
@@ -72,15 +74,25 @@ export interface Obligation {
   // the module is in general. Keyed by ModuleKey so a line cannot drift onto the wrong module, and
   // partial so a surface can render a module with no line rather than an empty string.
   does: Partial<Record<ModuleKey, string>>
+  // What the modules DO NOT answer, where a buyer would otherwise assume they do. Rendered beside the
+  // link and price on every surface that shows them (/assess and the lead email), because the `does`
+  // lines are not rendered there and a caveat only in them would never reach the reader. Today only
+  // CSRD carries one.
+  caveat?: string
 }
 
 // ── The map ──────────────────────────────────────────────────────────────────
 //
-// ⚠️ CSRD IS DELIBERATELY ABSENT. CSRD requires ESRS G1 business conduct, and NO MODULE COVERS G1 —
-// see docs/people-governance-module-roadmap.md. An entry mapping CSRD to the modules that answer
-// its climate and workforce standards would sell a partial answer as a whole one, on the surface a
-// buyer uses to decide what to buy. THE ENTRY LANDS WHEN G1 SHIPS, NOT BEFORE. Do not add it to
-// make the table look complete.
+// ⚠️ CSRD MAPS TO THE DOUBLE MATERIALITY ASSESSMENT, NOT TO THE REPORT (1 Oct 2026). It was absent
+// until then, because CSRD requires ESRS G1 business conduct and NO MODULE COVERS G1 (see
+// docs/people-governance-module-roadmap.md): an entry mapping CSRD to the modules that answer its climate
+// and workforce standards would have sold a partial answer as a whole one. The entry now answers the one
+// thing CSRD makes every in-scope company do first, the double materiality assessment, and says in its
+// `caveat`, on every surface that shows the link or the price, that the assessment is not the disclosures
+// and that G1 is not covered. MATERIALITY ONLY, by decision (1 Oct 2026). CSRD_BOTH_HALVES in
+// lib/modulePages.ts says the assessment has two halves, Materiality the impact half and Climate Risk the
+// financial half; the `does` line therefore says IMPACT HALF, so the entry does not claim the whole
+// assessment for one module. If Climate Risk is ever added here, its `does` line goes back with it.
 //
 // ⚠️ `cs3d` COVERS THE CHAIN OF ACTIVITIES ONLY. The Directive's duty also reaches the company's OWN
 // OPERATIONS AND SUBSIDIARIES, and nothing in the platform addresses that half — same roadmap. The
@@ -115,6 +127,16 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
       ghg: 'Supplies the Scope 1, 2 and 3 figures IFRS S2 requires as metrics and targets.',
       'climate-risk': 'Covers governance, strategy and risk management, including single materiality and scenario analysis.',
     },
+  },
+
+  'csrd': {
+    id: 'csrd',
+    name: 'CSRD / ESRS: Corporate Sustainability Reporting Directive',
+    modules: ['double-materiality'],
+    does: {
+      'double-materiality': 'Runs the impact half of the double materiality assessment: how your organisation affects people and the environment, with stakeholder engagement, every ESRS topic determined, and a record of who decided what.',
+    },
+    caveat: 'The double materiality assessment decides what you report; it does not prepare the ESRS disclosures. ESRS G1 business conduct is not covered by any ThemisIQ module.',
   },
 
   'cbam': {
@@ -223,8 +245,10 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
   },
 
   // Canada's Act (S-211). Kept apart from 'modern-slavery' because the laws differ in who they reach and
-  // what they ask, and a different module answers each: this report is Forced Labour Reporting's, the
-  // UK and Australian statements' supplier data is Supply Chain's.
+  // what they ask. This report is Forced Labour Reporting's. The UK and Australian statements' supplier
+  // data is Supply Chain's, and Forced Labour Reporting joins 'modern-slavery' for a country only once that
+  // country is 'available' in lib/forcedLabour/countries.ts: see modernSlaveryObligation() below, never a
+  // static entry, because a country in preview or hidden appears on no public surface.
   'canada-s211': {
     id: 'canada-s211',
     name: 'Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211)',
@@ -274,6 +298,47 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
       ghg: 'Covers the portfolio half: financed emissions by PCAF asset class, on the denominator each class requires, so climate exposure is reported across holdings and not only at the point of investment.',
     },
   },
+}
+
+// ── Modern slavery, by country ───────────────────────────────────────────────
+//
+// ⚠️ 'modern-slavery' ABOVE IS SUPPLY CHAIN ONLY, AND STAYS SO. Forced Labour Reporting prepares the UK
+// statement for preview accounts and nothing yet for Australia, and lib/forcedLabour/countries.ts is the
+// rule: a country that is not 'available' appears on NO public surface. So the module is added PER RESULT,
+// for the countries the result covers, and only those whose status is 'available'. With today's statuses
+// (uk 'preview', australia 'hidden') this returns the static entry unchanged.
+//
+// `countries` is a parameter so a test can flip a status without editing the list; callers pass nothing.
+export type ModernSlaveryCountry = Extract<CountryKey, 'uk' | 'australia'>
+export const isModernSlaveryCountry = (v: unknown): v is ModernSlaveryCountry => v === 'uk' || v === 'australia'
+
+export function modernSlaveryObligation(covered: readonly ModernSlaveryCountry[], countries: readonly Country[] = COUNTRIES): Obligation {
+  const base = OBLIGATIONS['modern-slavery']
+  const available = countries.filter(c => c.status === 'available' && covered.includes(c.key as ModernSlaveryCountry))
+  if (available.length === 0) return base
+  // "the United Kingdom", "Australia": the article the name takes in a sentence. UK-facing, so British.
+  const named = available.map(c => (c.key === 'uk' ? `the ${c.name}` : c.name))
+  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
+  return {
+    ...base,
+    // Forced Labour Reporting first: it prepares the statement, and Supply Chain supplies the supplier data
+    // the statement reports on.
+    modules: ['forced-labour', ...base.modules.filter(m => m !== 'forced-labour')],
+    does: {
+      'forced-labour': `Builds the modern slavery statement${available.length > 1 ? 's' : ''} for ${list} section by section, and produces the PDF for approval and signing by the organisation.`,
+      ...base.does,
+    },
+  }
+}
+
+// The obligation a page entry is answered by: the static entry, or for 'modern-slavery' the entry for
+// the countries that entry covers. ONE resolver, used by /assess and the lead email, so the two cannot
+// disagree on which modules a link sells. `covered` arrives from a client post in the email route, so it
+// is narrowed here rather than trusted.
+export function resolveObligation(id: ObligationId, covered?: unknown, countries: readonly Country[] = COUNTRIES): Obligation {
+  if (id !== 'modern-slavery') return OBLIGATIONS[id]
+  const keys = Array.isArray(covered) ? covered.filter(isModernSlaveryCountry) : []
+  return modernSlaveryObligation(keys, countries)
 }
 
 // ── Drivers ──────────────────────────────────────────────────────────────────
@@ -340,13 +405,16 @@ const FIXED_DRIVER_MODULES: Record<Exclude<DriverId, 'regulatory'>, ModuleKey[]>
 // a caller must render NOTHING, the same rule /assess applies to an empty obligation group, because
 // "we checked and found none" and "you have not answered enough for us to check" look identical once
 // they are both an empty box. The five fixed drivers never return empty.
-export function driverModules(id: DriverId, fired: ObligationId[]): ModuleKey[] {
+//
+// `resolve` defaults to the static map. /assess passes its own resolver so an obligation whose modules
+// depend on the result (modern slavery, by country) contributes the modules its link actually sells.
+export function driverModules(id: DriverId, fired: ObligationId[], resolve: (id: ObligationId) => Obligation = (o) => OBLIGATIONS[o]): ModuleKey[] {
   if (id !== 'regulatory') return FIXED_DRIVER_MODULES[id]
   const firedSet = new Set(fired)
   const out: ModuleKey[] = []
   for (const obligationId of ALL_OBLIGATION_IDS) {
     if (!firedSet.has(obligationId)) continue
-    for (const m of OBLIGATIONS[obligationId].modules) {
+    for (const m of resolve(obligationId).modules) {
       if (!out.includes(m)) out.push(m)
     }
   }

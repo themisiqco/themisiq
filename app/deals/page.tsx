@@ -179,7 +179,7 @@ export default function DealsPage() {
       {/* ── 10. CLOSING BAND ── */}
       <ClosingBand
         heading="Not sure what a target owes?"
-        body="Three questions, no account needed. The free assessment lists the regulations a company is likely to face, country by country."
+        body="Free, takes about five minutes. The free assessment lists the regulations a company is likely to face, country by country."
         primary={{ href: '/assess', label: 'Start the free assessment' }}
         secondary={{ href: '/advisory', label: 'Talk to us' }}
       />

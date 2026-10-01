@@ -215,7 +215,7 @@ export default function CbamPage() {
       {/* ── 10. CLOSING BAND ── */}
       <ClosingBand
         heading="Not sure whether CBAM reaches your goods?"
-        body="Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country."
+        body="Free, takes about five minutes. The free assessment lists the regulations your company is likely to face, country by country."
         primary={{ href: '/assess', label: 'Start the free assessment' }}
         secondary={{ href: '/advisory', label: 'Talk to us' }}
       />

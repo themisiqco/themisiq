@@ -31,16 +31,17 @@ import ThemisIQLogo from '../components/ThemisIQLogo'
 // comes from obligationPrice, which routes through the same cartQuote that /api/checkout charges
 // from. A price shown here and a price charged at checkout therefore cannot disagree.
 import {
-  OBLIGATIONS, obligationHref, obligationPrice, modulesHref, modulesPrice, modulesLabel,
-  priceLabel, driverModules, isDriverId, type ObligationId,
+  modulesHref, modulesPrice, modulesLabel,
+  priceLabel, driverModules, isDriverId, resolveObligation, type ObligationId, type ModernSlaveryCountry,
 } from '../../lib/obligations'
 
 // ── UNANSWERED ───────────────────────────────────────────────────────────────────────────────────
 //
 // A STRING LITERAL, NOT A SYMBOL, and the choice is about how each one FAILS.
 //   · Collision. A symbol cannot collide with any answer value, ever. 'unanswered' collides only if
-//     someone adds an option with that exact value — checked against all 27 option values in the
-//     questions array below, currently zero, and visible in that array if it ever changes.
+//     someone adds an option with that exact value. app/assess/obligations.test.ts checks every option
+//     value in the questions array against it, so a collision fails a test rather than relying on a
+//     count written here (this comment said 27 when the array held 46).
 //   · Serialisation. THIS IS WHY THE STRING WINS. JSON.stringify DROPS symbol-valued properties. The
 //     answers object is not posted today — answerProfile() flattens to label pairs first — but the
 //     submit path is a few lines away, and a symbol crossing it would silently become `undefined`,
@@ -57,6 +58,7 @@ export type ListingAnswer     = 'not_listed' | 'us_listed' | 'eu_listed' | 'uk_l
 export type OwnershipAnswer   = 'founder_family' | 'pe_vc' | 'group' | 'other'
 export type AiUseAnswer       = 'yes_hr' | 'yes_credit' | 'yes_other' | 'no_planned' | 'no'
 export type SupplyChainAnswer = 'simple' | 'moderate' | 'complex' | 'deep'
+export type EuGoodsAnswer     = 'import' | 'supply' | 'no' | 'unsure'
 // The slider is an INDEX into REVENUE_VALUES, not a figure. 0 is a real answer ('Under $50M'), which
 // is why the old `a.revenue !== undefined ? … : 0` default was wrong twice over: it produced a
 // FIGURE of 0 for an unset answer, and 0 is also a legal index meaning $25M.
@@ -125,6 +127,9 @@ interface Answers {
   // second rule to remember, and if anyone ever does read it they now have to handle the unanswered
   // arm. Typing it costs nothing today because nothing reads it.
   supply_chain: SupplyChainAnswer | typeof UNANSWERED
+  // CBAM goods. READ AFFIRMATIVELY ONLY (=== 'import' / 'supply' / 'unsure'), so it needs no wrapper under
+  // the rule above. If a negative read is ever needed, wrap it in Answered<> first.
+  eu_goods: EuGoodsAnswer | typeof UNANSWERED
 }
 
 // The starting state, and what 'Start over' restores. Replaces `{}`, which a non-optional Answers
@@ -138,6 +143,7 @@ export const EMPTY_ANSWERS: Answers = {
   ownership: UNANSWERED,
   ai_use: UNANSWERED,
   supply_chain: UNANSWERED,
+  eu_goods: UNANSWERED,
 }
 
 interface Obligation {
@@ -147,12 +153,17 @@ interface Obligation {
   // presence is what turns the module cell into a priced link, so an id here is a claim that the
   // linked modules can be bought and will do the job. Absent means the cell stays plain text.
   //
-  // NOT SET, DELIBERATELY, on: CSRD (no module covers ESRS G1); the CS3D group-parentage entry (the
+  // CSRD IS SET (1 Oct 2026): it maps to the double materiality assessment, and lib/obligations.ts carries
+  // the caveat that the assessment is not the disclosures and that no module covers ESRS G1, rendered
+  // beside the link. NOT SET, DELIBERATELY, on: the CS3D group-parentage entry (the
   // lib `cs3d` entry answers the chain of activities, not the group route this entry is about); the
   // Pay Transparency DAY-ONE entry (the lib entry answers the gap-REPORTING duty — the People module
   // holds nothing for posting salary ranges or the salary-history ban); and all six driver entries,
   // which are circumstances rather than instruments. Those render exactly as they do today.
   obligationId?: ObligationId
+  // The countries a 'modern-slavery' entry covers. resolveObligation() reads it to add Forced Labour
+  // Reporting for a country whose status is 'available', and for no other.
+  covered?: ModernSlaveryCountry[]
   // 'regulatory' = a rule that applies to you by operation of law. 'market' = something a
   // counterparty asks of you. The distinction is load-bearing for the reader: it separates
   // what carries a penalty from what carries a lost contract. Required, not optional, so a
@@ -256,7 +267,7 @@ export function computeObligations(a: Answers): Obligation[] {
   if (hasEU && csrdTurnover && csrdStaff !== false) {
     const staffIndeterminate = csrdStaff === null
     regs.push({
-      name: 'CSRD / ESRS: Corporate Sustainability Reporting Directive',
+      name: 'CSRD / ESRS: Corporate Sustainability Reporting Directive', obligationId: 'csrd',
       jurisdiction: 'European Union',
       group: 'regulatory',
       urgency: staffIndeterminate ? 'high' : 'critical',
@@ -502,7 +513,26 @@ export function computeObligations(a: Answers): Obligation[] {
   // 100,000,000. Neither could be re-checked against an official source that day (ag.gov.au timed out),
   // and the Act's current text (compilation No. 2) is what decides the threshold, so it says only that.
   // The UK timing is the guidance's recommendation, not law; Australia's six months is s.13(2)(e).
-  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act: UK and Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: assessTiming(msUK, msAU), module: 'Supply Chain', what: [msUK && `${UK_ASSESS_WHO} ${UK_ASSESS_CONTENT}`, msAU && `${AU_ASSESS_WHO} ${AU_ASSESS_CONTENT}`, fxNote].filter(Boolean).join(' '), action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
+  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act: UK and Australia', obligationId: 'modern-slavery', covered: [...(msUK ? ['uk' as const] : []), ...(msAU ? ['australia' as const] : [])], jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: assessTiming(msUK, msAU), module: 'Supply Chain', what: [msUK && `${UK_ASSESS_WHO} ${UK_ASSESS_CONTENT}`, msAU && `${AU_ASSESS_WHO} ${AU_ASSESS_CONTENT}`, fxNote].filter(Boolean).join(' '), action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
+
+  // ── EU CBAM ─────────────────────────────────────────────────────────────────
+  // ONE entry, fired on the eu_goods answer, read affirmatively. NO THRESHOLD IS STATED AS A FIGURE: no
+  // constant in lib/ holds the CBAM mass threshold, and a literal here would be an unsourced figure on a
+  // surface that tells a visitor whether a law reaches them. The entry says the threshold turns on annual
+  // import mass, which this form does not ask, and the CBAM module is where it is worked out.
+  const euGoods = a.eu_goods
+  if (euGoods === 'import' || euGoods === 'supply' || euGoods === 'unsure') {
+    const cbamBase = { name: 'EU CBAM: Carbon Border Adjustment Mechanism', obligationId: 'cbam' as const, jurisdiction: 'European Union · goods entering the EU', group: 'regulatory' as const, module: 'CBAM' }
+    if (euGoods === 'import') regs.push({ ...cbamBase, urgency: 'high', urgency_label: 'HIGH PRIORITY', timing: 'Annual declaration: depends on the mass you import',
+      what: 'The Carbon Border Adjustment Mechanism (Regulation (EU) 2023/956) places its duties on the IMPORTER of covered goods: iron and steel, aluminium, cement, fertilisers, hydrogen and electricity, identified by customs (CN) code. A covered importer must be an authorised CBAM declarant and declare each year the embedded emissions of the goods it brought in. For most covered goods, whether that duty reaches you depends on the total mass you import in a year, which this form does not ask. The declaration needs embedded emissions per good from the installations that produced them.',
+      action: 'Total last year\u2019s imports of covered goods by customs code to see whether you are above the threshold, then work out the embedded emissions with the CBAM module.' })
+    if (euGoods === 'supply') regs.push({ ...cbamBase, urgency: 'medium', urgency_label: 'CUSTOMER DATA', timing: 'When your EU customer declares',
+      what: 'CBAM duties fall on the EU importer, not on you. But the importer declares the embedded emissions of the goods it brings in, and those figures come from the installations that produced them: expect your EU customers to ask you for installation-level emissions data per good, and to use default values instead where you cannot supply it.',
+      action: 'Collect emissions data for the installations that make the goods you sell into the EU, so you can answer your customers\u2019 requests.' })
+    if (euGoods === 'unsure') regs.push({ ...cbamBase, urgency: 'monitor', urgency_label: 'CHECK YOUR GOODS', timing: 'Depends on your goods and your role',
+      what: 'CBAM covers iron and steel, aluminium, cement, fertilisers, hydrogen and electricity, identified by customs (CN) code, including some products made from them. If any of your goods are covered, what applies depends on whether you import them into the EU yourself or sell them to an EU importer, and for most covered goods on the total mass imported in a year.',
+      action: 'Check the customs codes of the goods you make or ship against the CBAM list, and establish who imports them into the EU.' })
+  }
 
   // ── Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211) ──────
   // s.2 "entity": a Canadian stock-exchange listing at any size, OR a Canada nexus with at least two of
@@ -599,6 +629,77 @@ export const canAdvance = (type: Question['type'], val: unknown): boolean =>
   : type === 'options' ? !!val
   : ((val as string[] | undefined) || []).length > 0
 
+// Module level, not inside the component: nothing in it reads component state, and a test can then check
+// every option value and the profile below without rendering the page.
+export const questions: Question[] = [
+  { id: 'driver' as keyof Answers, title: "What's driving your ESG focus right now?", sub: 'This helps us identify the right starting point.', type: 'options', options: [{ value: 'regulatory', label: 'A regulation applies to us', sub: 'SB 253, CSRD, EU AI Act, NIS2 (mandatory compliance)' }, { value: 'customer', label: 'A customer is asking us', sub: 'Supplier questionnaire, EcoVadis, procurement requirement' }, { value: 'investor', label: 'Our investor requires it', sub: 'LP ESG reporting, portfolio climate disclosure' }, { value: 'bank', label: 'Our bank or insurer is asking', sub: 'Sustainability-linked loan, climate risk questionnaire' }, { value: 'board', label: 'Our board wants it', sub: 'Governance, talent, reputation, proactive ESG' }, { value: 'ahead', label: 'We want to get ahead', sub: 'Proactive compliance before mandatory deadlines' }] },
+
+  { id: 'revenue' as keyof Answers, title: "What is your company's global annual revenue?", sub: 'Determines eligibility for SB 253 ($1B), SB 261 ($500M), ESRS/CSRD, and Modern Slavery Act thresholds.', type: 'slider' },
+  { id: 'employees' as keyof Answers, title: 'How many employees does your company have globally?', sub: 'Determines CSRD/ESRS scope, EU Pay Transparency, and California Pay Data Reporting thresholds.', type: 'options', options: [{ value: 'under50', label: 'Under 50', sub: 'Small organisation' }, { value: '50_249', label: '50–249', sub: 'NIS2 important entity threshold' }, { value: '250_499', label: '250–499', sub: 'ESRS mid-size · EU Pay Transparency (every 3 years)' }, { value: '500_999', label: '500–999', sub: 'ESRS large entity · EU Pay Transparency annual' }, { value: '1000_4999', label: '1,000–4,999', sub: 'Full ESRS scope · EU AI Act · NIS2 essential entity' }, { value: '5000plus', label: '5,000+', sub: 'All obligations apply · SEC human capital disclosure' }] },
+  { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: 'California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: 'United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: 'European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: 'United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: 'Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: 'Canada', sub: 'IFRS S2 adoption, forced labour reporting (S-211)' }, { value: 'apac', label: 'Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: 'Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
+  { id: 'sectors' as keyof Answers, title: 'Which sectors best describe your business?', sub: 'Determines NIS2 essential/important entity status, DORA applicability, and EU AI Act high-risk categories.', type: 'multiselect', options: [{ value: 'financial', label: 'Financial services', sub: 'DORA, NIS2 essential, SR 11-7' }, { value: 'energy', label: 'Energy / utilities', sub: 'NIS2 essential, SB 253, ESRS' }, { value: 'health', label: 'Healthcare', sub: 'NIS2 essential, EU AI Act high-risk' }, { value: 'manufacturing', label: 'Manufacturing / industrial', sub: 'SB 253, ESRS E1, NIS2 important' }, { value: 'tech', label: 'Technology / digital', sub: 'EU AI Act, NIS2, DORA (if fintech)' }, { value: 'transport', label: 'Transport / logistics', sub: 'NIS2 essential, Scope 3 Cat.4' }, { value: 'retail', label: 'Retail / consumer', sub: 'Supply chain, SB 253, ESRS' }, { value: 'other', label: 'Professional services', sub: 'ESRS, CDP, GRI' }] },
+  // CBAM. SUBTITLES DESCRIBE THE OPTION, NEVER THE OUTCOME (the rule on the listing question below):
+  // what each answer triggers is decided in computeObligations.
+  { id: 'eu_goods' as keyof Answers, title: 'Do you make or ship iron and steel, aluminium, cement, fertilisers, hydrogen or electricity that ends up in the EU?', sub: 'The goods the EU Carbon Border Adjustment Mechanism (CBAM) covers. They are identified by customs code, and include some products made from these materials.', type: 'options', options: [{ value: 'import', label: 'We import these goods into the EU', sub: 'We are the importer that brings them into the EU' }, { value: 'supply', label: 'We sell them to EU customers who import them', sub: 'We make or sell them outside the EU, and our customer imports them' }, { value: 'no', label: 'No', sub: 'None of these goods reach the EU through us' }, { value: 'unsure', label: 'Not sure', sub: 'We have not checked whether our goods are on the list' }] },
+  // Two questions, not one. SUBTITLES DESCRIBE THE OPTION, NEVER THE OUTCOME — the old ones made
+  // determinations before the visitor had answered, and got them wrong: 'EU publicly listed ·
+  // CSRD large company · ESRS full suite from FY2024' asserted CSRD scope from listing alone, when
+  // post-Omnibus CSRD is size-gated (>1,000 staff AND >EUR 450m turnover) and listing is not the
+  // test at all. What each answer triggers is decided in computeObligations and shown in the
+  // results — that is the only place a determination belongs.
+  { id: 'listing' as keyof Answers, title: 'Is your company publicly listed?', sub: 'Where your shares trade, if anywhere. Securities regulators impose disclosure duties on their own listed issuers.', type: 'options', options: [{ value: 'not_listed', label: 'Not listed', sub: 'No shares traded on a public market' }, { value: 'us_listed', label: 'Listed in the United States', sub: 'NYSE, Nasdaq, or another SEC-registered exchange' }, { value: 'eu_listed', label: 'Listed in the European Union', sub: 'Shares admitted to an EU regulated market' }, { value: 'uk_listed', label: 'Listed in the United Kingdom', sub: 'Shares admitted to the London Stock Exchange' }, { value: 'listed_other', label: 'Listed elsewhere', sub: 'A public market outside the US, EU and UK' }] },
+  { id: 'ownership' as keyof Answers, title: 'Who owns your company?', sub: 'Who holds the equity, which shapes what your investors and lenders ask of you, and (where there is a parent) what reaches you through it.', type: 'options', options: [{ value: 'founder_family', label: 'Founder or family owned', sub: 'Held by its founders, a family, or a family office' }, { value: 'pe_vc', label: 'Private equity or VC backed', sub: 'A private equity or venture capital fund holds a stake' }, { value: 'group', label: 'Part of a larger group', sub: 'A subsidiary, division or branch of a parent company' }, { value: 'other', label: 'Other', sub: 'None of the above describes how it is held' }] },
+  { id: 'ai_use' as keyof Answers, title: 'Does your company deploy AI systems that affect people?', sub: 'The EU AI Act applies to any organisation using AI that affects EU residents.', type: 'options', options: [{ value: 'yes_hr', label: 'Yes, in HR / hiring decisions', sub: `EU AI Act Annex III high-risk · from ${AI_ACT_HIGH_RISK_STANDALONE}` }, { value: 'yes_credit', label: 'Yes, in credit or financial decisions', sub: 'EU AI Act Annex III high-risk · DORA model risk' }, { value: 'yes_other', label: 'Yes, in other operational contexts', sub: 'Risk classification needed' }, { value: 'no_planned', label: 'Not yet but planning to deploy AI', sub: 'Governance framework needed before deployment' }, { value: 'no', label: 'No AI systems deployed', sub: 'EU AI Act unlikely to apply at this time' }] },
+  // QUALIFICATION, NOT COMPLIANCE — and labelled as such. No entry fires on this answer and none
+  // honestly could: every framework the old subtitles named ('Scope 3 Cat.1 likely low', 'SB 253
+  // Scope 3 2027', 'CS3D HRDD') is gated on turnover, headcount or jurisdiction, which this form
+  // already collects. Those subtitles asserted outcomes the answer cannot support — the same
+  // defect as the old ownership question. It earns its step by telling an advisor where the work
+  // actually is, so it goes to the internal alert and claims nothing in the results.
+  { id: 'supply_chain' as keyof Answers, title: 'How complex is your supply chain?', sub: 'Nothing in your results turns on this answer: no obligation is triggered by it. It tells a ThemisIQ advisor where your effort will actually go.', type: 'options', options: [{ value: 'simple', label: 'Simple: few domestic suppliers', sub: 'A small supplier base, mostly in your own country' }, { value: 'moderate', label: 'Moderate: multiple countries', sub: 'Suppliers spread across several countries' }, { value: 'complex', label: 'Complex: global supply chain', sub: 'A global supplier base across many countries' }, { value: 'deep', label: 'Deep: multi-tier, high-risk geographies', sub: 'Multiple tiers, including suppliers in higher-risk regions' }] },
+]
+
+// ── THE OPTIONS WRITE, AND ITS READ BACK ─────────────────────────────────────────────────────────
+//
+// ⚠️ ONE WRITE PATH FOR EVERY OPTIONS QUESTION, AND IT WRAPS ai_use. The click handler used to write
+// `{ ...a, [q.id]: opt.value }` for every question, so ai_use was stored as a BARE STRING while its type is
+// Answered<AiUseAnswer>. isAnswered() passed on the string and `aiField.answer` was undefined, which is
+// !== 'no': an EU visitor answering "No AI systems deployed" was shown the AI Act at HIGH PRIORITY, and
+// yes_hr / yes_credit got 'high' instead of 'critical' and yes_hr lost its Annex III hiring sentence. Found
+// 1 Oct 2026. The tests built answers with answered() by hand, so they never went through this write.
+// selectOption is what the click calls, and app/assess/coverage.test.ts drives it directly.
+//
+// The value is VALIDATED against the question's own options before it is stored, so an option that is
+// not on the question cannot reach state, wrapped or not.
+export function selectOption(a: Answers, id: keyof Answers, value: string): Answers {
+  const q = questions.find(x => x.id === id)
+  if (!q || q.type !== 'options' || !q.options?.some(o => o.value === value)) return a
+  if (id === 'ai_use') return { ...a, ai_use: answered(value as AiUseAnswer) }
+  return { ...a, [id]: value }
+}
+
+/** The option value a stored single-select answer holds: the bare value, or the wrapped one for ai_use. */
+export const storedOptionValue = (v: unknown): unknown =>
+  v !== null && typeof v === 'object' && !Array.isArray(v) && 'answer' in v ? (v as Answered<unknown>).answer : v
+
+// The visitor's answers, resolved to the LABELS THEY ACTUALLY SAW, for the internal alert. Sending
+// the raw `answers` object instead would put `revenue: 5` in the inbox — the slider stores an index
+// into REVENUE_LABELS, not a figure — and `us_listed` where the form said 'Listed in the United
+// States'. Resolving here, from the same array the visitor answered, is what stops the alert from
+// ever naming a value the form no longer offers.
+//
+// Every question is asked, so iterating the array is the whole population; an unanswered one is
+// skipped rather than sent as a blank row. If a conditional question is ever added, this must
+// iterate the list actually shown — a hidden question's stale answer must not reach the alert.
+export const answerProfile = (answers: Answers) => questions.flatMap(q => {
+  const v = answers[q.id]
+  if (v === undefined || v === UNANSWERED || (Array.isArray(v) && v.length === 0)) return []
+  const label = q.type === 'slider'
+    ? REVENUE_LABELS[v as number]
+    : (Array.isArray(v) ? v : [storedOptionValue(v)]).map(one => q.options?.find(o => o.value === one)?.label ?? String(one)).join(', ')
+  return [{ q: q.title, a: label }]
+})
+
 // ── Module cell, for entries that map to an ObligationId ─────────────────────
 //
 // THE LABEL IS DERIVED FROM THE OBLIGATION, NOT FROM THE ENTRY'S OWN `module` STRING. The two
@@ -609,7 +710,11 @@ export const canAdvance = (type: Question['type'], val: unknown): boolean =>
 //
 // The href, the price and the formatting all come from lib/obligations.ts — the lead email renders
 // the same three things and neither surface may hold its own copy.
-const obligationModuleLabel = (id: ObligationId): string => modulesLabel(OBLIGATIONS[id].modules)
+//
+// RESOLVED PER ENTRY, NOT READ FROM OBLIGATIONS[id]: 'modern-slavery' sells Forced Labour Reporting as well
+// for a country whose status is 'available', so its link, label and price follow the countries the entry
+// covers. resolveObligation is the one place that decides, and the lead email calls the same function.
+const entryObligation = (ob: Obligation) => resolveObligation(ob.obligationId!, ob.covered)
 
 // Order is the render order: what the law requires of you first, what the market asks of you second.
 const OBLIGATION_GROUPS: { key: Obligation['group']; title: string; sub: string }[] = [
@@ -631,30 +736,12 @@ export default function AssessPage() {
   const goNext = () => setStep(s => s + 1)
   const goBack = () => setStep(s => s - 1)
 
-  // The visitor's answers, resolved to the LABELS THEY ACTUALLY SAW, for the internal alert. Sending
-  // the raw `answers` object instead would put `revenue: 5` in the inbox — the slider stores an index
-  // into REVENUE_LABELS, not a figure — and `us_listed` where the form said 'Listed in the United
-  // States'. Resolving here, from the same array the visitor answered, is what stops the alert from
-  // ever naming a value the form no longer offers.
-  //
-  // Every question is asked, so iterating the array is the whole population; an unanswered one is
-  // skipped rather than sent as a blank row. If a conditional question is ever added, this must
-  // iterate the list actually shown — a hidden question's stale answer must not reach the alert.
-  const answerProfile = () => questions.flatMap(q => {
-    const v = answers[q.id]
-    if (v === undefined || (Array.isArray(v) && v.length === 0)) return []
-    const label = q.type === 'slider'
-      ? REVENUE_LABELS[v as number]
-      : (Array.isArray(v) ? v : [v]).map(one => q.options?.find(o => o.value === one)?.label ?? String(one)).join(', ')
-    return [{ q: q.title, a: label }]
-  })
-
   const submitToAPI = async () => {
     try {
       await fetch('/api/assessment/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role, [HONEYPOT_FIELD]: email.website }, obligations, profile: answerProfile() }),
+        body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role, [HONEYPOT_FIELD]: email.website }, obligations, profile: answerProfile(answers) }),
       })
     } catch (e) {
       console.error('Email send failed:', e)
@@ -666,30 +753,6 @@ export default function AssessPage() {
   const critical = obligations.filter(o => o.urgency === 'critical').length
   const high = obligations.filter(o => o.urgency === 'high').length
 
-  const questions: Question[] = [
-    { id: 'driver' as keyof Answers, title: "What's driving your ESG focus right now?", sub: 'This helps us identify the right starting point.', type: 'options', options: [{ value: 'regulatory', label: 'A regulation applies to us', sub: 'SB 253, CSRD, EU AI Act, NIS2 (mandatory compliance)' }, { value: 'customer', label: 'A customer is asking us', sub: 'Supplier questionnaire, EcoVadis, procurement requirement' }, { value: 'investor', label: 'Our investor requires it', sub: 'LP ESG reporting, portfolio climate disclosure' }, { value: 'bank', label: 'Our bank or insurer is asking', sub: 'Sustainability-linked loan, climate risk questionnaire' }, { value: 'board', label: 'Our board wants it', sub: 'Governance, talent, reputation, proactive ESG' }, { value: 'ahead', label: 'We want to get ahead', sub: 'Proactive compliance before mandatory deadlines' }] },
-
-    { id: 'revenue' as keyof Answers, title: "What is your company's global annual revenue?", sub: 'Determines eligibility for SB 253 ($1B), SB 261 ($500M), ESRS/CSRD, and Modern Slavery Act thresholds.', type: 'slider' },
-    { id: 'employees' as keyof Answers, title: 'How many employees does your company have globally?', sub: 'Determines CSRD/ESRS scope, EU Pay Transparency, and California Pay Data Reporting thresholds.', type: 'options', options: [{ value: 'under50', label: 'Under 50', sub: 'Small organisation' }, { value: '50_249', label: '50–249', sub: 'NIS2 important entity threshold' }, { value: '250_499', label: '250–499', sub: 'ESRS mid-size · EU Pay Transparency (every 3 years)' }, { value: '500_999', label: '500–999', sub: 'ESRS large entity · EU Pay Transparency annual' }, { value: '1000_4999', label: '1,000–4,999', sub: 'Full ESRS scope · EU AI Act · NIS2 essential entity' }, { value: '5000plus', label: '5,000+', sub: 'All obligations apply · SEC human capital disclosure' }] },
-    { id: 'jurisdictions' as keyof Answers, title: 'Where does your company operate or have revenue?', sub: 'Select all that apply. Each jurisdiction triggers different mandatory disclosure obligations.', type: 'multiselect', options: [{ value: 'california', label: 'California, USA', sub: 'SB 253, SB 261, CA Pay Data' }, { value: 'us_other', label: 'United States (other)', sub: 'SEC rules, NIST, Model Risk' }, { value: 'eu', label: 'European Union', sub: 'CSRD, ESRS, NIS2, DORA, EU AI Act' }, { value: 'uk', label: 'United Kingdom', sub: 'TCFD mandatory, Modern Slavery Act' }, { value: 'australia', label: 'Australia', sub: 'Modern Slavery Act, AASB S2' }, { value: 'canada', label: 'Canada', sub: 'IFRS S2 adoption, forced labour reporting (S-211)' }, { value: 'apac', label: 'Asia Pacific (other)', sub: 'Singapore, Japan, Hong Kong TCFD' }, { value: 'global', label: 'Global / multiple regions', sub: 'CDP, GRI, SBTi, UNGP' }] },
-    { id: 'sectors' as keyof Answers, title: 'Which sectors best describe your business?', sub: 'Determines NIS2 essential/important entity status, DORA applicability, and EU AI Act high-risk categories.', type: 'multiselect', options: [{ value: 'financial', label: 'Financial services', sub: 'DORA, NIS2 essential, SR 11-7' }, { value: 'energy', label: 'Energy / utilities', sub: 'NIS2 essential, SB 253, ESRS' }, { value: 'health', label: 'Healthcare', sub: 'NIS2 essential, EU AI Act high-risk' }, { value: 'manufacturing', label: 'Manufacturing / industrial', sub: 'SB 253, ESRS E1, NIS2 important' }, { value: 'tech', label: 'Technology / digital', sub: 'EU AI Act, NIS2, DORA (if fintech)' }, { value: 'transport', label: 'Transport / logistics', sub: 'NIS2 essential, Scope 3 Cat.4' }, { value: 'retail', label: 'Retail / consumer', sub: 'Supply chain, SB 253, ESRS' }, { value: 'other', label: 'Professional services', sub: 'ESRS, CDP, GRI' }] },
-    // Two questions, not one. SUBTITLES DESCRIBE THE OPTION, NEVER THE OUTCOME — the old ones made
-    // determinations before the visitor had answered, and got them wrong: 'EU publicly listed ·
-    // CSRD large company · ESRS full suite from FY2024' asserted CSRD scope from listing alone, when
-    // post-Omnibus CSRD is size-gated (>1,000 staff AND >EUR 450m turnover) and listing is not the
-    // test at all. What each answer triggers is decided in computeObligations and shown in the
-    // results — that is the only place a determination belongs.
-    { id: 'listing' as keyof Answers, title: 'Is your company publicly listed?', sub: 'Where your shares trade, if anywhere. Securities regulators impose disclosure duties on their own listed issuers.', type: 'options', options: [{ value: 'not_listed', label: 'Not listed', sub: 'No shares traded on a public market' }, { value: 'us_listed', label: 'Listed in the United States', sub: 'NYSE, Nasdaq, or another SEC-registered exchange' }, { value: 'eu_listed', label: 'Listed in the European Union', sub: 'Shares admitted to an EU regulated market' }, { value: 'uk_listed', label: 'Listed in the United Kingdom', sub: 'Shares admitted to the London Stock Exchange' }, { value: 'listed_other', label: 'Listed elsewhere', sub: 'A public market outside the US, EU and UK' }] },
-    { id: 'ownership' as keyof Answers, title: 'Who owns your company?', sub: 'Who holds the equity, which shapes what your investors and lenders ask of you, and (where there is a parent) what reaches you through it.', type: 'options', options: [{ value: 'founder_family', label: 'Founder or family owned', sub: 'Held by its founders, a family, or a family office' }, { value: 'pe_vc', label: 'Private equity or VC backed', sub: 'A private equity or venture capital fund holds a stake' }, { value: 'group', label: 'Part of a larger group', sub: 'A subsidiary, division or branch of a parent company' }, { value: 'other', label: 'Other', sub: 'None of the above describes how it is held' }] },
-    { id: 'ai_use' as keyof Answers, title: 'Does your company deploy AI systems that affect people?', sub: 'The EU AI Act applies to any organisation using AI that affects EU residents.', type: 'options', options: [{ value: 'yes_hr', label: 'Yes, in HR / hiring decisions', sub: `EU AI Act Annex III high-risk · from ${AI_ACT_HIGH_RISK_STANDALONE}` }, { value: 'yes_credit', label: 'Yes, in credit or financial decisions', sub: 'EU AI Act Annex III high-risk · DORA model risk' }, { value: 'yes_other', label: 'Yes, in other operational contexts', sub: 'Risk classification needed' }, { value: 'no_planned', label: 'Not yet but planning to deploy AI', sub: 'Governance framework needed before deployment' }, { value: 'no', label: 'No AI systems deployed', sub: 'EU AI Act unlikely to apply at this time' }] },
-    // QUALIFICATION, NOT COMPLIANCE — and labelled as such. No entry fires on this answer and none
-    // honestly could: every framework the old subtitles named ('Scope 3 Cat.1 likely low', 'SB 253
-    // Scope 3 2027', 'CS3D HRDD') is gated on turnover, headcount or jurisdiction, which this form
-    // already collects. Those subtitles asserted outcomes the answer cannot support — the same
-    // defect as the old ownership question. It earns its step by telling an advisor where the work
-    // actually is, so it goes to the internal alert and claims nothing in the results.
-    { id: 'supply_chain' as keyof Answers, title: 'How complex is your supply chain?', sub: 'Nothing in your results turns on this answer: no obligation is triggered by it. It tells a ThemisIQ advisor where your effort will actually go.', type: 'options', options: [{ value: 'simple', label: 'Simple: few domestic suppliers', sub: 'A small supplier base, mostly in your own country' }, { value: 'moderate', label: 'Moderate: multiple countries', sub: 'Suppliers spread across several countries' }, { value: 'complex', label: 'Complex: global supply chain', sub: 'A global supplier base across many countries' }, { value: 'deep', label: 'Deep: multi-tier, high-risk geographies', sub: 'Multiple tiers, including suppliers in higher-risk regions' }] },
-  ]
 
   // ── Step boundaries — EVERY GUARD *AND* EVERY SETTER DERIVES FROM HERE ──────
   // They used to be literals (email gate at step 7, results at 8, `step / 10` for the bar) against
@@ -743,7 +806,16 @@ export default function AssessPage() {
           {(() => {
             if (!isDriverId(answers.driver)) return null
             const fired = obligations.map(o => o.obligationId).filter((id): id is ObligationId => !!id)
-            const start = driverModules(answers.driver, fired).slice(0, 2)
+            // The same resolution the module cells use, so a fired modern-slavery entry contributes the
+            // modules its own link sells.
+            const resolved = (id: ObligationId) => {
+              const ob = obligations.find(o => o.obligationId === id)
+              return ob ? entryObligation(ob) : resolveObligation(id)
+            }
+            const start = driverModules(answers.driver, fired, resolved).slice(0, 2)
+            // A caveat travels with any module it qualifies: if CSRD fired and its modules are in the
+            // line, the line says what they do not cover, as the CSRD card does.
+            const caveats = [...new Set(fired.map(resolved).filter(o => o.caveat && o.modules.some(m => start.includes(m))).map(o => o.caveat!))]
             // Empty is a TRUE statement — nothing fired that any module answers — and it renders as
             // nothing. A "Start with" heading over no modules reads as a rendering fault.
             if (start.length === 0) return null
@@ -754,6 +826,7 @@ export default function AssessPage() {
                 <a href={modulesHref(start)} style={{ color: 'var(--color-brand)', fontWeight: 500, textDecoration: 'none' }}>
                   {modulesLabel(start)}{priced ? ` · ${priceLabel(modulesPrice(start))}` : ''} →
                 </a>
+                {caveats.map(c => <span key={c} style={{ display: 'block', fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>{c}</span>)}
               </p>
             )
           })()}
@@ -804,7 +877,7 @@ export default function AssessPage() {
                       <div style={{ padding: '0 14px 14px', borderTop: '0.5px solid #e8e7e4' }}>
                         <p style={{ fontSize: 13, color: '#555553', lineHeight: 1.65, margin: '10px 0 8px', fontWeight: 400 }}>{ob.what}</p>
                         {/* MODULE CELL. Linked and priced ONLY where the entry maps to an
-                            ObligationId. Where it does not — CSRD, the CS3D group route, the Pay
+                            ObligationId. Where it does not — the CS3D group route, the Pay
                             Transparency day-one duties, the six driver entries — it stays plain
                             text with NO href. Deliberately no /advisory or /pricing fallback: a
                             linked module is a promise that the thing on the other end can be bought
@@ -813,13 +886,18 @@ export default function AssessPage() {
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' as const, marginBottom: 10 }}>
                           <span style={{ fontSize: 11, color: 'var(--color-ink-muted)', flexShrink: 0 }}>Answered by</span>
                           {ob.obligationId ? (
-                            <a href={obligationHref(ob.obligationId)} style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-brand)', textDecoration: 'none' }}>
-                              {obligationModuleLabel(ob.obligationId)} · {priceLabel(obligationPrice(ob.obligationId))} →
+                            <a href={modulesHref(entryObligation(ob).modules)} style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-brand)', textDecoration: 'none' }}>
+                              {modulesLabel(entryObligation(ob).modules)} · {priceLabel(modulesPrice(entryObligation(ob).modules))} →
                             </a>
                           ) : (
                             <span style={{ fontSize: 12, color: '#555553' }}>{ob.module}</span>
                           )}
                         </div>
+                        {/* WHAT THE LINKED MODULES DO NOT COVER, beside the link and price it qualifies.
+                            Today only CSRD carries one (ESRS G1, and the disclosures themselves). */}
+                        {ob.obligationId && entryObligation(ob).caveat && (
+                          <p style={{ fontSize: 12, color: '#555553', lineHeight: 1.6, margin: '-4px 0 10px' }}>{entryObligation(ob).caveat}</p>
+                        )}
                         {/* ONE CTA. There were two, both pointing at /advisory, and the primary read
                             'ThemisIQ: {module} →' — styled as the action, worded like a module link,
                             landing on a page that sells nothing. With the module cell above carrying
@@ -898,6 +976,8 @@ export default function AssessPage() {
     // Questions
     const q = questions[step]
     const val = answers[q.id]
+    // What the options compare against: ai_use is stored wrapped, so its selected option is .answer.
+    const selected = storedOptionValue(val)
     const multiVal = (answers[q.id] as string[] | undefined) || []
     const canProceed = canAdvance(q.type, val)
 
@@ -934,9 +1014,9 @@ export default function AssessPage() {
           {q.type === 'options' && (
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
               {q.options?.map(opt => (
-                <div key={opt.value} onClick={() => setAnswers(a => ({ ...a, [q.id]: opt.value }))} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: `0.5px solid ${val === opt.value ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: val === opt.value ? 'color-mix(in srgb, var(--color-brand) 4%, transparent)' : '#fff' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${val === opt.value ? 'var(--color-brand)' : '#e8e7e4'}`, background: val === opt.value ? 'var(--color-brand)' : 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {val === opt.value && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />}
+                <div key={opt.value} onClick={() => setAnswers(a => selectOption(a, q.id, opt.value))} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: `0.5px solid ${selected === opt.value ? 'var(--color-brand)' : '#e8e7e4'}`, borderRadius: 10, cursor: 'pointer', background: selected === opt.value ? 'color-mix(in srgb, var(--color-brand) 4%, transparent)' : '#fff' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${selected === opt.value ? 'var(--color-brand)' : '#e8e7e4'}`, background: selected === opt.value ? 'var(--color-brand)' : 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {selected === opt.value && <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />}
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{opt.label}</div>
@@ -1001,7 +1081,7 @@ export default function AssessPage() {
           {/* Intro text — only on step 0 */}
           {step === 0 && (
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Free · 3 minutes · Instant results</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Free · 5 minutes · Instant results</div>
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 400, lineHeight: 1.2, marginBottom: '0.75rem', color: '#0d0d0d' }}>
                 Which compliance regulations<br />apply to <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>your company?</span>
               </h1>

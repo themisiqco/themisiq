@@ -25,6 +25,7 @@ const UNANSWERED_ALL = {
   ownership: UNANSWERED,
   ai_use: UNANSWERED,
   supply_chain: UNANSWERED,
+  eu_goods: UNANSWERED,
 }
 
 // THE FIRST TEST OVER app/assess/. This page determines a visitor's regulatory obligations from its
@@ -67,9 +68,9 @@ const answers = (employees: EmployeesAnswer) => ({
   employees,
 })
 
-// The CSRD entry carries NO obligationId — deliberately, because no module covers ESRS G1 (see the
-// comment on Obligation.obligationId in page.tsx, and the CSRD absence note in lib/obligations.ts).
-// So it is identified by name, which is the only stable handle it has.
+// The CSRD entry is identified by name. It has carried `obligationId: 'csrd'` since 1 Oct 2026 (the double
+// materiality assessment, with the ESRS G1 caveat: see lib/obligations.ts), but these tests are about its
+// headcount arms, and the name was the handle they were written against.
 // ⚠️ PAGE COPY, PINNED HERE. It moves when the page's wording moves: the em-dash sweep of 27 Sep 2026
 // turned this separator into a colon, and these three constants are what failed and had to follow.
 const CSRD_NAME = 'CSRD / ESRS: Corporate Sustainability Reporting Directive'
@@ -621,15 +622,15 @@ describe('the unanswered state cannot be mistaken for an answer', () => {
 // changed a verifier-facing state. That cost a migration, a backfill and four SQL files. This page is
 // built the right way round; this test is what keeps it that way while its copy is swept.
 //
-// ⚠️ TWO FILES ARE OUT OF SCOPE, AND ONLY TWO. app/assess/page.tsx declares the labels, and this file
+// ⚠️ THREE FILES ARE OUT OF SCOPE, AND ONLY THREE. app/assess/page.tsx declares the labels, and this file
 // necessarily quotes some to assert on them — obligations.test.ts:83 asserts a timing does NOT name a
 // headcount band, and :168 asserts an obligation's `jurisdiction` field, which happens to read the same
-// as an option label.
+// as an option label. app/assess/coverage.test.ts (1 Oct 2026) pins the CBAM question's labels verbatim.
 //
-// ⚠️ WHAT IT CANNOT CATCH, STATED SO NOBODY RELIES ON IT FURTHER THAN IT REACHES. Thirteen labels are
-// ordinary words — country names, headcount bands, sector names, 'Other' — and they occur all over the
-// tree for unrelated reasons. They are exempt by name below, so a new match on one of THOSE would pass.
-// The list is asserted to be exactly those thirteen, so a fourteenth collision has to be looked at.
+// ⚠️ WHAT IT CANNOT CATCH, STATED SO NOBODY RELIES ON IT FURTHER THAN IT REACHES. Fifteen labels are
+// ordinary words — country names, headcount bands, sector names, 'Other', 'No', 'Not sure' — and they occur
+// all over the tree for unrelated reasons. They are exempt by name below, so a new match on one of THOSE
+// would pass. The list is asserted to be exactly those fifteen, so a sixteenth collision has to be looked at.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Labels that are ordinary vocabulary, with the reason each is expected to occur elsewhere. */
@@ -647,9 +648,11 @@ const SHARED_VOCABULARY: Record<string, string> = {
   '50–249': 'a headcount band; /dashboard/cyber asks its own size question',
   '1,000–4,999': 'a headcount band; /dashboard/cyber asks its own size question',
   '5,000+': 'a headcount band; /dashboard/cyber asks its own size question',
+  'No': 'a yes/no answer; the AI Governance dashboard and the Forced Labour sections store it as a value',
+  'Not sure': 'an answer of its own in the Deals screening and the Forced Labour applicability check',
 }
 
-const OUT_OF_SCOPE = ['app/assess/page.tsx', 'app/assess/obligations.test.ts']
+const OUT_OF_SCOPE = ['app/assess/page.tsx', 'app/assess/obligations.test.ts', 'app/assess/coverage.test.ts']
 
 function optionLabels(): string[] {
   const src = readFileSync(join(REPO_ROOT, 'app/assess/page.tsx'), 'utf8')
@@ -709,7 +712,7 @@ describe('option labels are display-only', () => {
       'rather than a copy, add it to SHARED_VOCABULARY with the reason.').toEqual([])
   })
 
-  it('the shared-vocabulary exemption is exactly these thirteen, and every one still collides', () => {
+  it('the shared-vocabulary exemption is exactly these fifteen, and every one still collides', () => {
     // ⚠️ ASSERTED BOTH WAYS. An exemption that stops colliding is a rule nobody relies on and should be
     // deleted; a fourteenth collision must be a deliberate edit here, because the alternative is that the
     // guard quietly stops covering a label.
@@ -725,7 +728,7 @@ describe('option labels are display-only', () => {
         })
       expect(collides, `${label} no longer occurs elsewhere: delete it from SHARED_VOCABULARY`).toBe(true)
     }
-    expect(Object.keys(SHARED_VOCABULARY).length).toBe(13)
+    expect(Object.keys(SHARED_VOCABULARY).length).toBe(15)
   })
 })
 

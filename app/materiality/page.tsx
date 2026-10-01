@@ -662,7 +662,7 @@ export default function Page() {
       other half, which is the same reasoning as section 4. */}
       <ClosingBand
         heading="Not sure which half you need?"
-        body="Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country."
+        body="Free, takes about five minutes. The free assessment lists the regulations your company is likely to face, country by country."
         primary={{ href: '/assess', label: 'Start the free assessment' }}
         secondary={{ href: '/climate-risk', label: 'See Climate Risk' }}
       />

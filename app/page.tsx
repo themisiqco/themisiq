@@ -78,7 +78,7 @@ export default function Home() {
                 is explicit that opacity composites the text with whatever is behind it, which over a
                 photograph is a different colour in every pixel and unmeasurable. */}
             <p style={{ fontSize: 13, color: 'var(--color-on-dark-muted)', marginTop: '1rem' }}>
-              Three questions, no account needed.
+              Free, takes about five minutes.
             </p>
           </div>
         </div>
@@ -299,7 +299,7 @@ export default function Home() {
               Face the next request with confidence.
             </h2>
             <p style={{ fontSize: 14, color: 'var(--color-on-dark)', lineHeight: 1.65, margin: 0, maxWidth: '54ch' }}>
-              Three questions, no account needed. The free assessment lists the regulations your company is likely to face, country by country.
+              Free, takes about five minutes. The free assessment lists the regulations your company is likely to face, country by country.
             </p>
             {/* ⚠️ SB253_SHORT, NOT A SENTENCE WRITTEN HERE. It renders "SB 253 · 10 Nov 2026 proposed",
             and the word "proposed" is the whole reason the constant exists: lib/sb253.ts records that a

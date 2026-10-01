@@ -4,7 +4,7 @@ import { disclaimerParas } from '../../../../lib/disclaimer'
 // an id is a small stable token; a ready-made href would put the /order-vs-/pricing branch in two
 // places and let a cached page email a link nothing could audit. The route resolves label, href and
 // price from the same accessors /assess renders, so the two cannot quote different figures.
-import { OBLIGATIONS, obligationHref, obligationPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
+import { OBLIGATIONS, resolveObligation, modulesHref, modulesPrice, modulesLabel, priceLabel } from '../../../../lib/obligations'
 import { BRAND, INK_MUTED, ACCENT, STATE_ERROR, STATE_WARN, STATE_INFO, STATE_INFO_WASH } from '@/lib/brand'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
 import {
@@ -190,9 +190,14 @@ export async function POST(req: NextRequest) {
       const id = ob.obligationId
       if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(OBLIGATIONS, id)) return ob.module
       const known = id as keyof typeof OBLIGATIONS
-      const label = modulesLabel(OBLIGATIONS[known].modules)
-      // SITE_URL prefix: obligationHref is relative for the page's benefit and is dead in an inbox.
-      return `<a href="${SITE_URL}${obligationHref(known)}" style="color:${BRAND};text-decoration:none;">${label} · ${priceLabel(obligationPrice(known))} →</a>`
+      // THE SAME RESOLUTION /assess USES, so the email and the page sell the same modules: 'modern-slavery'
+      // adds Forced Labour Reporting only for a covered country whose status is 'available'. `covered` is
+      // client-posted, and resolveObligation narrows it to known country keys rather than trusting it.
+      const o = resolveObligation(known, ob.covered)
+      // SITE_URL prefix: modulesHref is relative for the page's benefit and is dead in an inbox.
+      const link = `<a href="${SITE_URL}${modulesHref(o.modules)}" style="color:${BRAND};text-decoration:none;">${modulesLabel(o.modules)} · ${priceLabel(modulesPrice(o.modules))} →</a>`
+      // The caveat travels with the link and price it qualifies, as on the page (today only CSRD's).
+      return o.caveat ? `${link}<div style="font-size:11px;color:#555553;line-height:1.5;margin-top:4px;">${o.caveat}</div>` : link
     }
     const row = (ob: any, i: number) => `
       <tr style="background:${i % 2 === 0 ? '#fff' : '#f8f7f5'}">

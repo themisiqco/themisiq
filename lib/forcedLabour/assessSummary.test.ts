@@ -12,7 +12,7 @@ import { computeObligations, UNANSWERED, type RevenueAnswer } from '@/app/assess
 // Every single-select spelled out as UNANSWERED on purpose, as app/assess/obligations.test.ts does.
 const UNANSWERED_ALL = {
   driver: UNANSWERED, revenue: UNANSWERED, employees: UNANSWERED, listing: UNANSWERED, ownership: UNANSWERED,
-  ai_use: UNANSWERED, supply_chain: UNANSWERED,
+  ai_use: UNANSWERED, supply_chain: UNANSWERED, eu_goods: UNANSWERED,
 } as const
 const REVENUE_750M: RevenueAnswer = 5
 
