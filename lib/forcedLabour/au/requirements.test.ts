@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 import * as R from './requirements'
 import {
   MODERN_SLAVERY_AU_URL, AU_MSA_GUIDANCE_URL, AU_MSA_PGB_GUIDANCE_URL, AU_MSA_SIGNATURE_GUIDANCE_URL,
-  AU_MSS_SUBMISSION_URL,
+  AU_MSS_SUBMISSION_URL, AU_MSS_ANNEX_URL,
 } from '../../sources'
 
 
@@ -16,7 +16,8 @@ describe('provenance', () => {
     expect(new URL(R.AU_MSA_SOURCE_URL).hostname).toBe('www.legislation.gov.au')
     expect(R.AU_MSA_SOURCE_URL).toMatch(/\/C2018A00153\/latest\/text$/)
     for (const [k, v] of [[R.AU_GUIDANCE_SOURCE_URL, AU_MSA_GUIDANCE_URL], [R.AU_GUIDANCE_PGB_SOURCE_URL, AU_MSA_PGB_GUIDANCE_URL],
-      [R.AU_GUIDANCE_SIGNATURE_SOURCE_URL, AU_MSA_SIGNATURE_GUIDANCE_URL], [R.AU_SUBMISSION_SOURCE_URL, AU_MSS_SUBMISSION_URL]]) {
+      [R.AU_GUIDANCE_SIGNATURE_SOURCE_URL, AU_MSA_SIGNATURE_GUIDANCE_URL], [R.AU_SUBMISSION_SOURCE_URL, AU_MSS_SUBMISSION_URL],
+      [R.AU_REGISTER_ANNEX_SOURCE_URL, AU_MSS_ANNEX_URL]]) {
       expect(k).toBe(v)
       expect(new URL(k).hostname).toBe('modernslaveryregister.gov.au')
       expect(k).toMatch(/\/resources\/[^/]+\.pdf$/)
@@ -28,13 +29,23 @@ describe('provenance', () => {
     expect(R.AU_GUIDANCE_VERSION).toBe('May 2023')
     expect(R.AU_GUIDANCE_SUPPLEMENTARY_VERSION).toBe('March 2026')
     expect(R.AU_SUBMISSION_VERSION).toBe('August 2025')
+    expect(R.AU_REGISTER_ANNEX_PDF_CREATED).toBe('2021-07-27')
+  })
+  it('records the register’s "over" against the Act’s "at least", and the Act decides', () => {
+    expect(R.AU_MSA_S5_1.paragraphs[0].text).toContain('at least $100 million')
+    expect(R.AU_SUBMISSION_REVENUE_DECLARATION).toContain('over AU$100 million')
+    expect(R.AU_SUBMISSION_STATEMENT_TYPES[0].text).toContain('at least AU$100 million')
   })
 })
 
 describe('statute and guidance are kept apart', () => {
   it('every exported quotation is prefixed with the kind of source it comes from', () => {
-    const unlabelled = Object.keys(R).filter(n => !/^AU_(MSA_|GUIDANCE_|SUBMISSION_|REQUIREMENTS_VERIFIED$)/.test(n))
+    const unlabelled = Object.keys(R).filter(n => !/^AU_(MSA_|GUIDANCE_|REGISTER_|SUBMISSION_|REQUIREMENTS_VERIFIED$)/.test(n))
     expect(unlabelled).toEqual([])
+  })
+  it('the annexure indexes the same seven criteria, a) to g)', () => {
+    expect(R.AU_REGISTER_ANNEX_CRITERIA.paragraphs.map(p => p.letter)).toEqual(R.AU_MSA_S16_1.paragraphs.map(p => p.letter))
+    expect(R.AU_REGISTER_ANNEX_NOTE_F).toContain('‘Do not own or control any other entities’')
   })
   it('the seven criteria are mandatory in the Act itself, (a) to (g)', () => {
     expect(R.AU_MSA_S16_1.leadIn).toContain('must')
@@ -291,11 +302,122 @@ describe('GUIDANCE: Supplementary guidance, principal governing body approval an
   })
 })
 
-describe('GUIDANCE: Modern Slavery Statements Register, submission process overview (August 2025)', () => {
+describe('REGISTER GUIDANCE: Modern Slavery Statement Annexure (undated; PDF created 27 Jul 2021)', () => {
+  it('AU_REGISTER_ANNEX_TITLE', () => {
+    expect(R.AU_REGISTER_ANNEX_TITLE).toBe('MODERN SLAVERY ACT 2018 (CTH) – STATEMENT ANNEXURE')
+  })
+  it('AU_REGISTER_ANNEX_APPROVAL', () => {
+    expect(R.AU_REGISTER_ANNEX_APPROVAL).toEqual({
+      heading: 'Principal Governing Body Approval',
+      segments: [
+        'This modern slavery statement was approved by the principal governing body of',
+        'as defined by the Modern Slavery Act 2018 (Cth) (“the Act”) on',
+      ],
+    })
+  })
+  it('AU_REGISTER_ANNEX_SIGNATURE', () => {
+    expect(R.AU_REGISTER_ANNEX_SIGNATURE).toEqual({
+      heading: 'Signature of Responsible Member',
+      segments: [
+        'This modern slavery statement is signed by a responsible member of',
+        'as defined by the Act:',
+      ],
+    })
+  })
+  it('AU_REGISTER_ANNEX_CRITERIA_INTRO', () => {
+    expect(R.AU_REGISTER_ANNEX_CRITERIA_INTRO).toBe('Please indicate the page number/s of your statement that addresses each of the mandatory criteria in section 16 of the Act:')
+  })
+  it('AU_REGISTER_ANNEX_CRITERIA_COLUMNS', () => {
+    expect(R.AU_REGISTER_ANNEX_CRITERIA_COLUMNS).toEqual([
+      'Mandatory criteria',
+      'Page number/s',
+    ])
+  })
+  it('AU_REGISTER_ANNEX_CRITERIA', () => {
+    expect(R.AU_REGISTER_ANNEX_CRITERIA).toEqual({
+      leadIn: 'Mandatory criteria',
+      paragraphs: [
+        { letter: 'a', text: 'Identify the reporting entity.' },
+        { letter: 'b', text: 'Describe the reporting entity’s structure, operations and supply chains.' },
+        { letter: 'c', text: 'Describe the risks of modern slavery practices in the operations and supply chains of the reporting entity and any entities it owns or controls.' },
+        { letter: 'd', text: 'Describe the actions taken by the reporting entity and any entities it owns or controls to assess and address these risks, including due diligence and remediation processes.' },
+        { letter: 'e', text: 'Describe how the reporting entity assesses the effectiveness of these actions.' },
+        { letter: 'f', text: 'Describe the process of consultation on the development of the statement with any entities the reporting entity owns or controls (a joint statement must also describe consultation with the entity covered by the statement).*' },
+        { letter: 'g', text: 'Any other information that the reporting entity, or the entity giving the statement, considers relevant.**' },
+      ],
+    })
+  })
+  it('AU_REGISTER_ANNEX_NOTE_F', () => {
+    expect(R.AU_REGISTER_ANNEX_NOTE_F).toBe('If your entity does not own or control any other entities and you are not submitting a joint statement, please include the statement ‘Do not own or control any other entities’ instead of a page number.')
+  })
+  it('AU_REGISTER_ANNEX_NOTE_G', () => {
+    expect(R.AU_REGISTER_ANNEX_NOTE_G).toBe('You are not required to include information for this criterion if you consider your responses to the other six criteria are sufficient.')
+  })
+})
+
+describe('REGISTER GUIDANCE: Modern Slavery Statements Register, submission process overview (August 2025)', () => {
   it('AU_SUBMISSION_PDF', () => {
     expect(R.AU_SUBMISSION_PDF).toBe('Upload one PDF statement (max 400MB; searchable PDF recommended).')
   })
   it('AU_SUBMISSION_SUPPORTING', () => {
     expect(R.AU_SUBMISSION_SUPPORTING).toBe('Supporting documents will not be made public.')
+  })
+  it('AU_SUBMISSION_CATEGORIES', () => {
+    expect(R.AU_SUBMISSION_CATEGORIES).toBe('This page displays the three categories under which entities can submit a Modern Slavery Statement in accordance with the Act.')
+  })
+  it('AU_SUBMISSION_VOLUNTARY_NOTICE', () => {
+    expect(R.AU_SUBMISSION_VOLUNTARY_NOTICE).toBe('Once selected, you will be prompted to confirm whether a voluntary notice has been submitted. As required under subsection 6(1) of the Act, this notice must be lodged before the end of the reporting period.')
+  })
+  it('AU_SUBMISSION_ENTITY_IDS', () => {
+    expect(R.AU_SUBMISSION_ENTITY_IDS).toEqual([
+      'For each entity, you must provide the ABN or ACN. This information will be validated, and the entity name will be auto-filled.',
+      'If you enter an ARBN or select Other, you will need to manually enter the entity’s name.',
+    ])
+  })
+  it('AU_SUBMISSION_REVENUE_DECLARATION', () => {
+    expect(R.AU_SUBMISSION_REVENUE_DECLARATION).toBe('For each entity, you will be asked to confirm whether the annual consolidated revenue is over AU$100 million. Your answer determines whether the entity is a reporting entity with obligations under the Act, or an ‘other’ entity included in the statement.')
+  })
+  it('AU_SUBMISSION_COUNTRY_SECTOR', () => {
+    expect(R.AU_SUBMISSION_COUNTRY_SECTOR).toBe('The country and industry sector questions must be completed for each reporting entity and the parent entity.')
+  })
+  it('AU_SUBMISSION_TYPE_CHECK', () => {
+    expect(R.AU_SUBMISSION_TYPE_CHECK).toBe('For example, if you selected a single statement in Step 1 but included more than one entity with annual consolidated revenue over AU$100 million, an error notification will appear.')
+  })
+  it('AU_SUBMISSION_ALL_ENTITIES', () => {
+    expect(R.AU_SUBMISSION_ALL_ENTITIES).toBe('Please ensure that all entities covered by the Modern Slavery Statement are included, helping to maintain complete and accurate reporting and supporting ongoing compliance.')
+  })
+  it('AU_SUBMISSION_REPORTING_PERIOD', () => {
+    expect(R.AU_SUBMISSION_REPORTING_PERIOD).toEqual([
+      'Please select the start date of your reporting period. The end date will be automatically calculated by adding 12 months. You can adjust the end date if needed.',
+      'The selected reporting period will be compared with the most recent submitted or published statement for your entity. The system will alert you if any gaps, overlaps or duplicate periods are detected.',
+    ])
+  })
+  it('AU_SUBMISSION_PERIOD_DISCREPANCY', () => {
+    expect(R.AU_SUBMISSION_PERIOD_DISCREPANCY).toEqual({
+      leadIn: 'If any discrepancy is identified, to proceed with your submission, you must either:',
+      items: [
+        'revise the reporting period, or',
+        'provide additional information to explain the issue flagged by the system.',
+      ],
+    })
+  })
+  it('AU_SUBMISSION_ONE_PDF', () => {
+    expect(R.AU_SUBMISSION_ONE_PDF).toBe('You can upload only one PDF file for the Modern Slavery Statement.')
+  })
+  it('AU_SUBMISSION_SUPPORTING_OPTIONAL', () => {
+    expect(R.AU_SUBMISSION_SUPPORTING_OPTIONAL).toBe('Supporting documents are optional, and you may upload multiple PDF files.')
+  })
+  it('AU_SUBMISSION_APPROVED_PUBLISHED', () => {
+    expect(R.AU_SUBMISSION_APPROVED_PUBLISHED).toBe('Approved Modern Slavery Statements will be published on the register.')
+  })
+  it('AU_SUBMISSION_SCREEN_INTRO', () => {
+    expect(R.AU_SUBMISSION_SCREEN_INTRO).toBe('Under the Commonwealth Modern Slavery Act 2018, Australian entities, or any entity that carries on business in Australia, with an annual consolidated revenue of at least AU$100 million are required to submit a Modern Slavery Statement for each reporting period. A statement must set out the reporting entity\'s actions to assess and address modern slavery risks in their global operations and supply chains.')
+  })
+  it('AU_SUBMISSION_STATEMENT_TYPES', () => {
+    expect(R.AU_SUBMISSION_STATEMENT_TYPES).toEqual([
+      { name: 'Single statement', text: 'A single statement applies to one entity with annual consolidated revenue of at least AU$100 million.' },
+      { name: 'Joint statement', text: 'A joint statement applies to two or more entities, each with annual consolidated revenue of at least AU$100 million.' },
+      { name: 'Voluntary statement', text: 'A voluntary statement applies to entities that do not meet the AU$100 million annual consolidated revenue threshold but elect to comply with the Act\'s reporting requirements.' },
+    ])
   })
 })

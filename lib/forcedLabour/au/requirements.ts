@@ -15,7 +15,15 @@
 // the six-month deadline are all in the Act (ss.13, 14, 16), so they are requirements, not
 // recommendations. The guidance adds what the Department will and will not publish, and how. Names say
 // which is which: AU_MSA_ is the Act; AU_GUIDANCE_ is the Department's guidance (the May 2023 guidance and
-// the March 2026 supplements); AU_SUBMISSION_ is the register's submission process.
+// the March 2026 supplements); AU_REGISTER_ANNEX_ and AU_SUBMISSION_ are register guidance (the statement
+// annexure and the submission process overview).
+//
+// ⚠️ THE REGISTER'S DOCUMENTS ARE REGISTER GUIDANCE, NOT THE APPROVED FORM. s.13(2)(b) and s.14(2)(b)
+// require a statement "prepared in a form approved by the Minister". Neither the statement annexure
+// (AU_REGISTER_ANNEX_) nor the submission process overview (AU_SUBMISSION_) describes itself as that
+// form, and nothing read on 1 Oct 2026 identifies one. OPEN QUESTION: lib/forcedLabour/requirementsMap.ts
+// OPEN_QUESTIONS. The register also writes the threshold as "over AU$100 million" in places; the Act says
+// "at least $100 million" (AU_MSA_S5_1), and the Act decides.
 //
 // ⚠️ THERE IS NO FINANCIAL PENALTY IN THE ACT AS COMPILED. s.16A (a request, then naming) is the only
 // consequence. An announcement of 17 July 2026 could not be reached from an official source when this was
@@ -23,7 +31,7 @@
 
 import {
   MODERN_SLAVERY_AU_URL, AU_MSA_GUIDANCE_URL, AU_MSA_PGB_GUIDANCE_URL, AU_MSA_SIGNATURE_GUIDANCE_URL,
-  AU_MSS_SUBMISSION_URL,
+  AU_MSS_SUBMISSION_URL, AU_MSS_ANNEX_URL,
 } from '../../sources'
 
 
@@ -50,6 +58,13 @@ export const AU_GUIDANCE_SUPPLEMENTARY_VERSION = 'March 2026'
 /** The register's submission process overview, dated August 2025. */
 export const AU_SUBMISSION_SOURCE_URL = AU_MSS_SUBMISSION_URL
 export const AU_SUBMISSION_VERSION = 'August 2025'
+/**
+ * The register's "Modern Slavery Statement Annexure": one page, undated (the PDF was created 27 Jul 2021,
+ * last modified 3 Aug 2021). Read from the copy Lisa saved on 1 Oct 2026, whose SHA-256 matched the file the
+ * register served that day. The register link returned 122 bytes earlier the same day.
+ */
+export const AU_REGISTER_ANNEX_SOURCE_URL = AU_MSS_ANNEX_URL
+export const AU_REGISTER_ANNEX_PDF_CREATED = '2021-07-27'
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
 // STATUTE: Modern Slavery Act 2018 (Cth)
@@ -325,8 +340,80 @@ export const AU_GUIDANCE_SIGNATURE_IN_STATEMENT =
   'Entities should ensure the approval of a responsible member is included in the statement and not in an external document.'
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
-// GUIDANCE: Modern Slavery Statements Register, submission process overview (August 2025)
+// REGISTER GUIDANCE: Modern Slavery Statement Annexure (undated; PDF created 27 Jul 2021)
 // ════════════════════════════════════════════════════════════════════════════════════════════════════
+// A one-page form: approval, signature, and a page index for the seven criteria. Footnote markers are
+// omitted; the two text-layer word splits ("th e", "trust ee") are read as the page prints them. Not
+// described as the approved form.
+
+/** The annexure's heading. It does not call itself the form approved by the Minister under s.13(2)(b). */
+export const AU_REGISTER_ANNEX_TITLE =
+  'MODERN SLAVERY ACT 2018 (CTH) – STATEMENT ANNEXURE'
+
+/**
+ * A blank field follows each segment: the entity, then the date. Footnote marker 1 (the s.4 definition)
+ * omitted.
+ */
+export const AU_REGISTER_ANNEX_APPROVAL = {
+  heading: 'Principal Governing Body Approval',
+  segments: [
+    'This modern slavery statement was approved by the principal governing body of',
+    'as defined by the Modern Slavery Act 2018 (Cth) (“the Act”) on',
+  ],
+} as const
+
+/**
+ * A blank field for the entity follows the first segment; after the second, an unlabelled signature box and
+ * two unlabelled lines. Footnote marker 2 omitted.
+ */
+export const AU_REGISTER_ANNEX_SIGNATURE = {
+  heading: 'Signature of Responsible Member',
+  segments: [
+    'This modern slavery statement is signed by a responsible member of',
+    'as defined by the Act:',
+  ],
+} as const
+
+/** The criteria index: a page number for each criterion. */
+export const AU_REGISTER_ANNEX_CRITERIA_INTRO =
+  'Please indicate the page number/s of your statement that addresses each of the mandatory criteria in section 16 of the Act:'
+
+/** The index table's column headings. */
+export const AU_REGISTER_ANNEX_CRITERIA_COLUMNS = [
+  'Mandatory criteria',
+  'Page number/s',
+] as const
+
+/**
+ * The index rows, a) to g), as printed, with the asterisks that point to the two notes below. The register's
+ * restatement, not the Act: s.16(1) is AU_MSA_S16_1.
+ */
+export const AU_REGISTER_ANNEX_CRITERIA = {
+  leadIn: 'Mandatory criteria',
+  paragraphs: [
+    { letter: 'a', text: 'Identify the reporting entity.' },
+    { letter: 'b', text: 'Describe the reporting entity’s structure, operations and supply chains.' },
+    { letter: 'c', text: 'Describe the risks of modern slavery practices in the operations and supply chains of the reporting entity and any entities it owns or controls.' },
+    { letter: 'd', text: 'Describe the actions taken by the reporting entity and any entities it owns or controls to assess and address these risks, including due diligence and remediation processes.' },
+    { letter: 'e', text: 'Describe how the reporting entity assesses the effectiveness of these actions.' },
+    { letter: 'f', text: 'Describe the process of consultation on the development of the statement with any entities the reporting entity owns or controls (a joint statement must also describe consultation with the entity covered by the statement).*' },
+    { letter: 'g', text: 'Any other information that the reporting entity, or the entity giving the statement, considers relevant.**' },
+  ],
+} as const
+
+/** The * note, to criterion f). */
+export const AU_REGISTER_ANNEX_NOTE_F =
+  'If your entity does not own or control any other entities and you are not submitting a joint statement, please include the statement ‘Do not own or control any other entities’ instead of a page number.'
+
+/** The ** note, to criterion g). */
+export const AU_REGISTER_ANNEX_NOTE_G =
+  'You are not required to include information for this criterion if you consider your responses to the other six criteria are sufficient.'
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+// REGISTER GUIDANCE: Modern Slavery Statements Register, submission process overview (August 2025)
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+// What the register asks when a statement is lodged. Two entries are transcribed from a screenshot and say
+// so. Not described as the approved form.
 
 /** Submission process overview. */
 export const AU_SUBMISSION_PDF =
@@ -335,3 +422,81 @@ export const AU_SUBMISSION_PDF =
 /** Submission process overview. */
 export const AU_SUBMISSION_SUPPORTING =
   'Supporting documents will not be made public.'
+
+/** Step 1. The three are named only in the screenshot: AU_SUBMISSION_STATEMENT_TYPES. */
+export const AU_SUBMISSION_CATEGORIES =
+  'This page displays the three categories under which entities can submit a Modern Slavery Statement in accordance with the Act.'
+
+/** Step 1, voluntary statement. */
+export const AU_SUBMISSION_VOLUNTARY_NOTICE =
+  'Once selected, you will be prompted to confirm whether a voluntary notice has been submitted. As required under subsection 6(1) of the Act, this notice must be lodged before the end of the reporting period.'
+
+/** Step 2, entity details: an identifier for every entity covered. */
+export const AU_SUBMISSION_ENTITY_IDS = [
+  'For each entity, you must provide the ABN or ACN. This information will be validated, and the entity name will be auto-filled.',
+  'If you enter an ARBN or select Other, you will need to manually enter the entity’s name.',
+] as const
+
+/**
+ * Step 2. ⚠️ "over AU$100 million": the Act says "at least $100 million" (s.5(1)(a)), and the same document's
+ * screenshot says "at least". The Act decides; an entity at exactly AU$100 million is a reporting entity.
+ */
+export const AU_SUBMISSION_REVENUE_DECLARATION =
+  'For each entity, you will be asked to confirm whether the annual consolidated revenue is over AU$100 million. Your answer determines whether the entity is a reporting entity with obligations under the Act, or an ‘other’ entity included in the statement.'
+
+/** Step 2, mandatory fields. */
+export const AU_SUBMISSION_COUNTRY_SECTOR =
+  'The country and industry sector questions must be completed for each reporting entity and the parent entity.'
+
+/** Step 2, validation against the statement type. */
+export const AU_SUBMISSION_TYPE_CHECK =
+  'For example, if you selected a single statement in Step 1 but included more than one entity with annual consolidated revenue over AU$100 million, an error notification will appear.'
+
+/** Step 2 note. */
+export const AU_SUBMISSION_ALL_ENTITIES =
+  'Please ensure that all entities covered by the Modern Slavery Statement are included, helping to maintain complete and accurate reporting and supporting ongoing compliance.'
+
+/** Step 3. */
+export const AU_SUBMISSION_REPORTING_PERIOD = [
+  'Please select the start date of your reporting period. The end date will be automatically calculated by adding 12 months. You can adjust the end date if needed.',
+  'The selected reporting period will be compared with the most recent submitted or published statement for your entity. The system will alert you if any gaps, overlaps or duplicate periods are detected.',
+] as const
+
+/** Step 3. */
+export const AU_SUBMISSION_PERIOD_DISCREPANCY = {
+  leadIn: 'If any discrepancy is identified, to proceed with your submission, you must either:',
+  items: [
+    'revise the reporting period, or',
+    'provide additional information to explain the issue flagged by the system.',
+  ],
+} as const
+
+/** Step 4. */
+export const AU_SUBMISSION_ONE_PDF =
+  'You can upload only one PDF file for the Modern Slavery Statement.'
+
+/** Step 4. */
+export const AU_SUBMISSION_SUPPORTING_OPTIONAL =
+  'Supporting documents are optional, and you may upload multiple PDF files.'
+
+/** Step 4. The next sentence is AU_SUBMISSION_SUPPORTING. */
+export const AU_SUBMISSION_APPROVED_PUBLISHED =
+  'Approved Modern Slavery Statements will be published on the register.'
+
+/**
+ * TRANSCRIBED FROM THE SCREENSHOT on page 1 (the register's submission page), checked by eye on 1 Oct 2026.
+ * Not in the text layer. The apostrophe is straight as it appears.
+ */
+export const AU_SUBMISSION_SCREEN_INTRO =
+  'Under the Commonwealth Modern Slavery Act 2018, Australian entities, or any entity that carries on business in Australia, with an annual consolidated revenue of at least AU$100 million are required to submit a Modern Slavery Statement for each reporting period. A statement must set out the reporting entity\'s actions to assess and address modern slavery risks in their global operations and supply chains.'
+
+/**
+ * TRANSCRIBED FROM THE SCREENSHOT on page 1, "Which statement type applies to your entity?", checked by eye
+ * on 1 Oct 2026. Not in the text layer. ⚠️ The joint definition is narrower than s.14, which lets a joint
+ * statement cover one or more reporting entities.
+ */
+export const AU_SUBMISSION_STATEMENT_TYPES = [
+  { name: 'Single statement', text: 'A single statement applies to one entity with annual consolidated revenue of at least AU$100 million.' },
+  { name: 'Joint statement', text: 'A joint statement applies to two or more entities, each with annual consolidated revenue of at least AU$100 million.' },
+  { name: 'Voluntary statement', text: 'A voluntary statement applies to entities that do not meet the AU$100 million annual consolidated revenue threshold but elect to comply with the Act\'s reporting requirements.' },
+] as const

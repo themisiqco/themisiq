@@ -12,20 +12,36 @@ this file is a description of it.
 
 ## 0. Before you start
 
-You need, in one terminal:
+You need, in one terminal, the connection exactly as `docs/backup-record.md`
+§3 sets it (session pooler host; the direct `db.<project id>.supabase.co` host is
+IPv6-only and does not resolve on this network). The values are in §1 of that
+file; the placeholders below are not to be filled in here:
 
 ```
-export DBURL='postgresql://…'          # the connection string from docs/backup-record.md
+export PGHOST=<session pooler host> PGPORT=5432 PGUSER=postgres.<project id> PGDATABASE=postgres
+read -rs PGPASSWORD && export PGPASSWORD
 ```
 
-The password is read from `~/.pgpass`, not from the command line. You will see
-this on every run:
+The password is typed at the prompt: nothing is shown, and it enters no file and
+no shell history. `pg_dump` and `psql` read these variables themselves.
 
-> `DeprecationWarning: pgpass support is deprecated and will be removed in pg@9.0.`
+`scripts/erase-account.mjs` still requires `DBURL`. Build it from the same
+variables. **It contains no password**: node-pg takes the password from
+`PGPASSWORD` when the connection string has none
+(`node_modules/pg/lib/connection-parameters.js`, `val('password', …)`):
 
-**That warning is expected and means nothing is wrong.** It fires only because
-`~/.pgpass` supplied the password successfully. It cannot be turned off without
-changing how the password is read — see the note at the end of this file.
+```
+export DBURL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}?sslmode=require"
+```
+
+When you have finished, **always**:
+
+```
+unset PGPASSWORD DBURL
+```
+
+If `~/.pgpass` exists from the earlier method, it is a file holding the
+password, and this method does not need it.
 
 The script needs a database role that can see every row. On Supabase that is the
 `postgres` role in the connection string above, **not** a pooled application
@@ -74,7 +90,7 @@ Copy the `id`. Everything below uses it as `<UUID>`.
 Not optional. This is the only route back if something is wrong.
 
 ```
-pg_dump "$DBURL" -Fc --no-owner -f ~/themisiq-backups/full_$(date +%Y%m%d).dump
+pg_dump -Fc --no-owner -f ~/themisiq-backups/full_$(date +%Y%m%d).dump
 ```
 
 ⚠️ **`pg_dump -f` overwrites silently.** If a file with today's date is already
@@ -433,18 +449,13 @@ erased the export is no longer possible.
 
 ## Appendix — the pgpass warning
 
-It cannot be suppressed without changing how the password is read.
+> `DeprecationWarning: pgpass support is deprecated and will be removed in pg@9.0.`
 
-`pg` emits it through `util.deprecate` at the moment `~/.pgpass` returns a
-password (`node_modules/pg/lib/client.js:299-318`). The only ways to stop it are:
+With the method in §0 you should not see this. `pg` emits it only when it falls
+back to `~/.pgpass` for a password (`node_modules/pg/lib/client.js`, the
+`pgPass(...)` branch), and it falls back only when neither the connection string
+nor `PGPASSWORD` supplies one.
 
-1. Supply the password some other way — an async `password` function, or putting
-   it in `DBURL`. Both change how the password is read, and putting a production
-   password in a shell variable is worse practice than `~/.pgpass` with mode
-   `0600`.
-2. `process.noDeprecation = true` or `node --no-deprecation`, which silences
-   **every** deprecation warning in the process, including ones about real
-   problems.
-
-Neither is worth it for a cosmetic line in a procedure run a few times a year.
-Leave it, and know what it means.
+**If you do see it, `PGPASSWORD` is not set in this terminal** and the password
+came from `~/.pgpass` instead. The run is not wrong, but it is not using the §0
+method: set `PGPASSWORD` as §0 shows, and consider removing `~/.pgpass`.

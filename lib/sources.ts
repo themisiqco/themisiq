@@ -385,9 +385,18 @@ export const AU_MSA_PGB_GUIDANCE_URL =
 export const AU_MSA_SIGNATURE_GUIDANCE_URL =
   'https://modernslaveryregister.gov.au/resources/MODERN_SLAVERY_ACT_SUPPLEMENTARY_GUIDANCE_-_Signature_of_Responsible_Member__2026.pdf'
 
-// Intent: the register's submission process overview (August 2025): one PDF, up to 400MB.
+// Intent: the register's submission process overview (August 2025): statement types, per-entity identifiers,
+// the revenue declaration, country and sector, reporting period checks, one PDF up to 400MB. REGISTER
+// GUIDANCE: it does not describe itself as the form approved by the Minister under s.13(2)(b).
 // @source-status: verified 2026-10-01
 export const AU_MSS_SUBMISSION_URL = 'https://modernslaveryregister.gov.au/resources/MSS_Submission_Overview.pdf'
+
+// Intent: the register's "Modern Slavery Statement Annexure": approval and signature wording and a page
+// index for the s.16(1) criteria. REGISTER GUIDANCE, undated (PDF created 27 Jul 2021); it does not describe
+// itself as the form approved by the Minister under s.13(2)(b). Returned 122 bytes on the morning of
+// 1 Oct 2026, then served the full PDF later that day, byte-identical (SHA-256) to the copy Lisa saved.
+// @source-status: verified 2026-10-01
+export const AU_MSS_ANNEX_URL = 'https://modernslaveryregister.gov.au/resources/Modern_Slavery_Statement_Annex.pdf'
 
 // Intent: the Modern Slavery Statements Register (s.18 of the Act), where statements are lodged and published.
 // @source-status: resolves 2026-10-01

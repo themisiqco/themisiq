@@ -28,7 +28,8 @@ it is lost, the only route is Project Settings → Database → Reset database
 password. Losing it once cost the better part of a morning.
 
 **The direct connection host** (`db.lugnholqfstzefxrzjwe.supabase.co`) is
-IPv6-only and unreachable from this machine. Use the pooler above.
+IPv6-only and unreachable from this machine. Use the pooler above, as §3 sets
+out.
 
 **Nothing in the application uses this password.** The Next.js app
 authenticates with the Supabase API keys in its environment variables. This
@@ -70,29 +71,42 @@ files in `db/dumps/` were checked and carry no customer rows.
 
 Requires `psql` / `pg_dump` (installed via `brew install libpq`).
 
-Set the connection string for the session — **single quotes**, so the shell
-does not interpret characters in the password:
+⚠️ **Use the session pooler, never the direct host.** The direct connection
+(`db.<project id>.supabase.co`) is IPv6-only and does not resolve on this
+network. The method below worked on 1 Oct 2026. It keeps the password out of
+the command line, the shell history and any connection string: `pg_dump` and
+`psql` read the `PG*` variables themselves, so no URL is passed at all.
+
+Set the connection for the session. The values are the ones in §1 (host,
+username); the placeholders below are not to be filled in here:
 
 ```
-export DBURL='postgresql://postgres.lugnholqfstzefxrzjwe:PASSWORD@aws-1-us-east-2.pooler.supabase.com:5432/postgres'
+export PGHOST=<session pooler host> PGPORT=5432 PGUSER=postgres.<project id> PGDATABASE=postgres
 ```
 
-Then clear it from history immediately:
+Then the password, typed at the prompt (nothing is shown as you type, and it
+does not enter the history), and press Return:
 
 ```
-history -c && history -w
+read -rs PGPASSWORD && export PGPASSWORD
 ```
 
 Test:
 
 ```
-psql "$DBURL" -c "select now();"
+psql -c "select now();"
+```
+
+When the dumps below are done, **always**:
+
+```
+unset PGPASSWORD
 ```
 
 **Full backup** — the one that matters:
 
 ```
-pg_dump "$DBURL" -Fc --no-owner -f ~/themisiq-backups/full_$(date +%Y%m%d).dump
+pg_dump -Fc --no-owner -f ~/themisiq-backups/full_$(date +%Y%m%d).dump
 ```
 
 ⚠️ **`pg_dump -f` overwrites silently.** No warning, no prompt: if the target
@@ -105,14 +119,14 @@ iCloud, because that copy had already been made and hash-verified.
 **Schema, for the repo:**
 
 ```
-pg_dump "$DBURL" --schema-only --schema=public --no-owner \
-  -f db/dumps/schema_public_$(date +%Y%m%d).sql
+pg_dump --schema-only --schema=public --no-owner \
+  -f db/dumps/schema_public_$(date +%Y%m%d_%H%M).sql
 ```
 
 **Reference data, for the repo:**
 
 ```
-pg_dump "$DBURL" --data-only --no-owner --table='public.mr_*' \
+pg_dump --data-only --no-owner --table='public.mr_*' \
   -f db/dumps/mr_reference_data_$(date +%Y%m%d).sql
 ```
 

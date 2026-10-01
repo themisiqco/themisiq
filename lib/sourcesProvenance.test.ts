@@ -89,6 +89,7 @@ const EXPECTED: Record<string, Status> = {
   AU_MSA_PGB_GUIDANCE_URL: 'verified',
   AU_MSA_SIGNATURE_GUIDANCE_URL: 'verified',
   AU_MSS_SUBMISSION_URL: 'verified',
+  AU_MSS_ANNEX_URL: 'verified',
   AU_MSS_REGISTER_URL: 'resolves',
 
   ISO_14064_3_URL: 'form-verified',

@@ -8,10 +8,16 @@
 # Take an encrypted, verified, off-machine backup of the ThemisIQ database.
 #
 # Usage:
-#   export DBURL='postgresql://...'            # the pooler string, see docs/backup-record.md
+#   export PGHOST=<session pooler host> PGPORT=5432 PGUSER=postgres.<project id> PGDATABASE=postgres
+#   read -rs PGPASSWORD && export PGPASSWORD    # typed at the prompt; never written in a file or the history
 #   export THEMISIQ_BACKUP_PUBKEY='age1...'    # age recipient, public half only
 #   export THEMISIQ_BACKUP_DEST="$HOME/Library/CloudStorage/OneDrive-themisiqco/themisiq-backups"
 #   scripts/backup.sh
+#   unset PGPASSWORD                           # always, when it has finished
+#
+# The connection is the PG* variables, as docs/backup-record.md section 3 sets them; pg_dump reads them
+# itself, so no connection string is passed and none is ever written. Use the session pooler host: the
+# direct host (db.<project id>.supabase.co) is IPv6-only and does not resolve on this network.
 #
 # What it leaves behind, per run:
 #   full_<stamp>.dump.age      the encrypted dump, locally and at the destination
@@ -56,8 +62,13 @@ RECORD="${REPO_ROOT}/docs/backup-record.md"
 
 step "Preflight"
 
-# The connection string is never printed, here or anywhere below.
-[ -n "${DBURL:-}" ]                   || die "DBURL is not set. Export the pooler connection string first; see docs/backup-record.md section 3."
+# The password is never printed, here or anywhere below.
+for v in PGHOST PGUSER PGDATABASE PGPASSWORD; do
+  [ -n "${!v:-}" ] || die "${v} is not set. Set the connection as docs/backup-record.md section 3 shows (PGHOST, PGPORT, PGUSER, PGDATABASE, then read -rs PGPASSWORD)."
+done
+case "$PGHOST" in
+  db.*.supabase.co) die "PGHOST is the direct host, which is IPv6-only and does not resolve on this network. Use the session pooler host; see docs/backup-record.md section 1." ;;
+esac
 [ -n "${THEMISIQ_BACKUP_PUBKEY:-}" ]  || die "THEMISIQ_BACKUP_PUBKEY is not set. It holds the age recipient (the public half, age1...). Without it this script would write an unencrypted dump to a cloud folder, so it refuses instead."
 [ -n "${THEMISIQ_BACKUP_DEST:-}" ]    || die "THEMISIQ_BACKUP_DEST is not set. It is the OneDrive folder the encrypted backup is copied to."
 
@@ -75,6 +86,7 @@ for existing in "$DUMP" "$PLAIN_SHA" "$ENC"; do
   [ -e "$existing" ] && die "Target already exists, refusing to overwrite: ${existing}"
 done
 
+say "host                  ${PGHOST}:${PGPORT:-5432} as ${PGUSER}"
 say "stamp                 ${STAMP}"
 say "local directory       ${LOCAL_DIR}"
 say "destination           ${THEMISIQ_BACKUP_DEST}"
@@ -82,7 +94,7 @@ say "retention             ${RETAIN_DAYS} days"
 say "record                ${RECORD}"
 
 step "1. Dump"
-pg_dump "$DBURL" -Fc --no-owner -f "$DUMP"
+pg_dump -Fc --no-owner -f "$DUMP"
 [ -s "$DUMP" ] || die "pg_dump produced an empty file: ${DUMP}"
 DUMP_BYTES="$(filesize "$DUMP")"
 say "wrote                 $(basename "$DUMP")"
@@ -205,3 +217,4 @@ say "local                 ${LOCAL_DIR}"
 say "destination           ${THEMISIQ_BACKUP_DEST}"
 say "plaintext removed     yes"
 say "restore needs         the age private key, then pg_restore; see docs/backup-record.md section 4"
+say "now                   unset PGPASSWORD (this script cannot clear it from your shell)"

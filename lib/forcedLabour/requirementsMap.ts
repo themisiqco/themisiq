@@ -78,26 +78,32 @@ export const AU_MAP: Record<MapTopic, readonly Cell[]> = {
     { finding: 'Consolidated revenue is the entity’s total revenue, or with controlled entities as a group, worked out under the accounting standards; control is as the accounting standards define it.', basis: 'statute', refs: ['au:AU_MSA_DEF_CONSOLIDATED_REVENUE', 'au:AU_MSA_DEF_CONTROL'] },
     { finding: 'Currency: the Act writes $100 million; the guidance writes AU$100 million. Neither says how revenue reported in another currency is converted.', basis: 'statute and guidance', refs: ['au:AU_MSA_S5_1#a', 'au:AU_GUIDANCE_THRESHOLD'] },
     { finding: 'Reporting period: a financial year, or another annual accounting period applicable to the entity.', basis: 'statute', refs: ['au:AU_MSA_DEF_REPORTING_PERIOD'] },
+    { finding: 'The register asks each entity to declare whether its revenue is "over AU$100 million", and that answer decides whether it is a reporting entity or an "other" entity in the statement. The Act says "at least $100 million", as does the register’s own submission screen. The Act decides: at exactly AU$100 million an entity is a reporting entity.', basis: 'statute and guidance', refs: ['au:AU_MSA_S5_1#a', 'au:AU_SUBMISSION_REVENUE_DECLARATION', 'au:AU_SUBMISSION_TYPE_CHECK', 'au:AU_SUBMISSION_SCREEN_INTRO'] },
   ],
   content: [
     { finding: 'Mandatory for each reporting entity covered: (a) identify it; (b) structure, operations and supply chains; (c) risks, including in entities it owns or controls; (d) actions to assess and address them, including due diligence and remediation; (e) how it assesses effectiveness; (f) the consultation process; (g) any other relevant information.', basis: 'statute and guidance', refs: ['au:AU_MSA_S16_1', 'au:AU_GUIDANCE_SEVEN_CRITERIA'] },
     { finding: 'Policies and staff training are examples of actions under (d), not separate criteria.', basis: 'statute', refs: ['au:AU_MSA_S16_1_EXAMPLE'] },
     { finding: 'Mandatory: details of approval by the principal governing body or bodies, and for a joint statement under (d)(iii), why the other bases were not practicable.', basis: 'statute', refs: ['au:AU_MSA_S16_2'] },
     { finding: 'Recommended: use the seven criteria as headings.', basis: 'guidance', refs: ['au:AU_GUIDANCE_HEADINGS'] },
+    { finding: 'The register’s statement annexure indexes the seven criteria and asks for the page numbers that address each. For f), an entity that owns or controls no other entities and is not giving a joint statement writes ‘Do not own or control any other entities’ instead of a page number; g) may be left out if the other six answers are sufficient.', basis: 'guidance', refs: ['au:AU_REGISTER_ANNEX_TITLE', 'au:AU_REGISTER_ANNEX_CRITERIA_INTRO', 'au:AU_REGISTER_ANNEX_CRITERIA_COLUMNS', 'au:AU_REGISTER_ANNEX_CRITERIA', 'au:AU_REGISTER_ANNEX_NOTE_F', 'au:AU_REGISTER_ANNEX_NOTE_G'] },
   ],
   approval: [
     { finding: 'Approved by the principal governing body and signed by a responsible member (a member of that body authorized to sign, or the sole trustee, administrator and so on). May be signed electronically.', basis: 'statute', refs: ['au:AU_MSA_S13_2#c', 'au:AU_MSA_S13_2#d', 'au:AU_MSA_DEF_PRINCIPAL_GOVERNING_BODY', 'au:AU_MSA_DEF_RESPONSIBLE_MEMBER', 'au:AU_MSA_SIGNED_ELECTRONICALLY'] },
     { finding: 'Approval cannot be delegated (not to an individual, executive committee, sub-committee or working group); unclear approval or an unclear signature means the statement is not published. Recommended: give the approval date. The signature should show name, title, and a signature or explicit approval wording, inside the statement.', basis: 'guidance', refs: ['au:AU_GUIDANCE_PGB_NO_DELEGATION', 'au:AU_GUIDANCE_PGB_DATE', 'au:AU_GUIDANCE_SIGNATURE_NOT_PUBLISHED', 'au:AU_GUIDANCE_SIGNATURE_INCLUDES', 'au:AU_GUIDANCE_SIGNATURE_IN_STATEMENT'] },
+    { finding: 'The annexure’s wording: the statement was approved by the principal governing body of [entity] on [date], and is signed by a responsible member of [entity], each "as defined by" the Act.', basis: 'guidance', refs: ['au:AU_REGISTER_ANNEX_APPROVAL', 'au:AU_REGISTER_ANNEX_SIGNATURE'] },
   ],
   joint: [
     { finding: 'Any entity except the Commonwealth may give one statement covering several reporting entities, prepared in consultation with each. Approval by each entity’s body, or by a higher entity that controls them all, or, if neither is practicable, at least one, with signatures to match.', basis: 'statute', refs: ['au:AU_MSA_S14_1', 'au:AU_MSA_S14_2', 'au:AU_MSA_S16_2#b'] },
+    { finding: 'The register offers three statement types: single, joint and voluntary. Its joint definition (two or more entities, each a reporting entity) is narrower than s.14, which allows a joint statement covering one or more reporting entities. Choosing single while listing more than one entity over the threshold is an error. A voluntary statement needs a notice lodged before the end of the reporting period.', basis: 'statute and guidance', refs: ['au:AU_SUBMISSION_CATEGORIES', 'au:AU_SUBMISSION_STATEMENT_TYPES', 'au:AU_SUBMISSION_TYPE_CHECK', 'au:AU_SUBMISSION_VOLUNTARY_NOTICE', 'au:AU_MSA_S14_1'] },
   ],
   timing: [
     { finding: 'Within 6 months after the end of the reporting period (or a period prescribed by rules, for a joint statement).', basis: 'statute and guidance', refs: ['au:AU_MSA_S13_2#e', 'au:AU_MSA_S14_2#f', 'au:AU_GUIDANCE_DEADLINE'] },
   ],
   publication: [
     { finding: 'Given to the Minister in an approved form and manner, and registered on the public Modern Slavery Statements Register. The Minister may decline to register a non-compliant statement. Other publication is optional.', basis: 'statute and guidance', refs: ['au:AU_MSA_S13_1', 'au:AU_MSA_S13_2#b', 'au:AU_MSA_S18', 'au:AU_MSA_S19_1', 'au:AU_MSA_S19_NOTE', 'au:AU_GUIDANCE_PUBLISH', 'au:AU_GUIDANCE_REFUSE'] },
-    { finding: 'Format: one PDF, up to 400MB, searchable recommended. Supporting documents are not made public.', basis: 'guidance', refs: ['au:AU_SUBMISSION_PDF', 'au:AU_SUBMISSION_SUPPORTING'] },
+    { finding: 'Format: one PDF for the statement, up to 400MB, searchable recommended. Supporting PDFs are optional and are not made public; approved statements are published.', basis: 'guidance', refs: ['au:AU_SUBMISSION_PDF', 'au:AU_SUBMISSION_ONE_PDF', 'au:AU_SUBMISSION_SUPPORTING_OPTIONAL', 'au:AU_SUBMISSION_SUPPORTING', 'au:AU_SUBMISSION_APPROVED_PUBLISHED'] },
+    { finding: 'Lodgement asks, for every entity covered: an ABN or ACN (or an ARBN or other, with the name typed in) and the revenue declaration; and for each reporting entity and the parent entity: country and industry sector. Every entity covered must be listed.', basis: 'guidance', refs: ['au:AU_SUBMISSION_ENTITY_IDS', 'au:AU_SUBMISSION_REVENUE_DECLARATION', 'au:AU_SUBMISSION_COUNTRY_SECTOR', 'au:AU_SUBMISSION_ALL_ENTITIES'] },
+    { finding: 'Reporting period: a start date, with the end date calculated as 12 months later and adjustable. The register compares it with the entity’s last statement and flags gaps, overlaps and duplicates, which must be fixed or explained.', basis: 'guidance', refs: ['au:AU_SUBMISSION_REPORTING_PERIOD', 'au:AU_SUBMISSION_PERIOD_DISCREPANCY'] },
     { finding: 'No language requirement was found in the Act or the guidance read.', basis: 'none found', refs: [] },
   ],
   personalInformation: [
@@ -157,4 +163,16 @@ export const OUTSIDE_THE_AREAS: readonly { topic: string; refs: readonly string[
   { topic: 'Consultation with owned or controlled entities', refs: ['au:AU_MSA_S16_1#f'], note: 'Australia only.' },
   { topic: 'Approval and signature', refs: ['ca:S211_ACT_SECTION_11_4', 'uk:UK_MSA_S54_6', 'au:AU_MSA_S13_2', 'au:AU_MSA_S14_2', 'au:AU_MSA_S16_2'],
     note: 'All three, different rules: Canada requires an attestation; the UK’s signer depends on the kind of organization; Australia requires approval details in the statement and does not allow delegation.' },
+]
+
+// ── Open questions ───────────────────────────────────────────────────────────────────────────────────
+// What the sources read do not settle. Each names the constants that frame it. Not to be answered from
+// memory: closing one needs an official source, recorded as a constant.
+export const OPEN_QUESTIONS: readonly { country: 'uk' | 'au'; question: string; refs: readonly string[] }[] = [
+  { country: 'au',
+    question: 'Which document is the "form approved by the Minister" that s.13(2)(b) and s.14(2)(b) require? Neither the register’s statement annexure nor its submission process overview describes itself as that form.',
+    refs: ['au:AU_MSA_S13_2#b', 'au:AU_MSA_S14_2#b', 'au:AU_REGISTER_ANNEX_TITLE', 'au:AU_SUBMISSION_CATEGORIES'] },
+  { country: 'uk',
+    question: 'Does approval by a parent’s board satisfy s.54(6) for each in-scope subsidiary using a group statement? The guidance allows one group statement; it does not say whose board must approve it.',
+    refs: ['uk:UK_MSA_S54_6#a', 'uk:UK_GUIDANCE_GROUP_ONE_STATEMENT', 'uk:UK_GUIDANCE_GROUP_STATEMENT'] },
 ]

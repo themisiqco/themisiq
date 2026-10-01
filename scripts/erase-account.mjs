@@ -109,9 +109,11 @@ function loadEnvLocal() {
 }
 loadEnvLocal()
 
-// DBURL is NOT in .env.local and is not read by the app. It is the shell variable
-// from docs/backup-record.md — export it in the same terminal before running:
-//     export DBURL='postgresql://...'
+// DBURL is NOT in .env.local and is not read by the app. It is a shell variable, built in the same terminal
+// as docs/erasure-runbook.md section 0 shows, from PGUSER, PGHOST, PGPORT and PGDATABASE:
+//     export DBURL="postgresql://${PGUSER}@${PGHOST}:${PGPORT}/${PGDATABASE}?sslmode=require"
+// It carries no password. node-pg takes the password from PGPASSWORD (read -rs, also section 0) when the
+// connection string has none, and falls back to ~/.pgpass only if PGPASSWORD is unset.
 const DBURL = process.env.DBURL
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -208,7 +210,7 @@ if (args.execute && !args.confirm) FAIL('--execute requires --confirm <email>. R
 if (args.execute && !args.requestedAt) FAIL('--execute requires --requested-at <date> — the erasure record must say when the customer asked. Refusing.')
 if (args.execute && !args.performedBy) FAIL('--execute requires --performed-by <name> — the erasure record must say who ran it. Refusing.')
 if (args.execute && args.export) FAIL('--export and --execute are separate runs. Export first, check it, then execute.')
-if (!DBURL) FAIL("DBURL is not set. Export the connection string first (see docs/backup-record.md §… 'export DBURL=…'), then re-run.")
+if (!DBURL) FAIL('DBURL is not set. Set the connection as docs/erasure-runbook.md section 0 shows (PGHOST, PGPORT, PGUSER, PGDATABASE, read -rs PGPASSWORD, then export DBURL), then re-run.')
 
 const MODE = args.execute ? 'EXECUTE' : args.export ? 'EXPORT' : 'DRY RUN'
 const UID = args.user
@@ -955,7 +957,7 @@ async function main() {
     if (missing.length) console.log(`  not present in the catalogue, skipped: ${missing.join(', ')}`)
 
     if (blind.length) {
-      FAIL(`RLS pre-flight FAILED — ${blind.length} of ${blind.length + clear} table(s) in scope would be FILTERED for ${me.who}:\n\n    ${blind.join('\n    ')}\n\n  This is not a permissions error you would see at run time. RLS returns an EMPTY RESULT, so the run would report 0 rows found, delete nothing, pass the residual check, and write an erasure_log row saying it succeeded.\n\n  Fix by connecting as a role that owns these tables or holds BYPASSRLS — on Supabase, the 'postgres' role in the connection string from docs/backup-record.md, not a pooled application role.\n\n  To confirm the diagnosis before changing anything, run 'set row_security = off;' in a psql session as this role and re-query one table: that setting turns the silent filtering into a loud error instead.\n\n  Nothing was done.`)
+      FAIL(`RLS pre-flight FAILED — ${blind.length} of ${blind.length + clear} table(s) in scope would be FILTERED for ${me.who}:\n\n    ${blind.join('\n    ')}\n\n  This is not a permissions error you would see at run time. RLS returns an EMPTY RESULT, so the run would report 0 rows found, delete nothing, pass the residual check, and write an erasure_log row saying it succeeded.\n\n  Fix by connecting as a role that owns these tables or holds BYPASSRLS — on Supabase, the 'postgres' role (PGUSER=postgres.<project id>, as docs/erasure-runbook.md section 0 sets it), not a pooled application role.\n\n  To confirm the diagnosis before changing anything, run 'set row_security = off;' in a psql session as this role and re-query one table: that setting turns the silent filtering into a loud error instead.\n\n  Nothing was done.`)
     }
     console.log(`  PASS — all ${clear} in-scope table(s) are readable in full by ${me.who}.`)
   }

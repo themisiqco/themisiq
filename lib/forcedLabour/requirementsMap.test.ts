@@ -3,7 +3,7 @@ import * as UK from './uk/requirements'
 import * as AU from './au/requirements'
 import * as CA from '../s211/requirements'
 import * as SOURCES from '../sources'
-import { UK_MAP, AU_MAP, MAP_TOPICS, CROSSWALK, OUTSIDE_THE_AREAS, type Cell } from './requirementsMap'
+import { UK_MAP, AU_MAP, MAP_TOPICS, CROSSWALK, OUTSIDE_THE_AREAS, OPEN_QUESTIONS, type Cell } from './requirementsMap'
 import { PENDING_REFORMS } from './pendingReforms'
 
 // The map's job is to say where each rule lives. These tests hold it to that: every reference resolves to
@@ -29,6 +29,7 @@ const allRefs = [
   ...cells(UK_MAP).flatMap(c => c.refs), ...cells(AU_MAP).flatMap(c => c.refs),
   ...CROSSWALK.flatMap(r => [...r.canada.refs, ...r.uk.refs, ...r.au.refs]),
   ...OUTSIDE_THE_AREAS.flatMap(o => o.refs),
+  ...OPEN_QUESTIONS.flatMap(q => q.refs),
 ]
 
 describe('the requirements map', () => {
@@ -61,6 +62,13 @@ describe('the requirements map', () => {
       if (c.basis === 'statute') expect(c.refs.filter(r => !statute.test(r)), c.finding).toEqual([])
       if (c.basis === 'guidance') expect(c.refs.filter(r => statute.test(r)), c.finding).toEqual([])
     }
+  })
+
+  it('keeps the approved-form question open, and maps the register guidance as guidance', () => {
+    expect(OPEN_QUESTIONS.some(q => q.country === 'au' && q.question.includes('form approved by the Minister'))).toBe(true)
+    const register = cells(AU_MAP).filter(c => c.refs.some(r => /^au:AU_(REGISTER_|SUBMISSION_)/.test(r)))
+    expect(register.every(c => c.basis !== 'statute')).toBe(true)
+    expect(cells(AU_MAP).some(c => c.refs.includes('au:AU_REGISTER_ANNEX_NOTE_F'))).toBe(true)
   })
 
   it('records the UK six-month timing as guidance and the Australian one as statute', () => {
