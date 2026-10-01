@@ -732,6 +732,9 @@ export default function AssessPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   // `website` IS THE HONEYPOT, not a field anyone is asked for. See lib/assessmentSubmitGuard.ts.
   const [email, setEmail] = useState({ first: '', last: '', emailAddr: '', company: '', role: '', website: '' })
+  // Shown under the email field when "Show my map" is pressed without a usable address. The button used
+  // to do nothing at all in that case, which reads as a broken page.
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   const goNext = () => setStep(s => s + 1)
   const goBack = () => setStep(s => s - 1)
@@ -834,10 +837,10 @@ export default function AssessPage() {
         <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <span style={{ flexShrink: 0, marginTop: 1, color: '#0C447C' }}>✉</span>
           <div style={{ fontSize: 13, color: '#0C447C', lineHeight: 1.55 }}>
-            We&apos;ve emailed a copy of your Compliance Obligation Map to <strong>{email.emailAddr || 'your inbox'}</strong>. If you don&apos;t see it within a few minutes, please check your spam or junk folder, and mark it &ldquo;not spam&rdquo; so future updates reach you.
+            We&apos;re sending a copy of your Compliance Obligation Map to <strong>{email.emailAddr || 'your inbox'}</strong>. If you don&apos;t see it within a few minutes, please check your spam or junk folder, and mark it &ldquo;not spam&rdquo; so future updates reach you.
           </div>
         </div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(11rem, 100%), 1fr))', gap: 8, marginBottom: '1.5rem' }}>
-          {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: 'var(--color-state-warn)' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: '#1fb1ff' }].map(({ val, label, color }) => (
+          {[{ val: critical, label: 'Immediate action', color: '#B91C1C' }, { val: high, label: 'High priority', color: 'var(--color-state-warn)' }, { val: obligations.length - critical - high, label: 'Monitor / annual', color: 'var(--color-ink-muted)' }].map(({ val, label, color }) => (
             <div key={label} style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '12px', textAlign: 'center' as const }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', color, marginBottom: 2 }}>{val}</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{label}</div>
@@ -937,16 +940,39 @@ export default function AssessPage() {
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 400, marginBottom: 8, lineHeight: 1.2, color: '#0d0d0d' }}>Your compliance map is ready.</h2>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.6 }}>Enter your details to see what applies to you, each with its timing, what it requires, and the ThemisIQ module that addresses it.</p>
         </div>
-        <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '1.5rem', display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#fff', marginBottom: 4 }}>Where should we send your results?</h3>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 8, fontWeight: 400 }}>Results display instantly. We'll also email a PDF you can share with your board or legal team.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <input value={email.first} onChange={e => setEmail(v => ({...v, first: e.target.value}))} placeholder="First name" style={inputStyle} />
-            <input value={email.last} onChange={e => setEmail(v => ({...v, last: e.target.value}))} placeholder="Last name" style={inputStyle} />
+        {/* A LIGHT PANEL, NOT THE BLACK BOX IT WAS. Every field has a visible label tied by htmlFor/id;
+            placeholders are kept only where they add an example. Field, focus and button styles are the
+            .tq-field / .tq-btn-brand classes in the token file, which carry the contrast figures. */}
+        <div style={{ background: 'var(--color-paper)', border: '1px solid var(--color-brand-line)', borderRadius: 12, padding: '1.5rem', display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: 'var(--color-ink)', marginBottom: 0 }}>Where should we send your results?</h3>
+          {/* NO PDF. app/api/assessment/submit/route.ts sends an HTML email with no attachment; this line
+              said "We'll also email a PDF you can share with your board or legal team" until 1 Oct 2026. */}
+          <p style={{ fontSize: 13, color: 'var(--color-ink-muted)', marginBottom: 4, fontWeight: 400 }}>Results display instantly, and we{"\u2019"}ll email you a copy.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label htmlFor="assess-first" style={fieldLabel}>First name</label>
+              <input id="assess-first" autoComplete="given-name" className="tq-field" value={email.first} onChange={e => setEmail(v => ({...v, first: e.target.value}))} style={inputStyle} />
+            </div>
+            <div>
+              <label htmlFor="assess-last" style={fieldLabel}>Last name</label>
+              <input id="assess-last" autoComplete="family-name" className="tq-field" value={email.last} onChange={e => setEmail(v => ({...v, last: e.target.value}))} style={inputStyle} />
+            </div>
           </div>
-          <input value={email.emailAddr} onChange={e => setEmail(v => ({...v, emailAddr: e.target.value}))} placeholder="Work email address" type="email" style={inputStyle} />
-          <input value={email.company} onChange={e => setEmail(v => ({...v, company: e.target.value}))} placeholder="Company name" style={inputStyle} />
-          <input value={email.role} onChange={e => setEmail(v => ({...v, role: e.target.value}))} placeholder="Your role (e.g. CFO, Head of Sustainability)" style={inputStyle} />
+          <div>
+            <label htmlFor="assess-email" style={fieldLabel}>Work email</label>
+            <input id="assess-email" type="email" autoComplete="email" className="tq-field" placeholder="name@company.com"
+              value={email.emailAddr} onChange={e => { setEmail(v => ({...v, emailAddr: e.target.value})); setEmailError(null) }}
+              aria-invalid={emailError ? true : undefined} aria-describedby={emailError ? 'assess-email-error' : undefined} style={inputStyle} />
+            {emailError && <p id="assess-email-error" role="alert" style={{ fontSize: 12, color: 'var(--color-state-error)', margin: '6px 0 0' }}>{emailError}</p>}
+          </div>
+          <div>
+            <label htmlFor="assess-company" style={fieldLabel}>Company</label>
+            <input id="assess-company" autoComplete="organization" className="tq-field" value={email.company} onChange={e => setEmail(v => ({...v, company: e.target.value}))} style={inputStyle} />
+          </div>
+          <div>
+            <label htmlFor="assess-role" style={fieldLabel}>Your role</label>
+            <input id="assess-role" autoComplete="organization-title" className="tq-field" placeholder="For example CFO, Head of Sustainability" value={email.role} onChange={e => setEmail(v => ({...v, role: e.target.value}))} style={inputStyle} />
+          </div>
           {/* ⚠️ THE HONEYPOT. NOT display:none AND NOT hidden — a bot that respects either skips it, and
               a field nothing ever fills catches nothing. It is taken out of the layout and out of the
               tab order instead, so a person never sees it or reaches it, while a form-filling bot that
@@ -962,10 +988,15 @@ export default function AssessPage() {
               only while the email gate sat at a hardcoded step 7 and made questions[7] unreachable.
               Once the array grew and supply_chain became a live question, 8 was the index of
               supply_chain: the visitor submitted the form and was shown a question again. */}
-          <button onClick={() => { if (email.emailAddr.includes("@")) { submitToAPI(); setStep(RESULTS_STEP) } }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, background: 'var(--color-brand)', color: '#0d0d0d', border: 'none', cursor: 'pointer', marginTop: 4 }}>
+          {/* Background and label colour come from .tq-btn-brand, NOT inline: an inline background would
+              switch the hover off. The label was #0d0d0d on brand, 2.55:1. */}
+          <button className="tq-btn-brand" onClick={() => {
+            if (!email.emailAddr.includes('@')) { setEmailError('Enter your work email address, including the @.'); return }
+            submitToAPI(); setStep(RESULTS_STEP)
+          }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer', marginTop: 4 }}>
             Show my Compliance Obligation Map →
           </button>
-          <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', textAlign: 'center' as const }}>No spam. No sales calls unless you ask.</p>
+          <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center' as const, margin: 0 }}>No spam. No sales calls unless you ask.</p>
         </div>
         <div style={{ marginTop: '1rem' }}>
           <button onClick={goBack} style={backBtn}>← Back</button>
@@ -985,7 +1016,7 @@ export default function AssessPage() {
       <div>
         <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 16, padding: '1.5rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#0d0d0d', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{step + 1}</div>
+            <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--color-brand)', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{step + 1}</div>
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Question {step + 1} of {EMAIL_STEP}</div>
           </div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.35rem', fontWeight: 400, lineHeight: 1.25, marginBottom: 6, color: '#0d0d0d' }}>{q.title}</h2>
@@ -1046,7 +1077,13 @@ export default function AssessPage() {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={goBack} disabled={step === 0} style={{ ...backBtn, opacity: step === 0 ? 0.3 : 1 }}>← Back</button>
-          <button onClick={goNext} disabled={!canProceed} style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, background: canProceed ? '#0d0d0d' : '#e8e7e4', color: canProceed ? '#fff' : 'var(--color-ink-muted)', border: 'none', cursor: canProceed ? 'pointer' : 'not-allowed' }}>Continue →</button>
+          {/* Enabled: .tq-btn-brand (brand fill, --color-on-dark label 6.48:1, hover --color-brand-hover 4.69:1),
+              with no inline background so the hover works. Disabled: no class, and the inline face the token
+              file's DISABLED AND INACTIVE STATE block sets out: --color-ink-muted on --color-sunken, 5.00:1,
+              with a --color-line edge. Never opacity. */}
+          <button onClick={goNext} disabled={!canProceed} className={canProceed ? 'tq-btn-brand' : undefined}
+            style={{ fontSize: 13, fontWeight: 500, padding: '10px 28px', borderRadius: 8, cursor: canProceed ? 'pointer' : 'not-allowed',
+              ...(canProceed ? { border: '1px solid transparent' } : { background: 'var(--color-sunken)', color: 'var(--color-ink-muted)', border: '1px solid var(--color-line)' }) }}>Continue →</button>
         </div>
       </div>
     )
@@ -1099,5 +1136,8 @@ export default function AssessPage() {
   )
 }
 
-const inputStyle: React.CSSProperties = { width: '100%', fontSize: 13, padding: '11px 14px', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: '#fff', outline: 'none' }
+// NO `outline` HERE: an inline outline would beat .tq-field's focus ring. Edge, placeholder and focus are
+// measured in the token file beside .tq-field.
+const inputStyle: React.CSSProperties = { width: '100%', fontSize: 14, padding: '10px 12px', border: '1px solid var(--color-ink-muted)', borderRadius: 8, background: 'var(--color-paper)', color: 'var(--color-ink)' }
+const fieldLabel: React.CSSProperties = { display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-ink)', marginBottom: 4 }
 const backBtn: React.CSSProperties = { fontSize: 13, fontWeight: 400, padding: '10px 20px', borderRadius: 8, background: 'none', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }
