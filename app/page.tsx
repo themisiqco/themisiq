@@ -150,6 +150,11 @@ export default function Home() {
                 <figcaption>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-ink)', marginBottom: 4 }}>{e.who}</div>
                   <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{e.what}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', columnGap: '1rem', marginTop: 6 }}>
+                    {e.links.map(l => (
+                      <a key={l.href} href={l.href} style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', padding: '0.35rem 0' }}>{l.label} →</a>
+                    ))}
+                  </div>
                 </figcaption>
               </figure>
             ))}
@@ -328,16 +333,13 @@ export default function Home() {
 
 // ── DATA ──────────────────────────────────────────────────────────────────────────────────────────
 /**
- * ⚠️ SIX PHOTOGRAPHS, SUPPLIED SEPARATELY, AND NOT ONE OF THEM IS STOCK. The files below do not exist
- * in the repo yet: until they land the page renders with broken images, which is the intended failure —
- * a placeholder would be indistinguishable from a finished page. Required, all in public/home/:
+ * Homepage photographs, all in public/home/:
  *   still-life.jpg   1200 x 900   the request section
- *   essay-steel.jpg  800 x 1000   } the five essay photographs, portrait, so the offset grid reads
- *   essay-parts.jpg  800 x 1000   } as a column of unlike scenes rather than a filmstrip
- *   essay-grain.jpg  800 x 1000   }
- *   essay-timber.jpg 800 x 1000   }
- *   essay-software.jpg 800 x 1000 }
- * Alt text describes the SCENE, never the caption: a screen reader user gets the caption from the
+ *   essay-*.jpg      800 x 1000   the ten essay photographs, portrait, so the offset grid reads
+ *                                 as a column of unlike scenes rather than a filmstrip
+ * Each essay card links to the module that answers its situation, so every module is reachable
+ * from this section.
+ * Alt text describes the scene, never the caption: a screen reader user gets the caption from the
  * figcaption immediately after it, so repeating it there says the same thing twice and describes
  * nothing.
  */
@@ -346,16 +348,36 @@ const PHOTOS = {
 } as const
 
 const ESSAY = [
-  { who: 'Steel and aluminium exporter', what: 'Shipping into the EU. The embedded emissions in each shipment are declarable under CBAM.',
-    src: '/home/essay-steel.jpg', w: 800, h: 1000, alt: 'Coils of rolled steel stacked in a warehouse, lit from a high window.' },
+  { who: 'Steel and aluminium exporter', what: 'Your EU importer needs the embedded emissions in each shipment to file under CBAM.',
+    src: '/home/essay-steel.jpg', w: 800, h: 1000, alt: 'Coils of rolled steel stacked in a warehouse, lit from a high window.',
+    links: [{ label: 'CBAM', href: '/cbam' }] },
   { who: 'Tier 2 parts supplier', what: 'An automotive customer wants Scope 1 and 2 data before the next contract renewal.',
-    src: '/home/essay-parts.jpg', w: 800, h: 1000, alt: 'Machined metal components in a tray on a factory bench.' },
-  { who: 'Grain grower or processor', what: 'A food brand wants farm-level emissions data for its Scope 3 target.',
-    src: '/home/essay-grain.jpg', w: 800, h: 1000, alt: 'A combine harvester moving through a ripe wheat field.' },
-  { who: 'Timber and wood products producer', what: 'Buyers want land use, carbon removals and sourcing evidence on the record.',
-    src: '/home/essay-timber.jpg', w: 800, h: 1000, alt: 'Stacked sawn timber in a mill yard with forest behind it.' },
+    src: '/home/essay-parts.jpg', w: 800, h: 1000, alt: 'Machined metal components in a tray on a factory bench.',
+    links: [{ label: 'GHG Emissions', href: '/climate-ghg' }] },
+  { who: 'Grain grower or processor', what: 'A food brand has set a science-based target and asks its suppliers to set their own.',
+    src: '/home/essay-grain.jpg', w: 800, h: 1000, alt: 'A combine harvester moving through a ripe wheat field.',
+    links: [{ label: 'GHG Emissions', href: '/climate-ghg' }] },
+  { who: 'Textile, apparel or footwear maker', what: 'A global brand wants human rights risks mapped across your fabric and component suppliers.',
+    src: '/home/essay-textiles.jpg', w: 800, h: 1000, alt: 'Sewing machines and dark blue dress forms in a bright garment workshop.',
+    links: [{ label: 'Supply Chain', href: '/supply-chain' }] },
   { who: 'Growing software company', what: 'Enterprise procurement wants AI and cybersecurity governance policies.',
-    src: '/home/essay-software.jpg', w: 800, h: 1000, alt: 'Two people at a desk looking at code on a monitor in an open-plan office.' },
+    src: '/home/essay-software.jpg', w: 800, h: 1000, alt: 'Two people at a desk looking at code on a monitor in an open-plan office.',
+    links: [{ label: 'AI Governance', href: '/ai-governance' }, { label: 'Cyber Governance', href: '/cyber' }] },
+  { who: 'Family-owned business', what: 'The bank wants to understand climate risk to your sites before renewing the credit line.',
+    src: '/home/essay-family.jpg', w: 800, h: 1000, alt: 'Three generations of a family raising a glass beside the brewing tanks in their brewery.',
+    links: [{ label: 'Climate Risk', href: '/climate-risk' }] },
+  { who: 'Importer selling into Canada', what: 'Your forced labour report is due to Public Safety Canada by May 31, every year.',
+    src: '/home/essay-canada.jpg', w: 800, h: 1000, alt: 'Shipping containers painted with the Canadian flag, stacked under a blue sky.',
+    links: [{ label: 'Forced Labour Reporting', href: '/forced-labour' }] },
+  { who: 'Business preparing for sale', what: 'Buyers will ask which rules apply and what meeting them will cost.',
+    src: '/home/essay-sale.jpg', w: 800, h: 1000, alt: 'Hands marking up printed financial reports and charts on a desk beside a calculator.',
+    links: [{ label: 'Deals and Investment', href: '/deals' }] },
+  { who: 'Employer with staff in the EU', what: 'Gender pay gap reporting under the Pay Transparency Directive starts in 2027 for employers with 150 or more staff, and reaches those with 100 or more by 2031.',
+    src: '/home/essay-eu.jpg', w: 800, h: 1000, alt: 'European Union flags on poles outside a curved glass office building.',
+    links: [{ label: 'People and Workforce', href: '/people' }] },
+  { who: 'Investor-backed company', what: 'The board and investors want to know which sustainability topics matter most to the business.',
+    src: '/home/essay-investor.jpg', w: 800, h: 1000, alt: 'A notebook and pen on a long boardroom table lined with empty chairs.',
+    links: [{ label: 'Materiality Assessment', href: '/materiality' }] },
 ] as const
 
 /**
