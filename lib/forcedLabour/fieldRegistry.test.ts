@@ -109,10 +109,13 @@ describe('countries follow the Stage A crosswalk', () => {
     for (const f of FIELD_REGISTRY.filter(f => f.area === 'steps')) expect(f.countries.filter(c => c !== 'canada' && c !== 'uk'), f.key).toEqual([])
   })
 
-  it('Canada s.11(3)(e), approval, applicability and report bookkeeping stay Canada-only', () => {
+  it('Canada s.11(3)(e), applicability and report bookkeeping stay Canada-only; approval is never shared (each country its own)', () => {
     for (const f of FIELD_REGISTRY) {
-      if (canadaSection(f)?.section === 'remediation_income_loss' || ['approval', 'applicability', 'report'].includes(f.area as string)) {
+      if (canadaSection(f)?.section === 'remediation_income_loss' || ['applicability', 'report'].includes(f.area as string)) {
         expect(f.countries, f.key).toEqual(['canada'])
+      }
+      if (f.area === 'approval') {
+        expect(f.countries, f.key).toEqual([f.canada ? 'canada' : 'uk'])
       }
     }
   })

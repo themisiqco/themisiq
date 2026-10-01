@@ -81,10 +81,12 @@ describe('the shared model', () => {
 
   it('a shared answer changed in the shared store (as another country would) is what Canada reads and prints', async () => {
     await saveAll(SINGLE_REPORT)
-    const row = h.db.tables.fl_answers.find(a => a.field_key === 'training.training_description')!
-    row.value = 'A course rewritten in the UK report.'
+    const row = h.db.tables.fl_answers.find(a => a.field_key === 'training.frequency_and_length')!
+    row.value = 'Changed in the UK report.'
     const training = (await open()).sections.find((s: { section_key: string }) => s.section_key === 'training')
-    expect(training.content.training_description).toBe('A course rewritten in the UK report.')
+    expect(training.content.frequency_and_length).toBe('Changed in the UK report.')
+    // a per-country answer (Stage D1b) is Canada's own, whatever the shared store holds
+    expect(training.content.training_description).toBe(SINGLE_REPORT.sections.training!.training_description)
     for (const s of h.db.tables.s211_report_sections) s.status = 'complete'
     expect((await exportReport(req('GET'), ctx({ id: 'r1' }))).status).toBe(200)
     // The Canada-only answers are untouched by anything in the shared store.
@@ -93,10 +95,11 @@ describe('the shared model', () => {
   })
 
   it('a field taken out of a section is removed from the shared store; a null is kept as null', async () => {
-    await put('training', { training_provided: 'Yes', training_description: 'x', employees_trained: 4 })
-    await put('training', { training_provided: 'Yes', employees_trained: null })
+    await put('training', { mandatory: 'Mandatory', frequency_and_length: 'x', employees_trained: 4, training_provided: 'Yes' })
+    await put('training', { mandatory: 'Mandatory', employees_trained: null, training_provided: 'Yes' })
     const keys = Object.fromEntries(h.db.tables.fl_answers.map(a => [a.field_key, a.value]))
-    expect(keys).toEqual({ 'training.training_provided': 'Yes', 'training.employees_trained': null })
+    // training_provided is per-country (Stage D1b): never in the shared store
+    expect(keys).toEqual({ 'training.mandatory': 'Mandatory', 'training.employees_trained': null })
   })
 
   it('a Canada-only field never reaches the shared store', async () => {

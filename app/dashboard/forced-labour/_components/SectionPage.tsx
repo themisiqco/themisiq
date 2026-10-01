@@ -40,6 +40,8 @@ import {
 import { defaultReportingYear } from '../../../../lib/s211/defaults'
 import { BUILDER_ROOT, PREVIEW_ID, ORDER_HREF, ORDER_LABEL, PREVIEW_SECTION_MESSAGE, canWrite } from '../../../../lib/s211/builderAccess'
 import type { ReportRecord, SectionRow } from './types'
+import { draftNotes, clearDraft, draftBadge, draftConfirmLabel } from '../../../../lib/forcedLabour/drafts'
+import { DraftNotice } from './CountryTabs'
 
 type Autosaver = ReturnType<typeof createAutosaver<SectionContent>>
 type Pending = { kind: 'steps' | 'attestation'; mine: string; next: SectionContent } | null
@@ -60,11 +62,12 @@ const PREVIEW_REPORT: ReportRecord = {
 const previewContent = (key: SectionKey): SectionContent =>
   key === 'approval_attestation' ? refreshAttestation({}, attestationInputs({}, {})).content : {}
 
-export function SectionPage({ id, sectionKey, preview = false }: { id: string; sectionKey: SectionKey; preview?: boolean }) {
+export function SectionPage({ id, sectionKey, preview = false, base: baseProp }: { id: string; sectionKey: SectionKey; preview?: boolean; base?: string }) {
   const def = sectionDef(sectionKey)
   // Full access edits; read-only and the preview show every field disabled and store nothing.
   const writable = canWrite(useBuilderState()) && !preview
-  const base = preview ? `${BUILDER_ROOT}/${PREVIEW_ID}` : `${BUILDER_ROOT}/${id}`
+  // A report's sections live under its Canada tab (Stage D1); the preview walkthrough keeps its own path.
+  const base = preview ? `${BUILDER_ROOT}/${PREVIEW_ID}` : (baseProp ?? `${BUILDER_ROOT}/${id}/canada`)
   const idx = SECTIONS.findIndex(s => s.key === sectionKey)
   const prev = SECTIONS[idx - 1], next = SECTIONS[idx + 1]
 
@@ -124,7 +127,8 @@ export function SectionPage({ id, sectionKey, preview = false }: { id: string; s
     autosaverRef.current?.schedule(c)
   }
   const change = (key: string, value: unknown) => {
-    let c = { ...contentRef.current, [key]: value }
+    // Editing a field started from another country's answer makes it Canada's own (lib/forcedLabour/drafts.ts).
+    let c = clearDraft({ ...contentRef.current, [key]: value }, key)
     // Section 11, approval by each entity's governing body: start one signer row per entity covered.
     if (sectionKey === 'approval_attestation' && key === 'approval_basis' && value === 'joint_each'
       && !(Array.isArray(c.entity_signatories) && c.entity_signatories.length)) {
@@ -317,6 +321,8 @@ export function SectionPage({ id, sectionKey, preview = false }: { id: string; s
                   && !basisOptions.includes(content.approval_basis as (typeof basisOptions)[number])
                   && <p style={S.warn}>The basis saved here does not match the report type chosen in section 1. Choose again.</p>}
                 {f.key === 'controlled_entities' && def.controlledEntities && <p style={S.hint}>Public Safety Canada guidance: &ldquo;{def.controlledEntities}&rdquo;</p>}
+                {draftNotes(content)[f.key] && <DraftNotice text={draftBadge(draftNotes(content)[f.key], 'canada')} confirmLabel={draftConfirmLabel('canada')}
+                  disabled={!writable} onConfirm={() => apply(clearDraft(contentRef.current, f.key))} />}
                 <FieldInput field={f} value={content[f.key]} content={content} onChange={v => change(f.key, v)} onBlur={blur}
                   options={sectionKey === 'approval_attestation' && f.key === 'approval_basis' ? basisOptions.map(b => ({ value: b, label: APPROVAL_BASIS_LABEL[b] })) : undefined} />
                 {sectionKey === 'report_details' && f.key === 'financial_year_confirmed' && !showFyOverride && (

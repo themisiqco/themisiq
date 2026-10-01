@@ -140,8 +140,10 @@ export function Disclosure({ title, open, onToggle, children }: { title: string;
 
 // ── The field renderer ──────────────────────────────────────────────────────────────────────────────
 type Row = Record<string, string>
-export function FieldInput({ field, value, onChange, onBlur, options, content }: {
+export function FieldInput({ field, value, onChange, onBlur, options, content, tag }: {
   field: Field; value: unknown; onChange: (v: unknown) => void; onBlur: () => void
+  /** A country's own source tag, in place of Canada's SOURCE_LABEL (null: none). Canada passes nothing. */
+  tag?: string | null
   /** Overrides field.options, with labels: section 11's approval basis. */
   options?: { value: string; label: string }[]
   /** The section's answers, for a label or check that depends on them. */
@@ -157,7 +159,9 @@ export function FieldInput({ field, value, onChange, onBlur, options, content }:
     <>
       <label htmlFor={id} style={S.label}>
         {label}
-        {field.source !== 'act' && <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--color-ink-muted)' }}> [{SOURCE_LABEL[field.source]}]</span>}
+        {tag !== undefined
+          ? tag && <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--color-ink-muted)' }}> [{tag}]</span>
+          : field.source !== 'act' && <span style={{ fontWeight: 400, fontSize: 11.5, color: 'var(--color-ink-muted)' }}> [{SOURCE_LABEL[field.source]}]</span>}
       </label>
       {field.hint && <p style={S.hint}>{field.hint}</p>}
     </>

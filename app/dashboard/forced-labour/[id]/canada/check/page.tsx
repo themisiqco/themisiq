@@ -1,6 +1,6 @@
 'use client'
 
-// app/dashboard/forced-labour/[id]/check/page.tsx
+// app/dashboard/forced-labour/[id]/canada/check/page.tsx
 // The check page before export: what is not complete, where a "nothing to report" sentence stands in,
 // the personal-information rule and scan, and the export. What is listed comes from
 // lib/s211/checkReport.ts; what blocks export and what looks like personal information, from
@@ -9,17 +9,20 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { s211Api, s211Download, type DownloadResult } from '../../../../../lib/s211/client'
-import { exportGate, scanPersonalInformation, scanUndrawable, describeChars, PERSONAL_INFO_KIND_LABEL, PERSONAL_INFO_NAMES_NOTE } from '../../../../../lib/s211/exportCheck'
-import { checkReport, NOTHING_MISSING_LINE, type CheckRow, type SectionState } from '../../../../../lib/s211/checkReport'
-import { asList, labelsEndingSentence } from '../../../../../lib/s211/sectionStatus'
-import type { SectionContent, SectionKey } from '../../../../../lib/s211/builderContent'
-import { BuilderFrame, ReadOnlyBanner, S, StatusPill, NotFound404, PersonalInformation, useBuilderState } from '../../_components/ui'
-import { canWrite, ORDER_HREF, RENEW_LABEL } from '../../../../../lib/s211/builderAccess'
-import type { ReportRecord, SectionRow } from '../../_components/types'
+import { s211Api, s211Download, type DownloadResult } from '../../../../../../lib/s211/client'
+import { exportGate, scanPersonalInformation, scanUndrawable, describeChars, PERSONAL_INFO_KIND_LABEL, PERSONAL_INFO_NAMES_NOTE } from '../../../../../../lib/s211/exportCheck'
+import { checkReport, NOTHING_MISSING_LINE, type CheckRow, type SectionState } from '../../../../../../lib/s211/checkReport'
+import { asList, labelsEndingSentence } from '../../../../../../lib/s211/sectionStatus'
+import type { SectionContent, SectionKey } from '../../../../../../lib/s211/builderContent'
+import { BuilderFrame, ReadOnlyBanner, S, StatusPill, NotFound404, PersonalInformation, useBuilderState } from '../../../_components/ui'
+import { canWrite, ORDER_HREF, RENEW_LABEL } from '../../../../../../lib/s211/builderAccess'
+import type { ReportRecord, SectionRow } from '../../../_components/types'
+import { DraftsToConfirm } from '../../../_components/DraftsToConfirm'
+import { savedDrafts, clearDraft } from '../../../../../../lib/forcedLabour/drafts'
+import { SECTIONS } from '../../../../../../lib/s211/builderContent'
 
 function SectionLink({ id, r }: { id: string; r: CheckRow }) {
-  return <Link href={`/dashboard/forced-labour/${id}/${r.key}`} style={{ fontSize: 14, color: 'var(--color-ink)' }}>{r.number}. {r.title}</Link>
+  return <Link href={`/dashboard/forced-labour/${id}/canada/${r.key}`} style={{ fontSize: 14, color: 'var(--color-ink)' }}>{r.number}. {r.title}</Link>
 }
 
 function StillToFill({ r }: { r: CheckRow }) {
@@ -56,15 +59,28 @@ function Check({ id }: { id: string }) {
   const pi = scanPersonalInformation(contents)
   const undrawable = scanUndrawable(contents)
   const card = { ...S.card, padding: '12px 16px' }
+  // Answers started from another country's report and not yet confirmed: they block export (exportGate).
+  const drafts = savedDrafts(contents as Record<string, SectionContent>).map(d => {
+    const def = SECTIONS.find(s => s.key === d.section)!
+    return { ...d, sectionTitle: `${def.number}. ${def.title}`, href: `/dashboard/forced-labour/${id}/canada/${d.section}`, label: def.fields.find(f => f.key === d.field)?.label ?? d.field }
+  })
+  const confirmDraft = async (section: string, field: string) => {
+    const row = data.sections.find(s => s.section_key === section)
+    if (!row) return
+    const r = await s211Api<{ section: SectionRow }>(`/reports/${id}/sections/${section}`, { method: 'PUT', body: { content: clearDraft(row.content, field) } })
+    if (r.data) setData({ ...data, sections: data.sections.map(s => (s.section_key === section ? r.data!.section : s)) })
+  }
 
   return (
     <>
-      <p style={{ ...S.muted, margin: 0 }}><Link href={`/dashboard/forced-labour/${id}`}>Back to report overview</Link></p>
+      <p style={{ ...S.muted, margin: 0 }}><Link href={`/dashboard/forced-labour/${id}/canada`}>Back to report overview</Link></p>
       <h1 style={S.h1}>Check the report</h1>
       {!writable && <ReadOnlyBanner />}
       <p style={S.muted}>{data.report.company_name}, reporting year {data.report.reporting_year}. A last look before the report is exported for approval and signing.</p>
 
       {c.warnings.map(w => <p key={w} style={S.warn}>{w}</p>)}
+
+      <DraftsToConfirm items={drafts} to="canada" writable={writable} onConfirm={confirmDraft} />
 
       <h2 style={S.h2}>Sections not yet complete</h2>
       {c.incomplete.length === 0 && c.optionalUsedIncomplete.length === 0
@@ -106,7 +122,7 @@ function Check({ id }: { id: string }) {
             <ul style={{ ...S.body, paddingLeft: 18 }}>
               {pi.map((h, i) => (
                 <li key={i} style={{ marginBottom: 6 }}>
-                  <Link href={`/dashboard/forced-labour/${id}/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: &ldquo;{h.match}&rdquo; looks like {PERSONAL_INFO_KIND_LABEL[h.kind]}.
+                  <Link href={`/dashboard/forced-labour/${id}/canada/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: &ldquo;{h.match}&rdquo; looks like {PERSONAL_INFO_KIND_LABEL[h.kind]}.
                 </li>
               ))}
             </ul>
@@ -120,7 +136,7 @@ function Check({ id }: { id: string }) {
           <ul style={{ ...S.body, paddingLeft: 18 }}>
             {undrawable.map((h, i) => (
               <li key={i} style={{ marginBottom: 8 }}>
-                <Link href={`/dashboard/forced-labour/${id}/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: {describeChars(h.chars)}.
+                <Link href={`/dashboard/forced-labour/${id}/canada/${h.section}`}>{h.number}. {h.title}</Link>, {h.field}: {describeChars(h.chars)}.
                 <span style={S.muted}> Printed as: &ldquo;{h.printedAs}&rdquo;</span>
               </li>
             ))}
@@ -151,7 +167,7 @@ function ExportArea({ id, gate }: { id: string; gate: ReturnType<typeof exportGa
       <ul style={{ ...S.body, paddingLeft: 18 }}>
         {blockers.map((b, i) => (
           <li key={i} style={{ marginBottom: 6 }}>
-            {b.section ? <Link href={`/dashboard/forced-labour/${id}/${b.section}`}>{b.message}</Link> : b.message}
+            {b.section ? <Link href={`/dashboard/forced-labour/${id}/canada/${b.section}`}>{b.message}</Link> : b.message}
             {b.missing.length > 0 && <span style={S.muted}> Still to fill in: {labelsEndingSentence(b.missing)}</span>}
           </li>
         ))}

@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+// The Canada section keys the old report URLs used (lib/s211/builderContent.ts SECTION_KEYS; a test holds them equal).
+const CANADA_SECTION_KEYS = ['report_details', 'structure_activities_supply_chains', 'policies_due_diligence', 'risks', 'remediation', 'remediation_income_loss', 'training', 'effectiveness', 'steps_taken', 'other_information', 'approval_attestation']
+
 const nextConfig: NextConfig = {
   /* config options here */
 
@@ -23,6 +26,12 @@ const nextConfig: NextConfig = {
       { source: '/dashboard/s211/:path*', destination: '/dashboard/forced-labour/:path*', permanent: true },
       // Stage 5c: the module is multi-country, so Canada's free check lives under /forced-labour/canada.
       { source: '/forced-labour/check', destination: '/forced-labour/canada/check', permanent: true },
+      // Stage D1 (1 Oct 2026): a report's sections moved under its Canada tab, so /dashboard/forced-labour/[id]
+      // could become the overview of every country on the report. Only Canada's eleven section keys and its
+      // check page move; `preview` is not a report id (the walkthrough keeps /preview/<section>), and the
+      // overview, /canada and every other country's tab are left alone.
+      { source: '/dashboard/forced-labour/:id((?!preview/)[^/]+)/check', destination: '/dashboard/forced-labour/:id/canada/check', permanent: true },
+      { source: `/dashboard/forced-labour/:id((?!preview/)[^/]+)/:section(${CANADA_SECTION_KEYS.join('|')})`, destination: '/dashboard/forced-labour/:id/canada/:section', permanent: true },
     ]
   },
 

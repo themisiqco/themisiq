@@ -90,3 +90,21 @@ export function withoutLink<T extends Record<string, unknown>>(row: T): Omit<T, 
   void _link
   return rest
 }
+
+/**
+ * Canada sections with no saved row whose shared fields another country has answered (Stage D1): each is
+ * read as an empty section with those answers laid over it, so an answer given in the UK report appears in
+ * Canada too. A Canada-only report never has one: every shared answer it holds came from a saved section.
+ */
+export function sectionsOnlyShared(savedKeys: ReadonlySet<string>, answers: ReadonlyMap<string, unknown>, keys: readonly SectionKey[]):
+  { section_key: SectionKey; content: SectionContent }[] {
+  return keys
+    .filter(k => !savedKeys.has(k) && sharedFieldsOf(k).some(f => answers.has(f.fieldKey)))
+    .map(k => ({ section_key: k, content: overlaySection(k, {} as SectionContent, answers) }))
+}
+
+/** A Canada section's fields with their registry keys, for drafts (lib/forcedLabour/drafts.ts). */
+export const canadaFieldsOf = (section: SectionKey): { key: string; registryKey: string }[] =>
+  FIELD_REGISTRY.filter(f => f.canada?.kind === 'section' && f.canada.section === section && !f.canada.hidden)
+    .map(f => ({ key: (f.canada as { field: string }).field, registryKey: f.key }))
+

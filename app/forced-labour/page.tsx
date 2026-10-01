@@ -8,7 +8,7 @@ import { sectionTitle } from '@/app/components/headingStyles'
 import {
   ModuleSpine, EvidenceSection, ClosingBand, ModuleSection, ModuleFaq, bodyCopy, moduleEyebrow, type Faq,
 } from '@/app/components/modulePage'
-import { COUNTRIES, STATUS_LABEL, PRICE_INCLUDES, CANADA_CHECK } from '@/lib/forcedLabour/countries'
+import { availableCountries, STATUS_LABEL, PRICE_INCLUDES, CANADA_CHECK } from '@/lib/forcedLabour/countries'
 
 const KEY = 'forced-labour' as const
 
@@ -24,9 +24,10 @@ export const metadata: Metadata = {
  * module that prepares reports country by country, and everything specific to a country lives on that
  * country's page (/forced-labour/canada). This page names Canada only where it says what exists today.
  *
- * ⚠️ THE COUNTRY LIST IS DATA. "Choose your country" renders lib/forcedLabour/countries.ts. A country that
- * is not yet available is plain text: no link, no order button, no date. Adding one is a change to that
- * list, made with the builder that prepares its report, not an edit here.
+ * ⚠️ THE COUNTRY LIST IS DATA. "Choose your country" renders the AVAILABLE countries in
+ * lib/forcedLabour/countries.ts, and only those (Stage D1b): a country in preview or hidden is not named here
+ * at all, and there is no "Not yet available" line. A country appears when its status becomes 'available',
+ * made with the builder that prepares its report, not by an edit here.
  *
  * ⚠️ SECTIONS 2, 3, 6 AND 7 OF THE TEN-SECTION SHAPE (arrivals, covers, outputs, framework chips) ARE ON
  * THE COUNTRY PAGE, because each of them is about one country's law. What stays here is what is true of
@@ -64,7 +65,8 @@ export default function ForcedLabourPage() {
       <ModuleSection>
         <h2 style={sectionTitle}>Choose your country</h2>
         <ul style={{ listStyle: 'none', padding: 0, margin: '2rem 0 0', borderTop: '1px solid var(--color-line-strong)', maxWidth: '72ch' }}>
-          {COUNTRIES.map(c => {
+          {availableCountries().map(c => {
+            const status = 'available' as const
             const inner = (
               <>
                 <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: 'var(--color-ink)' }}>{c.name}</span>
@@ -73,15 +75,15 @@ export default function ForcedLabourPage() {
             )
             const pill = (
               <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 99, whiteSpace: 'nowrap', flexShrink: 0,
-                background: c.status === 'available' ? 'var(--color-state-ok-wash)' : 'var(--color-ground)',
-                color: c.status === 'available' ? 'var(--color-state-ok)' : 'var(--color-ink-muted)' }}>
-                {STATUS_LABEL[c.status]}
+                background: status === 'available' ? 'var(--color-state-ok-wash)' : 'var(--color-ground)',
+                color: status === 'available' ? 'var(--color-state-ok)' : 'var(--color-ink-muted)' }}>
+                {STATUS_LABEL[status]}
               </span>
             )
             const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '1.1rem 0', borderBottom: '1px solid var(--color-line)' } as const
             return (
-              <li key={c.key} data-country={c.key} data-status={c.status}>
-                {c.status === 'available' && c.href
+              <li key={c.key} data-country={c.key} data-status={status}>
+                {status === 'available' && c.href
                   ? <a href={c.href} style={{ ...row, textDecoration: 'none' }}><span>{inner}</span>{pill}</a>
                   : <div style={row}><span>{inner}</span>{pill}</div>}
               </li>
@@ -170,7 +172,7 @@ const FAQ: readonly Faq[] = [
   { q: 'What does the module do?',
     a: 'It prepares the report a country’s law asks for on forced labour and child labour in your supply chains. It works out whether the law applies to you, takes you through each requirement with the law’s words and its official guidance beside it, checks the report for missing answers and personal information, and produces it as a PDF for your governing body to approve and sign.' },
   { q: 'Which countries does it cover, and how are more added?',
-    a: 'Canada is available now. Each country’s report follows its own law, so a country is added when its report is built: its own questions, its law and guidance quoted, and its own checks. Australia’s Modern Slavery Act 2018 and the UK’s Modern Slavery Act 2015 are not yet available.' },
+    a: 'Canada is available now. Each country’s report follows its own law, so a country is added when its report is built: its own questions, its law and guidance quoted, and its own checks.' },
   { q: 'What happens when our term ends?',
     a: 'Your reports stay. You can still open and read them, and download the PDF of any report that is complete. Starting or changing a report needs an active term.' },
   { q: 'Is the applicability result legal advice?',

@@ -17,9 +17,10 @@ vi.mock('../../components/Nav', () => ({ default: () => null }))
 vi.mock('../../../lib/supabase', () => ({ supabase: {} }))
 
 const { default: ListPage } = await import('./page')
-const { default: HomePage } = await import('./[id]/page')
-const { default: CheckPage } = await import('./[id]/check/page')
-const { default: SectionRoute } = await import('./[id]/[section]/page')
+// Stage D1 (1 Oct 2026): the report's former home is its Canada tab; check and sections moved with it.
+const { default: HomePage } = await import('./[id]/canada/page')
+const { default: CheckPage } = await import('./[id]/canada/check/page')
+const { default: SectionRoute } = await import('./[id]/canada/[section]/page')
 const { default: PreviewRoute } = await import('./preview/[section]/page')
 
 // A params promise React's use() can read synchronously.
@@ -114,8 +115,8 @@ describe('read-only: the parts that appear once a report has loaded (checked in 
   // These render after the page's own data load, which a server render does not run.
   const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
   const section = read('app/dashboard/forced-labour/_components/SectionPage.tsx')
-  const home = read('app/dashboard/forced-labour/[id]/page.tsx')
-  const check = read('app/dashboard/forced-labour/[id]/check/page.tsx')
+  const home = read('app/dashboard/forced-labour/[id]/canada/page.tsx')
+  const check = read('app/dashboard/forced-labour/[id]/canada/check/page.tsx')
 
   it('a section: nothing is scheduled to save, every field is disabled, and complete/reopen and the autosave line are gone', () => {
     expect(section).toMatch(/const writable = canWrite\(useBuilderState\(\)\) && !preview/)

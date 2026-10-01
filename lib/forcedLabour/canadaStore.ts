@@ -105,3 +105,17 @@ export async function saveSharedColumns(supabase: SupabaseClient, flReportId: st
   const { error } = await supabase.from('fl_reports').update({ ...parentPatch, updated_at: new Date().toISOString() }).eq('id', flReportId)
   return !error
 }
+
+/**
+ * The Canada report's id for an id in a URL: the Canada report's own id, or (Stage D1b) its parent's, since a report's
+ * pages now use the parent's id. Null when neither names a Canada report this user can see.
+ */
+export async function canadaReportIdFor(supabase: SupabaseClient, id: string): Promise<{ ok: true; id: string | null } | { ok: false }> {
+  const { data, error } = await supabase.from('s211_reports').select('id').eq('id', id).maybeSingle()
+  if (error) return { ok: false }
+  if (data) return { ok: true, id: data.id as string }
+  const { data: viaParent, error: e2 } = await supabase.from('s211_reports').select('id').eq('fl_report_id', id).maybeSingle()
+  if (e2) return { ok: false }
+  return { ok: true, id: (viaParent?.id as string | undefined) ?? null }
+}
+

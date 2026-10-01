@@ -5,14 +5,14 @@
 // `is` (where an absent column reads as null, as a column the row was created without would), and an
 // array of rows to insert or upsert.
 
-import { fakeSaveSection, type FailInSave } from './fakeSaveSection'
+import { fakeSaveSection, fakeSaveCountrySection, fakeSetCountryEntities, fakeCreateReport, type FailInSave } from './fakeSaveSection'
 
 type Row = Record<string, unknown>
 // rpc: what each database function answers. 'throw' makes the call itself throw. A function with no
 // entry answers { data: null, error } as PostgREST does for an unknown function.
 export type RpcReply = { data: unknown; error: { message: string } | null } | 'throw'
 // failInSave: see lib/s211/testing/fakeSaveSection.ts. fl_save_canada_section is imitated unless rpc names it.
-export type FakeDb = { tables: Record<string, Row[]>; calls: string[]; rpc?: Record<string, RpcReply>; failInSave?: FailInSave }
+export type FakeDb = { tables: Record<string, Row[]>; calls: string[]; rpc?: Record<string, RpcReply>; failInSave?: FailInSave; authUid?: string }
 
 export function fakeSupabase(db: FakeDb) {
   const from = (table: string) => {
@@ -56,6 +56,9 @@ export function fakeSupabase(db: FakeDb) {
     const reply = db.rpc?.[fn]
     if (reply === 'throw') throw new Error('network')
     if (reply === undefined && fn === 'fl_save_canada_section') return fakeSaveSection(db, args, db.failInSave ?? null)
+    if (reply === undefined && fn === 'fl_save_country_section') return fakeSaveCountrySection(db, args, db.failInSave ?? null)
+    if (reply === undefined && fn === 'fl_set_country_entities') return fakeSetCountryEntities(db, args)
+    if (reply === undefined && fn === 'fl_create_report') return fakeCreateReport(db, args, db.authUid ?? 'u1')
     return reply ?? { data: null, error: { message: `Could not find the function public.${fn}` } }
   }
   return { from, rpc }

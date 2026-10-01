@@ -40,7 +40,7 @@ export function ApplicabilityResult({ result }: { result: ReturnType<typeof eval
 // labels as the visible segments. Nothing selected is "not answered"; choosing the selected answer again
 // clears it, so an answer can always be taken back. The values are the dropdowns' values exactly.
 
-const YES_NO = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] as const
+export const YES_NO = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] as const
 const YES_NO_NOT_SURE = [...YES_NO, { value: 'not-sure', label: 'Not sure' }] as const
 
 /** The Act's own words for the two notes in step 2 (s.2 "entity", paragraphs (a) and (b)). */
@@ -70,7 +70,7 @@ export const APPLICABILITY_CSS = `
 }
 `
 
-function Segmented({ name, legend, value, options, onChange }: {
+export function Segmented({ name, legend, value, options, onChange }: {
   name: string; legend: string; value: string | undefined
   options: readonly { value: string; label: string }[]; onChange: (v: string) => void
 }) {
@@ -92,7 +92,7 @@ function Segmented({ name, legend, value, options, onChange }: {
   )
 }
 
-function Step({ n, title, explain, children }: { n: number; title: string; explain: string; children: React.ReactNode }) {
+export function Step({ n, title, explain, children }: { n: number; title: string; explain: string; children: React.ReactNode }) {
   return (
     <section className="fl-step" aria-labelledby={`fl-step-${n}`}>
       <div className="fl-step-head">
@@ -105,7 +105,7 @@ function Step({ n, title, explain, children }: { n: number; title: string; expla
   )
 }
 
-function AmountField({ id, label, value, onChange }: { id: string; label: string; value: string | undefined; onChange: (v: string) => void }) {
+export function AmountField({ id, label, value, onChange }: { id: string; label: string; value: string | undefined; onChange: (v: string) => void }) {
   return (
     <label htmlFor={id} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{label}
       {/* Text, not type="number": no spinner, and room for the separators. The stored value is plain digits. */}

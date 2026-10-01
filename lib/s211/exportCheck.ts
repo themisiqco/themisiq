@@ -18,6 +18,7 @@ import { placeholdersIn, PLACEHOLDER_WARNING } from './attestation'
 import { signerMismatches } from './reportModel'
 import { charisCovers, codePointLabel } from '../pdf/charisCoverage'
 import { fallbackText } from '../pdf/fallbackText'
+import { savedDrafts, LAW_SCOPE } from '../forcedLabour/drafts'
 
 export type SectionState = { status: SectionStatus; content: SectionContent }
 export type ExportBlocker = { section: SectionKey | null; message: string; missing: string[] }
@@ -43,6 +44,15 @@ export function exportGate(sections: Partial<Record<SectionKey, SectionState>>):
   const names = (xs: string[]) => { const t = xs.join('; '); return /[.!?]$/.test(t) ? t : `${t}.` }
   if (unsigned.length) blockers.push({ section: 'approval_attestation', message: `No signer is named for ${names(unsigned)} Each entity's governing body approved the report, so a member of each signs it.`, missing: [] })
   if (unknown.length) blockers.push({ section: 'approval_attestation', message: `A signer row names an entity section 1 does not list: ${names(unknown)} Use the legal name exactly as section 1 gives it.`, missing: [] })
+  // An answer started from another country's report (lib/forcedLabour/drafts.ts) and saved without being edited or
+  // confirmed. A Canada-only report never has one.
+  for (const d of SECTIONS) {
+    const drafts = savedDrafts({ [d.key]: sections[d.key]?.content })
+    if (!drafts.length) continue
+    const labels = drafts.map(x => d.fields.find(f => f.key === x.field)?.label ?? x.field)
+    blockers.push({ section: d.key, missing: labels,
+      message: `${d.number}. ${d.title}: ${drafts.length === 1 ? 'an answer' : `${drafts.length} answers`} started from another country\u2019s report ${drafts.length === 1 ? 'is' : 'are'} not confirmed. Edit each, or confirm that it covers ${LAW_SCOPE.canada}.` })
+  }
   return { ready: blockers.length === 0, blockers }
 }
 

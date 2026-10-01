@@ -34,21 +34,19 @@ const inOrder = (text: string, order: string[]) => {
 }
 
 describe('the country list (lib/forcedLabour/countries.ts)', () => {
-  it('only Canada is available; the others are not, and carry no page', () => {
+  it('only Canada is available; the others carry no page', () => {
     expect(COUNTRIES.map(c => [c.key, c.status, c.href])).toEqual([
-      ['canada', 'available', '/forced-labour/canada'], ['australia', 'not-yet', null], ['uk', 'not-yet', null],
+      ['canada', 'available', '/forced-labour/canada'], ['australia', 'hidden', null], ['uk', 'preview', null],
     ])
     expect(COUNTRIES.filter(c => c.status !== 'available').every(c => c.href === null)).toBe(true)
   })
 
-  it('on the overview, a country not yet available is plain text: never a link, never an order button, never a date', () => {
+  it('on the overview, only an available country is listed (Stage D1b): no other is named, and none is "not yet available"', () => {
     for (const c of COUNTRIES.filter(c => c.status !== 'available')) {
-      const li = new RegExp(`<li data-country="${c.key}"[^>]*>(.*?)</li>`).exec(rawOverview)?.[1]
-      expect(li, c.key).toBeDefined()
-      expect(li, c.key).not.toMatch(/<a |href=|\/order|\bOrder\b/)
-      expect(decode(li!)).toContain(`${c.name} ${c.law} Not yet available`)
-      expect(decode(li!)).not.toMatch(/\b20\d\d\b(?! )|\bin (Q[1-4]|early|late|spring|summer|fall|autumn|winter)\b/i)
+      expect(rawOverview, c.key).not.toContain(`data-country="${c.key}"`)
+      expect(decode(rawOverview), c.key).not.toContain(c.law)
     }
+    expect(decode(rawOverview)).not.toMatch(/not yet available/i)
     const ca = /<li data-country="canada"[^>]*>(.*?)<\/li>/.exec(rawOverview)![1]
     expect(ca).toContain('href="/forced-labour/canada"')
     expect(decode(ca)).toContain('Available')
@@ -61,10 +59,10 @@ describe('the country list (lib/forcedLabour/countries.ts)', () => {
     }
   })
 
-  it('the builder\'s Start form lists every country, with only the available ones selectable', () => {
+  it('the builder\'s Start form offers only the countries the account may use (Stage D1b), starting from Canada', () => {
     const list = read('app/dashboard/forced-labour/page.tsx')
-    expect(list).toContain("disabled={c.status !== 'available'}")
-    expect(list).toContain('value="canada"')
+    expect(list).not.toContain("disabled={c.status !== 'available'}")
+    expect(list).toContain("COUNTRIES.filter(c => c.key === 'canada')")
   })
 })
 
@@ -189,7 +187,7 @@ describe('the free check', () => {
     expect(r.obligation.outcome).toBe('must-report')
     expect(r.unanswered).toBe(4)
     expect(read('app/forced-labour/canada/check/page.tsx')).toContain('<ApplicabilityQuestions form={form} onChange={set} />')
-    expect(read('app/dashboard/forced-labour/[id]/page.tsx')).toContain('<ApplicabilityQuestions form={form} onChange={set} />')
+    expect(read('app/dashboard/forced-labour/[id]/canada/page.tsx')).toContain('<ApplicabilityQuestions form={form} onChange={set} />')
   })
 
   it('stores nothing on a server: no API call, only this browser\'s draft', () => {

@@ -20,7 +20,7 @@ import { createLayout, MARGIN, type Layout } from '../pdf/layout'
 import { CHARIS_FAMILY } from '../fonts/charis'
 import { charisCanDraw, fallbackText } from '../pdf/drawable'
 import { INK, SECONDARY, MUTED, TABLE_INK, HAIRLINE } from '../pdf/palette'
-import type { Block, S211ReportModel, SignatureBlock } from './reportModel'
+import type { Block, SignatureBlock } from './reportModel'
 
 type FaceStyle = 'normal' | 'bold' | 'italic'
 
@@ -29,6 +29,8 @@ const H2 = 20 + 15 * 1.3 + 9
 const H3 = 15 + 12 * 1.3 + 7
 /** Room for three lines of body text: what a heading must have beneath it on its page. */
 const FOLLOW = 3 * 10.5 * 1.65
+/** Layout's body line height (lib/pdf/layout.ts BODY_LINE). */
+const BODY_LINE = 10.5 * 1.65
 const REF_LINE = 14
 const CELL = 9.5
 const CELL_PAD = 5
@@ -40,10 +42,41 @@ const stringsOf = (v: unknown): string[] =>
     : v && typeof v === 'object' ? Object.values(v).flatMap(stringsOf)
     : []
 
-export type S211Pdf = { doc: jsPDF; substituted: string[] }
+/** Where each part landed: the page of its heading, of the first thing beneath it, and of its last line. For tests. */
+export type PartPages = { title: string; headingPage: number; firstContentPage: number; endPage: number }
+export type S211Pdf = { doc: jsPDF; substituted: string[]; pages: PartPages[] }
 
-export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
-  const l: Layout = createLayout({ format: 'letter' })
+/**
+ * ⚠️ EVERY OPTION DEFAULTS TO CANADA'S LAYOUT, so Canada's call passes nothing and its bytes are unchanged
+ * (scratch/adapter-proof.ts). The UK statement passes UK_PDF_OPTIONS (lib/forcedLabour/uk/statementModel.ts).
+ *   format: Letter (Canada) or A4 (the UK).
+ *   cover: 'name-first' prints the title small above a large organisation name (Canada); 'title-first' prints the
+ *     title as the large line, then the subtitle, then the organisation name smaller beneath it (the UK).
+ *   keepWithNext: a part's heading and reference line never end a page without the first content beneath them.
+ */
+export type PdfOptions = { format?: 'letter' | 'a4'; cover?: 'name-first' | 'title-first'; keepWithNext?: boolean }
+
+/**
+ * What the renderer draws: the shape of S211ReportModel without its Canada-only keys, so another country's document
+ * (the UK statement, lib/forcedLabour/uk/statementModel.ts, Stage D2) is drawn by the same code. Canada's model fits
+ * it unchanged.
+ */
+export type PdfDocumentModel = {
+  /** `subtitle`, under the title, is the UK statement's (Stage D2 review); Canada's report has none. */
+  cover: { title: string; subtitle?: string; legalName: string; revised: boolean; rows: [string, string][] }
+  runningHeader: string
+  /** `keepTogether` puts the whole part on one page, starting a new page if it would not fit (the UK's approval and signing). */
+  parts: { title: string; reference: string | null; blocks: Block[]; keepTogether?: boolean }[]
+  footerCredit: string | null
+  metadata: { title: string; subject: string; author: string; language: 'en-CA' | 'en-GB' }
+}
+
+/**
+ * ⚠️ LETTER UNLESS ASKED. Canada's report is LETTER and its call passes nothing, so its bytes are unchanged
+ * (scratch/adapter-proof.ts). The UK statement asks for A4, the size printed and filed in the UK.
+ */
+export function generateS211ReportPDF(m: PdfDocumentModel, options: PdfOptions = {}): S211Pdf {
+  const l: Layout = createLayout({ format: options.format ?? 'letter' })
   const { doc, contentWidth, pageWidth, pageHeight } = l
   const left = MARGIN.left
   const canDraw = charisCanDraw(doc)
@@ -68,9 +101,17 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
 
   // ── cover ───────────────────────────────────────────────────────────────────────────────────────
   l.moveTo(MARGIN.top + 90)
-  for (const line of lines(m.cover.title, 12, 'normal')) { setType(12, 'normal', SECONDARY); doc.text(line, left, l.y()); l.moveTo(l.y() + 17) }
-  l.spacer(14)
-  for (const line of lines(m.cover.legalName, 26, 'normal')) { setType(26, 'normal', INK); doc.text(line, left, l.y()); l.moveTo(l.y() + 32) }
+  if (options.cover === 'title-first') {
+    for (const line of lines(m.cover.title, 26, 'normal')) { setType(26, 'normal', INK); doc.text(line, left, l.y()); l.moveTo(l.y() + 32) }
+    if (m.cover.subtitle) for (const line of lines(m.cover.subtitle, 10.5, 'normal')) { setType(10.5, 'normal', MUTED); doc.text(line, left, l.y()); l.moveTo(l.y() + 15) }
+    l.spacer(18)
+    for (const line of lines(m.cover.legalName, 15, 'normal')) { setType(15, 'normal', INK); doc.text(line, left, l.y()); l.moveTo(l.y() + 20) }
+  } else {
+    for (const line of lines(m.cover.title, 12, 'normal')) { setType(12, 'normal', SECONDARY); doc.text(line, left, l.y()); l.moveTo(l.y() + 17) }
+    if (m.cover.subtitle) for (const line of lines(m.cover.subtitle, 10.5, 'normal')) { setType(10.5, 'normal', MUTED); doc.text(line, left, l.y()); l.moveTo(l.y() + 15) }
+    l.spacer(14)
+    for (const line of lines(m.cover.legalName, 26, 'normal')) { setType(26, 'normal', INK); doc.text(line, left, l.y()); l.moveTo(l.y() + 32) }
+  }
   if (m.cover.revised) { setType(12, 'bold', INK); doc.text('Revised report', left, l.y() + 4); l.moveTo(l.y() + 22) }
   l.spacer(10)
   doc.setDrawColor(HAIRLINE); doc.setLineWidth(0.75)
@@ -86,13 +127,20 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
   l.newPage()
 
   // ── blocks ──────────────────────────────────────────────────────────────────────────────────────
+  /** The page the first thing in a part is drawn on, recorded once per part. */
+  let firstContentPage: number | null = null
+  const mark = () => { if (firstContentPage === null) firstContentPage = l.page() }
+
   const para = (text: string) => {
+    if (options.keepWithNext) room(BODY_LINE)
+    mark()
     l.body(safe(text))
     l.spacer(6)
   }
 
   const subheading = (text: string) => {
     room(H3 + FOLLOW)
+    mark()
     l.heading(safe(text), 3)
   }
 
@@ -106,6 +154,7 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
 
   const facts = (rows: [string, string][]) => {
     room(CELL * 1.15 + 2 * CELL_PAD + 4)
+    mark()
     autoTable(doc, {
       startY: l.y(),
       margin: { top: MARGIN.top, bottom: MARGIN.bottom, left: MARGIN.left, right: MARGIN.right },
@@ -122,6 +171,7 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
   const table = (b: Extract<Block, { kind: 'table' }>) => {
     // The title and the header and first row stay together.
     room(H3 + 2 * (CELL * 1.15 + 2 * CELL_PAD) + 30)
+    mark()
     l.heading(safe(b.title), 3)
     autoTable(doc, {
       startY: l.y(),
@@ -143,18 +193,51 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
    * because the attestation is signed beneath it; every further block (one per entity under
    * 11(4)(b)(i)) is kept whole, and may start a new page.
    */
-  const signature = (b: Extract<Block, { kind: 'signature' }>) => {
-    const rowH = 40
-    const several = b.signers.length > 1
-    const blockH = (sb: SignatureBlock) =>
-      (several ? 22 : 0) + sb.rows.length * rowH + lines(sb.statement, 10.5, 'normal').length * 17 + 10
+  const SIGNER_ROW = 40
+  const signerHeight = (sb: SignatureBlock, several: boolean) =>
+    (several ? 22 : 0) + sb.rows.length * SIGNER_ROW + lines(sb.statement, 10.5, 'normal').length * 17 + 10
+  /** The attestation and the first signature block: what the signature keeps on one page. */
+  const signatureHeight = (b: Extract<Block, { kind: 'signature' }>) => {
     const bodyLines = b.attestation.reduce((n, p) => n + lines(p, 10.5, 'normal').length, 0)
-    room(H3 + bodyLines * 10.5 * 1.65 + b.attestation.length * 6 + 16 + (b.signers[0] ? blockH(b.signers[0]) : 0))
+    return H3 + bodyLines * 10.5 * 1.65 + b.attestation.length * 6 + 16 + (b.signers[0] ? signerHeight(b.signers[0], b.signers.length > 1) : 0)
+  }
+
+  /** The least a block needs on the page its part's heading is on: what its own keep-together asks for. */
+  const firstNeed = (b: Block | undefined): number => {
+    if (!b) return 0
+    switch (b.kind) {
+      case 'para': return Math.min(2, lines(b.text, 10.5, 'normal').length) * BODY_LINE
+      case 'subheading': return H3 + FOLLOW
+      case 'facts': return CELL * 1.15 + 2 * CELL_PAD + 4
+      case 'table': return H3 + 2 * (CELL * 1.15 + 2 * CELL_PAD) + 30
+      case 'signature': return signatureHeight(b)
+    }
+  }
+  /** A block's whole height, estimated generously: only used to decide whether a part that must stay together needs a new page. */
+  const fullHeight = (b: Block): number => {
+    const rowLines = (cells: string[], widths: number[]) => Math.max(1, ...cells.map((c, i) => lines(c, CELL, 'normal', widths[i] - 10).length))
+    const rowH = (n: number) => n * CELL * 1.15 + 2 * CELL_PAD + 1
+    switch (b.kind) {
+      case 'para': return lines(b.text, 10.5, 'normal').length * BODY_LINE + 6
+      case 'subheading': return H3
+      case 'facts': return b.rows.reduce((h, [k, v]) => h + rowH(rowLines([k, v], [190, contentWidth - 190])), 0) + 12
+      case 'table': {
+        const w = b.columns.map(() => contentWidth / b.columns.length)
+        return H3 + rowH(rowLines(b.columns, w)) + b.rows.reduce((h, r) => h + rowH(rowLines(r, w)), 0) + 12
+      }
+      case 'signature': return signatureHeight(b) + b.signers.slice(1).reduce((h, sb) => h + signerHeight(sb, true) + 18, 0)
+    }
+  }
+
+  const signature = (b: Extract<Block, { kind: 'signature' }>) => {
+    const several = b.signers.length > 1
+    room(signatureHeight(b))
+    mark()
     l.heading(safe(b.heading), 3)
     b.attestation.forEach(para)
     l.spacer(16)
     b.signers.forEach((sb, i) => {
-      if (i > 0) { room(blockH(sb) + 18); l.spacer(18) }
+      if (i > 0) { room(signerHeight(sb, several) + 18); l.spacer(18) }
       if (several) {
         setType(10.5, 'bold', INK)
         doc.text(safe(`For ${sb.entity}`), left, l.y() + 10.5)
@@ -167,10 +250,11 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
         if (r.value) { setType(11.5, 'normal', INK); doc.text(safe(r.value), left + 90, top + 20) }
         doc.setDrawColor(INK); doc.setLineWidth(0.5)
         doc.line(left + 90, top + 26, left + contentWidth, top + 26)
-        l.moveTo(top + rowH)
+        l.moveTo(top + SIGNER_ROW)
       }
+      // An empty statement prints nothing (the UK block has none; Canada's always has one).
       setType(10.5, 'normal', INK)
-      for (const line of doc.splitTextToSize(safe(sb.statement), contentWidth) as string[]) { doc.text(line, left, l.y() + 10.5); l.spacer(17) }
+      if (sb.statement) for (const line of doc.splitTextToSize(safe(sb.statement), contentWidth) as string[]) { doc.text(line, left, l.y() + 10.5); l.spacer(17) }
     })
   }
 
@@ -185,17 +269,24 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
   }
 
   // ── parts ───────────────────────────────────────────────────────────────────────────────────────
+  const pages: PartPages[] = []
   m.parts.forEach((part, i) => {
+    const head = (i > 0 ? 6 : 0) + H2 + (part.reference ? REF_LINE + 2 : 0)
+    if (part.keepTogether) room(head + part.blocks.reduce((h, b) => h + fullHeight(b), 0))
     // The heading, its reference line and the start of its content, together.
     room(H2 + REF_LINE + FOLLOW)
+    if (options.keepWithNext) room(head + firstNeed(part.blocks[0]))
+    firstContentPage = null
     if (i > 0) l.spacer(6)
     l.heading(safe(part.title), 2)
+    const headingPage = l.page()
     if (part.reference) {
       setType(8.5, 'normal', MUTED)
       doc.text(safe(part.reference), left, l.y() + 1)
       l.spacer(REF_LINE + 2)
     }
     part.blocks.forEach(block)
+    pages.push({ title: part.title, headingPage, firstContentPage: firstContentPage ?? headingPage, endPage: doc.getCurrentPageInfo().pageNumber })
     l.spacer(10)
   })
 
@@ -216,5 +307,5 @@ export function generateS211ReportPDF(m: S211ReportModel): S211Pdf {
     if (m.footerCredit) doc.text(safe(m.footerCredit), left, footerBaseline)
   }
 
-  return { doc, substituted }
+  return { doc, substituted, pages }
 }

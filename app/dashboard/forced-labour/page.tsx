@@ -4,19 +4,26 @@
 // Forced Labour Reporting: the user's reports and a form to start one (full access); their reports with
 // no form (expired: read-only); or the module explained with an order link and a read-through of the
 // sections (never bought: preview). States: lib/s211/builderAccess.ts.
+//
+// Since Stage D1b (1 Oct 2026) a report can start from any country this account may use (Canada, or the UK for an
+// account on the preview list), and the list shows every report whatever country it started from, linked by the
+// report's own id. The countries offered come from /api/forced-labour/countries, which leaves out any country this
+// account may not use: no "not yet available" line, no disabled option.
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { s211Api } from '../../../lib/s211/client'
 import { defaultReportingYear } from '../../../lib/s211/defaults'
 import { SECTIONS } from '../../../lib/s211/builderContent'
-import { CANADA_CHECK, COUNTRIES, STATUS_LABEL } from '../../../lib/forcedLabour/countries'
+import { CANADA_CHECK, COUNTRIES, type CountryKey } from '../../../lib/forcedLabour/countries'
+import { flApi, type ReportListRow } from '../../../lib/forcedLabour/client'
 import { BUILDER_ROOT, PREVIEW_ID, ORDER_HREF, ORDER_LABEL, READ_ONLY_EXPORT_NOTE, canWrite } from '../../../lib/s211/builderAccess'
 import { BuilderFrame, ReadOnlyBanner, S, useBuilderState } from './_components/ui'
 import { DRAFT_KEYS, readDraft, clearDraft } from '../../../lib/drafts'
 import { parseApplicabilityDraft, formToReportPatch, formToActivities } from '../../../lib/s211/applicability'
 
 type ReportRow = { id: string; company_name: string; reporting_year: number; status: string; updated_at: string }
+const countryName = (k: string) => COUNTRIES.find(c => c.key === k)?.name ?? k
 
 /** Never bought: what the module does, and the way in. Nothing is fetched and nothing can be stored. */
 function Preview() {
@@ -46,7 +53,10 @@ function Preview() {
 function ReportsList() {
   const state = useBuilderState()
   const writable = canWrite(state)
-  const [reports, setReports] = useState<ReportRow[] | null>(null)
+  const [reports, setReports] = useState<ReportListRow[] | null>(null)
+  // Canada until the account's countries arrive: every account may start a Canada report.
+  const [countries, setCountries] = useState<{ key: CountryKey; name: string; law: string }[]>(() => COUNTRIES.filter(c => c.key === 'canada'))
+  const [country, setCountry] = useState<CountryKey>('canada')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [company, setCompany] = useState('')
   const [year, setYear] = useState(() => String(defaultReportingYear(new Date())))
@@ -54,10 +64,11 @@ function ReportsList() {
   const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
-    void s211Api<{ reports: ReportRow[] }>('/reports').then(r => {
+    void flApi<{ reports: ReportListRow[] }>('/reports').then(r => {
       if (r.data) setReports(r.data.reports)
       else setLoadError(r.error ?? 'The reports could not be loaded.')
     })
+    void flApi<{ countries: { key: CountryKey; name: string; law: string }[] }>('/countries').then(r => { if (r.data?.countries.length) setCountries(r.data.countries) })
   }, [])
 
   // Answers from the free check (/forced-labour/canada/check), if this browser holds them: written into the
@@ -66,6 +77,13 @@ function ReportsList() {
 
   const create = async () => {
     setCreating(true); setCreateError(null)
+    if (country !== 'canada') {
+      // Any other country: the report and its first country row together (public.fl_create_report).
+      const r = await flApi<{ report: { id: string } }>('/reports', { method: 'POST', body: { organization_name: company, country } })
+      if (!r.data) { setCreating(false); setCreateError(r.error); return }
+      window.location.href = `${BUILDER_ROOT}/${r.data.report.id}`
+      return
+    }
     const r = await s211Api<{ report: ReportRow }>('/reports', { method: 'POST', body: { company_name: company, reporting_year: Number(year) } })
     if (!r.data) { setCreating(false); setCreateError(r.error); return }
     const id = r.data.report.id
@@ -92,31 +110,32 @@ function ReportsList() {
       {reports?.length === 0 && <p style={S.muted}>You have not started a report yet.</p>}
       {reports?.map(r => (
         <Link key={r.id} href={`/dashboard/forced-labour/${r.id}`} style={{ ...S.card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-ink)' }}>{r.company_name}</span>
-          <span style={S.muted}>Reporting year {r.reporting_year}</span>
+          <span>
+            <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: 'var(--color-ink)' }}>{r.name}</span>
+            <span style={S.muted}>{r.countries.map(countryName).join(', ')}</span>
+          </span>
+          {r.canadaReportingYear !== null && <span style={S.muted}>Reporting year {r.canadaReportingYear}</span>}
         </Link>
       ))}
 
       {writable && <>
       <h2 style={S.h2}>Start a report</h2>
       <div style={S.card}>
-        {/* Presentation only (Stage 5c): reports are Canadian by definition and nothing new is stored. A
-            country that is not yet available is listed and cannot be chosen. */}
+        {/* Only the countries this account may use (/api/forced-labour/countries). Other countries are added to
+            a report from its overview. */}
         <label htmlFor="country" style={S.label}>Country</label>
-        <select id="country" style={{ ...S.input, maxWidth: 360, marginBottom: 14 }} value="canada" onChange={() => {}}>
-          {COUNTRIES.map(c => (
-            <option key={c.key} value={c.key} disabled={c.status !== 'available'}>
-              {c.name}: {c.law}{c.status === 'available' ? '' : ` (${STATUS_LABEL[c.status].toLowerCase()})`}
-            </option>
-          ))}
+        <select id="country" style={{ ...S.input, maxWidth: 360, marginBottom: 14 }} value={country} onChange={e => setCountry(e.target.value as CountryKey)}>
+          {countries.map(c => <option key={c.key} value={c.key}>{c.name}: {c.law}</option>)}
         </select>
         <label htmlFor="company" style={S.label}>Company name</label>
-        <p style={S.hint}>You will give the full legal name in section 1.</p>
+        <p style={S.hint}>{country === 'canada' ? 'You will give the full legal name in section 1.' : 'You will choose the organisation giving the statement in Statement details.'}</p>
         <input id="company" style={{ ...S.input, marginBottom: 14 }} value={company} maxLength={300} onChange={e => setCompany(e.target.value)} />
-        <label htmlFor="year" style={S.label}>Reporting year</label>
-        <p style={S.hint}>The year the report is due, by May 31. A report due in 2026 covers the financial year before it.</p>
-        <input id="year" style={{ ...S.input, maxWidth: 140, marginBottom: 14 }} type="number" min={2024} value={year} onChange={e => setYear(e.target.value)} />
-        {checkDraft && <p style={S.hint}>Your answers from the free applicability check will be added to this report.</p>}
+        {country === 'canada' && <>
+          <label htmlFor="year" style={S.label}>Reporting year</label>
+          <p style={S.hint}>The year the report is due, by May 31. A report due in 2026 covers the financial year before it.</p>
+          <input id="year" style={{ ...S.input, maxWidth: 140, marginBottom: 14 }} type="number" min={2024} value={year} onChange={e => setYear(e.target.value)} />
+          {checkDraft && <p style={S.hint}>Your answers from the free applicability check will be added to this report.</p>}
+        </>}
         {createError && <p style={S.error}>{createError}</p>}
         <div><button type="button" style={S.button} disabled={creating} onClick={create}>{creating ? 'Starting' : 'Start the report'}</button></div>
       </div>

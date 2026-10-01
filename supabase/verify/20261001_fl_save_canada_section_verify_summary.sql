@@ -9,6 +9,10 @@
 -- pass = true. What the function DOES (both writes or neither) is the second script,
 -- 20261001_fl_save_canada_section_verify_atomic.sql.
 
+-- Check "every table ... is schema-qualified" removes string literals before it looks: an error message such as
+-- 'a Canada report starts from s211_reports' names a table in words, not in SQL. Until 1 Oct 2026 it did not, and
+-- 20261001_fl_entities_and_create_verify_summary.sql reported "unqualified 1" for that sentence in
+-- fl_create_report (a false positive: the behaviour script ran the function under its empty search_path).
 with
 fn as (
   select p.oid, p.prosecdef, p.provolatile::text as volatility, p.proconfig, l.lanname::text as lang,
@@ -39,7 +43,7 @@ checks as (
   union all
   select '05 every table it names is schema-qualified',
          'unqualified 0',
-         (select 'unqualified ' || (select count(*) from regexp_matches(def, '(?:from|into|update|join)\s+(?!public\.)(fl_|s211_)\w+', 'gi')) from fn)
+         (select 'unqualified ' || (select count(*) from regexp_matches(regexp_replace(def, '''(?:[^'']|'''')*''', '''''', 'g'), '(?:from|into|update|join)\s+(?!public\.)(fl_|s211_)\w+', 'gi')) from fn)
   union all
   select '06 policy counts on the three tables it writes, unchanged',
          'fl_answers:4, s211_report_sections:4, s211_reports:4',

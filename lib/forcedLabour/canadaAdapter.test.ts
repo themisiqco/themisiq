@@ -46,28 +46,32 @@ describe('every report-model fixture comes back identical', () => {
   }
 
   it('and the comparison would catch a lost answer (negative control)', () => {
-    const after = buildS211ReportModel(roundTrip(SINGLE_REPORT, true, 'training.training_description'))
+    const after = buildS211ReportModel(roundTrip(SINGLE_REPORT, true, 'structure_activities_supply_chains.structure_description'))
     expect(JSON.stringify(after)).not.toBe(JSON.stringify(buildS211ReportModel(SINGLE_REPORT)))
   })
 })
 
 describe('writing and reading', () => {
   it('a field held is upserted, null included; a field absent is removed', () => {
-    const { upsert, remove } = sharedAnswersFrom('training', { training_provided: 'Yes', employees_trained: null } as unknown as SectionContent)
-    expect(upsert).toEqual([{ field_key: 'training.training_provided', value: 'Yes' }, { field_key: 'training.employees_trained', value: null }])
-    expect(remove).toContain('training.training_description')
+    const { upsert, remove } = sharedAnswersFrom('training', { mandatory: 'Mandatory', employees_trained: null, training_provided: 'Yes' } as unknown as SectionContent)
+    expect(upsert).toEqual([{ field_key: 'training.mandatory', value: 'Mandatory' }, { field_key: 'training.employees_trained', value: null }])
+    expect(remove).toContain('training.audience')
+    // per-country since Stage D1b: never in the shared store
+    expect([...upsert.map(u => u.field_key), ...remove]).not.toContain('training.training_provided')
     // Shared with Australia (s.16(1)(d)), so absent here means removed from the shared store too.
     expect(remove).toContain('training.controlled_entities')
   })
   it('the shared store wins; with no row the section’s own value stands', () => {
-    const out = overlaySection('training', { training_provided: 'Yes', training_description: 'old' } as unknown as SectionContent,
-      new Map([['training.training_description', 'new']]))
-    expect(out).toEqual({ training_provided: 'Yes', training_description: 'new' })
+    const out = overlaySection('training', { training_provided: 'Yes', frequency_and_length: 'old' } as unknown as SectionContent,
+      new Map([['training.frequency_and_length', 'new']]))
+    expect(out).toEqual({ training_provided: 'Yes', frequency_and_length: 'new' })
     expect(overlaySection('training', { training_provided: 'Yes' } as unknown as SectionContent, new Map())).toEqual({ training_provided: 'Yes' })
+    // a per-country answer is never overlaid, whatever the shared store holds
+    expect(overlaySection('training', { training_description: 'mine' } as unknown as SectionContent, new Map([['training.training_description', 'theirs']]))).toEqual({ training_description: 'mine' })
   })
   it('a cleared answer (JSON null) overrides the section’s stale copy', () => {
-    expect(overlaySection('training', { training_description: 'stale' } as unknown as SectionContent, new Map([['training.training_description', null]])))
-      .toEqual({ training_description: null })
+    expect(overlaySection('training', { frequency_and_length: 'stale' } as unknown as SectionContent, new Map([['training.frequency_and_length', null]])))
+      .toEqual({ frequency_and_length: null })
   })
   it('a Canada-only field is never overlaid', () => {
     const out = overlaySection('remediation_income_loss', { measures_caused_loss: 'No' } as unknown as SectionContent,

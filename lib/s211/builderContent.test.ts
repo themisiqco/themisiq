@@ -132,10 +132,10 @@ describe('review fixes: builder text', () => {
 describe('review fixes: the builder pages (source checks)', () => {
   // The section page moved into a shared component in Stage 5a, used by the report and preview routes.
   const page = read('app/dashboard/forced-labour/_components/SectionPage.tsx')
-  const route = read('app/dashboard/forced-labour/[id]/[section]/page.tsx')
+  const route = read('app/dashboard/forced-labour/[id]/canada/[section]/page.tsx')
   const ui = read('app/dashboard/forced-labour/_components/ui.tsx')
-  const check = read('app/dashboard/forced-labour/[id]/check/page.tsx')
-  const home = read('app/dashboard/forced-labour/[id]/page.tsx')
+  const check = read('app/dashboard/forced-labour/[id]/canada/check/page.tsx')
+  const home = read('app/dashboard/forced-labour/[id]/canada/page.tsx')
   const list = read('app/dashboard/forced-labour/page.tsx')
 
   it('the panels open on the first visit, read once before the visit is recorded (item A1)', () => {

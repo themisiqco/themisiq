@@ -12,7 +12,8 @@
 // fl_answers and the whole section to s211_report_sections in ONE transaction (saveCanadaSection, through
 // public.fl_save_canada_section). Either both are saved or neither is.
 import { NextResponse } from 'next/server'
-import { ensureParent, saveCanadaSection } from '../../../../../../../lib/forcedLabour/canadaStore'
+import { ensureParent, saveCanadaSection, canadaReportIdFor } from '../../../../../../../lib/forcedLabour/canadaStore'
+import { settleOffered } from '../../../../../../../lib/forcedLabour/drafts'
 import { requireS211, notFound, MAX_CONTENT_CHARS } from '../../../../../../../lib/s211/server'
 import { isSectionKey } from '../../../../../../../lib/s211/builderContent'
 import { statusAfterEdit, markComplete, type SectionStatus } from '../../../../../../../lib/s211/sectionStatus'
@@ -20,7 +21,7 @@ import { statusAfterEdit, markComplete, type SectionStatus } from '../../../../.
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string; key: string }> }) {
   const gate = await requireS211(req, 'write')
   if (!gate.ok) return gate.response
-  const { id, key } = await params
+  const { id: urlId, key } = await params
   if (!isSectionKey(key)) return notFound()
 
   const body = await req.json().catch(() => null) as { content?: unknown; action?: unknown } | null
@@ -31,7 +32,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'This section is too long to save.' }, { status: 413 })
   const action = body?.action === 'complete' || body?.action === 'reopen' ? body.action : 'save'
 
-  // The report must be the user's. RLS answers with no row otherwise.
+  // The report must be the user's. RLS answers with no row otherwise. The URL may carry the parent's id (Stage D1b).
+  const resolved = await canadaReportIdFor(gate.supabase, urlId)
+  if (!resolved.ok) return NextResponse.json({ error: 'The report could not be loaded.' }, { status: 500 })
+  if (!resolved.id) return notFound()
+  const id = resolved.id
   const { data: report, error: rErr } = await gate.supabase.from('s211_reports')
     .select('id, fl_report_id, company_name, financial_year_end, status').eq('id', id).maybeSingle()
   if (rErr) return NextResponse.json({ error: 'The report could not be loaded.' }, { status: 500 })
@@ -40,7 +45,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { data: existing } = await gate.supabase.from('s211_report_sections')
     .select('status').eq('report_id', id).eq('section_key', key).maybeSingle()
   const before = (existing?.status ?? 'not_started') as SectionStatus
-  const c = content as Record<string, unknown>
+  // Offered drafts kept by the user are stored as drafts, still marked (lib/forcedLabour/drafts.ts).
+  const c = settleOffered(content as Record<string, unknown>) as Record<string, unknown>
 
   let status: SectionStatus
   if (action === 'complete') {

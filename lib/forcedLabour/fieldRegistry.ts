@@ -44,6 +44,11 @@ export type RegistryField = {
   area: Area
   canada: CanadaHome | null
   note?: string
+  /**
+   * The answer this field gives, across countries, when each country keeps its own (Stage D1b): the Canada
+   * key of the question. Fields with the same concept are each other's draft source (lib/forcedLabour/drafts.ts).
+   */
+  concept?: string
 }
 
 export const storage = (f: RegistryField): 'shared' | 'country' => (f.countries.length > 1 ? 'shared' : 'country')
@@ -55,7 +60,7 @@ const hidden = (section: SectionKey, field: string, area: Area, note: string): R
 const col = (column: string, area: Area, countries: readonly CountryKey[], note?: string): RegistryField =>
   ({ key: `report.${column}`, countries, area, canada: { kind: 'column', column }, ...(note ? { note } : {}) })
 
-export const FIELD_REGISTRY: readonly RegistryField[] = [
+const CANADA_AS_LISTED: readonly RegistryField[] = [
   // ── s211_reports columns ──
   col('company_name', 'identity', ALL, 'The organization’s name: fl_reports.organization_name.'),
   col('reporting_year', 'report', CA, 'Canada’s report year (due May 31 of it). UK and Australia work from the period.'),
@@ -134,6 +139,77 @@ export const FIELD_REGISTRY: readonly RegistryField[] = [
     'entity_signatories', 'attestation_text', 'authority_to_bind'], 'Canada s.11(4) and (5). Each country records its own approval.'),
   hidden('approval_attestation', '_attestation_built', 'approval', 'The attestation as built (lib/s211/attestation.ts).'),
 ]
+
+// ── Per-country, not shared (Stage D1b, 1 Oct 2026) ─────────────────────────────────────────────────────
+// Narrative answers whose meaning depends on the law's scope. Canada asks about forced labour and child
+// labour; section 54 about slavery and human trafficking; Australia's Act about modern slavery. One answer
+// cannot be right for all of them, so each country keeps its own, linked by `concept`. A country opening one
+// with no answer yet starts from another country's as a draft, marked until the user edits or confirms it.
+// Factual and structural answers (structure, supply chains, figures, process descriptions that do not depend
+// on the scope) stay shared.
+//   key (Canada's)                                   UK section     why it depends on the scope
+export const PER_COUNTRY: readonly { key: string; ukSection: string | null; why: string }[] = [
+  { key: 'policies_due_diligence.has_policy',              ukSection: 'policies',      why: 'Canada asks for a policy covering forced labour and child labour.' },
+  { key: 'risks.risk_assessment_done',                     ukSection: 'risk',          why: '"These risks" are the law\u2019s risks.' },
+  { key: 'risks.risk_areas',                               ukSection: 'risk',          why: 'Why each area carries a risk, and what was done, is about the law\u2019s risk.' },
+  { key: 'risks.own_operations_risk',                      ukSection: 'risk',          why: 'A risk description.' },
+  { key: 'risks.management_steps',                         ukSection: 'risk',          why: 'How the risks found were dealt with.' },
+  { key: 'policies_due_diligence.due_diligence_description', ukSection: 'due_diligence', why: 'A due diligence narrative.' },
+  { key: 'policies_due_diligence.purchasing_practices',    ukSection: 'due_diligence', why: 'Whether purchasing practices contribute to the law\u2019s risk.' },
+  { key: 'remediation.instances_identified',               ukSection: 'due_diligence', why: 'Canada asks about instances of forced labour or child labour.' },
+  { key: 'remediation.remediation_taken',                  ukSection: 'due_diligence', why: 'Remediation of those instances.' },
+  { key: 'remediation.remediation_description',            ukSection: 'due_diligence', why: 'A remediation narrative.' },
+  { key: 'training.training_provided',                     ukSection: 'training',      why: 'Canada asks about training on forced labour or child labour.' },
+  { key: 'training.covers',                                ukSection: 'training',      why: 'Canada\u2019s options are forced labour and child labour.' },
+  { key: 'training.training_description',                  ukSection: 'training',      why: 'Training content.' },
+  { key: 'effectiveness.assesses_effectiveness',           ukSection: 'effectiveness', why: 'Whether the actions on the law\u2019s risk work.' },
+  { key: 'effectiveness.effectiveness_description',        ukSection: 'effectiveness', why: 'An effectiveness narrative.' },
+  { key: 'effectiveness.goals_short_term',                 ukSection: 'effectiveness', why: 'Goals on the law\u2019s risk.' },
+  { key: 'effectiveness.goals_medium_term',                ukSection: 'effectiveness', why: 'Goals on the law\u2019s risk.' },
+  { key: 'effectiveness.goals_long_term',                  ukSection: 'effectiveness', why: 'Goals on the law\u2019s risk.' },
+  { key: 'effectiveness.progress_since_last_report',       ukSection: 'effectiveness', why: 'Progress against those goals.' },
+  { key: 'effectiveness.findings_changed_practice',        ukSection: 'effectiveness', why: 'An effectiveness narrative.' },
+  { key: 'steps_taken.steps_summary',                      ukSection: 'steps_taken',   why: 'Canada: steps on forced labour and child labour; s.54(4): on slavery and human trafficking.' },
+  // The reporting entity and the entities covered: per country through fl_report_entities (Stage D1b), so a
+  // UK subsidiary's statement and a Canadian parent's report can sit in one report. Canada keeps its own here.
+  { key: 'report_details.legal_name',                      ukSection: null,            why: 'The entity giving each country\u2019s report can differ.' },
+  { key: 'report_details.joint_entities',                  ukSection: null,            why: 'The entities each country\u2019s report covers can differ.' },
+]
+const PER_COUNTRY_KEYS = new Set(PER_COUNTRY.map(p => p.key))
+const CANADA_AND_SHARED: readonly RegistryField[] = CANADA_AS_LISTED.map(f =>
+  PER_COUNTRY_KEYS.has(f.key) ? { ...f, countries: CA, concept: PER_COUNTRY.find(p => p.key === f.key)!.ukSection ? f.key : undefined,
+    note: `${f.note ? `${f.note} ` : ''}Per-country since Stage D1b: ${PER_COUNTRY.find(p => p.key === f.key)!.why}` } : f)
+/** The UK's own answer to each per-country question, under its UK section. */
+export const UK_PER_COUNTRY_FIELDS: readonly RegistryField[] = PER_COUNTRY.filter(p => p.ukSection).map(p => {
+  const ca = CANADA_AS_LISTED.find(f => f.key === p.key)!
+  return { key: `uk_${p.ukSection}.${p.key.split('.')[1]}`, countries: ['uk'] as const, area: ca.area, canada: null, concept: p.key, note: `The UK\u2019s own answer. ${p.why}` }
+})
+
+// ── UK-only (Stage D1, 1 Oct 2026). Kept in the UK record (fl_report_countries.content), never shared. ──
+const ukOnly = (key: string, area: Area, note: string): RegistryField => ({ key, countries: ['uk'], area, canada: null, note })
+/**
+ * The organisation's own revenue, once, for the report as a whole. Not any law's measure: each country's check
+ * asks for its own figure, and this only gives a starting estimate (converted at the dated rate in lib/fx.ts).
+ * Canada keeps its own figures in its applicability answers, so Canada is not listed here.
+ */
+export const ORGANIZATION_FIELDS: readonly RegistryField[] = [
+  { key: 'organization.revenue_amount', countries: ['uk', 'australia'], area: 'identity', canada: null, note: 'Revenue for the most recent financial year, as a plain number. A starting estimate only.' },
+  { key: 'organization.revenue_currency', countries: ['uk', 'australia'], area: 'identity', canada: null, note: 'The currency of that figure (a code lib/fx.ts holds a rate for).' },
+]
+
+export const UK_ONLY_FIELDS: readonly RegistryField[] = [
+  ukOnly('uk_statement_details.is_group_statement', 'identity', 'One statement for a parent and its subsidiaries (statutory guidance; the Act has no provision of its own).'),
+  ukOnly('uk_statement_details.financial_year_ending', 'period', 'The year the financial year ended, with the shared year-end month and day.'),
+  ukOnly('uk_steps_taken.statement_kind', 'steps', 'Section 54(4): the steps taken, or a statement that none were.'),
+  ukOnly('uk_policies.covers_slavery_trafficking', 2, 'Whether the policy covers slavery and human trafficking, which the shared Canada question does not ask.'),
+  ukOnly('uk_training.covers_slavery_trafficking', 5, 'Whether the training covers slavery and human trafficking, which the shared Canada question does not ask.'),
+  // Approval and signing (Stage D2): section 54(6), by kind of organisation. Each country's approval is its own.
+  ...['org_type', 'approving_body', 'approval_date', 'signer_name', 'signer_title', 'signed_date', 'signer_capacity', 'signer_on_board', 'group_approvals']
+    .map(f => ukOnly(`uk_approval.${f}`, 'approval', 'Section 54(6) approval and signing, or the guidance\u2019s best practice on it.')),
+]
+
+/** Every field: Canada's (shared or not) and the UK's own. */
+export const FIELD_REGISTRY: readonly RegistryField[] = [...CANADA_AND_SHARED, ...ORGANIZATION_FIELDS, ...UK_ONLY_FIELDS, ...UK_PER_COUNTRY_FIELDS]
 
 /** Builder state that is never stored, so it has no registry entry. */
 export const CANADA_UI_ONLY = ['fy_override'] as const
