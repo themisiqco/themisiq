@@ -195,7 +195,7 @@ describe('CSRD maps to the Materiality Assessment, with the G1 caveat', () => {
     // The two surfaces that print an obligation's link and price: the /assess module cell and "Start with"
     // line, and the lead email's module cell. /pricing and /materiality import nothing from lib/obligations.
     const page = readFileSync(join(REPO_ROOT, 'app/assess/page.tsx'), 'utf8')
-    const route = readFileSync(join(REPO_ROOT, 'app/api/assessment/submit/route.ts'), 'utf8')
+    const route = readFileSync(join(REPO_ROOT, 'lib/assessmentEmail.ts'), 'utf8')  // the email builders, which the route calls
     expect(page).toMatch(/entryObligation\(ob\)\.caveat/)
     expect(page).toMatch(/caveats\.map\(/)
     expect(route).toMatch(/o\.caveat \?/)

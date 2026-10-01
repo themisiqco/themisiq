@@ -453,6 +453,7 @@ describe('no em dash reaches customer-facing copy, and the remaining budget only
       expect(SWEEP_BUDGET[f], `${f} must not have a budget`).toBeUndefined()
     }
     expect(renderedDashes('lib/obligations.ts'), 'its names travel into the email').toBe(0)
+    expect(renderedDashes('lib/assessmentEmail.ts'), 'the assessment emails are built here (1 Oct 2026)').toBe(0)
   })
 
   it('the permanent exemptions are real, and neither reaches further than its reason', () => {

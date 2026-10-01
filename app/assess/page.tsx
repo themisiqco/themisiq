@@ -920,7 +920,7 @@ export default function AssessPage() {
         })}
         <div className="tq-band" style={{ borderRadius: 12, padding: '1.5rem', textAlign: 'center' as const }}>
           <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 6 }}>Want help navigating all {obligations.length} obligations?</h3>
-          <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: '1.25rem', fontWeight: 400 }}>A ThemisIQ advisor will review your results and tell you exactly what to do first. No charge for the initial call.</p>
+          <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: '1.25rem', fontWeight: 400 }}>An advisor will review your results with you and suggest where to start. No charge for the initial call.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Talk to a specialist</a>
            <a href="/dashboard/ghg" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>Calculate your emissions →</a>
