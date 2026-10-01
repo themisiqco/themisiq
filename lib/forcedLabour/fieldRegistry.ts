@@ -69,8 +69,8 @@ export const FIELD_REGISTRY: readonly RegistryField[] = [
   col('status', 'report', CA, 'Canada report status. Each country has its own in fl_report_countries.'),
 
   // ── 1. report_details ──
-  ...sec('report_details', 'identity', ALL, ['legal_name', 'joint_entities'], 'Entity names: fl_report_entities. Each country marks which are its reporting entities.'),
-  ...sec('report_details', 'period', ALL, ['year_end_month', 'year_end_day', 'financial_year_start', 'financial_year_end'], 'The organization’s financial year: fl_reports.period_start / period_end.'),
+  ...sec('report_details', 'identity', ALL, ['legal_name', 'joint_entities'], 'Stored in fl_answers as Canada keeps them (Canada adapter, 1 Oct 2026). fl_report_entities, with each country\u2019s reporting entities marked, is filled from them when a second country needs it.'),
+  ...sec('report_details', 'period', ALL, ['year_end_month', 'year_end_day', 'financial_year_start', 'financial_year_end'], 'Stored in fl_answers as Canada keeps them (year-end month and day, or the override dates). fl_reports.period_start / period_end are derived from them when a second country needs a period.'),
   ...sec('report_details', 'period', CA, ['financial_year_confirmed'], 'Confirms the year Canada’s May 31 rule derives (deriveFinancialYear).'),
   ...sec('report_details', 'report', CA, ['report_type'], 'Canada s.11(2). Australia (s.13/s.14) and the UK (group statement) each ask their own.'),
   ...sec('report_details', 'report', CA, ['is_revised', 'revision_date', 'revision_changes'], 'Canada s.12.'),

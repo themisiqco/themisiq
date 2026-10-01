@@ -7,7 +7,12 @@
 // as complete with a required field empty, whatever the client sends.
 //
 // Gated by lib/s211/server.ts. The report must exist and belong to the user (RLS): otherwise 404.
+//
+// Through the shared model (lib/forcedLabour/canadaAdapter.ts): the section's shared fields go to
+// fl_answers and the whole section to s211_report_sections in ONE transaction (saveCanadaSection, through
+// public.fl_save_canada_section). Either both are saved or neither is.
 import { NextResponse } from 'next/server'
+import { ensureParent, saveCanadaSection } from '../../../../../../../lib/forcedLabour/canadaStore'
 import { requireS211, notFound, MAX_CONTENT_CHARS } from '../../../../../../../lib/s211/server'
 import { isSectionKey } from '../../../../../../../lib/s211/builderContent'
 import { statusAfterEdit, markComplete, type SectionStatus } from '../../../../../../../lib/s211/sectionStatus'
@@ -27,7 +32,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const action = body?.action === 'complete' || body?.action === 'reopen' ? body.action : 'save'
 
   // The report must be the user's. RLS answers with no row otherwise.
-  const { data: report, error: rErr } = await gate.supabase.from('s211_reports').select('id').eq('id', id).maybeSingle()
+  const { data: report, error: rErr } = await gate.supabase.from('s211_reports')
+    .select('id, fl_report_id, company_name, financial_year_end, status').eq('id', id).maybeSingle()
   if (rErr) return NextResponse.json({ error: 'The report could not be loaded.' }, { status: 500 })
   if (!report) return notFound()
 
@@ -47,11 +53,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     status = statusAfterEdit(key, before, c)
   }
 
-  const updated_at = new Date().toISOString()
-  const { data, error } = await gate.supabase.from('s211_report_sections')
-    .upsert({ report_id: id, section_key: key, content: c, status, updated_at }, { onConflict: 'report_id,section_key' })
-    .select('section_key, content, status, updated_at').single()
-  if (error || !data) return NextResponse.json({ error: 'The section could not be saved.' }, { status: 500 })
-  await gate.supabase.from('s211_reports').update({ updated_at }).eq('id', id)
+  // Linking a report saved before the adapter to its parent is a step of its own: harmless if the save
+  // below then fails, and done once.
+  const parent = await ensureParent(gate.supabase, gate.userId, report as unknown as { id: string })
+  if (!parent.ok) return NextResponse.json({ error: 'The section could not be saved.' }, { status: 500 })
+  const data = await saveCanadaSection(gate.supabase, id, key, c, status)
+  if (!data) return NextResponse.json({ error: 'The section could not be saved.' }, { status: 500 })
   return NextResponse.json({ section: data })
 }

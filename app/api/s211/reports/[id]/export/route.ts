@@ -11,19 +11,25 @@ import { requireS211, notFound } from '../../../../../../lib/s211/server'
 import { exportGate, type SectionState } from '../../../../../../lib/s211/exportCheck'
 import { buildS211ReportModel, reportFileName } from '../../../../../../lib/s211/reportModel'
 import { generateS211ReportPDF } from '../../../../../../lib/s211/reportPdf'
-import type { SectionKey } from '../../../../../../lib/s211/builderContent'
+import type { SectionContent, SectionKey } from '../../../../../../lib/s211/builderContent'
+import { overlaySection } from '../../../../../../lib/forcedLabour/canadaAdapter'
+import { loadShared } from '../../../../../../lib/forcedLabour/canadaStore'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const gate = await requireS211(req, 'read')
   if (!gate.ok) return gate.response
   const { id } = await params
-  const { data: report, error } = await gate.supabase.from('s211_reports').select('id, reporting_year').eq('id', id).maybeSingle()
+  const { data: report, error } = await gate.supabase.from('s211_reports').select('id, reporting_year, fl_report_id').eq('id', id).maybeSingle()
   if (error) return NextResponse.json({ error: 'The report could not be loaded.' }, { status: 500 })
   if (!report) return notFound()
   const { data: rows, error: sErr } = await gate.supabase.from('s211_report_sections').select('section_key, content, status').eq('report_id', id)
   if (sErr) return NextResponse.json({ error: 'The report sections could not be loaded.' }, { status: 500 })
 
-  const sections = Object.fromEntries((rows ?? []).map(r => [r.section_key, { status: r.status, content: r.content ?? {} }])) as Partial<Record<SectionKey, SectionState>>
+  // Through the shared model: each section with the shared answers laid over it (lib/forcedLabour/canadaAdapter.ts).
+  const shared = await loadShared(gate.supabase, report.fl_report_id as string | null)
+  if (!shared.ok) return NextResponse.json({ error: 'The report could not be loaded.' }, { status: 500 })
+  const sections = Object.fromEntries((rows ?? []).map(r => [r.section_key,
+    { status: r.status, content: overlaySection(r.section_key as SectionKey, (r.content ?? {}) as SectionContent, shared.answers) }])) as Partial<Record<SectionKey, SectionState>>
   const check = exportGate(sections)
   if (!check.ready) return NextResponse.json({ error: 'The report is not ready to export.', blockers: check.blockers }, { status: 409 })
 
