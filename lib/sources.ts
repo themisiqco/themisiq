@@ -323,6 +323,76 @@ export const MODERN_SLAVERY_UK_S54_URL = 'https://www.legislation.gov.uk/ukpga/2
 // @source-status: verified 2026-09-26
 export const MODERN_SLAVERY_AU_URL = 'https://www.legislation.gov.au/C2018A00153/latest/text'
 
+// ── Forced Labour Reporting, UK and Australia (Stage A, 1 Oct 2026) ────────────────────────────────────
+// Read in full on 1 Oct 2026 for lib/forcedLabour/uk/requirements.ts and lib/forcedLabour/au/requirements.ts,
+// whose strings were checked word for word against the downloaded text. 'verified' below means that.
+
+// Intent: SI 2015/1833, the Modern Slavery Act 2015 (Transparency in Supply Chains) Regulations 2015. Sets
+// the s.54(2)(b) threshold (£36 million) and how total turnover is measured (reg. 3). Latest revised
+// version; legislation.gov.uk showed no amendments to it.
+// @source-status: verified 2026-10-01
+export const UK_TISC_REGULATIONS_URL = 'https://www.legislation.gov.uk/uksi/2015/1833'
+
+// Intent: the Home Office statutory guidance under s.54(9), "Transparency in supply chains: a practical
+// guide". The collection page, which carries the current version and its change history (last updated
+// 1 Dec 2025). The text was read from its accessible HTML version.
+// @source-status: verified 2026-10-01
+export const UK_TISC_GUIDANCE_URL = 'https://www.gov.uk/government/publications/transparency-in-supply-chains-a-practical-guide'
+
+// Intent: GOV.UK "Publish an annual modern slavery statement": sign-off, timing and the registry, as the
+// Home Office describes them to organisations. Last updated 25 Apr 2024.
+// @source-status: verified 2026-10-01
+export const UK_MSS_PUBLISH_GUIDANCE_URL = 'https://www.gov.uk/guidance/publish-an-annual-modern-slavery-statement'
+
+// Intent: GOV.UK "Add your modern slavery statement to the statement registry", the registry's guidance.
+// @source-status: verified 2026-10-01
+export const UK_MSS_REGISTRY_GUIDANCE_URL = 'https://www.gov.uk/guidance/add-your-modern-slavery-statement-to-the-statement-registry'
+
+// Intent: the UK modern slavery statement registry service itself. Opened, not quoted: what it requires
+// is recorded from the guidance page above.
+// @source-status: resolves 2026-10-01
+export const UK_MSS_REGISTRY_URL = 'https://modern-slavery-statement-registry.service.gov.uk/'
+
+// Intent: the Immigration and Asylum Bill (Bill 105, 2026-27), which would amend s.54. ⚠️ THE PARLIAMENT
+// BILLS API RECORD, NOT THE PUBLIC PAGE: bills.parliament.uk and publications.parliament.uk return 403 or a
+// Cloudflare challenge to an automated client, so the stages were read here on 1 Oct 2026. The bill's own
+// text could not be read from either host; see lib/forcedLabour/pendingReforms.ts.
+// @source-status: verified 2026-10-01
+export const UK_IMMIGRATION_ASYLUM_BILL_URL = 'https://bills-api.parliament.uk/api/v1/Bills/4254'
+
+// Intent: the Home Office impact assessment for the bill (published 30 Jun 2026). Measure 16 lists the
+// s.54 changes. An impact assessment describes intent; it is not the bill.
+// @source-status: verified 2026-10-01
+export const UK_IMMIGRATION_ASYLUM_BILL_IA_URL = 'https://www.gov.uk/government/publications/immigration-and-asylum-bill-2026-impact-assessment'
+
+// Intent: the Regulatory Policy Committee's opinion on that impact assessment (published 14 Aug 2026).
+// @source-status: verified 2026-10-01
+export const UK_IMMIGRATION_ASYLUM_BILL_RPC_URL = 'https://www.gov.uk/government/publications/rpc-opinion-impact-of-immigration-and-asylum-bill'
+
+// Intent: "Commonwealth Modern Slavery Act 2018: Guidance for Reporting Entities" (May 2023), from the
+// Modern Slavery Statements Register's resources. ⚠️ ag.gov.au, the Department's own site, timed out on
+// every attempt on 1 Oct 2026; the register is the Department's and serves the same document.
+// @source-status: verified 2026-10-01
+export const AU_MSA_GUIDANCE_URL = 'https://modernslaveryregister.gov.au/resources/Commonwealth_Modern_Slavery_Act_Guidance.pdf'
+
+// Intent: supplementary guidance, principal governing body approval (March 2026): no delegation of approval.
+// @source-status: verified 2026-10-01
+export const AU_MSA_PGB_GUIDANCE_URL =
+  'https://modernslaveryregister.gov.au/resources/MODERN_SLAVERY_ACT_SUPPLEMENTARY_GUIDANCE_-_Principal_Governing_Body_Approval_-_2026.pdf'
+
+// Intent: supplementary guidance, signature of a responsible member (March 2026).
+// @source-status: verified 2026-10-01
+export const AU_MSA_SIGNATURE_GUIDANCE_URL =
+  'https://modernslaveryregister.gov.au/resources/MODERN_SLAVERY_ACT_SUPPLEMENTARY_GUIDANCE_-_Signature_of_Responsible_Member__2026.pdf'
+
+// Intent: the register's submission process overview (August 2025): one PDF, up to 400MB.
+// @source-status: verified 2026-10-01
+export const AU_MSS_SUBMISSION_URL = 'https://modernslaveryregister.gov.au/resources/MSS_Submission_Overview.pdf'
+
+// Intent: the Modern Slavery Statements Register (s.18 of the Act), where statements are lodged and published.
+// @source-status: resolves 2026-10-01
+export const AU_MSS_REGISTER_URL = 'https://modernslaveryregister.gov.au/'
+
 // Intent: the SASB Standards, now maintained by the ISSB under the IFRS Foundation, which is why this is
 // an ifrs.org URL and not sasb.org. app/dashboard/people/page.tsx:285 offers "SASB Human Capital" as a
 // selectable framework, so the claim is about the human-capital topics and not the full set of 77

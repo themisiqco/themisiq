@@ -21,6 +21,9 @@ import { CS3D_APPLIES_FROM, CS3D_CITATION, CS3D_EMPLOYEE_THRESHOLD, CS3D_TURNOVE
 // reader can see which fixing a borderline call was made on.
 import { convertCurrency, FX_AS_OF } from '../../lib/deals/assessment'
 import { S211_THRESHOLDS } from '../../lib/s211/entity'
+import {
+  ukTurnoverInScope, auRevenueInScope, assessTiming, UK_ASSESS_WHO, UK_ASSESS_CONTENT, AU_ASSESS_WHO, AU_ASSESS_CONTENT,
+} from '../../lib/forcedLabour/assessSummary'
 import ThemisIQLogo from '../components/ThemisIQLogo'
 // The obligation → module mapping, its link vocabulary and its prices. NONE of this is restated
 // here: the shorthand comes from obligationModulesParam (which inverts LEGACY_PRICING_PAGE_ID, so a
@@ -214,7 +217,7 @@ export function computeObligations(a: Answers): Obligation[] {
   // restated in dollars. Same direction as lib/deals/assessment.ts's evaluateLimb.
   // UNANSWERED → 0, stated rather than defaulted. Behaviour is unchanged from the old
   // `a.revenue !== undefined ? … : 0`, and it is SAFE ONLY BECAUSE EVERY REVENUE COMPARISON IN THIS
-  // FUNCTION IS A LOWER BOUND — `> 1bn`, `>= 500m`, `>= 10m`, `> 36m` — so 0 fails all of them, which
+  // FUNCTION IS A LOWER BOUND — `> 1bn`, `>= 500m`, `>= 10m`, `>= 36m` — so 0 fails all of them, which
   // is the correct answer for a figure nobody gave. THE MOMENT SOMEONE WRITES A `<` COMPARISON
   // AGAINST revUSD, 0 becomes an affirmative answer and this line is the defect. Then it has to
   // become `number | null` and every site has to narrow.
@@ -488,17 +491,18 @@ export function computeObligations(a: Answers): Obligation[] {
   // Both thresholds are in their OWN currency and were previously compared against the raw USD
   // slider figure, which OVER-CALLS: £36m is about $41m at the dated rate, so a $38m UK company was
   // told it had to file. Converted via lib/deals/assessment.ts's convertCurrency — one rate table.
-  const msUK = hasUK && revIn('GBP') > 36_000_000
-  const msAU = hasAU && revIn('AUD') >= 100_000_000
-  // AU THRESHOLD VERIFIED AGAINST THE GOVERNMENT'S OWN RESPONSE, 12 August 2026. The previous copy
-  // said the threshold was "UNDER REVIEW, with a reduction to AUD 50,000,000 proposed" — undated and
-  // unsourced, and it read as a live proposal heading for adoption. It is not: the McMillan statutory
-  // review recommended AUD 50m in 2023, and the Government's December 2024 response NOTED that
-  // recommendation rather than agreeing to it, retaining AUD 100m and deferring the question until
-  // other reforms are scoped. An Australian company between the two figures could have read the old
-  // copy as a reason to prepare for a duty it does not have. THE PERISHABLE CLAIM is "declined and
-  // deferred" — the Government said it would revisit, so re-check before relying on this.
-  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act: UK and Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: 'Annual · 6 months after financial year end', module: 'Supply Chain', what: `${msUK ? 'UK Modern Slavery Act 2015 s.54: GBP 36,000,000 total GLOBAL turnover including subsidiaries, for any body corporate carrying on business in any part of the UK. ' : ''}${msAU ? 'Australian Modern Slavery Act 2018: AUD 100,000,000 consolidated revenue. The 2023 statutory review recommended lowering this to AUD 50,000,000, but the Government declined to adopt that recommendation in its December 2024 response and retained AUD 100,000,000, saying it would revisit the threshold once other reforms are scoped. The current bar is AUD 100,000,000. ' : ''}An annual transparency statement is required covering the steps taken to ensure no modern slavery in your operations and supply chains. ${fxNote}`, action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
+  const msUK = hasUK && ukTurnoverInScope(revIn('GBP'))
+  const msAU = hasAU && auRevenueInScope(revIn('AUD'))
+  // ⚠️ UK IS >=, NOT >. s.54(2)(b) says "not less than" the £36 million in SI 2015/1833 reg. 2, so exactly
+  // £36 million is in scope; this read `> 36_000_000` until 1 Oct 2026. The comparisons and every sentence
+  // below come from lib/forcedLabour/assessSummary.ts, built from the verbatim constants, and are tested
+  // there at the boundary (no revenue band here lands on it).
+  // ⚠️ THE AUSTRALIAN THRESHOLD-REVIEW SENTENCE WAS REMOVED ON 1 OCT 2026. It said the 2023 statutory
+  // review recommended AUD 50,000,000 and that the Government's December 2024 response retained AUD
+  // 100,000,000. Neither could be re-checked against an official source that day (ag.gov.au timed out),
+  // and the Act's current text (compilation No. 2) is what decides the threshold, so it says only that.
+  // The UK timing is the guidance's recommendation, not law; Australia's six months is s.13(2)(e).
+  if (msUK || msAU) regs.push({ name: 'Modern Slavery Act: UK and Australia', obligationId: 'modern-slavery', jurisdiction: msUK && msAU ? 'UK + Australia' : msUK ? 'United Kingdom' : 'Australia', group: 'regulatory', urgency: 'medium', urgency_label: 'ANNUAL', timing: assessTiming(msUK, msAU), module: 'Supply Chain', what: [msUK && `${UK_ASSESS_WHO} ${UK_ASSESS_CONTENT}`, msAU && `${AU_ASSESS_WHO} ${AU_ASSESS_CONTENT}`, fxNote].filter(Boolean).join(' '), action: 'Conduct supply chain human rights assessment and draft the Modern Slavery statement.' })
 
   // ── Canada: Fighting Against Forced Labour and Child Labour in Supply Chains Act (S-211) ──────
   // s.2 "entity": a Canadian stock-exchange listing at any size, OR a Canada nexus with at least two of

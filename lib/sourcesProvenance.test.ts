@@ -74,6 +74,23 @@ const EXPECTED: Record<string, Status> = {
   S211_GUIDANCE_URL: 'verified',
   S211_TEMPLATE_URL: 'verified',
 
+  // Added 1 Oct 2026 for Forced Labour Reporting Stage A (UK and Australia). Each 'verified' one was read in
+  // full and the requirements files' quotations checked against it word for word. The two registers were
+  // opened and returned 200, but nothing is quoted from them, so they claim `resolves` only.
+  UK_TISC_REGULATIONS_URL: 'verified',
+  UK_TISC_GUIDANCE_URL: 'verified',
+  UK_MSS_PUBLISH_GUIDANCE_URL: 'verified',
+  UK_MSS_REGISTRY_GUIDANCE_URL: 'verified',
+  UK_MSS_REGISTRY_URL: 'resolves',
+  UK_IMMIGRATION_ASYLUM_BILL_URL: 'verified',
+  UK_IMMIGRATION_ASYLUM_BILL_IA_URL: 'verified',
+  UK_IMMIGRATION_ASYLUM_BILL_RPC_URL: 'verified',
+  AU_MSA_GUIDANCE_URL: 'verified',
+  AU_MSA_PGB_GUIDANCE_URL: 'verified',
+  AU_MSA_SIGNATURE_GUIDANCE_URL: 'verified',
+  AU_MSS_SUBMISSION_URL: 'verified',
+  AU_MSS_REGISTER_URL: 'resolves',
+
   ISO_14064_3_URL: 'form-verified',
   ISO_42001_URL: 'form-verified',
 

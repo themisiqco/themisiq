@@ -143,7 +143,7 @@ const groups: Group[] = [
       // lib/sources.ts, held there so the claim is sourced even though this shape cannot link it.
       // The href is s.54 rather than the Act: the Act also covers offences and victim protection, and s.54
       // is the only part the Supply Chain module addresses.
-      { name: 'Modern Slavery Act', body: 'The UK and Australian statements on steps taken to address forced labour in operations and supply chains.', maps: 'Supplier questionnaire responses and the evidence behind each answer.', href: MODERN_SLAVERY_UK_S54_URL, covers: [{ href: '/supply-chain' }] },
+      { name: 'Modern Slavery Act', body: 'The UK and Australian modern slavery laws: an annual statement on the steps taken to address modern slavery in operations and supply chains.', maps: 'Supplier questionnaire responses and the evidence behind each answer.', href: MODERN_SLAVERY_UK_S54_URL, covers: [{ href: '/supply-chain' }] },
     ],
   },
   {

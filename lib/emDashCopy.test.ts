@@ -44,6 +44,17 @@ const DASH = '—'
  * counted now, which is why four budgets went up in the rebaseline.
  */
 const ANNEX_II_FILE = 'lib/cbam/boundaries.ts'
+
+/**
+ * Statutory and guidance text reproduced VERBATIM, file by file: the same argument as Annex II, at file
+ * scope. The UK Modern Slavery Act 2015 s.54 and the Australian Modern Slavery Act 2018 use an em dash to
+ * end a lead-in ("is within this subsection if it—") and inside definitions ("in the case of a body
+ * corporate—carries on business"). Changing one would misquote the statute, and each string in these
+ * files is pinned word for word by its own test (lib/forcedLabour/<country>/requirements.test.ts).
+ * ⚠️ THESE FILES HOLD QUOTATIONS ONLY. Our own words go in comments, which this counter never reads. A
+ * file whose purpose is anything else does not belong in this set.
+ */
+const VERBATIM_LAW_FILES = new Set(['lib/forcedLabour/uk/requirements.ts', 'lib/forcedLabour/au/requirements.ts'])
 const quotedBullet = (rel: string, p: Piece): boolean =>
   rel === ANNEX_II_FILE && p.whole && /^\s*—/.test(p.text) && p.text.trim() !== DASH
 
@@ -154,6 +165,7 @@ export function renderedDashes(file: string): number {
   const ef = file === EF_SOURCES_OBJECT.file
     ? declarationRange(file, EF_SOURCES_OBJECT.name)
     : null
+  if (VERBATIM_LAW_FILES.has(file)) return 0
   return pieces(file)
     .filter(p => !(ef && p.pos >= ef[0] && p.pos <= ef[1]))
     .filter(p => !quotedBullet(file, p) && !emptyValueGlyph(p) && !legacyDataKey(p)
