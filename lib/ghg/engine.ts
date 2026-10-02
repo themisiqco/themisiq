@@ -2843,6 +2843,59 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
   return out
 }
 
+// The fuel each emissions field belongs to, as slices and resolutions name it. Stationary and fleet
+// diesel share 'diesel' here; they stay apart as FIELDS wherever a figure is concerned (T5 ruling).
+const FIELD_FUEL: Record<string, string> = {
+  natural_gas_amount: 'natural_gas', propane_amount: 'propane', diesel_stationary_amount: 'diesel',
+  diesel_mobile_amount: 'diesel', gasoline_amount: 'gasoline', electricity_kwh: 'electricity',
+  fuel_oil_distillate_amount: 'fuel_oil_distillate', fuel_oil_residual_amount: 'fuel_oil_residual',
+}
+
+/**
+ * Per priced location and emissions field: the annual tCO2e (Scope 1, or Scope 2 location-based) and the
+ * part of it that is ESTIMATED by a gap gross-up. One implementation for pctEstimated and for the
+ * monthly reconcile (T6), so the share reported as estimated and the gap the reconciliation explains are
+ * the same number.
+ *   estimated = emissions × (derived figure − evidenced quantity) / derived figure
+ * where the evidenced quantity is Σ counted contributions' value × in-window share. applyResolutions has
+ * already grossed up each meter by its own coverage and matched each estimate to its document type, so
+ * the difference is exactly what was grossed up, per meter, per field (T5 ruling). Proration allocates
+ * real metered data, so a prorated field's evidenced quantity equals its figure.
+ * `documentBacked` is true when at least one counted bill backs the field; a typed figure is not.
+ * Unpriceable and refused locations are skipped, as calcInventory skips them.
+ */
+export interface FieldEmissions {
+  locId: string; field: string; fuelType: string; scope: 1 | 2
+  annual: number; estimated: number; documentBacked: boolean
+}
+export function emissionsByLocationField(
+  inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
+  gwpVersion: GwpVersion,
+): FieldEmissions[] {
+  const year = inventory.reporting_year
+  const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12)
+  const resolutions = inventory.coverage_resolutions ?? []
+  const out: FieldEmissions[] = []
+  for (const loc of deriveLocations(inventory)) {
+    if (unpriceableReason(loc, gwpVersion, year)) continue
+    const evidenced: Record<string, number> = {}
+    for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
+      if (c.counted) evidenced[String(c.field)] = (evidenced[String(c.field)] ?? 0) + c.value * (c.share ?? 0)
+    }
+    for (const [field, annual] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year))) {
+      const figure = (loc as unknown as Record<string, number>)[field]
+      const ev = evidenced[field]
+      const grossedUp = ev == null ? 0 : figure - ev
+      // Summation order differs from applyResolutions' per-meter sums, so an unestimated field can
+      // differ from its evidence by rounding alone; that is not estimation.
+      const estimated = ev != null && figure > 0 && grossedUp > figure * 1e-9 ? annual * (grossedUp / figure) : 0
+      out.push({ locId: loc.id, field, fuelType: FIELD_FUEL[field] ?? field, scope: field === 'electricity_kwh' ? 2 : 1,
+        annual, estimated, documentBacked: ev != null })
+    }
+  }
+  return out
+}
+
 /**
  * Share of an inventory's Scope 1+2 tCO2e that is ESTIMATED rather than
  * evidenced, 0-100. Derived from coverage resolutions, weighted by emissions —
@@ -2854,53 +2907,22 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
  * null is an absence, not zero).
  *
  * Takes the inventory and derives its locations itself (T5), so the share is measured against the
- * figures the totals are calculated on, never a stored field that may be stale.
+ * figures the totals are calculated on, never a stored field that may be stale. Per meter and per field
+ * by construction: see emissionsByLocationField.
  */
 export function pctEstimated(
   inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
   gwpVersion: GwpVersion,
 ): number | null {
-  // T5 ruling: each accepted gap gross-up counts only against its own meter's figure, and fuels shared
-  // across document types (stationary and fleet diesel) are separate groups. Both follow from measuring
-  // estimation per FIELD as (derived figure − evidenced quantity): applyResolutions has already grossed
-  // up each meter by its own coverage and matched the estimate to its document type, so whatever was
-  // grossed up, and only that, is the difference. Proration by billing days allocates real metered data,
-  // so a prorated field's evidenced quantity equals its figure and it counts as 0% estimated. Legacy
-  // 'straddle' and 'duplicate' resolutions are never accepted and change no figure.
-  // Takes the inventory, not locations, so it derives the figures itself and the caller does no
-  // arithmetic: a stale stored field cannot reach the share.
-  const year = inventory.reporting_year
-  const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12)
-  const resolutions = inventory.coverage_resolutions ?? []
   const locations = deriveLocations(inventory)
-  let estimated = 0
-  for (const loc of locations) {
-    // Excluded from the denominator by calcInventory below, so it must be excluded from the
-    // numerator too — otherwise an unpriceable location's estimated share would be measured
-    // against a total it is not part of.
-    if (unpriceableReason(loc, gwpVersion, year)) continue
-    const evidenced: Record<string, number> = {}
-    for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
-      if (c.counted) evidenced[String(c.field)] = (evidenced[String(c.field)] ?? 0) + c.value * (c.share ?? 0)
-    }
-    for (const [field, emissions] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year))) {
-      const figure = (loc as unknown as Record<string, number>)[field]
-      const ev = evidenced[field]
-      if (ev == null || !(figure > 0)) continue
-      const grossedUp = figure - ev
-      // Summation order differs from applyResolutions' per-meter sums, so an unestimated field can
-      // differ from its evidence by rounding alone; that is not estimation.
-      if (grossedUp <= figure * 1e-9) continue
-      estimated += emissions * (grossedUp / figure)
-    }
-  }
+  const estimated = emissionsByLocationField(inventory, gwpVersion).reduce((a, f) => a + f.estimated, 0)
   // A wholly manual inventory (no confirmed concierge proposal on any location) has no evidence
   // basis to measure "estimated share" against — null is an absence, not a 0% claim.
   const hasConciergeData = locations.some(loc =>
     (loc.source_docs ?? []).some(d => (d.extracted ?? []).some(p => p.status === 'confirmed' && p.value != null)))
   if (estimated <= 0 && !hasConciergeData) return null
 
-  const inv = calcInventory(locations, gwpVersion, year)
+  const inv = calcInventory(locations, gwpVersion, inventory.reporting_year)
   const total = inv.s1_total + inv.s2_location
   if (total <= 0) return 0 // concierge data present but zero emissions → 0% estimated, not an absence
   return (estimated / total) * 100
@@ -3036,6 +3058,22 @@ export const COVERAGE_MESSAGE = {
     `${fileA} and ${fileB} cover the same days (${from} to ${to}). Choose Same bill, count it once, or Different meters or accounts.`,
   all_rejected: (fuel: string, site: string) =>
     `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.`,
+  // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
+  stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
+    `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
+}
+
+// The "uses this fuel" switch behind each document-backed field (T6 ruling). calcLocation and buildWorkings
+// price a field only when its switch is on, so confirmed bills under a switch that is off would leave the
+// annual figure silently. Electricity has no switch.
+const FIELD_SWITCH: Partial<Record<keyof Location, keyof Location>> = {
+  natural_gas_amount: 'has_natural_gas', propane_amount: 'has_propane', diesel_stationary_amount: 'has_diesel_stationary',
+  diesel_mobile_amount: 'has_mobile', gasoline_amount: 'has_mobile',
+}
+/** True when the field has a "uses this fuel" switch and it is off, so the annual figure omits the field. */
+export function streamSwitchOff(loc: Location, field: keyof Location | string): boolean {
+  const sw = FIELD_SWITCH[field as keyof Location]
+  return sw != null && !(loc as unknown as Record<string, unknown>)[String(sw)]
 }
 
 // ── BILL CONTRIBUTIONS (docs/review/design-derived-figures.md, task T1) ─────────────────────────
@@ -3843,7 +3881,7 @@ export interface CoverageIssue {
   locId: string
   fuelType: string
   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
-  // "no silent zero"), none (a document with nothing read from it, unchanged).
+  // "no silent zero"), stream_off (T6 ruling), none (a document with nothing read from it, unchanged).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
   docIds?: string[]
@@ -3918,6 +3956,23 @@ export function findUnresolvedCoverage(
       const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
       if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected',
         message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
+    }
+
+    // Confirmed bills under a "uses this fuel" switch that is off (T6 ruling). The annual figure omits a
+    // switched-off field, so without this the bills would vanish from every total with nothing said.
+    const confirmedByField = new Map<string, { fuelType: string; docIds: Set<string>; n: number }>()
+    loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
+      if (p.status !== 'confirmed' || p.value == null) return
+      const map = fieldFor(d.document_type, p.fuelType)
+      if (!map || !streamSwitchOff(loc, map.amount)) return
+      const e = confirmedByField.get(String(map.amount)) ?? { fuelType: p.fuelType, docIds: new Set(), n: 0 }
+      e.n += 1; e.docIds.add(d.id)
+      confirmedByField.set(String(map.amount), e)
+    }))
+    for (const [field, e] of confirmedByField) {
+      const meta = STREAM_META[FIELD_STREAM[field as keyof Location] as DeclarableStream]
+      out.push({ locId: loc.id, fuelType: e.fuelType, status: 'stream_off', docIds: [...e.docIds],
+        message: COVERAGE_MESSAGE.stream_off(site, meta.verb, meta.name, e.n, FUEL_NAME[e.fuelType] ?? e.fuelType) })
     }
 
     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by

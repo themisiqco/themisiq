@@ -334,10 +334,10 @@ describe('what a removal leaves in the database', () => {
       source_docs: [doc('d2', 500)] as never })
     const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion }
 
-    const before = buildMonthlyEmissions([keep, gone], 2025, deps, 'AR6').slices
+    const before = buildMonthlyEmissions({ locations: [keep, gone], reporting_year: 2025 }, deps, 'AR6').slices
     expect(before.some(s => s.location_name === 'Gone'), 'the fixture must produce rows for it').toBe(true)
 
-    const after = buildMonthlyEmissions(editRows([keep, gone], { kind: 'remove', id: 'gone' }) as Location[], 2025, deps, 'AR6').slices
+    const after = buildMonthlyEmissions({ locations: editRows([keep, gone], { kind: 'remove', id: 'gone' }) as Location[], reporting_year: 2025 }, deps, 'AR6').slices
     expect(after.some(s => s.location_name === 'Gone')).toBe(false)
     expect(after.length, 'and the survivor keeps its own rows').toBeGreaterThan(0)
   })

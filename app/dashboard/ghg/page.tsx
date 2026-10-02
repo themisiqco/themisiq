@@ -1673,9 +1673,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
     // authoritative; a monthly failure here must NOT escape or skip setSaved(true).
     try {
       if (savedId) {
+        // The inventory, not its locations: the split reads counted bills inside the reporting window,
+        // which needs the year end and the coverage resolutions (T6).
         const { slices } = buildMonthlyEmissions(
-          inventory.locations as any,   // source_docs[].extracted[] live on these
-          inventory.reporting_year,
+          inventory,
           { calcGas, pickEF, getGridFactor, isResolvedGridRegion },
           'AR6'
         )

@@ -30,9 +30,9 @@ import {
   type DeclarableStream,
   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
   deriveLocations,
-  validateResolution, COVERAGE_MESSAGE,
+  validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
 } from './engine';
-import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
@@ -324,13 +324,13 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
         fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
       })])],
     });
-    const annual = calcInventory([l], 'AR6', 2024);
     const res: CoverageResolution = {
       locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
       note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2024-06-01T00:00:00Z',
     };
-    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
-    const r = reconcile(slices, 2024, annual, [res]);
+    const inv = { locations: [l], reporting_year: 2024, coverage_resolutions: [res] };
+    const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
+    const r = reconcile(slices, inv, 'AR6');
     expect(r.reconciles).toBe(true);
     expect(r.months_evidenced).toBe(9);
     expect(r.pct_estimated).toBeCloseTo(25, 1);
@@ -345,26 +345,26 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
       })])],
     });
     const annual = calcInventory([l], 'AR6', 2024);
-    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
-    const r = reconcile(slices, 2024, annual, []);
+    const inv = { locations: [l], reporting_year: 2024 };
+    const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
+    const r = reconcile(slices, inv, 'AR6');
     expect(r.reconciles).toBe(true);
     expect(r.pct_estimated).toBeCloseTo(0, 2);
     expect(r.scope1_evidenced).toBeCloseTo(annual.s1_total, 2); // evidenced ≈ annual (no gross-up)
     expect(r.months_evidenced).toBe(12);
   });
 
-  it("F1c a REAL defect — annual figure exceeds the bills with NO resolution to explain it — does NOT reconcile", () => {
-    // natural_gas_amount 2000 but the only bill is 900 (Jan–Sep) and NO extrapolate resolution on file.
-    // The 1100-worth of annual excess is explained by nothing → the reconciler must fire.
-    const l = loc({
-      has_natural_gas: true, natural_gas_amount: 2000, natural_gas_unit: 'mcf',
-      source_docs: [doc('utility_bill_gas', [prop({
-        fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
-      })])],
-    });
-    const annual = calcInventory([l], 'AR6', 2024);
-    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
-    const r = reconcile(slices, 2024, annual, []); // no resolution — the excess is unexplained
+  // T6: the annual figure is now derived from the bills (T4), so a stored field can no longer exceed them.
+  // The defect the reconciler still exists to catch is monthly rows that disagree with the bills: here,
+  // rows written while a second bill was on file, read against the inventory after it was removed.
+  it("F1c a REAL defect — monthly rows the current bills do not support — does NOT reconcile", () => {
+    const jan = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30' })], 'kept');
+    const oct = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 400, unit: 'mcf', periodStart: '2024-10-01', periodEnd: '2024-12-31' })], 'removed');
+    const before = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan, oct] })], reporting_year: 2024 };
+    const after = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan] })], reporting_year: 2024 };
+    const staleSlices = buildMonthlyEmissions(before, deps, 'AR6').slices;
+    expect(reconcile(staleSlices, before, 'AR6').reconciles, 'consistent with the bills they came from').toBe(true);
+    const r = reconcile(staleSlices, after, 'AR6');
     expect(r.reconciles).toBe(false);
     expect(Math.abs(r.unexplained_delta)).toBeGreaterThan(0.01);
   });
@@ -2590,7 +2590,7 @@ describe('T16 country refusals', () => {
     // The same four deps handleSave passes at app/dashboard/ghg/page.tsx:1391.
     const monthlyDeps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
     let out!: ReturnType<typeof buildMonthlyEmissions>;
-    expect(() => { out = buildMonthlyEmissions([priced, refused], 2025, monthlyDeps, 'AR6'); }).not.toThrow();
+    expect(() => { out = buildMonthlyEmissions({ locations: [priced, refused], reporting_year: 2025 }, monthlyDeps, 'AR6'); }).not.toThrow();
 
     expect(out.slices.length, 'the priced location still produces its rows').toBeGreaterThan(0);
     expect(out.slices.every(s => s.location_name === 'Priced Site'),
@@ -3518,8 +3518,9 @@ describe('T1 billContributions', () => {
   });
 
   // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage;
-  // T5 adds buildWorkings (contributions on rows) and pctEstimated (evidenced quantity per field).
-  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings and pctEstimated (T2, T3, T5)', () => {
+  // T5 adds buildWorkings (contributions on rows) and the evidenced quantity per field, which T6 moved into
+  // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split.
+  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField and buildMonthlyEmissions (T2, T3, T5, T6)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
@@ -3531,9 +3532,9 @@ describe('T1 billContributions', () => {
       const n = (src.match(/billContributions\(/g) ?? []).length;
       return n ? [`${f}: ${n}`] : [];
     });
-    expect(calls).toEqual(['lib/ghg/engine.ts: 4']);
+    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1']);
     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
-    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function pctEstimated(']) {
+    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(']) {
       const body = engineSrc.slice(engineSrc.indexOf(fn));
       expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
     }
@@ -3842,10 +3843,12 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
     expect(blocked, 'some trials overlap').toBeGreaterThan(20); expect(checked, 'some trials count 2+ bills').toBeGreaterThan(20);
   });
 
+  // Extended in T6: the "uses natural gas" switch is random too. A switched-off field reaches no total, so
+  // its figure counts as zero here, and confirmed bills under it must raise the stream_off issue.
   it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
     const r = rng(11);
     const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
-    const seen = { blocking: 0, silent: 0, usedNone: 0 };
+    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0 };
     for (let t = 0; t < 400; t++) {
       const n = 1 + Math.floor(r() * 3);
       const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
@@ -3856,11 +3859,19 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
         const status = pick(['confirmed', 'confirmed', 'rejected', 'extracted'] as const);
         return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
       });
-      const l = loc({ has_natural_gas: true, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
+      const switchOn = r() < 0.75;
+      const l = loc({ has_natural_gas: switchOn, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
       const resolutions: CoverageResolution[] = r() < 0.2
         ? [res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u', email: 'e@x.example' } })] : [];
       const a = applyResolutions(l, resolutions, W(2025).start, W(2025).end).natural_gas_amount;
-      const figure = a ? (a.mixedUnits ? 0 : a.value) : l.natural_gas_amount;
+      const derived = a ? (a.mixedUnits ? 0 : a.value) : l.natural_gas_amount;
+      // What reaches the total: nothing, when the switch is off.
+      const figure = switchOn ? derived : 0;
+      const confirmedBills = docs.some(d => d.extracted!.some(p => p.status === 'confirmed' && p.value != null));
+      if (!switchOn && confirmedBills) {
+        expect(issues(l, 2025, resolutions).some(i => i.status === 'stream_off'), `trial ${t}: switch off over confirmed bills`).toBe(true);
+        seen.streamOff++;
+      }
       if (figure > 0) continue;
       // A gap is left out: it would satisfy this in almost every trial and hide whether the
       // no-silent-zero issues themselves fire.
@@ -3876,6 +3887,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
     }
     // Each way out was actually reached, so the property is not passing vacuously.
     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
+    expect(seen.streamOff).toBeGreaterThan(20);
   });
 });
 
@@ -4273,5 +4285,208 @@ describe('T5 pctEstimated applies each gross-up to its own meter only', () => {
     expect(deriveLocations(inv)[0].natural_gas_amount).toBe(2400);
     // Evidenced 1,800 of 2,400 (A 1,200 + B 600); B's gross-up is 600, a quarter of the figure.
     expect(pctEstimated(inv, 'AR6')).toBeCloseTo(25, 9);
+  });
+});
+
+// ── T6: monthly reads counted contributions, in-window only; reconcile by location and fuel ─────────
+// docs/review/design-derived-figures.md section 6 and section 11 T6.
+describe('T6 monthly split', () => {
+  const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, sourceQuote: `${value} mcf`, ...o });
+  const elec = (value: number, periodStart: string, periodEnd: string) =>
+    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, sourceQuote: `${value} kWh` });
+  const gdoc = (id: string, p: ExtractedProposal) => doc('utility_bill_gas', [p], id);
+  const site = (docs: SourceDoc[], o: Partial<Location> = {}) => loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs, ...o });
+  const inv = (locations: Location[], reporting_year: number, fiscal_year_end_month = 12, coverage_resolutions: CoverageResolution[] = []) =>
+    ({ locations, reporting_year, fiscal_year_end_month, coverage_resolutions });
+  const sum = (xs: MonthlySlice[], f: (s: MonthlySlice) => number) => xs.reduce((a, s) => a + f(s), 0);
+  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate();
+  const month = (y: number, m: number) => [`${y}-${String(m).padStart(2, '0')}-01`, `${y}-${String(m).padStart(2, '0')}-${lastDay(y, m)}`] as const;
+  // Scenario A (docs/review/recalc/scenarios-additions.md): "Dec 1, 2025 – Jan 1, 2026" and "Jan 1, 2026 – Feb 1, 2026".
+  const scenarioA = () => site([gdoc('bill1', gas(310, '2025-12-01', '2026-01-01')), gdoc('bill2', gas(280, '2026-01-01', '2026-02-01'))]);
+
+  it('Scenario A, FY2025: writes only December 2025, from Bill 1; Bill 2 writes nothing', () => {
+    const { slices, skipped } = buildMonthlyEmissions(inv([scenarioA()], 2025), deps, 'AR6');
+    expect(slices.map(s => [s.period_month, s.activity_value, s.reporting_year])).toEqual([['2025-12-01', 310, 2025]]);
+    expect(skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'not counted: outside_year' });
+  });
+
+  it('Scenario A, FY2026: writes only January 2026, from Bill 2', () => {
+    const { slices } = buildMonthlyEmissions(inv([scenarioA()], 2026), deps, 'AR6');
+    expect(slices.map(s => [s.period_month, s.activity_value])).toEqual([['2026-01-01', 280]]);
+  });
+
+  it('a straddling bill writes only its in-window days, each month a fraction of the whole bill', () => {
+    const { slices } = buildMonthlyEmissions(inv([site([gdoc('s', gas(310, '2024-12-20', '2025-01-19'))])], 2025), deps, 'AR6');
+    expect(slices.map(s => s.period_month)).toEqual(['2025-01-01']);
+    expect(slices[0].activity_value).toBeCloseTo(310 * 19 / 31, 6);
+    expect(slices[0].pct_in_month).toBeCloseTo(19 / 31, 6);
+  });
+
+  it('a March year end splits over its own window: a bill across 31 March writes only March', () => {
+    const { slices } = buildMonthlyEmissions(inv([site([gdoc('m', gas(310, '2025-03-15', '2025-04-14'))])], 2025, 3), deps, 'AR6');
+    expect(slices.map(s => [s.period_month, s.reporting_year])).toEqual([['2025-03-01', 2025]]);
+    expect(slices[0].activity_value).toBeCloseTo(310 * 17 / 31, 6);
+  });
+
+  it('uncounted bills write nothing and are reported: same bill, mixed units, undated; pending is silent', () => {
+    const same: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'],
+      note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' };
+    const r1 = buildMonthlyEmissions(inv([site([gdoc('a', gas(100, ...month(2025, 1))), gdoc('b', gas(100, ...month(2025, 1)))])], 2025, 12, [same]), deps, 'AR6');
+    expect(sum(r1.slices, s => s.activity_value as number), 'counted once').toBeCloseTo(100, 6);
+    expect(r1.skipped.map(k => k.reason)).toEqual(['not counted: same_bill_as']);
+    const r2 = buildMonthlyEmissions(inv([site([gdoc('a', gas(100, ...month(2025, 1))), gdoc('b', gas(100, ...month(2025, 2), { unit: 'therms' }))])], 2025), deps, 'AR6');
+    expect(r2.slices).toEqual([]);
+    expect(r2.skipped.map(k => k.reason)).toEqual(['not counted: mixed_units', 'not counted: mixed_units']);
+    const r3 = buildMonthlyEmissions(inv([site([gdoc('u', gas(100, null, null)), gdoc('p', gas(100, ...month(2025, 1), { status: 'extracted' }))])], 2025), deps, 'AR6');
+    expect(r3.slices).toEqual([]);
+    expect(r3.skipped.map(k => k.reason)).toEqual(['not counted: undated']);
+  });
+
+  it('a location the totals exclude as unpriceable writes no monthly row', () => {
+    const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'GB' });
+    const r = buildMonthlyEmissions(inv([blocked], 2025), deps, 'AR6');
+    expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toHaveLength(1);
+    expect(r.slices).toEqual([]);
+    expect(r.skipped).toContainEqual({ fuelType: 'all', document_type: 'all', reason: 'location excluded: unpriceable' });
+  });
+
+  it('slices carry their location id, for matching by location', () => {
+    const { slices } = buildMonthlyEmissions(inv([site([gdoc('a', gas(100, ...month(2025, 1)))], { id: 'site-7' })], 2025), deps, 'AR6');
+    expect(slices.every(s => s.location_id === 'site-7')).toBe(true);
+  });
+
+  describe('the identity: Σ slices = Σ counted contributions = annual before the gross-up', () => {
+    const extrap = (o: Partial<CoverageResolution> = {}): CoverageResolution => ({ locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate',
+      monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z', ...o });
+    const halfYear = () => site(Array.from({ length: 6 }, (_, k) => gdoc(`m${k}`, gas(100, ...month(2025, k + 1)))));
+
+    it('six months evidenced, grossed up ×12/6: slices hold the six, never the gross-up', () => {
+      const i = inv([halfYear()], 2025, 12, [extrap()]);
+      const { slices } = buildMonthlyEmissions(i, deps, 'AR6');
+      expect(deriveLocations(i)[0].natural_gas_amount, 'annual is grossed up').toBe(1200);
+      expect(sum(slices, s => s.activity_value as number), 'monthly is not').toBeCloseTo(600, 6);
+      const [f] = emissionsByLocationField(i, 'AR6');
+      expect(sum(slices, s => s.tco2e)).toBeCloseTo(f.annual - f.estimated, 4);
+      expect(new Set(slices.map(s => s.period_month)).size).toBe(6);
+    });
+
+    it('Σ slice activity equals Σ counted contributions, bill by bill, including a prorated one', () => {
+      const l = site([gdoc('s', gas(310, '2024-12-20', '2025-01-19')), gdoc('f', gas(280, ...month(2025, 2))), gdoc('o', gas(90, ...month(2024, 6)))]);
+      const counted = billContributions(l, [], periodFromYearAndEnd(2025, 12)).filter(c => c.counted);
+      const { slices } = buildMonthlyEmissions(inv([l], 2025), deps, 'AR6');
+      expect(sum(slices, s => s.activity_value as number)).toBeCloseTo(counted.reduce((a, c) => a + c.value * (c.share ?? 0), 0), 6);
+    });
+
+    it('guard: the monthly split never reads a gap estimate or an annual figure', () => {
+      const src = stripTsComments(readFileSync(join(__dirname, 'monthlyEmissions.ts'), 'utf8'));
+      const start = src.indexOf('export function buildMonthlyEmissions(');
+      const body = src.slice(start, src.indexOf('\n}\n', start));
+      for (const banned of ['monthsCovered', 'extrapolate', 'applyResolutions', 'emissionsByLocationField', 'pctEstimated', '_amount', 'electricity_kwh']) {
+        expect(body, banned).not.toContain(banned);
+      }
+    });
+  });
+
+  describe('reconcile by location and fuel', () => {
+    const report = (i: ReturnType<typeof inv>) => reconcile(buildMonthlyEmissions(i, deps, 'AR6').slices, i, 'AR6');
+
+    it('Scenario A reconciles with delta 0 in FY2025 and FY2026', () => {
+      for (const y of [2025, 2026]) {
+        const r = report(inv([scenarioA()], y));
+        expect(r.reconciles, `FY${y}`).toBe(true);
+        expect(r.unexplained_delta, `FY${y}`).toBe(0);
+        expect(r.months_evidenced, `FY${y}`).toBe(1);
+      }
+    });
+
+    it('two sites, gas and electricity, one extrapolated: every group reconciles, delta 0', () => {
+      const a = site(Array.from({ length: 6 }, (_, k) => gdoc(`a${k}`, gas(100, ...month(2025, k + 1)))), { id: 'A', name: 'Site A', grid_region: 'US_CA' });
+      a.source_docs.push(doc('utility_electricity', [elec(5000, '2025-01-01', '2025-12-31')], 'ae'));
+      const b = site([gdoc('b1', gas(310, '2024-12-20', '2025-01-19')), gdoc('b2', gas(400, '2025-01-20', '2025-12-31'))], { id: 'B', name: 'Site B' });
+      const ex: CoverageResolution = { locId: 'A', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
+      const r = report(inv([a, b], 2025, 12, [ex]));
+      expect(r.groups.map(g => [g.location_id, g.fuel_type])).toEqual([['A', 'natural_gas'], ['A', 'electricity'], ['B', 'natural_gas']]);
+      expect(r.groups.every(g => g.unexplained === 0)).toBe(true);
+      expect(r.reconciles).toBe(true);
+      expect(r.unexplained_delta).toBe(0);
+      expect(r.groups.find(g => g.location_id === 'A' && g.fuel_type === 'natural_gas')!.estimated).toBeGreaterThan(0);
+    });
+
+    it('a March year end reconciles over its own window', () => {
+      const r = report(inv([site([gdoc('x', gas(310, '2025-03-15', '2025-04-14')), gdoc('y', gas(100, '2024-04-01', '2024-04-30'))])], 2025, 3));
+      expect(r.reconciles).toBe(true);
+      expect(r.unexplained_delta).toBe(0);
+    });
+
+    it('typed figures with no counted bill are not compared (no monthly basis)', () => {
+      const r = report(inv([site([gdoc('a', gas(100, ...month(2025, 1)))], { has_propane: true, propane_amount: 500 })], 2025));
+      expect(r.groups.map(g => g.fuel_type)).toEqual(['natural_gas']);
+      expect(r.reconciles).toBe(true);
+    });
+
+    it('slices for a location that has no counted bill do not reconcile (compared against 0)', () => {
+      const withBill = inv([site([gdoc('a', gas(100, ...month(2025, 1)))])], 2025);
+      const without = inv([site([])], 2025);
+      const r = reconcile(buildMonthlyEmissions(withBill, deps, 'AR6').slices, without, 'AR6');
+      expect(r.reconciles).toBe(false);
+    });
+  });
+});
+
+// ── T6 ruling: confirmed bills under a "uses this fuel" switch that is off ─────────────────────────────
+describe('T6 stream_off: a switched-off field with confirmed bills is never silently dropped', () => {
+  const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+  const lastDay = (m: number) => new Date(2025, m, 0).getDate();
+  const bill = (k: number, o: Partial<ExtractedProposal> = {}) => doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 100, unit: 'mcf',
+    periodStart: `2025-${String(k).padStart(2, '0')}-01`, periodEnd: `2025-${String(k).padStart(2, '0')}-${lastDay(k)}`, ...o })], `g${k}`);
+  const siteA = (hasGas: boolean, o: Partial<ExtractedProposal> = {}) =>
+    loc({ name: 'Site A', has_natural_gas: hasGas, natural_gas_unit: 'mcf', source_docs: [bill(1, o), bill(2, o), bill(3, o)] });
+  const inv = (l: Location) => ({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] });
+  const offIssues = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => i.status === 'stream_off');
+
+  it('raises an issue naming the site, the fuel and the number of confirmed bills', () => {
+    expect(offIssues(siteA(false))).toEqual([{ locId: 'L1', fuelType: 'natural_gas', status: 'stream_off', docIds: ['g1', 'g2', 'g3'],
+      message: 'Site A is marked as not using natural gas, but 3 natural gas bills are confirmed. Turn natural gas on for this site, or reject the bills.' }]);
+  });
+
+  it('it is in the export-blocking list (conciergeReady requires that list to be empty)', () => {
+    expect(findUnresolvedCoverage([siteA(false)], 2025, 12, []).length).toBeGreaterThan(0);
+  });
+
+  it('singular wording for one bill, and a vehicle stream uses its own verb', () => {
+    const one = loc({ name: 'Depot', has_natural_gas: false, source_docs: [bill(1)] });
+    expect(offIssues(one)[0].message).toBe('Depot is marked as not using natural gas, but 1 natural gas bill is confirmed. Turn natural gas on for this site, or reject the bill.');
+    const fleet = loc({ name: 'Depot', has_mobile: false, source_docs: [doc('fleet_fuel', [prop({ fuelType: 'gasoline', value: 50, unit: 'gallons',
+      periodStart: '2025-01-01', periodEnd: '2025-01-31' })], 'f')] });
+    expect(offIssues(fleet)[0].message).toBe('Depot is marked as not having company vehicles or mobile equipment, but 1 gasoline bill is confirmed. Turn company vehicles or mobile equipment on for this site, or reject the bill.');
+  });
+
+  it('cleared by turning the switch on, or by rejecting the bills', () => {
+    expect(offIssues(siteA(true))).toEqual([]);
+    expect(offIssues(siteA(false, { status: 'rejected' }))).toEqual([]);
+  });
+
+  it('electricity has no switch and never raises it', () => {
+    const l = loc({ grid_region: 'US_CA', source_docs: [doc('utility_electricity', [prop({ fuelType: 'electricity', value: 900, unit: 'kwh',
+      periodStart: '2025-01-01', periodEnd: '2025-01-31' })], 'e')] });
+    expect(offIssues(l)).toEqual([]);
+  });
+
+  it('the monthly split writes nothing for the field and reports stream_off, matching the annual figure', () => {
+    const { slices, skipped } = buildMonthlyEmissions(inv(siteA(false)), deps, 'AR6');
+    expect(slices).toEqual([]);
+    expect(skipped.map(k => k.reason)).toEqual(['stream_off', 'stream_off', 'stream_off']);
+    expect(calcInventory(deriveLocations(inv(siteA(false))), 'AR6', 2025).s1_total).toBe(0);
+  });
+
+  it('reconcile reports zero with the switch off, and with it on', () => {
+    for (const on of [false, true]) {
+      const i = inv(siteA(on));
+      const r = reconcile(buildMonthlyEmissions(i, deps, 'AR6').slices, i, 'AR6');
+      expect(r.reconciles, `switch ${on}`).toBe(true);
+      expect(r.unexplained_delta, `switch ${on}`).toBe(0);
+    }
   });
 });

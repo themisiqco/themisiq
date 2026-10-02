@@ -23,13 +23,32 @@
  * with a timestamp. So on a 9/12 inventory monthly sums to 9/12 of annual. That
  * divergence is CORRECT and is exactly what `reconcile` (below) models and explains.
  *
- * Skips any proposal that is not status==='confirmed', or has value==null, or
- * has null/unparseable dates, or whose unit doesn't map to an EF key (skip +
- * flag, never compute with a guessed factor).
+ * READS COUNTED CONTRIBUTIONS, IN-WINDOW ONLY (T6). Each slice comes from a bill the annual engine
+ * counts (billContributions: confirmed, dated, in the reporting window, not excluded as the same bill as
+ * another, not mixed units), and only the days of that bill INSIDE the reporting window are split into
+ * months. A bill outside the year, or the part of a straddling bill outside it, writes nothing. So for
+ * every location and fuel:
+ *   Σ slices = Σ counted contributions = the annual figure before the gap gross-up,
+ * and `reconcile` below checks exactly that, explaining any remaining difference by the gross-up.
+ *
+ * Uncounted bills write nothing; each is reported in `skipped` with its reason (a pending proposal is not
+ * reported: it is not yet a bill). A confirmed proposal with no value is reported too. A bill whose unit
+ * has no factor is skipped and reported, never computed with a guessed factor.
  */
 
-import { parseLocalDate, exclusiveEnd, countryRefusal } from "./engine";
-import type { CoverageResolution } from "./engine";
+import {
+  parseLocalDate, countryRefusal, billContributions, acceptedResolutions, periodFromYearAndEnd,
+  deriveLocations, findUnpriceableLocations, emissionsByLocationField, streamSwitchOff,
+} from "./engine";
+import type { CoverageResolution, Location } from "./engine";
+
+/** The inventory fields the monthly split and the reconciliation read. */
+export interface MonthlyInventory {
+  locations: Location[];
+  reporting_year: number;
+  fiscal_year_end_month?: number;
+  coverage_resolutions?: CoverageResolution[];
+}
 
 export type GwpVersion = "AR4" | "AR5" | "AR6";
 
@@ -72,6 +91,9 @@ export interface InventoryLocationLike extends MonthlyLocation {
 }
 
 export interface MonthlySlice {
+  // In memory only: ghg_monthly_emissions has no location id column (the page maps each column by name).
+  // reconcile matches slices to locations by it; location_name is not unique.
+  location_id?: string;
   period_month: string;      // 'YYYY-MM-01'
   reporting_year: number;
   scope: 1 | 2;
@@ -99,10 +121,9 @@ export interface MonthlyResult {
 }
 
 // ---- date helpers (day-level, mirrors the coverage engine's approach) --------
-// parseLocalDate + exclusiveEnd are imported from lib/ghg/engine (single source of
-// truth). The engine's exclusiveEnd canonicalizes BOTH bill-end conventions; this
-// module's old blind +1-day copy DISAGREED with it — a live bug — so importing the
-// engine's version is the fix.
+// parseLocalDate is imported from lib/ghg/engine. Each bill's canonical end now arrives already
+// canonicalised on its contribution (periodEndExclusive, built by the engine's exclusiveEnd), so this
+// module no longer converts an end date itself — the one definition stays in the engine.
 // daysBetween stays LOCAL and half-open on purpose: the engine's daysBetween is
 // inclusive (+1 day) for coverage's inclusive ranges. This module prorates over the
 // half-open span [start, exclusiveEnd), so it needs the exclusive day count; using
@@ -159,20 +180,29 @@ function resolveBill(
 }
 
 /**
- * Build monthly slices for one inventory. Pure: pass the live factor fns + the
- * inventory's locations.  reportingYear is used for the grid factor lookup and
- * stamped on each slice.
+ * Build monthly slices for one inventory. Pure: pass the live factor fns + the inventory. The reporting
+ * year picks the grid factor (as the annual engine does) and, with the year end, the window. Each slice
+ * is stamped with the calendar year of its month (design section 6), not the inventory's year.
  */
 export function buildMonthlyEmissions(
-  locations: InventoryLocationLike[],
-  reportingYear: number,
+  inventory: MonthlyInventory,
   deps: MonthlyDeps,
   gwp: GwpVersion = "AR6"
 ): MonthlyResult {
   const slices: MonthlySlice[] = [];
   const skipped: SkippedBill[] = [];
+  const year = inventory.reporting_year;
+  const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12);
+  // The window as periodFromYearAndEnd returns it: `end` is the last day IN the year, so the exclusive
+  // boundary is end + 1 day. Same construction as billContributions.
+  const winStart = new Date(win.start.getFullYear(), win.start.getMonth(), win.start.getDate());
+  const winEndExcl = new Date(win.end.getFullYear(), win.end.getMonth(), win.end.getDate() + 1);
+  const resolutions = inventory.coverage_resolutions ?? [];
+  // The same location set as the annual totals: a location the totals exclude as unpriceable writes no
+  // monthly row either, judged on its derived figures as the totals are (T4).
+  const unpriceable = new Set(findUnpriceableLocations(deriveLocations(inventory), gwp, year).map(u => u.locId));
 
-  for (const loc of locations) {
+  for (const loc of inventory.locations) {
     // ⚠️ A LOCATION REFUSED FOR ITS COUNTRY CONTRIBUTES NO MONTHLY ROW AT ALL, AND THE FUEL GUARD
     // BELOW IS NOT ENOUGH ON ITS OWN. Its fuel bills would already land in `skipped`, because
     // pickEF returns a miss and calcGas throws inside the try. Its ELECTRICITY would not: that
@@ -189,69 +219,83 @@ export function buildMonthlyEmissions(
       skipped.push({ fuelType: "all", document_type: "all", reason: `location excluded: ${refusal.state}` });
       continue;
     }
-    for (const doc of loc.source_docs ?? []) {
-      for (const p of doc.extracted ?? []) {
-        if (p.status !== "confirmed") continue;            // only confirmed bills persist
-        if (p.value == null) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "no canonical value (needs_manual_review)" }); continue; }
-        if (!p.periodStart || !p.periodEnd) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "missing bill dates" }); continue; }
+    if (unpriceable.has(loc.id)) {
+      skipped.push({ fuelType: "all", document_type: "all", reason: "location excluded: unpriceable" });
+      continue;
+    }
+    // A confirmed proposal with no value has no contribution row (T1), so it is reported here.
+    for (const doc of loc.source_docs ?? []) for (const p of doc.extracted ?? []) {
+      if (p.status === "confirmed" && p.value == null) skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "no canonical value (needs_manual_review)" });
+    }
+    for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
+      const doc = loc.source_docs.find(d => d.id === c.docId)!;
+      if (!c.counted) {
+        if (c.reason !== "not_confirmed") skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `not counted: ${c.reason}` });
+        continue;
+      }
+      // The field's "uses this fuel" switch is off, so the annual figure omits it; the monthly split
+      // matches, and the export-blocking stream_off issue says why (T6 ruling).
+      if (streamSwitchOff(loc, c.field)) {
+        skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: "stream_off" });
+        continue;
+      }
+      const resolved = resolveBill(doc.document_type, c.fuelType, c.unit);
+      if (!resolved) { skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `no EF mapping for (${doc.document_type}, ${c.fuelType}, ${c.unit ?? "—"})` }); continue; }
 
-        const start = parseLocalDate(p.periodStart);
-        const endIncl = parseLocalDate(p.periodEnd);
-        if (!start || !endIncl) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "unparseable bill dates" }); continue; }
-        const endExcl = exclusiveEnd(endIncl);
-        const totalDays = daysBetween(start, endExcl);
-        if (totalDays <= 0) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "non-positive date span" }); continue; }
-
-        const resolved = resolveBill(doc.document_type, p.fuelType, p.unit);
-        if (!resolved) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `no EF mapping for (${doc.document_type}, ${p.fuelType}, ${p.unit ?? "—"})` }); continue; }
-
-        // total bill emissions, then prorate across months by day-fraction
-        let billTotal: number;
-        let efSource: string | null;
-        if (resolved.kind === "electricity") {
-          // Unresolved grid region → OMIT this electricity bill (no getGridFactor call, no US_AVG).
-          if (!deps.isResolvedGridRegion(loc.grid_region ?? "")) {
-            skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `unresolved grid region (${loc.grid_region ?? ""})` });
-            continue;
-          }
-          const gf = deps.getGridFactor(loc.grid_region ?? "", reportingYear);
-          billTotal = (p.value * gf.ef) / 1000;
-          efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
-        } else {
-          // The refusal now comes from calcGas, not pickEF: pickEF returns a uniform "no factor"
-          // marker for a key no table carries, and calcGas is what declines to price it. Guarding
-          // only the lookup left the throw one line outside the catch — a dead guard and an escaped
-          // error. Both calls sit inside, and an unpriceable bill lands in `skipped` where the
-          // caller already reads it, rather than taking the whole monthly write down.
-          try {
-            const ef: EFFactor = deps.pickEF(loc, resolved.efKey);
-            billTotal = deps.calcGas(ef, p.value, gwp).total;
-          } catch (e) {
-            skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });
-            continue;
-          }
-          efSource = resolved.efKey;
+      // The whole bill's emissions; each month takes its days' fraction of it.
+      let billTotal: number;
+      let efSource: string | null;
+      if (resolved.kind === "electricity") {
+        // Unresolved grid region → OMIT this electricity bill (no getGridFactor call, no US_AVG).
+        if (!deps.isResolvedGridRegion(loc.grid_region ?? "")) {
+          skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `unresolved grid region (${loc.grid_region ?? ""})` });
+          continue;
         }
-
-        const spans = monthSpans(start, endExcl);
-        for (const s of spans) {
-          const pct = s.days / totalDays;
-          slices.push({
-            period_month: s.key,
-            reporting_year: s.year,
-            scope: resolved.scope,
-            location_name: loc.name ?? null,
-            fuel_type: p.fuelType,
-            activity_value: p.value != null ? +(p.value * pct).toFixed(6) : null,
-            activity_unit: p.unit,
-            tco2e: +(billTotal * pct).toFixed(6),
-            gwp_version: gwp,
-            ef_source: efSource,
-            period_start: p.periodStart,
-            period_end: p.periodEnd,
-            pct_in_month: +pct.toFixed(6),
-          });
+        const gf = deps.getGridFactor(loc.grid_region ?? "", year);
+        billTotal = (c.value * gf.ef) / 1000;
+        efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
+      } else {
+        // The refusal now comes from calcGas, not pickEF: pickEF returns a uniform "no factor"
+        // marker for a key no table carries, and calcGas is what declines to price it. Both calls
+        // sit inside the try, so an unpriceable bill lands in `skipped` where the caller already
+        // reads it, rather than taking the whole monthly write down.
+        try {
+          const ef: EFFactor = deps.pickEF(loc, resolved.efKey);
+          billTotal = deps.calcGas(ef, c.value, gwp).total;
+        } catch (e) {
+          skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });
+          continue;
         }
+        efSource = resolved.efKey;
+      }
+
+      // IN-WINDOW DAYS ONLY. A counted bill always has a usable period (undated and invalid ones are
+      // never counted), and totalDays is its full span, so each month's fraction is of the whole bill and
+      // the in-window months sum to its share.
+      const start = parseLocalDate(c.periodStart as string);
+      const endExcl = parseLocalDate(c.periodEndExclusive as string);
+      const from = start > winStart ? start : winStart;
+      const to = endExcl < winEndExcl ? endExcl : winEndExcl;
+      const totalDays = c.totalDays as number;
+      const p = doc.extracted![c.proposalIndex];
+      for (const s of monthSpans(from, to)) {
+        const pct = s.days / totalDays;
+        slices.push({
+          location_id: loc.id,
+          period_month: s.key,
+          reporting_year: s.year,
+          scope: resolved.scope,
+          location_name: loc.name ?? null,
+          fuel_type: c.fuelType,
+          activity_value: +(c.value * pct).toFixed(6),
+          activity_unit: c.unit,
+          tco2e: +(billTotal * pct).toFixed(6),
+          gwp_version: gwp,
+          ef_source: efSource,
+          period_start: p.periodStart,
+          period_end: p.periodEnd,
+          pct_in_month: +pct.toFixed(6),
+        });
       }
     }
   }
@@ -259,72 +303,74 @@ export function buildMonthlyEmissions(
   return { slices, skipped };
 }
 
-/** Sum evidenced monthly tco2e by scope for a reporting year. Private — the old exported
- * `reconcileByScope` claimed the sum "should match the annual scope total within tolerance",
- * which is FALSE whenever an extrapolation is on file (see the module header). `reconcile`
- * below replaces that false equality with a completeness report that models the divergence. */
-function sumByScope(slices: MonthlySlice[], year: number): { scope1: number; scope2: number } {
-  let scope1 = 0, scope2 = 0;
-  for (const s of slices) {
-    if (s.reporting_year !== year) continue;
-    if (s.scope === 1) scope1 += s.tco2e; else scope2 += s.tco2e;
-  }
-  return { scope1: +scope1.toFixed(4), scope2: +scope2.toFixed(4) };
-}
-
 /**
- * Completeness report reconciling evidenced monthly slices against the annual engine's figure.
- * NOT an equality check — monthly is evidenced-only and annual is evidenced + estimated, so on any
- * extrapolated inventory they legitimately differ. This models that expected divergence and reports
- * only the REMAINING difference: a non-zero `unexplained_delta` is a genuine defect the trust check
- * can finally fire on.
+ * Completeness report reconciling evidenced monthly slices against the annual engine's figure, BY
+ * LOCATION AND FUEL (T6). NOT an equality check — monthly is evidenced-only and annual is evidenced +
+ * estimated, so on any extrapolated inventory they legitimately differ. For each location and fuel with
+ * counted bills:
+ *   annual − Σ slices − the gross-up the engine estimated = 0
+ * and a non-zero remainder anywhere is a genuine defect. The annual figure and the estimate come from
+ * emissionsByLocationField, the same derivation pctEstimated reports, so the two cannot disagree.
+ * Typed figures with no counted bill (steam, refrigerants, a manual gas figure) have no monthly basis
+ * and are not compared; slices for a location and fuel with no counted bill are compared against 0.
  */
+export interface ReconciliationGroup {
+  location_id: string;
+  fuel_type: string;
+  scope: 1 | 2;
+  annual: number;
+  evidenced: number;
+  estimated: number;
+  unexplained: number;
+}
 export interface ReconciliationReport {
-  scope1_evidenced: number;      // Σ monthly slices, scope 1, for `year`
-  scope2_evidenced: number;      // Σ monthly slices, scope 2, for `year`
-  scope1_annual: number;         // annual engine's Scope-1 figure (passed in)
-  scope2_annual: number;         // annual engine's Scope-2 (location) figure (passed in)
-  months_evidenced: number;      // distinct period_month values present in the year's slices
+  scope1_evidenced: number;      // Σ monthly slices, scope 1
+  scope2_evidenced: number;      // Σ monthly slices, scope 2
+  scope1_annual: number;         // annual Scope 1 of the fields with counted bills
+  scope2_annual: number;         // annual Scope 2 (location-based) of the fields with counted bills
+  months_evidenced: number;      // distinct period_month values present in the slices
   months_in_period: number;      // 12, or the fiscal window's month count
   pct_estimated: number;         // (annual − evidenced) / annual, as a percentage
-  reconciles: boolean;           // TRUE iff the delta is fully explained by extrapolations on file
-  unexplained_delta: number;     // (annual − evidenced) − Σ(expected gross-up). NON-ZERO ⇒ real bug.
+  reconciles: boolean;           // TRUE iff every group's remainder is within rounding
+  unexplained_delta: number;     // Σ group remainders. NON-ZERO ⇒ real bug.
+  groups: ReconciliationGroup[];
   summary: string;
 }
 
 export function reconcile(
   slices: MonthlySlice[],
-  year: number,
-  annual: { s1_total: number; s2_location: number },
-  resolutions: CoverageResolution[],
+  inventory: MonthlyInventory,
+  gwp: GwpVersion = "AR6",
   monthsInPeriod: number = 12
 ): ReconciliationReport {
-  const { scope1: scope1_evidenced, scope2: scope2_evidenced } = sumByScope(slices, year);
-  const yearSlices = slices.filter(s => s.reporting_year === year);
-
-  // Expected gross-up: the estimated (non-evidenced) portion the ANNUAL engine added for each
-  // extrapolate resolution. applyResolutions grosses a fuel ×12/monthsCovered from its evidenced
-  // bills, so annual_fuel = evidenced_fuel × 12/monthsCovered, and the estimated portion is
-  //   annual_fuel × (1 − monthsCovered/12) = evidenced_fuel × (12 − monthsCovered)/monthsCovered.
-  // We derive it from evidenced (the caller passes only aggregate annual, not per-fuel) — identical
-  // by construction to the annual gross-up. A resolution is matched to its slices by fuel_type.
-  let expected1 = 0, expected2 = 0;
-  for (const r of resolutions) {
-    if (r.kind !== "extrapolate" || !r.monthsCovered || r.monthsCovered <= 0 || r.monthsCovered >= 12) continue;
-    const fuelSlices = yearSlices.filter(s => s.fuel_type === r.fuelType);
-    if (fuelSlices.length === 0) continue; // nothing evidenced for this fuel → nothing to gross up
-    const evidencedFuel = fuelSlices.reduce((a, s) => a + s.tco2e, 0);
-    const grossUp = evidencedFuel * (12 - r.monthsCovered) / r.monthsCovered;
-    if (fuelSlices[0].scope === 2) expected2 += grossUp; else expected1 += grossUp;
+  const key = (loc: string, fuel: string) => `${loc}|${fuel}`;
+  const groups = new Map<string, ReconciliationGroup>();
+  const group = (loc: string, fuel: string, scope: 1 | 2) => {
+    const k = key(loc, fuel);
+    if (!groups.has(k)) groups.set(k, { location_id: loc, fuel_type: fuel, scope, annual: 0, evidenced: 0, estimated: 0, unexplained: 0 });
+    return groups.get(k)!;
+  };
+  for (const f of emissionsByLocationField(inventory, gwp)) {
+    if (!f.documentBacked) continue;
+    const g = group(f.locId, f.fuelType, f.scope);
+    g.annual += f.annual;
+    g.estimated += f.estimated;
   }
+  for (const s of slices) group(s.location_id ?? "", s.fuel_type, s.scope).evidenced += s.tco2e;
 
-  const annualTotal = annual.s1_total + annual.s2_location;
+  let scope1_evidenced = 0, scope2_evidenced = 0, scope1_annual = 0, scope2_annual = 0, unexplained = 0;
+  for (const g of groups.values()) {
+    g.unexplained = +(g.annual - g.evidenced - g.estimated).toFixed(4);
+    unexplained += g.unexplained;
+    if (g.scope === 2) { scope2_evidenced += g.evidenced; scope2_annual += g.annual; }
+    else { scope1_evidenced += g.evidenced; scope1_annual += g.annual; }
+  }
+  const unexplained_delta = +unexplained.toFixed(4);
+  const reconciles = [...groups.values()].every(g => Math.abs(g.unexplained) < 0.01); // rounding tolerance
+
+  const months_evidenced = new Set(slices.map(s => s.period_month)).size;
+  const annualTotal = scope1_annual + scope2_annual;
   const evidencedTotal = scope1_evidenced + scope2_evidenced;
-  const expectedTotal = expected1 + expected2;
-  const unexplained_delta = +((annualTotal - evidencedTotal) - expectedTotal).toFixed(4);
-  const reconciles = Math.abs(unexplained_delta) < 0.01; // rounding tolerance
-
-  const months_evidenced = new Set(yearSlices.map(s => s.period_month)).size;
   const pct_estimated = annualTotal > 0
     ? +(((annualTotal - evidencedTotal) / annualTotal) * 100).toFixed(1)
     : 0;
@@ -334,9 +380,9 @@ export function reconcile(
     : `⚠ Unexplained difference of ${unexplained_delta} mtCO₂e between monthly and annual. This is not accounted for by any acknowledged coverage gap.`;
 
   return {
-    scope1_evidenced, scope2_evidenced,
-    scope1_annual: annual.s1_total, scope2_annual: annual.s2_location,
+    scope1_evidenced: +scope1_evidenced.toFixed(4), scope2_evidenced: +scope2_evidenced.toFixed(4),
+    scope1_annual, scope2_annual,
     months_evidenced, months_in_period: monthsInPeriod,
-    pct_estimated, reconciles, unexplained_delta, summary,
+    pct_estimated, reconciles, unexplained_delta, groups: [...groups.values()], summary,
   };
 }

@@ -1,0 +1,976 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 269686c..f73fa3c 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -73,12 +73,12 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
+ 
+ - **`app/dashboard/ghg/page.tsx` RENDERS `buildWorkings()` output; never re-derive workings rows in the component.** There is ONE renderer. A second, hand-rolled derivation in `renderStep4` once drifted from the engine and was removed — reintroducing any per-row calc in the component is the regression.
+ - **`applyResolutions()` is the single source of truth for what a figure IS.** Both the write path and the audit trail derive from it, so the number and the method claimed for it cannot disagree.
+-- **`exclusiveEnd()` — ONE definition.** End date on the 1st = exclusive (first-of-next-month billing); every other end date = inclusive last covered day. `monthlyEmissions.ts` imports it — do not fork it.
++- **`exclusiveEnd()` — ONE definition.** End date on the 1st = exclusive (first-of-next-month billing); every other end date = inclusive last covered day. exclusiveEnd(): one definition, in the engine. The monthly split receives each bill's canonical end on its contribution and never converts an end date itself.
+ - **`daysBetween` (engine) is INCLUSIVE; `monthlyEmissions.ts` uses a LOCAL half-open count. Two contracts, deliberate — do NOT unify them.** The half-open count is what makes monthly proration reconcile; the inclusive one serves coverage's inclusive ranges.
+ - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
+ - **Coverage gate is keyed per `(document_type, fuelType, meter_label)` and returns every issue, not a single status.** Overlap compares full bill periods, not their in-year days, so two copies of a bill outside the year still raise an overlap. An overlap is resolved only as `same_bill` (one document counts, the others are retained as evidence) or `different_meters` (both count, the second meter named); no resolution may leave two counted bills over the same days. Only accepted resolutions (passing `validateResolution`) affect figures, issues or audit rows; legacy `duplicate` and `straddle` are never accepted. A straddle is not an issue: it is prorated by its own days. No silent zero: an undated, invalid-period or mixed-units bill, or a field whose documents were all rejected with no figure entered, raises an export-blocking issue naming the document. Only `outside_year` and `same_bill_as` may leave a bill uncounted without one; a `used_none` confirmation records who confirmed it and when. A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
+ - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
+-- **Run `npx vitest run lib/ghg/engine.test.ts` (237 passed, 1 todo — verified 1 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
++- **Run `npx vitest run lib/ghg/engine.test.ts` (309 passed, 1 todo — verified 2 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+ 
+ ---
+ 
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index a63deb0..155c353 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -1673,9 +1673,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+     // authoritative; a monthly failure here must NOT escape or skip setSaved(true).
+     try {
+       if (savedId) {
++        // The inventory, not its locations: the split reads counted bills inside the reporting window,
++        // which needs the year end and the coverage resolutions (T6).
+         const { slices } = buildMonthlyEmissions(
+-          inventory.locations as any,   // source_docs[].extracted[] live on these
+-          inventory.reporting_year,
++          inventory,
+           { calcGas, pickEF, getGridFactor, isResolvedGridRegion },
+           'AR6'
+         )
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 9f7b84a..e777df9 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -30,9 +30,9 @@ import {
+   type DeclarableStream,
+   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
+   deriveLocations,
+-  validateResolution, COVERAGE_MESSAGE,
++  validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
+ } from './engine';
+-import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
++import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
+ import { NOT_PROVIDED } from '../notProvided';
+ import { countryRefusalText } from './countryRefusalCopy';
+ import { stripTsComments } from '../testing/stripComments';
+@@ -324,13 +324,13 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
+         fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
+       })])],
+     });
+-    const annual = calcInventory([l], 'AR6', 2024);
+     const res: CoverageResolution = {
+       locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
+       note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2024-06-01T00:00:00Z',
+     };
+-    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
+-    const r = reconcile(slices, 2024, annual, [res]);
++    const inv = { locations: [l], reporting_year: 2024, coverage_resolutions: [res] };
++    const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
++    const r = reconcile(slices, inv, 'AR6');
+     expect(r.reconciles).toBe(true);
+     expect(r.months_evidenced).toBe(9);
+     expect(r.pct_estimated).toBeCloseTo(25, 1);
+@@ -345,26 +345,26 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
+       })])],
+     });
+     const annual = calcInventory([l], 'AR6', 2024);
+-    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
+-    const r = reconcile(slices, 2024, annual, []);
++    const inv = { locations: [l], reporting_year: 2024 };
++    const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
++    const r = reconcile(slices, inv, 'AR6');
+     expect(r.reconciles).toBe(true);
+     expect(r.pct_estimated).toBeCloseTo(0, 2);
+     expect(r.scope1_evidenced).toBeCloseTo(annual.s1_total, 2); // evidenced ≈ annual (no gross-up)
+     expect(r.months_evidenced).toBe(12);
+   });
+ 
+-  it("F1c a REAL defect — annual figure exceeds the bills with NO resolution to explain it — does NOT reconcile", () => {
+-    // natural_gas_amount 2000 but the only bill is 900 (Jan–Sep) and NO extrapolate resolution on file.
+-    // The 1100-worth of annual excess is explained by nothing → the reconciler must fire.
+-    const l = loc({
+-      has_natural_gas: true, natural_gas_amount: 2000, natural_gas_unit: 'mcf',
+-      source_docs: [doc('utility_bill_gas', [prop({
+-        fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
+-      })])],
+-    });
+-    const annual = calcInventory([l], 'AR6', 2024);
+-    const slices = buildMonthlyEmissions([l], 2024, deps, 'AR6').slices;
+-    const r = reconcile(slices, 2024, annual, []); // no resolution — the excess is unexplained
++  // T6: the annual figure is now derived from the bills (T4), so a stored field can no longer exceed them.
++  // The defect the reconciler still exists to catch is monthly rows that disagree with the bills: here,
++  // rows written while a second bill was on file, read against the inventory after it was removed.
++  it("F1c a REAL defect — monthly rows the current bills do not support — does NOT reconcile", () => {
++    const jan = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30' })], 'kept');
++    const oct = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 400, unit: 'mcf', periodStart: '2024-10-01', periodEnd: '2024-12-31' })], 'removed');
++    const before = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan, oct] })], reporting_year: 2024 };
++    const after = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan] })], reporting_year: 2024 };
++    const staleSlices = buildMonthlyEmissions(before, deps, 'AR6').slices;
++    expect(reconcile(staleSlices, before, 'AR6').reconciles, 'consistent with the bills they came from').toBe(true);
++    const r = reconcile(staleSlices, after, 'AR6');
+     expect(r.reconciles).toBe(false);
+     expect(Math.abs(r.unexplained_delta)).toBeGreaterThan(0.01);
+   });
+@@ -2590,7 +2590,7 @@ describe('T16 country refusals', () => {
+     // The same four deps handleSave passes at app/dashboard/ghg/page.tsx:1391.
+     const monthlyDeps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+     let out!: ReturnType<typeof buildMonthlyEmissions>;
+-    expect(() => { out = buildMonthlyEmissions([priced, refused], 2025, monthlyDeps, 'AR6'); }).not.toThrow();
++    expect(() => { out = buildMonthlyEmissions({ locations: [priced, refused], reporting_year: 2025 }, monthlyDeps, 'AR6'); }).not.toThrow();
+ 
+     expect(out.slices.length, 'the priced location still produces its rows').toBeGreaterThan(0);
+     expect(out.slices.every(s => s.location_name === 'Priced Site'),
+@@ -3518,8 +3518,9 @@ describe('T1 billContributions', () => {
+   });
+ 
+   // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage;
+-  // T5 adds buildWorkings (contributions on rows) and pctEstimated (evidenced quantity per field).
+-  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings and pctEstimated (T2, T3, T5)', () => {
++  // T5 adds buildWorkings (contributions on rows) and the evidenced quantity per field, which T6 moved into
++  // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split.
++  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField and buildMonthlyEmissions (T2, T3, T5, T6)', () => {
+     const root = join(__dirname, '..', '..');
+     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+       const rel = `${dir}/${n}`;
+@@ -3531,9 +3532,9 @@ describe('T1 billContributions', () => {
+       const n = (src.match(/billContributions\(/g) ?? []).length;
+       return n ? [`${f}: ${n}`] : [];
+     });
+-    expect(calls).toEqual(['lib/ghg/engine.ts: 4']);
++    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1']);
+     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
+-    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function pctEstimated(']) {
++    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(']) {
+       const body = engineSrc.slice(engineSrc.indexOf(fn));
+       expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
+     }
+@@ -3842,10 +3843,12 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+     expect(blocked, 'some trials overlap').toBeGreaterThan(20); expect(checked, 'some trials count 2+ bills').toBeGreaterThan(20);
+   });
+ 
++  // Extended in T6: the "uses natural gas" switch is random too. A switched-off field reaches no total, so
++  // its figure counts as zero here, and confirmed bills under it must raise the stream_off issue.
+   it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
+     const r = rng(11);
+     const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
+-    const seen = { blocking: 0, silent: 0, usedNone: 0 };
++    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0 };
+     for (let t = 0; t < 400; t++) {
+       const n = 1 + Math.floor(r() * 3);
+       const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
+@@ -3856,11 +3859,19 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+         const status = pick(['confirmed', 'confirmed', 'rejected', 'extracted'] as const);
+         return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
+       });
+-      const l = loc({ has_natural_gas: true, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
++      const switchOn = r() < 0.75;
++      const l = loc({ has_natural_gas: switchOn, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
+       const resolutions: CoverageResolution[] = r() < 0.2
+         ? [res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u', email: 'e@x.example' } })] : [];
+       const a = applyResolutions(l, resolutions, W(2025).start, W(2025).end).natural_gas_amount;
+-      const figure = a ? (a.mixedUnits ? 0 : a.value) : l.natural_gas_amount;
++      const derived = a ? (a.mixedUnits ? 0 : a.value) : l.natural_gas_amount;
++      // What reaches the total: nothing, when the switch is off.
++      const figure = switchOn ? derived : 0;
++      const confirmedBills = docs.some(d => d.extracted!.some(p => p.status === 'confirmed' && p.value != null));
++      if (!switchOn && confirmedBills) {
++        expect(issues(l, 2025, resolutions).some(i => i.status === 'stream_off'), `trial ${t}: switch off over confirmed bills`).toBe(true);
++        seen.streamOff++;
++      }
+       if (figure > 0) continue;
+       // A gap is left out: it would satisfy this in almost every trial and hide whether the
+       // no-silent-zero issues themselves fire.
+@@ -3876,6 +3887,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+     }
+     // Each way out was actually reached, so the property is not passing vacuously.
+     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
++    expect(seen.streamOff).toBeGreaterThan(20);
+   });
+ });
+ 
+@@ -4275,3 +4287,206 @@ describe('T5 pctEstimated applies each gross-up to its own meter only', () => {
+     expect(pctEstimated(inv, 'AR6')).toBeCloseTo(25, 9);
+   });
+ });
++
++// ── T6: monthly reads counted contributions, in-window only; reconcile by location and fuel ─────────
++// docs/review/design-derived-figures.md section 6 and section 11 T6.
++describe('T6 monthly split', () => {
++  const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
++  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, sourceQuote: `${value} mcf`, ...o });
++  const elec = (value: number, periodStart: string, periodEnd: string) =>
++    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, sourceQuote: `${value} kWh` });
++  const gdoc = (id: string, p: ExtractedProposal) => doc('utility_bill_gas', [p], id);
++  const site = (docs: SourceDoc[], o: Partial<Location> = {}) => loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs, ...o });
++  const inv = (locations: Location[], reporting_year: number, fiscal_year_end_month = 12, coverage_resolutions: CoverageResolution[] = []) =>
++    ({ locations, reporting_year, fiscal_year_end_month, coverage_resolutions });
++  const sum = (xs: MonthlySlice[], f: (s: MonthlySlice) => number) => xs.reduce((a, s) => a + f(s), 0);
++  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate();
++  const month = (y: number, m: number) => [`${y}-${String(m).padStart(2, '0')}-01`, `${y}-${String(m).padStart(2, '0')}-${lastDay(y, m)}`] as const;
++  // Scenario A (docs/review/recalc/scenarios-additions.md): "Dec 1, 2025 – Jan 1, 2026" and "Jan 1, 2026 – Feb 1, 2026".
++  const scenarioA = () => site([gdoc('bill1', gas(310, '2025-12-01', '2026-01-01')), gdoc('bill2', gas(280, '2026-01-01', '2026-02-01'))]);
++
++  it('Scenario A, FY2025: writes only December 2025, from Bill 1; Bill 2 writes nothing', () => {
++    const { slices, skipped } = buildMonthlyEmissions(inv([scenarioA()], 2025), deps, 'AR6');
++    expect(slices.map(s => [s.period_month, s.activity_value, s.reporting_year])).toEqual([['2025-12-01', 310, 2025]]);
++    expect(skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'not counted: outside_year' });
++  });
++
++  it('Scenario A, FY2026: writes only January 2026, from Bill 2', () => {
++    const { slices } = buildMonthlyEmissions(inv([scenarioA()], 2026), deps, 'AR6');
++    expect(slices.map(s => [s.period_month, s.activity_value])).toEqual([['2026-01-01', 280]]);
++  });
++
++  it('a straddling bill writes only its in-window days, each month a fraction of the whole bill', () => {
++    const { slices } = buildMonthlyEmissions(inv([site([gdoc('s', gas(310, '2024-12-20', '2025-01-19'))])], 2025), deps, 'AR6');
++    expect(slices.map(s => s.period_month)).toEqual(['2025-01-01']);
++    expect(slices[0].activity_value).toBeCloseTo(310 * 19 / 31, 6);
++    expect(slices[0].pct_in_month).toBeCloseTo(19 / 31, 6);
++  });
++
++  it('a March year end splits over its own window: a bill across 31 March writes only March', () => {
++    const { slices } = buildMonthlyEmissions(inv([site([gdoc('m', gas(310, '2025-03-15', '2025-04-14'))])], 2025, 3), deps, 'AR6');
++    expect(slices.map(s => [s.period_month, s.reporting_year])).toEqual([['2025-03-01', 2025]]);
++    expect(slices[0].activity_value).toBeCloseTo(310 * 17 / 31, 6);
++  });
++
++  it('uncounted bills write nothing and are reported: same bill, mixed units, undated; pending is silent', () => {
++    const same: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'],
++      note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' };
++    const r1 = buildMonthlyEmissions(inv([site([gdoc('a', gas(100, ...month(2025, 1))), gdoc('b', gas(100, ...month(2025, 1)))])], 2025, 12, [same]), deps, 'AR6');
++    expect(sum(r1.slices, s => s.activity_value as number), 'counted once').toBeCloseTo(100, 6);
++    expect(r1.skipped.map(k => k.reason)).toEqual(['not counted: same_bill_as']);
++    const r2 = buildMonthlyEmissions(inv([site([gdoc('a', gas(100, ...month(2025, 1))), gdoc('b', gas(100, ...month(2025, 2), { unit: 'therms' }))])], 2025), deps, 'AR6');
++    expect(r2.slices).toEqual([]);
++    expect(r2.skipped.map(k => k.reason)).toEqual(['not counted: mixed_units', 'not counted: mixed_units']);
++    const r3 = buildMonthlyEmissions(inv([site([gdoc('u', gas(100, null, null)), gdoc('p', gas(100, ...month(2025, 1), { status: 'extracted' }))])], 2025), deps, 'AR6');
++    expect(r3.slices).toEqual([]);
++    expect(r3.skipped.map(k => k.reason)).toEqual(['not counted: undated']);
++  });
++
++  it('a location the totals exclude as unpriceable writes no monthly row', () => {
++    const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'GB' });
++    const r = buildMonthlyEmissions(inv([blocked], 2025), deps, 'AR6');
++    expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toHaveLength(1);
++    expect(r.slices).toEqual([]);
++    expect(r.skipped).toContainEqual({ fuelType: 'all', document_type: 'all', reason: 'location excluded: unpriceable' });
++  });
++
++  it('slices carry their location id, for matching by location', () => {
++    const { slices } = buildMonthlyEmissions(inv([site([gdoc('a', gas(100, ...month(2025, 1)))], { id: 'site-7' })], 2025), deps, 'AR6');
++    expect(slices.every(s => s.location_id === 'site-7')).toBe(true);
++  });
++
++  describe('the identity: Σ slices = Σ counted contributions = annual before the gross-up', () => {
++    const extrap = (o: Partial<CoverageResolution> = {}): CoverageResolution => ({ locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate',
++      monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z', ...o });
++    const halfYear = () => site(Array.from({ length: 6 }, (_, k) => gdoc(`m${k}`, gas(100, ...month(2025, k + 1)))));
++
++    it('six months evidenced, grossed up ×12/6: slices hold the six, never the gross-up', () => {
++      const i = inv([halfYear()], 2025, 12, [extrap()]);
++      const { slices } = buildMonthlyEmissions(i, deps, 'AR6');
++      expect(deriveLocations(i)[0].natural_gas_amount, 'annual is grossed up').toBe(1200);
++      expect(sum(slices, s => s.activity_value as number), 'monthly is not').toBeCloseTo(600, 6);
++      const [f] = emissionsByLocationField(i, 'AR6');
++      expect(sum(slices, s => s.tco2e)).toBeCloseTo(f.annual - f.estimated, 4);
++      expect(new Set(slices.map(s => s.period_month)).size).toBe(6);
++    });
++
++    it('Σ slice activity equals Σ counted contributions, bill by bill, including a prorated one', () => {
++      const l = site([gdoc('s', gas(310, '2024-12-20', '2025-01-19')), gdoc('f', gas(280, ...month(2025, 2))), gdoc('o', gas(90, ...month(2024, 6)))]);
++      const counted = billContributions(l, [], periodFromYearAndEnd(2025, 12)).filter(c => c.counted);
++      const { slices } = buildMonthlyEmissions(inv([l], 2025), deps, 'AR6');
++      expect(sum(slices, s => s.activity_value as number)).toBeCloseTo(counted.reduce((a, c) => a + c.value * (c.share ?? 0), 0), 6);
++    });
++
++    it('guard: the monthly split never reads a gap estimate or an annual figure', () => {
++      const src = stripTsComments(readFileSync(join(__dirname, 'monthlyEmissions.ts'), 'utf8'));
++      const start = src.indexOf('export function buildMonthlyEmissions(');
++      const body = src.slice(start, src.indexOf('\n}\n', start));
++      for (const banned of ['monthsCovered', 'extrapolate', 'applyResolutions', 'emissionsByLocationField', 'pctEstimated', '_amount', 'electricity_kwh']) {
++        expect(body, banned).not.toContain(banned);
++      }
++    });
++  });
++
++  describe('reconcile by location and fuel', () => {
++    const report = (i: ReturnType<typeof inv>) => reconcile(buildMonthlyEmissions(i, deps, 'AR6').slices, i, 'AR6');
++
++    it('Scenario A reconciles with delta 0 in FY2025 and FY2026', () => {
++      for (const y of [2025, 2026]) {
++        const r = report(inv([scenarioA()], y));
++        expect(r.reconciles, `FY${y}`).toBe(true);
++        expect(r.unexplained_delta, `FY${y}`).toBe(0);
++        expect(r.months_evidenced, `FY${y}`).toBe(1);
++      }
++    });
++
++    it('two sites, gas and electricity, one extrapolated: every group reconciles, delta 0', () => {
++      const a = site(Array.from({ length: 6 }, (_, k) => gdoc(`a${k}`, gas(100, ...month(2025, k + 1)))), { id: 'A', name: 'Site A', grid_region: 'US_CA' });
++      a.source_docs.push(doc('utility_electricity', [elec(5000, '2025-01-01', '2025-12-31')], 'ae'));
++      const b = site([gdoc('b1', gas(310, '2024-12-20', '2025-01-19')), gdoc('b2', gas(400, '2025-01-20', '2025-12-31'))], { id: 'B', name: 'Site B' });
++      const ex: CoverageResolution = { locId: 'A', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
++      const r = report(inv([a, b], 2025, 12, [ex]));
++      expect(r.groups.map(g => [g.location_id, g.fuel_type])).toEqual([['A', 'natural_gas'], ['A', 'electricity'], ['B', 'natural_gas']]);
++      expect(r.groups.every(g => g.unexplained === 0)).toBe(true);
++      expect(r.reconciles).toBe(true);
++      expect(r.unexplained_delta).toBe(0);
++      expect(r.groups.find(g => g.location_id === 'A' && g.fuel_type === 'natural_gas')!.estimated).toBeGreaterThan(0);
++    });
++
++    it('a March year end reconciles over its own window', () => {
++      const r = report(inv([site([gdoc('x', gas(310, '2025-03-15', '2025-04-14')), gdoc('y', gas(100, '2024-04-01', '2024-04-30'))])], 2025, 3));
++      expect(r.reconciles).toBe(true);
++      expect(r.unexplained_delta).toBe(0);
++    });
++
++    it('typed figures with no counted bill are not compared (no monthly basis)', () => {
++      const r = report(inv([site([gdoc('a', gas(100, ...month(2025, 1)))], { has_propane: true, propane_amount: 500 })], 2025));
++      expect(r.groups.map(g => g.fuel_type)).toEqual(['natural_gas']);
++      expect(r.reconciles).toBe(true);
++    });
++
++    it('slices for a location that has no counted bill do not reconcile (compared against 0)', () => {
++      const withBill = inv([site([gdoc('a', gas(100, ...month(2025, 1)))])], 2025);
++      const without = inv([site([])], 2025);
++      const r = reconcile(buildMonthlyEmissions(withBill, deps, 'AR6').slices, without, 'AR6');
++      expect(r.reconciles).toBe(false);
++    });
++  });
++});
++
++// ── T6 ruling: confirmed bills under a "uses this fuel" switch that is off ─────────────────────────────
++describe('T6 stream_off: a switched-off field with confirmed bills is never silently dropped', () => {
++  const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
++  const lastDay = (m: number) => new Date(2025, m, 0).getDate();
++  const bill = (k: number, o: Partial<ExtractedProposal> = {}) => doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 100, unit: 'mcf',
++    periodStart: `2025-${String(k).padStart(2, '0')}-01`, periodEnd: `2025-${String(k).padStart(2, '0')}-${lastDay(k)}`, ...o })], `g${k}`);
++  const siteA = (hasGas: boolean, o: Partial<ExtractedProposal> = {}) =>
++    loc({ name: 'Site A', has_natural_gas: hasGas, natural_gas_unit: 'mcf', source_docs: [bill(1, o), bill(2, o), bill(3, o)] });
++  const inv = (l: Location) => ({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] });
++  const offIssues = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => i.status === 'stream_off');
++
++  it('raises an issue naming the site, the fuel and the number of confirmed bills', () => {
++    expect(offIssues(siteA(false))).toEqual([{ locId: 'L1', fuelType: 'natural_gas', status: 'stream_off', docIds: ['g1', 'g2', 'g3'],
++      message: 'Site A is marked as not using natural gas, but 3 natural gas bills are confirmed. Turn natural gas on for this site, or reject the bills.' }]);
++  });
++
++  it('it is in the export-blocking list (conciergeReady requires that list to be empty)', () => {
++    expect(findUnresolvedCoverage([siteA(false)], 2025, 12, []).length).toBeGreaterThan(0);
++  });
++
++  it('singular wording for one bill, and a vehicle stream uses its own verb', () => {
++    const one = loc({ name: 'Depot', has_natural_gas: false, source_docs: [bill(1)] });
++    expect(offIssues(one)[0].message).toBe('Depot is marked as not using natural gas, but 1 natural gas bill is confirmed. Turn natural gas on for this site, or reject the bill.');
++    const fleet = loc({ name: 'Depot', has_mobile: false, source_docs: [doc('fleet_fuel', [prop({ fuelType: 'gasoline', value: 50, unit: 'gallons',
++      periodStart: '2025-01-01', periodEnd: '2025-01-31' })], 'f')] });
++    expect(offIssues(fleet)[0].message).toBe('Depot is marked as not having company vehicles or mobile equipment, but 1 gasoline bill is confirmed. Turn company vehicles or mobile equipment on for this site, or reject the bill.');
++  });
++
++  it('cleared by turning the switch on, or by rejecting the bills', () => {
++    expect(offIssues(siteA(true))).toEqual([]);
++    expect(offIssues(siteA(false, { status: 'rejected' }))).toEqual([]);
++  });
++
++  it('electricity has no switch and never raises it', () => {
++    const l = loc({ grid_region: 'US_CA', source_docs: [doc('utility_electricity', [prop({ fuelType: 'electricity', value: 900, unit: 'kwh',
++      periodStart: '2025-01-01', periodEnd: '2025-01-31' })], 'e')] });
++    expect(offIssues(l)).toEqual([]);
++  });
++
++  it('the monthly split writes nothing for the field and reports stream_off, matching the annual figure', () => {
++    const { slices, skipped } = buildMonthlyEmissions(inv(siteA(false)), deps, 'AR6');
++    expect(slices).toEqual([]);
++    expect(skipped.map(k => k.reason)).toEqual(['stream_off', 'stream_off', 'stream_off']);
++    expect(calcInventory(deriveLocations(inv(siteA(false))), 'AR6', 2025).s1_total).toBe(0);
++  });
++
++  it('reconcile reports zero with the switch off, and with it on', () => {
++    for (const on of [false, true]) {
++      const i = inv(siteA(on));
++      const r = reconcile(buildMonthlyEmissions(i, deps, 'AR6').slices, i, 'AR6');
++      expect(r.reconciles, `switch ${on}`).toBe(true);
++      expect(r.unexplained_delta, `switch ${on}`).toBe(0);
++    }
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 2b344b6..04bccd6 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -2843,64 +2843,86 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
+   return out
+ }
+ 
++// The fuel each emissions field belongs to, as slices and resolutions name it. Stationary and fleet
++// diesel share 'diesel' here; they stay apart as FIELDS wherever a figure is concerned (T5 ruling).
++const FIELD_FUEL: Record<string, string> = {
++  natural_gas_amount: 'natural_gas', propane_amount: 'propane', diesel_stationary_amount: 'diesel',
++  diesel_mobile_amount: 'diesel', gasoline_amount: 'gasoline', electricity_kwh: 'electricity',
++  fuel_oil_distillate_amount: 'fuel_oil_distillate', fuel_oil_residual_amount: 'fuel_oil_residual',
++}
++
+ /**
+- * Share of an inventory's Scope 1+2 tCO2e that is ESTIMATED rather than
+- * evidenced, 0-100. Derived from coverage resolutions, weighted by emissions —
+- * NOT by fuel count. A 91.7%-estimated gas figure on a location whose emissions
+- * are 95% electricity is not a 91.7%-estimated inventory.
+- *
+- * Returns null when nothing is estimated AND nothing was concierge-read
+- * (a wholly manual inventory has no evidence basis to measure against —
+- * null is an absence, not zero).
+- *
+- * Takes the inventory and derives its locations itself (T5), so the share is measured against the
+- * figures the totals are calculated on, never a stored field that may be stale.
++ * Per priced location and emissions field: the annual tCO2e (Scope 1, or Scope 2 location-based) and the
++ * part of it that is ESTIMATED by a gap gross-up. One implementation for pctEstimated and for the
++ * monthly reconcile (T6), so the share reported as estimated and the gap the reconciliation explains are
++ * the same number.
++ *   estimated = emissions × (derived figure − evidenced quantity) / derived figure
++ * where the evidenced quantity is Σ counted contributions' value × in-window share. applyResolutions has
++ * already grossed up each meter by its own coverage and matched each estimate to its document type, so
++ * the difference is exactly what was grossed up, per meter, per field (T5 ruling). Proration allocates
++ * real metered data, so a prorated field's evidenced quantity equals its figure.
++ * `documentBacked` is true when at least one counted bill backs the field; a typed figure is not.
++ * Unpriceable and refused locations are skipped, as calcInventory skips them.
+  */
+-export function pctEstimated(
++export interface FieldEmissions {
++  locId: string; field: string; fuelType: string; scope: 1 | 2
++  annual: number; estimated: number; documentBacked: boolean
++}
++export function emissionsByLocationField(
+   inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
+   gwpVersion: GwpVersion,
+-): number | null {
+-  // T5 ruling: each accepted gap gross-up counts only against its own meter's figure, and fuels shared
+-  // across document types (stationary and fleet diesel) are separate groups. Both follow from measuring
+-  // estimation per FIELD as (derived figure − evidenced quantity): applyResolutions has already grossed
+-  // up each meter by its own coverage and matched the estimate to its document type, so whatever was
+-  // grossed up, and only that, is the difference. Proration by billing days allocates real metered data,
+-  // so a prorated field's evidenced quantity equals its figure and it counts as 0% estimated. Legacy
+-  // 'straddle' and 'duplicate' resolutions are never accepted and change no figure.
+-  // Takes the inventory, not locations, so it derives the figures itself and the caller does no
+-  // arithmetic: a stale stored field cannot reach the share.
++): FieldEmissions[] {
+   const year = inventory.reporting_year
+   const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12)
+   const resolutions = inventory.coverage_resolutions ?? []
+-  const locations = deriveLocations(inventory)
+-  let estimated = 0
+-  for (const loc of locations) {
+-    // Excluded from the denominator by calcInventory below, so it must be excluded from the
+-    // numerator too — otherwise an unpriceable location's estimated share would be measured
+-    // against a total it is not part of.
++  const out: FieldEmissions[] = []
++  for (const loc of deriveLocations(inventory)) {
+     if (unpriceableReason(loc, gwpVersion, year)) continue
+     const evidenced: Record<string, number> = {}
+     for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
+       if (c.counted) evidenced[String(c.field)] = (evidenced[String(c.field)] ?? 0) + c.value * (c.share ?? 0)
+     }
+-    for (const [field, emissions] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year))) {
++    for (const [field, annual] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year))) {
+       const figure = (loc as unknown as Record<string, number>)[field]
+       const ev = evidenced[field]
+-      if (ev == null || !(figure > 0)) continue
+-      const grossedUp = figure - ev
++      const grossedUp = ev == null ? 0 : figure - ev
+       // Summation order differs from applyResolutions' per-meter sums, so an unestimated field can
+       // differ from its evidence by rounding alone; that is not estimation.
+-      if (grossedUp <= figure * 1e-9) continue
+-      estimated += emissions * (grossedUp / figure)
++      const estimated = ev != null && figure > 0 && grossedUp > figure * 1e-9 ? annual * (grossedUp / figure) : 0
++      out.push({ locId: loc.id, field, fuelType: FIELD_FUEL[field] ?? field, scope: field === 'electricity_kwh' ? 2 : 1,
++        annual, estimated, documentBacked: ev != null })
+     }
+   }
++  return out
++}
++
++/**
++ * Share of an inventory's Scope 1+2 tCO2e that is ESTIMATED rather than
++ * evidenced, 0-100. Derived from coverage resolutions, weighted by emissions —
++ * NOT by fuel count. A 91.7%-estimated gas figure on a location whose emissions
++ * are 95% electricity is not a 91.7%-estimated inventory.
++ *
++ * Returns null when nothing is estimated AND nothing was concierge-read
++ * (a wholly manual inventory has no evidence basis to measure against —
++ * null is an absence, not zero).
++ *
++ * Takes the inventory and derives its locations itself (T5), so the share is measured against the
++ * figures the totals are calculated on, never a stored field that may be stale. Per meter and per field
++ * by construction: see emissionsByLocationField.
++ */
++export function pctEstimated(
++  inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
++  gwpVersion: GwpVersion,
++): number | null {
++  const locations = deriveLocations(inventory)
++  const estimated = emissionsByLocationField(inventory, gwpVersion).reduce((a, f) => a + f.estimated, 0)
+   // A wholly manual inventory (no confirmed concierge proposal on any location) has no evidence
+   // basis to measure "estimated share" against — null is an absence, not a 0% claim.
+   const hasConciergeData = locations.some(loc =>
+     (loc.source_docs ?? []).some(d => (d.extracted ?? []).some(p => p.status === 'confirmed' && p.value != null)))
+   if (estimated <= 0 && !hasConciergeData) return null
+ 
+-  const inv = calcInventory(locations, gwpVersion, year)
++  const inv = calcInventory(locations, gwpVersion, inventory.reporting_year)
+   const total = inv.s1_total + inv.s2_location
+   if (total <= 0) return 0 // concierge data present but zero emissions → 0% estimated, not an absence
+   return (estimated / total) * 100
+@@ -3036,6 +3058,22 @@ export const COVERAGE_MESSAGE = {
+     `${fileA} and ${fileB} cover the same days (${from} to ${to}). Choose Same bill, count it once, or Different meters or accounts.`,
+   all_rejected: (fuel: string, site: string) =>
+     `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.`,
++  // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
++  stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
++    `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
++}
++
++// The "uses this fuel" switch behind each document-backed field (T6 ruling). calcLocation and buildWorkings
++// price a field only when its switch is on, so confirmed bills under a switch that is off would leave the
++// annual figure silently. Electricity has no switch.
++const FIELD_SWITCH: Partial<Record<keyof Location, keyof Location>> = {
++  natural_gas_amount: 'has_natural_gas', propane_amount: 'has_propane', diesel_stationary_amount: 'has_diesel_stationary',
++  diesel_mobile_amount: 'has_mobile', gasoline_amount: 'has_mobile',
++}
++/** True when the field has a "uses this fuel" switch and it is off, so the annual figure omits the field. */
++export function streamSwitchOff(loc: Location, field: keyof Location | string): boolean {
++  const sw = FIELD_SWITCH[field as keyof Location]
++  return sw != null && !(loc as unknown as Record<string, unknown>)[String(sw)]
+ }
+ 
+ // ── BILL CONTRIBUTIONS (docs/review/design-derived-figures.md, task T1) ─────────────────────────
+@@ -3843,7 +3881,7 @@ export interface CoverageIssue {
+   locId: string
+   fuelType: string
+   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
+-  // "no silent zero"), none (a document with nothing read from it, unchanged).
++  // "no silent zero"), stream_off (T6 ruling), none (a document with nothing read from it, unchanged).
+   status: string
+   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
+   docIds?: string[]
+@@ -3920,6 +3958,23 @@ export function findUnresolvedCoverage(
+         message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
+     }
+ 
++    // Confirmed bills under a "uses this fuel" switch that is off (T6 ruling). The annual figure omits a
++    // switched-off field, so without this the bills would vanish from every total with nothing said.
++    const confirmedByField = new Map<string, { fuelType: string; docIds: Set<string>; n: number }>()
++    loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
++      if (p.status !== 'confirmed' || p.value == null) return
++      const map = fieldFor(d.document_type, p.fuelType)
++      if (!map || !streamSwitchOff(loc, map.amount)) return
++      const e = confirmedByField.get(String(map.amount)) ?? { fuelType: p.fuelType, docIds: new Set(), n: 0 }
++      e.n += 1; e.docIds.add(d.id)
++      confirmedByField.set(String(map.amount), e)
++    }))
++    for (const [field, e] of confirmedByField) {
++      const meta = STREAM_META[FIELD_STREAM[field as keyof Location] as DeclarableStream]
++      out.push({ locId: loc.id, fuelType: e.fuelType, status: 'stream_off', docIds: [...e.docIds],
++        message: COVERAGE_MESSAGE.stream_off(site, meta.verb, meta.name, e.n, FUEL_NAME[e.fuelType] ?? e.fuelType) })
++    }
++
+     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
+     // (document_type, fuelType, meter_label). Same-bill exclusions, undated, invalid and mixed bills are
+     // not placed (each is reported above, or is a resolved overlap).
+diff --git a/lib/ghg/locationDelete.test.ts b/lib/ghg/locationDelete.test.ts
+index b4dedc4..9ed4dfd 100644
+--- a/lib/ghg/locationDelete.test.ts
++++ b/lib/ghg/locationDelete.test.ts
+@@ -334,10 +334,10 @@ describe('what a removal leaves in the database', () => {
+       source_docs: [doc('d2', 500)] as never })
+     const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion }
+ 
+-    const before = buildMonthlyEmissions([keep, gone], 2025, deps, 'AR6').slices
++    const before = buildMonthlyEmissions({ locations: [keep, gone], reporting_year: 2025 }, deps, 'AR6').slices
+     expect(before.some(s => s.location_name === 'Gone'), 'the fixture must produce rows for it').toBe(true)
+ 
+-    const after = buildMonthlyEmissions(editRows([keep, gone], { kind: 'remove', id: 'gone' }) as Location[], 2025, deps, 'AR6').slices
++    const after = buildMonthlyEmissions({ locations: editRows([keep, gone], { kind: 'remove', id: 'gone' }) as Location[], reporting_year: 2025 }, deps, 'AR6').slices
+     expect(after.some(s => s.location_name === 'Gone')).toBe(false)
+     expect(after.length, 'and the survivor keeps its own rows').toBeGreaterThan(0)
+   })
+diff --git a/lib/ghg/monthlyEmissions.ts b/lib/ghg/monthlyEmissions.ts
+index 58c7302..3348e9c 100644
+--- a/lib/ghg/monthlyEmissions.ts
++++ b/lib/ghg/monthlyEmissions.ts
+@@ -23,13 +23,32 @@
+  * with a timestamp. So on a 9/12 inventory monthly sums to 9/12 of annual. That
+  * divergence is CORRECT and is exactly what `reconcile` (below) models and explains.
+  *
+- * Skips any proposal that is not status==='confirmed', or has value==null, or
+- * has null/unparseable dates, or whose unit doesn't map to an EF key (skip +
+- * flag, never compute with a guessed factor).
++ * READS COUNTED CONTRIBUTIONS, IN-WINDOW ONLY (T6). Each slice comes from a bill the annual engine
++ * counts (billContributions: confirmed, dated, in the reporting window, not excluded as the same bill as
++ * another, not mixed units), and only the days of that bill INSIDE the reporting window are split into
++ * months. A bill outside the year, or the part of a straddling bill outside it, writes nothing. So for
++ * every location and fuel:
++ *   Σ slices = Σ counted contributions = the annual figure before the gap gross-up,
++ * and `reconcile` below checks exactly that, explaining any remaining difference by the gross-up.
++ *
++ * Uncounted bills write nothing; each is reported in `skipped` with its reason (a pending proposal is not
++ * reported: it is not yet a bill). A confirmed proposal with no value is reported too. A bill whose unit
++ * has no factor is skipped and reported, never computed with a guessed factor.
+  */
+ 
+-import { parseLocalDate, exclusiveEnd, countryRefusal } from "./engine";
+-import type { CoverageResolution } from "./engine";
++import {
++  parseLocalDate, countryRefusal, billContributions, acceptedResolutions, periodFromYearAndEnd,
++  deriveLocations, findUnpriceableLocations, emissionsByLocationField, streamSwitchOff,
++} from "./engine";
++import type { CoverageResolution, Location } from "./engine";
++
++/** The inventory fields the monthly split and the reconciliation read. */
++export interface MonthlyInventory {
++  locations: Location[];
++  reporting_year: number;
++  fiscal_year_end_month?: number;
++  coverage_resolutions?: CoverageResolution[];
++}
+ 
+ export type GwpVersion = "AR4" | "AR5" | "AR6";
+ 
+@@ -72,6 +91,9 @@ export interface InventoryLocationLike extends MonthlyLocation {
+ }
+ 
+ export interface MonthlySlice {
++  // In memory only: ghg_monthly_emissions has no location id column (the page maps each column by name).
++  // reconcile matches slices to locations by it; location_name is not unique.
++  location_id?: string;
+   period_month: string;      // 'YYYY-MM-01'
+   reporting_year: number;
+   scope: 1 | 2;
+@@ -99,10 +121,9 @@ export interface MonthlyResult {
+ }
+ 
+ // ---- date helpers (day-level, mirrors the coverage engine's approach) --------
+-// parseLocalDate + exclusiveEnd are imported from lib/ghg/engine (single source of
+-// truth). The engine's exclusiveEnd canonicalizes BOTH bill-end conventions; this
+-// module's old blind +1-day copy DISAGREED with it — a live bug — so importing the
+-// engine's version is the fix.
++// parseLocalDate is imported from lib/ghg/engine. Each bill's canonical end now arrives already
++// canonicalised on its contribution (periodEndExclusive, built by the engine's exclusiveEnd), so this
++// module no longer converts an end date itself — the one definition stays in the engine.
+ // daysBetween stays LOCAL and half-open on purpose: the engine's daysBetween is
+ // inclusive (+1 day) for coverage's inclusive ranges. This module prorates over the
+ // half-open span [start, exclusiveEnd), so it needs the exclusive day count; using
+@@ -159,20 +180,29 @@ function resolveBill(
+ }
+ 
+ /**
+- * Build monthly slices for one inventory. Pure: pass the live factor fns + the
+- * inventory's locations.  reportingYear is used for the grid factor lookup and
+- * stamped on each slice.
++ * Build monthly slices for one inventory. Pure: pass the live factor fns + the inventory. The reporting
++ * year picks the grid factor (as the annual engine does) and, with the year end, the window. Each slice
++ * is stamped with the calendar year of its month (design section 6), not the inventory's year.
+  */
+ export function buildMonthlyEmissions(
+-  locations: InventoryLocationLike[],
+-  reportingYear: number,
++  inventory: MonthlyInventory,
+   deps: MonthlyDeps,
+   gwp: GwpVersion = "AR6"
+ ): MonthlyResult {
+   const slices: MonthlySlice[] = [];
+   const skipped: SkippedBill[] = [];
++  const year = inventory.reporting_year;
++  const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12);
++  // The window as periodFromYearAndEnd returns it: `end` is the last day IN the year, so the exclusive
++  // boundary is end + 1 day. Same construction as billContributions.
++  const winStart = new Date(win.start.getFullYear(), win.start.getMonth(), win.start.getDate());
++  const winEndExcl = new Date(win.end.getFullYear(), win.end.getMonth(), win.end.getDate() + 1);
++  const resolutions = inventory.coverage_resolutions ?? [];
++  // The same location set as the annual totals: a location the totals exclude as unpriceable writes no
++  // monthly row either, judged on its derived figures as the totals are (T4).
++  const unpriceable = new Set(findUnpriceableLocations(deriveLocations(inventory), gwp, year).map(u => u.locId));
+ 
+-  for (const loc of locations) {
++  for (const loc of inventory.locations) {
+     // ⚠️ A LOCATION REFUSED FOR ITS COUNTRY CONTRIBUTES NO MONTHLY ROW AT ALL, AND THE FUEL GUARD
+     // BELOW IS NOT ENOUGH ON ITS OWN. Its fuel bills would already land in `skipped`, because
+     // pickEF returns a miss and calcGas throws inside the try. Its ELECTRICITY would not: that
+@@ -189,69 +219,83 @@ export function buildMonthlyEmissions(
+       skipped.push({ fuelType: "all", document_type: "all", reason: `location excluded: ${refusal.state}` });
+       continue;
+     }
+-    for (const doc of loc.source_docs ?? []) {
+-      for (const p of doc.extracted ?? []) {
+-        if (p.status !== "confirmed") continue;            // only confirmed bills persist
+-        if (p.value == null) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "no canonical value (needs_manual_review)" }); continue; }
+-        if (!p.periodStart || !p.periodEnd) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "missing bill dates" }); continue; }
+-
+-        const start = parseLocalDate(p.periodStart);
+-        const endIncl = parseLocalDate(p.periodEnd);
+-        if (!start || !endIncl) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "unparseable bill dates" }); continue; }
+-        const endExcl = exclusiveEnd(endIncl);
+-        const totalDays = daysBetween(start, endExcl);
+-        if (totalDays <= 0) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "non-positive date span" }); continue; }
+-
+-        const resolved = resolveBill(doc.document_type, p.fuelType, p.unit);
+-        if (!resolved) { skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `no EF mapping for (${doc.document_type}, ${p.fuelType}, ${p.unit ?? "—"})` }); continue; }
++    if (unpriceable.has(loc.id)) {
++      skipped.push({ fuelType: "all", document_type: "all", reason: "location excluded: unpriceable" });
++      continue;
++    }
++    // A confirmed proposal with no value has no contribution row (T1), so it is reported here.
++    for (const doc of loc.source_docs ?? []) for (const p of doc.extracted ?? []) {
++      if (p.status === "confirmed" && p.value == null) skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "no canonical value (needs_manual_review)" });
++    }
++    for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
++      const doc = loc.source_docs.find(d => d.id === c.docId)!;
++      if (!c.counted) {
++        if (c.reason !== "not_confirmed") skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `not counted: ${c.reason}` });
++        continue;
++      }
++      // The field's "uses this fuel" switch is off, so the annual figure omits it; the monthly split
++      // matches, and the export-blocking stream_off issue says why (T6 ruling).
++      if (streamSwitchOff(loc, c.field)) {
++        skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: "stream_off" });
++        continue;
++      }
++      const resolved = resolveBill(doc.document_type, c.fuelType, c.unit);
++      if (!resolved) { skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `no EF mapping for (${doc.document_type}, ${c.fuelType}, ${c.unit ?? "—"})` }); continue; }
+ 
+-        // total bill emissions, then prorate across months by day-fraction
+-        let billTotal: number;
+-        let efSource: string | null;
+-        if (resolved.kind === "electricity") {
+-          // Unresolved grid region → OMIT this electricity bill (no getGridFactor call, no US_AVG).
+-          if (!deps.isResolvedGridRegion(loc.grid_region ?? "")) {
+-            skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `unresolved grid region (${loc.grid_region ?? ""})` });
+-            continue;
+-          }
+-          const gf = deps.getGridFactor(loc.grid_region ?? "", reportingYear);
+-          billTotal = (p.value * gf.ef) / 1000;
+-          efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
+-        } else {
+-          // The refusal now comes from calcGas, not pickEF: pickEF returns a uniform "no factor"
+-          // marker for a key no table carries, and calcGas is what declines to price it. Guarding
+-          // only the lookup left the throw one line outside the catch — a dead guard and an escaped
+-          // error. Both calls sit inside, and an unpriceable bill lands in `skipped` where the
+-          // caller already reads it, rather than taking the whole monthly write down.
+-          try {
+-            const ef: EFFactor = deps.pickEF(loc, resolved.efKey);
+-            billTotal = deps.calcGas(ef, p.value, gwp).total;
+-          } catch (e) {
+-            skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });
+-            continue;
+-          }
+-          efSource = resolved.efKey;
++      // The whole bill's emissions; each month takes its days' fraction of it.
++      let billTotal: number;
++      let efSource: string | null;
++      if (resolved.kind === "electricity") {
++        // Unresolved grid region → OMIT this electricity bill (no getGridFactor call, no US_AVG).
++        if (!deps.isResolvedGridRegion(loc.grid_region ?? "")) {
++          skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `unresolved grid region (${loc.grid_region ?? ""})` });
++          continue;
+         }
+-
+-        const spans = monthSpans(start, endExcl);
+-        for (const s of spans) {
+-          const pct = s.days / totalDays;
+-          slices.push({
+-            period_month: s.key,
+-            reporting_year: s.year,
+-            scope: resolved.scope,
+-            location_name: loc.name ?? null,
+-            fuel_type: p.fuelType,
+-            activity_value: p.value != null ? +(p.value * pct).toFixed(6) : null,
+-            activity_unit: p.unit,
+-            tco2e: +(billTotal * pct).toFixed(6),
+-            gwp_version: gwp,
+-            ef_source: efSource,
+-            period_start: p.periodStart,
+-            period_end: p.periodEnd,
+-            pct_in_month: +pct.toFixed(6),
+-          });
++        const gf = deps.getGridFactor(loc.grid_region ?? "", year);
++        billTotal = (c.value * gf.ef) / 1000;
++        efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
++      } else {
++        // The refusal now comes from calcGas, not pickEF: pickEF returns a uniform "no factor"
++        // marker for a key no table carries, and calcGas is what declines to price it. Both calls
++        // sit inside the try, so an unpriceable bill lands in `skipped` where the caller already
++        // reads it, rather than taking the whole monthly write down.
++        try {
++          const ef: EFFactor = deps.pickEF(loc, resolved.efKey);
++          billTotal = deps.calcGas(ef, c.value, gwp).total;
++        } catch (e) {
++          skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });
++          continue;
+         }
++        efSource = resolved.efKey;
++      }
++
++      // IN-WINDOW DAYS ONLY. A counted bill always has a usable period (undated and invalid ones are
++      // never counted), and totalDays is its full span, so each month's fraction is of the whole bill and
++      // the in-window months sum to its share.
++      const start = parseLocalDate(c.periodStart as string);
++      const endExcl = parseLocalDate(c.periodEndExclusive as string);
++      const from = start > winStart ? start : winStart;
++      const to = endExcl < winEndExcl ? endExcl : winEndExcl;
++      const totalDays = c.totalDays as number;
++      const p = doc.extracted![c.proposalIndex];
++      for (const s of monthSpans(from, to)) {
++        const pct = s.days / totalDays;
++        slices.push({
++          location_id: loc.id,
++          period_month: s.key,
++          reporting_year: s.year,
++          scope: resolved.scope,
++          location_name: loc.name ?? null,
++          fuel_type: c.fuelType,
++          activity_value: +(c.value * pct).toFixed(6),
++          activity_unit: c.unit,
++          tco2e: +(billTotal * pct).toFixed(6),
++          gwp_version: gwp,
++          ef_source: efSource,
++          period_start: p.periodStart,
++          period_end: p.periodEnd,
++          pct_in_month: +pct.toFixed(6),
++        });
+       }
+     }
+   }
+@@ -259,72 +303,74 @@ export function buildMonthlyEmissions(
+   return { slices, skipped };
+ }
+ 
+-/** Sum evidenced monthly tco2e by scope for a reporting year. Private — the old exported
+- * `reconcileByScope` claimed the sum "should match the annual scope total within tolerance",
+- * which is FALSE whenever an extrapolation is on file (see the module header). `reconcile`
+- * below replaces that false equality with a completeness report that models the divergence. */
+-function sumByScope(slices: MonthlySlice[], year: number): { scope1: number; scope2: number } {
+-  let scope1 = 0, scope2 = 0;
+-  for (const s of slices) {
+-    if (s.reporting_year !== year) continue;
+-    if (s.scope === 1) scope1 += s.tco2e; else scope2 += s.tco2e;
+-  }
+-  return { scope1: +scope1.toFixed(4), scope2: +scope2.toFixed(4) };
+-}
+-
+ /**
+- * Completeness report reconciling evidenced monthly slices against the annual engine's figure.
+- * NOT an equality check — monthly is evidenced-only and annual is evidenced + estimated, so on any
+- * extrapolated inventory they legitimately differ. This models that expected divergence and reports
+- * only the REMAINING difference: a non-zero `unexplained_delta` is a genuine defect the trust check
+- * can finally fire on.
++ * Completeness report reconciling evidenced monthly slices against the annual engine's figure, BY
++ * LOCATION AND FUEL (T6). NOT an equality check — monthly is evidenced-only and annual is evidenced +
++ * estimated, so on any extrapolated inventory they legitimately differ. For each location and fuel with
++ * counted bills:
++ *   annual − Σ slices − the gross-up the engine estimated = 0
++ * and a non-zero remainder anywhere is a genuine defect. The annual figure and the estimate come from
++ * emissionsByLocationField, the same derivation pctEstimated reports, so the two cannot disagree.
++ * Typed figures with no counted bill (steam, refrigerants, a manual gas figure) have no monthly basis
++ * and are not compared; slices for a location and fuel with no counted bill are compared against 0.
+  */
++export interface ReconciliationGroup {
++  location_id: string;
++  fuel_type: string;
++  scope: 1 | 2;
++  annual: number;
++  evidenced: number;
++  estimated: number;
++  unexplained: number;
++}
+ export interface ReconciliationReport {
+-  scope1_evidenced: number;      // Σ monthly slices, scope 1, for `year`
+-  scope2_evidenced: number;      // Σ monthly slices, scope 2, for `year`
+-  scope1_annual: number;         // annual engine's Scope-1 figure (passed in)
+-  scope2_annual: number;         // annual engine's Scope-2 (location) figure (passed in)
+-  months_evidenced: number;      // distinct period_month values present in the year's slices
++  scope1_evidenced: number;      // Σ monthly slices, scope 1
++  scope2_evidenced: number;      // Σ monthly slices, scope 2
++  scope1_annual: number;         // annual Scope 1 of the fields with counted bills
++  scope2_annual: number;         // annual Scope 2 (location-based) of the fields with counted bills
++  months_evidenced: number;      // distinct period_month values present in the slices
+   months_in_period: number;      // 12, or the fiscal window's month count
+   pct_estimated: number;         // (annual − evidenced) / annual, as a percentage
+-  reconciles: boolean;           // TRUE iff the delta is fully explained by extrapolations on file
+-  unexplained_delta: number;     // (annual − evidenced) − Σ(expected gross-up). NON-ZERO ⇒ real bug.
++  reconciles: boolean;           // TRUE iff every group's remainder is within rounding
++  unexplained_delta: number;     // Σ group remainders. NON-ZERO ⇒ real bug.
++  groups: ReconciliationGroup[];
+   summary: string;
+ }
+ 
+ export function reconcile(
+   slices: MonthlySlice[],
+-  year: number,
+-  annual: { s1_total: number; s2_location: number },
+-  resolutions: CoverageResolution[],
++  inventory: MonthlyInventory,
++  gwp: GwpVersion = "AR6",
+   monthsInPeriod: number = 12
+ ): ReconciliationReport {
+-  const { scope1: scope1_evidenced, scope2: scope2_evidenced } = sumByScope(slices, year);
+-  const yearSlices = slices.filter(s => s.reporting_year === year);
++  const key = (loc: string, fuel: string) => `${loc}|${fuel}`;
++  const groups = new Map<string, ReconciliationGroup>();
++  const group = (loc: string, fuel: string, scope: 1 | 2) => {
++    const k = key(loc, fuel);
++    if (!groups.has(k)) groups.set(k, { location_id: loc, fuel_type: fuel, scope, annual: 0, evidenced: 0, estimated: 0, unexplained: 0 });
++    return groups.get(k)!;
++  };
++  for (const f of emissionsByLocationField(inventory, gwp)) {
++    if (!f.documentBacked) continue;
++    const g = group(f.locId, f.fuelType, f.scope);
++    g.annual += f.annual;
++    g.estimated += f.estimated;
++  }
++  for (const s of slices) group(s.location_id ?? "", s.fuel_type, s.scope).evidenced += s.tco2e;
+ 
+-  // Expected gross-up: the estimated (non-evidenced) portion the ANNUAL engine added for each
+-  // extrapolate resolution. applyResolutions grosses a fuel ×12/monthsCovered from its evidenced
+-  // bills, so annual_fuel = evidenced_fuel × 12/monthsCovered, and the estimated portion is
+-  //   annual_fuel × (1 − monthsCovered/12) = evidenced_fuel × (12 − monthsCovered)/monthsCovered.
+-  // We derive it from evidenced (the caller passes only aggregate annual, not per-fuel) — identical
+-  // by construction to the annual gross-up. A resolution is matched to its slices by fuel_type.
+-  let expected1 = 0, expected2 = 0;
+-  for (const r of resolutions) {
+-    if (r.kind !== "extrapolate" || !r.monthsCovered || r.monthsCovered <= 0 || r.monthsCovered >= 12) continue;
+-    const fuelSlices = yearSlices.filter(s => s.fuel_type === r.fuelType);
+-    if (fuelSlices.length === 0) continue; // nothing evidenced for this fuel → nothing to gross up
+-    const evidencedFuel = fuelSlices.reduce((a, s) => a + s.tco2e, 0);
+-    const grossUp = evidencedFuel * (12 - r.monthsCovered) / r.monthsCovered;
+-    if (fuelSlices[0].scope === 2) expected2 += grossUp; else expected1 += grossUp;
++  let scope1_evidenced = 0, scope2_evidenced = 0, scope1_annual = 0, scope2_annual = 0, unexplained = 0;
++  for (const g of groups.values()) {
++    g.unexplained = +(g.annual - g.evidenced - g.estimated).toFixed(4);
++    unexplained += g.unexplained;
++    if (g.scope === 2) { scope2_evidenced += g.evidenced; scope2_annual += g.annual; }
++    else { scope1_evidenced += g.evidenced; scope1_annual += g.annual; }
+   }
++  const unexplained_delta = +unexplained.toFixed(4);
++  const reconciles = [...groups.values()].every(g => Math.abs(g.unexplained) < 0.01); // rounding tolerance
+ 
+-  const annualTotal = annual.s1_total + annual.s2_location;
++  const months_evidenced = new Set(slices.map(s => s.period_month)).size;
++  const annualTotal = scope1_annual + scope2_annual;
+   const evidencedTotal = scope1_evidenced + scope2_evidenced;
+-  const expectedTotal = expected1 + expected2;
+-  const unexplained_delta = +((annualTotal - evidencedTotal) - expectedTotal).toFixed(4);
+-  const reconciles = Math.abs(unexplained_delta) < 0.01; // rounding tolerance
+-
+-  const months_evidenced = new Set(yearSlices.map(s => s.period_month)).size;
+   const pct_estimated = annualTotal > 0
+     ? +(((annualTotal - evidencedTotal) / annualTotal) * 100).toFixed(1)
+     : 0;
+@@ -334,9 +380,9 @@ export function reconcile(
+     : `⚠ Unexplained difference of ${unexplained_delta} mtCO₂e between monthly and annual. This is not accounted for by any acknowledged coverage gap.`;
+ 
+   return {
+-    scope1_evidenced, scope2_evidenced,
+-    scope1_annual: annual.s1_total, scope2_annual: annual.s2_location,
++    scope1_evidenced: +scope1_evidenced.toFixed(4), scope2_evidenced: +scope2_evidenced.toFixed(4),
++    scope1_annual, scope2_annual,
+     months_evidenced, months_in_period: monthsInPeriod,
+-    pct_estimated, reconciles, unexplained_delta, summary,
++    pct_estimated, reconciles, unexplained_delta, groups: [...groups.values()], summary,
+   };
+ }
