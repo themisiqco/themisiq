@@ -1,0 +1,1118 @@
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 155c353..b82d48c 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -1,6 +1,6 @@
+ 'use client'
+ 
+-import { useState, useEffect, useRef, Suspense } from 'react'
++import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
+ import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
+ import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
+ import { editRows } from '../../../lib/rowList'
+@@ -11,7 +11,7 @@ import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
+ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
+ import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
+ import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
+-import { factorEditionsForSave } from '../../../lib/ghg/factorEditions'
++import { figuresForSave } from '../../../lib/ghg/savePayload'
+ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
+ import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
+ import type { YearDataStatus } from '../../../lib/ghg/series'
+@@ -29,8 +29,8 @@ import {
+   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
+   detectGridRegion, gridRegionForCountry, pickEF,
+   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
+-  calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation, pctEstimated,
+-  applyResolutions, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
++  calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
++  deriveLocations, deriveStoredLocations, documentsBacking, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+   streamState, DECLARABLE_STREAMS,
+   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
+   findSteamFactorGaps, steamFactorFor,
+@@ -546,6 +546,23 @@ function LockedDocUpload({ label }: { label: string }) {
+     </div>
+   )
+ }
++// A FIGURE BACKED BY DOCUMENTS IS SHOWN, NOT TYPED (section 3.3, T7 ruling). When a field has confirmed or
++// pending bills, deriveLocations works its figure out from them and nothing typed here would count, so the
++// input is read-only and says where the figure comes from. Switching such a field to a typed figure, with a
++// reason, is T10. A field with no backing documents is the customer's to type, as before.
++function FigureInput({ loc, field, onChange, style }: { loc: Location; field: keyof Location; onChange: (v: number) => void; style: React.CSSProperties }) {
++  const n = documentsBacking(loc, field)
++  const value = (loc as unknown as Record<string, number>)[String(field)]
++  const { flex, ...inputOwn } = style
++  if (n === 0) return <input type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
++  return (
++    <div style={flex != null ? { flex } : undefined}>
++      <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
++      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>From {n} document{n === 1 ? '' : 's'}</div>
++    </div>
++  )
++}
++
+ function GHGPage() {
+   const [step, setStep] = useState(0)
+   /** Why an ?id= in the URL did not open, or null. Set by the load effect, shown above the page. */
+@@ -766,7 +783,7 @@ const searchParams = useSearchParams()
+     const priorReportingYear = inventory.reporting_year - 1
+     supabase
+       .from('ghg_inventories')
+-      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach')
++      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions')
+       .eq('company_id', companyId)
+       .eq('reporting_year', priorReportingYear)
+       .limit(2)
+@@ -784,14 +801,18 @@ const searchParams = useSearchParams()
+           workings: unknown; locations_data: unknown
+           scope1_total: number | null; scope2_location_total: number | null
+           boundary_approach: string | null
++          reporting_year: number; fiscal_year_end_month: number | null; coverage_resolutions: unknown
+         }
++        // DERIVED FIRST (T7): locations_data is saved raw, so a figure that comes from bills would read
++        // as 0, and fuelTypesPresent would drop electricity or vehicle fuel that the year did have.
++        const priorLocations = deriveStoredLocations(row)
+         // The one verdict on whether a stored total is complete, imported rather than reimplemented.
+-        const verdict = assessCompleteness(row.workings, row.locations_data)
++        const verdict = assessCompleteness(row.workings, priorLocations, row.reporting_year)
+         // A summary needs readable location detail. Without it there is nothing to compare, and a
+         // count of 0 would render as "your inventory went from 0 locations to 6" — a structural
+         // claim about a year we cannot read. Null instead: the module then withholds Tier B and
+         // records why, which is what assessCompleteness has already called 'unverifiable'.
+-        const locs = Array.isArray(row.locations_data) ? (row.locations_data as Location[]) : null
++        const locs = Array.isArray(priorLocations) ? (priorLocations as Location[]) : null
+         set({
+           status: 'found',
+           state: PRIOR_STATE_FROM_DATA_STATUS[verdict.dataStatus],
+@@ -1229,72 +1250,38 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+     if (lastSaveError.current) alert(locationDeleteSaveFailed(facts, lastSaveError.current))
+   }
+ 
+-  // Concierge: update one proposal, then recompute mapped inventory fields from ALL confirmed proposals at this location.
+-  // fuelType + docType -> field(s). Write = SUM of confirmed proposals mapping to that field.
+-  // Mixed units for one field are NOT summed (would be wrong) -> those proposals flip to needs_manual_review.
++  // Concierge: update one proposal. NOTHING ELSE IS WRITTEN (T7). A document-backed figure is never stored:
++  // deriveLocations works it out from the documents on every render and every save, so removing a
++  // document, un-confirming or rejecting a proposal, or changing the year can no longer leave a stale
++  // figure behind. Mixed units are no longer flipped to needs_manual_review here: the export-blocking
++  // mixed_units coverage issue names the documents and says what to do (T3).
+   const updateProposal = (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => {
+     setInventory(inv => {
+       const locs = [...inv.locations]
+-
+-      // 1. Apply the patch to the target proposal.
+-      let docs = locs[locIdx].source_docs.map(d => {
+-        if (d.id !== docId || !d.extracted) return d
+-        return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p) }
+-      })
+-
+-      // 2. applyResolutions is the ONE implementation of what each field's figure is (shared with
+-      //    buildWorkings). It gathers confirmed proposals, sums, and applies any coverage resolution.
+-      const loc: any = { ...locs[locIdx], source_docs: docs }
+-      const win = periodFromYearAndEnd(inv.reporting_year, inv.fiscal_year_end_month)
+-      const applied = applyResolutions(loc, inv.coverage_resolutions ?? [], win.start, win.end)
+-
+-      // 3. Write each field. Mixed units -> don't write; flag those proposals for review.
+-      const flagged: { docId: string; pi: number }[] = []
+-      Object.values(applied).forEach(a => {
+-        if (a.mixedUnits) { flagged.push(...a.refs); return }
+-        loc[a.field] = a.value
+-        if (a.unitField && a.unit != null) loc[a.unitField] = a.unit
+-      })
+-
+-      // 4. If any field had mixed units, flip those proposals to needs_manual_review.
+-      if (flagged.length) {
+-        docs = docs.map(d => {
+-          if (!d.extracted) return d
+-          return { ...d, extracted: d.extracted.map((p, pi) => flagged.some(f => f.docId === d.id && f.pi === pi) ? { ...p, status: 'needs_manual_review' as ConciergeStatus } : p) }
+-        })
++      locs[locIdx] = {
++        ...locs[locIdx],
++        source_docs: locs[locIdx].source_docs.map(d => {
++          if (d.id !== docId || !d.extracted) return d
++          return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p) }
++        }),
+       }
+-
+-      loc.source_docs = docs
+-      locs[locIdx] = loc
+       return { ...inv, locations: locs }
+     })
+-    }
+-    // Write a coverage resolution (gap/overlap/straddle) onto the inventory. Re-resolving the
+-  // same fuel+location+kind overwrites the prior one. The extrapolation gross-up is applied
+-  // in updateProposal's field-write step; here we also nudge a re-derivation by re-confirming
+-  // an existing confirmed proposal so totals refresh immediately.
++  }
++  // Write a coverage resolution onto the inventory. Re-resolving the same fuel+location+kind overwrites the
++  // prior one (keyed by document and meter in T8). No figure is written (T7): the derived figures pick the
++  // resolution up on the next render.
+   const addCoverageResolution = (res: CoverageResolution) => {
+     setInventory(inv => {
+       const existing = (inv.coverage_resolutions ?? []).filter(
+         r => !(r.locId === res.locId && r.fuelType === res.fuelType && r.kind === res.kind))
+-      // Re-derive affected fields so an extrapolation applies right away. We recompute the
+-      // same byField sum used in updateProposal, now that the resolution is present.
+-      const resolutions = [...existing, res]
+-      const win = periodFromYearAndEnd(inv.reporting_year, inv.fiscal_year_end_month)
+-      const locs = inv.locations.map(loc => {
+-        if (loc.id !== res.locId) return loc
+-        const next: any = { ...loc }
+-        // Same single implementation as updateProposal — no copy-pasted gross-up logic.
+-        Object.values(applyResolutions(loc, resolutions, win.start, win.end)).forEach(a => {
+-          if (a.mixedUnits) return
+-          next[a.field] = a.value
+-          if (a.unitField && a.unit != null) next[a.unitField] = a.unit
+-        })
+-        return next
+-      })
+-      return { ...inv, coverage_resolutions: resolutions, locations: locs }
++      return { ...inv, coverage_resolutions: [...existing, res] }
+     })
+   }
++  // THE DERIVED LOCATIONS (T4, T7). Every figure on screen, every gate and every saved total reads these;
++  // inventory.locations holds only what the customer typed and the documents. Index-aligned with
++  // inventory.locations (deriveLocations maps in order), so derivedLocations[i] is inventory.locations[i].
++  const derivedLocations = useMemo(() => deriveLocations(inventory), [inventory])
+   const needsMarketBased = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
+   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
+   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
+@@ -1326,7 +1313,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // data or attestation, NOT acknowledgement (unlike a coverage gap). Gated at the same four sites as
+   // gridReady, with its own amber message; deliberately NOT gating the step-2 Continue.
+   // coverageResolutions: an accepted 'used_none' (T3) answers the declaration for its stream.
+-  const undeclaredStreams = findUndeclaredStreams(inventory.locations, coverageResolutions)
++  const undeclaredStreams = findUndeclaredStreams(derivedLocations, coverageResolutions)
+   const declarationsReady = undeclaredStreams.length === 0
+   // SPLIT BY WHY THE STREAM BLOCKS, because the two states need OPPOSITE instructions and one message
+   // cannot carry both. "Enter the data or attest absent" is right for a stream nobody was asked about
+@@ -1345,7 +1332,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // three, and calcInventory (called three times, one per basis) excludes the same locations each
+   // time. Running the probe per basis would triple a pure-arithmetic sweep to reach that same
+   // answer, and — worse — would invite a future reader to believe the sets could differ.
+-  const unpriceableLocations = findUnpriceableLocations(inventory.locations, 'AR6', inventory.reporting_year)
++  const unpriceableLocations = findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year)
+   const refusedLocations = unpriceableLocations.filter(u => u.kind === 'country')
+   const factorGapLocations = unpriceableLocations.filter(u => u.kind === 'factor')
+   // ⚠️ THE EXPORT GATE BLOCKS ONLY ON WHAT THE CUSTOMER CAN FIX, AND THAT IS NOT A RELAXATION.
+@@ -1367,7 +1354,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // Every publisher that priced anything in this inventory, in first-appearance order. The union of
+   // the per-location lists, so the checklist note and each location's own line cannot disagree.
+   const inventoryPublishers = [...new Set(
+-    inventory.locations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year)),
++    derivedLocations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year)),
+   )]
+   // One phrasing of "this total leaves something out", used at every site that shows a total.
+   // ⚠️ "we can't work out YET" IS TRUE OF A UNIT MISMATCH AND FALSE OF A COUNTRY WE HOLD NO FACTORS
+@@ -1393,7 +1380,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // factor (CA/AU/NZ/EU) and supplied no provider figure. Its steam contributes NOTHING to any total,
+   // so exporting would hand a verifier an assurance package whose Scope 2 is short by a stream the
+   // customer positively declared. The remedy is the supplier-factor field on the Energy & fuel step.
+-  const steamFactorGaps = findSteamFactorGaps(inventory.locations)
++  const steamFactorGaps = findSteamFactorGaps(derivedLocations)
+   const steamFactorsReady = steamFactorGaps.length === 0
+   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
+   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
+@@ -1427,7 +1414,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // Every surface below reads totals_ar6 directly; lib/ghg/gwpBasis.test.ts fails if a framework's gwp
+   // ever stops being AR6, because then these surfaces would label AR6 figures with another basis.
+   // The engine still computes on AR4 and AR5 (its GWP table and tests use them); only this page stopped.
+-  const totals_ar6 = calcInventory(inventory.locations, 'AR6', inventory.reporting_year)
++  const totals_ar6 = calcInventory(derivedLocations, 'AR6', inventory.reporting_year)
+ 
+   // Everything the comparability step hands forward. Assembled here rather than read out of
+   // scattered state at save time, so the write path takes FACTS and infers nothing.
+@@ -1441,7 +1428,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+       thisScope2: totals_ar6.s2_location,
+       priorYearState: priorYear.status === 'found' ? priorYear.state : 'not_stored',
+       priorSummary: priorYear.status === 'found' ? priorYear.summary : null,
+-      thisSummary: summarize(inventory.locations, inventory.boundary_approach),
++      thisSummary: summarize(derivedLocations, inventory.boundary_approach),
+     }),
+     /** The answer as captured when given, with the observation and basis of that moment. */
+     capture: comparabilityCapture,
+@@ -1607,6 +1594,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+       checkedAt: new Date().toISOString(),
+     })
+ 
++    // One derivation for every figure the save writes (T7): totals, workings, pct_estimated and
++    // factor_editions from derived locations, locations_data as edited. See lib/ghg/savePayload.ts.
++    const saved = figuresForSave(inventory, 'AR6')
+     const payload = {
+       user_id: session.user.id,
+       reporting_year: inventory.reporting_year,
+@@ -1629,14 +1619,19 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+       // fresh inventory is null anyway.
+       comparability_disclosure: comparabilityRecord ?? inventory.comparability_disclosure ?? null,
+       selected_frameworks: inventory.selected_frameworks,
+-      locations_data: inventory.locations,
++      // RAW, NOT DERIVED (T7 ruling): a document-backed field is never stored as a figure. Every reader
++      // re-derives it from the documents, so a stored figure is only ever one the customer typed.
++      locations_data: saved.locations_data,
+       coverage_resolutions: coverageResolutions,
+-      pct_estimated: pctEstimated(inventory, 'AR6'),
+-      scope1_total: totals_ar6.s1_total,
+-      scope2_location_total: totals_ar6.s2_location,
+-      scope2_market_total: totals_ar6.s2_market,
+-      scope1_intensity: inventory.revenue_millions > 0 ? totals_ar6.s1_total / inventory.revenue_millions : 0,
+-      scope2_intensity: inventory.revenue_millions > 0 ? totals_ar6.s2_location / inventory.revenue_millions : 0,
++      pct_estimated: saved.pct_estimated,
++      scope1_total: saved.totals.s1_total,
++      scope2_location_total: saved.totals.s2_location,
++      scope2_market_total: saved.totals.s2_market,
++      scope1_intensity: inventory.revenue_millions > 0 ? saved.totals.s1_total / inventory.revenue_millions : 0,
++      scope2_intensity: inventory.revenue_millions > 0 ? saved.totals.s2_location / inventory.revenue_millions : 0,
++      // 2 = figures derived from accepted documents at every save. The column must exist first:
++      // docs/review/patches/T7.sql, run BEFORE this code is deployed, or every save is refused.
++      derivation_version: saved.derivation_version,
+       gwp_version: 'AR6',
+       // Which factor editions priced the totals above. The electricity edition comes from
+       // getGridFactor().usedYear, NOT from the citation — EF_SOURCES.electricity_uk is deliberately
+@@ -1644,7 +1639,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+       // identically and usedYear is the only thing that tells the earlier inventory from the later.
+       // The stored map is passed as the fallback so a save that computes nothing (an inventory with
+       // no priced location yet) leaves an earlier record intact rather than erasing it to '{}'.
+-      factor_editions: factorEditionsForSave(inventory.locations, inventory.reporting_year, inventory.factor_editions),
++      factor_editions: saved.factor_editions,
+       status: 'draft',
+ // ⚠️ THIS IS ALSO THE RECORD OF WHAT THE SAVED TOTALS LEFT OUT. scope1_total / scope2_* above are
+ // computed with unpriceable locations EXCLUDED, and buildWorkings emits one `declaration:
+@@ -1653,7 +1648,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+ // needed to record it. If that row is ever dropped from buildWorkings, these saved totals become
+ // silently short — the stored inventory would assert a company-wide figure that omits a site with
+ // nothing on the record saying so.
+-workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month),
++workings: saved.workings,
+       updated_at: new Date().toISOString(),
+     }
+     let savedId: string | null = inventoryId
+@@ -2061,7 +2056,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+   )
+ 
+   const renderStep2 = () => {
+-    const loc = inventory.locations[activeLocation]
++    // DERIVED (T7): document-backed figures come from the documents; every other field is exactly what was
++    // typed, because deriveLocations changes only document-backed fields. Edits still go to
++    // inventory.locations through updateLocation, by index.
++    const loc = derivedLocations[activeLocation]
+     // SEAM: calcLocation refuses an unpriceable location, and this is the step the customer is sent
+     // to in order to FIX one — so an unguarded call here takes down the only screen that can undo
+     // the problem. The blocking panel below replaces the live-results figures entirely.
+@@ -2111,11 +2109,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                     {ngUnitOptions(loc.country).map(([val, label]) => (
+-                      <button key={val} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
++                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+                   <Field label={`Total natural gas: ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
+-                    <input type="number" value={loc.natural_gas_amount || ''} onChange={e => updateLocation(activeLocation, 'natural_gas_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} style={inputStyle} />
+                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
+                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                         {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit)}
+@@ -2131,11 +2129,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                     {propaneUnitOptions(loc.country).map(([val, label]) => (
+-                      <button key={val} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
++                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
+-                    <input type="number" value={loc.propane_amount || ''} onChange={e => updateLocation(activeLocation, 'propane_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                 </div>
+@@ -2146,11 +2144,11 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                     {liquidUnitOptions(loc.country).map(([val, label]) => (
+-                      <button key={val} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
++                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
+-                    <input type="number" value={loc.diesel_stationary_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_stationary_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                 </div>
+@@ -2206,8 +2204,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
+                   <Field label={`Gasoline for company vehicles: ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
+                     <div style={{ display: 'flex', gap: 8 }}>
+-                      <input type="number" value={loc.gasoline_amount || ''} onChange={e => updateLocation(activeLocation, 'gasoline_amount', Number(e.target.value))} placeholder="0" style={{ ...inputStyle, flex: 1 }} />
+-                      <select value={loc.gasoline_unit} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
++                      <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} style={{ ...inputStyle, flex: 1 }} />
++                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                         {liquidUnitOptions(loc.country).map(([val, label]) => (
+                           <option key={val} value={val}>{label}</option>
+                         ))}
+@@ -2216,8 +2214,8 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+                   </Field>
+                   <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
+                     <div style={{ display: 'flex', gap: 8 }}>
+-                      <input type="number" value={loc.diesel_mobile_amount || ''} onChange={e => updateLocation(activeLocation, 'diesel_mobile_amount', Number(e.target.value))} placeholder="0" style={{ ...inputStyle, flex: 1 }} />
+-                      <select value={loc.diesel_mobile_unit} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
++                      <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} style={{ ...inputStyle, flex: 1 }} />
++                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                         {liquidUnitOptions(loc.country).map(([val, label]) => (
+                           <option key={val} value={val}>{label}</option>
+                         ))}
+@@ -2253,7 +2251,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
+               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
+                 <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
+-                  <input type="number" value={loc.electricity_kwh || ''} onChange={e => updateLocation(activeLocation, 'electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                  <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} style={inputStyle} />
+                 </Field>
+                 {validateElectricity(loc.electricity_kwh) && (
+                   <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+@@ -2512,10 +2510,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+             <div style={{ background: '#fff', border: '0.5px solid var(--color-brand-line)', borderRadius: 12, padding: '1.5rem' }}>
+               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>ESRS E1 / GRI 305: Market-based Scope 2</div>
+               <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require you to report Scope 2 on both a location-based AND market-based basis. Market-based Scope 2 subtracts electricity from renewable energy contracts (PPAs, RECs, green tariffs).</p>
+-              {inventory.locations.map((loc, i) => (
++              {derivedLocations.map((loc, i) => (
+                 <div key={loc.id} style={{ marginBottom: 14 }}>
+                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
+-                    <input type="number" value={loc.renewable_electricity_kwh || ''} onChange={e => updateLocation(i, 'renewable_electricity_kwh', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
+                 </div>
+@@ -2666,10 +2664,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+             // ONE derivation. The tested engine builds every workings row (including Phase-3b declaration
+             // rows and the always-emitted market-based row); the screen just filters by location. The
+             // second, hand-rolled table derivation that used to live here is gone (Phase 4).
+-            const allRows = buildWorkings(inventory.locations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
++            const allRows = buildWorkings(derivedLocations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
+             // The licence attributions the cited sources require, from the SAME rows the tables render.
+             const attributions = sourceAttributionsFor(allRows.map(r => r.ef_source))
+-            return <>{inventory.locations.map((loc, i) => {
++            return <>{derivedLocations.map((loc, i) => {
+               // calcLocation is the SAME call that refuses an unpriceable location, so it must not
+               // run for one — this line is a second unguarded render-path crash site, not just the
+               // totals at the top of the component.
+@@ -3085,7 +3083,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+     // Per-location residual-mix citation for the PDF (only when a market-based framework is in scope).
+     const needsMkt = activeFrameworks.some(f => f.id === 'esrs' || f.id === 'gri')
+     const residualRows: string[][] = needsMkt
+-      ? inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
++      ? derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
+           const resRegion = residualRegionFor(l)
+           const res = getResidualFactor(resRegion, inventory.reporting_year, 'AR6')
+           return [
+@@ -3098,7 +3096,9 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+     // ⚠️ NOT `as any`. Every other argument here is cast, and that is why changing the audit
+     // parameter's TYPE did not break this call site on its own — `as any` defeats the check that
+     // would have caught it. This one argument is passed typed so the union actually binds.
+-    generateAssurancePDF(inventory as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
++    // DERIVED LOCATIONS (T7): the PDF's citations, exclusions and document index read the locations, and
++    // the citations choose publishers by which streams have figures, so it must see the derived ones.
++    generateAssurancePDF({ ...inventory, locations: derivedLocations } as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
+   }
+ 
+   const generateExport = async (frameworkId: string) => {
+@@ -3117,7 +3117,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+       ['Revenue (USD millions)', rev],
+       ...(emp > 0 ? [['Employees (FTE)', emp]] : []),
+       ['Boundary', inventory.boundary_approach.replace(/_/g, ' ')],
+-      ['Locations', inventory.locations.length],
++      ['Locations', derivedLocations.length],
+       [''],
+       ['RESULTS'],
+       // ⚠️ CSV_DP, IN EVERY FIGURE BELOW, AND THE SAME PRECISION IN THE LOCATION BREAKDOWN. A verifier
+@@ -3147,10 +3147,10 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+       ...(exclusionNote ? [['Excluded from the figures above', exclusionNote]] : []),
+       [''],
+       ['METHODS'],
+-      ...combustionSourcesFor(inventory.locations).map(src => ['Combustion factors', src]),
+-      ...gridSourcesFor(inventory.locations).map(src => ['Electricity factors', src]),
++      ...combustionSourcesFor(derivedLocations).map(src => ['Combustion factors', src]),
++      ...gridSourcesFor(derivedLocations).map(src => ['Electricity factors', src]),
+       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
+-      ...sourceAttributionsForLocations(inventory.locations).flatMap(a => [
++      ...sourceAttributionsForLocations(derivedLocations).flatMap(a => [
+         [`Licence attribution: ${a.publisher}`, a.attribution],
+         [`Licence: ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
+       ]),
+@@ -3159,7 +3159,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+       ...((fw.id === 'esrs' || fw.id === 'gri')
+         ? [
+             ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],
+-            ...inventory.locations.filter(l => l.electricity_kwh > 0).map(l => {
++            ...derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
+               const resRegion = residualRegionFor(l)
+               const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion)
+               return [`Residual factor: ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
+@@ -3178,7 +3178,7 @@ workings: buildWorkings(inventory.locations, 'AR6', inventory.reporting_year, co
+       // 'Note' column carries the same claim as the `declaration: 'unpriceable'` row buildWorkings
+       // writes, so the breakdown and the workings in the same export cannot disagree.
+       ['Location', 'Grid region', 'S1 Total', 'S2 Location', 'Note'],
+-      ...inventory.locations.map(loc => {
++      ...derivedLocations.map(loc => {
+         const blocked = unpriceableById.get(loc.id)
+         if (blocked) {
+           // ⚠️ 'Not quantified', THE SAME WORDS THE WORKINGS TABLE USES FOR THIS LOCATION'S RESULT.
+diff --git a/lib/ghg/combustionSources.test.ts b/lib/ghg/combustionSources.test.ts
+index aa9d392..7916fd0 100644
+--- a/lib/ghg/combustionSources.test.ts
++++ b/lib/ghg/combustionSources.test.ts
+@@ -112,10 +112,11 @@ describe('combustion citations follow the jurisdiction that priced them', () =>
+     // to compare, so this asserts the call, not a resemblance between two expressions. Previously the
+     // XLSX inlined `[...new Set(locations.map(combustionSource))]` and a test held the two in step;
+     // one helper each removes the thing that could drift.
++    // derivedLocations since T7: a figure from bills is on the derived locations, not the stored ones.
+     expect(lineIn(pageSrc, PAGE, "['Combustion factors', src]"))
+-      .toContain('combustionSourcesFor(inventory.locations)')
++      .toContain('combustionSourcesFor(derivedLocations)')
+     expect(lineIn(pageSrc, PAGE, "['Electricity factors', src]"))
+-      .toContain('gridSourcesFor(inventory.locations)')
++      .toContain('gridSourcesFor(derivedLocations)')
+     // Kept: the catalogue was the electricity row until this pass, and it must not come back.
+     expect(pageSrc, 'the catalogue must not be the XLSX electricity row again')
+       .not.toContain("['Electricity factors', EF_SOURCES.electricity]")
+diff --git a/lib/ghg/defraAttribution.test.ts b/lib/ghg/defraAttribution.test.ts
+index 93e7ec3..c4c0854 100644
+--- a/lib/ghg/defraAttribution.test.ts
++++ b/lib/ghg/defraAttribution.test.ts
+@@ -64,7 +64,10 @@ describe('DEFRA/DESNZ licence attribution', () => {
+     const ghg = read('app/dashboard/ghg/page.tsx')
+     expect(ghg, 'workings').toContain('sourceAttributionsFor(allRows.map(r => r.ef_source))')
+     expect(ghg, 'workings').toContain('<SourceAttributions attributions={attributions}')
+-    expect(ghg, 'framework CSV').toContain('...sourceAttributionsForLocations(inventory.locations).flatMap(a => [')
++    // derivedLocations since T7 (the CSV); the PDF still reads inventory.locations, which the page now
++    // passes as the derived locations.
++    expect(ghg, 'framework CSV').toContain('...sourceAttributionsForLocations(derivedLocations).flatMap(a => [')
++    expect(ghg, 'the PDF is given the derived locations').toContain('generateAssurancePDF({ ...inventory, locations: derivedLocations }')
+     expect(read('lib/assurancePdf.ts'), 'assurance PDF').toContain('...sourceAttributionsForLocations(inventory.locations).flatMap(a => [')
+     expect(read('app/verify/[token]/page.tsx'), 'verifier page').toContain('<SourceAttributions attributions={sourceAttributionsFor(inv.workings.map(factorSourceOf))}')
+     expect(read('app/methodology/page.tsx'), 'methodology').toContain('${DEFRA_DESNZ_PUBLICATION.attribution_required}')
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index e777df9..641a9c0 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -31,6 +31,7 @@ import {
+   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
+   deriveLocations,
+   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
++  documentsBacking, deriveStoredLocations,
+ } from './engine';
+ import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
+ import { NOT_PROVIDED } from '../notProvided';
+@@ -4490,3 +4491,39 @@ describe('T6 stream_off: a switched-off field with confirmed bills is never sile
+     }
+   });
+ });
++
++// ── T7: documentsBacking and deriveStoredLocations ───────────────────────────────────────────────────
++describe('T7 documentsBacking: the read-only rule for step-2 inputs', () => {
++  const g = (status: ExtractedProposal['status'], id: string, value: number | null = 100) =>
++    doc('utility_bill_gas', [prop({ status, value })], id);
++  it('counts documents with a confirmed or pending proposal with a value; not rejected, not valueless', () => {
++    const l = loc({ source_docs: [g('confirmed', 'a'), g('extracted', 'b'), g('needs_manual_review', 'c'), g('rejected', 'd'), g('confirmed', 'e', null)] });
++    expect(documentsBacking(l, 'natural_gas_amount')).toBe(3);
++    expect(documentsBacking(l, 'propane_amount')).toBe(0);
++  });
++  it('agrees with deriveLocations: backed means derived, unbacked means typed', () => {
++    for (const docs of [[g('confirmed', 'a')], [g('extracted', 'a')], [g('rejected', 'a')], []]) {
++      const l = loc({ has_natural_gas: true, natural_gas_amount: 777, source_docs: docs });
++      const derived = deriveLocations({ locations: [l], reporting_year: 2024 })[0].natural_gas_amount;
++      expect(documentsBacking(l, 'natural_gas_amount') > 0, JSON.stringify(docs.map(d => d.extracted![0].status))).toBe(derived !== 777);
++    }
++  });
++});
++
++describe('T7 deriveStoredLocations: readers of a stored row derive first', () => {
++  const row = (locations_data: unknown, o: Record<string, unknown> = {}) => ({ locations_data, reporting_year: 2024, fiscal_year_end_month: 12, coverage_resolutions: [], ...o });
++  it('derives a document-backed figure from a raw stored row, with the row\'s own year end and resolutions', () => {
++    const raw = [loc({ has_natural_gas: true, natural_gas_amount: 0, source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2024-04-01', periodEnd: '2024-04-30' })])] })];
++    expect((deriveStoredLocations(row(raw)) as Location[])[0].natural_gas_amount).toBe(100);
++    expect((deriveStoredLocations(row(raw, { fiscal_year_end_month: 3 })) as Location[])[0].natural_gas_amount, 'Apr 2024 is outside the year ending 31 Mar 2024').toBe(0);
++  });
++  it('passes a non-array through, so the reader reports "no location data" itself', () => {
++    for (const v of [null, undefined, {}, 'x']) expect(deriveStoredLocations(row(v))).toBe(v);
++  });
++  it('an old row without source_docs reads as having no documents; a malformed one is returned unchanged', () => {
++    const old = [{ ...loc({ natural_gas_amount: 50 }), source_docs: undefined }];
++    expect((deriveStoredLocations(row(old)) as Location[])[0].natural_gas_amount).toBe(50);
++    const bad = [{ ...loc({}), source_docs: [{ id: 'x', document_type: 'utility_bill_gas', extracted: 'not an array' }] }];
++    expect(deriveStoredLocations(row(bad))).toBe(bad);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 04bccd6..cc58247 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -3437,6 +3437,47 @@ export function deriveLocations(inventory: {
+   })
+ }
+ 
++/**
++ * deriveLocations for a STORED ghg_inventories row (T7). locations_data is saved RAW: a document-backed
++ * field holds only what was typed (usually 0), never its figure (T7 ruling). So every reader of a stored
++ * row that looks at a figure must derive first, or a figure that comes from bills reads as 0. Readers:
++ * the prior-year summary (GHG page) and the trends completeness check (lib/ghg/loadSeries.ts). Scope 3
++ * Cat 3 may not import the engine, so it reads priced streams from the saved workings instead
++ * (lib/scope3/cat3Inputs.ts).
++ * Returns the stored value unchanged when it is not an array, or when deriving throws on a malformed row,
++ * so each reader's own "no location data" or "cannot evaluate" handling still applies. An old row
++ * without source_docs on a location is read as having no documents.
++ */
++export function deriveStoredLocations(row: {
++  locations_data: unknown; reporting_year: number; fiscal_year_end_month?: number | null; coverage_resolutions?: unknown
++}): unknown {
++  if (!Array.isArray(row.locations_data)) return row.locations_data
++  try {
++    const locations = (row.locations_data as Location[]).map(l => ({ ...l, source_docs: Array.isArray(l?.source_docs) ? l.source_docs : [] }))
++    return deriveLocations({
++      locations, reporting_year: row.reporting_year, fiscal_year_end_month: row.fiscal_year_end_month ?? 12,
++      coverage_resolutions: Array.isArray(row.coverage_resolutions) ? row.coverage_resolutions as CoverageResolution[] : [],
++    })
++  } catch {
++    return row.locations_data
++  }
++}
++
++/**
++ * How many documents back a field, by the same rule deriveLocations uses (T4 ruling): a document counts
++ * when it holds a confirmed or pending proposal with a value for the field. A rejected proposal does not.
++ * Above 0, the field's figure is derived from its documents, so the page shows it read-only with "From N
++ * documents" (section 3.3, T7 ruling); at 0, the field is the customer's typed figure.
++ */
++export function documentsBacking(loc: Location, field: keyof Location): number {
++  const ids = new Set<string>()
++  loc.source_docs.forEach(d => d.extracted?.forEach(p => {
++    if (p.value == null || p.status === 'rejected') return
++    if (fieldFor(d.document_type, p.fuelType)?.amount === field) ids.add(d.id)
++  }))
++  return ids.size
++}
++
+ // Provenance stamp attached to a workings row so the verifier can trace a figure back to its bills.
+ // concierge = read verbatim off confirmed bills; concierge-extrapolated = grossed up for a coverage
+ // gap (number is estimated, quotes are the underlying bills); manual = not concierge-read.
+diff --git a/lib/ghg/factorEditions.test.ts b/lib/ghg/factorEditions.test.ts
+index 2d34275..06d6e48 100644
+--- a/lib/ghg/factorEditions.test.ts
++++ b/lib/ghg/factorEditions.test.ts
+@@ -407,13 +407,18 @@ describe('sameFactorEditions', () => {
+ // an inventory that predates the column. No error, no flag. Both halves are asserted from source
+ // because neither is reachable from a unit test.
+ describe('factor_editions survives the load-then-save round trip', () => {
++  // T7: the payload's figures come from figuresForSave (lib/ghg/savePayload.ts), one derivation for the
++  // totals, the workings and factor_editions. The page line reads its result; the call is pinned there.
+   it('F21 the save payload writes it, computed from the SAME locations and year as the totals', () => {
+-    const line = lineContaining('factor_editions: factorEditionsForSave')
+-    expect(line, 'the same locations that produced scope1_total').toContain('inventory.locations')
++    expect(lineContaining('factor_editions: saved.'), 'the payload reads the one derivation').toContain('factor_editions: saved.factor_editions,')
++    expect(lineContaining('scope1_total: saved.'), 'and so do the totals beside it').toContain('scope1_total: saved.totals.s1_total,')
++    const saveSrc = readFileSync(join(process.cwd(), 'lib/ghg/savePayload.ts'), 'utf8')
++    const line = saveSrc.split('\n').find(l => l.includes('factor_editions: factorEditionsForSave'))!
++    expect(line, 'the same derived locations that produce the totals').toContain('derived')
+     expect(line, 'the same year passed to buildWorkings — anything else records a calc never performed')
+       .toContain('inventory.reporting_year')
+     expect(line, 'the stored map must be offered as the fallback').toContain('inventory.factor_editions')
+-    expect(pageSrc).toContain("from '../../../lib/ghg/factorEditions'")
++    expect(saveSrc).toContain("from './factorEditions'")
+   })
+ 
+   it('F22 an empty recompute falls back to the stored map rather than erasing it', () => {
+@@ -455,7 +460,7 @@ describe('factor_editions survives the load-then-save round trip', () => {
+       'prior_year_s1:', 'prior_year_s2:', 'comparability_disclosure:', 'selected_frameworks:',
+       'locations_data:', 'coverage_resolutions:', 'pct_estimated:', 'scope1_total:',
+       'scope2_location_total:', 'scope2_market_total:', 'scope1_intensity:', 'scope2_intensity:',
+-      'gwp_version:', 'status:', 'workings:', 'updated_at:',
++      'gwp_version:', 'status:', 'workings:', 'updated_at:', 'derivation_version:',
+     ]
+     for (const k of REQUIRED) expect(block, `payload key ${k} was dropped`).toContain(k)
+     expect(block).toContain('factor_editions:')
+@@ -464,7 +469,8 @@ describe('factor_editions survives the load-then-save round trip', () => {
+     // [a-z0-9_] — the digits matter. Without them this misses scope1_total, scope2_location_total,
+     // scope2_market_total, both intensities and both prior_year_s* keys: seven of the twenty-six.
+     const keyCount = block.split('\n').filter(l => /^\s*[a-z0-9_]+:/.test(l)).length
+-    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(26)
++    // 27 since T7 added derivation_version.
++    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(27)
+   })
+ 
+   it('F25 scans a real file — a moved call site fails loudly instead of passing vacuously', () => {
+diff --git a/lib/ghg/loadSeries.ts b/lib/ghg/loadSeries.ts
+index e624329..e27b77c 100644
+--- a/lib/ghg/loadSeries.ts
++++ b/lib/ghg/loadSeries.ts
+@@ -25,7 +25,7 @@ import {
+   type YearDataStatus,
+   type YearExclusion,
+ } from "./series";
+-import { findUnpriceableLocations, type Location } from "./engine";
++import { findUnpriceableLocations, deriveStoredLocations, type Location } from "./engine";
+ import type { FactorEditions } from "./factorEditions";
+ import { anyPublishedFactorApplied } from "./factorEditions";
+ import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
+@@ -93,7 +93,7 @@ export interface Completeness {
+ // null total or a null company_id, and a dropped row is indistinguishable from an absent one. The
+ // whole point of the comparability step is to tell "no prior year" apart from "a prior year we
+ // cannot describe", so it fetches its one row itself and brings it here for the verdict.
+-export function assessCompleteness(workings: unknown, locationsData: unknown): Completeness {
++export function assessCompleteness(workings: unknown, locationsData: unknown, reportingYear: number): Completeness {
+   // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
+   if (Array.isArray(workings)) {
+     // ⚠️ MATCHES ALL FOUR EXCLUSION MARKERS. Filtering on "unpriceable" alone would let a year
+@@ -130,7 +130,9 @@ export function assessCompleteness(workings: unknown, locationsData: unknown): C
+     };
+   }
+   try {
+-    const unpriceable = findUnpriceableLocations(locationsData as Location[]);
++    // The row's own year (T7 revision): the check is "can this year be priced with today's tables", and
++    // the tables are looked up by reporting year. Called without it, every year was checked as 2024.
++    const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear);
+     if (unpriceable.length > 0) {
+       const names = unpriceable.map((u) => u.locName).join(", ");
+       return {
+@@ -189,6 +191,9 @@ interface RawRow {
+   // Both jsonb. Needed to qualify the totals above — see assessCompleteness.
+   workings: unknown;
+   locations_data: unknown;
++  // locations_data is saved raw (T7), so the figures are derived from it with these before it is read.
++  fiscal_year_end_month: number | null;
++  coverage_resolutions: unknown;
+ }
+ 
+ // ⚠️ workings and locations_data are FULL jsonb columns, and the larger ones on this table.
+@@ -202,7 +207,7 @@ const SELECT =
+   // here: workings carries factor_vintage per grid row but nothing for combustion editions, and only
+   // for inventories saved since the provenance pass.
+   "factor_editions, " +
+-  "workings, locations_data, " +
++  "workings, locations_data, fiscal_year_end_month, coverage_resolutions, " +
+   // The total ALONE cannot say whether it covers two categories or fifteen, and it is read as a Scope 3
+   // baseline by the SBTi dashboard. The five coverage columns come with it, per inventory.
+   "scope3_inventories(total_scope3_tco2e, scope3_categories_relevant, scope3_categories_in_total, " +
+@@ -248,7 +253,8 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
+       const s3 = Array.isArray(r.scope3_inventories)
+         ? r.scope3_inventories[0]
+         : r.scope3_inventories;
+-      const completeness = assessCompleteness(r.workings, r.locations_data);
++      // Derived first (T7): locations_data is saved raw, so a figure from bills would otherwise read as 0.
++      const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year);
+       mapped.push({
+         ...completeness,
+         company_id: r.company_id,
+diff --git a/lib/scope3/cat3Inputs.test.ts b/lib/scope3/cat3Inputs.test.ts
+index 8f17208..0f1c079 100644
+--- a/lib/scope3/cat3Inputs.test.ts
++++ b/lib/scope3/cat3Inputs.test.ts
+@@ -323,3 +323,44 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
+       .toEqual(["import type { Cat3InputRow, Cat3Inputs, Cat3Stream } from './cat3Energy'"])
+   })
+ })
++
++// ── T7: locations_data is saved raw, so a figure from bills lives only in workings ────────────────────
++describe('Category 3 reads a bills-only stream as quantified from the priced workings row (T7)', () => {
++  const bill = (fuelType: string, document_type: string, value: number, unit: string, id: string) => ({
++    id, file_name: `${id}.pdf`, document_type, uploaded_at: '2026-06-01', file_path: `/${id}.pdf`,
++    extracted: [{ fuelType, rawValue: null, rawUnit: null, value, unit, periodStart: '2026-01-01', periodEnd: '2026-12-31',
++      confidence: 'high' as const, sourceQuote: 'q', notes: null, status: 'confirmed' as const }],
++  })
++  it('C3I-T7a electricity and gas from bills, stored as 0, are quantified, not undeclared or declared-unquantified', () => {
++    const raw = answered({ name: 'Site', country: 'GB', grid_region: 'UK', electricity_kwh: 0, has_natural_gas: true, natural_gas_amount: 0,
++      natural_gas_unit: 'kwh', source_docs: [bill('electricity', 'utility_electricity', 10_000, 'kwh', 'e'), bill('natural_gas', 'utility_bill_gas', 5_000, 'kwh', 'g')] as never },
++      ['electricity', 'natural_gas'])
++    const r = cat3InputsFrom(workingsOf([raw]), [raw])
++    expect(r.inputs!.declaration.undeclared).toEqual([])
++  })
++  it('C3I-T7b without a priced row the stored amount still decides, as before', () => {
++    const declaredEmpty = answered({ name: 'Site', country: 'GB', has_natural_gas: true, natural_gas_amount: 0 }, ['natural_gas', 'electricity'])
++    const r = cat3InputsFrom(workingsOf([declaredEmpty]), [declaredEmpty])
++    expect(r.inputs!.declaration.undeclared).toContain('natural_gas')
++  })
++})
++
++// ── T7 revision: a T5 zero row is not an unrecognised stream ───────────────────────────────────────────
++describe('Category 3 passes over a zero row (every bill outside the year) silently', () => {
++  it('C3I-T7c no "unrecognised stream" note; the declaration still reads as before', () => {
++    // workingsOf prices reporting year 2026; both gas bills are 2025, so every one is outside the year.
++    const bill = (id: string, m: string) => ({ id, file_name: `${id}.pdf`, document_type: 'utility_bill_gas', uploaded_at: '2026-06-01',
++      file_path: `/${id}.pdf`, extracted: [{ fuelType: 'natural_gas', rawValue: null, rawUnit: null, value: 500, unit: 'kwh',
++        periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-28`, confidence: 'high' as const, sourceQuote: 'q', notes: null, status: 'confirmed' as const }] })
++    const site = answered({ name: 'Site', country: 'GB', grid_region: 'UK', electricity_kwh: 1000, has_natural_gas: true, natural_gas_unit: 'kwh',
++      source_docs: [bill('g1', '03'), bill('g2', '04')] as never }, ['electricity', 'natural_gas'])
++    const workings = workingsOf([site]) as { gwp_basis?: string; declaration?: string; stream?: string }[]
++    expect(workings.filter(w => w.gwp_basis === 'all_bills_excluded'), 'the fixture produces a zero row').toHaveLength(1)
++    expect(workings.find(w => w.stream === 'natural_gas')?.declaration, 'and the declaration row beside it').toBe('declared_unquantified')
++    const r = cat3InputsFrom(workings, [site])
++    expect(r.skipped.filter(k => k.code === 'stream_not_recognised')).toEqual([])
++    // As before the zero row existed: gas is declared but carries no figure, so the category is withheld on it.
++    expect(r.inputs!.declaration.undeclared).toContain('natural_gas')
++    expect(r.undeclared_detail).toContainEqual({ location: 'Site', stream: 'natural_gas', state: 'declared_unquantified' })
++  })
++})
+diff --git a/lib/scope3/cat3Inputs.ts b/lib/scope3/cat3Inputs.ts
+index 256e425..6806c94 100644
+--- a/lib/scope3/cat3Inputs.ts
++++ b/lib/scope3/cat3Inputs.ts
+@@ -108,27 +108,34 @@ type DeclarableStream = typeof DECLARABLE_STREAMS[number]
+  * findUndeclaredStreams, engine.ts:3179-3191. Electricity has no checkbox, so its quantity is the only
+  * signal there is (the engine's own note at engine.ts:3118-3122).
+  */
+-function declaredAndQuantified(loc: Record<string, unknown>, s: DeclarableStream): [boolean, boolean] {
++// ⚠️ OR A PRICED WORKINGS ROW (T7). locations_data is saved raw since T7: a field whose figure comes from
++// bills holds only what was typed (usually 0), and the figure lives in workings. This module may not
++// import the engine to re-derive it, so a stream counts as quantified when its stored amount is above 0
++// (inventories saved before T7) OR the saved workings carry a priced row for that location and stream
++// (buildWorkings tags each priced row with its stream; declaration rows and the T5 zero rows are not
++// priced). Electricity has no checkbox, so a priced electricity row also declares it.
++function declaredAndQuantified(loc: Record<string, unknown>, s: DeclarableStream, priced: boolean): [boolean, boolean] {
++  const q = (stored: boolean) => stored || priced
+   switch (s) {
+-    case 'natural_gas': return [bool(loc.has_natural_gas), (num(loc.natural_gas_amount) ?? 0) > 0]
+-    case 'propane': return [bool(loc.has_propane), (num(loc.propane_amount) ?? 0) > 0]
+-    case 'diesel_stationary': return [bool(loc.has_diesel_stationary), (num(loc.diesel_stationary_amount) ?? 0) > 0]
+-    case 'fuel_oil_distillate': return [bool(loc.has_fuel_oil_distillate), (num(loc.fuel_oil_distillate_amount) ?? 0) > 0]
+-    case 'fuel_oil_residual': return [bool(loc.has_fuel_oil_residual), (num(loc.fuel_oil_residual_amount) ?? 0) > 0]
++    case 'natural_gas': return [bool(loc.has_natural_gas), q((num(loc.natural_gas_amount) ?? 0) > 0)]
++    case 'propane': return [bool(loc.has_propane), q((num(loc.propane_amount) ?? 0) > 0)]
++    case 'diesel_stationary': return [bool(loc.has_diesel_stationary), q((num(loc.diesel_stationary_amount) ?? 0) > 0)]
++    case 'fuel_oil_distillate': return [bool(loc.has_fuel_oil_distillate), q((num(loc.fuel_oil_distillate_amount) ?? 0) > 0)]
++    case 'fuel_oil_residual': return [bool(loc.has_fuel_oil_residual), q((num(loc.fuel_oil_residual_amount) ?? 0) > 0)]
+     case 'mobile': return [bool(loc.has_mobile),
+-      (num(loc.gasoline_amount) ?? 0) > 0 || (num(loc.diesel_mobile_amount) ?? 0) > 0]
++      q((num(loc.gasoline_amount) ?? 0) > 0 || (num(loc.diesel_mobile_amount) ?? 0) > 0)]
+     // Either refrigerant answer declares the stream; ammonia is declarable though never priced.
+     case 'refrigerants': return [bool(loc.has_hfc_refrigerants) || bool(loc.uses_ammonia),
+-      (num(loc.refrigerant_purchased_kg) ?? 0) > 0]
+-    case 'purchased_steam': return [bool(loc.has_purchased_steam), (num(loc.purchased_steam_mmbtu) ?? 0) > 0]
++      q((num(loc.refrigerant_purchased_kg) ?? 0) > 0)]
++    case 'purchased_steam': return [bool(loc.has_purchased_steam), q((num(loc.purchased_steam_mmbtu) ?? 0) > 0)]
+     case 'electricity': {
+-      const kwh = (num(loc.electricity_kwh) ?? 0) > 0
++      const kwh = q((num(loc.electricity_kwh) ?? 0) > 0)
+       return [kwh, kwh]
+     }
+   }
+ }
+ 
+-function declarationState(locations: Record<string, unknown>[]) {
++function declarationState(locations: Record<string, unknown>[], priced: Set<string>) {
+   const detail: Cat3InputsResult['undeclared_detail'] = []
+   for (const loc of locations) {
+     const attested = new Set(
+@@ -136,7 +143,7 @@ function declarationState(locations: Record<string, unknown>[]) {
+         .filter(isRecord).map(a => str(a.stream)),
+     )
+     for (const stream of DECLARABLE_STREAMS) {
+-      const [declared, quantified] = declaredAndQuantified(loc, stream)
++      const [declared, quantified] = declaredAndQuantified(loc, stream, priced.has(`${str(loc.name) || 'Location'}|${stream}`))
+       if (declared && quantified) continue                       // 'quantified': answered and supplied
+       const state = declared ? 'declared_unquantified' : 'undeclared'
+       // An attestation answers 'undeclared'. It does NOT answer 'declared_unquantified': a site cannot
+@@ -242,7 +249,11 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
+   if (readable.length === 0) return empty({ code: 'workings_shape_unreadable', rows: rows.length })
+ 
+   const countries = countryByName(locations)
+-  const { undeclared, detail } = declarationState(locations)
++  // Priced rows by location name and stream: the engine's own verdict at save, from derived figures (T7).
++  const priced = new Set(readable
++    .filter(r => typeof r.stream === 'string' && !('declaration' in r) && num(r.result_tco2e) !== null)
++    .map(r => `${str(r.location) || 'Location'}|${str(r.stream)}`))
++  const { undeclared, detail } = declarationState(locations, priced)
+   const skipped: Cat3Skipped[] = []
+   const inputRows: Cat3InputRow[] = []
+   const unresolved = new Set<string>()
+@@ -296,6 +307,10 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
+     // The declaration bookkeeping rows carry no activity: the declaration state is read from
+     // locations_data instead, so these are passed over without a skip entry of their own.
+     if (declaration !== '') continue
++    // A T5 zero row (every confirmed bill for the field outside the year, or the same bill as another):
++    // activity 0, deliberately untagged by stream, and its stream already has a declaration row. It
++    // prices nothing, so it is passed over silently; without this it read as an unrecognised stream.
++    if (str(r.gwp_basis) === 'all_bills_excluded') continue
+     if (scope === 3) continue                       // the NZ row, already held aside
+     // Coverage-resolution and other audit rows: scope 0, no activity, nothing to price.
+     if (scope !== 1 && scope !== 2) continue
+diff --git a/lib/vsme/b3Energy.ts b/lib/vsme/b3Energy.ts
+index 75e3b8e..ee2db52 100644
+--- a/lib/vsme/b3Energy.ts
++++ b/lib/vsme/b3Energy.ts
+@@ -101,6 +101,14 @@ function locationFuelMWh(loc: B3Location): number {
+ }
+ 
+ /**
++ * ⚠️ NOT SAFE ON A STORED ghg_inventories ROW SINCE T7. NOTHING CALLS THIS TODAY (only climateCore, which
++ * nothing calls), so this is a guard for whoever wires it up. After T7, locations_data is saved RAW: a
++ * field whose figure comes from bills (electricity_kwh, renewable_electricity_kwh, natural_gas_amount,
++ * propane_amount, diesel_*, gasoline_amount) holds only what was typed, usually 0, and the figure lives in
++ * the saved workings. Fed stored locations, this function returns 0 MWh for every bill-backed figure.
++ * Take the quantities from the saved workings' activity_data (as lib/scope3/cat3Inputs.ts does), or pass
++ * deriveStoredLocations(row) from lib/ghg/engine.ts if loading the engine is acceptable in that bundle.
++ *
+  * Aggregate all locations into the B3 energy block.
+  *
+  * Renewable scope note: renewable energy in this model = renewable electricity
+diff --git a/lib/ghg/savePayload.ts b/lib/ghg/savePayload.ts
+new file mode 100644
+index 0000000..8814ef0
+--- /dev/null
++++ b/lib/ghg/savePayload.ts
+@@ -0,0 +1,32 @@
++// lib/ghg/savePayload.ts
++//
++// THE FIGURES A SAVE WRITES, FROM ONE DERIVATION (T7). Pure: no React, no Supabase, no clock.
++//
++// Totals, workings, pct_estimated and factor_editions are all built from deriveLocations output, so the
++// saved totals equal the sum of the saved workings rows by construction. locations_data is the RAW
++// locations, as edited (T7 ruling): a document-backed field keeps whatever was typed (usually 0), never
++// the derived figure. Every reader re-derives on load, so a stored figure is only ever a typed one, which
++// is what deriveLocations' rule for all-rejected fields relies on (T4 ruling).
++//
++// derivation_version 2 marks figures derived from accepted documents at every save. The column is added
++// by docs/review/patches/T7.sql (supabase/migrations/20261002_ghg_derivation_version.sql), which must
++// exist in the database before this code saves, or the save is refused for an unknown column.
++
++import { deriveLocations, calcInventory, buildWorkings, pctEstimated, type Inventory, type GwpVersion } from './engine'
++import { factorEditionsForSave } from './factorEditions'
++
++export const DERIVATION_VERSION = 2
++
++export function figuresForSave(inventory: Inventory, gwpVersion: GwpVersion = 'AR6') {
++  const derived = deriveLocations(inventory)
++  const resolutions = inventory.coverage_resolutions ?? []
++  const totals = calcInventory(derived, gwpVersion, inventory.reporting_year)
++  return {
++    locations_data: inventory.locations,
++    totals,
++    workings: buildWorkings(derived, gwpVersion, inventory.reporting_year, resolutions, inventory.fiscal_year_end_month),
++    pct_estimated: pctEstimated(inventory, gwpVersion),
++    factor_editions: factorEditionsForSave(derived, inventory.reporting_year, inventory.factor_editions),
++    derivation_version: DERIVATION_VERSION,
++  }
++}
+diff --git a/lib/ghg/savePath.test.ts b/lib/ghg/savePath.test.ts
+new file mode 100644
+index 0000000..f7f0022
+--- /dev/null
++++ b/lib/ghg/savePath.test.ts
+@@ -0,0 +1,132 @@
++// lib/ghg/savePath.test.ts
++//
++// T7: the save writes figures derived from the documents, and never stores a document-backed figure.
++// docs/review/design-derived-figures.md section 11 T7 and the T7 rulings in section 10.
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { figuresForSave, DERIVATION_VERSION } from './savePayload'
++import {
++  emptyLocation, deriveLocations, pctEstimated, buildWorkings, calcInventory,
++  type Location, type Inventory, type SourceDoc, type ExtractedProposal, type CoverageResolution,
++} from './engine'
++import { stripTsComments } from '../testing/stripComments'
++
++const ROOT = process.cwd()
++const pageSrc = readFileSync(join(ROOT, 'app/dashboard/ghg/page.tsx'), 'utf8')
++const pageCode = stripTsComments(pageSrc)
++
++const prop = (o: Partial<ExtractedProposal>): ExtractedProposal => ({
++  fuelType: 'natural_gas', rawValue: null, rawUnit: null, value: 100, unit: 'mcf', periodStart: '2025-01-01',
++  periodEnd: '2025-01-31', confidence: 'high', sourceQuote: 'q', notes: null, status: 'confirmed', ...o,
++})
++const doc = (document_type: string, p: ExtractedProposal, id: string): SourceDoc =>
++  ({ id, file_name: `${id}.pdf`, document_type, uploaded_at: '2025-06-01', file_path: `/${id}.pdf`, extracted: [p] })
++const loc = (o: Partial<Location>): Location => ({ ...emptyLocation('L1', 'Site A'), ...o })
++const inv = (locations: Location[], o: Partial<Inventory> = {}): Inventory => ({
++  company_name: 'Acme', reporting_year: 2025, revenue_millions: 0, fiscal_year_end_month: 12, locations,
++  coverage_resolutions: [], ...o,
++} as unknown as Inventory)
++
++describe('T7 source guard: the page writes no document-backed figure', () => {
++  it('applyResolutions is not called or imported by the page', () => {
++    expect(pageCode).not.toMatch(/applyResolutions\s*\(/)
++    expect(pageCode).not.toMatch(/\bapplyResolutions\b/)
++  })
++  it('no field is assigned from a computed figure', () => {
++    expect(pageCode).not.toMatch(/\[a\.field\]\s*=/)
++    expect(pageCode).not.toMatch(/\[a\.unitField\]\s*=/)
++    expect(pageCode, 'the mixed-units flip to needs_manual_review is gone (the T3 issue replaces it)')
++      .not.toMatch(/status:\s*'needs_manual_review'\s*as ConciergeStatus/)
++  })
++  it('the payload is built from figuresForSave, with raw locations and derivation_version', () => {
++    expect(pageSrc).toContain('const saved = figuresForSave(inventory, \'AR6\')')
++    for (const line of ['locations_data: saved.locations_data,', 'workings: saved.workings,', 'pct_estimated: saved.pct_estimated,',
++      'scope1_total: saved.totals.s1_total,', 'factor_editions: saved.factor_editions,', 'derivation_version: saved.derivation_version,']) {
++      expect(pageSrc, line).toContain(line)
++    }
++  })
++  it('totals, gates and exports read the derived locations', () => {
++    for (const s of ['calcInventory(derivedLocations,', 'findUndeclaredStreams(derivedLocations,', 'findUnpriceableLocations(derivedLocations,',
++      'findSteamFactorGaps(derivedLocations)', 'buildWorkings(derivedLocations,', 'const loc = derivedLocations[activeLocation]',
++      'generateAssurancePDF({ ...inventory, locations: derivedLocations }']) {
++      expect(pageSrc, s).toContain(s)
++    }
++  })
++  it('every document-backed input goes through FigureInput', () => {
++    for (const f of ['natural_gas_amount', 'propane_amount', 'diesel_stationary_amount', 'gasoline_amount', 'diesel_mobile_amount', 'electricity_kwh', 'renewable_electricity_kwh']) {
++      expect(pageSrc, f).toContain(`<FigureInput loc={loc} field="${f}"`)
++      expect(pageCode, `${f}: no raw input left`).not.toMatch(new RegExp(`<input type="number" value=\\{loc\\.${f} \\|\\| ''\\}`))
++    }
++  })
++  it('the prior-year summary derives the stored row before reading it', () => {
++    expect(pageSrc).toContain("boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions')")
++    expect(pageSrc).toContain('const priorLocations = deriveStoredLocations(row)')
++    expect(pageSrc).toContain('assessCompleteness(row.workings, priorLocations, row.reporting_year)')
++  })
++  it('the trends completeness check derives the stored row before reading it', () => {
++    const series = readFileSync(join(ROOT, 'lib/ghg/loadSeries.ts'), 'utf8')
++    expect(series).toContain('"workings, locations_data, fiscal_year_end_month, coverage_resolutions, "')
++    expect(series).toContain('assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year)')
++  })
++})
++
++describe('T7 figuresForSave', () => {
++  const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 1, pctEstimated: 92,
++    note: '1 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' }
++  const fixtures: [string, Inventory][] = [
++    ['gas from one bill', inv([loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', prop({}), 'g')] })])],
++    ['gas grossed up, electricity typed', inv([loc({ has_natural_gas: true, grid_region: 'US_CA', electricity_kwh: 5000,
++      source_docs: [doc('utility_bill_gas', prop({}), 'g')] })], { coverage_resolutions: [extrap] } as Partial<Inventory>)],
++    ['stale stored figure, bill outside the year', inv([loc({ has_natural_gas: true, natural_gas_amount: 999,
++      source_docs: [doc('utility_bill_gas', prop({ periodStart: '2024-01-01', periodEnd: '2024-01-31' }), 'g')] })])],
++    ['two sites, March year end', inv([
++      loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', prop({ periodStart: '2024-06-01', periodEnd: '2024-06-30' }), 'g')] }),
++      loc({ id: 'L2', name: 'Site B', grid_region: 'US_CA', source_docs: [doc('utility_electricity', prop({ fuelType: 'electricity', value: 9000, unit: 'kwh' }), 'e')] }),
++    ], { fiscal_year_end_month: 3 } as Partial<Inventory>)],
++  ]
++
++  for (const [label, i] of fixtures) {
++    it(`${label}: saved totals equal the sum of the saved workings rows`, () => {
++      const f = figuresForSave(i, 'AR6')
++      type Row = { scope?: number; scope2_method?: string; stream?: string; result_tco2e?: number | null }
++      const rows = f.workings as Row[]
++      const sum = (p: (r: Row) => boolean) => rows.filter(r => typeof r.result_tco2e === 'number' && p(r)).reduce((a, r) => a + (r.result_tco2e as number), 0)
++      expect(sum(r => r.scope === 1)).toBeCloseTo(f.totals.s1_total, 9)
++      expect(sum(r => r.scope === 2 && r.scope2_method !== 'market-based')).toBeCloseTo(f.totals.s2_location, 9)
++      expect(sum(r => r.scope === 2 && (r.scope2_method === 'market-based' || r.stream === 'purchased_steam'))).toBeCloseTo(f.totals.s2_market, 9)
++    })
++  }
++
++  it('locations_data is the raw locations: a document-backed figure is never stored', () => {
++    const i = fixtures[0][1]
++    const f = figuresForSave(i, 'AR6')
++    expect(f.locations_data).toBe(i.locations)
++    expect(f.locations_data[0].natural_gas_amount, 'stored as typed (0), not the derived 100').toBe(0)
++    expect(deriveLocations(i)[0].natural_gas_amount).toBe(100)
++    expect(f.totals.s1_total).toBeGreaterThan(0)
++  })
++
++  it('every figure comes from the same derivation as the screen', () => {
++    const i = fixtures[1][1]
++    const f = figuresForSave(i, 'AR6')
++    expect(f.totals).toEqual(calcInventory(deriveLocations(i), 'AR6', 2025))
++    expect(f.workings).toEqual(buildWorkings(deriveLocations(i), 'AR6', 2025, i.coverage_resolutions ?? [], 12))
++    expect(f.pct_estimated).toBe(pctEstimated(i, 'AR6'))
++    expect(f.derivation_version).toBe(DERIVATION_VERSION)
++    expect(DERIVATION_VERSION).toBe(2)
++  })
++
++  it('a stale stored figure never reaches the saved totals', () => {
++    const f = figuresForSave(fixtures[2][1], 'AR6')
++    expect(f.totals.s1_total, 'the only bill is outside the year').toBe(0)
++  })
++
++  it('rejecting every bill after a save leaves no stale figure (the stored value was never the derived one)', () => {
++    const confirmed = fixtures[0][1]
++    const saved = figuresForSave(confirmed, 'AR6').locations_data
++    const reopened = inv(saved.map(l => ({ ...l, source_docs: l.source_docs.map(d => ({ ...d, extracted: d.extracted!.map(p => ({ ...p, status: 'rejected' as const })) })) })))
++    expect(figuresForSave(reopened, 'AR6').totals.s1_total).toBe(0)
++  })
++})
+diff --git a/lib/ghg/loadSeriesYear.test.ts b/lib/ghg/loadSeriesYear.test.ts
+new file mode 100644
+index 0000000..8da1ac2
+--- /dev/null
++++ b/lib/ghg/loadSeriesYear.test.ts
+@@ -0,0 +1,49 @@
++// lib/ghg/loadSeriesYear.test.ts
++//
++// T7 revision: assessCompleteness checks a stored year against THAT year's factor tables, not 2024's.
++//
++// ⚠️ WHY THIS SPIES ON THE CALL RATHER THAN COMPARING TWO VERDICTS. Today no pricing refusal depends on
++// the year: MissingEmissionFactorError comes only from pickEF, whose combustion tables have no year
++// dimension, and the year-keyed grid lookup never refuses. So a location unpriceable in one year is
++// unpriceable in every year, and no fixture can show the verdict moving. What can be shown is that the
++// row's own year is the one the check is run with, which is what decides the answer the day a
++// year-keyed table can refuse (factor-years branch, T3c).
++
++import { describe, it, expect, vi } from 'vitest'
++
++const calls: unknown[][] = []
++vi.mock('./engine', async (importOriginal) => {
++  const m = await importOriginal<typeof import('./engine')>()
++  return {
++    ...m,
++    findUnpriceableLocations: (...args: Parameters<typeof m.findUnpriceableLocations>) => {
++      calls.push(args)
++      return m.findUnpriceableLocations(...args)
++    },
++  }
++})
++
++// loadSeries creates the Supabase client at import; this test never queries, so the client is a stub.
++vi.mock('../supabase', () => ({ supabase: {} }))
++
++import { assessCompleteness } from './loadSeries'
++import { emptyLocation } from './engine'
++
++describe('assessCompleteness uses the row\'s own reporting year', () => {
++  it('re-checks an unmarked row with that year, not the 2024 default', () => {
++    const locs = [{ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' }]
++    for (const year of [2023, 2025, 2026]) {
++      calls.length = 0
++      expect(assessCompleteness([], locs, year).dataStatus, `${year}`).toBe('ok')
++      expect(calls).toHaveLength(1)
++      expect(calls[0][2], `${year}: the year the tables are looked up by`).toBe(year)
++    }
++  })
++
++  it('an unpriceable location is still caught, with the year passed through', () => {
++    const locs = [{ ...emptyLocation('L1', 'Site A'), country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }]
++    calls.length = 0
++    expect(assessCompleteness([], locs, 2025).dataStatus).toBe('unverifiable')
++    expect(calls[0][2]).toBe(2025)
++  })
++})
+diff --git a/supabase/migrations/20261002_ghg_derivation_version.sql b/supabase/migrations/20261002_ghg_derivation_version.sql
+new file mode 100644
+index 0000000..93ac264
+--- /dev/null
++++ b/supabase/migrations/20261002_ghg_derivation_version.sql
+@@ -0,0 +1,25 @@
++-- supabase/migrations/20261002_ghg_derivation_version.sql
++-- NOT RUN.
++--
++-- T7 (docs/review/design-derived-figures.md, section 11). Adds ghg_inventories.derivation_version.
++-- Written against db/dumps/schema_public_20261001_1057.sql, where the column does not exist.
++--
++-- RUN THIS BEFORE THE T7 CODE SAVES ANYTHING. The T7 save payload writes derivation_version; against a
++-- table without the column, PostgREST refuses the whole save (unknown column), so every save fails.
++-- Running it first is safe for the code already on main: main never names the column, an insert takes
++-- the default and an update leaves it alone.
++--
++-- No grant or policy change: an added column is covered by the table's existing grants and RLS policies.
++-- The audit trigger and enforce_ghg_location_allowance() fire on update and do not read this column.
++-- Idempotent (add column if not exists; comment on replaces the comment).
++
++begin;
++
++alter table public.ghg_inventories
++  add column if not exists derivation_version smallint not null default 2;
++
++comment on column public.ghg_inventories.derivation_version is
++  '2 = location figures derived from accepted documents through applyResolutions at every save. '
++  'No version 1 inventories exist (column added pre-launch).';
++
++commit;

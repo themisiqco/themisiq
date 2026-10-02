@@ -439,6 +439,8 @@ The tests are grouped by task in section 11. They include all of these:
 | T5: all-excluded field | A field whose confirmed bills are all silently excluded (`outside_year` or `same_bill_as`) gets a workings row with activity 0 and result 0 carrying its contributions, so a verifier sees which documents were excluded and why. It adds nothing to any total. |
 | T5: share cell | `workingsCells.ts` shows a bill's share as "12 of 31 days, ×0.387" when prorated and "31 of 31 days" when wholly inside the year, matching T2's proration note. An excluded bill shows "Not counted" (the reason says why); an undated or invalid-period bill shows "Not applicable". |
 | T6: switched-off field with confirmed bills | A field with confirmed bills whose "uses this fuel" switch is off (e.g. `has_natural_gas` false) is never silently dropped. It raises an export-blocking coverage issue, `stream_off`, naming the site, the fuel and the number of confirmed bills in plain language: "Site A is marked as not using natural gas, but 3 natural gas bills are confirmed. Turn natural gas on for this site, or reject the bills." The monthly split skips the field with reason `stream_off`, matching the annual figure, so `reconcile` reports zero. Cleared by turning the switch on or rejecting the bills. The T3 no-silent-zero property test covers it. |
+| T7: what the save stores | `locations_data` is saved RAW: a document-backed field keeps only what was typed (usually 0), never its derived figure. Totals, workings, `pct_estimated` and `factor_editions` are saved from derived locations (`figuresForSave`, lib/ghg/savePayload.ts). Every reader of a stored row that reads a figure derives first: the prior-year summary and the trends completeness check through `deriveStoredLocations`; Scope 3 Cat 3, which may not import the engine, reads a stream as quantified when the saved workings carry a priced row for it. |
+| T7: step-2 inputs | A field with confirmed or pending bills shows its derived figure read-only, "From N documents" (section 3.3), and its unit control is locked because the unit comes from the documents. Switching to a typed figure with a reason stays in T10. A field with no backing documents is editable as before. |
 | Merge set | derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8 (widened), T9 (widened), T12, T10. T11 and T13 follow on main. T8 and T9 are widened as described in section 11; T12 moves after T9, and T10 after T12. |
 | T3b: label forms | Replaces the proposed "YE" forms. Non-December year ends read "Apr 2024 to Mar 2025" in menus, tiles and headings; "2024–25" on chart axes only; "2024-04_to_2025-03" in filenames. December year ends read "2025" in all three. No "YE" or "FY" abbreviations in customer-facing labels. Running text keeps T3a's "the year ending 31 March 2025". |
 | T3b: SB 253 first-report window | From CARB's Final Regulation Order, Title 17 CCR §96076(c) (text in the T3b entry). The first report (due 10 November 2026) covers the fiscal year ending **after 1 February 2025 and on or before 1 February 2026**. A fiscal year ending on or before 1 February in a calendar year reports the year ending in that calendar year; one ending later reports the year ending in the previous calendar year. Optionally, the most recent preceding year may be reported where its data is available. Status: adopted by CARB (Executive Order R-26-006) and resubmitted to OAL on 21 September 2026; OAL approval not yet reached, so it carries the same 'proposed' handling as `SB253_DATE_STATUS`. |
@@ -1085,8 +1087,22 @@ supplies every year label below. Follows T3b on the same branch.
     `newer_version_exists` = (the hash of the live projection ≠ the pinned `snapshot_sha256`).
   - **Pre-flight and verify.** The RLS-on-new-table and grants pre-flight from the memory notes applies. Run a
     verify script after, in the house format (check_name, expected, actual, pass).
+  - **No bill-backed quantities from `locations_data` (T7 consequence).** Since T7, `locations_data` is saved
+    raw: a document-backed field holds only what was typed (usually 0), and the figure lives in `workings`.
+    The shared projection (`public.ghg_verifier_projection`, used by `get_verifier_inventory` and by the
+    snapshot) must therefore stop returning the document-backed quantity keys from each `locations_data`
+    element: `electricity_kwh`, `renewable_electricity_kwh`, `natural_gas_amount`, `propane_amount`,
+    `diesel_stationary_amount`, `diesel_mobile_amount` and `gasoline_amount` (the fields `fieldFor` maps
+    documents to). For example, rebuild the array with `jsonb_agg(elem - array[...])`. A verifier reads every
+    figure from `workings`; the verifier page already does, and uses `locations_data` only for names and
+    document paths. Typed-only figures (steam, refrigerants, fuel oil, biogenic) are also in `workings`.
 - **Tests:** snapshot reused on an unchanged projection; new `version_no` on change; pinned link keeps the old
   snapshot after a re-save; `newer_version_exists` true after a re-save; whitelist test covers the snapshot keys.
+  - **Projection carries no bill-backed quantity:** for an inventory whose figures come from bills, neither the
+    live projection nor a snapshot carries any of the seven keys above in any `locations_data` element, while
+    `name`, `country` and `source_docs` are still present. The whitelist test (lib/ghg/verifierWhitelist.test.ts)
+    asserts the seven keys are excluded, and a page test asserts the verifier page reads no quantity from
+    `locations_data`.
 - **Done:** a verifier link always shows the version it was issued against, and says when a newer one exists.
 
 ### T17. Assurance PDF: workings page, document index status, stored residual table

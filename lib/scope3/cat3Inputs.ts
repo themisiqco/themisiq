@@ -108,27 +108,34 @@ type DeclarableStream = typeof DECLARABLE_STREAMS[number]
  * findUndeclaredStreams, engine.ts:3179-3191. Electricity has no checkbox, so its quantity is the only
  * signal there is (the engine's own note at engine.ts:3118-3122).
  */
-function declaredAndQuantified(loc: Record<string, unknown>, s: DeclarableStream): [boolean, boolean] {
+// ⚠️ OR A PRICED WORKINGS ROW (T7). locations_data is saved raw since T7: a field whose figure comes from
+// bills holds only what was typed (usually 0), and the figure lives in workings. This module may not
+// import the engine to re-derive it, so a stream counts as quantified when its stored amount is above 0
+// (inventories saved before T7) OR the saved workings carry a priced row for that location and stream
+// (buildWorkings tags each priced row with its stream; declaration rows and the T5 zero rows are not
+// priced). Electricity has no checkbox, so a priced electricity row also declares it.
+function declaredAndQuantified(loc: Record<string, unknown>, s: DeclarableStream, priced: boolean): [boolean, boolean] {
+  const q = (stored: boolean) => stored || priced
   switch (s) {
-    case 'natural_gas': return [bool(loc.has_natural_gas), (num(loc.natural_gas_amount) ?? 0) > 0]
-    case 'propane': return [bool(loc.has_propane), (num(loc.propane_amount) ?? 0) > 0]
-    case 'diesel_stationary': return [bool(loc.has_diesel_stationary), (num(loc.diesel_stationary_amount) ?? 0) > 0]
-    case 'fuel_oil_distillate': return [bool(loc.has_fuel_oil_distillate), (num(loc.fuel_oil_distillate_amount) ?? 0) > 0]
-    case 'fuel_oil_residual': return [bool(loc.has_fuel_oil_residual), (num(loc.fuel_oil_residual_amount) ?? 0) > 0]
+    case 'natural_gas': return [bool(loc.has_natural_gas), q((num(loc.natural_gas_amount) ?? 0) > 0)]
+    case 'propane': return [bool(loc.has_propane), q((num(loc.propane_amount) ?? 0) > 0)]
+    case 'diesel_stationary': return [bool(loc.has_diesel_stationary), q((num(loc.diesel_stationary_amount) ?? 0) > 0)]
+    case 'fuel_oil_distillate': return [bool(loc.has_fuel_oil_distillate), q((num(loc.fuel_oil_distillate_amount) ?? 0) > 0)]
+    case 'fuel_oil_residual': return [bool(loc.has_fuel_oil_residual), q((num(loc.fuel_oil_residual_amount) ?? 0) > 0)]
     case 'mobile': return [bool(loc.has_mobile),
-      (num(loc.gasoline_amount) ?? 0) > 0 || (num(loc.diesel_mobile_amount) ?? 0) > 0]
+      q((num(loc.gasoline_amount) ?? 0) > 0 || (num(loc.diesel_mobile_amount) ?? 0) > 0)]
     // Either refrigerant answer declares the stream; ammonia is declarable though never priced.
     case 'refrigerants': return [bool(loc.has_hfc_refrigerants) || bool(loc.uses_ammonia),
-      (num(loc.refrigerant_purchased_kg) ?? 0) > 0]
-    case 'purchased_steam': return [bool(loc.has_purchased_steam), (num(loc.purchased_steam_mmbtu) ?? 0) > 0]
+      q((num(loc.refrigerant_purchased_kg) ?? 0) > 0)]
+    case 'purchased_steam': return [bool(loc.has_purchased_steam), q((num(loc.purchased_steam_mmbtu) ?? 0) > 0)]
     case 'electricity': {
-      const kwh = (num(loc.electricity_kwh) ?? 0) > 0
+      const kwh = q((num(loc.electricity_kwh) ?? 0) > 0)
       return [kwh, kwh]
     }
   }
 }
 
-function declarationState(locations: Record<string, unknown>[]) {
+function declarationState(locations: Record<string, unknown>[], priced: Set<string>) {
   const detail: Cat3InputsResult['undeclared_detail'] = []
   for (const loc of locations) {
     const attested = new Set(
@@ -136,7 +143,7 @@ function declarationState(locations: Record<string, unknown>[]) {
         .filter(isRecord).map(a => str(a.stream)),
     )
     for (const stream of DECLARABLE_STREAMS) {
-      const [declared, quantified] = declaredAndQuantified(loc, stream)
+      const [declared, quantified] = declaredAndQuantified(loc, stream, priced.has(`${str(loc.name) || 'Location'}|${stream}`))
       if (declared && quantified) continue                       // 'quantified': answered and supplied
       const state = declared ? 'declared_unquantified' : 'undeclared'
       // An attestation answers 'undeclared'. It does NOT answer 'declared_unquantified': a site cannot
@@ -242,7 +249,11 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
   if (readable.length === 0) return empty({ code: 'workings_shape_unreadable', rows: rows.length })
 
   const countries = countryByName(locations)
-  const { undeclared, detail } = declarationState(locations)
+  // Priced rows by location name and stream: the engine's own verdict at save, from derived figures (T7).
+  const priced = new Set(readable
+    .filter(r => typeof r.stream === 'string' && !('declaration' in r) && num(r.result_tco2e) !== null)
+    .map(r => `${str(r.location) || 'Location'}|${str(r.stream)}`))
+  const { undeclared, detail } = declarationState(locations, priced)
   const skipped: Cat3Skipped[] = []
   const inputRows: Cat3InputRow[] = []
   const unresolved = new Set<string>()
@@ -296,6 +307,10 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
     // The declaration bookkeeping rows carry no activity: the declaration state is read from
     // locations_data instead, so these are passed over without a skip entry of their own.
     if (declaration !== '') continue
+    // A T5 zero row (every confirmed bill for the field outside the year, or the same bill as another):
+    // activity 0, deliberately untagged by stream, and its stream already has a declaration row. It
+    // prices nothing, so it is passed over silently; without this it read as an unrecognised stream.
+    if (str(r.gwp_basis) === 'all_bills_excluded') continue
     if (scope === 3) continue                       // the NZ row, already held aside
     // Coverage-resolution and other audit rows: scope 0, no activity, nothing to price.
     if (scope !== 1 && scope !== 2) continue

@@ -112,10 +112,11 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
     // to compare, so this asserts the call, not a resemblance between two expressions. Previously the
     // XLSX inlined `[...new Set(locations.map(combustionSource))]` and a test held the two in step;
     // one helper each removes the thing that could drift.
+    // derivedLocations since T7: a figure from bills is on the derived locations, not the stored ones.
     expect(lineIn(pageSrc, PAGE, "['Combustion factors', src]"))
-      .toContain('combustionSourcesFor(inventory.locations)')
+      .toContain('combustionSourcesFor(derivedLocations)')
     expect(lineIn(pageSrc, PAGE, "['Electricity factors', src]"))
-      .toContain('gridSourcesFor(inventory.locations)')
+      .toContain('gridSourcesFor(derivedLocations)')
     // Kept: the catalogue was the electricity row until this pass, and it must not come back.
     expect(pageSrc, 'the catalogue must not be the XLSX electricity row again')
       .not.toContain("['Electricity factors', EF_SOURCES.electricity]")

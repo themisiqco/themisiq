@@ -323,3 +323,44 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
       .toEqual(["import type { Cat3InputRow, Cat3Inputs, Cat3Stream } from './cat3Energy'"])
   })
 })
+
+// ── T7: locations_data is saved raw, so a figure from bills lives only in workings ────────────────────
+describe('Category 3 reads a bills-only stream as quantified from the priced workings row (T7)', () => {
+  const bill = (fuelType: string, document_type: string, value: number, unit: string, id: string) => ({
+    id, file_name: `${id}.pdf`, document_type, uploaded_at: '2026-06-01', file_path: `/${id}.pdf`,
+    extracted: [{ fuelType, rawValue: null, rawUnit: null, value, unit, periodStart: '2026-01-01', periodEnd: '2026-12-31',
+      confidence: 'high' as const, sourceQuote: 'q', notes: null, status: 'confirmed' as const }],
+  })
+  it('C3I-T7a electricity and gas from bills, stored as 0, are quantified, not undeclared or declared-unquantified', () => {
+    const raw = answered({ name: 'Site', country: 'GB', grid_region: 'UK', electricity_kwh: 0, has_natural_gas: true, natural_gas_amount: 0,
+      natural_gas_unit: 'kwh', source_docs: [bill('electricity', 'utility_electricity', 10_000, 'kwh', 'e'), bill('natural_gas', 'utility_bill_gas', 5_000, 'kwh', 'g')] as never },
+      ['electricity', 'natural_gas'])
+    const r = cat3InputsFrom(workingsOf([raw]), [raw])
+    expect(r.inputs!.declaration.undeclared).toEqual([])
+  })
+  it('C3I-T7b without a priced row the stored amount still decides, as before', () => {
+    const declaredEmpty = answered({ name: 'Site', country: 'GB', has_natural_gas: true, natural_gas_amount: 0 }, ['natural_gas', 'electricity'])
+    const r = cat3InputsFrom(workingsOf([declaredEmpty]), [declaredEmpty])
+    expect(r.inputs!.declaration.undeclared).toContain('natural_gas')
+  })
+})
+
+// ── T7 revision: a T5 zero row is not an unrecognised stream ───────────────────────────────────────────
+describe('Category 3 passes over a zero row (every bill outside the year) silently', () => {
+  it('C3I-T7c no "unrecognised stream" note; the declaration still reads as before', () => {
+    // workingsOf prices reporting year 2026; both gas bills are 2025, so every one is outside the year.
+    const bill = (id: string, m: string) => ({ id, file_name: `${id}.pdf`, document_type: 'utility_bill_gas', uploaded_at: '2026-06-01',
+      file_path: `/${id}.pdf`, extracted: [{ fuelType: 'natural_gas', rawValue: null, rawUnit: null, value: 500, unit: 'kwh',
+        periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-28`, confidence: 'high' as const, sourceQuote: 'q', notes: null, status: 'confirmed' as const }] })
+    const site = answered({ name: 'Site', country: 'GB', grid_region: 'UK', electricity_kwh: 1000, has_natural_gas: true, natural_gas_unit: 'kwh',
+      source_docs: [bill('g1', '03'), bill('g2', '04')] as never }, ['electricity', 'natural_gas'])
+    const workings = workingsOf([site]) as { gwp_basis?: string; declaration?: string; stream?: string }[]
+    expect(workings.filter(w => w.gwp_basis === 'all_bills_excluded'), 'the fixture produces a zero row').toHaveLength(1)
+    expect(workings.find(w => w.stream === 'natural_gas')?.declaration, 'and the declaration row beside it').toBe('declared_unquantified')
+    const r = cat3InputsFrom(workings, [site])
+    expect(r.skipped.filter(k => k.code === 'stream_not_recognised')).toEqual([])
+    // As before the zero row existed: gas is declared but carries no figure, so the category is withheld on it.
+    expect(r.inputs!.declaration.undeclared).toContain('natural_gas')
+    expect(r.undeclared_detail).toContainEqual({ location: 'Site', stream: 'natural_gas', state: 'declared_unquantified' })
+  })
+})

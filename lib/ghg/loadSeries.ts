@@ -25,7 +25,7 @@ import {
   type YearDataStatus,
   type YearExclusion,
 } from "./series";
-import { findUnpriceableLocations, type Location } from "./engine";
+import { findUnpriceableLocations, deriveStoredLocations, type Location } from "./engine";
 import type { FactorEditions } from "./factorEditions";
 import { anyPublishedFactorApplied } from "./factorEditions";
 import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
@@ -93,7 +93,7 @@ export interface Completeness {
 // null total or a null company_id, and a dropped row is indistinguishable from an absent one. The
 // whole point of the comparability step is to tell "no prior year" apart from "a prior year we
 // cannot describe", so it fetches its one row itself and brings it here for the verdict.
-export function assessCompleteness(workings: unknown, locationsData: unknown): Completeness {
+export function assessCompleteness(workings: unknown, locationsData: unknown, reportingYear: number): Completeness {
   // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
   if (Array.isArray(workings)) {
     // ⚠️ MATCHES ALL FOUR EXCLUSION MARKERS. Filtering on "unpriceable" alone would let a year
@@ -130,7 +130,9 @@ export function assessCompleteness(workings: unknown, locationsData: unknown): C
     };
   }
   try {
-    const unpriceable = findUnpriceableLocations(locationsData as Location[]);
+    // The row's own year (T7 revision): the check is "can this year be priced with today's tables", and
+    // the tables are looked up by reporting year. Called without it, every year was checked as 2024.
+    const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear);
     if (unpriceable.length > 0) {
       const names = unpriceable.map((u) => u.locName).join(", ");
       return {
@@ -189,6 +191,9 @@ interface RawRow {
   // Both jsonb. Needed to qualify the totals above — see assessCompleteness.
   workings: unknown;
   locations_data: unknown;
+  // locations_data is saved raw (T7), so the figures are derived from it with these before it is read.
+  fiscal_year_end_month: number | null;
+  coverage_resolutions: unknown;
 }
 
 // ⚠️ workings and locations_data are FULL jsonb columns, and the larger ones on this table.
@@ -202,7 +207,7 @@ const SELECT =
   // here: workings carries factor_vintage per grid row but nothing for combustion editions, and only
   // for inventories saved since the provenance pass.
   "factor_editions, " +
-  "workings, locations_data, " +
+  "workings, locations_data, fiscal_year_end_month, coverage_resolutions, " +
   // The total ALONE cannot say whether it covers two categories or fifteen, and it is read as a Scope 3
   // baseline by the SBTi dashboard. The five coverage columns come with it, per inventory.
   "scope3_inventories(total_scope3_tco2e, scope3_categories_relevant, scope3_categories_in_total, " +
@@ -248,7 +253,8 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
       const s3 = Array.isArray(r.scope3_inventories)
         ? r.scope3_inventories[0]
         : r.scope3_inventories;
-      const completeness = assessCompleteness(r.workings, r.locations_data);
+      // Derived first (T7): locations_data is saved raw, so a figure from bills would otherwise read as 0.
+      const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year);
       mapped.push({
         ...completeness,
         company_id: r.company_id,

@@ -31,6 +31,7 @@ import {
   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
   deriveLocations,
   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
+  documentsBacking, deriveStoredLocations,
 } from './engine';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
@@ -4488,5 +4489,41 @@ describe('T6 stream_off: a switched-off field with confirmed bills is never sile
       expect(r.reconciles, `switch ${on}`).toBe(true);
       expect(r.unexplained_delta, `switch ${on}`).toBe(0);
     }
+  });
+});
+
+// ── T7: documentsBacking and deriveStoredLocations ───────────────────────────────────────────────────
+describe('T7 documentsBacking: the read-only rule for step-2 inputs', () => {
+  const g = (status: ExtractedProposal['status'], id: string, value: number | null = 100) =>
+    doc('utility_bill_gas', [prop({ status, value })], id);
+  it('counts documents with a confirmed or pending proposal with a value; not rejected, not valueless', () => {
+    const l = loc({ source_docs: [g('confirmed', 'a'), g('extracted', 'b'), g('needs_manual_review', 'c'), g('rejected', 'd'), g('confirmed', 'e', null)] });
+    expect(documentsBacking(l, 'natural_gas_amount')).toBe(3);
+    expect(documentsBacking(l, 'propane_amount')).toBe(0);
+  });
+  it('agrees with deriveLocations: backed means derived, unbacked means typed', () => {
+    for (const docs of [[g('confirmed', 'a')], [g('extracted', 'a')], [g('rejected', 'a')], []]) {
+      const l = loc({ has_natural_gas: true, natural_gas_amount: 777, source_docs: docs });
+      const derived = deriveLocations({ locations: [l], reporting_year: 2024 })[0].natural_gas_amount;
+      expect(documentsBacking(l, 'natural_gas_amount') > 0, JSON.stringify(docs.map(d => d.extracted![0].status))).toBe(derived !== 777);
+    }
+  });
+});
+
+describe('T7 deriveStoredLocations: readers of a stored row derive first', () => {
+  const row = (locations_data: unknown, o: Record<string, unknown> = {}) => ({ locations_data, reporting_year: 2024, fiscal_year_end_month: 12, coverage_resolutions: [], ...o });
+  it('derives a document-backed figure from a raw stored row, with the row\'s own year end and resolutions', () => {
+    const raw = [loc({ has_natural_gas: true, natural_gas_amount: 0, source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2024-04-01', periodEnd: '2024-04-30' })])] })];
+    expect((deriveStoredLocations(row(raw)) as Location[])[0].natural_gas_amount).toBe(100);
+    expect((deriveStoredLocations(row(raw, { fiscal_year_end_month: 3 })) as Location[])[0].natural_gas_amount, 'Apr 2024 is outside the year ending 31 Mar 2024').toBe(0);
+  });
+  it('passes a non-array through, so the reader reports "no location data" itself', () => {
+    for (const v of [null, undefined, {}, 'x']) expect(deriveStoredLocations(row(v))).toBe(v);
+  });
+  it('an old row without source_docs reads as having no documents; a malformed one is returned unchanged', () => {
+    const old = [{ ...loc({ natural_gas_amount: 50 }), source_docs: undefined }];
+    expect((deriveStoredLocations(row(old)) as Location[])[0].natural_gas_amount).toBe(50);
+    const bad = [{ ...loc({}), source_docs: [{ id: 'x', document_type: 'utility_bill_gas', extracted: 'not an array' }] }];
+    expect(deriveStoredLocations(row(bad))).toBe(bad);
   });
 });

@@ -3437,6 +3437,47 @@ export function deriveLocations(inventory: {
   })
 }
 
+/**
+ * deriveLocations for a STORED ghg_inventories row (T7). locations_data is saved RAW: a document-backed
+ * field holds only what was typed (usually 0), never its figure (T7 ruling). So every reader of a stored
+ * row that looks at a figure must derive first, or a figure that comes from bills reads as 0. Readers:
+ * the prior-year summary (GHG page) and the trends completeness check (lib/ghg/loadSeries.ts). Scope 3
+ * Cat 3 may not import the engine, so it reads priced streams from the saved workings instead
+ * (lib/scope3/cat3Inputs.ts).
+ * Returns the stored value unchanged when it is not an array, or when deriving throws on a malformed row,
+ * so each reader's own "no location data" or "cannot evaluate" handling still applies. An old row
+ * without source_docs on a location is read as having no documents.
+ */
+export function deriveStoredLocations(row: {
+  locations_data: unknown; reporting_year: number; fiscal_year_end_month?: number | null; coverage_resolutions?: unknown
+}): unknown {
+  if (!Array.isArray(row.locations_data)) return row.locations_data
+  try {
+    const locations = (row.locations_data as Location[]).map(l => ({ ...l, source_docs: Array.isArray(l?.source_docs) ? l.source_docs : [] }))
+    return deriveLocations({
+      locations, reporting_year: row.reporting_year, fiscal_year_end_month: row.fiscal_year_end_month ?? 12,
+      coverage_resolutions: Array.isArray(row.coverage_resolutions) ? row.coverage_resolutions as CoverageResolution[] : [],
+    })
+  } catch {
+    return row.locations_data
+  }
+}
+
+/**
+ * How many documents back a field, by the same rule deriveLocations uses (T4 ruling): a document counts
+ * when it holds a confirmed or pending proposal with a value for the field. A rejected proposal does not.
+ * Above 0, the field's figure is derived from its documents, so the page shows it read-only with "From N
+ * documents" (section 3.3, T7 ruling); at 0, the field is the customer's typed figure.
+ */
+export function documentsBacking(loc: Location, field: keyof Location): number {
+  const ids = new Set<string>()
+  loc.source_docs.forEach(d => d.extracted?.forEach(p => {
+    if (p.value == null || p.status === 'rejected') return
+    if (fieldFor(d.document_type, p.fuelType)?.amount === field) ids.add(d.id)
+  }))
+  return ids.size
+}
+
 // Provenance stamp attached to a workings row so the verifier can trace a figure back to its bills.
 // concierge = read verbatim off confirmed bills; concierge-extrapolated = grossed up for a coverage
 // gap (number is estimated, quotes are the underlying bills); manual = not concierge-read.

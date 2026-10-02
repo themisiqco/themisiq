@@ -407,13 +407,18 @@ describe('sameFactorEditions', () => {
 // an inventory that predates the column. No error, no flag. Both halves are asserted from source
 // because neither is reachable from a unit test.
 describe('factor_editions survives the load-then-save round trip', () => {
+  // T7: the payload's figures come from figuresForSave (lib/ghg/savePayload.ts), one derivation for the
+  // totals, the workings and factor_editions. The page line reads its result; the call is pinned there.
   it('F21 the save payload writes it, computed from the SAME locations and year as the totals', () => {
-    const line = lineContaining('factor_editions: factorEditionsForSave')
-    expect(line, 'the same locations that produced scope1_total').toContain('inventory.locations')
+    expect(lineContaining('factor_editions: saved.'), 'the payload reads the one derivation').toContain('factor_editions: saved.factor_editions,')
+    expect(lineContaining('scope1_total: saved.'), 'and so do the totals beside it').toContain('scope1_total: saved.totals.s1_total,')
+    const saveSrc = readFileSync(join(process.cwd(), 'lib/ghg/savePayload.ts'), 'utf8')
+    const line = saveSrc.split('\n').find(l => l.includes('factor_editions: factorEditionsForSave'))!
+    expect(line, 'the same derived locations that produce the totals').toContain('derived')
     expect(line, 'the same year passed to buildWorkings — anything else records a calc never performed')
       .toContain('inventory.reporting_year')
     expect(line, 'the stored map must be offered as the fallback').toContain('inventory.factor_editions')
-    expect(pageSrc).toContain("from '../../../lib/ghg/factorEditions'")
+    expect(saveSrc).toContain("from './factorEditions'")
   })
 
   it('F22 an empty recompute falls back to the stored map rather than erasing it', () => {
@@ -455,7 +460,7 @@ describe('factor_editions survives the load-then-save round trip', () => {
       'prior_year_s1:', 'prior_year_s2:', 'comparability_disclosure:', 'selected_frameworks:',
       'locations_data:', 'coverage_resolutions:', 'pct_estimated:', 'scope1_total:',
       'scope2_location_total:', 'scope2_market_total:', 'scope1_intensity:', 'scope2_intensity:',
-      'gwp_version:', 'status:', 'workings:', 'updated_at:',
+      'gwp_version:', 'status:', 'workings:', 'updated_at:', 'derivation_version:',
     ]
     for (const k of REQUIRED) expect(block, `payload key ${k} was dropped`).toContain(k)
     expect(block).toContain('factor_editions:')
@@ -464,7 +469,8 @@ describe('factor_editions survives the load-then-save round trip', () => {
     // [a-z0-9_] — the digits matter. Without them this misses scope1_total, scope2_location_total,
     // scope2_market_total, both intensities and both prior_year_s* keys: seven of the twenty-six.
     const keyCount = block.split('\n').filter(l => /^\s*[a-z0-9_]+:/.test(l)).length
-    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(26)
+    // 27 since T7 added derivation_version.
+    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(27)
   })
 
   it('F25 scans a real file — a moved call site fails loudly instead of passing vacuously', () => {

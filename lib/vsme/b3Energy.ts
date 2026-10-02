@@ -101,6 +101,14 @@ function locationFuelMWh(loc: B3Location): number {
 }
 
 /**
+ * ⚠️ NOT SAFE ON A STORED ghg_inventories ROW SINCE T7. NOTHING CALLS THIS TODAY (only climateCore, which
+ * nothing calls), so this is a guard for whoever wires it up. After T7, locations_data is saved RAW: a
+ * field whose figure comes from bills (electricity_kwh, renewable_electricity_kwh, natural_gas_amount,
+ * propane_amount, diesel_*, gasoline_amount) holds only what was typed, usually 0, and the figure lives in
+ * the saved workings. Fed stored locations, this function returns 0 MWh for every bill-backed figure.
+ * Take the quantities from the saved workings' activity_data (as lib/scope3/cat3Inputs.ts does), or pass
+ * deriveStoredLocations(row) from lib/ghg/engine.ts if loading the engine is acceptable in that bundle.
+ *
  * Aggregate all locations into the B3 energy block.
  *
  * Renewable scope note: renewable energy in this model = renewable electricity
