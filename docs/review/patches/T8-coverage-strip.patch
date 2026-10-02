@@ -1,0 +1,991 @@
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index b82d48c..7fc1335 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -12,6 +12,8 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
+ import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
+ import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
+ import { figuresForSave } from '../../../lib/ghg/savePayload'
++import { upsertResolution } from '../../../lib/ghg/coverageActions'
++import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
+ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
+ import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
+ import type { YearDataStatus } from '../../../lib/ghg/series'
+@@ -37,7 +39,7 @@ import {
+   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
+   snapUnitsForCountry,
+   validateElectricity, validateNaturalGas, validateCompleteness,
+-  parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
++  periodFromYearAndEnd,
+ } from '../../../lib/ghg/engine'
+ import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
+ import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
+@@ -52,7 +54,7 @@ import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, wo
+ import SourceAttributions from '../../components/SourceAttributions'
+ import type {
+   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
+-  ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
++  ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation,
+ } from '../../../lib/ghg/engine'
+ 
+ 
+@@ -554,7 +556,8 @@ function FigureInput({ loc, field, onChange, style }: { loc: Location; field: ke
+   const n = documentsBacking(loc, field)
+   const value = (loc as unknown as Record<string, number>)[String(field)]
+   const { flex, ...inputOwn } = style
+-  if (n === 0) return <input type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
++  // The id lets the coverage strip's "Enter the figure manually" put the cursor here (T8).
++  if (n === 0) return <input id={`figure-${loc.id}-${String(field)}`} type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
+   return (
+     <div style={flex != null ? { flex } : undefined}>
+       <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
+@@ -623,6 +626,15 @@ const searchParams = useSearchParams()
+   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
+   const [activeExport, setActiveExport] = useState('sb253')
+   const [dataConfirmed, setDataConfirmed] = useState(false)
++  // Who is signed in, for "Confirm this site used none", which records who confirmed and when (T8). Null
++  // until the session is read, or when it has no email; the control is disabled while null.
++  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
++  useEffect(() => {
++    supabase.auth.getSession().then(({ data: { session } }) => {
++      const u = session?.user
++      setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
++    })
++  }, [])
+   // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
+   // storage upload, which produced no document at all, and a failed storage DELETE, where the document
+   // is still attached and still listed. Everything that happens to a document that DOES exist and stays
+@@ -1268,15 +1280,27 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+       return { ...inv, locations: locs }
+     })
+   }
+-  // Write a coverage resolution onto the inventory. Re-resolving the same fuel+location+kind overwrites the
+-  // prior one (keyed by document and meter in T8). No figure is written (T7): the derived figures pick the
+-  // resolution up on the next render.
++  // Write a coverage resolution onto the inventory, replacing only one with the same key (T8: by document
++  // set, document, meter or field; see lib/ghg/coverageActions.ts), so no resolution overwrites another.
++  // No figure is written (T7): the derived figures pick the resolution up on the next render.
+   const addCoverageResolution = (res: CoverageResolution) => {
+-    setInventory(inv => {
+-      const existing = (inv.coverage_resolutions ?? []).filter(
+-        r => !(r.locId === res.locId && r.fuelType === res.fuelType && r.kind === res.kind))
+-      return { ...inv, coverage_resolutions: [...existing, res] }
+-    })
++    setInventory(inv => ({ ...inv, coverage_resolutions: upsertResolution(inv.coverage_resolutions ?? [], res) }))
++  }
++  // "Different meters or accounts": the document's meter label and the resolution that must match it,
++  // written in ONE update so neither exists without the other (T3 ruling: meter_label is the one source).
++  const labelMeter = (locId: string, docId: string, label: string, res: CoverageResolution) => {
++    setInventory(inv => ({
++      ...inv,
++      locations: inv.locations.map(l => l.id !== locId ? l : {
++        ...l, source_docs: l.source_docs.map(d => d.id === docId ? { ...d, meter_label: label } : d),
++      }),
++      coverage_resolutions: upsertResolution(inv.coverage_resolutions ?? [], res),
++    }))
++  }
++  // "Enter the figure manually": the field is editable (all its bills were rejected), so put the cursor there.
++  const enterManually = (locId: string, field: string) => {
++    const el = document.getElementById(`figure-${locId}-${field}`) as HTMLInputElement | null
++    el?.focus()
+   }
+   // THE DERIVED LOCATIONS (T4, T7). Every figure on screen, every gate and every saved total reads these;
+   // inventory.locations holds only what the customer typed and the documents. Index-aligned with
+@@ -2120,7 +2144,7 @@ workings: saved.workings,
+                       </div>
+                     )}
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
++                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2135,7 +2159,7 @@ workings: saved.workings,
+                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
+                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
++                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2150,7 +2174,7 @@ workings: saved.workings,
+                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
+                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
++                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2178,7 +2202,7 @@ workings: saved.workings,
+                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                     <input type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
++                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2194,7 +2218,7 @@ workings: saved.workings,
+                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                     <input type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
++                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2222,7 +2246,7 @@ workings: saved.workings,
+                       </select>
+                     </div>
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
++                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2242,7 +2266,7 @@ workings: saved.workings,
+                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
+                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
++                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
+                 </div>
+               )}
+             </div>
+@@ -2315,7 +2339,7 @@ workings: saved.workings,
+                     <a href={EPA_EGRID_POWER_PROFILER_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
+                   </div>
+                 )}
+-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
++                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
+               </div>
+             </div>
+             <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system: Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
+@@ -2385,7 +2409,7 @@ workings: saved.workings,
+                       )}
+                     </>
+                   })()}
+-                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
++                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2515,7 +2539,7 @@ workings: saved.workings,
+                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
+                     <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
++                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
+                 </div>
+               ))}
+             </div>
+@@ -2534,7 +2558,7 @@ workings: saved.workings,
+                       docs live in the locations_data jsonb with no DB constraint on document_type,
+                       and /api/verifier-documents iterates source_docs generically, so this slot
+                       reaches the verifier surface on its own. */}
+-                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
++                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
+                 </div>
+               ))}
+             </div>
+@@ -3457,7 +3481,7 @@ const PROPOSAL_BADGE_COLOUR: Record<ConciergeStatus, { bg: string; color: string
+   rejected:            { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
+ }
+ 
+-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
++function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, onLabelMeter, onEnterManually, currentUser, location, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onLabelMeter: (locId: string, docId: string, label: string, res: CoverageResolution) => void; onEnterManually: (locId: string, field: string) => void; currentUser: CurrentUser | null; location: Location; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
+   const ref = useRef<HTMLInputElement>(null)
+   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
+   const [editVal, setEditVal] = useState<string>('')
+@@ -3494,114 +3518,11 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+         </div>
+       </div>
+       <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
+-      {(() => {
+-        // Coverage strip — ONE per (fuelType) at this location. A fleet_fuel upload carries gasoline AND
+-        // diesel from the same bills; each fuel gets its OWN strip, status and resolution (the C1 fix), so a
+-        // gap on diesel can't be cleared by acknowledging gasoline. Within a strip, a control is rendered
+-        // for EACH unresolved issue in cov.issues — a gap+overlap fuel shows BOTH (the D1 fix).
+-        const win = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+-        const groups = new Map<string, CoveragePeriod[]>()
+-        docs.forEach(d => (d.extracted ?? []).forEach((p, pi) => {
+-          if (p.status !== 'confirmed' || !p.periodStart || !p.periodEnd) return
+-          const arr = groups.get(p.fuelType) ?? []
+-          arr.push({ docId: d.id, pi, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
+-          groups.set(p.fuelType, arr)
+-        }))
+-        if (groups.size === 0) return null
+-        const KIND_FOR = { gap: 'extrapolate', overlap: 'duplicate', straddle: 'straddle' } as const
+-        return [...groups.entries()].map(([fuelOfStrip, periods]) => {
+-          const cov = analyzeCoverage(periods, win.start, win.end)
+-          const resFor = (kind: CoverageResolution['kind']) =>
+-            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip
+-              && (r.kind !== 'extrapolate' || r.documentType == null || r.documentType === docType))
+-          const gapRes = resFor('extrapolate')
+-          const dupRes = resFor('duplicate')
+-          const strdRes = resFor('straddle')
+-          // Resolved only when EVERY issue present has its matching resolution on file.
+-          const unresolvedIssues = cov.issues.filter(iss => !resFor(KIND_FOR[iss]))
+-          const resolved = unresolvedIssues.length === 0
+-          const tone =
+-            resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
+-            : { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' }
+-          const fuelPrefix = groups.size > 1 && fuelOfStrip ? `${fuelOfStrip}: ` : ''
+-          return (
+-          <div key={fuelOfStrip} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
+-            <div>{tone.icon} {fuelPrefix}{resolved && cov.issues.length > 0 ? `${cov.monthsCovered}/12 months from bills; remaining estimated (${cov.pctEstimated}% estimated).` : cov.summary}</div>
+-            {cov.outOfWindow.length > 0 && (
+-              <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
+-                ℹ️ {cov.outOfWindow.length} bill{cov.outOfWindow.length > 1 ? 's' : ''} outside reporting year {reportingYear}, not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
+-              </div>
+-            )}
+-            {cov.issues.includes('gap') && !gapRes && (
+-              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+-                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Upload the missing bill above, or:</span>
+-                <button
+-                  onClick={() => onAddCoverageResolution({
+-                    locId,
+-                    fuelType: fuelOfStrip,
+-                    kind: 'extrapolate',
+-                    documentType: docType,
+-                    monthsCovered: cov.monthsCovered,
+-                    pctEstimated: cov.pctEstimated,
+-                    note: `${cov.monthsCovered} of 12 months evidenced by bills; remaining ${12 - cov.monthsCovered} month(s) estimated by scaling metered data ×12/${cov.monthsCovered} (${cov.pctEstimated}% estimated).`,
+-                    acknowledgedAt: new Date().toISOString(),
+-                  })}
+-                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-state-warn)', color: '#fff', border: 'none', cursor: 'pointer' }}
+-                >Acknowledge &amp; estimate</button>
+-              </div>
+-            )}
+-            {cov.issues.includes('overlap') && !dupRes && (
+-              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+-                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Two bills cover the same period. Remove the duplicate above, or:</span>
+-                <button
+-                  onClick={() => onAddCoverageResolution({
+-                    locId,
+-                    fuelType: fuelOfStrip,
+-                    kind: 'duplicate',
+-                    note: `Overlapping bills detected for ${fuelOfStrip || 'this fuel'}; user confirmed the overlap is intentional (e.g. corrected re-issue) and accepted the figures as-is. No double-count adjustment applied.`,
+-                    acknowledgedAt: new Date().toISOString(),
+-                  })}
+-                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-state-warn)', color: '#fff', border: 'none', cursor: 'pointer' }}
+-                >Confirm not a duplicate</button>
+-              </div>
+-            )}
+-            {cov.issues.includes('straddle') && !strdRes && (
+-              <div style={{ marginTop: 6 }}>
+-                <div style={{ fontWeight: 400, color: '#7c5a16', marginBottom: 6 }}>A bill crosses the reporting-year boundary. How should the overlapping portion be counted?</div>
+-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+-                  {([
+-                    { choice: 'prorate' as const, label: 'Prorate by days', note: 'day-level proration: only the in-window portion is counted, split by day count across the boundary' },
+-                    { choice: 'this_year' as const, label: 'Count in this year', note: 'the full straddling bill is attributed to this reporting year' },
+-                    { choice: 'next_year' as const, label: 'Count in next year', note: 'the full straddling bill is attributed to the next reporting year (excluded here)' },
+-                  ]).map(opt => (
+-                    <button
+-                      key={opt.choice}
+-                      onClick={() => onAddCoverageResolution({
+-                        locId,
+-                        fuelType: fuelOfStrip,
+-                        kind: 'straddle',
+-                        straddleChoice: opt.choice,
+-                        daysInYear: cov.straddles[0]?.daysInYear,
+-                        totalDays: cov.straddles[0]?.totalDays,
+-                        // ⚠️ THE DASH STAYS, AND IT IS THE ONLY ONE LEFT ON THIS SCREEN THAT IS PROSE.
+-                        // This note is PERSISTED in coverage_resolutions and reprinted to verifiers
+-                        // through rowNoteOf on /verify/[token]. Resolutions already recorded carry the
+-                        // dash, so sweeping it here would put both forms in one audit trail without
+-                        // changing a single stored record. applyResolutions never reads it, so this is
+-                        // a wording decision and not a correctness one. Budgeted in lib/emDashCopy.test.ts.
+-                        note: `Boundary-straddling bill for ${fuelOfStrip || 'this fuel'} resolved by "${opt.label}" — ${opt.note}.`,
+-                        acknowledgedAt: new Date().toISOString(),
+-                      })}
+-                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: opt.choice === 'prorate' ? '#0F6E56' : '#fff', color: opt.choice === 'prorate' ? '#fff' : '#555553', border: opt.choice === 'prorate' ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}
+-                    >{opt.label}</button>
+-                  ))}
+-                </div>
+-              </div>
+-            )}
+-          </div>
+-          )
+-        })
+-      })()}
++      {/* The coverage strip (T8): the engine's issues for this upload, per fuel and meter, with the controls
++          that answer them. See ./_components/CoverageStrip.tsx. */}
++      <CoverageStrip location={location} docType={docType} reportingYear={reportingYear} fiscalYearEndMonth={fiscalYearEndMonth}
++        resolutions={coverageResolutions} currentUser={currentUser} onAdd={onAddCoverageResolution}
++        onLabelMeter={(docId, l, res) => onLabelMeter(locId, docId, l, res)} onEnterManually={field => onEnterManually(locId, field)} />
+       {uploadError && (
+         <div style={{ marginTop: 6, background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#B91C1C', lineHeight: 1.5 }}>
+           {uploadError}
+diff --git a/lib/emDashCopy.test.ts b/lib/emDashCopy.test.ts
+index a85a071..48622c9 100644
+--- a/lib/emDashCopy.test.ts
++++ b/lib/emDashCopy.test.ts
+@@ -342,7 +342,7 @@ const SWEEP_BUDGET: Record<string, number> = {
+   'app/dashboard/cbam/report/exportXlsx.ts': 10,
+   'app/dashboard/cbam/setup/page.tsx': 2,
+   'app/dashboard/climate-risk/report/page.tsx': 2,
+-  'app/dashboard/ghg/page.tsx': 3,
++  'app/dashboard/ghg/page.tsx': 2,
+   'app/dashboard/materiality/report/page.tsx': 2,
+   'app/dashboard/materiality/survey/[id]/respondents/import/page.tsx': 2,
+   'app/dashboard/materiality/survey/[id]/results/page.tsx': 3,
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 641a9c0..0d59980 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -3520,8 +3520,9 @@ describe('T1 billContributions', () => {
+ 
+   // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage;
+   // T5 adds buildWorkings (contributions on rows) and the evidenced quantity per field, which T6 moved into
+-  // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split.
+-  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField and buildMonthlyEmissions (T2, T3, T5, T6)', () => {
++  // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split; T8 adds the
++  // coverage strip, which shows each bill's prorated share.
++  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField, buildMonthlyEmissions and the coverage strip (T2, T3, T5, T6, T8)', () => {
+     const root = join(__dirname, '..', '..');
+     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+       const rel = `${dir}/${n}`;
+@@ -3533,7 +3534,7 @@ describe('T1 billContributions', () => {
+       const n = (src.match(/billContributions\(/g) ?? []).length;
+       return n ? [`${f}: ${n}`] : [];
+     });
+-    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1']);
++    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1', 'app/dashboard/ghg/_components/CoverageStrip.tsx: 1']);
+     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
+     for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(']) {
+       const body = engineSrc.slice(engineSrc.indexOf(fn));
+@@ -3683,7 +3684,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+ 
+   it('Scenario B + Bill 2, FY2026: overlap raised with a message naming both documents and the shared days', () => {
+     expect(issues(scenarioB(), 2026).filter(i => i.status === 'overlap')).toEqual([
+-      { locId: 'L1', fuelType: 'electricity', status: 'overlap', docIds: ['bill2', 'monthOnly'], meterLabel: null, message: OVERLAP_MSG }]);
++      { locId: 'L1', fuelType: 'electricity', status: 'overlap', docIds: ['bill2', 'monthOnly'], meterLabel: null, documentType: 'utility_electricity', message: OVERLAP_MSG }]);
+   });
+ 
+   it('Scenario B + Bill 2, FY2025: the overlap is STILL raised (full periods), though both contribute 0', () => {
+@@ -3738,7 +3739,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+       return edoc(`${prefix}${i}`, elec(100, `2025-${m}-01`, `2025-${m}-${last}`), meter);
+     });
+     const l = loc({ source_docs: [...months(12), ...months(6, 'B', 'b')] });
+-    expect(issues(l, 2025).filter(i => i.status === 'gap')).toEqual([{ locId: 'L1', fuelType: 'electricity', status: 'gap', meterLabel: 'B' }]);
++    expect(issues(l, 2025).filter(i => i.status === 'gap')).toEqual([{ locId: 'L1', fuelType: 'electricity', status: 'gap', meterLabel: 'B', documentType: 'utility_electricity' }]);
+     const wrongMeter = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50 });
+     expect(issues(l, 2025, [wrongMeter]).filter(i => i.status === 'gap'), 'a default-meter estimate does not clear meter B').toHaveLength(1);
+     const meterB = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, meterLabel: 'B' });
+@@ -3779,7 +3780,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+     const usedNone = res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u-1', email: 'jo@acme.example' } });
+ 
+     it('raises an export-blocking issue offering a manual figure or "used none"', () => {
+-      expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected',
++      expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected', field: 'natural_gas_amount',
+         message: 'Every natural gas document for Plant was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.' });
+     });
+ 
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index cc58247..be521f8 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -3925,6 +3925,10 @@ export interface CoverageIssue {
+   // "no silent zero"), stream_off (T6 ruling), none (a document with nothing read from it, unchanged).
+   status: string
+   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
++  // T8: what the strip needs to place the issue and act on it. documentType on gap and overlap (the coverage
++  // group's document type); field on all_rejected (which figure "used none" or a typed figure answers).
++  documentType?: string
++  field?: string
+   docIds?: string[]
+   meterLabel?: string | null
+ }
+@@ -3995,7 +3999,7 @@ export function findUnresolvedCoverage(
+       if (!e.statuses.every(st => st === 'rejected')) continue
+       const entered = Number((loc as unknown as Record<string, unknown>)[field] ?? 0) > 0
+       const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
+-      if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected',
++      if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected', field,
+         message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
+     }
+ 
+@@ -4034,14 +4038,14 @@ export function findUnresolvedCoverage(
+       if (cov.issues.includes('gap')) {
+         const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel
+           && (r.documentType == null || r.documentType === g.documentType))
+-        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel })
++        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel, documentType: g.documentType })
+       }
+       for (const pair of cov.overlaps) {
+         const from = pair.a.start > pair.b.start ? pair.a.start : pair.b.start
+         const endA = exclusiveEnd(pair.a.end), endB = exclusiveEnd(pair.b.end)
+         const toExcl = endA < endB ? endA : endB
+         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
+-        out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel,
++        out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,
+           message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), isoDay(from), isoDay(to)) })
+       }
+     }
+diff --git a/lib/ghg/coverageActions.ts b/lib/ghg/coverageActions.ts
+new file mode 100644
+index 0000000..b472011
+--- /dev/null
++++ b/lib/ghg/coverageActions.ts
+@@ -0,0 +1,100 @@
++// lib/ghg/coverageActions.ts
++//
++// THE RESOLUTIONS THE COVERAGE STRIP WRITES, AND HOW THEY ARE KEPT (T8). Pure: no React, no clock (the
++// caller passes the time), no Supabase.
++//
++// Each builder returns a resolution in the shape validateResolution accepts (lib/ghg/engine.ts), so a
++// control can only write something the engine will act on. The `note` is stored with the resolution and
++// reprinted to verifiers, so it is plain language with no em dash.
++//
++// KEYED SO NO RESOLUTION OVERWRITES ANOTHER (T8, and the ruling in section 10 of the design doc).
++// The page used to replace any resolution with the same location, fuel and kind, so two overlaps on one
++// fuel, or estimates for two meters, overwrote each other. Now:
++//   - same_bill:         the SET of documents it names (counted plus excluded, order ignored), so choosing
++//                        again for the same pair replaces the earlier choice instead of keeping both, which
++//                        would exclude both bills and drop the figure;
++//   - different_meters:  its document;
++//   - extrapolate:       (document type, fuel, meter);
++//   - used_none:         (location, fuel, field).
++// Legacy duplicate and straddle keep the old (location, fuel, kind) key; nothing writes them any more.
++
++import type { CoverageResolution } from './engine'
++
++export function resolutionKey(r: CoverageResolution): string {
++  switch (r.kind) {
++    case 'same_bill':
++      return `same_bill|${r.locId}|${r.fuelType}|${[r.countedDocId ?? '', ...(r.excludedDocIds ?? [])].sort().join(',')}`
++    case 'different_meters':
++      return `different_meters|${r.locId}|${r.docId ?? ''}`
++    case 'extrapolate':
++      return `extrapolate|${r.locId}|${r.documentType ?? ''}|${r.fuelType}|${r.meterLabel ?? ''}`
++    case 'used_none':
++      return `used_none|${r.locId}|${r.fuelType}|${r.field ?? ''}`
++    default:
++      return `${r.kind}|${r.locId}|${r.fuelType}`
++  }
++}
++
++/** Store `res`, replacing only a resolution with the same key. */
++export function upsertResolution(list: readonly CoverageResolution[], res: CoverageResolution): CoverageResolution[] {
++  const key = resolutionKey(res)
++  return [...list.filter(r => resolutionKey(r) !== key), res]
++}
++
++/** "Same bill, count it once": `counted` is kept, `excluded` is retained as evidence but not counted. */
++export function sameBillResolution(a: {
++  locId: string; fuelType: string; counted: { id: string; file: string }; excluded: { id: string; file: string }; at: string
++}): CoverageResolution {
++  return {
++    locId: a.locId, fuelType: a.fuelType, kind: 'same_bill',
++    countedDocId: a.counted.id, excludedDocIds: [a.excluded.id],
++    note: `${a.counted.file} and ${a.excluded.file} are the same bill, so it is counted once, from ${a.counted.file}.`,
++    acknowledgedAt: a.at,
++  }
++}
++
++/** "Different meters or accounts": the second document's own meter label, which must match (T3 ruling). */
++export function differentMetersResolution(a: {
++  locId: string; fuelType: string; doc: { id: string; file: string }; meterLabel: string; at: string
++}): CoverageResolution {
++  const label = a.meterLabel.trim()
++  return {
++    locId: a.locId, fuelType: a.fuelType, kind: 'different_meters', docId: a.doc.id, meterLabel: label,
++    note: `${a.doc.file} is for a different meter or account: ${label}.`,
++    acknowledgedAt: a.at,
++  }
++}
++
++/** A gap estimate for one meter of one document type: that meter's bills grossed up by its own coverage. */
++export function estimateResolution(a: {
++  locId: string; fuelType: string; documentType: string; meterLabel: string | null
++  monthsCovered: number; pctEstimated: number; at: string
++}): CoverageResolution {
++  const m = a.monthsCovered
++  const meter = a.meterLabel ? `Meter ${a.meterLabel}: ` : ''
++  return {
++    locId: a.locId, fuelType: a.fuelType, kind: 'extrapolate', documentType: a.documentType,
++    ...(a.meterLabel ? { meterLabel: a.meterLabel } : {}),
++    monthsCovered: m, pctEstimated: a.pctEstimated,
++    note: `${meter}${m} of 12 months evidenced by bills; remaining ${12 - m} month(s) estimated by scaling metered data ×12/${m} (${a.pctEstimated}% estimated).`,
++    acknowledgedAt: a.at,
++  }
++}
++
++const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
++/** A plain date for a note, "2 October 2026": the calendar day, where the confirmation was made, of a recorded time. */
++export function plainDate(iso: string): string {
++  const d = new Date(iso)
++  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
++}
++
++/** "Confirm this site used no {fuel}": a recorded figure of zero, with who confirmed it and when (T3 ruling). */
++export function usedNoneResolution(a: {
++  locId: string; fuelType: string; field: string; fuelName: string; by: { userId: string; email: string }; at: string
++}): CoverageResolution {
++  return {
++    locId: a.locId, fuelType: a.fuelType, kind: 'used_none', field: a.field, by: a.by,
++    note: `${a.by.email} confirmed on ${plainDate(a.at)} that this site used no ${a.fuelName}.`,
++    acknowledgedAt: a.at,
++  }
++}
+diff --git a/lib/ghg/coverageActions.test.ts b/lib/ghg/coverageActions.test.ts
+new file mode 100644
+index 0000000..241b7aa
+--- /dev/null
++++ b/lib/ghg/coverageActions.test.ts
+@@ -0,0 +1,138 @@
++// lib/ghg/coverageActions.test.ts
++//
++// T8: what the coverage strip's controls write, and that no resolution overwrites another.
++
++import { describe, it, expect } from 'vitest'
++import {
++  resolutionKey, upsertResolution, sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution, plainDate,
++} from './coverageActions'
++import {
++  emptyLocation, validateResolution, findUnresolvedCoverage, deriveLocations,
++  type Location, type SourceDoc, type ExtractedProposal, type CoverageResolution,
++} from './engine'
++
++const AT = '2026-10-02T09:00:00.000Z'
++const prop = (o: Partial<ExtractedProposal>): ExtractedProposal => ({
++  fuelType: 'natural_gas', rawValue: null, rawUnit: null, value: 100, unit: 'mcf', periodStart: '2025-01-01',
++  periodEnd: '2025-01-31', confidence: 'high', sourceQuote: 'q', notes: null, status: 'confirmed', ...o,
++})
++const gdoc = (id: string, o: Partial<ExtractedProposal> = {}, meter?: string): SourceDoc => ({
++  id, file_name: `${id}.pdf`, document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: `/${id}.pdf`,
++  extracted: [prop(o)], ...(meter ? { meter_label: meter } : {}),
++})
++const loc = (docs: SourceDoc[]): Location => ({ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs })
++const issues = (l: Location, r: CoverageResolution[]) => findUnresolvedCoverage([l], 2025, 12, r)
++const gas = (l: Location, r: CoverageResolution[]) => deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: r })[0].natural_gas_amount
++const file = (id: string) => ({ id, file: `${id}.pdf` })
++
++describe('every builder writes a resolution the engine accepts', () => {
++  const pair = loc([gdoc('a'), gdoc('b', { value: 120 })])
++  it('same bill', () => {
++    const r = sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('a'), excluded: file('b'), at: AT })
++    expect(validateResolution(r, pair)).toBeNull()
++    expect(r).toMatchObject({ kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'], acknowledgedAt: AT })
++    expect(r.note).toBe('a.pdf and b.pdf are the same bill, so it is counted once, from a.pdf.')
++  })
++  it('different meters, once the document carries the label', () => {
++    const r = differentMetersResolution({ locId: 'L1', fuelType: 'natural_gas', doc: file('b'), meterLabel: '  Meter 2 ', at: AT })
++    expect(r.meterLabel).toBe('Meter 2')
++    expect(validateResolution(r, pair), 'the label must be on the document first').not.toBeNull()
++    expect(validateResolution(r, loc([gdoc('a'), gdoc('b', {}, 'Meter 2')]))).toBeNull()
++    expect(r.note).toBe('b.pdf is for a different meter or account: Meter 2.')
++  })
++  it('estimate, per meter and document type', () => {
++    const r = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: 'B', monthsCovered: 6, pctEstimated: 50, at: AT })
++    expect(validateResolution(r, pair)).toBeNull()
++    expect(r).toMatchObject({ kind: 'extrapolate', documentType: 'utility_bill_gas', meterLabel: 'B', monthsCovered: 6 })
++    expect(r.note).toBe('Meter B: 6 of 12 months evidenced by bills; remaining 6 month(s) estimated by scaling metered data ×12/6 (50% estimated).')
++    const plain = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null, monthsCovered: 9, pctEstimated: 25, at: AT })
++    expect('meterLabel' in plain, 'the default meter carries no label').toBe(false)
++  })
++  it('used none records who confirmed it and when', () => {
++    const r = usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas',
++      by: { userId: 'u-1', email: 'jo@acme.example' }, at: AT })
++    expect(validateResolution(r, pair)).toBeNull()
++    expect(r).toMatchObject({ kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u-1', email: 'jo@acme.example' }, acknowledgedAt: AT })
++    expect(r.note).toBe(`jo@acme.example confirmed on ${plainDate(AT)} that this site used no natural gas.`)
++    expect(plainDate('2026-10-02T12:00:00.000Z'), 'a plain date: day, month name, year').toBe('2 October 2026')
++  })
++  it('no note carries an em dash', () => {
++    const notes = [
++      sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('a'), excluded: file('b'), at: AT }).note,
++      differentMetersResolution({ locId: 'L1', fuelType: 'natural_gas', doc: file('b'), meterLabel: 'M', at: AT }).note,
++      estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: 'B', monthsCovered: 6, pctEstimated: 50, at: AT }).note,
++      usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas', by: { userId: 'u', email: 'e@x.example' }, at: AT }).note,
++    ]
++    for (const n of notes) expect(n).not.toContain('—')
++  })
++})
++
++describe('keyed storage: no resolution overwrites another', () => {
++  it('two overlaps on one fuel are both kept', () => {
++    let list: CoverageResolution[] = []
++    list = upsertResolution(list, sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('a'), excluded: file('b'), at: AT }))
++    list = upsertResolution(list, sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('c'), excluded: file('d'), at: AT }))
++    expect(list).toHaveLength(2)
++  })
++  it('choosing again for the same pair replaces the earlier choice, so the figure never drops to zero (ruling)', () => {
++    const l = loc([gdoc('a'), gdoc('b', { value: 120 })])
++    let list: CoverageResolution[] = []
++    list = upsertResolution(list, sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('a'), excluded: file('b'), at: AT }))
++    expect(gas(l, list)).toBe(100)
++    list = upsertResolution(list, sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('b'), excluded: file('a'), at: AT }))
++    expect(list).toHaveLength(1)
++    expect(gas(l, list), 'b counted once, not both excluded').toBe(120)
++    expect(issues(l, list).filter(i => i.status === 'overlap')).toEqual([])
++  })
++  it('gap estimates on two meters are both kept; a second estimate for the same meter replaces the first', () => {
++    const est = (meter: string | null, m: number) => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: meter, monthsCovered: m, pctEstimated: 0, at: AT })
++    let list: CoverageResolution[] = []
++    list = upsertResolution(list, est(null, 6))
++    list = upsertResolution(list, est('B', 3))
++    expect(list).toHaveLength(2)
++    list = upsertResolution(list, est('B', 4))
++    expect(list.map(r => [r.meterLabel ?? null, r.monthsCovered])).toEqual([[null, 6], ['B', 4]])
++  })
++  it('an estimate for stationary diesel and one for fleet diesel are both kept', () => {
++    const est = (documentType: string) => estimateResolution({ locId: 'L1', fuelType: 'diesel', documentType, meterLabel: null, monthsCovered: 6, pctEstimated: 50, at: AT })
++    expect(upsertResolution([est('fuel_diesel')], est('fleet_fuel'))).toHaveLength(2)
++  })
++  it('used none is kept per field; different meters per document', () => {
++    const un = (field: string) => usedNoneResolution({ locId: 'L1', fuelType: 'diesel', field, fuelName: 'diesel', by: { userId: 'u', email: 'e@x.example' }, at: AT })
++    expect(upsertResolution([un('diesel_stationary_amount')], un('diesel_mobile_amount'))).toHaveLength(2)
++    const dm = (doc: string) => differentMetersResolution({ locId: 'L1', fuelType: 'natural_gas', doc: file(doc), meterLabel: 'M', at: AT })
++    expect(upsertResolution([dm('b')], dm('c'))).toHaveLength(2)
++    expect(upsertResolution([dm('b')], { ...dm('b'), meterLabel: 'N' })).toHaveLength(1)
++  })
++  it('the same-bill key ignores order', () => {
++    const r1 = sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('a'), excluded: file('b'), at: AT })
++    const r2 = sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: file('b'), excluded: file('a'), at: AT })
++    expect(resolutionKey(r1)).toBe(resolutionKey(r2))
++  })
++})
++
++describe('the controls resolve the issue they answer', () => {
++  it('different meters splits the groups: the overlap clears and both bills count', () => {
++    const withLabel = loc([gdoc('a'), gdoc('b', { value: 120 }, 'Meter 2')])
++    const r = differentMetersResolution({ locId: 'L1', fuelType: 'natural_gas', doc: file('b'), meterLabel: 'Meter 2', at: AT })
++    expect(issues(withLabel, [r]).filter(i => i.status === 'overlap')).toEqual([])
++    expect(gas(withLabel, [r])).toBe(220)
++  })
++  it('an estimate on meter B clears only meter B\'s gap', () => {
++    const months = (n: number, meter?: string, p = 'a') => Array.from({ length: n }, (_, k) => {
++      const m = String(k + 1).padStart(2, '0')
++      return gdoc(`${p}${k}`, { periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${new Date(2025, k + 1, 0).getDate()}` }, meter)
++    })
++    const l = loc([...months(6), ...months(6, 'B', 'b')])
++    const gaps = (r: CoverageResolution[]) => issues(l, r).filter(i => i.status === 'gap').map(i => i.meterLabel)
++    expect(gaps([])).toEqual([null, 'B'])
++    const est = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: 'B', monthsCovered: 6, pctEstimated: 50, at: AT })
++    expect(gaps([est])).toEqual([null])
++  })
++  it('used none clears the all-rejected issue', () => {
++    const l = loc([gdoc('a', { status: 'rejected' })])
++    expect(issues(l, []).some(i => i.status === 'all_rejected')).toBe(true)
++    const r = usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas', by: { userId: 'u', email: 'e@x.example' }, at: AT })
++    expect(issues(l, [r]).some(i => i.status === 'all_rejected')).toBe(false)
++  })
++})
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.tsx b/app/dashboard/ghg/_components/CoverageStrip.tsx
+new file mode 100644
+index 0000000..fa2a3be
+--- /dev/null
++++ b/app/dashboard/ghg/_components/CoverageStrip.tsx
+@@ -0,0 +1,176 @@
++// app/dashboard/ghg/_components/CoverageStrip.tsx
++//
++// THE COVERAGE STRIP UNDER EACH DOCUMENT UPLOAD (T8). It renders the ENGINE's issues for this document type,
++// never a second analysis of its own: findUnresolvedCoverage decides what is wrong, and this component only
++// shows it and offers the controls that answer it. Every control writes a resolution built in
++// lib/ghg/coverageActions.ts, in the shape validateResolution accepts.
++//
++// One block per coverage group, (fuel, meter), the same key the engine uses (T3). A straddling bill is not
++// an issue: it is prorated by its own days, and the strip says so with the share (T2). The old "this year",
++// "next year" and "Confirm not a duplicate" buttons are gone; the engine ignored what they wrote.
++//
++// All text here is shown to the customer: plain language, no em dash.
++
++import { useState } from 'react'
++import {
++  findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
++  parseLocalDate, reportingYearLabel, fieldFor,
++  type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
++} from '../../../../lib/ghg/engine'
++import {
++  sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
++} from '../../../../lib/ghg/coverageActions'
++
++export type CurrentUser = { userId: string; email: string }
++
++export type CoverageStripProps = {
++  location: Location               // the stored location, all document types (the engine needs them all)
++  docType: string                  // the upload this strip sits under
++  reportingYear: number
++  fiscalYearEndMonth: number
++  resolutions: CoverageResolution[]
++  currentUser: CurrentUser | null  // who confirms "used none"; the control is disabled without one
++  onAdd: (res: CoverageResolution) => void
++  // Writes the document's meter label and its different_meters resolution in ONE update, so the
++  // resolution never exists without the label it must match.
++  onLabelMeter: (docId: string, label: string, res: CoverageResolution) => void
++  onEnterManually: (field: string) => void
++}
++
++const fuelName = (f: string) => f.replace(/_/g, ' ')
++const now = () => new Date().toISOString()
++const warnButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-state-warn)', color: '#fff', border: 'none', cursor: 'pointer' } as const
++const plainButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' } as const
++const prompt = { fontWeight: 400, color: '#7c5a16' } as const
++const row = { marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } as const
++
++/** The meter-name input for one overlap. Its own component so each overlap keeps its own text. */
++function DifferentMeters({ fileB, onSave }: { fileB: string; onSave: (label: string) => void }) {
++  const [label, setLabel] = useState('')
++  return (
++    <div style={row}>
++      <span style={prompt}>If they&apos;re for different meters or accounts, name the second one:</span>
++      <input value={label} onChange={e => setLabel(e.target.value)} placeholder={`Meter or account for ${fileB}`}
++        style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '0.5px solid #e8e7e4', minWidth: 180 }} />
++      <button disabled={!label.trim()} onClick={() => onSave(label.trim())} style={{ ...plainButton, opacity: label.trim() ? 1 : 0.5 }}>Save</button>
++    </div>
++  )
++}
++
++export function CoverageStrip(p: CoverageStripProps) {
++  const { location, docType } = p
++  const win = periodFromYearAndEnd(p.reportingYear, p.fiscalYearEndMonth)
++  const docs = location.source_docs.filter(d => d.document_type === docType)
++  const docIdsHere = new Set(docs.map(d => d.id))
++  const fileOf = (id: string) => location.source_docs.find(d => d.id === id)?.file_name ?? id
++  const issues = findUnresolvedCoverage([location], p.reportingYear, p.fiscalYearEndMonth, p.resolutions)
++  const contributions = billContributions(location, acceptedResolutions(location, p.resolutions), win)
++    .filter(c => docIdsHere.has(c.docId))
++
++  // Coverage groups for this document type, as the engine forms them: counted or outside-the-year bills
++  // with a usable period, keyed by fuel and meter.
++  const groups = new Map<string, { fuelType: string; meterLabel: string | null; periods: CoveragePeriod[] }>()
++  for (const c of contributions) {
++    if (!(c.counted || c.reason === 'outside_year') || !c.periodStart || !c.periodEndExclusive) continue
++    const d = docs.find(x => x.id === c.docId) as SourceDoc
++    const prop = d.extracted![c.proposalIndex]
++    const key = `${c.fuelType}|${c.meterLabel ?? ''}`
++    const g = groups.get(key) ?? { fuelType: c.fuelType, meterLabel: c.meterLabel, periods: [] }
++    g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(prop.periodStart as string), end: parseLocalDate(prop.periodEnd as string) })
++    groups.set(key, g)
++  }
++  const inGroup = (i: { fuelType: string; meterLabel?: string | null; documentType?: string }, fuelType: string, meterLabel: string | null) =>
++    i.documentType === docType && i.fuelType === fuelType && (i.meterLabel ?? null) === meterLabel
++
++  // Issues that belong to this upload but not to a coverage group: the all-rejected question, and the
++  // plain-language messages for bills that are not counted (their controls arrive in T9).
++  const fieldsHere = new Set(docs.flatMap(d => (d.extracted ?? []).map(x => fieldFor(docType, x.fuelType)?.amount)).filter(Boolean).map(String))
++  const allRejected = issues.filter(i => i.status === 'all_rejected' && i.field && fieldsHere.has(i.field))
++  const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off'].includes(i.status)
++    && (i.docIds ?? []).some(id => docIdsHere.has(id)) && i.message)
++
++  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0) return null
++  const yearText = reportingYearLabel(win).inText
++  const many = groups.size > 1
++
++  return (
++    <>
++      {[...groups.values()].map(g => {
++        const cov = analyzeCoverage(g.periods, win.start, win.end)
++        const gap = issues.find(i => i.status === 'gap' && inGroup(i, g.fuelType, g.meterLabel))
++        const overlaps = issues.filter(i => i.status === 'overlap' && inGroup(i, g.fuelType, g.meterLabel))
++        const resolved = !gap && overlaps.length === 0
++        const tone = resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' } : { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' }
++        const prefix = many || g.meterLabel ? `${fuelName(g.fuelType)}${g.meterLabel ? `, meter ${g.meterLabel}` : ''}: ` : ''
++        const missing = cov.gaps.map(x => x.label).join(', ')
++        const headline = cov.status === 'full'
++          ? 'All 12 months covered by bills.'
++          : resolved && cov.issues.includes('gap')
++            ? `${cov.monthsCovered} of 12 months from bills; the other ${12 - cov.monthsCovered} are estimated (${cov.pctEstimated}% of the total).`
++            : `${cov.monthsCovered} of 12 months covered by bills.${missing ? ` Missing: ${missing}.` : ''}`
++        const prorated = contributions.filter(c => c.reason === 'prorated' && c.fuelType === g.fuelType && (c.meterLabel ?? null) === g.meterLabel)
++        return (
++          <div key={`${g.fuelType}|${g.meterLabel ?? ''}`} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
++            <div>{tone.icon} {prefix}{headline}</div>
++            {cov.outOfWindow.length > 0 && (
++              <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
++                ℹ️ {cov.outOfWindow.length} bill{cov.outOfWindow.length > 1 ? 's' : ''} outside reporting year {p.reportingYear}, not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
++              </div>
++            )}
++            {prorated.map(c => (
++              <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
++                {fileOf(c.docId)} crosses into another year: {c.inWindowDays} of its {c.totalDays} days are in {yearText}, so {((c.share ?? 0) * 100).toFixed(1)}% of the bill is counted.
++              </div>
++            ))}
++            {gap && (
++              <div style={row}>
++                <span style={prompt}>Upload the missing bill above, or:</span>
++                <button style={warnButton} onClick={() => p.onAdd(estimateResolution({
++                  locId: location.id, fuelType: g.fuelType, documentType: docType, meterLabel: g.meterLabel,
++                  monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, at: now(),
++                }))}>Estimate the missing months</button>
++              </div>
++            )}
++            {overlaps.map(o => {
++              const [a, b] = o.docIds as [string, string]
++              return (
++                <div key={`${a}|${b}`} style={{ marginTop: 6 }}>
++                  <div style={prompt}>{o.message}</div>
++                  <div style={row}>
++                    <span style={prompt}>If these are the same bill, count it once:</span>
++                    {[[a, b], [b, a]].map(([counted, excluded]) => (
++                      <button key={counted} style={plainButton} onClick={() => p.onAdd(sameBillResolution({
++                        locId: location.id, fuelType: g.fuelType, at: now(),
++                        counted: { id: counted, file: fileOf(counted) }, excluded: { id: excluded, file: fileOf(excluded) },
++                      }))}>Count {fileOf(counted)}</button>
++                    ))}
++                  </div>
++                  <DifferentMeters fileB={fileOf(b)} onSave={label => p.onLabelMeter(b, label, differentMetersResolution({
++                    locId: location.id, fuelType: g.fuelType, doc: { id: b, file: fileOf(b) }, meterLabel: label, at: now(),
++                  }))} />
++                </div>
++              )
++            })}
++          </div>
++        )
++      })}
++      {allRejected.map(i => (
++        <div key={`rejected|${i.field}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
++          <div>⚠ {i.message}</div>
++          <div style={row}>
++            <button style={warnButton} onClick={() => p.onEnterManually(i.field as string)}>Enter the figure manually</button>
++            <button style={{ ...plainButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
++              onClick={() => p.currentUser && p.onAdd(usedNoneResolution({
++                locId: location.id, fuelType: i.fuelType, field: i.field as string, fuelName: fuelName(i.fuelType), by: p.currentUser, at: now(),
++              }))}>Confirm this site used no {fuelName(i.fuelType)}</button>
++          </div>
++        </div>
++      ))}
++      {notices.map((i, k) => (
++        <div key={`notice|${k}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
++          ⚠ {i.message}
++        </div>
++      ))}
++    </>
++  )
++}
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.test.tsx b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+new file mode 100644
+index 0000000..f3cbcc9
+--- /dev/null
++++ b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+@@ -0,0 +1,126 @@
++// app/dashboard/ghg/_components/CoverageStrip.test.tsx
++//
++// T8: the coverage strip renders the engine's issues and the controls that answer them, and none of the
++// controls the engine ignored.
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { renderToStaticMarkup } from 'react-dom/server'
++import { CoverageStrip, type CoverageStripProps } from './CoverageStrip'
++import { emptyLocation, type Location, type SourceDoc, type ExtractedProposal } from '@/lib/ghg/engine'
++import { stripTsComments } from '@/lib/testing/stripComments'
++
++const prop = (o: Partial<ExtractedProposal>): ExtractedProposal => ({
++  fuelType: 'natural_gas', rawValue: null, rawUnit: null, value: 100, unit: 'mcf', periodStart: '2025-01-01',
++  periodEnd: '2025-01-31', confidence: 'high', sourceQuote: 'q', notes: null, status: 'confirmed', ...o,
++})
++const gdoc = (id: string, o: Partial<ExtractedProposal> = {}, meter?: string): SourceDoc => ({
++  id, file_name: `${id}.pdf`, document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: `/${id}.pdf`,
++  extracted: [prop(o)], ...(meter ? { meter_label: meter } : {}),
++})
++const site = (docs: SourceDoc[]): Location => ({ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs })
++const draw = (location: Location, o: Partial<CoverageStripProps> = {}) => renderToStaticMarkup(
++  <CoverageStrip location={location} docType="utility_bill_gas" reportingYear={2025} fiscalYearEndMonth={12} resolutions={[]}
++    currentUser={{ userId: 'u-1', email: 'jo@acme.example' }} onAdd={() => {}} onLabelMeter={() => {}} onEnterManually={() => {}} {...o} />)
++const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/\s+/g, ' ')
++const month = (k: number) => {
++  const m = String(k).padStart(2, '0')
++  return { periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${new Date(2025, k, 0).getDate()}` }
++}
++
++describe('coverage strip', () => {
++  it('an overlap shows the engine message and both resolutions', () => {
++    const t = text(draw(site([gdoc('a'), gdoc('b')])))
++    expect(t).toContain('a.pdf and b.pdf cover the same days (2025-01-01 to 2025-01-31). Choose Same bill, count it once, or Different meters or accounts.')
++    expect(t).toContain('If these are the same bill, count it once:')
++    expect(t).toContain('Count a.pdf')
++    expect(t).toContain('Count b.pdf')
++    expect(t).toContain("If they're for different meters or accounts, name the second one:")
++    expect(draw(site([gdoc('a'), gdoc('b')]))).toContain('placeholder="Meter or account for b.pdf"')
++    expect(draw(site([gdoc('a'), gdoc('b')]))).toMatch(/>Save<\/button>/)
++  })
++
++  it('no control the engine ignores is offered', () => {
++    const t = text(draw(site([gdoc('a'), gdoc('b'), gdoc('s', { periodStart: '2024-12-20', periodEnd: '2025-01-19' })])))
++    for (const gone of ['Confirm not a duplicate', 'Count in this year', 'Count in next year', 'Prorate by days', 'How should the overlapping portion be counted?']) {
++      expect(t, gone).not.toContain(gone)
++    }
++  })
++
++  it('a straddling bill is disclosed with its prorated share, not offered as a choice', () => {
++    const t = text(draw(site([gdoc('s', { value: 310, periodStart: '2024-12-20', periodEnd: '2025-01-19' })])))
++    expect(t).toContain('s.pdf crosses into another year: 19 of its 31 days are in reporting year 2025, so 61.3% of the bill is counted.')
++  })
++
++  it('a non-December year names the year by its end', () => {
++    const t = text(draw(site([gdoc('s', { periodStart: '2025-03-15', periodEnd: '2025-04-14' })]), { fiscalYearEndMonth: 3 }))
++    expect(t).toContain('days are in the year ending 31 March 2025')
++  })
++
++  it('gaps are shown and estimated per meter', () => {
++    const docs = [...[1, 2, 3, 4, 5, 6].map(k => gdoc(`a${k}`, month(k))), ...[1, 2, 3].map(k => gdoc(`b${k}`, month(k), 'B'))]
++    const t = text(draw(site(docs)))
++    expect(t).toContain('natural gas: 6 of 12 months covered by bills. Missing: Jul 2025, Aug 2025, Sep 2025, Oct 2025, Nov 2025, Dec 2025.')
++    expect(t).toContain('natural gas, meter B: 3 of 12 months covered by bills.')
++    expect((t.match(/Estimate the missing months/g) ?? []).length, 'one estimate control per meter').toBe(2)
++  })
++
++  it('an estimated gap says how many months are estimated and their share', () => {
++    const docs = [1, 2, 3, 4, 5, 6].map(k => gdoc(`a${k}`, month(k)))
++    const est = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate' as const, documentType: 'utility_bill_gas', monthsCovered: 6, pctEstimated: 50,
++      note: 'n', acknowledgedAt: '2026-10-02T09:00:00.000Z' }
++    const t = text(draw(site(docs), { resolutions: [est] }))
++    expect(t).toContain('6 of 12 months from bills; the other 6 are estimated (50% of the total).')
++    expect(t).not.toContain('Estimate the missing months')
++  })
++
++  it('a full year reads as covered, with no control', () => {
++    const t = text(draw(site(Array.from({ length: 12 }, (_, k) => gdoc(`m${k}`, month(k + 1))))))
++    expect(t).toContain('All 12 months covered by bills.')
++    expect(t).not.toContain('Estimate the missing months')
++  })
++
++  it('every bill rejected: the message and both answers; "used none" needs a signed-in user', () => {
++    const l = site([gdoc('r', { status: 'rejected' })])
++    const t = text(draw(l))
++    expect(t).toContain('Every natural gas document for Site A was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.')
++    expect(t).toContain('Enter the figure manually')
++    expect(t).toContain('Confirm this site used no natural gas')
++    expect(draw(l, { currentUser: null })).toMatch(/<button[^>]*disabled=""[^>]*>Confirm this site used no natural gas<\/button>/)
++    expect(draw(l)).not.toMatch(/<button[^>]*disabled=""[^>]*>Confirm this site used no natural gas<\/button>/)
++  })
++
++  it('bills that are not counted show their plain-language reason', () => {
++    const t = text(draw(site([gdoc('u', { periodStart: null, periodEnd: null })])))
++    expect(t).toContain('u.pdf has no billing period, so it is not counted. Enter the dates as they appear on the bill.')
++  })
++
++  it('nothing to say: no strip', () => {
++    expect(draw(site([]))).toBe('')
++  })
++
++  it('no em dash anywhere it renders', () => {
++    const docs = [gdoc('a'), gdoc('b'), gdoc('s', { periodStart: '2024-12-20', periodEnd: '2025-01-19' }), gdoc('r', { status: 'rejected', fuelType: 'natural_gas' })]
++    expect(draw(site(docs))).not.toContain('—')
++  })
++})
++
++describe('the page wires the strip and writes no ignored resolution', () => {
++  const page = stripTsComments(readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8'))
++  const strip = stripTsComments(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/CoverageStrip.tsx'), 'utf8'))
++  it('no duplicate or straddle resolution is written anywhere', () => {
++    for (const src of [page, strip]) {
++      expect(src).not.toMatch(/kind:\s*'duplicate'/)
++      expect(src).not.toMatch(/kind:\s*'straddle'/)
++    }
++  })
++  it('resolutions are stored by key, and the meter label and its resolution in one update', () => {
++    expect(page).toContain('upsertResolution(inv.coverage_resolutions ?? [], res)')
++    expect(page).not.toMatch(/r\.kind === res\.kind/)
++    expect(page).toContain("source_docs: l.source_docs.map(d => d.id === docId ? { ...d, meter_label: label } : d)")
++  })
++  it('the strip builds every resolution through lib/ghg/coverageActions', () => {
++    for (const b of ['sameBillResolution(', 'differentMetersResolution(', 'estimateResolution(', 'usedNoneResolution(']) expect(strip).toContain(b)
++  })
++})

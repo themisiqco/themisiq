@@ -3925,6 +3925,10 @@ export interface CoverageIssue {
   // "no silent zero"), stream_off (T6 ruling), none (a document with nothing read from it, unchanged).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
+  // T8: what the strip needs to place the issue and act on it. documentType on gap and overlap (the coverage
+  // group's document type); field on all_rejected (which figure "used none" or a typed figure answers).
+  documentType?: string
+  field?: string
   docIds?: string[]
   meterLabel?: string | null
 }
@@ -3995,7 +3999,7 @@ export function findUnresolvedCoverage(
       if (!e.statuses.every(st => st === 'rejected')) continue
       const entered = Number((loc as unknown as Record<string, unknown>)[field] ?? 0) > 0
       const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
-      if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected',
+      if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected', field,
         message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
     }
 
@@ -4034,14 +4038,14 @@ export function findUnresolvedCoverage(
       if (cov.issues.includes('gap')) {
         const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel
           && (r.documentType == null || r.documentType === g.documentType))
-        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel })
+        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel, documentType: g.documentType })
       }
       for (const pair of cov.overlaps) {
         const from = pair.a.start > pair.b.start ? pair.a.start : pair.b.start
         const endA = exclusiveEnd(pair.a.end), endB = exclusiveEnd(pair.b.end)
         const toExcl = endA < endB ? endA : endB
         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
-        out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel,
+        out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,
           message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), isoDay(from), isoDay(to)) })
       }
     }

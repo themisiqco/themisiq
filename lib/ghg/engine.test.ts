@@ -3520,8 +3520,9 @@ describe('T1 billContributions', () => {
 
   // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage;
   // T5 adds buildWorkings (contributions on rows) and the evidenced quantity per field, which T6 moved into
-  // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split.
-  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField and buildMonthlyEmissions (T2, T3, T5, T6)', () => {
+  // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split; T8 adds the
+  // coverage strip, which shows each bill's prorated share.
+  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField, buildMonthlyEmissions and the coverage strip (T2, T3, T5, T6, T8)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
@@ -3533,7 +3534,7 @@ describe('T1 billContributions', () => {
       const n = (src.match(/billContributions\(/g) ?? []).length;
       return n ? [`${f}: ${n}`] : [];
     });
-    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1']);
+    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1', 'app/dashboard/ghg/_components/CoverageStrip.tsx: 1']);
     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
     for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(']) {
       const body = engineSrc.slice(engineSrc.indexOf(fn));
@@ -3683,7 +3684,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
 
   it('Scenario B + Bill 2, FY2026: overlap raised with a message naming both documents and the shared days', () => {
     expect(issues(scenarioB(), 2026).filter(i => i.status === 'overlap')).toEqual([
-      { locId: 'L1', fuelType: 'electricity', status: 'overlap', docIds: ['bill2', 'monthOnly'], meterLabel: null, message: OVERLAP_MSG }]);
+      { locId: 'L1', fuelType: 'electricity', status: 'overlap', docIds: ['bill2', 'monthOnly'], meterLabel: null, documentType: 'utility_electricity', message: OVERLAP_MSG }]);
   });
 
   it('Scenario B + Bill 2, FY2025: the overlap is STILL raised (full periods), though both contribute 0', () => {
@@ -3738,7 +3739,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
       return edoc(`${prefix}${i}`, elec(100, `2025-${m}-01`, `2025-${m}-${last}`), meter);
     });
     const l = loc({ source_docs: [...months(12), ...months(6, 'B', 'b')] });
-    expect(issues(l, 2025).filter(i => i.status === 'gap')).toEqual([{ locId: 'L1', fuelType: 'electricity', status: 'gap', meterLabel: 'B' }]);
+    expect(issues(l, 2025).filter(i => i.status === 'gap')).toEqual([{ locId: 'L1', fuelType: 'electricity', status: 'gap', meterLabel: 'B', documentType: 'utility_electricity' }]);
     const wrongMeter = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50 });
     expect(issues(l, 2025, [wrongMeter]).filter(i => i.status === 'gap'), 'a default-meter estimate does not clear meter B').toHaveLength(1);
     const meterB = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, meterLabel: 'B' });
@@ -3779,7 +3780,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
     const usedNone = res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u-1', email: 'jo@acme.example' } });
 
     it('raises an export-blocking issue offering a manual figure or "used none"', () => {
-      expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected',
+      expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected', field: 'natural_gas_amount',
         message: 'Every natural gas document for Plant was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.' });
     });
 

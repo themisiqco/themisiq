@@ -12,6 +12,8 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
 import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
+import { upsertResolution } from '../../../lib/ghg/coverageActions'
+import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
 import type { YearDataStatus } from '../../../lib/ghg/series'
@@ -37,7 +39,7 @@ import {
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  parseLocalDate, periodFromYearAndEnd, analyzeCoverage,
+  periodFromYearAndEnd,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -52,7 +54,7 @@ import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, wo
 import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
-  ConciergeStatus, CoveragePeriod, CoverageResolution, DeclarableStream, UnpriceableLocation,
+  ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation,
 } from '../../../lib/ghg/engine'
 
 
@@ -554,7 +556,8 @@ function FigureInput({ loc, field, onChange, style }: { loc: Location; field: ke
   const n = documentsBacking(loc, field)
   const value = (loc as unknown as Record<string, number>)[String(field)]
   const { flex, ...inputOwn } = style
-  if (n === 0) return <input type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
+  // The id lets the coverage strip's "Enter the figure manually" put the cursor here (T8).
+  if (n === 0) return <input id={`figure-${loc.id}-${String(field)}`} type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
   return (
     <div style={flex != null ? { flex } : undefined}>
       <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
@@ -623,6 +626,15 @@ const searchParams = useSearchParams()
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
   const [dataConfirmed, setDataConfirmed] = useState(false)
+  // Who is signed in, for "Confirm this site used none", which records who confirmed and when (T8). Null
+  // until the session is read, or when it has no email; the control is disabled while null.
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const u = session?.user
+      setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
+    })
+  }, [])
   // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
   // storage upload, which produced no document at all, and a failed storage DELETE, where the document
   // is still attached and still listed. Everything that happens to a document that DOES exist and stays
@@ -1268,15 +1280,27 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       return { ...inv, locations: locs }
     })
   }
-  // Write a coverage resolution onto the inventory. Re-resolving the same fuel+location+kind overwrites the
-  // prior one (keyed by document and meter in T8). No figure is written (T7): the derived figures pick the
-  // resolution up on the next render.
+  // Write a coverage resolution onto the inventory, replacing only one with the same key (T8: by document
+  // set, document, meter or field; see lib/ghg/coverageActions.ts), so no resolution overwrites another.
+  // No figure is written (T7): the derived figures pick the resolution up on the next render.
   const addCoverageResolution = (res: CoverageResolution) => {
-    setInventory(inv => {
-      const existing = (inv.coverage_resolutions ?? []).filter(
-        r => !(r.locId === res.locId && r.fuelType === res.fuelType && r.kind === res.kind))
-      return { ...inv, coverage_resolutions: [...existing, res] }
-    })
+    setInventory(inv => ({ ...inv, coverage_resolutions: upsertResolution(inv.coverage_resolutions ?? [], res) }))
+  }
+  // "Different meters or accounts": the document's meter label and the resolution that must match it,
+  // written in ONE update so neither exists without the other (T3 ruling: meter_label is the one source).
+  const labelMeter = (locId: string, docId: string, label: string, res: CoverageResolution) => {
+    setInventory(inv => ({
+      ...inv,
+      locations: inv.locations.map(l => l.id !== locId ? l : {
+        ...l, source_docs: l.source_docs.map(d => d.id === docId ? { ...d, meter_label: label } : d),
+      }),
+      coverage_resolutions: upsertResolution(inv.coverage_resolutions ?? [], res),
+    }))
+  }
+  // "Enter the figure manually": the field is editable (all its bills were rejected), so put the cursor there.
+  const enterManually = (locId: string, field: string) => {
+    const el = document.getElementById(`figure-${locId}-${field}`) as HTMLInputElement | null
+    el?.focus()
   }
   // THE DERIVED LOCATIONS (T4, T7). Every figure on screen, every gate and every saved total reads these;
   // inventory.locations holds only what the customer typed and the documents. Index-aligned with
@@ -2120,7 +2144,7 @@ workings: saved.workings,
                       </div>
                     )}
                   </Field>
-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
+                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -2135,7 +2159,7 @@ workings: saved.workings,
                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2150,7 +2174,7 @@ workings: saved.workings,
                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2178,7 +2202,7 @@ workings: saved.workings,
                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2194,7 +2218,7 @@ workings: saved.workings,
                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2222,7 +2246,7 @@ workings: saved.workings,
                       </select>
                     </div>
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2242,7 +2266,7 @@ workings: saved.workings,
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
+                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
@@ -2315,7 +2339,7 @@ workings: saved.workings,
                     <a href={EPA_EGRID_POWER_PROFILER_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
+                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
             <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system: Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
@@ -2385,7 +2409,7 @@ workings: saved.workings,
                       )}
                     </>
                   })()}
-                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
+                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -2515,7 +2539,7 @@ workings: saved.workings,
                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
                     <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
+                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -2534,7 +2558,7 @@ workings: saved.workings,
                       docs live in the locations_data jsonb with no DB constraint on document_type,
                       and /api/verifier-documents iterates source_docs generically, so this slot
                       reaches the verifier surface on its own. */}
-                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
+                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -3457,7 +3481,7 @@ const PROPOSAL_BADGE_COLOUR: Record<ConciergeStatus, { bg: string; color: string
   rejected:            { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
+function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, onLabelMeter, onEnterManually, currentUser, location, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onLabelMeter: (locId: string, docId: string, label: string, res: CoverageResolution) => void; onEnterManually: (locId: string, field: string) => void; currentUser: CurrentUser | null; location: Location; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
@@ -3494,114 +3518,11 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         </div>
       </div>
       <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
-      {(() => {
-        // Coverage strip — ONE per (fuelType) at this location. A fleet_fuel upload carries gasoline AND
-        // diesel from the same bills; each fuel gets its OWN strip, status and resolution (the C1 fix), so a
-        // gap on diesel can't be cleared by acknowledging gasoline. Within a strip, a control is rendered
-        // for EACH unresolved issue in cov.issues — a gap+overlap fuel shows BOTH (the D1 fix).
-        const win = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
-        const groups = new Map<string, CoveragePeriod[]>()
-        docs.forEach(d => (d.extracted ?? []).forEach((p, pi) => {
-          if (p.status !== 'confirmed' || !p.periodStart || !p.periodEnd) return
-          const arr = groups.get(p.fuelType) ?? []
-          arr.push({ docId: d.id, pi, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
-          groups.set(p.fuelType, arr)
-        }))
-        if (groups.size === 0) return null
-        const KIND_FOR = { gap: 'extrapolate', overlap: 'duplicate', straddle: 'straddle' } as const
-        return [...groups.entries()].map(([fuelOfStrip, periods]) => {
-          const cov = analyzeCoverage(periods, win.start, win.end)
-          const resFor = (kind: CoverageResolution['kind']) =>
-            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip
-              && (r.kind !== 'extrapolate' || r.documentType == null || r.documentType === docType))
-          const gapRes = resFor('extrapolate')
-          const dupRes = resFor('duplicate')
-          const strdRes = resFor('straddle')
-          // Resolved only when EVERY issue present has its matching resolution on file.
-          const unresolvedIssues = cov.issues.filter(iss => !resFor(KIND_FOR[iss]))
-          const resolved = unresolvedIssues.length === 0
-          const tone =
-            resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
-            : { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' }
-          const fuelPrefix = groups.size > 1 && fuelOfStrip ? `${fuelOfStrip}: ` : ''
-          return (
-          <div key={fuelOfStrip} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
-            <div>{tone.icon} {fuelPrefix}{resolved && cov.issues.length > 0 ? `${cov.monthsCovered}/12 months from bills; remaining estimated (${cov.pctEstimated}% estimated).` : cov.summary}</div>
-            {cov.outOfWindow.length > 0 && (
-              <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
-                ℹ️ {cov.outOfWindow.length} bill{cov.outOfWindow.length > 1 ? 's' : ''} outside reporting year {reportingYear}, not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
-              </div>
-            )}
-            {cov.issues.includes('gap') && !gapRes && (
-              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Upload the missing bill above, or:</span>
-                <button
-                  onClick={() => onAddCoverageResolution({
-                    locId,
-                    fuelType: fuelOfStrip,
-                    kind: 'extrapolate',
-                    documentType: docType,
-                    monthsCovered: cov.monthsCovered,
-                    pctEstimated: cov.pctEstimated,
-                    note: `${cov.monthsCovered} of 12 months evidenced by bills; remaining ${12 - cov.monthsCovered} month(s) estimated by scaling metered data ×12/${cov.monthsCovered} (${cov.pctEstimated}% estimated).`,
-                    acknowledgedAt: new Date().toISOString(),
-                  })}
-                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-state-warn)', color: '#fff', border: 'none', cursor: 'pointer' }}
-                >Acknowledge &amp; estimate</button>
-              </div>
-            )}
-            {cov.issues.includes('overlap') && !dupRes && (
-              <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 400, color: '#7c5a16' }}>Two bills cover the same period. Remove the duplicate above, or:</span>
-                <button
-                  onClick={() => onAddCoverageResolution({
-                    locId,
-                    fuelType: fuelOfStrip,
-                    kind: 'duplicate',
-                    note: `Overlapping bills detected for ${fuelOfStrip || 'this fuel'}; user confirmed the overlap is intentional (e.g. corrected re-issue) and accepted the figures as-is. No double-count adjustment applied.`,
-                    acknowledgedAt: new Date().toISOString(),
-                  })}
-                  style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'var(--color-state-warn)', color: '#fff', border: 'none', cursor: 'pointer' }}
-                >Confirm not a duplicate</button>
-              </div>
-            )}
-            {cov.issues.includes('straddle') && !strdRes && (
-              <div style={{ marginTop: 6 }}>
-                <div style={{ fontWeight: 400, color: '#7c5a16', marginBottom: 6 }}>A bill crosses the reporting-year boundary. How should the overlapping portion be counted?</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {([
-                    { choice: 'prorate' as const, label: 'Prorate by days', note: 'day-level proration: only the in-window portion is counted, split by day count across the boundary' },
-                    { choice: 'this_year' as const, label: 'Count in this year', note: 'the full straddling bill is attributed to this reporting year' },
-                    { choice: 'next_year' as const, label: 'Count in next year', note: 'the full straddling bill is attributed to the next reporting year (excluded here)' },
-                  ]).map(opt => (
-                    <button
-                      key={opt.choice}
-                      onClick={() => onAddCoverageResolution({
-                        locId,
-                        fuelType: fuelOfStrip,
-                        kind: 'straddle',
-                        straddleChoice: opt.choice,
-                        daysInYear: cov.straddles[0]?.daysInYear,
-                        totalDays: cov.straddles[0]?.totalDays,
-                        // ⚠️ THE DASH STAYS, AND IT IS THE ONLY ONE LEFT ON THIS SCREEN THAT IS PROSE.
-                        // This note is PERSISTED in coverage_resolutions and reprinted to verifiers
-                        // through rowNoteOf on /verify/[token]. Resolutions already recorded carry the
-                        // dash, so sweeping it here would put both forms in one audit trail without
-                        // changing a single stored record. applyResolutions never reads it, so this is
-                        // a wording decision and not a correctness one. Budgeted in lib/emDashCopy.test.ts.
-                        note: `Boundary-straddling bill for ${fuelOfStrip || 'this fuel'} resolved by "${opt.label}" — ${opt.note}.`,
-                        acknowledgedAt: new Date().toISOString(),
-                      })}
-                      style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: opt.choice === 'prorate' ? '#0F6E56' : '#fff', color: opt.choice === 'prorate' ? '#fff' : '#555553', border: opt.choice === 'prorate' ? 'none' : '0.5px solid #e8e7e4', cursor: 'pointer' }}
-                    >{opt.label}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          )
-        })
-      })()}
+      {/* The coverage strip (T8): the engine's issues for this upload, per fuel and meter, with the controls
+          that answer them. See ./_components/CoverageStrip.tsx. */}
+      <CoverageStrip location={location} docType={docType} reportingYear={reportingYear} fiscalYearEndMonth={fiscalYearEndMonth}
+        resolutions={coverageResolutions} currentUser={currentUser} onAdd={onAddCoverageResolution}
+        onLabelMeter={(docId, l, res) => onLabelMeter(locId, docId, l, res)} onEnterManually={field => onEnterManually(locId, field)} />
       {uploadError && (
         <div style={{ marginTop: 6, background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#B91C1C', lineHeight: 1.5 }}>
           {uploadError}
