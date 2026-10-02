@@ -453,6 +453,38 @@ The tests are grouped by task in section 11. They include all of these:
 | Merge set | derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8 (widened), T9 (widened), T12, T10. T11 and T13 follow on main. T8 and T9 are widened as described in section 11; T12 moves after T9, and T10 after T12. |
 | T3b: label forms | Replaces the proposed "YE" forms. Non-December year ends read "Apr 2024 to Mar 2025" in menus, tiles and headings; "2024–25" on chart axes only; "2024-04_to_2025-03" in filenames. December year ends read "2025" in all three. No "YE" or "FY" abbreviations in customer-facing labels. Running text keeps T3a's "the year ending 31 March 2025". |
 | T3b: SB 253 first-report window | From CARB's Final Regulation Order, Title 17 CCR §96076(c) (text in the T3b entry). The first report (due 10 November 2026) covers the fiscal year ending **after 1 February 2025 and on or before 1 February 2026**. A fiscal year ending on or before 1 February in a calendar year reports the year ending in that calendar year; one ending later reports the year ending in the previous calendar year. Optionally, the most recent preceding year may be reported where its data is available. Status: adopted by CARB (Executive Order R-26-006) and resubmitted to OAL on 21 September 2026; OAL approval not yet reached, so it carries the same 'proposed' handling as `SB253_DATE_STATUS`. |
+| Factor integrity: no cross-country fallback | A missing factor key never uses another country's or publisher's value. Only exact conversions are applied: US gallon ↔ litre; therm, kWh, MJ, MMBtu ↔ GJ; Mcf, Ccf, ft³ ↔ m³; lb ↔ kg. Any density or energy content must come from the same publisher as the factor, cited; otherwise the line is unpriced with a plain-language export-blocking issue. (FI2) |
+| Factor integrity: no silent drop-out | Any input without a factor raises an export-blocking issue. It never excludes the site from the totals and is never priced at zero; the site's other lines are still priced. (FI1) |
+| Factor integrity: unit and country change | Changing a unit, or a location's country, either converts the figure exactly, with a visible conversion note, or clears the figure and asks. It never relabels. This includes the open CLAUDE.md defect "Unit switch relabels without converting". (FI5) |
+| Factor integrity: propane by mass | Propane in kg or lb is priced with the publisher's own per-mass factor or density, cited, or it blocks. The unverified US density of 4.24 lb/gal is removed. (FI4) |
+| Factor integrity: Australian Category 3 | The DEFRA stand-in for Australian gas and electricity is replaced by NGA's Scope 3 factors, by state, cited. (FI6) |
+| Factor integrity: steam | Where no steam factor is published, supplier-figure entry stays, with a plain message. (FI7) |
+| Factor integrity: EU derived factors (2 Oct 2026) | Applied now: the `EF_EU` per-litre and per-m³ factors built on densities and an energy content that neither cited source publishes are removed, and those EU lines block until the quantity is entered in a unit the publisher's basis supports, or a same-publisher value is found and cited. (FI3) |
+| Factor integrity: Category 3 stand-in (2 Oct 2026) | The no-fallback ruling covers Scope 1 and 2 factor keys. The disclosed DEFRA `uk_stand_in` for Category 3 stays for Canada, New Zealand, the EU, and Australian lines other than gas and electricity. |
+| Factor integrity: unsupported country (2 Oct 2026) | Unchanged: a location in an unsupported country stays excluded from the totals, stated on every surface, and does not block export. The no-silent-drop-out ruling applies to inputs in supported countries. |
+| Factor integrity: calorific basis (2 Oct 2026) | A gas quantity in an energy unit (kWh, GJ, MJ, therms, MMBtu) is priced only with an energy-basis factor whose gross or net basis its publisher states. A gross/net ratio is used only if that publisher publishes it, cited. Otherwise the line is unpriced with a blocking issue. |
+| FI3: EU units and properties (2 Oct 2026, second set) | Net-basis gas entry is struck. kg and tonnes are offered for an EU fuel only where the cited factor source publishes on a mass basis. |
+| Density and energy content, all countries (2 Oct 2026, second set) | Refines the no-fallback ruling. A density or energy content comes from the factor's own publisher by preference. Otherwise a cited official or standards source (for example the EU JRC or EN 590) is allowed, and is shown in the row's derivation note. Another country's emission factor is never allowed. ⚑ Two readings applied in FI2 and FI3, to confirm: (1) a value chosen by us inside a range that a standard gives (as `EF_EU` does today for diesel, petrol and residual fuel oil) is not a value that source publishes, and does not qualify; (2) a gross/net calorific ratio counts as an energy content under this rule, which widens the earlier calorific-basis ruling from "same publisher only". |
+| Canadian gas with no province (2 Oct 2026) | Blocks, and requires the province. The Ontario fallback (`EF_CA.natural_gas_m3` 1.921) is removed. (FI1) |
+| Unknown refrigerant (2 Oct 2026) | Confirmed: FI1 makes an unrecognised or blank refrigerant type with kilograms entered an unpriced line with an export-blocking issue, never `?? 0`, with a test. |
+| Market-based Scope 2 with no residual mix loaded (UK, CA, NZ): report, 2 Oct 2026 | **What each surface shows today:**<br>• **Workings row** (screen, XLSX, verifier page, from stored workings; engine.ts:3911-3927): the source reads "Electricity (S2 market-based, location-factor fallback)"; the factor is the location grid factor; the citation is the grid publisher's, followed by "No published residual mix for this subregion; market-based falls back to location factor." (1265-1266) and the grid vintage note; the vintage is the grid year.<br>• **XLSX methods block** (page.tsx:3191-3195): "Residual-mix factor applied to uncovered load", then per location "Location-factor fallback" with the same note.<br>• **PDF** (lib/assurancePdf.ts:276-280, rows from page.tsx:3113-3121, ESRS or GRI only): heading "Market-based Scope 2 — Residual Mix" and the sentence "Residual-mix factor applied to uncovered load", with each location's row reading "Location-factor fallback" and the note.<br>• **Methodology page** (app/methodology/page.tsx:71): names AIB and Green-e as the residual sources and the location factor only "for full-disclosure jurisdictions where no residual mix is published (e.g. Austria)"; it does not mention the UK, Canada or New Zealand.<br>• **Totals** (page.tsx:2642, 3000, 3159): no note. ⚑ Only these lines were checked.<br>**Finding:** the grid-average substitution IS disclosed on the row, so no disclosure task is added. The wording has defects: the US word "subregion"; an unchecked claim that no residual mix is "published"; a PDF and XLSX introduction that says a residual mix was applied; and a methodology page that omits these countries. Corrections are proposed in FI8, marked to strike if not wanted. ⚑ The GHG Protocol Scope 2 Guidance text on disclosing grid-average use in the market-based method was not re-read for this report. |
+| Fleet fuel (2 Oct 2026) | Mobile combustion is priced with each country's published mobile factors for CO2, CH4 and N2O, cited. Where a country publishes none, the line blocks; stationary factors are never used. (FI9) ⚑ Open: the input that selects the vehicle class or control technology where the publisher's factors vary by them (FI9). |
+| NZ use class (2 Oct 2026) | Shown on every NZ combustion row and recorded in `factor_editions`. (FI10) |
+| F-06: factor editions in the year-on-year disclosure (2 Oct 2026) | In scope, added to T3c. The comparability disclosure in the export, CSV, verifier page and PDF names every factor edition that changed between the compared years, and its effect (this year's activity at last year's edition, minus at this year's), or says why the effect could not be calculated. ISO 14064-3 cl. 6.3.1.5, as cited in the ruling. |
+| T11 and T17 classification (2 Oct 2026) | Core pre-launch work, not post-core. T11 (verifier page: contributions, reasons, estimated dates) and T17 (PDF workings page) supply the data trail (ISO 14064-3 cl. 6.1.3.2) and the documented information that qualitative materiality relies on (cl. 5.1.7). Clause numbers as cited in the ruling; the standard's text was not re-read for this record. |
+| Batch "Accept all" (2 Oct 2026) | Added to T13. None exists today. If one is built, it persists a per-bill acceptance record (who, when, which reading), because the customer's approval of each AI reading is the control a verifier will test. |
+| Review actions: who and when (report, 2 Oct 2026) | Checked at `3e37755`.<br>**Recorded, and in the saved workings:**<br>• **Reject and Undo** (page.tsx:3608, 3590 → proposalEdits.ts:67-89): `statusLog` with `by` and `at`, carried on the contribution (engine.ts:3410).<br>• **Date correction** (`editPeriod`, proposalEdits.ts:33-44) and **unit correction** (`editUnit`, 51-61): `asRead` and `corrections` with `by` and `at`, carried on the contribution (engine.ts:3408-3409).<br>• **Manual override** (T10): reason, `by` and `at` in `manual_overrides`, written to the row's `manual_override` (engine.ts:3858).<br>• **"Used none"** (coverageActions.ts:92-100): `by` and `at`, in the resolution note and the audit text (engine.ts:3037).<br>The path to the saved record: contributions go onto workings rows (engine.ts:3850-3858), and workings are saved by `figuresForSave` (lib/ghg/savePayload.ts:27).<br>**Not recorded, or not reaching the workings:**<br>• **Confirm** (page.tsx:3598-3600): the patch is `{ status: 'confirmed' }` only. No who, no when, no record of which reading was accepted.<br>• **Edit figure, Save** (page.tsx:3584): `{ value, status: 'confirmed' }`. No who or when. The read value is overwritten: `asRead` holds dates and unit only (engine.ts:1620), and the contribution carries `value` only (3401). `rawValue` (1600) stays on the proposal in `locations_data`, but nothing in the workings shows the figure was edited.<br>• **Flag for review** (page.tsx:3607): `{ status: 'needs_manual_review' }` only.<br>• **Date confirmation without a change:** `periodConfirmedAt` and `periodConfirmedBy` are set (proposalEdits.ts:39-40) but not copied to the contribution (engine.ts:3395-3411). They are shown in the review only (ProposalEdits.tsx:103-104).<br>• **Override removal** ("Use the bills instead", lib/ghg/overrides.ts:36): `removedBy` and `removedAt` in `manual_overrides_removed` on the location, but `buildWorkings` does not read them.<br>• **Coverage resolutions** `same_bill`, `different_meters` and `extrapolate` (coverageActions.ts:44-82): `acknowledgedAt` only, no who. Their workings row has `resolved_at` (engine.ts:4069).<br>• **Not in the list, found alongside:**<br>&nbsp;&nbsp;– Removing a document (`removeDoc`, page.tsx:1176-1190) deletes the stored file and the document with its proposals, and leaves no record.<br>&nbsp;&nbsp;– A typed figure on a field with no documents carries no who or when.<br>Fix: T18, in scope (rulings below). |
+| T18: document removal (2 Oct 2026) | A document with any confirmed or rejected reading cannot be deleted from the inventory. "Remove" becomes "Withdraw": the file is kept, its readings stop counting (reason `withdrawn`), and the evidence list, workings, verifier page and PDF show it as withdrawn with who, when and a required reason. A withdrawal can be undone, recorded the same way. A true delete stays available for a file uploaded in error or holding information that must not be kept: it requires a reason, deletes the file and its readings, and leaves a permanent tombstone (file name, SHA-256 if known, who, when, reason) that appears in the saved workings and to verifiers. A document with no reading acted on yet (extraction pending or failed) may be deleted freely, and the deletion is logged. ⚑ Open (T18): `audit_log` keeps earlier snapshots of the inventory, so a privacy delete cannot remove past copies of what was read. |
+| T18: edit figure (2 Oct 2026) | Keeps the AI's original reading (`asRead`) and appends a correction with who and when, as date and unit corrections do. |
+| T18: confirm (2 Oct 2026) | Records who, when and the exact reading accepted: value, unit, period and source quote. |
+| T18: typed figures (2 Oct 2026) | A typed figure on a field with no documents records who and when it was entered or changed. |
+| T18: coverage resolutions (2 Oct 2026) | Same bill, different meters and gap-estimate resolutions record who as well as when. |
+| T18: flag for review (2 Oct 2026) | Records who and when. Ruled as a move from the T13 list into T18; T13 never listed it, so it is recorded in T18 only. |
+| T18 scope (2 Oct 2026) | T18 is in scope, no longer proposed. Core pre-launch work with T11 and T17. |
+| FI0: location cap retired (2 Oct 2026) | GHG is priced by employee count with unlimited locations. Part (b) of `enforce_ghg_location_allowance()`, the location cap, is retired. Part (a), the entitlement gate (an active `ghg` pass with `term_end > now()`, else "expired" or "requires the GHG module"), stays, with the em dash in "still on screen — purchase" replaced by a full stop. FI0 runs on its own small branch off main: NOT RUN SQL replacing the function with the gate only; stop writing `location_allowance` for GHG; remove the client wall and the location-limit copy; tests that a 25-location inventory saves with an active pass and is refused without one. |
+| Trigger capture (2 Oct 2026) | Write docs/review/patches/capture-triggers.sql (NOT RUN), an idempotent capture of `log_audit()` and `audit_ghg_inventories` exactly as live. **Finding:** of the two triggers reported as missing from the migrations, only `audit_ghg_inventories` is. `log_audit()` is in 20260726_capture_audit_log_infrastructure.sql, and `enforce_ghg_location_allowance()` with its trigger is in 20260618_ghg_location_allowance.sql; both are identical to the 1 Oct 2026 dump. The capture creates the audit trigger only if absent; otherwise it compares the live definition and raises on a difference. docs/review/live-trigger-functions.sql did not exist when this was written; diff against it before running. |
+| Launch (2 Oct 2026) | The commercial launch has moved from 1 November 2026 to a date to be set once the GHG module is complete. Order and estimate for the remaining work: section 12. |
+| Sequencing (2 Oct 2026) | The `factor-integrity` branch (FI1 to FI10) is created from main after derived-figures merges. `factor-years` (T3b, T3c, T3d) is created from main after `factor-integrity` merges. |
 | T3b: optional election and allowlist | Optional-election banner confirmed, for a window ending after 1 February 2026: "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it." The EU deadline string "FY2024 (large EU companies)" stays on the source-guard allowlist. |
 
 ---
@@ -461,11 +493,13 @@ The tests are grouped by task in section 11. They include all of these:
 
 Each task is one reviewable diff with its own tests. Run `npx vitest run lib/ghg/engine.test.ts` before and after
 every engine task: the passing count only goes up. Run `npm run build` after every task. Tasks T1 to T13 are the
-core derived-figures work. T14 to T17 come after it, as ruled.
+core derived-figures work. T14 to T16 come after it, as ruled. T11, T17 and T18 are core pre-launch work
+(ruling of 2 Oct 2026).
 
 **Merge set (ruling, section 10).** derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8, T9,
-T12, T10. T11 and T13 follow on main. T3b, T3c and T3d are on the `factor-years` branch, created from main after
-that merge. The tasks below are listed in that order. T3a has no entry of its own: it is the patch
+T12, T10. T11 and T13 follow on main. FI1 to FI10 are on the `factor-integrity` branch, created from main after
+that merge; T3b, T3c and T3d are on the `factor-years` branch, created from main after `factor-integrity` merges
+(sequencing ruling of 2 Oct 2026). The tasks below are listed in that order. T3a has no entry of its own: it is the patch
 docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the proration note).
 
 ### T1. Engine: `billContributions` (pure, not yet wired)
@@ -642,7 +676,14 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
 - **Done:** a customer with an unusable document can finish, and the reason travels with the figure.
 
 ### T11. Verifier page: contributions, reasons, estimated dates
-- **Order:** after derived-figures merges, on main.
+- **Classification:** core pre-launch work (ruling of 2 Oct 2026, section 10). It supplies the data trail a
+  verifier follows from each figure back to its documents (ISO 14064-3 cl. 6.1.3.2), and the documented
+  information that qualitative materiality depends on (cl. 5.1.7). Clause numbers are as cited in the ruling.
+- **Order:** after derived-figures merges, on main; scheduled in section 12 after the work that adds workings
+  fields.
+- **Also renders** (T18): each action's who and when; the reading accepted at confirmation; an edited figure
+  beside the value read; withdrawn documents with who, when and reason; tombstones of deleted documents; typed-figure
+  entries.
 - **Files:** app/verify/[token]/page.tsx (render from stored `workings`); lib/ghg/verifierWhitelist.test.ts if a new
   field crosses the projection; tests.
 - **SQL:** none (fields live inside the `workings` jsonb the RPC already returns).
@@ -660,12 +701,667 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
   NGA's published unit (51.53 kg CO2e/GJ), instead of converting MJ and GJ to MMBtu and pricing on a derived
   54.367 kg CO2e/MMBtu. It would remove one conversion and the derived factor; it needs a GJ canonical unit for
   natural gas (or per country) in lib/unitConversions.ts.
+- **Batch "Accept all" (ruling of 2 Oct 2026, section 10).** No batch accept exists today; each proposal is
+  confirmed one at a time (page.tsx:3598-3600).
+  - If one is built later, it must persist a per-bill acceptance record for every proposal it confirms: who,
+    when, and which reading was accepted (value, unit and dates as shown at that moment).
+  - The record is the same shape as T18's single-bill confirmation record, so a verifier sees no difference
+    between a bill accepted alone and one accepted in a batch.
+  - It goes through `guardConfirm` per bill, so a month-only bill or one with no figure is never accepted by
+    the batch.
+  - Reason: the customer's approval of each AI reading is the control a verifier will test.
 - **Tests:** full suite; engine count not lower than before T1.
 - **Done:** F-09, F-10 and F-11 are closed by tests that would fail on the old code.
 
+### FI0. Retire the GHG location cap; keep the entitlement gate (own branch)
+- **Branch:** `fi0-location-cap`, a small branch off main, independent of `derived-figures` and the factor
+  branches. It touches no engine code.
+- **Estimate:** M, 2 diffs, 1.5 to 2 days:
+  - the SQL (drafted, NOT RUN: docs/review/patches/FI0-entitlement-gate-only.sql, with
+    docs/review/patches/FI0-verify.sql);
+  - the code and copy.
+- **Rulings (section 10, "FI0"):** part (a) of `enforce_ghg_location_allowance()`, the entitlement gate, stays.
+  Part (b), the location cap, is retired, because GHG is priced by employee band with unlimited locations. The
+  gate's "still on screen — purchase" message loses its em dash.
+- **Where the location limit is enforced, written or described** (checked at `3e37755`, 2 Oct 2026):
+  - **Enforced, database:**
+    - `enforce_ghg_location_allowance()` part (b) and its trigger `trg_enforce_ghg_location_allowance`:
+      supabase/migrations/20260618_ghg_location_allowance.sql:65-130. The body there is identical to the 1 Oct
+      2026 dump, db/dumps/schema_public_20261001_1057.sql:570-628; the cap is at 605-626.
+    - **Correction to the premise:** this trigger is in the migrations folder. So is `log_audit()`
+      (20260726_capture_audit_log_infrastructure.sql). Only the trigger `audit_ghg_inventories` is missing
+      (captured in docs/review/patches/capture-triggers.sql, NOT RUN).
+  - **Enforced, client:**
+    - `useGhgLocationAllowance` (lib/useEntitlement.ts:197-225), read at app/dashboard/ghg/page.tsx:660;
+    - the add-location check, outside and inside the updater (page.tsx:1013, 1016);
+    - the wall copy, shown twice (page.tsx:2073-2074 and 2114-2115): "You've reached your plan's location limit
+      ({n})" / "Your current plan covers up to {n} location(s). Upgrade to add more: your existing data stays
+      exactly as it is." with "See plans & upgrade";
+    - comments at page.tsx:288, 647, 999-1005, 1572 and 3308.
+  - **Written, the column:** `entitlements.location_allowance`. It is created in
+    20260618_ghg_location_allowance.sql:47-50 and defined in 20260811_entitlements_definition.sql:71. Its live
+    column comment names "Essentials 3 / Professional 15 / Advisory uncapped" (dumps). Writers:
+    - **checkout:** app/api/checkout/route.ts:123 (`locationAllowanceForTier`) and :288 (metadata
+      `ghg_location_allowance`); it also selects the column at :144;
+    - **admin invoice:** app/api/admin/create-invoice/route.ts:157 and :274, selecting it at :212; comments at
+      :10-14;
+    - **Stripe webhook:** app/api/webhooks/stripe/route.ts:181-182 reads the metadata and :245 upserts the
+      column on every purchase, with a comment at :252;
+    - **lib/pricing.ts:**
+      - `locationAllowanceForTier` (124-132; its legacy branch 3 / 10 / 20 is dead under
+        `NEW_PRICING_ACTIVE`);
+      - `GHG_TIERS[*].locationAllowance`, all null (170-184);
+      - comments at :481 and :587.
+  - **Tests that pin it:**
+    - lib/entitlementMetadata.test.ts:10-11, 37-39, 58, 110, 121, 125-149;
+    - lib/pricing.test.ts:297;
+    - lib/ghgTierKeys.test.ts:47;
+    - lib/entitlementTerm.test.ts:14.
+  - **Described, customer-facing copy:**
+    - **app/calculate-emissions/page.tsx:145** (FAQ structured data): "priced by number of locations".
+    - **app/calculate-emissions/page.tsx:588 and :692:** "The GHG module is priced by number of locations: from
+      ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {...}". Both
+      allowances are null, so **at `3e37755` this renders as "for up to  locations"**: wrong and broken.
+    - **app/climate-ghg/page.tsx:**
+      - :162: "{Unlimited locations} on the entry tier. Larger allowances and an uncapped tier are in the
+        picker." This contradicts itself;
+      - :216: the heading "Priced by locations, not by seats.";
+      - :218-219: "because an inventory for three sites is not the same work as one for fifteen";
+      - :233: the tier cards' allowance line;
+      - comments at :72, 95-97 and 224.
+    - **app/pricing/page.tsx:637-638:** the tier button's "unlimited locations" line.
+    - **app/pricing/page.tsx:648-652:** "What counts as a location", placed "because the tier the buyer picks is
+      a location count".
+    - **app/order/page.tsx:115:** "· up to {n} locations" / "· uncapped".
+  - **Described, internal:**
+    - CLAUDE.md:20-23 (the DB-only list; stale, since both objects are in migrations), :54
+      (`useGhgLocationAllowance()`) and :236-237 ("Only GHG scales by location ... Hard enforcement, upgrade
+      wall");
+    - comments in 20260909_verifier_invite_term_gate.sql:76, 121; 20260913_module_entitlement_triggers.sql:28,
+      59, 113; 20260930_s211_read_write_split.sql:25; 20260811_deals_free_tier_cap.sql:31;
+      20260928_concierge_source_model.sql; and 20260928_ghg_employee_bands.sql:17 ("until the batch that retires
+      the cap");
+    - lib/useEntitlement.ts:55, 71, 174; app/api/concierge/extract/route.ts:107; lib/obligations.ts:367, 490;
+    - docs/review/ghg-register.md, LOC-01 to LOC-09 (147-178).
+- **Files:**
+  - **SQL** (NOT RUN, parsed offline with pglast): docs/review/patches/FI0-entitlement-gate-only.sql.
+    - It replaces the function body with the gate only, keeping its name and trigger, so there is no moment
+      without a gate.
+    - The message becomes "Saving a GHG inventory requires the GHG module. Your work is still on screen.
+      Purchase to save it."
+    - It re-comments the column as retired.
+    - Its pre-flight reports how many GHG rows still hold a non-null allowance.
+  - **lib/pricing.ts:** remove `locationAllowance` from `GHG_TIERS` and remove `locationAllowanceForTier`.
+  - **app/api/checkout/route.ts, app/api/admin/create-invoice/route.ts:** stop deriving and sending
+    `ghg_location_allowance`, and stop selecting `location_allowance` (select `module_key` only).
+  - **app/api/webhooks/stripe/route.ts:** stop reading the metadata key and stop writing `location_allowance`;
+    the key is dropped from the upserted row.
+    - A Checkout Session created before deploy may still carry the key; it is ignored.
+    - Rows written earlier keep their value, which no trigger reads after the SQL.
+  - **lib/useEntitlement.ts:** remove `useGhgLocationAllowance`.
+  - **app/dashboard/ghg/page.tsx:** remove the allowance read, both add-location checks, `showLocationWall` and
+    both walls. Rewrite the five comments.
+  - **Copy, derived from `GHG_TIERS` employee bands, no hard-coded price** (CLAUDE.md pricing rule). Drafts:
+    - **calculate-emissions :588 and :692:** "* All prices in USD. The GHG module is priced by number of
+      employees, with unlimited locations on every plan: from ${starter} a year for up to {starter.max}
+      employees. Larger organisations are quoted."
+    - **calculate-emissions :145:** "... starts at ${ghgFrom} USD and is priced by number of employees, with
+      unlimited locations; ..."
+    - **climate-ghg :162:** "Unlimited locations on every plan. Plans are sized by number of employees."
+    - **climate-ghg :216:** the heading becomes "Priced by organisation size, not by sites." The paragraph at
+      :218-219 is rewritten to match. ⚑ Lisa to confirm the wording.
+    - **climate-ghg :233:** the employee band ("1 to 19 employees") in place of the allowance.
+    - **pricing :637-638:** the employee band.
+    - **pricing :648-652:** "Every plan covers unlimited locations. Plans are sized by your number of employees."
+    - **order :115:** the tier label and employee band.
+  - **Tests:**
+    - lib/entitlementMetadata.test.ts: `REQUIRED_KEYS` loses `ghg_location_allowance`, and a source test asserts
+      the webhook row has no `location_allowance` key;
+    - lib/pricing.test.ts:297 is replaced by "no GHG tier carries a location field";
+    - lib/ghgTierKeys.test.ts:47 is updated;
+    - new source test: no `useGhgLocationAllowance`, no "location limit" and no "priced by number of locations"
+      anywhere under app/;
+    - new copy test: the calculate-emissions note renders no empty number. The test fails on today's "for up to
+      locations".
+    - **Database tests** (no local Postgres server): docs/review/patches/FI0-verify.sql, run by Lisa after the
+      SQL. It returns rows in the house format, and all its writes are undone. It checks:
+      - a 25-location inventory saves with an active pass;
+      - the same save is refused once the pass has expired, with the expired message;
+      - it is refused with no GHG row, with the new module message;
+      - the body no longer reads `location_allowance` and has no em dash.
+  - **CLAUDE.md** (Lisa applies):
+    - :20-23: remove both objects from the DB-only list (they are in migrations), and add the uncaptured
+      `audit_ghg_inventories` trigger until capture-triggers.sql runs;
+    - :54: drop `useGhgLocationAllowance()`;
+    - :236-237: "GHG is priced by employee band, with unlimited locations on every plan. The only database rule on
+      a GHG save is the entitlement gate."
+- **Does main's live code work before and after the SQL runs? Yes in both states, provided the pre-flight
+  count is 0.**
+  - **Before (today):** every self-serve writer sends an empty allowance, which the webhook writes as null, and
+    null is "uncapped" to part (b). So the cap is already inert for any row written since 28 Sep 2026.
+    20260928_concierge_source_model.sql records that the one GHG row then existing (the developer test account)
+    holds null. A row holding a non-null value is the only way a customer is capped today, and only the
+    pre-flight count shows whether one exists.
+  - **After the SQL, before FI0's code:** main still reads and writes the column, which still exists. The client
+    wall reads null and never shows, and the function no longer reads the column. Nothing breaks.
+  - **After FI0's code:** works with the new function. With the old function it also works, provided the count
+    is 0.
+- **Order to run:**
+  1. capture-triggers.sql, at any time (independent; it creates nothing on prod).
+  2. FI0-entitlement-gate-only.sql, then FI0-verify.sql.
+  3. Merge FI0's code to main.
+  4. **Later, separately:** a migration dropping `entitlements.location_allowance`, and renaming the function to
+     `enforce_ghg_entitlement()` with its trigger. ⚠️ Only after step 3 is live. The webhook upserts the column
+     until then; dropped first, the upsert fails and a paying customer receives no entitlement.
+- **Done:** a GHG save is refused only for a missing or expired pass. No code reads or writes a location
+  allowance. No customer-facing text describes a location limit or prices by locations.
+
+### Factor integrity branch (after derived-figures merges, before factor-years)
+Branch `factor-integrity`, created from main after derived-figures merges; `factor-years` is created from main
+after this branch merges (sequencing ruling of 2 Oct 2026, section 10). Tasks FI1 to FI10; the recommended order,
+which differs from the numbering, is in section 12. Evidence for every gap named below is in
+docs/review/au-factor-coverage.md (AU) and docs/review/factor-coverage-all.md (UK, CA, NZ, EU); line numbers are
+at `3e37755` and must be re-read before editing.
+
+Rulings applied (section 10, "Factor integrity"):
+- no cross-country fallback;
+- exact conversions only;
+- a density or energy content from the factor's own publisher by preference, otherwise from a cited official or
+  standards source shown in the row's derivation note, and never another country's emission factor;
+- no silent drop-out;
+- unit and country changes convert exactly or clear and ask;
+- propane mass by the same density rule, or block;
+- Australian Category 3 gas and electricity from NGA Scope 3;
+- steam with no published factor keeps supplier entry;
+- Canadian gas with no province blocks;
+- fleet fuel priced with each country's published mobile factors, or blocks;
+- the NZ use class shown on rows.
+
+Decisions of 2 Oct 2026:
+- EU factors built on uncited properties are removed now and block;
+- the DEFRA Category 3 stand-in stays for every other line;
+- an unsupported-country location stays a stated, non-blocking exclusion;
+- a gas bill in an energy unit prices only on the same calorific basis;
+- no net-basis gas entry for the EU.
+
+**Estimates.** S = up to 1 working day; M = 1 to 2 days; L = 3 to 5 days. Each estimate covers drafting and
+verifying the patch, Lisa's review, one revision round, the build and the commit. A "diff" is one reviewable patch.
+
+**Design note for T3c.** FI2 tags every factor value with the table (publisher) that supplied it. T3c later adds
+an edition key to the same tables; FI2's shape must leave room for it (`{ publisher, edition?, value }`), so T3c
+extends it rather than replacing it.
+
+**Expected consequence (stated before any code).** Once this branch lands, inventories that price today will
+block, and some will price differently:
+- **Block:**
+  - every EU liquid-fuel and gas line, until each density or energy content it needs is replaced by a cited
+    value, or until the quantity is entered in kg or tonnes for a fuel whose cited source publishes on a mass
+    basis (FI3);
+  - every bill whose unit has no cited route to the factor (FI2), for example CA gas in therms, MMBtu, GJ or MJ,
+    and NZ gas in m³, unless a cited energy content is found;
+  - propane in kg or lb wherever no cited density or per-mass factor exists (FI4);
+  - an unknown refrigerant type, and Canadian gas with no province (FI1);
+  - fleet fuel in any country whose publisher has no mobile factor for it (FI9).
+- **Now price:** AU gas in kWh (exact to GJ, NGA gross basis); AU and NZ diesel, petrol and propane gallons
+  (exact to litres, own factor); NZ propane kg bills (MfE per-kg factor); UK gas in therms, MMBtu, GJ and MJ
+  (exact to kWh, DEFRA gross basis).
+- **Price differently:** every row that today carries a US EPA value under another publisher's citation.
+
+### FI1. Engine: an unpriceable input is a blocking line, never a dropped site
+- **Estimate:** L, 2 diffs:
+  - the engine line-level unpriced row, issues, refrigerant and province;
+  - consumers: page, monthly and Category 3.
+- **Files:**
+  - **lib/ghg/engine.ts:**
+    - `assertPriceable` / `MissingEmissionFactorError` (2483-2513), `unpriceableReason` kind `'factor'`
+      (2811-2815), the exclusion in `calcInventory` (2865) and the single `declaration: 'unpriceable'` workings
+      row (3829-3831): a missing factor no longer excludes the location. The line is unpriced: excluded from
+      every total (never counted as zero), its workings row carries `result_tco2e: null` and the message, and the
+      location's other lines are still priced. This is the same line-level shape as T3c's `edition_missing`;
+      the two share one `unpriced` row type.
+    - New coverage issue `factor_missing`, export-blocking, keyed (location, field). Message: "{Fuel} at {site}
+      is recorded in {unit}, and {publisher} publishes no factor this figure can be converted to exactly, so it
+      is not counted. Enter it in {units the publisher supports}, or reject the bill. Export is blocked until
+      this is resolved."
+    - **Refrigerants** (ruling, section 10): `REFRIGERANT_GWP[...]?.[gwp] ?? 0` (2735, 3896) becomes an
+      unpriced line with the issue "The refrigerant type at {site} is not one we hold a GWP for, so it is not
+      counted. Choose the refrigerant type. Export is blocked until it is chosen." This covers a blank type with
+      kilograms entered as well as an unrecognised one. Ammonia (`uses_ammonia`) is unchanged: it prices
+      nothing by design, because ammonia has a GWP of zero.
+    - **Canadian gas with no province** (ruling, section 10): the Ontario fallback is removed.
+      - The fallback is `EF_CA.natural_gas_m3.co2` 1.921, "Ontario fallback" (242-245), applied when
+        `grid_region || province` matches no key in `EF_CA_NG_CO2_M3` (2550-2556).
+      - A CA gas line whose province is blank or unrecognised is unpriced, with the issue "The province for
+        {site} is not set, so its natural gas is not counted. Choose the province. Export is blocked until it
+        is chosen."
+      - The province select already exists (page.tsx:2008-2019, 2306-2310). Electricity is already gated by
+        `gridReady` (page.tsx:1334-1338), and that gate is unchanged.
+      - Both issues clear when the province is chosen.
+    - `findUnpriceableLocations` keeps only the country refusals. `country_not_supported` keeps today's stated,
+      non-blocking exclusion (decision, section 10); `country_not_listed` keeps blocking.
+  - **lib/ghg/monthlyEmissions.ts** (166-179, 258-267): an unpriced line is skipped with reason
+    `factor_missing`, so `reconcile` reports zero unexplained delta.
+  - **app/dashboard/ghg/page.tsx:** `factorGapLocations` / `pricingReady` (1365-1380) read the new issues; the
+    export gate lists each with its message. The unpriceable-location panel becomes a per-line list.
+  - **lib/scope3/cat3Inputs.ts** (288-296): `location_excluded` for a factor gap becomes a per-stream skip,
+    `scope1_not_priced`, so the location's priced streams still reach Category 3.
+  - **CLAUDE.md** (Lisa applies): "No input without a factor is ever dropped silently or takes a site out of the
+    totals. It is an unpriced line with an export-blocking issue naming the site, the fuel and the unit. The
+    only whole-location exclusion is an unsupported country, which is stated on every surface."
+- **SQL:** none.
+- **Tests:**
+  - **Property test:** for every country in `efRouting`'s supported set × every fuel × every unit in the wizard
+    options and `convertibleUnits`, the line is either priced or unpriced with a blocking issue. It is never
+    `?? 0`, and the location is never excluded.
+  - A location with one unpriceable line still has its other lines priced and in every total.
+  - **Refrigerant:**
+    - an unrecognised refrigerant type with 50 kg entered, and a blank type with 50 kg entered, each give an
+      unpriced line, the blocking issue, and a fugitive total of 0 that is not counted as a priced zero;
+    - choosing a held type clears the issue and prices at kg × GWP;
+    - a source test finds no `?? 0` on a `REFRIGERANT_GWP` read.
+  - **Canada:** a CA location with gas in m³ and no province is unpriced with the province issue, and is not
+    priced at 1.921. Choosing ON prices at the Ontario value; choosing AB prices at AB's.
+  - Monthly and annual agree: `reconcile` is zero with an unpriced line present.
+  - An unsupported country is still excluded, stated and non-blocking; a not-listed country still blocks.
+  - Messages carry no em dash.
+  - Engine test count only goes up.
+- **Done:** no input in a supported country can leave the totals without an export-blocking issue that names it.
+
+### FI2. Engine: no cross-country fallback; exact conversions; provenance from the value
+- **Estimate:** L, 3 diffs:
+  - the exact conversion table and publisher-tagged factor tables;
+  - removal of the fallback and routing by quantity type;
+  - the Category 3 publisher sentences.
+- **Depends on:** FI1, so a key that stops falling back becomes a blocking line, not a dropped site.
+- **Files:**
+  - **lib/unitConversions.ts:**
+    - **One table of exact conversions**, the only ones the engine applies at pricing:
+      - US gallon = 3.785411784 L;
+      - ft³ = 0.028316846592 m³ (0.3048³), so mcf = 28.316846592 m³ and ccf = 2.8316846592 m³;
+      - therm = 0.105505585262 GJ;
+      - MMBtu = 1.05505585262 GJ;
+      - kWh = 0.0036 GJ;
+      - MJ = 0.001 GJ;
+      - lb = 0.45359237 kg.
+    - Each constant is cited (NIST SP 811, or the definition) and labelled exact. The "(IEA)" label at 40 is
+      corrected.
+    - `M3_PER_MCF` (engine.ts:285, 1000/35.3147, rounded) is replaced by the exact value.
+    - `PROPANE_LB_PER_GAL` goes in FI4.
+  - **lib/ghg/engine.ts:**
+    - **No fallback.** Remove `?? (EF as any)[key]` from every branch of `pickEF` (2528, 2531, 2535, 2540,
+      2547). A key absent from the location's own table resolves only by an exact conversion to a unit that table
+      holds. Otherwise the result is FI1's unpriced line.
+    - **Route by quantity type.** Volume ↔ volume, energy ↔ energy and mass ↔ mass use the exact table.
+      - **Volume ↔ energy or mass ↔ volume** needs an energy content or density (refined ruling, section 10).
+        - **Preference:** a value published by the factor's own publisher. Example: NGA 0.0393 GJ/m³, already the
+          basis of `EF_AU.natural_gas_m3`.
+        - **Otherwise:** a value from a cited official or standards source, for example the EU JRC or EN 590.
+        - **Never:** another country's emission factor.
+        - Each property is stored beside the factor with its citation (document, table, row) and printed in the
+          row's derivation note: "Density {value} kg/L, from {source, table}."
+        - A value we chose inside a range a standard gives is not a value that source publishes, and does not
+          qualify (⚑ reading of the ruling, recorded in section 10 for confirmation).
+      - **Calorific basis** (decision, section 10): a gas quantity in an energy unit (kWh, GJ, MJ, therms,
+        MMBtu) prices only with an energy-basis factor whose gross or net basis its publisher states.
+        - A gross/net ratio follows the same rule as any energy content: the publisher's own by preference,
+          otherwise a cited official or standards source, shown in the derivation note.
+        - The refinement is read as covering this ratio (⚑ confirm, section 10).
+        - Otherwise the line is unpriced.
+      - **As held today:**
+        - DEFRA kWh is gross (engine.ts:327), so UK energy units price.
+        - NGA 51.53 kg CO2e/GJ is gross, so AU energy units price. This replaces the derived `natural_gas_mmbtu`
+          54.367 and absorbs the T13 note on pricing Australian gas natively in GJ.
+        - US EPA MMBtu is HHV, so US energy units price.
+        - EU MRR is net (FI3).
+        - MfE kWh: basis not recorded (⚑ factor-coverage-all.md 4.2). It prices kWh only once the basis is
+          confirmed from the MfE document.
+        - ECCC: per m³ only. Energy units block unless an ECCC energy content is transcribed.
+    - **Provenance from the value.** Each factor table carries its publisher. `pickEF` returns `{ factor,
+      publisher, conversion? }`. `combustionSource` (2645-2649), `factor_vintage` (3787) and the GWP stamp in
+      `factorCells` (3722-3733) are taken from the table that supplied the value, never from the location's
+      country.
+    - **Every converted line** carries a `conversion_note` on its workings row: "1,000 US gallons converted to
+      3,785.41 litres (1 US gallon = 3.785411784 litres, exact)."
+    - **Canada, blank province:** handled in FI1.
+  - **lib/ghg/monthlyEmissions.ts:** uses the same `pickEF`; no separate path.
+  - **lib/scope3/cat3Inputs.ts** (377) and **cat3Copy.ts** (148-152, 424, 442): `scope1_publisher` is read from
+    the row's recorded publisher. `CAT3_EPA_HHV_SENTENCE` fires only when the row's publisher is US EPA, not on
+    the unit.
+  - **Stale comments** at engine.ts:2204-2209 (`pickEF` header) and 2533, 2538 ("fall back to US EF") are
+    rewritten to the new rule.
+- **SQL:** none.
+- **Tests:**
+  - **Publisher matches value** (the cross-publisher test). For every supported country × fuel × unit the
+    wizard or bill path can store, build the inventory and walk every workings row. Either the row is unpriced,
+    or the factor value it used is found in the table of the publisher its `ef_source` and `factor_vintage`
+    name, under the key the row records (after its recorded exact conversion). The test fails if any row
+    cites one publisher while its value comes from another's table.
+  - **Every property shown:** every row priced through a density, energy content or gross/net ratio carries a
+    derivation note naming that value and its source. No property comes from another country's emission factor
+    table.
+  - **Source test:** no `?? (EF as any)` and no `?? EF[` in `pickEF` or anything it calls.
+  - **Exact table:** each constant equals its definition to full precision. mcf ↔ m³ round-trips.
+  - **Calorific basis:**
+    - AU gas in kWh prices at 51.53 × 0.0036 per kWh;
+    - EU gas in kWh is unpriced with the issue;
+    - UK gas in therms prices via exact kWh at the DEFRA gross factor.
+  - **Conversion note:** present and plain on every converted row.
+  - Category 3 sentences name the publisher that priced the row.
+  - Engine count only goes up.
+- **Done:** every priced row's value comes from the publisher it cites. Every conversion is either exact or uses
+  a property that is cited and shown on the row. Nothing else prices.
+
+### FI3. EU: no factor through an uncited property; mass units only where the source is mass-based
+- **Estimate:** M, 2 diffs:
+  - a research record, a document only: per fuel, what each candidate source publishes;
+  - the `EF_EU` restructure and the units offered.
+  The research may take longer than the code.
+- **Depends on:** FI2.
+- **Decisions (section 10):** apply now and block; net-basis gas entry is struck; the density and
+  energy-content rule is the refined one.
+- **What changes, and why.** Every `EF_EU` per-litre and per-m³ key rests on a value that, the code itself
+  records, neither cited source publishes:
+  - **gas:** 36 MJ/m³ (engine.ts:569-572);
+  - **diesel:** 0.844 kg/L, "conservative upper end" of EN 590;
+  - **petrol:** 0.745 kg/L, "near midpoint" of EN 228;
+  - **LPG:** 0.510 kg/L, "no European standard bounding it";
+  - **residual fuel oil:** 0.990 kg/L, "one-sided bound".
+  Sources for these: engine.ts:416-437 and 573-588.
+  Under the refined rule, a point chosen inside a standard's range is not a cited value (⚑ reading, section 10),
+  so none of the five qualifies as it stands.
+- **Files:**
+  - **lib/ghg/engine.ts** (`EF_EU` 396-588):
+    - Each derived key is kept only once its property is replaced by a value from:
+      - the factor's publisher (EU MRR Annex VI, IPCC 2006); or
+      - failing that, a cited official or standards source that states a single value, for example the EU JRC.
+      The value, source and table go in `EU_DERIVATION` and on the row's derivation note.
+    - Until then the key is removed and the line is unpriced (FI1). Nothing is assumed.
+    - The emission factors per TJ (net calorific value) and the net calorific values stay as published, each
+      cited by table and row.
+  - **Mass units:**
+    - kg and tonnes are offered for an EU fuel **only where the cited factor source publishes on a mass basis**.
+      Here that is: a net calorific value per tonne from the same table as the factor per TJ, so mass × NCV ×
+      factor uses the cited source alone.
+    - ⚑ For each fuel, confirm from MRR Annex VI Table 1 and IPCC 2006 Vol. 2 Table 1.2 that both values are
+      published. A fuel without both gets no mass unit.
+    - Wizard options: `ngUnitOptions`, `liquidUnitOptions`, `propaneUnitOptions`, engine.ts:2048, 2062, 2104.
+  - **Gas in an energy unit:** no net-basis entry is offered (ruling).
+    - An EU gas bill in kWh, GJ or MJ is taken as stated on the bill. It prices only if a gross/net ratio is
+      cited under FI2's rule, shown in the derivation note.
+    - Otherwise it is unpriced.
+    - Gas in m³ prices only with a cited volumetric energy content.
+  - **Issue message:** "The EU factor for {fuel} is published per unit of energy, and we hold no cited {density
+    or energy content} to convert {unit} to it, so this line is not counted. {If a mass unit is offered: Enter
+    the quantity in kilograms or tonnes, or reject the bill.} Export is blocked until this is resolved."
+  - **app/methodology/page.tsx** and **`EF_SOURCES.combustion_eu`** (798): state the basis, each property's
+    source, and the units accepted.
+- **Research record** (docs/review/eu-fuel-properties.md, new, alongside, no code):
+  - per fuel, whether EU MRR, IPCC 2006, the Commission's MRR guidance or the EU JRC publish a density, a
+    volumetric energy content or a gross/net ratio;
+  - for each, the document, table, value, and whether the value is single or a range.
+- **SQL:** none.
+- **Tests:**
+  - **Source test:** no `EF_EU` value depends on 36, 0.844, 0.745, 0.510 or 0.990 unless that property carries a
+    citation.
+  - An EU diesel figure in litres, with no cited density, is unpriced with the message.
+  - A fuel with a mass-basis source prices from tonnes at mass × NCV × factor, each value cited. A fuel without
+    one is offered no mass unit.
+  - EU gas in kWh with no cited ratio is unpriced. With a cited ratio it prices, and the derivation note names
+    the ratio and its source.
+  - The FI2 cross-publisher and property tests pass for EU.
+- **Done:** no EU line is priced through a property that is not cited and shown on its row.
+
+### FI4. Propane by mass: cited density or per-mass factor, or block
+- **Estimate:** M, 1 diff, plus a research record per publisher.
+- **Depends on:** FI2.
+- **Files:**
+  - **lib/unitConversions.ts:**
+    - Remove `PROPANE_LB_PER_GAL` (48-52) and the `propane:lbs` and `propane:kg` rules (142-150).
+    - lb → kg is exact (FI2).
+    - A propane bill in kg or lb is stored as kg, not converted to a volume. `SELECTOR_UNITS.propane` (30) gains
+      `kg`.
+  - **lib/ghg/engine.ts:** a propane quantity in kg prices by:
+    - the publisher's own per-mass factor, where one is held: `EF_NZ.propane_kg` (706, 721); or
+    - a density under FI2's refined rule (the publisher's own by preference, otherwise a cited official or
+      standards source), shown in the derivation note, converting to the volume its factor uses.
+    - Otherwise the line is unpriced (FI1).
+    - **The 4.24 lb/gal value itself.** It is removed as it stands. Its comment cites "EIA / NPGA" and says
+      "VERIFY PROVENANCE"; NPGA is a trade association, not an official or standards body. It may return only
+      if an official source is found that states that value, cited by document and table.
+  - **Per publisher** (⚑ each to be confirmed against the document before a value is entered; none assumed):
+    - DEFRA LPG and propane per tonne;
+    - NGA LPG energy content per tonne;
+    - ECCC propane density;
+    - US EPA propane per mass.
+  - **Volume to mass** (litres or gallons where the factor is per kg, e.g. NZ): the same rule in reverse.
+- **SQL:** none.
+- **Tests:**
+  - **Source test:** no `PROPANE_LB_PER_GAL`, and no propane density without a citation.
+  - An NZ propane kg bill prices at MfE's per-kg factor, not at a US litre factor.
+  - A kg bill for a publisher with no per-mass factor and no density is unpriced with the issue.
+  - lb converts to kg exactly.
+  - FI2's cross-publisher test passes for propane.
+- **Done:** no propane figure passes through a density that is not cited and shown on its row.
+
+### FI5. Unit selector and country change: convert exactly or clear and ask
+- **Estimate:** M, 2 diffs:
+  - the engine `changeUnit`, `unitsForCountryChange` and the residual-region guard;
+  - the page handlers and messages.
+- **Depends on:** FI2 (the exact table).
+- **Closes:** the CLAUDE.md open defect "Unit switch relabels without converting", and the country-change
+  relabel (`unitsForCountryChange`, engine.ts:2173-2186; page.tsx:968).
+- **Rule, derived from the ruling:**
+  - **Convert** when old and new unit measure the same quantity and an exact conversion joins them (volume ↔
+    volume, energy ↔ energy, mass ↔ mass).
+  - **Otherwise clear** the figure and ask (volume ↔ energy, volume ↔ mass, or any pair with no exact
+    conversion).
+  - A field whose figure comes from documents keeps its locked unit (T7). Its unit is corrected on the bill (T9).
+- **Files:**
+  - **lib/ghg/engine.ts:**
+    - `unitsForCountryChange` returns, per stream, `{ unit, value, conversion }` or `{ unit, cleared: true,
+      from }`. A new pure `changeUnit(field, value, from, to)` serves the unit selector.
+    - Each conversion appends `{ field, from, to, factor, valueBefore, valueAfter, at, by }` to the location's
+      `unit_changes`. The workings row for that field carries it as its `conversion_note`.
+  - **app/dashboard/ghg/page.tsx:**
+    - The unit selector handler and the country handler (960-975) call these.
+    - **Converted:** shows, beside the field, "Converted from 1,000 US gallons to 3,785.41 litres (1 US gallon =
+      3.785411784 litres)."
+    - **Cleared:** shows "The {fuel} figure was in {old unit}, which cannot be converted exactly to {new unit},
+      so it has been cleared. Enter it in {new unit}."
+    - A cleared field with no figure raises FI1's issue until it is entered or confirmed as none.
+  - **Stale residual region** (factor-coverage-all.md 1.3): the country handler also clears `residual_region`,
+    and `residualRegionFor` (engine.ts:1192-1193) ignores a `residual_region` that does not belong to the
+    location's country.
+  - **CLAUDE.md** (Lisa applies): move "Unit switch relabels without converting" out of Known defects. Add the
+    invariant: "A unit change never relabels a figure: it converts exactly, with the conversion shown and
+    recorded, or it clears the figure and asks."
+- **SQL:** none (`unit_changes` lives in `locations_data`).
+- **Tests:**
+  - **The CLAUDE.md case:** 332 m³ switched to Mcf becomes 11.7245 Mcf (332 ÷ 28.316846592 = 11.72447), never 332 Mcf.
+  - US→GB with 1,000 gallons of diesel gives 3,785.41 litres with a note.
+  - US→GB steam in MMBtu converts to kWh exactly.
+  - US→NZ propane in gallons is cleared (volume to mass), with the message.
+  - Gas mcf to kWh is cleared.
+  - A document-backed field is not changed by a country change.
+  - A US location with a residual subregion switched to GB has no `residual_region`, and its market-based row
+    does not cite Green-e.
+  - **Property test:** for every country pair and every stream with a figure, the figure is converted exactly
+    or cleared. It is never the same number under a different unit.
+- **Done:** no unit or country change can relabel a figure.
+
+### FI6. Australia Category 3: NGA Scope 3 for gas and electricity, by state
+- **Estimate:** M, 2 diffs:
+  - the transcribed NGA Scope 3 file with spot tests;
+  - the Category 3 wiring and copy.
+- **Depends on:** FI2 (provenance on rows).
+- **Files:**
+  - **lib/emissionFactors/ngaScope3_2025.ts (new).**
+    - Transcribed from *National Greenhouse Accounts Factors 2025*. Every value is cited by table, row and
+      column:
+      - the Scope 3 electricity factor for each state and territory (the Scope 3 column of the table that
+        gives `GRID_EF.AU_*`, engine.ts:979-981);
+      - the Scope 3 natural gas factors for each state, per GJ.
+    - ⚑ Before transcribing, confirm from the NGA text: the table numbers; what the electricity Scope 3 factor
+      covers (upstream fuel extraction, T&D losses, or both), and whether NGA splits it; whether gas factors
+      differ by metro and non-metro; how the ACT is listed. None of this is assumed here.
+    - Keyed by edition, ready for T3c.
+  - **lib/scope3/cat3Energy.ts** (243-256, 317):
+    - For an AU location, the electricity lines are replaced by NGA's Scope 3 electricity line(s) for the
+      location's state. The replacement follows NGA's split: one line if NGA gives one combined figure, labelled
+      with what it covers; separate 3a and 3c lines if NGA splits them.
+    - Gas is priced at NGA's Scope 3 gas factor for the state. The stored unit is converted to GJ under FI2: m³
+      by NGA's 0.0393 GJ/m³, energy units exactly.
+    - These lines carry no `uk_stand_in` flag.
+    - AU liquids, LPG and steam keep the DEFRA stand-in, flagged (decision, section 10).
+  - **lib/scope3/cat3Copy.ts** (124-128, 207-211): AU wording names NGA for gas and electricity and the UK
+    stand-in for the rest.
+  - **lib/ghg/engine.ts:1116:** the "DELIBERATELY NOT SEEDED" comment is replaced by a pointer to the new file.
+  - **app/methodology/page.tsx:** the Category 3 paragraph for Australia.
+  - **A blank state:** the AU gas and electricity Category 3 lines are withheld with a reason naming the
+    missing state. They are not priced at a national figure.
+- **SQL:** none.
+- **Tests:**
+  - At least one spot value per table against the document.
+  - An AU electricity line in each state uses that state's NGA factor and cites NGA 2025.
+  - AU gas in m³ and in kWh both price at the NGA Scope 3 gas factor, with the conversion stated.
+  - AU diesel keeps the DEFRA stand-in and its flag.
+  - No AU gas or electricity Cat 3 line carries `uk_stand_in`.
+  - FI2's cross-publisher test extended to Category 3 rows.
+- **Done:** Australian Category 3 gas and electricity are priced from NGA by state, cited, and nothing else in
+  Australian Category 3 changes.
+
+### FI7. Steam with no published factor: plain supplier-figure message
+- **Estimate:** S, 1 diff.
+- **Files:**
+  - **lib/ghg/engine.ts** (`STEAM_EF` CA, AU, NZ, EU guidance, 2364-2396) and **app/dashboard/ghg/page.tsx**
+    (2392-2396): one message per kind, plain, no em dash.
+    - `unpublished`: "There is no published {country} factor for purchased steam or district heat, so this
+      line is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked
+      until it is entered."
+    - EU `not_searched`: "This platform holds no factor for purchased steam or district heat in {country},
+      so this line is not counted. Ask your provider for their emission intensity and enter it below. Export is
+      blocked until it is entered."
+  - The steam row joins FI1's unpriced line type: it shows `result_tco2e: null`, not a contribution of 0.
+  - Supplier entry is unchanged.
+  - page.tsx:2359: label the selected steam unit from the unit, so a UK location in kWh no longer shows "MMBtu".
+  - Stale comments at engine.ts:193-196, 2093-2095 and 2475-2477.
+- **SQL:** none.
+- **Tests:**
+  - Each kind shows its message.
+  - A supplier figure clears the issue and prices.
+  - No US steam fallback for any country (existing test kept).
+  - The UK kWh label reads kWh.
+- **Done:** a customer with no published steam factor is told plainly what to enter and why export waits for it.
+
+### FI8. Close-out
+- **Estimate:** S, 1 diff.
+- **Files:**
+  - **Stale comments** listed in factor-coverage-all.md section 6 and au-factor-coverage.md section 6.
+  - **docs/review/ghg-findings.md:** F-01 marked fixed (commit references added by Lisa).
+  - **docs/review/factor-year-selection.md:** line references refreshed.
+  - **app/methodology/page.tsx:** one disclosure paragraph: "Each emission factor is applied only to quantities
+    in the units its publisher uses, or converted to them by an exact conversion such as gallons to litres. If a
+    conversion needs a density or energy content, we use the publisher's own figure where it publishes one, and
+    otherwise a figure from a named official or standards source, shown beside the calculation. We never use
+    another country's emission factor. If no such figure exists, the line is not counted and the inventory
+    cannot be exported until it is entered in a unit we can price."
+  - **Market-based Scope 2 where no residual mix is loaded** (UK, CA, NZ; report in section 10).
+    - These are wording corrections, not the disclosure task the ruling provides for: the substitution is
+      already disclosed on the row. ⚑ Strike if not wanted.
+    - The row note (engine.ts:1265-1266) "No published residual mix for this subregion; market-based falls back
+      to location factor." becomes "No residual mix is loaded for {country}, so the market-based figure uses the
+      location-based grid average for the electricity not covered by contractual instruments." This removes the
+      US word "subregion" and the unchecked claim that none is published.
+    - The XLSX methods line (page.tsx:3191) and the PDF sentence (lib/assurancePdf.ts:280) say a residual-mix
+      factor was applied to uncovered load. They gain: "or, where no residual mix is loaded, the location-based
+      grid average (named per location below)."
+    - The methodology Scope 2 paragraph (app/methodology/page.tsx:71) names the countries that use the
+      grid-average substitution, alongside the full-disclosure case it already names.
+  - **CLAUDE.md** (Lisa applies), proposed: "No factor falls back to another country's or publisher's value.
+    Every workings row's value comes from the publisher it cites."
+- **Tests:**
+  - Full suite.
+  - The FI2 cross-publisher test runs over every country fixture.
+  - Engine count not lower than before FI1.
+- **Done:** F-01 is closed by a test that fails on the old code, and the methodology page states the rule.
+
+### FI9. Fleet fuel: each country's published mobile factors, or block
+- **Estimate:** L, 3 diffs:
+  - a research and transcription record per publisher, with a data file of transcribed values;
+  - the data model and wizard input that selects the publisher's vehicle class;
+  - the engine wiring and tests.
+  An open decision comes first (below).
+- **Ruling (section 10):** mobile combustion (`diesel_mobile_*`, `gasoline_*`) is priced with the location's
+  country's published mobile factors for CO2, CH4 and N2O, cited. Where that publisher publishes none for a
+  fuel, the fleet line is unpriced with a blocking issue. A stationary factor is never used for a fleet line.
+- **What is there today:**
+  - Every table's mobile keys equal its stationary keys: US `EF` (168-169), `EF_CA` (270-271), `EF_NZ` (705,
+    720, "deliberate, for consistency"), `EF_EU` (513), `EF_AU` (656) and `EF_UK` (335).
+  - `lib/ghg/mobile.ts` holds transcribed ECCC NIR 2026 mobile factors (Annex 6, Table A6.1-15) and IPCC 2006
+    Vol. 2 Ch. 3 mobile defaults. Nothing imports it (mobile.ts:3-9).
+- **⚑ Decision needed before code (not recorded).** mobile.ts:33-39 records that ECCC publishes mobile CH4 and
+  N2O by vehicle class and emission-control technology, with N2O varying up to 94-fold within one class. The
+  US EPA Hub publishes CH4 and N2O per mile by vehicle type and model year (⚑ confirm table). No current input
+  can choose between these rows. Options for Lisa:
+  - (a) one vehicle class, and where the publisher requires it one control tier or model year, per location;
+  - (b) a fleet split by class, with fuel per class;
+  - (c) either of those, and a customer who cannot characterise the fleet is blocked.
+  The ruling's "block where none is published" does not settle what to do where a factor is published but the
+  class is unknown.
+- **Research (per publisher, recorded before any value is entered; none assumed):**
+  - DEFRA: whether its liquid-fuel factors are stated to apply to transport use, or a separate transport table
+    applies;
+  - NGA: the transport-fuel combustion table;
+  - MfE: transport-fuel factors (the engine already uses Transport Regular Petrol for petrol);
+  - EPA Hub: mobile CO2 per gallon, and CH4 and N2O per mile;
+  - ECCC: NIR Table A6.1-15, already transcribed;
+  - EU: IPCC 2006 Vol. 2 Ch. 3, already transcribed, energy basis, so it needs a cited energy content under
+    FI2's rule.
+- **Files:** lib/ghg/engine.ts (mobile keys per table, edition-keyed for T3c; `calcLocation` mobile path);
+  lib/ghg/mobile.ts (wired, or superseded by per-publisher files); app/dashboard/ghg/page.tsx (the class input
+  the decision settles); the methodology page; CLAUDE.md (Lisa applies): "A fleet line is priced only with a
+  mobile factor; a stationary factor is never used for a vehicle."
+- **Issue message:** "{Publisher} publishes no mobile combustion factor for {fuel}, so the {fuel} used in
+  vehicles at {site} is not counted. Export is blocked until this is resolved." The remedy depends on the
+  decision.
+- **SQL:** none.
+- **Tests:**
+  - every fleet row's CO2, CH4 and N2O are found in the publisher's mobile table under the selected class;
+  - **source test:** no `*_mobile_*` key is defined as a copy of a stationary key unless the publisher states,
+    cited, that one factor covers both uses;
+  - a fleet line for a publisher with no mobile factor is unpriced with the issue;
+  - FI2's cross-publisher test covers fleet rows.
+- **Done:** no vehicle fuel is priced with a stationary factor.
+
+### FI10. New Zealand use class on every row
+- **Estimate:** S, 1 diff.
+- **Ruling (section 10):** the use class that selected the `EF_NZ` table (`nz_use_class`, commercial or
+  industrial, engine.ts:2539) is shown on every NZ combustion row.
+- **Files:**
+  - **lib/ghg/engine.ts:** `pushFuel` (3760) adds `factor_variant: 'Commercial use class'` or
+    `'Industrial use class'` to NZ rows. The comment at 694-699, which records that the use class appears
+    nowhere, is replaced.
+  - **lib/ghg/factorEditions.ts:** the NZ combustion entry records the use class, so `sameFactorEditions`
+    reports a change between years.
+  - **Shown on:** the workings table, the XLSX, the verifier page (app/verify/[token]/page.tsx) and the PDF.
+    Add to lib/ghg/verifierWhitelist.test.ts if the field crosses the projection.
+- **Tests:**
+  - an NZ industrial location's rows carry "Industrial use class" and price at the industrial values;
+  - two inventories differing only in use class are not reported as the same factor editions;
+  - the field renders on every surface.
+- **Done:** a verifier can see which MfE table priced each New Zealand row.
+
+**Not covered by these rulings** (found in the audits, left for a later decision):
+- the CA and EU fixed end-use CH4 and N2O rows, which are not shown on rows (the `factor_variant` field from
+  FI10 could carry them);
+- `factor_editions` has no residual-mix entry;
+- `s3_td` is not gated on a resolved region.
+
+Edition and year coverage stays with T3c and T3d.
+
 ### Factor-years branch: T3b, T3c, T3d
-Branch `factor-years`, created from main after derived-figures merges (sequencing ruling, section 10). Order:
-T3b, T3c, T3d.
+Branch `factor-years`, created from main after the factor integrity branch merges (sequencing ruling of
+2 Oct 2026, section 10; previously after derived-figures). Order: T3b, T3c, T3d.
 
 ### T3b. Reporting-year labels, Scope 3 year end, SB 253 banner from the window
 - **Branch:** `factor-years`. **Depends on:** T3a (`reportingYearLabel`).
@@ -946,8 +1642,48 @@ supplies every year label below. Follows T3b on the same branch.
     detects a change between years.
   - **Methodology page:** source test for the disclosure paragraph.
   - Engine test count only goes up.
+- **F-06: factor editions in the year-on-year disclosure** (ruling of 2 Oct 2026, section 10; finding F-06 in
+  docs/review/ghg-findings.md; ISO 14064-3 cl. 6.3.1.5 as cited in the ruling).
+  - **Today:**
+    - The comparability module has no edition observation (`ObservationKind`, lib/ghg/comparability.ts:103-111).
+    - `FACTOR_EDITION_DISCLOSURE` (lib/ghg/factorEditions.ts:444) is read only by the trends page.
+    - The CSV and the PDF carry no comparability record. The verifier page shows the record
+      (app/verify/[token]/page.tsx:765-843) and this year's editions (859-929), but no comparison.
+  - **lib/ghg/comparability.ts:** a new observation kind, `factor_edition`. For every dataset whose selected
+    edition differs between the compared years, it records:
+    - `{ dataset, publisher, priorEdition, currentEdition, effect_tco2e, effect_basis }`.
+    - **Effect:** this year's activity priced at the prior year's edition, minus the same activity at this
+      year's edition, per dataset and summed by scope. It isolates the part of the year-on-year change that
+      comes from the factors alone.
+    - It is computed only from editions T3c's registry marks held. If the prior edition is not held,
+      `effect_tco2e` is null and `effect_basis` says so: "The 2024 DESNZ factors are not loaded, so the
+      effect of the change could not be calculated." The change itself is still named.
+    - A prior year with no recorded `factor_editions` gives one observation saying the comparison could not
+      be made, and why.
+  - **The disclosure travels with the record** (`comparability_disclosure`) to all four surfaces:
+    - the export screen;
+    - the CSV / XLSX (`generateExport`, page.tsx:3101-3215): a "Comparability with {prior year label}" block;
+    - the verifier page, inside the existing comparability section;
+    - the assurance PDF (lib/assurancePdf.ts): a comparability section.
+    `FACTOR_EDITION_DISCLOSURE` is printed with it on each surface.
+  - **Wording** (plain, no em dash; year labels from `reportingYearLabel`):
+    - "Emission factors changed between {prior label} and {current label}: {publisher} {dataset} {prior
+      edition} to {current edition}. Pricing this year's activity at last year's factors would give {x}
+      tCO2e {more or less} in Scope {n}."
+    - Where the effect is null: "... The effect could not be calculated because {reason}."
+  - **app/climate-ghg/page.tsx:305:** the FAQ sentence "including which factor editions were applied" becomes
+    true. Re-read it against the built disclosure, and correct it if it still claims more.
+  - **Tests:**
+    - two inventories whose DESNZ grid edition differs give one `factor_edition` observation, with the effect
+      equal to activity × (prior factor − current factor);
+    - the same edition in both years gives no observation;
+    - a prior edition not held gives a null effect with the reason;
+    - the observation appears in the CSV, the verifier page and the PDF (fixture tests on each builder);
+    - lib/ghg/verifierWhitelist.test.ts covers any new field.
 - **Done:**
   - Every year-keyed factor is chosen by `selectEdition` from the window, and no code path substitutes a year.
+  - (F-06) Every surface that carries the year-on-year comparison names each factor edition that changed and
+    its effect, or says why the effect could not be calculated.
   - Every workings row names its edition, rule, basis, and publication and correction dates, plus the
     selection date for class (b).
   - A required edition that is not held leaves its line unpriced, with the message and an export-blocking issue.
@@ -1123,6 +1859,12 @@ supplies every year label below. Follows T3b on the same branch.
 - **Done:** a verifier link always shows the version it was issued against, and says when a newer one exists.
 
 ### T17. Assurance PDF: workings page, document index status, stored residual table
+- **Classification:** core pre-launch work (ruling of 2 Oct 2026, section 10; ISO 14064-3 cl. 6.1.3.2 data
+  trail and cl. 5.1.7 documented information, as cited in the ruling). It was listed with T14 to T16 as
+  post-core work.
+- **Also renders** (T18): in the document index, withdrawn documents (who, when, reason) and tombstones of deleted
+  documents (file, SHA-256 if known, who, when, reason); in the workings page, each reading's confirmation and
+  corrections.
 - **Files:** lib/assurancePdf.ts (new Workings page from the stored `workings` argument; document index Status column
   with reasons; residual table from stored market-based rows); app/dashboard/ghg/page.tsx (PDF caller at 3080-3096
   passes stored workings, removes the `getResidualFactor` recompute); tests.
@@ -1133,3 +1875,239 @@ supplies every year label below. Follows T3b on the same branch.
   true (PDF-01 in ghg-register.md).
 - **Done:** the PDF shows the same workings a verifier sees, from the same stored data, with no figure recomputed
   at export.
+
+### T18. Who and when on every review action; document withdrawal and deletion
+- **Status:** in scope (rulings of 2 Oct 2026, section 10: "T18" rows). Core pre-launch work, with T11 and T17.
+- **Estimate:** L, 4 diffs, 5 to 7 days:
+  1. proposal records: confirm, edit figure and flag, carried onto contributions;
+  2. the document lifecycle: withdraw, restore, delete with tombstone, and free deletion of unused uploads;
+  3. typed-figure entries, and who on the coverage resolutions;
+  4. page wiring, the evidence list and the on-screen workings.
+  The verifier page and PDF rendering of these records is in T11 and T17.
+- **Gaps closed** (report in section 10, "Review actions: who and when"): Confirm, Edit figure and Flag for
+  review recorded no who or when; Edit figure overwrote the read value; date confirmations and override removals
+  did not reach the workings; three coverage resolutions recorded no who; removing a document left no record;
+  typed figures recorded no who or when.
+
+**A. Proposal records** (rulings 2, 3, 6)
+- **lib/ghg/proposalEdits.ts** (pure, no clock):
+  - **`confirmProposal(p, { by, at })`** sets `status: 'confirmed'` and records `confirmation: { at, by,
+    reading: { value, unit, rawValue, rawUnit, periodStart, periodEnd, sourceQuote } }`, the exact reading
+    shown when accepted. It goes through `guardConfirm`. A later Undo or re-confirmation appends rather than
+    overwrites (`confirmations[]`).
+  - **`editFigure(p, { value, by, at })`**:
+    - keeps the read value the first time, extending `asRead` with `value` and `rawValue` (engine.ts:1620);
+    - appends `{ fields: ['value'], at, by }` to `corrections`, as date and unit corrections do;
+    - confirms through `confirmProposal`.
+  - **`flagProposal(p, { by, at })`** sets `needs_manual_review` and appends `{ action: 'flagged', at, by,
+    statusBefore }` to `statusLog`. (Ruling 6 asked for this to move from T13 into T18. Flag was never on T13's
+    list: T13's addition was "Accept all". It is recorded here only.)
+- **lib/ghg/engine.ts:**
+  - `ExtractedProposal` gains `confirmations`. `asRead` gains `value` and `rawValue`. `corrections.fields`
+    gains `'value'`. `statusLog.action` gains `'flagged'`, `'withdrawn'` and `'restored'` (part B).
+  - `BillContribution` (3230-3256) gains `confirmations`, `periodConfirmedAt` and `periodConfirmedBy`, set in
+    `billContributions` (3395-3411) beside `asRead`, `corrections` and `statusLog`.
+  - `buildWorkings` adds the field's `manual_overrides_removed` entries (lib/ghg/overrides.ts:36) to its row.
+- **app/dashboard/ghg/page.tsx:** Confirm (3598-3600), Edit figure Save (3584) and Flag for review (3607) call
+  these builders with `currentUser`, and are disabled without one, as Reject is (3608).
+  - The review shows "Confirmed by {email} on {date}."
+  - It shows "Read as {value} {unit}; changed by {email} on {date}." beside the date and unit lines from T9
+    (ProposalEdits.tsx `ProposalNotes`).
+- The T13 "Accept all" record, if ever built, is `confirmProposal` applied per bill.
+
+**B. Documents: withdraw, restore, delete** (ruling 1)
+- **Which action a document offers:**
+  - **Any reading confirmed or rejected** (status `confirmed` or `rejected`, or a `confirmations` entry): it
+    cannot be deleted. "Remove" becomes **"Withdraw"**.
+  - **No reading acted on yet** (extraction pending or failed, or every reading still `extracted` or
+    `needs_manual_review` with no confirmation): **"Delete"**, free, logged.
+    - ⚑ Reading of the ruling: a reading the customer only flagged counts as not acted on. Confirm or correct.
+  - **"Delete permanently"** is available on any document, behind a required reason. It is for a file uploaded
+    in error, or one holding information that must not be kept.
+- **Withdraw:**
+  - Requires a reason. The file stays in storage and the document and its readings stay on the location.
+  - The SourceDoc gets `withdrawn: { at, by, reason }`, and `document_log` gets `{ kind: 'withdrawn', docId,
+    file, at, by, reason }`.
+  - Every reading of a withdrawn document contributes with the new reason **`withdrawn`** (not counted), carrying
+    the withdrawal record.
+  - **No silent zero (T3 ruling).** For the all-rejected check, a withdrawn reading counts as rejected. A field
+    whose documents are all withdrawn or rejected, with no figure entered, raises the existing export-blocking
+    issue.
+- **Restore** (undo a withdrawal):
+  - Requires a reason, recorded the same way: `{ kind: 'restored', ... }`.
+  - The readings return to the statuses they had. A bill confirmed on month-only dates never confirmed returns
+    to "To confirm", as Undo does (T9).
+- **Delete permanently:**
+  - Requires a reason. It deletes the storage file, the document and its readings.
+  - It appends a **tombstone** to `document_log`: `{ kind: 'deleted', file, sha256 (if known, from T15; null
+    otherwise), at, by, reason }`.
+  - The tombstone carries no readings and no source quote, because the point of the delete may be that they
+    must not be kept.
+- **Delete (unused):** deletes the file and the document, and appends `{ kind: 'deleted_unused', file, sha256 if
+  known, at, by }`.
+  - ⚑ Design choice, not ruled: this entry is shown in the evidence list and the saved workings like the other
+    entries, so a verifier sees every upload that existed. Strike if not wanted.
+- **The log cannot be rewritten by a save.**
+  - `document_log` lives on the location in `locations_data`.
+  - The save path (lib/ghg/savePayload.ts) refuses a payload whose `document_log` is not a superset of the one
+    loaded, and never drops an entry.
+  - The audit trigger on `ghg_inventories` records each save. ⚑ Its definition is not in `supabase/migrations/`
+    (only the CBAM triggers are, 20260726_cbam_audit_triggers.sql). Confirm it exists before relying on it.
+- **⚑ Open, needs a decision: what a privacy delete cannot reach.**
+  - `audit_log` stores `to_jsonb(old)` of every changed row (20260910_erasure_log.sql header). Earlier saves of
+    the inventory, including the deleted document's readings and source quotes, therefore remain in
+    `audit_log`. That table cannot be edited by any signed-in account (lib/auditTrailNotice.ts), and the only
+    removal path today is the account-level erasure script.
+  - Options:
+    - (a) say so in the delete confirmation and in the tombstone, and handle a request to purge history through
+      a service-role process outside the app;
+    - (b) build a document-level purge of `audit_log` snapshots. That needs SQL and a decision on what an audit
+      trail may lose.
+  - Until ruled, the confirmation text states what is and is not removed.
+- **Where it shows:**
+  - the evidence list on each location ("Withdrawn by {email} on {date}: {reason}", "Restored by ...", "{file}
+    was deleted by {email} on {date}: {reason}");
+  - the saved workings: a document-event row per log entry, beside the coverage-resolution rows (engine.ts
+    4055-4070), plus the `withdrawn` contributions on field rows;
+  - the verifier page (T11) and the PDF document index (T17).
+- **Messages** (plain, no em dash):
+  - **Withdraw:** "Withdraw {file}? It stays on file as evidence but is no longer counted. Give a reason."
+  - **Delete permanently:** "Delete {file} permanently? The file and what was read from it are removed from
+    this inventory. A record that it existed, who deleted it, when and why is kept. Earlier saved versions in
+    the audit trail still contain what was read from it. Give a reason."
+  - **Delete, unused:** "Delete {file}? Nothing from it has been used."
+
+**C. Typed figures and coverage resolutions** (rulings 4, 5)
+- **Typed figures:**
+  - Every field the customer types, on a location with no documents for that field, gets an entry in
+    `typed_entries: [{ field, value, unit, at, by }]` on the location.
+  - Written by the save path for each typed field whose value differs from the last saved record, with the
+    saving user and time. It is one entry per change per save, not per keystroke.
+  - The workings row for a typed figure carries the latest entry as `entered_by` and `entered_at`, plus the
+    history.
+  - The same mechanism records the typed figure under a manual override (T10), alongside its reason.
+- **lib/ghg/coverageActions.ts** (44-82): `sameBillResolution`, `differentMetersResolution` and
+  `estimateResolution` take `by: { userId, email }` as `usedNoneResolution` does (92-100). Their notes end
+  "Recorded by {email} on {date}."
+  - The coverage-resolution workings row (engine.ts:4069) carries `resolved_by`.
+  - A stored resolution without `by` still validates, and shows "Who: not recorded" (pre-launch, section 4).
+- `labelMeter` (page.tsx:1282-1291) passes `by` through to the different-meters resolution.
+
+- **Files:**
+  - lib/ghg/proposalEdits.ts;
+  - lib/ghg/engine.ts (types, contributions, the `withdrawn` reason, document-event and typed-entry rows,
+    override removals on rows);
+  - lib/ghg/coverageActions.ts;
+  - lib/ghg/documentActions.ts (new, pure: `withdrawDocument`, `restoreDocument`, `deleteDocument`,
+    `documentActionsFor`);
+  - lib/ghg/savePayload.ts (`typed_entries`, the append-only `document_log` guard);
+  - app/dashboard/ghg/page.tsx (review buttons, `removeDoc` 1176-1190 split into the three actions, the evidence
+    list);
+  - app/dashboard/ghg/_components/ProposalEdits.tsx (notes);
+  - lib/ghg/verifierWhitelist.test.ts.
+  - **CLAUDE.md** (Lisa applies): "Every review action records who and when, and reaches the saved workings. A
+    document with a confirmed or rejected reading is withdrawn, never deleted, unless deleted permanently with a
+    reason, which leaves a tombstone."
+- **SQL:** none (`locations_data`, `coverage_resolutions` and `workings` are jsonb). Option (b) above would need
+  SQL.
+- **Tests:**
+  - **Property test** over every action (confirm, edit figure, edit dates, confirm dates, edit unit, flag,
+    reject, undo, withdraw, restore, delete permanently, delete unused, override, remove override, typed entry,
+    each coverage resolution): the saved workings carry its who and when.
+  - **Confirm** records the exact reading, including `sourceQuote`. A second confirmation after Undo appends.
+  - **Edit figure:** `asRead.value` is the read value, the correction has `fields: ['value']`, and the workings
+    show both values.
+  - **Flag** appends `flagged` with `statusBefore`.
+  - **Document actions:**
+    - a document with a confirmed reading offers Withdraw and Delete permanently, never Delete;
+    - one with only pending readings offers Delete;
+    - withdrawing requires a reason and stops its readings counting with reason `withdrawn`;
+    - restoring returns their statuses, with the R5 exception;
+    - every withdrawn or rejected document on a field with no figure blocks export.
+  - **Tombstone:** after Delete permanently, the document and readings are gone and the tombstone (file,
+    sha256 or null, who, when, reason) is in the saved workings. It holds no reading or source quote.
+  - **Append-only:** a save payload missing a `document_log` entry that the loaded record had is refused.
+  - **Typed entries:** changing a typed figure and saving appends one entry. Saving unchanged appends none.
+  - **Resolutions:** same bill, different meters and estimate carry `by`. A legacy resolution without `by`
+    shows "not recorded".
+  - The verifier whitelist covers the new fields.
+  - Messages carry no em dash.
+  - Engine test count only goes up.
+- **Done:**
+  - Every action that changes what is counted, or how, is in the saved workings with who and when.
+  - No document with an acted-on reading can disappear without a tombstone.
+  - The AI's reading is never lost when a figure is edited.
+
+---
+
+## 12. Remaining GHG work: recommended order and estimate (2 Oct 2026)
+
+The commercial launch has moved from 1 November 2026 to a date to be set once the GHG module is complete
+(section 10). This section orders all the remaining GHG work. It ranks by dependency first, then by the risk of
+a wrong number reaching a customer or a verifier, then by presentation. Sizes use the scale in the factor
+integrity heading: S up to 1 working day, M 1 to 2, L 3 to 5. Each includes drafting, verifying, review, one
+revision round, build and commit.
+
+### 12.1 Order
+
+| # | Item | Branch | Size, diffs | Days | Why here |
+|---|---|---|---|---|---|
+| 1 | Derived-figures run-through fixes, then merge | `derived-figures` | M to L, 1 to 3 | 2 to 4 | Everything else is created from main after this merge. The fix list is whatever the run-through produced. The only open item known in this session is the live results panel disappearing, with no cause found in code; it needs a reproduction first. |
+| 1a | FI0 retire the location cap (and capture-triggers.sql) | `fi0-location-cap` | M, 2 | 1.5 to 2 | Independent of every other branch. Copy is wrong in the code at `3e37755`, and in production if main carries the same pricing (⚑ not checked: no git was run): the calculate-emissions note renders "for up to  locations", and three pages still say GHG is priced by locations. The SQL is low-risk and can run as soon as it is reviewed. |
+| 2 | T13 core close-out | main | S, 1 | 1 | Removes the dead paths (legacy straddle and duplicate writers) before FI1 rewrites the same engine code, and closes F-09 to F-11 with tests. |
+| 3 | T15 exact-duplicate check across document types | main | M, 1 | 2 | Wrong-number risk: the same bill uploaded under two document types is counted twice today. Done on main before the factor branch opens, so Lisa does not have to switch branches mid-task. |
+| 4 | FI1 blocking line, never a dropped site; CA province; refrigerant | `factor-integrity` | L, 2 | 3 to 4 | Today whole sites leave the totals over one unit, and refrigerants can price at zero. Every later FI task relies on its unpriced line. |
+| 5 | FI2 no fallback, exact conversions, provenance | `factor-integrity` | L, 3 | 4 to 5 | F-01: US EPA values under other publishers' citations in every non-US country. The largest wrong-number class found. |
+| 6 | FI5 unit and country change | `factor-integrity` | M, 2 | 2 | The open CLAUDE.md defect, live in production, where 332 m³ becomes 332 Mcf, about 28 times too high. Can start as soon as FI2's first diff (the exact table) is in. Also closes the stale residual-region leak. |
+| 7 | FI3 EU properties | `factor-integrity` | M, 2 | 2 to 3, plus research | Every EU fuel line rests on an uncited property. The research record can run in parallel with items 4 to 6. |
+| 8 | FI4 propane by mass | `factor-integrity` | M, 1 | 1 to 2, plus research | The uncited US density reaches every country. |
+| 9 | FI7 steam message | `factor-integrity` | S, 1 | 0.5 | Wording and the unpriced-line shape, after FI1. |
+| 10 | FI10 NZ use class on rows | `factor-integrity` | S, 1 | 0.5 to 1 | Disclosure, after FI2 has fixed the row shape. |
+| 11 | FI8 close-out, then merge `factor-integrity` | `factor-integrity` | S, 1 | 1 | |
+| 12 | T3b reporting-year labels, Scope 3 year end, SB 253 banner | `factor-years` | M, 1 to 2 | 2 | Presentation, but T3c depends on its labels. |
+| 13 | T3c edition selection, no year substitution, and F-06 | `factor-years` | L, 4 | 5 to 6 | Wrong-year factors today (the UK grid differs about 26% between the 2025 and 2026 keys). Includes the only SQL in this plan. F-06 (the edition comparison in the year-on-year disclosure, on all four surfaces) adds one diff. |
+| 14 | T3d load the required editions | `factor-years` | L, 3 (one per year: 2025, 2024, 2026) | 5 to 8 | Clears the blocks T3c creates. Transcription from primary sources, checked by Lisa, is most of the time. |
+| 15 | FI6 Australian Category 3 from NGA | see 12.2 | M, 2 | 2 to 3 | The DEFRA stand-in is disclosed today, so this is a lower risk of a misleading number. |
+| 16 | FI9 fleet fuel mobile factors | see 12.2 | L, 3 | 4 to 6, after the decision | CH4 and N2O on fleet lines only; CO2 is barely affected (mobile.ts:24-31). Waits on the open vehicle-class decision. |
+| 17 | T18 who and when on every review action; withdraw and delete | main | L, 4 | 5 to 7 | **In scope, core pre-launch** (ruling, section 10). Confirm, edit figure, flag, typed figures and three coverage resolutions record no who; an edited figure loses its reading; removing a document leaves no record. It goes before T11 and T17 because they can only show a trail that is recorded. Could move earlier, to straight after item 3, to protect inventories prepared during testing. |
+| 18 | T11 verifier page: contributions, reasons, estimated dates | main | M, 1 | 2 | **Core pre-launch** (ruling, section 10). Renders workings fields. Done once FI2, FI10, T3c and T18 have added theirs (conversion note, publisher, use class, edition, rule, who and when), so it is built once. |
+| 19 | T17 assurance PDF workings page | main | M, 1 to 2 | 2 to 3 | **Core pre-launch** (ruling, section 10). Same reason as T11. It also removes the PDF's export-time residual recompute. |
+| 20 | Country run-throughs (US, CA, UK, EU, AU, NZ) | | | 4 to 5 | Once after `factor-integrity` merges and once after item 19, each with one inventory per country and a verifier link. |
+
+### 12.2 Recommendations that need a ruling
+
+- **Move FI6 and FI9 after T3c.** As ruled, they sit on `factor-integrity`, before `factor-years`. Both add new
+  factor tables that T3c then re-keys by edition. Both carry a lower risk of a wrong number than wrong-year
+  editions, and FI9 is waiting on a decision. Putting them after T3d, on `factor-years` or a short branch of
+  their own, means the tables are written edition-keyed once, and the factor-integrity merge is not held up by
+  FI9's decision. If not ruled, keep the numbered order and expect `factor-integrity` to take 6 to 9 days longer
+  to merge.
+- **FI9 vehicle-class input:** options (a), (b) or (c) in FI9. It is needed before item 16 starts.
+- **Not in this order:** T14 (`metered_split`) and T16 (verifier links pinned to a saved version, which has SQL)
+  were not in the list given. T16 bears on verifier trust: today a verifier link shows the live inventory,
+  so a re-save changes what an issued link shows. ⚑ Decide whether T16 is needed before launch.
+
+### 12.3 Overall estimate
+
+**Sum of the items: 52 to 70 working days. Realistic: about 63 working days, roughly 12 to 13 weeks, with a range
+of 57 to 74.** FI0 (1.5 to 2 days) was added on 2 Oct 2026. This includes F-06 in T3c and T18 at its full scope (withdraw and delete, tombstones, typed-figure
+entries), both added on 2 Oct 2026. It excludes the ⚑ option (b) document-level purge of `audit_log`, which
+would add SQL and about 2 to 3 days. The realistic figure allows for waiting on decisions and sources, and for findings from the
+run-throughs that the plan cannot list in advance.
+
+Assumptions:
+- One developer and reviewer (Lisa), with CC drafting and verifying each patch. GHG is close to full-time work.
+  At half-time, double the calendar time.
+- Each diff takes one revision round, as most T tasks so far have (T6, T7, T8, T9 and T10 each had one).
+- Factor values for T3d, FI6, FI9, and the FI3 and FI4 research, are transcribed from primary documents that can
+  be obtained, and Lisa checks spot values against the document. If a source cannot be found, the line blocks
+  as ruled, and the work finishes with fewer lines priced, not later.
+- The only SQL is T3c's `factor_selection` column. T16 is excluded.
+- Decisions (FI9's input, the two readings in section 10, the 12.2 move) are made within a day or two of being
+  asked. Each week of waiting on FI9 delays only item 16 if the 12.2 move is ruled, or the factor-integrity
+  merge if not.
+- The run-throughs find no defect larger than one M-sized fix per country. A finding on the scale of the silent
+  zeros the T3 property tests found would add a task.
+- No production incident takes time away. The unit-switch defect stays live until item 6 lands. If that is too
+  long, FI5 could instead be done on main straight after item 1, with its own exact-conversion table, at a cost
+  of about 1 extra day to reconcile with FI2 later.
