@@ -3084,6 +3084,13 @@ export function billContributions(
  * confirmed proposals and any coverage resolutions on file.
  * Pure. Called by the component's write path AND by buildWorkings — so the
  * figure in the total and the figure in the audit trail cannot diverge.
+ *
+ * T2 (docs/review/design-derived-figures.md): the figure is the FOLD OF billContributions — the sum of
+ * each counted bill's value × its own in-window share — then the extrapolation gross-up. So a bill wholly
+ * outside the reporting year contributes nothing (rule R1, finding F-09), a straddling bill is prorated
+ * automatically by its own days (rule R2), and undated or invalid-period bills are not counted (T1
+ * rulings). A stored 'straddle' resolution is IGNORED: the customer's this-year / next-year / prorate
+ * choice no longer reaches the figure, and buildWorkings writes no audit row for it.
  */
 export interface AppliedField {
   field: keyof Location
@@ -3092,9 +3099,11 @@ export interface AppliedField {
   value: number           // the figure actually used
   unit?: string
   adjustment: null | {
-    kind: 'extrapolate' | 'straddle' | 'duplicate'
+    // 'prorate' is automatic (rule R2), not a customer resolution. 'duplicate' is the legacy resolution
+    // (no effect on the value; replaced in T3).
+    kind: 'extrapolate' | 'prorate' | 'duplicate'
     method: string        // human-readable, flows verbatim into workings
-    basis: string         // e.g. "9 of 12 months; ×12/9" | "12 of 31 days in FY"
+    basis: string         // e.g. "9 of 12 months; ×12/9" | "2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387"
     factor: number        // multiplier applied to rawSum (1 = unchanged)
   }
   mixedUnits: boolean     // true → do not write; caller flags for manual review
@@ -3105,25 +3114,25 @@ export interface AppliedField {
   refs: { docId: string; pi: number }[]   // (docId, proposal index) feeding this field — for the write path's mixed-unit flip
 }
 
+// The method label on a figure prorated by billing days. One string, so the figure's adjustment and the
+// provenance note the verifier reads cannot word it two ways.
+export const PRORATE_METHOD = 'Prorated by billing days'
+
 export function applyResolutions(loc: Location, resolutions: CoverageResolution[], winStart: Date, winEnd: Date): Record<string, AppliedField> {
-  const DAY = 86400000
-  const winEexcl = new Date(winEnd.getFullYear(), winEnd.getMonth(), winEnd.getDate() + 1)
   const year = winEnd.getFullYear()
-  // Does THIS proposal's canonical [start, exclusiveEnd(end)) interval straddle the window? Same
-  // convention as analyzeCoverage's detector, so the strip, the figure and the audit trail agree.
-  const proposalStraddles = (periodStart: string | null, periodEnd: string | null): boolean => {
-    if (!periodStart || !periodEnd) return false
-    const s = parseLocalDate(periodStart)
-    const e = exclusiveEnd(parseLocalDate(periodEnd))
-    const total = Math.round((e.getTime() - s.getTime()) / DAY)
-    const ovS = s > winStart ? s : winStart
-    const ovE = e < winEexcl ? e : winEexcl
-    const inWin = Math.max(0, Math.round((ovE.getTime() - ovS.getTime()) / DAY))
-    return inWin > 0 && inWin < total
+  const contributions = billContributions(loc, resolutions, { start: winStart, end: winEnd })
+  const isoDay = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  // The last covered day of a contribution, for the basis text: the exclusive end minus one day.
+  const lastCoveredDay = (endExclusive: string): string => {
+    const e = parseLocalDate(endExclusive)
+    return isoDay(new Date(e.getFullYear(), e.getMonth(), e.getDate() - 1))
   }
 
-  // 1. Gather confirmed proposals per target field (via the shared fieldFor join key).
-  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[]; props: { value: number; periodStart: string | null; periodEnd: string | null }[] }
+  // 1. Gather confirmed proposals per target field (via the shared fieldFor join key). Provenance — quotes,
+  //    document ids, file paths, refs — is unchanged from before T2: every confirmed proposal with a value.
+  //    Per-bill provenance (which bills counted, and why the others did not) arrives with T5.
+  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[] }
   const acc: Record<string, Acc> = {}
   loc.source_docs.forEach(d => {
     d.extracted?.forEach((p, pi) => {
@@ -3131,9 +3140,8 @@ export function applyResolutions(loc: Location, resolutions: CoverageResolution[
       const map = fieldFor(d.document_type, p.fuelType)
       if (!map) return
       const key = String(map.amount)
-      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [], props: [] }
+      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
       acc[key].rawSum += p.value
-      acc[key].props.push({ value: p.value, periodStart: p.periodStart, periodEnd: p.periodEnd })
       if (p.unit) acc[key].units.add(p.unit)
       acc[key].fuelTypes.add(p.fuelType)
       acc[key].refs.push({ docId: d.id, pi })
@@ -3148,40 +3156,29 @@ export function applyResolutions(loc: Location, resolutions: CoverageResolution[
     const mixedUnits = a.units.size > 1
     const unit = a.units.size === 1 ? [...a.units][0] : undefined
     const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === a.fuelType && !!r.monthsCovered && r.monthsCovered > 0)
-    const strad = resolutions.find(r => r.kind === 'straddle' && r.locId === loc.id && r.fuelType === a.fuelType)
     const dup = resolutions.find(r => r.kind === 'duplicate' && r.locId === loc.id && r.fuelType === a.fuelType)
 
-    // STRADDLE scaling is PER-PROPOSAL — only the straddling bill(s) are scaled; the other bills for
-    // this field are left untouched (scaling the whole sum would corrupt eleven correct bills).
-    const straddleFactor =
-      strad?.straddleChoice === 'next_year' ? 0
-      : strad?.straddleChoice === 'this_year' ? 1
-      : strad?.straddleChoice === 'prorate' ? (strad.totalDays ? (strad.daysInYear ?? 0) / strad.totalDays : 1)
-      : 1
-    const straddledSum = strad
-      ? a.props.reduce((s, pr) => s + pr.value * (proposalStraddles(pr.periodStart, pr.periodEnd) ? straddleFactor : 1), 0)
-      : a.rawSum
-    // EXTRAPOLATION gross-up applies AFTER the per-proposal straddle scaling. ORDER MATTERS.
+    // THE FOLD: each counted bill contributes its value × its own in-window share. Nothing else reaches
+    // the figure — not a bill outside the year, not an undated or invalid-period bill, not a stored
+    // straddle choice.
+    const counted = contributions.filter(c => String(c.field) === key && c.counted)
+    const foldedSum = counted.reduce((s, c) => s + c.value * (c.share ?? 0), 0)
+    // EXTRAPOLATION gross-up applies AFTER the fold. ORDER MATTERS.
     const extrFactor = (extr && extr.monthsCovered) ? 12 / extr.monthsCovered : 1
-    const value = mixedUnits ? a.rawSum : straddledSum * extrFactor
+    const value = mixedUnits ? a.rawSum : foldedSum * extrFactor
 
+    const prorated = counted.filter(c => c.reason === 'prorated')
     let adjustment: AppliedField['adjustment'] = null
-    if (extr || strad || dup) {
-      // basis states the REAL arithmetic, in application order (straddle per-proposal, THEN extrapolate).
-      const parts: string[] = []
-      if (strad) {
-        const tot = strad.totalDays ?? 0, din = strad.daysInYear ?? 0
-        parts.push(
-          strad.straddleChoice === 'next_year' ? `next_year: straddling bill excluded (0 of ${tot} days counted)`
-          : strad.straddleChoice === 'this_year' ? `this_year: straddling bill counted in full (${tot} of ${tot} days)`
-          : `prorate: ${din} of ${tot} days in FY${year}; straddling bill scaled ×${(tot ? din / tot : 1).toFixed(3)}`
-        )
-      }
+    if (extr || prorated.length > 0 || dup) {
+      // basis states the REAL arithmetic, in application order (per-bill proration, THEN extrapolate).
+      const parts: string[] = prorated.map(c =>
+        `${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in FY${year}, ×${(c.share ?? 0).toFixed(3)}`)
       if (extr) parts.push(resolutionBasis(extr))
-      if (dup && !strad && !extr) parts.push(resolutionBasis(dup))
-      // primary drives kind + method: extrapolate (the gross-up) if present, else the straddle/duplicate.
-      const primary = extr ?? strad ?? dup!
-      adjustment = { kind: primary.kind, method: resolutionMethod(primary), basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
+      if (dup && prorated.length === 0 && !extr) parts.push(resolutionBasis(dup))
+      // primary drives kind + method: extrapolate (the gross-up) if present, else proration, else the duplicate.
+      const kind: NonNullable<AppliedField['adjustment']>['kind'] = extr ? 'extrapolate' : prorated.length > 0 ? 'prorate' : 'duplicate'
+      const method = kind === 'prorate' ? PRORATE_METHOD : resolutionMethod((extr ?? dup)!)
+      adjustment = { kind, method, basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
     }
 
     out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
@@ -3196,8 +3193,13 @@ interface Provenance {
   source_quotes?: string[]
   source_doc_ids?: string[]
   source_file_paths?: string[]
-  entry_method: 'manual' | 'concierge' | 'concierge-extrapolated'
+  // concierge-prorated (T2): read off confirmed bills, with at least one bill apportioned to the reporting
+  // year by its own billing days. ALLOCATED, NOT ESTIMATED: every unit traces to a bill.
+  entry_method: 'manual' | 'concierge' | 'concierge-prorated' | 'concierge-extrapolated'
   extrapolation_note?: string
+  // The per-bill day arithmetic behind a concierge-prorated figure. Separate from extrapolation_note,
+  // which the verifier page reads as an estimate.
+  proration_note?: string
 }
 
 function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12) {
@@ -3376,6 +3378,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const a = applied[String(field)]
       const quotes = a?.quotes ?? []
       if (!quotes.length) return { entry_method: 'manual' }
+      if (a && a.adjustment && a.adjustment.kind === 'prorate') {
+        return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+          entry_method: 'concierge-prorated', proration_note: a.adjustment.basis }
+      }
       if (a && a.adjustment) {
         return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
           entry_method: 'concierge-extrapolated', extrapolation_note: `${a.adjustment.method} — ${a.adjustment.basis}` }
@@ -3541,6 +3547,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // Every gap/overlap/straddle the user resolved is recorded here so a verifier
   // sees the method and basis behind any estimated or adjusted figure. Spec: line 462.
   for (const r of resolutions) {
+    // A stored 'straddle' resolution is IGNORED by the figure since T2 (straddling bills are prorated
+    // automatically by their own days), so it gets no audit row: a row must not claim a method the figure
+    // did not apply. The proration itself is disclosed on the figure's own row (concierge-prorated).
+    if (r.kind === 'straddle') continue
     // Method string comes from the SAME resolutionMethod() that fills AppliedField.adjustment.method,
     // so the audit row and the figure's provenance stamp can never claim different things.
     rows.push({

@@ -75,30 +75,36 @@ describe('GROUP A — straddle', () => {
     expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 2); // ≈ 38.71
   });
 
-  it("A2 next_year → workings gas figure should be 0 (bill belongs to next FY)", () => {
+  // T2: a stored straddle choice is IGNORED. The straddling bill is prorated automatically by its own
+  // days (12 of 31 in FY2024), whatever the legacy resolution said. Was: next_year → 0.
+  it("A2 legacy next_year is ignored → the bill is prorated by its own days, 100 × 12/31", () => {
     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('next_year')]);
-    expect(ngRow(rows)?.activity_data).toBe(0);
+    expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 6);
   });
 
-  it("A3 this_year → workings gas figure should be 100 (full bill counts this FY)", () => {
-    // NOTE: this asserts the SAME 100 the engine already echoes, so at the engine seam
-    // this is expected to PASS even today. The audited failure is in the component
-    // field-write path (not engine-testable). Flagged in the Phase-2 report.
+  // T2: was this_year → 100. The legacy choice is ignored; the bill is prorated by its own days.
+  it("A3 legacy this_year is ignored → the bill is prorated by its own days, 100 × 12/31", () => {
     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('this_year')]);
-    expect(ngRow(rows)?.activity_data).toBe(100);
+    expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 6);
   });
 
-  it("A4 buildWorkings must not advertise a method it didn't apply — a 'prorate' resolution row implies the gas figure was prorated", () => {
-    const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('prorate')]);
-    const resRow = rows.find(r => r.gwp_basis === 'coverage_resolution' && String(r.emission_factor).includes('prorate'));
-    expect(resRow, 'expected a straddle "prorate" coverage-resolution row').toBeTruthy();
-    // The workings claim proration; the actual figure must agree with that claim.
-    expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 2);
+  // T2: was "a 'prorate' resolution row implies the figure was prorated". The legacy resolution no longer
+  // reaches the figure, so it gets no audit row at all (a row must not claim a method not applied); the
+  // proration is disclosed on the figure's own row instead.
+  it("A4 a legacy straddle resolution gets NO audit row; the proration is disclosed on the gas row itself", () => {
+    for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
+      const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes(choice)]);
+      expect(rows.filter(r => r.gwp_basis === 'coverage_resolution'), choice).toEqual([]);
+      expect(ngRow(rows)?.proration_note, choice).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387');
+    }
   });
 
   it("A5 a straddle-adjusted number must NOT be stamped entry_method 'concierge' (that means read verbatim off bills)", () => {
     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('prorate')]);
     expect(ngRow(rows)?.entry_method).not.toBe('concierge');
+    // T2: it is stamped concierge-prorated (allocated, not estimated), and carries no extrapolation note.
+    expect(ngRow(rows)?.entry_method).toBe('concierge-prorated');
+    expect(ngRow(rows)?.extrapolation_note).toBeUndefined();
   });
 });
 
@@ -3502,16 +3508,23 @@ describe('T1 billContributions', () => {
     expect(JSON.stringify(l)).toBe(before);
   });
 
-  it('is not yet wired: nothing outside its definition and the tests calls it (T1 done criterion)', () => {
+  // T1's guard was "nothing calls it yet". T2 wires it into applyResolutions, and only there.
+  it('is called only by applyResolutions (wired in T2)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
       if (n === 'node_modules' || n.startsWith('.')) return [];
       return statSync(join(root, rel)).isDirectory() ? walk(rel) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [rel] : [];
     });
-    const callers = [...walk('lib'), ...walk('app')].filter(f =>
-      /billContributions\(/.test(stripTsComments(readFileSync(join(root, f), 'utf8')).replace(/export function billContributions\(/, '')));
-    expect(callers).toEqual([]);
+    const calls = [...walk('lib'), ...walk('app')].flatMap(f => {
+      const src = stripTsComments(readFileSync(join(root, f), 'utf8')).replace(/export function billContributions\(/, '');
+      const n = (src.match(/billContributions\(/g) ?? []).length;
+      return n ? [`${f}: ${n}`] : [];
+    });
+    expect(calls).toEqual(['lib/ghg/engine.ts: 1']);
+    const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
+    const body = engineSrc.slice(engineSrc.indexOf('export function applyResolutions('));
+    expect(body.slice(0, body.indexOf('\n}\n')), 'the one call is inside applyResolutions').toMatch(/billContributions\(/);
   });
 
   it('exclusiveEnd has exactly one definition in lib/ and app/ (CLAUDE.md invariant)', () => {
@@ -3527,5 +3540,108 @@ describe('T1 billContributions', () => {
       return n ? [`${f}: ${n}`] : [];
     });
     expect(defs).toEqual(['lib/ghg/engine.ts: 1']);
+  });
+});
+
+// ── T2: applyResolutions as the fold of billContributions (design doc section 11) ─────────────────────
+// The figure is Σ counted bills' value × own share, then the extrapolation gross-up. Scenarios A and B are in
+// docs/review/recalc/scenarios-additions.md.
+describe('T2 applyResolutions folds billContributions', () => {
+  const w = (y: number) => periodFromYearAndEnd(y, 12);
+  const elec = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, periodConfidence: 'high', sourceQuote: `${value} kWh`, ...o });
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, ...o });
+  const scenarioA = () => loc({
+    source_docs: [
+      doc('utility_electricity', [elec(1000, '2025-12-01', '2026-01-01')], 'bill1'),
+      doc('utility_electricity', [elec(1200, '2026-01-01', '2026-02-01')], 'bill2'),
+    ],
+  });
+  const applied = (l: Location, res: CoverageResolution[], y: number) => applyResolutions(l, res, w(y).start, w(y).end);
+
+  it('Scenario A: a bill wholly outside the year contributes 0 (F-09); FY2025 counts Bill 1 only, FY2026 Bill 2 only', () => {
+    const a25 = applied(scenarioA(), [], 2025).electricity_kwh;
+    expect(a25.value).toBe(1000);
+    expect(a25.rawSum, 'rawSum is still every confirmed bill').toBe(2200);
+    expect(a25.adjustment).toBeNull();
+    expect(applied(scenarioA(), [], 2026).electricity_kwh.value).toBe(1200);
+  });
+
+  it('two straddling bills are each prorated by their OWN days, not one shared ratio', () => {
+    const l = loc({
+      source_docs: [
+        doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')], 'start'), // 19 of 31 in FY2025
+        doc('utility_bill_gas', [gas(310, '2025-12-15', '2026-01-14')], 'end'),   // 17 of 31 in FY2025
+      ],
+    });
+    const a = applied(l, [], 2025).natural_gas_amount;
+    expect(a.value).toBeCloseTo(310 * 19 / 31 + 310 * 17 / 31, 9);
+    expect(a.adjustment).toMatchObject({ kind: 'prorate', method: 'Prorated by billing days' });
+    expect(a.adjustment?.basis).toBe(
+      '2024-12-20 to 2025-01-19: 19 of 31 days in FY2025, ×0.613; then 2025-12-15 to 2026-01-14: 17 of 31 days in FY2025, ×0.548');
+  });
+
+  it('the extrapolation gross-up applies AFTER the fold, and the gross-up drives the stamp', () => {
+    const l = loc({ source_docs: [doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')])] });
+    const ext: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2025-06-01T00:00:00Z' };
+    const a = applied(l, [ext], 2025).natural_gas_amount;
+    expect(a.value).toBeCloseTo((310 * 19 / 31) * (12 / 6), 9);
+    expect(a.adjustment?.kind).toBe('extrapolate');
+    expect(a.adjustment?.basis.startsWith('2024-12-20 to 2025-01-19: 19 of 31 days in FY2025, ×0.613; then ')).toBe(true);
+    const row = buildWorkings([{ ...l, has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf' }], 'AR6', 2025, [ext]).find(r => r.source === 'Natural gas');
+    expect(row?.entry_method).toBe('concierge-extrapolated');
+    expect(row?.proration_note).toBeUndefined();
+  });
+
+  it('a stored straddle resolution is ignored: every legacy choice gives the same figure as none', () => {
+    const l = loc({ source_docs: [doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')])] });
+    const none = applied(l, [], 2025).natural_gas_amount.value;
+    for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
+      expect(applied(l, [{ ...straddleRes(choice), daysInYear: 1, totalDays: 31 }], 2025).natural_gas_amount.value, choice).toBe(none);
+    }
+  });
+
+  it('buildWorkings still writes audit rows for resolutions that reach the figure (extrapolate), not for a legacy straddle', () => {
+    const l = loc({ has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf', source_docs: [doc('utility_bill_gas', [gas(310, '2025-01-01', '2025-06-30')])] });
+    const ext: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2025-06-01T00:00:00Z' };
+    const rows = buildWorkings([l], 'AR6', 2025, [ext, straddleRes('next_year')]);
+    expect(rows.filter(r => r.gwp_basis === 'coverage_resolution').map(r => r.activity_unit)).toEqual(['extrapolate']);
+  });
+
+  it('the proration note has no em dash and names each bill, its days and its share', () => {
+    const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, []);
+    const note = ngRow(rows)?.proration_note as string;
+    expect(note).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387');
+    expect(note).not.toContain('\u2014');
+  });
+
+  it('undated and invalid-period bills are not counted (T1 rulings); a dated bill beside them still is', () => {
+    const l = loc({
+      source_docs: [doc('utility_bill_gas', [
+        gas(100, '2025-03-01', '2025-03-31'),
+        gas(50, null, null),
+        gas(40, '2025-03-10', '2025-03-01'),
+        gas(30, 'Mar 2025', '2025-03-31'),
+      ])],
+    });
+    expect(applied(l, [], 2025).natural_gas_amount.value).toBe(100);
+  });
+
+  it('mixed units: unchanged, mixedUnits true and value = rawSum (the write path skips it)', () => {
+    const l = loc({ source_docs: [doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { unit: 'mcf' }), gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' })])] });
+    const a = applied(l, [], 2025).natural_gas_amount;
+    expect(a.mixedUnits).toBe(true);
+    expect(a.value).toBe(300);
+  });
+
+  it('Scenario B with Bill 2 in FY2026: both January bills are counted (overlap resolution is T3)', () => {
+    const l = loc({ source_docs: [
+      doc('utility_electricity', [elec(1200, '2026-01-01', '2026-02-01')], 'bill2'),
+      doc('utility_electricity', [elec(1150, '2026-01-01', '2026-01-31', { periodConfidence: 'medium' })], 'monthOnly'),
+    ] });
+    expect(applied(l, [], 2026).electricity_kwh.value).toBe(2350);
+    // In FY2025 both are outside the year: 0, where before T2 both were summed in full (F-10).
+    expect(applied(l, [], 2025).electricity_kwh.value).toBe(0);
   });
 });

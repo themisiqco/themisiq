@@ -418,6 +418,9 @@ The tests are grouped by task in section 11. They include all of these:
 | T1: null value | A proposal with value null produces no row. |
 | T1: periodOrigin | high → printed, medium → billing_month; a missing or other periodConfidence → null (not recorded). |
 | T1: meterLabel | null means the default single meter. |
+| T2: proration stamp | A figure with at least one bill prorated by its own days (and no extrapolation) is stamped `entry_method: 'concierge-prorated'`, with the per-bill arithmetic in a separate `proration_note` (e.g. "2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387"), not in `extrapolation_note`, which the verifier page labels "Estimated". The verifier page shows the badge "Bill-sourced, prorated" and the line "Prorated by billing days: {note}". With an extrapolation as well, the gross-up drives the stamp (`concierge-extrapolated`) and the basis lists the proration first, then the gross-up. |
+| T2: legacy straddle rows | A stored `straddle` resolution gets no audit row in `buildWorkings`: it no longer reaches the figure, and a row must not claim a method the figure did not apply. |
+| T2: release | T2 is committed but not pushed to main until T3 (blocking issues for undated, invalid_period, mixed_units) and T8 (strip controls) land with it. |
 | T3: no silent zero | Of the not-counted reasons, only `outside_year` and `same_bill_as` may be silent. `undated`, `invalid_period` and `mixed_units` must each raise an export-blocking coverage issue with a plain-language message, so a field can never drop to zero without the customer being told. (`not_confirmed` from `extracted` or `needs_manual_review` already blocks export through the pending-proposal gate, page.tsx:1301. A `rejected` proposal does not block on its own; the all-rejected case is the next ruling.) |
 | T3: all documents rejected | When every document for a field is rejected and no manual figure is entered, raise an export-blocking issue offering "Enter the figure manually" or "Confirm this site used none". Confirming records who and when, appears in workings and on the verifier page, and clears the issue. Entering a manual figure clears it the same way (the field then has `entry_method: 'manual'`, per section 3.3). |
 
@@ -440,7 +443,9 @@ core derived-figures work. T14 to T17 come after it, as ruled.
 
 ### T2. Engine: `applyResolutions` as the fold of contributions (R1, R2 automatic proration)
 - **Files:** lib/ghg/engine.ts (`applyResolutions`, the `CoverageResolution` reader treating legacy `straddle` as
-  ignored); engine.test.ts.
+  ignored, the `concierge-prorated` provenance stamp and `proration_note`, no audit row for a legacy straddle);
+  engine.test.ts; app/verify/[token]/page.tsx (accepts and labels `concierge-prorated`; renders `proration_note`
+  without the "Estimated" label). See the T2 rulings in section 10.
 - **SQL:** none.
 - **Tests:** out-of-year bill contributes 0 (F-09); per-bill straddle shares; extrapolation applied after the fold;
   legacy `straddle` ignored; existing figure tests updated only where F-09 or the straddle rule changes them

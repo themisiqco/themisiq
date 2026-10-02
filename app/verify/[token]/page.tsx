@@ -60,7 +60,8 @@ interface WorkingRow {
   quantification_method?: string
   result_tco2e: number | null
   // Concierge provenance (present only for bill-sourced rows). Lets a verifier trace a figure
-  // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates.
+  // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates;
+  // 'concierge-prorated' rows are bill-sourced with a bill apportioned to the year by its billing days.
   source_quotes?: string[]
   source_doc_ids?: string[]
   // Index-aligned with source_quotes: the storage path behind quote[i]. Used ONLY as a lookup key
@@ -68,8 +69,11 @@ interface WorkingRow {
   // (source_doc_ids cannot serve here: the engine DEDUPES it while pushing filePaths once per quote,
   // so source_doc_ids[i] is not "the document behind quote i".)
   source_file_paths?: string[]
-  entry_method?: 'manual' | 'concierge' | 'concierge-extrapolated'
+  entry_method?: 'manual' | 'concierge' | 'concierge-prorated' | 'concierge-extrapolated'
   extrapolation_note?: string
+  // The per-bill day arithmetic behind a concierge-prorated figure. Not an estimate: rendered without
+  // the "Estimated" label extrapolation_note carries.
+  proration_note?: string
   // A convert-then-apply step, where one was needed: fuel oil entered in litres and steam entered
   // in GJ are converted to the unit their published factor is per, and this records the arithmetic.
   // Distinct from extrapolation_note, which is about PROVENANCE (a grossed-up estimate) and renders
@@ -1017,6 +1021,9 @@ export default function VerifierPage() {
                       {w.entry_method === 'concierge' && (
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-brand)', background: 'color-mix(in srgb, var(--color-brand) 8%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
                       )}
+                      {w.entry_method === 'concierge-prorated' && (
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced, prorated</span>
+                      )}
                       {w.entry_method === 'concierge-extrapolated' && (
                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
                       )}
@@ -1031,6 +1038,9 @@ export default function VerifierPage() {
                             </span>
                           )
                         })}</div>
+                      )}
+                      {w.proration_note && (
+                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Prorated by billing days: {w.proration_note}</div>
                       )}
                       {w.extrapolation_note && (
                         <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Estimated — {w.extrapolation_note}</div>
