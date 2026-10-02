@@ -434,6 +434,10 @@ The tests are grouped by task in section 11. They include all of these:
 | T3c: unpublished edition | A required edition that has not been published blocks, with a message saying the factors for that year have not been published yet. This is distinct from an edition that is published but not loaded. |
 | Sequencing | T3b, T3c and T3d move to a separate branch, `factor-years`, created from main after derived-figures merges. In T3d, editions for reporting year 2025 are loaded first, then 2024, then 2026. |
 | T4: field with documents but no confirmed proposal | A field with at least one pending proposal (extracted or needs_manual_review) that has a value is document-backed: `deriveLocations` derives it from its confirmed proposals, so 0 when none is confirmed (the pending-proposal gate already blocks export). A field whose proposals are all rejected, or that has none, keeps its stored value as the typed figure (3.3, T3 all-rejected ruling). Mixed units derive to 0 (no mixed contribution is counted, T1), with the T3 issue saying why. Known limit until T7: while the page still writes fields, a stored value on an all-rejected field, or on a location whose last document was removed, may be a stale copy and is read as typed. |
+| T5: pctEstimated | `pctEstimated` must (a) apply each accepted gap gross-up only to its own meter's figure, not to the whole fuel, and (b) keep stationary and fleet diesel, and any other fuel shared across document types, as separate groups. It may take the reporting window or read T5's contributions, whichever keeps the page component free of arithmetic. Tests cover both cases. |
+| T5: gap estimates name their document type | An `extrapolate` resolution gains `documentType`. The gross-up and the gap check match on (documentType, fuel, meter), so a stationary-diesel estimate never grosses up or clears fleet diesel. A stored estimate without `documentType` is accepted only where the location has one document type for that fuel; where it has two, it is not accepted, the gap stays open, and it must be re-estimated. The page's estimate control writes `documentType` from T5. |
+| T5: all-excluded field | A field whose confirmed bills are all silently excluded (`outside_year` or `same_bill_as`) gets a workings row with activity 0 and result 0 carrying its contributions, so a verifier sees which documents were excluded and why. It adds nothing to any total. |
+| T5: share cell | `workingsCells.ts` shows a bill's share as "12 of 31 days, ×0.387" when prorated and "31 of 31 days" when wholly inside the year, matching T2's proration note. An excluded bill shows "Not counted" (the reason says why); an undated or invalid-period bill shows "Not applicable". |
 | Merge set | derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8 (widened), T9 (widened), T12, T10. T11 and T13 follow on main. T8 and T9 are widened as described in section 11; T12 moves after T9, and T10 after T12. |
 | T3b: label forms | Replaces the proposed "YE" forms. Non-December year ends read "Apr 2024 to Mar 2025" in menus, tiles and headings; "2024–25" on chart axes only; "2024-04_to_2025-03" in filenames. December year ends read "2025" in all three. No "YE" or "FY" abbreviations in customer-facing labels. Running text keeps T3a's "the year ending 31 March 2025". |
 | T3b: SB 253 first-report window | From CARB's Final Regulation Order, Title 17 CCR §96076(c) (text in the T3b entry). The first report (due 10 November 2026) covers the fiscal year ending **after 1 February 2025 and on or before 1 February 2026**. A fiscal year ending on or before 1 February in a calendar year reports the year ending in that calendar year; one ending later reports the year ending in the previous calendar year. Optionally, the most recent preceding year may be reported where its data is available. Status: adopted by CARB (Executive Order R-26-006) and resubmitted to OAL on 21 September 2026; OAL approval not yet reached, so it carries the same 'proposed' handling as `SB253_DATE_STATUS`. |
@@ -505,10 +509,15 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
 
 ### T5. Engine: contributions and overrides on workings rows
 - **Files:** lib/ghg/engine.ts (`buildWorkings` adds `contributions`, drops the stale-field fallback for
-  document-backed fields); lib/ghg/workingsCells.ts (share cell); tests.
+  document-backed fields; `pctEstimated` per meter and per document-type group, ruling in section 10);
+  lib/ghg/workingsCells.ts (share cell); tests.
 - **SQL:** none.
 - **Tests:** each document-backed row carries its contributions; excluded documents present with reasons;
   `entry_method` is never 'manual' for a field with accepted documents.
+  - **`pctEstimated`, gross-up per meter:** two meters on one fuel, only one estimated. The estimated share
+    counts only that meter's gross-up, not the whole fuel's.
+  - **`pctEstimated`, shared fuels kept apart:** a site with stationary diesel and fleet diesel, where a gap
+    estimate on one does not count the other as estimated.
 - **Done:** stored workings carry everything the verifier page and the PDF need, with no recompute.
 
 ### T6. Monthly: read contributions, in-window only; `reconcile` by location and fuel

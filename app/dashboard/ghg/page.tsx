@@ -1631,7 +1631,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       selected_frameworks: inventory.selected_frameworks,
       locations_data: inventory.locations,
       coverage_resolutions: coverageResolutions,
-      pct_estimated: pctEstimated(inventory.locations, coverageResolutions, 'AR6', inventory.reporting_year),
+      pct_estimated: pctEstimated(inventory, 'AR6'),
       scope1_total: totals_ar6.s1_total,
       scope2_location_total: totals_ar6.s2_location,
       scope2_market_total: totals_ar6.s2_market,
@@ -3511,7 +3511,8 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         return [...groups.entries()].map(([fuelOfStrip, periods]) => {
           const cov = analyzeCoverage(periods, win.start, win.end)
           const resFor = (kind: CoverageResolution['kind']) =>
-            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip)
+            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip
+              && (r.kind !== 'extrapolate' || r.documentType == null || r.documentType === docType))
           const gapRes = resFor('extrapolate')
           const dupRes = resFor('duplicate')
           const strdRes = resFor('straddle')
@@ -3538,6 +3539,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                     locId,
                     fuelType: fuelOfStrip,
                     kind: 'extrapolate',
+                    documentType: docType,
                     monthsCovered: cov.monthsCovered,
                     pctEstimated: cov.pctEstimated,
                     note: `${cov.monthsCovered} of 12 months evidenced by bills; remaining ${12 - cov.monthsCovered} month(s) estimated by scaling metered data ×12/${cov.monthsCovered} (${cov.pctEstimated}% estimated).`,

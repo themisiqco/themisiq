@@ -183,3 +183,26 @@ export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: st
   if (r.gwp_basis === COVERAGE_ROW_BASIS) return NOT_APPLICABLE
   return r.ef_source || NOT_PROVIDED
 }
+
+/**
+ * The share cell for one bill on a document-backed workings row (T5 ruling). It reads as T2's proration
+ * note does, so the two never describe a bill differently:
+ *   - prorated:                "12 of 31 days, ×0.387"
+ *   - counted, wholly in year: "31 of 31 days"
+ *   - undated or invalid period (no days to count): NOT_APPLICABLE
+ *   - any other bill not counted: "Not counted"; the reason, not this cell, says why.
+ * Structural type rather than the engine's BillContribution, because the engine imports this file.
+ */
+export type ShareCellContribution = {
+  reason: string
+  inWindowDays: number | null
+  totalDays: number | null
+  share: number | null
+}
+export const NOT_COUNTED = 'Not counted'
+export function contributionShareCell(c: ShareCellContribution): string {
+  if (c.reason === 'undated' || c.reason === 'invalid_period') return NOT_APPLICABLE
+  if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
+  const days = `${c.inWindowDays} of ${c.totalDays} days`
+  return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days
+}

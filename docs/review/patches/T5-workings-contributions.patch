@@ -1,0 +1,695 @@
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 3251f75..a63deb0 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -1631,7 +1631,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+       selected_frameworks: inventory.selected_frameworks,
+       locations_data: inventory.locations,
+       coverage_resolutions: coverageResolutions,
+-      pct_estimated: pctEstimated(inventory.locations, coverageResolutions, 'AR6', inventory.reporting_year),
++      pct_estimated: pctEstimated(inventory, 'AR6'),
+       scope1_total: totals_ar6.s1_total,
+       scope2_location_total: totals_ar6.s2_location,
+       scope2_market_total: totals_ar6.s2_market,
+@@ -3511,7 +3511,8 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+         return [...groups.entries()].map(([fuelOfStrip, periods]) => {
+           const cov = analyzeCoverage(periods, win.start, win.end)
+           const resFor = (kind: CoverageResolution['kind']) =>
+-            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip)
++            coverageResolutions.find(r => r.kind === kind && r.locId === locId && r.fuelType === fuelOfStrip
++              && (r.kind !== 'extrapolate' || r.documentType == null || r.documentType === docType))
+           const gapRes = resFor('extrapolate')
+           const dupRes = resFor('duplicate')
+           const strdRes = resFor('straddle')
+@@ -3538,6 +3539,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                     locId,
+                     fuelType: fuelOfStrip,
+                     kind: 'extrapolate',
++                    documentType: docType,
+                     monthsCovered: cov.monthsCovered,
+                     pctEstimated: cov.pctEstimated,
+                     note: `${cov.monthsCovered} of 12 months evidenced by bills; remaining ${12 - cov.monthsCovered} month(s) estimated by scaling metered data ×12/${cov.monthsCovered} (${cov.pctEstimated}% estimated).`,
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 757465f..9f7b84a 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -36,6 +36,7 @@ import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+ import { NOT_PROVIDED } from '../notProvided';
+ import { countryRefusalText } from './countryRefusalCopy';
+ import { stripTsComments } from '../testing/stripComments';
++import { contributionShareCell } from './workingsCells';
+ 
+ // ── fixture builders ─────────────────────────────────────────────────────────
+ const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
+@@ -504,7 +505,7 @@ describe('GROUP J — pctEstimated', () => {
+       source_docs: [gasBill(100, '2024-01-31')], // 1 month evidenced, grossed ×12 into the 1200 field
+     });
+     // 11/12 of the sole fuel's emissions are estimated → 91.67%.
+-    expect(pctEstimated([l], [extrapolate('natural_gas', 1)], 'AR6', 2024)).toBeCloseTo(91.67, 1);
++    expect(pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2024 }, 'AR6')).toBeCloseTo(91.67, 1);
+   });
+ 
+   it('J2 same 1/12 gas extrapolation, but electricity is 95% of tCO2e → estimation is SMALL (~4.6%), not 91.7% — weighting is by emissions, not fuel count', () => {
+@@ -518,7 +519,7 @@ describe('GROUP J — pctEstimated', () => {
+       grid_region: 'US_AVG', electricity_kwh: kwh,
+       source_docs: [gasBill(1000 / 12, '2024-01-31')],
+     });
+-    const pct = pctEstimated([l], [extrapolate('natural_gas', 1)], 'AR6', 2024);
++    const pct = pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2024 }, 'AR6');
+     // (gasT × 11/12) / (20 × gasT) × 100 = (11/12)/20 × 100 ≈ 4.58 — NOT 91.7.
+     expect(pct).toBeCloseTo(4.58, 1);
+     expect(pct).toBeLessThan(10);
+@@ -529,12 +530,12 @@ describe('GROUP J — pctEstimated', () => {
+       has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
+       source_docs: [gasBill(1200, '2024-12-31')], // full-year bill, no resolution
+     });
+-    expect(pctEstimated([l], [], 'AR6', 2024)).toBe(0);
++    expect(pctEstimated({ locations: [l], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBe(0);
+   });
+ 
+   it('J4 wholly manual inventory (no proposals, no resolutions) → null (an absence, not zero)', () => {
+     const l = loc({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }); // source_docs: []
+-    expect(pctEstimated([l], [], 'AR6', 2024)).toBeNull();
++    expect(pctEstimated({ locations: [l], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBeNull();
+   });
+ 
+   it('J5 straddle "prorate" only, no extrapolate → 0% (proration allocates real metered data; it is not estimation)', () => {
+@@ -546,7 +547,7 @@ describe('GROUP J — pctEstimated', () => {
+       locId: 'L1', fuelType: 'natural_gas', kind: 'straddle', straddleChoice: 'prorate',
+       daysInYear: 20, totalDays: 31, note: 'prorated', acknowledgedAt: '2024-06-01T00:00:00Z',
+     };
+-    expect(pctEstimated([l], [strad], 'AR6', 2024)).toBe(0);
++    expect(pctEstimated({ locations: [l], coverage_resolutions: [strad], reporting_year: 2024 }, 'AR6')).toBe(0);
+   });
+ });
+ 
+@@ -685,8 +686,8 @@ describe('GROUP L — unpriceable locations are isolated, excluded, and recorded
+   it('L5 pctEstimated measures the estimated share against the same excluded set', () => {
+     // Blocked location out of BOTH numerator and denominator — otherwise its estimated emissions
+     // would be weighed against a total it is not part of.
+-    expect(() => pctEstimated([good(), bad()], [], 'AR6', 2024)).not.toThrow();
+-    expect(pctEstimated([good(), bad()], [], 'AR6', 2024)).toBe(pctEstimated([good()], [], 'AR6', 2024));
++    expect(() => pctEstimated({ locations: [good(), bad()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).not.toThrow();
++    expect(pctEstimated({ locations: [good(), bad()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBe(pctEstimated({ locations: [good()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6'));
+   });
+ 
+   it('L6 the probe is GWP-independent — the same locations are excluded on AR4, AR5 and AR6', () => {
+@@ -1920,8 +1921,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
+     // never returned to a caller. So there is nothing to assert on directly — Z8's textual check is
+     // what covers that site. This exercises it end-to-end instead: pctEstimated walks both grades and
+     // must not throw or double-count.
+-    expect(() => pctEstimated([both], [], 'AR6', 2025)).not.toThrow();
+-    expect(pctEstimated([both], [], 'AR6', 2025), 'null = nothing concierge-derived, so no estimated share to report').toBeNull();
++    expect(() => pctEstimated({ locations: [both], coverage_resolutions: [], reporting_year: 2025 }, 'AR6')).not.toThrow();
++    expect(pctEstimated({ locations: [both], coverage_resolutions: [], reporting_year: 2025 }, 'AR6'), 'null = nothing concierge-derived, so no estimated share to report').toBeNull();
+     // Each grade declares and quantifies alone.
+     expect(streamState(loc({ has_fuel_oil_distillate: true }), 'fuel_oil_distillate')).toBe('declared_unquantified');
+     expect(streamState(loc({ has_fuel_oil_distillate: true }), 'fuel_oil_residual')).toBe('undeclared');
+@@ -3516,8 +3517,9 @@ describe('T1 billContributions', () => {
+     expect(JSON.stringify(l)).toBe(before);
+   });
+ 
+-  // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage.
+-  it('is called only by applyResolutions and findUnresolvedCoverage (T2, T3)', () => {
++  // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage;
++  // T5 adds buildWorkings (contributions on rows) and pctEstimated (evidenced quantity per field).
++  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings and pctEstimated (T2, T3, T5)', () => {
+     const root = join(__dirname, '..', '..');
+     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+       const rel = `${dir}/${n}`;
+@@ -3529,9 +3531,9 @@ describe('T1 billContributions', () => {
+       const n = (src.match(/billContributions\(/g) ?? []).length;
+       return n ? [`${f}: ${n}`] : [];
+     });
+-    expect(calls).toEqual(['lib/ghg/engine.ts: 2']);
++    expect(calls).toEqual(['lib/ghg/engine.ts: 4']);
+     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
+-    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(']) {
++    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function pctEstimated(']) {
+       const body = engineSrc.slice(engineSrc.indexOf(fn));
+       expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
+     }
+@@ -4076,13 +4078,13 @@ describe('T4 deriveLocations', () => {
+     });
+   });
+ 
+-  it('pctEstimated, fed derived locations, measures the gross-up against the derived total', () => {
++  it('pctEstimated derives the locations itself (T5): stale stored figures give the same share as derived', () => {
+     const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50,
+       note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
+     const months = Array.from({ length: 6 }, (_, k) => gdoc(`m${k}`, gas(100, `2025-0${k + 1}-01`, `2025-0${k + 1}-${new Date(2025, k + 1, 0).getDate()}`)));
+     const i = inv([gasSite(0, months)], 2025, 12, [extrap]); // stored 0: the page never wrote it
+-    expect(pctEstimated(i.locations, [extrap], 'AR6', 2025), 'stored: no emissions to measure against').toBe(0);
+-    expect(pctEstimated(deriveLocations(i), [extrap], 'AR6', 2025)).toBeCloseTo(50, 9);
++    expect(pctEstimated(i, 'AR6')).toBeCloseTo(50, 9);
++    expect(pctEstimated({ ...i, locations: deriveLocations(i) }, 'AR6')).toBeCloseTo(50, 9);
+   });
+ 
+   it('findUnpriceableLocations judges the derived figure: a stale stored figure no document supports is not priced', () => {
+@@ -4092,3 +4094,184 @@ describe('T4 deriveLocations', () => {
+     expect(findUnpriceableLocations(deriveLocations(inv([site])), 'AR6', 2025)).toEqual([]);
+   });
+ });
++
++// ── T5: contributions on workings rows, no stale fallback, zero rows, documentType, pctEstimated ────
++// docs/review/design-derived-figures.md section 11 T5 and the T5 rulings in section 10.
++describe('T5 workings rows carry their contributions', () => {
++  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, sourceQuote: `${value} mcf`, ...o });
++  const gdoc = (id: string, p: ExtractedProposal, meter?: string): SourceDoc =>
++    ({ ...doc('utility_bill_gas', [p], id), ...(meter ? { meter_label: meter } : {}) });
++  const gasSite = (amount: number, docs: SourceDoc[], o: Partial<Location> = {}) =>
++    loc({ has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: 'mcf', source_docs: docs, ...o });
++  type Row = { stream?: string; source?: string; scope?: number; activity_data?: number; result_tco2e?: number | null; entry_method?: string;
++    declaration?: string; note?: string; contributions?: BillContribution[]; gwp_basis?: string; source_doc_ids?: string[] };
++  const rowsOf = (locs: Location[], y = 2025, res: CoverageResolution[] = [], m = 12) => buildWorkings(locs, 'AR6', y, res, m) as Row[];
++  const gasRow = (rows: Row[]) => rows.find(r => r.stream === 'natural_gas');
++  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate();
++  const month = (y: number, m: number) => [`${y}-${String(m).padStart(2, '0')}-01`, `${y}-${String(m).padStart(2, '0')}-${lastDay(y, m)}`] as const;
++
++  it('each document-backed row carries every bill for its field, counted or not, with the reason', () => {
++    const rows = rowsOf([gasSite(0, [gdoc('in', gas(100, ...month(2025, 1))), gdoc('old', gas(70, ...month(2024, 3)))])]);
++    expect(gasRow(rows)?.contributions?.map(c => [c.docId, c.counted, c.reason])).toEqual([['in', true, 'counted'], ['old', false, 'outside_year']]);
++  });
++
++  it('a same-bill exclusion is present with its reason and the document it duplicates', () => {
++    const res: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'],
++      note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' };
++    const rows = rowsOf([gasSite(0, [gdoc('a', gas(100, ...month(2025, 1))), gdoc('b', gas(100, ...month(2025, 1)))])], 2025, [res]);
++    expect(gasRow(rows)?.contributions?.find(c => c.docId === 'b')).toMatchObject({ counted: false, reason: 'same_bill_as', reasonRef: 'a' });
++    expect(gasRow(rows)?.activity_data).toBe(100);
++  });
++
++  it('a typed figure over all-rejected documents is manual, and still lists the rejected documents', () => {
++    const r = gasRow(rowsOf([gasSite(250, [gdoc('x', gas(100, ...month(2025, 1), { status: 'rejected' }))])]));
++    expect(r?.entry_method).toBe('manual');
++    expect(r?.activity_data).toBe(250);
++    expect(r?.contributions?.map(c => c.reason)).toEqual(['not_confirmed']);
++  });
++
++  it("entry_method is never 'manual' for a field with confirmed documents, even with no source quote", () => {
++    const r = gasRow(rowsOf([gasSite(0, [gdoc('a', gas(100, ...month(2025, 1), { sourceQuote: null }))])]));
++    expect(r?.entry_method).toBe('concierge');
++    expect(r?.source_doc_ids).toEqual(['a']);
++  });
++
++  it('no stale-field fallback: stored locations give the derived figure, not the stored one', () => {
++    const stale = gasSite(999, [gdoc('a', gas(100, ...month(2025, 1)))]);
++    expect(gasRow(rowsOf([stale]))?.activity_data).toBe(100);
++    const pendingOnly = gasSite(999, [gdoc('a', gas(100, ...month(2025, 1), { status: 'extracted' }))]);
++    expect(gasRow(rowsOf([pendingOnly]))?.declaration, 'pending only: derived 0, so declared, not priced').toBe('declared_unquantified');
++  });
++
++  describe('all-excluded field: zero row', () => {
++    it('every confirmed bill outside the year: one zero row with the contributions, and the declaration still shows', () => {
++      const rows = rowsOf([gasSite(170, [gdoc('o1', gas(100, ...month(2024, 3))), gdoc('o2', gas(70, ...month(2024, 4)))])]);
++      const z = rows.filter(r => r.gwp_basis === 'all_bills_excluded');
++      expect(z).toHaveLength(1);
++      expect(z[0]).toMatchObject({ source: 'Natural gas', scope: 1, activity_data: 0, result_tco2e: 0, entry_method: 'concierge' });
++      expect(z[0].stream, 'untagged, so it does not count as priced').toBeUndefined();
++      expect(z[0].contributions?.map(c => c.reason)).toEqual(['outside_year', 'outside_year']);
++      expect(z[0].note).toBe('No bill is counted for this line: each confirmed bill is outside reporting year 2025 or is the same bill as another document.');
++      expect(rows.find(r => r.stream === 'natural_gas')?.declaration).toBe('declared_unquantified');
++    });
++
++    it('a non-December year names the year by its end', () => {
++      const rows = rowsOf([gasSite(0, [gdoc('o', gas(100, ...month(2025, 6)))])], 2025, [], 3);
++      expect(rows.find(r => r.gwp_basis === 'all_bills_excluded')?.note).toContain('the year ending 31 March 2025');
++    });
++
++    it('electricity gets a zero row too, with no em dash in its note', () => {
++      const site = loc({ grid_region: 'US_CA', electricity_kwh: 900, source_docs: [doc('utility_electricity',
++        [prop({ fuelType: 'electricity', value: 900, unit: 'kwh', periodStart: '2024-05-01', periodEnd: '2024-05-31' })], 'e')] });
++      const z = rowsOf([site]).find(r => r.gwp_basis === 'all_bills_excluded');
++      expect(z).toMatchObject({ source: 'Electricity', scope: 2, result_tco2e: 0 });
++      expect(z?.note).not.toContain('—');
++    });
++
++    it('no zero row when any bill counts, when the field is blocked (mixed, undated), or when nothing is confirmed', () => {
++      const cases: Location[] = [
++        gasSite(0, [gdoc('in', gas(100, ...month(2025, 1))), gdoc('o', gas(100, ...month(2024, 3)))]),
++        gasSite(0, [gdoc('a', gas(100, ...month(2024, 3))), gdoc('b', gas(100, ...month(2025, 2), { unit: 'therms' }))]),
++        gasSite(0, [gdoc('u', gas(100, null, null))]),
++        gasSite(0, [gdoc('p', gas(100, ...month(2024, 3), { status: 'extracted' }))]),
++      ];
++      for (const [k, c] of cases.entries()) expect(rowsOf([c]).filter(r => r.gwp_basis === 'all_bills_excluded'), `case ${k}`).toEqual([]);
++    });
++
++    it('zero rows add nothing: totals still equal the sum of the rows', () => {
++      const i = { locations: [gasSite(170, [gdoc('o1', gas(100, ...month(2024, 3)))])], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] };
++      const rows = rowsOf(i.locations);
++      const s1 = rows.filter(r => r.scope === 1 && typeof r.result_tco2e === 'number').reduce((a, r) => a + (r.result_tco2e as number), 0);
++      expect(s1).toBe(calcInventory(deriveLocations(i), 'AR6', 2025).s1_total);
++    });
++  });
++
++  describe('share cell', () => {
++    const cell = (reason: string, inWindowDays: number | null, totalDays: number | null, share: number | null) =>
++      contributionShareCell({ reason, inWindowDays, totalDays, share });
++    it('prorated, counted, excluded and undated bills', () => {
++      expect(cell('prorated', 12, 31, 12 / 31)).toBe('12 of 31 days, ×0.387');
++      expect(cell('counted', 31, 31, 1)).toBe('31 of 31 days');
++      for (const r of ['outside_year', 'same_bill_as', 'not_confirmed', 'mixed_units']) expect(cell(r, 0, 31, 0), r).toBe('Not counted');
++      expect(cell('undated', null, null, null)).toBe('Not applicable');
++      expect(cell('invalid_period', null, null, null)).toBe('Not applicable');
++    });
++    it('reads the stored contributions on a real row, matching the proration note', () => {
++      const r = gasRow(rowsOf([gasSite(0, [gdoc('s', gas(310, '2024-12-20', '2025-01-19'))])], 2025)) as Row & { proration_note?: string };
++      const c = r.contributions![0];
++      expect(contributionShareCell(c)).toBe('19 of 31 days, ×0.613');
++      expect(r.proration_note).toContain('19 of 31 days in reporting year 2025, ×0.613');
++    });
++  });
++});
++
++describe('T5 gap estimates name their document type', () => {
++  const months = (docType: string, fuelType: string, unit: string, n: number, prefix: string) => Array.from({ length: n }, (_, k) => {
++    const m = String(k + 1).padStart(2, '0');
++    return doc(docType, [prop({ fuelType, value: 10, unit, periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${new Date(2025, k + 1, 0).getDate()}`, sourceQuote: '10 gal' })], `${prefix}${k}`);
++  });
++  const est = (o: Partial<CoverageResolution> = {}): CoverageResolution =>
++    ({ locId: 'L1', fuelType: 'diesel', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z', ...o } as CoverageResolution);
++  // Stationary diesel: 6 months. Fleet diesel: 6 months (for the gap tests) or 12 (for pctEstimated).
++  const site = (fleetMonths: number) => loc({ has_diesel_stationary: true, diesel_stationary_unit: 'gallons', has_mobile: true, diesel_mobile_unit: 'gallons',
++    source_docs: [...months('fuel_diesel', 'diesel', 'gallons', 6, 's'), ...months('fleet_fuel', 'diesel', 'gallons', fleetMonths, 'f')] });
++  const W = periodFromYearAndEnd(2025, 12);
++  const gaps = (l: Location, r: CoverageResolution[]) => findUnresolvedCoverage([l], 2025, 12, r).filter(i => i.status === 'gap');
++
++  it('an estimate without documentType is not accepted where the fuel has two document types', () => {
++    expect(validateResolution(est(), site(6))).toBe('Choose which documents this estimate covers.');
++    expect(gaps(site(6), [est()])).toHaveLength(2);
++    const a = applyResolutions(site(6), [est()], W.start, W.end);
++    expect([a.diesel_stationary_amount.value, a.diesel_mobile_amount.value]).toEqual([60, 60]);
++  });
++
++  it('an estimate naming fuel_diesel grosses up and clears stationary diesel only', () => {
++    const r = est({ documentType: 'fuel_diesel' });
++    expect(validateResolution(r, site(6))).toBeNull();
++    const a = applyResolutions(site(6), [r], W.start, W.end);
++    expect([a.diesel_stationary_amount.value, a.diesel_mobile_amount.value]).toEqual([120, 60]);
++    expect(gaps(site(6), [r])).toHaveLength(1);
++  });
++
++  it('a document type not on the site is not accepted', () => {
++    expect(validateResolution(est({ documentType: 'utility_bill_gas' }), site(6))).toBe('The estimate names documents that are not on this site.');
++  });
++
++  it('a stored estimate without documentType still applies where the fuel has one document type', () => {
++    const gasOnly = loc({ has_natural_gas: true, source_docs: months('utility_bill_gas', 'natural_gas', 'mcf', 6, 'g') });
++    const r = est({ fuelType: 'natural_gas' });
++    expect(validateResolution(r, gasOnly)).toBeNull();
++    expect(applyResolutions(gasOnly, [r], W.start, W.end).natural_gas_amount.value).toBe(120);
++  });
++
++  it('pctEstimated keeps stationary and fleet diesel apart: an estimate on one does not count the other', () => {
++    const l = site(12);
++    const r = est({ documentType: 'fuel_diesel' });
++    const d = deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [r] })[0];
++    expect([d.diesel_stationary_amount, d.diesel_mobile_amount]).toEqual([120, 120]);
++    const es = calcInventory([loc({ has_diesel_stationary: true, diesel_stationary_amount: 120, diesel_stationary_unit: 'gallons' })], 'AR6', 2025).s1_total;
++    const ef = calcInventory([loc({ has_mobile: true, diesel_mobile_amount: 120, diesel_mobile_unit: 'gallons' })], 'AR6', 2025).s1_total;
++    const pct = pctEstimated({ locations: [l], reporting_year: 2025, coverage_resolutions: [r] }, 'AR6');
++    expect(pct).toBeCloseTo(0.5 * es / (es + ef) * 100, 9);
++    expect(pct, 'not half of both diesel streams').not.toBeCloseTo(50, 1);
++  });
++});
++
++describe('T5 pctEstimated applies each gross-up to its own meter only', () => {
++  it('two gas meters, only meter B estimated: the share counts B\'s gross-up, not the whole fuel', () => {
++    const bill = (k: number, meter?: string) => {
++      const m = String(k).padStart(2, '0');
++      return { ...doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 100, unit: 'mcf', periodStart: `2025-${m}-01`,
++        periodEnd: `2025-${m}-${new Date(2025, k, 0).getDate()}` })], `${meter ?? 'A'}${k}`), ...(meter ? { meter_label: meter } : {}) };
++    };
++    const l = loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [
++      ...Array.from({ length: 12 }, (_, k) => bill(k + 1)), ...Array.from({ length: 6 }, (_, k) => bill(k + 1, 'B'))] });
++    const r: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50,
++      meterLabel: 'B', note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
++    const inv = { locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [r] };
++    expect(deriveLocations(inv)[0].natural_gas_amount).toBe(2400);
++    // Evidenced 1,800 of 2,400 (A 1,200 + B 600); B's gross-up is 600, a quarter of the figure.
++    expect(pctEstimated(inv, 'AR6')).toBeCloseTo(25, 9);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 6a35858..2b344b6 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -22,7 +22,7 @@ import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ } from '../unitConversions'
+ // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
+ // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
+ import { NOT_PROVIDED } from '../notProvided'
+-import { ALL_LOCATIONS } from './workingsCells'
++import { ALL_LOCATIONS, NOT_APPLICABLE } from './workingsCells'
+ // Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
+ // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
+ // shape stays in one place. See lib/ghg/comparability.ts.
+@@ -1871,6 +1871,10 @@ interface CoverageResolution {
+   // extrapolate: which meter's gap (absent or null = the default single meter). different_meters: the
+   // label given, which must equal the document's own meter_label (the one source the engine groups by).
+   meterLabel?: string | null
++  // extrapolate (T5): which document type's gap. Stationary diesel (fuel_diesel) and fleet diesel
++  // (fleet_fuel) share fuelType 'diesel', so without this one estimate grossed up and cleared both.
++  // Absent is accepted only where the location has a single document type for the fuel.
++  documentType?: string
+   // same_bill: the document that counts, and the ones retained as evidence but not counted.
+   countedDocId?: string
+   excludedDocIds?: string[]
+@@ -2805,39 +2809,37 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+   }, { s1_total: 0, s2_location: 0, s2_market: 0, s3_td: 0, co2: 0, ch4: 0, n2o: 0, biogenic: 0 })
+ }
+ 
+-// tCO2e per fuelType for ONE location, keyed by the same fuelType strings a CoverageResolution
+-// carries ('natural_gas' | 'propane' | 'diesel' | 'gasoline' | 'electricity'). This is the per-fuel
+-// decomposition calcLocation deliberately lumps together (it sums s1_stationary/s1_mobile); pctEstimated
+-// needs the split to weight an extrapolation by the emissions it actually estimated. Same EFs, same
+-// grid gate, same GWP as calcLocation — so a fuel's share here reconciles with the inventory total.
+-// diesel (stationary AND mobile) both map to 'diesel', matching fieldFor's two diesel docTypes.
++// tCO2e per document-backed FIELD for ONE location (T5). Keyed by field, not fuelType, so stationary
++// diesel and fleet diesel, which share fuelType 'diesel', stay separate: an estimate on one must never
++// count the other as estimated. Same EFs, same grid gate, same GWP as calcLocation, so a field's share
++// here reconciles with the inventory total.
+ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number): Record<string, number> {
+   const out: Record<string, number> = {}
+   const add = (k: string, v: number) => { out[k] = (out[k] ?? 0) + v }
+   if (loc.has_natural_gas && loc.natural_gas_amount > 0)
+-    add('natural_gas', calcGas(pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), loc.natural_gas_amount, gwpVersion).total)
++    add('natural_gas_amount', calcGas(pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), loc.natural_gas_amount, gwpVersion).total)
+   if (loc.has_propane && loc.propane_amount > 0)
+-    add('propane', calcGas(pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), loc.propane_amount, gwpVersion).total)
++    add('propane_amount', calcGas(pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), loc.propane_amount, gwpVersion).total)
+   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
+-    add('diesel', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
++    add('diesel_stationary_amount', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
+   if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
+     const fod = fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)
+-    add('fuel_oil_distillate', calcGas(pickEF(loc, fod.key as keyof typeof EF), fod.priced, gwpVersion).total)
++    add('fuel_oil_distillate_amount', calcGas(pickEF(loc, fod.key as keyof typeof EF), fod.priced, gwpVersion).total)
+   }
+   if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
+     const forr = fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)
+-    add('fuel_oil_residual', calcGas(pickEF(loc, forr.key as keyof typeof EF), forr.priced, gwpVersion).total)
++    add('fuel_oil_residual_amount', calcGas(pickEF(loc, forr.key as keyof typeof EF), forr.priced, gwpVersion).total)
+   }
+   if (loc.has_mobile) {
+     if (loc.gasoline_amount > 0)
+-      add('gasoline', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
++      add('gasoline_amount', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
+     if (loc.diesel_mobile_amount > 0)
+-      add('diesel', calcGas(pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_mobile_amount, gwpVersion).total)
++      add('diesel_mobile_amount', calcGas(pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_mobile_amount, gwpVersion).total)
+   }
+   // Electricity = Scope 2 location-based (the series' headline basis). Same grid gate as calcLocation:
+   // an unresolved grid_region contributes 0 there, so it must contribute 0 here too.
+   if (isResolvedGridRegion(loc.grid_region) && loc.electricity_kwh > 0)
+-    add('electricity', loc.electricity_kwh * getGridFactor(loc.grid_region, year).ef / 1000)
++    add('electricity_kwh', loc.electricity_kwh * getGridFactor(loc.grid_region, year).ef / 1000)
+   return out
+ }
+ 
+@@ -2851,31 +2853,45 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
+  * (a wholly manual inventory has no evidence basis to measure against —
+  * null is an absence, not zero).
+  *
+- * `locations` must be deriveLocations output (T4): the share is measured against the figures the
+- * totals are calculated on, not against a stored field that may be stale.
++ * Takes the inventory and derives its locations itself (T5), so the share is measured against the
++ * figures the totals are calculated on, never a stored field that may be stale.
+  */
+ export function pctEstimated(
+-  locations: Location[],
+-  resolutions: CoverageResolution[],
++  inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
+   gwpVersion: GwpVersion,
+-  year: number
+ ): number | null {
+-  // Only 'extrapolate' produces estimated emissions. Proration by billing days is an allocation of
+-  // REAL metered data, not an estimate. Legacy 'straddle' and 'duplicate' resolutions are never accepted
+-  // and change no figure (T2, T3), so they are not counted either.
+-  const extraps = resolutions.filter(r => r.kind === 'extrapolate' && !!r.monthsCovered && r.monthsCovered > 0)
++  // T5 ruling: each accepted gap gross-up counts only against its own meter's figure, and fuels shared
++  // across document types (stationary and fleet diesel) are separate groups. Both follow from measuring
++  // estimation per FIELD as (derived figure − evidenced quantity): applyResolutions has already grossed
++  // up each meter by its own coverage and matched the estimate to its document type, so whatever was
++  // grossed up, and only that, is the difference. Proration by billing days allocates real metered data,
++  // so a prorated field's evidenced quantity equals its figure and it counts as 0% estimated. Legacy
++  // 'straddle' and 'duplicate' resolutions are never accepted and change no figure.
++  // Takes the inventory, not locations, so it derives the figures itself and the caller does no
++  // arithmetic: a stale stored field cannot reach the share.
++  const year = inventory.reporting_year
++  const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12)
++  const resolutions = inventory.coverage_resolutions ?? []
++  const locations = deriveLocations(inventory)
+   let estimated = 0
+   for (const loc of locations) {
+     // Excluded from the denominator by calcInventory below, so it must be excluded from the
+     // numerator too — otherwise an unpriceable location's estimated share would be measured
+     // against a total it is not part of.
+     if (unpriceableReason(loc, gwpVersion, year)) continue
+-    const byFuel = fuelEmissionsByType(loc, gwpVersion, year)
+-    for (const r of extraps) {
+-      if (r.locId !== loc.id) continue
+-      const m = r.monthsCovered as number
+-      const estimatedFraction = Math.max(0, (12 - m) / 12) // e.g. 1/12 evidenced → 11/12 estimated
+-      estimated += (byFuel[r.fuelType] ?? 0) * estimatedFraction
++    const evidenced: Record<string, number> = {}
++    for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
++      if (c.counted) evidenced[String(c.field)] = (evidenced[String(c.field)] ?? 0) + c.value * (c.share ?? 0)
++    }
++    for (const [field, emissions] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year))) {
++      const figure = (loc as unknown as Record<string, number>)[field]
++      const ev = evidenced[field]
++      if (ev == null || !(figure > 0)) continue
++      const grossedUp = figure - ev
++      // Summation order differs from applyResolutions' per-meter sums, so an unestimated field can
++      // differ from its evidence by rounding alone; that is not estimation.
++      if (grossedUp <= figure * 1e-9) continue
++      estimated += emissions * (grossedUp / figure)
+     }
+   }
+   // A wholly manual inventory (no confirmed concierge proposal on any location) has no evidence
+@@ -2960,8 +2976,12 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
+   const hasFuel = (docId: string) =>
+     docs.some(d => d.id === docId && (d.extracted ?? []).some(p => p.fuelType === r.fuelType))
+   switch (r.kind) {
+-    case 'extrapolate':
+-      return r.monthsCovered && r.monthsCovered > 0 ? null : 'An estimate needs the number of months covered by bills.'
++    case 'extrapolate': {
++      if (!(r.monthsCovered && r.monthsCovered > 0)) return 'An estimate needs the number of months covered by bills.'
++      const types = new Set(docs.filter(d => (d.extracted ?? []).some(p => p.fuelType === r.fuelType)).map(d => d.document_type))
++      if (r.documentType != null) return types.has(r.documentType) ? null : 'The estimate names documents that are not on this site.'
++      return types.size > 1 ? 'Choose which documents this estimate covers.' : null
++    }
+     case 'same_bill': {
+       const ex = r.excludedDocIds ?? []
+       if (!r.countedDocId) return 'Choose the document that counts.'
+@@ -3255,7 +3275,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+   // 1. Gather confirmed proposals per target field (via the shared fieldFor join key). Provenance — quotes,
+   //    document ids, file paths, refs — is unchanged from before T2: every confirmed proposal with a value.
+   //    Per-bill provenance (which bills counted, and why the others did not) arrives with T5.
+-  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[] }
++  type Acc = { field: keyof Location; unitField?: keyof Location; documentType: string; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[] }
+   const acc: Record<string, Acc> = {}
+   loc.source_docs.forEach(d => {
+     d.extracted?.forEach((p, pi) => {
+@@ -3263,7 +3283,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+       const map = fieldFor(d.document_type, p.fuelType)
+       if (!map) return
+       const key = String(map.amount)
+-      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
++      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, documentType: d.document_type, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
+       acc[key].rawSum += p.value
+       if (p.unit) acc[key].units.add(p.unit)
+       acc[key].fuelTypes.add(p.fuelType)
+@@ -3290,7 +3310,10 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+     const extrs: { meter: string | null; r: CoverageResolution }[] = []
+     let grossed = 0
+     for (const [meter, sum] of meters) {
+-      const r = resolutions.find(x => x.kind === 'extrapolate' && x.fuelType === a.fuelType && (x.meterLabel ?? null) === meter)
++      // Matched on document type too (T5): accepted resolutions without one exist only where the fuel has
++      // a single document type at this location, so `null` cannot reach a second group.
++      const r = resolutions.find(x => x.kind === 'extrapolate' && x.fuelType === a.fuelType && (x.meterLabel ?? null) === meter
++        && (x.documentType == null || x.documentType === a.documentType))
+       if (r) extrs.push({ meter, r })
+       grossed += sum * (r && r.monthsCovered ? 12 / r.monthsCovered : 1)
+     }
+@@ -3390,8 +3413,23 @@ interface Provenance {
+   // The per-bill day arithmetic behind a concierge-prorated figure. Separate from extrapolation_note,
+   // which the verifier page reads as an estimate.
+   proration_note?: string
++  // T5: every bill for this field and what became of it: counted, prorated, or not counted and why
++  // (outside the year, the same bill as another, undated, invalid period, mixed units, not confirmed).
++  // Stored in workings, so the verifier page and the PDF never recompute it.
++  contributions?: BillContribution[]
+ }
+ 
++// Document-backed fields that get a zero row when every confirmed bill is silently excluded (T5 ruling).
++// The source labels match the priced rows' labels. renewable_electricity_kwh is not an emissions line.
++const ZERO_ROW_FIELDS: { field: keyof Location; source: string; scope: number; unitField?: keyof Location; unit: string }[] = [
++  { field: 'natural_gas_amount', source: 'Natural gas', scope: 1, unitField: 'natural_gas_unit', unit: '' },
++  { field: 'propane_amount', source: 'Propane', scope: 1, unitField: 'propane_unit', unit: '' },
++  { field: 'diesel_stationary_amount', source: 'Diesel (stationary)', scope: 1, unitField: 'diesel_stationary_unit', unit: '' },
++  { field: 'gasoline_amount', source: 'Gasoline (mobile)', scope: 1, unitField: 'gasoline_unit', unit: '' },
++  { field: 'diesel_mobile_amount', source: 'Diesel (mobile)', scope: 1, unitField: 'diesel_mobile_unit', unit: '' },
++  { field: 'electricity_kwh', source: 'Electricity', scope: 2, unit: 'kWh' },
++]
++
+ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12) {
+   const rows: any[] = []
+   const win = periodFromYearAndEnd(year, fiscalYearEndMonth)
+@@ -3508,7 +3546,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+       ef_source: combustionSource(loc), ...vintageOf(COMBUSTION_EDITION, loc),
+       result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
+   }
+-  for (const loc of locations) {
++  // NO STALE-FIELD FALLBACK (T5). Workings are built from derived locations, so every document-backed
++  // figure is the fold of its counted bills whatever the stored field says. Idempotent, so a caller that
++  // already passes deriveLocations output (T4) gets the same rows.
++  const derivedLocations = deriveLocations({ locations, reporting_year: year, fiscal_year_end_month: fiscalYearEndMonth, coverage_resolutions: resolutions })
++  for (const loc of derivedLocations) {
+     // Decided BEFORE any row is emitted, and with the same helper calcInventory uses. A location
+     // the total excluded must not also appear here with priced rows — the audit trail would then
+     // show workings for emissions no total contains. One row stating the exclusion instead, with
+@@ -3556,27 +3598,30 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+     // applyResolutions is the single source of the figure AND its provenance/method, so the number
+     // in the row and the claim in the audit trail cannot diverge (that divergence was the SEV 0 bug).
+     const applied = applyResolutions(loc, resolutions, win.start, win.end)
+-    // Figure for a field: the resolution-applied value when the field is concierge-derived; otherwise
+-    // the location's own value (manual entry, or a mixed-unit field the write path deliberately skipped).
+-    const figure = (field: keyof Location): number => {
+-      const a = applied[String(field)]
+-      return a && !a.mixedUnits ? a.value : (loc as any)[field] as number
+-    }
+-    // Provenance stamp from the applied field. No quotes → honest 'manual'. An adjustment on file
+-    // (extrapolate/straddle/duplicate) with quotes → 'concierge-extrapolated' + the method/basis note.
++    // Every bill for this location and what became of it, the same rows applyResolutions folded.
++    const contributions = billContributions(loc, acceptedResolutions(loc, resolutions), win)
++    const contributionsFor = (field: keyof Location) => contributions.filter(c => String(c.field) === String(field))
++    // Figure for a field: the location's own value, which deriveLocations has already set from the
++    // documents for every document-backed field. A typed figure is used only where no document backs it.
++    const figure = (field: keyof Location): number => (loc as unknown as Record<string, number>)[String(field)]
++    // Provenance stamp from the applied field. A field with confirmed documents is never 'manual' (T5),
++    // whether or not its bills carried a quote. An adjustment on file → prorated or extrapolated stamp.
++    // Every row for a document-backed field carries its contributions, including documents not counted.
+     const provOf = (field: keyof Location): Provenance => {
+       const a = applied[String(field)]
+-      const quotes = a?.quotes ?? []
+-      if (!quotes.length) return { entry_method: 'manual' }
+-      if (a && a.adjustment && a.adjustment.kind === 'prorate') {
+-        return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+-          entry_method: 'concierge-prorated', proration_note: a.adjustment.basis }
++      const contrib = contributionsFor(field)
++      const withContrib = (p: Provenance): Provenance => contrib.length ? { ...p, contributions: contrib } : p
++      if (!a || a.docIds.length === 0) return withContrib({ entry_method: 'manual' })
++      const quotes = a.quotes
++      if (a.adjustment && a.adjustment.kind === 'prorate') {
++        return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
++          entry_method: 'concierge-prorated', proration_note: a.adjustment.basis })
+       }
+-      if (a && a.adjustment) {
+-        return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+-          entry_method: 'concierge-extrapolated', extrapolation_note: `${a.adjustment.method} — ${a.adjustment.basis}` }
++      if (a.adjustment) {
++        return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
++          entry_method: 'concierge-extrapolated', extrapolation_note: `${a.adjustment.method} — ${a.adjustment.basis}` })
+       }
+-      return { source_quotes: quotes, source_doc_ids: a!.docIds, source_file_paths: a!.filePaths, entry_method: 'concierge' }
++      return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths, entry_method: 'concierge' })
+     }
+     if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'natural_gas', 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, `natural_gas_${loc.natural_gas_unit}`, provOf('natural_gas_amount'))
+     if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'propane', 'Propane', 1, figure('propane_amount'), loc.propane_unit, propaneEfKey(loc.propane_unit), provOf('propane_amount'))
+@@ -3586,8 +3631,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+     // Convert AFTER applying resolutions, then hand pushFuel the gallons figure — the factor is
+     // published per gallon, so the activity it multiplies must be gallons or the row would state a
+     // result the engine did not compute. The note carries the entered figure and the arithmetic.
+-    // ⚠️ figure(), NOT the raw field: calcLocation and calcInventory read the stored amount, this reads
+-    // the coverage-resolution-applied one. That distinction predates the grade split and survives it.
++    // figure() reads the derived location (T5), the same value calcLocation and calcInventory read when
++    // fed deriveLocations output, so the row and the total cannot disagree.
+     if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
+       const entered = figure('fuel_oil_distillate_amount')
+       // Same decision as calcLocation, from the same helper. Where the publisher prints per litre the
+@@ -3693,6 +3738,27 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+       rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(st.note ? { note: st.note } : {}) })
+       }
+     }
++    // ── All-excluded fields: a zero row carrying the contributions (T5 ruling) ─────────────────────
++    // A field whose confirmed bills are ALL silently excluded (outside the year, or the same bill as
++    // another document) has a figure of 0 and produced no row above, so without this the documents and
++    // why they were excluded would be missing from the workings. Activity 0 and result 0 add nothing to
++    // any total.
++    // ⚠️ DELIBERATELY NOT TAGGED WITH A STREAM. The declaration loop below treats a tagged row as "this
++    // stream was priced", and nothing was priced here: a bill outside the year evidences nothing about
++    // the year. Untagged, the stream still gets its declaration row (declared, not quantified), so the
++    // gap in the inventory stays visible beside the evidence of why.
++    for (const z of ZERO_ROW_FIELDS) {
++      if (figure(z.field) !== 0) continue
++      const contrib = contributionsFor(z.field)
++      const confirmed = contrib.filter(c => c.reason !== 'not_confirmed')
++      if (confirmed.length === 0 || !confirmed.every(c => c.reason === 'outside_year' || c.reason === 'same_bill_as')) continue
++      rows.push({ location: loc.name || 'Location', source: z.source, scope: z.scope,
++        activity_data: 0, activity_unit: z.unitField ? String((loc as unknown as Record<string, string>)[String(z.unitField)]) : z.unit,
++        emission_factor: NOT_APPLICABLE, emission_factor_display: NOT_APPLICABLE, ef_source: NOT_APPLICABLE,
++        ...(z.scope === 2 ? { scope2_method: 'location-based' } : {}),
++        gwp_basis: 'all_bills_excluded', result_tco2e: 0, entry_method: 'concierge', contributions: contrib,
++        note: `No bill is counted for this line: each confirmed bill is outside ${reportingYearLabel(win).inText} or is the same bill as another document.` })
++    }
+     // ── Declaration rows: EVERY stream gets a row, so no stream can ever be silent ────────────────
+     //
+     // ⚠️ THE TRIGGER IS AN OBSERVED FACT, NOT A SECOND COPY OF THE PRICING CONDITION. This loop used to
+@@ -3857,12 +3923,12 @@ export function findUnresolvedCoverage(
+     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
+     // (document_type, fuelType, meter_label). Same-bill exclusions, undated, invalid and mixed bills are
+     // not placed (each is reported above, or is a resolved overlap).
+-    const groups = new Map<string, { fuelType: string; meterLabel: string | null; periods: CoveragePeriod[] }>()
++    const groups = new Map<string, { documentType: string; fuelType: string; meterLabel: string | null; periods: CoveragePeriod[] }>()
+     for (const c of contributions) {
+       if (!(c.counted || c.reason === 'outside_year') || !c.periodStart || !c.periodEndExclusive) continue
+       const d = loc.source_docs.find(x => x.id === c.docId)!
+       const key = `${d.document_type}|${c.fuelType}|${c.meterLabel ?? ''}`
+-      const g = groups.get(key) ?? { fuelType: c.fuelType, meterLabel: c.meterLabel, periods: [] }
++      const g = groups.get(key) ?? { documentType: d.document_type, fuelType: c.fuelType, meterLabel: c.meterLabel, periods: [] }
+       const p = d.extracted![c.proposalIndex]
+       g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
+       groups.set(key, g)
+@@ -3870,7 +3936,8 @@ export function findUnresolvedCoverage(
+     for (const g of groups.values()) {
+       const cov = analyzeCoverage(g.periods, coverageWin.start, coverageWin.end)
+       if (cov.issues.includes('gap')) {
+-        const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel)
++        const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel
++          && (r.documentType == null || r.documentType === g.documentType))
+         if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel })
+       }
+       for (const pair of cov.overlaps) {
+diff --git a/lib/ghg/workingsCells.ts b/lib/ghg/workingsCells.ts
+index abb862e..05ee7f5 100644
+--- a/lib/ghg/workingsCells.ts
++++ b/lib/ghg/workingsCells.ts
+@@ -183,3 +183,26 @@ export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: st
+   if (r.gwp_basis === COVERAGE_ROW_BASIS) return NOT_APPLICABLE
+   return r.ef_source || NOT_PROVIDED
+ }
++
++/**
++ * The share cell for one bill on a document-backed workings row (T5 ruling). It reads as T2's proration
++ * note does, so the two never describe a bill differently:
++ *   - prorated:                "12 of 31 days, ×0.387"
++ *   - counted, wholly in year: "31 of 31 days"
++ *   - undated or invalid period (no days to count): NOT_APPLICABLE
++ *   - any other bill not counted: "Not counted"; the reason, not this cell, says why.
++ * Structural type rather than the engine's BillContribution, because the engine imports this file.
++ */
++export type ShareCellContribution = {
++  reason: string
++  inWindowDays: number | null
++  totalDays: number | null
++  share: number | null
++}
++export const NOT_COUNTED = 'Not counted'
++export function contributionShareCell(c: ShareCellContribution): string {
++  if (c.reason === 'undated' || c.reason === 'invalid_period') return NOT_APPLICABLE
++  if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
++  const days = `${c.inWindowDays} of ${c.totalDays} days`
++  return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days
++}

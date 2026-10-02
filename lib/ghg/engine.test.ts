@@ -36,6 +36,7 @@ import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
+import { contributionShareCell } from './workingsCells';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -504,7 +505,7 @@ describe('GROUP J — pctEstimated', () => {
       source_docs: [gasBill(100, '2024-01-31')], // 1 month evidenced, grossed ×12 into the 1200 field
     });
     // 11/12 of the sole fuel's emissions are estimated → 91.67%.
-    expect(pctEstimated([l], [extrapolate('natural_gas', 1)], 'AR6', 2024)).toBeCloseTo(91.67, 1);
+    expect(pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2024 }, 'AR6')).toBeCloseTo(91.67, 1);
   });
 
   it('J2 same 1/12 gas extrapolation, but electricity is 95% of tCO2e → estimation is SMALL (~4.6%), not 91.7% — weighting is by emissions, not fuel count', () => {
@@ -518,7 +519,7 @@ describe('GROUP J — pctEstimated', () => {
       grid_region: 'US_AVG', electricity_kwh: kwh,
       source_docs: [gasBill(1000 / 12, '2024-01-31')],
     });
-    const pct = pctEstimated([l], [extrapolate('natural_gas', 1)], 'AR6', 2024);
+    const pct = pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2024 }, 'AR6');
     // (gasT × 11/12) / (20 × gasT) × 100 = (11/12)/20 × 100 ≈ 4.58 — NOT 91.7.
     expect(pct).toBeCloseTo(4.58, 1);
     expect(pct).toBeLessThan(10);
@@ -529,12 +530,12 @@ describe('GROUP J — pctEstimated', () => {
       has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
       source_docs: [gasBill(1200, '2024-12-31')], // full-year bill, no resolution
     });
-    expect(pctEstimated([l], [], 'AR6', 2024)).toBe(0);
+    expect(pctEstimated({ locations: [l], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBe(0);
   });
 
   it('J4 wholly manual inventory (no proposals, no resolutions) → null (an absence, not zero)', () => {
     const l = loc({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }); // source_docs: []
-    expect(pctEstimated([l], [], 'AR6', 2024)).toBeNull();
+    expect(pctEstimated({ locations: [l], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBeNull();
   });
 
   it('J5 straddle "prorate" only, no extrapolate → 0% (proration allocates real metered data; it is not estimation)', () => {
@@ -546,7 +547,7 @@ describe('GROUP J — pctEstimated', () => {
       locId: 'L1', fuelType: 'natural_gas', kind: 'straddle', straddleChoice: 'prorate',
       daysInYear: 20, totalDays: 31, note: 'prorated', acknowledgedAt: '2024-06-01T00:00:00Z',
     };
-    expect(pctEstimated([l], [strad], 'AR6', 2024)).toBe(0);
+    expect(pctEstimated({ locations: [l], coverage_resolutions: [strad], reporting_year: 2024 }, 'AR6')).toBe(0);
   });
 });
 
@@ -685,8 +686,8 @@ describe('GROUP L — unpriceable locations are isolated, excluded, and recorded
   it('L5 pctEstimated measures the estimated share against the same excluded set', () => {
     // Blocked location out of BOTH numerator and denominator — otherwise its estimated emissions
     // would be weighed against a total it is not part of.
-    expect(() => pctEstimated([good(), bad()], [], 'AR6', 2024)).not.toThrow();
-    expect(pctEstimated([good(), bad()], [], 'AR6', 2024)).toBe(pctEstimated([good()], [], 'AR6', 2024));
+    expect(() => pctEstimated({ locations: [good(), bad()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).not.toThrow();
+    expect(pctEstimated({ locations: [good(), bad()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBe(pctEstimated({ locations: [good()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6'));
   });
 
   it('L6 the probe is GWP-independent — the same locations are excluded on AR4, AR5 and AR6', () => {
@@ -1920,8 +1921,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // never returned to a caller. So there is nothing to assert on directly — Z8's textual check is
     // what covers that site. This exercises it end-to-end instead: pctEstimated walks both grades and
     // must not throw or double-count.
-    expect(() => pctEstimated([both], [], 'AR6', 2025)).not.toThrow();
-    expect(pctEstimated([both], [], 'AR6', 2025), 'null = nothing concierge-derived, so no estimated share to report').toBeNull();
+    expect(() => pctEstimated({ locations: [both], coverage_resolutions: [], reporting_year: 2025 }, 'AR6')).not.toThrow();
+    expect(pctEstimated({ locations: [both], coverage_resolutions: [], reporting_year: 2025 }, 'AR6'), 'null = nothing concierge-derived, so no estimated share to report').toBeNull();
     // Each grade declares and quantifies alone.
     expect(streamState(loc({ has_fuel_oil_distillate: true }), 'fuel_oil_distillate')).toBe('declared_unquantified');
     expect(streamState(loc({ has_fuel_oil_distillate: true }), 'fuel_oil_residual')).toBe('undeclared');
@@ -3516,8 +3517,9 @@ describe('T1 billContributions', () => {
     expect(JSON.stringify(l)).toBe(before);
   });
 
-  // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage.
-  it('is called only by applyResolutions and findUnresolvedCoverage (T2, T3)', () => {
+  // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage;
+  // T5 adds buildWorkings (contributions on rows) and pctEstimated (evidenced quantity per field).
+  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings and pctEstimated (T2, T3, T5)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
@@ -3529,9 +3531,9 @@ describe('T1 billContributions', () => {
       const n = (src.match(/billContributions\(/g) ?? []).length;
       return n ? [`${f}: ${n}`] : [];
     });
-    expect(calls).toEqual(['lib/ghg/engine.ts: 2']);
+    expect(calls).toEqual(['lib/ghg/engine.ts: 4']);
     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
-    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(']) {
+    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function pctEstimated(']) {
       const body = engineSrc.slice(engineSrc.indexOf(fn));
       expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
     }
@@ -4076,13 +4078,13 @@ describe('T4 deriveLocations', () => {
     });
   });
 
-  it('pctEstimated, fed derived locations, measures the gross-up against the derived total', () => {
+  it('pctEstimated derives the locations itself (T5): stale stored figures give the same share as derived', () => {
     const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50,
       note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
     const months = Array.from({ length: 6 }, (_, k) => gdoc(`m${k}`, gas(100, `2025-0${k + 1}-01`, `2025-0${k + 1}-${new Date(2025, k + 1, 0).getDate()}`)));
     const i = inv([gasSite(0, months)], 2025, 12, [extrap]); // stored 0: the page never wrote it
-    expect(pctEstimated(i.locations, [extrap], 'AR6', 2025), 'stored: no emissions to measure against').toBe(0);
-    expect(pctEstimated(deriveLocations(i), [extrap], 'AR6', 2025)).toBeCloseTo(50, 9);
+    expect(pctEstimated(i, 'AR6')).toBeCloseTo(50, 9);
+    expect(pctEstimated({ ...i, locations: deriveLocations(i) }, 'AR6')).toBeCloseTo(50, 9);
   });
 
   it('findUnpriceableLocations judges the derived figure: a stale stored figure no document supports is not priced', () => {
@@ -4090,5 +4092,186 @@ describe('T4 deriveLocations', () => {
     const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'GB', natural_gas_unit: 'm3' });
     expect(findUnpriceableLocations([site], 'AR6', 2025), 'stored: blocked on a figure nothing supports').toHaveLength(1);
     expect(findUnpriceableLocations(deriveLocations(inv([site])), 'AR6', 2025)).toEqual([]);
+  });
+});
+
+// ── T5: contributions on workings rows, no stale fallback, zero rows, documentType, pctEstimated ────
+// docs/review/design-derived-figures.md section 11 T5 and the T5 rulings in section 10.
+describe('T5 workings rows carry their contributions', () => {
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, sourceQuote: `${value} mcf`, ...o });
+  const gdoc = (id: string, p: ExtractedProposal, meter?: string): SourceDoc =>
+    ({ ...doc('utility_bill_gas', [p], id), ...(meter ? { meter_label: meter } : {}) });
+  const gasSite = (amount: number, docs: SourceDoc[], o: Partial<Location> = {}) =>
+    loc({ has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: 'mcf', source_docs: docs, ...o });
+  type Row = { stream?: string; source?: string; scope?: number; activity_data?: number; result_tco2e?: number | null; entry_method?: string;
+    declaration?: string; note?: string; contributions?: BillContribution[]; gwp_basis?: string; source_doc_ids?: string[] };
+  const rowsOf = (locs: Location[], y = 2025, res: CoverageResolution[] = [], m = 12) => buildWorkings(locs, 'AR6', y, res, m) as Row[];
+  const gasRow = (rows: Row[]) => rows.find(r => r.stream === 'natural_gas');
+  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate();
+  const month = (y: number, m: number) => [`${y}-${String(m).padStart(2, '0')}-01`, `${y}-${String(m).padStart(2, '0')}-${lastDay(y, m)}`] as const;
+
+  it('each document-backed row carries every bill for its field, counted or not, with the reason', () => {
+    const rows = rowsOf([gasSite(0, [gdoc('in', gas(100, ...month(2025, 1))), gdoc('old', gas(70, ...month(2024, 3)))])]);
+    expect(gasRow(rows)?.contributions?.map(c => [c.docId, c.counted, c.reason])).toEqual([['in', true, 'counted'], ['old', false, 'outside_year']]);
+  });
+
+  it('a same-bill exclusion is present with its reason and the document it duplicates', () => {
+    const res: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'],
+      note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' };
+    const rows = rowsOf([gasSite(0, [gdoc('a', gas(100, ...month(2025, 1))), gdoc('b', gas(100, ...month(2025, 1)))])], 2025, [res]);
+    expect(gasRow(rows)?.contributions?.find(c => c.docId === 'b')).toMatchObject({ counted: false, reason: 'same_bill_as', reasonRef: 'a' });
+    expect(gasRow(rows)?.activity_data).toBe(100);
+  });
+
+  it('a typed figure over all-rejected documents is manual, and still lists the rejected documents', () => {
+    const r = gasRow(rowsOf([gasSite(250, [gdoc('x', gas(100, ...month(2025, 1), { status: 'rejected' }))])]));
+    expect(r?.entry_method).toBe('manual');
+    expect(r?.activity_data).toBe(250);
+    expect(r?.contributions?.map(c => c.reason)).toEqual(['not_confirmed']);
+  });
+
+  it("entry_method is never 'manual' for a field with confirmed documents, even with no source quote", () => {
+    const r = gasRow(rowsOf([gasSite(0, [gdoc('a', gas(100, ...month(2025, 1), { sourceQuote: null }))])]));
+    expect(r?.entry_method).toBe('concierge');
+    expect(r?.source_doc_ids).toEqual(['a']);
+  });
+
+  it('no stale-field fallback: stored locations give the derived figure, not the stored one', () => {
+    const stale = gasSite(999, [gdoc('a', gas(100, ...month(2025, 1)))]);
+    expect(gasRow(rowsOf([stale]))?.activity_data).toBe(100);
+    const pendingOnly = gasSite(999, [gdoc('a', gas(100, ...month(2025, 1), { status: 'extracted' }))]);
+    expect(gasRow(rowsOf([pendingOnly]))?.declaration, 'pending only: derived 0, so declared, not priced').toBe('declared_unquantified');
+  });
+
+  describe('all-excluded field: zero row', () => {
+    it('every confirmed bill outside the year: one zero row with the contributions, and the declaration still shows', () => {
+      const rows = rowsOf([gasSite(170, [gdoc('o1', gas(100, ...month(2024, 3))), gdoc('o2', gas(70, ...month(2024, 4)))])]);
+      const z = rows.filter(r => r.gwp_basis === 'all_bills_excluded');
+      expect(z).toHaveLength(1);
+      expect(z[0]).toMatchObject({ source: 'Natural gas', scope: 1, activity_data: 0, result_tco2e: 0, entry_method: 'concierge' });
+      expect(z[0].stream, 'untagged, so it does not count as priced').toBeUndefined();
+      expect(z[0].contributions?.map(c => c.reason)).toEqual(['outside_year', 'outside_year']);
+      expect(z[0].note).toBe('No bill is counted for this line: each confirmed bill is outside reporting year 2025 or is the same bill as another document.');
+      expect(rows.find(r => r.stream === 'natural_gas')?.declaration).toBe('declared_unquantified');
+    });
+
+    it('a non-December year names the year by its end', () => {
+      const rows = rowsOf([gasSite(0, [gdoc('o', gas(100, ...month(2025, 6)))])], 2025, [], 3);
+      expect(rows.find(r => r.gwp_basis === 'all_bills_excluded')?.note).toContain('the year ending 31 March 2025');
+    });
+
+    it('electricity gets a zero row too, with no em dash in its note', () => {
+      const site = loc({ grid_region: 'US_CA', electricity_kwh: 900, source_docs: [doc('utility_electricity',
+        [prop({ fuelType: 'electricity', value: 900, unit: 'kwh', periodStart: '2024-05-01', periodEnd: '2024-05-31' })], 'e')] });
+      const z = rowsOf([site]).find(r => r.gwp_basis === 'all_bills_excluded');
+      expect(z).toMatchObject({ source: 'Electricity', scope: 2, result_tco2e: 0 });
+      expect(z?.note).not.toContain('—');
+    });
+
+    it('no zero row when any bill counts, when the field is blocked (mixed, undated), or when nothing is confirmed', () => {
+      const cases: Location[] = [
+        gasSite(0, [gdoc('in', gas(100, ...month(2025, 1))), gdoc('o', gas(100, ...month(2024, 3)))]),
+        gasSite(0, [gdoc('a', gas(100, ...month(2024, 3))), gdoc('b', gas(100, ...month(2025, 2), { unit: 'therms' }))]),
+        gasSite(0, [gdoc('u', gas(100, null, null))]),
+        gasSite(0, [gdoc('p', gas(100, ...month(2024, 3), { status: 'extracted' }))]),
+      ];
+      for (const [k, c] of cases.entries()) expect(rowsOf([c]).filter(r => r.gwp_basis === 'all_bills_excluded'), `case ${k}`).toEqual([]);
+    });
+
+    it('zero rows add nothing: totals still equal the sum of the rows', () => {
+      const i = { locations: [gasSite(170, [gdoc('o1', gas(100, ...month(2024, 3)))])], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] };
+      const rows = rowsOf(i.locations);
+      const s1 = rows.filter(r => r.scope === 1 && typeof r.result_tco2e === 'number').reduce((a, r) => a + (r.result_tco2e as number), 0);
+      expect(s1).toBe(calcInventory(deriveLocations(i), 'AR6', 2025).s1_total);
+    });
+  });
+
+  describe('share cell', () => {
+    const cell = (reason: string, inWindowDays: number | null, totalDays: number | null, share: number | null) =>
+      contributionShareCell({ reason, inWindowDays, totalDays, share });
+    it('prorated, counted, excluded and undated bills', () => {
+      expect(cell('prorated', 12, 31, 12 / 31)).toBe('12 of 31 days, ×0.387');
+      expect(cell('counted', 31, 31, 1)).toBe('31 of 31 days');
+      for (const r of ['outside_year', 'same_bill_as', 'not_confirmed', 'mixed_units']) expect(cell(r, 0, 31, 0), r).toBe('Not counted');
+      expect(cell('undated', null, null, null)).toBe('Not applicable');
+      expect(cell('invalid_period', null, null, null)).toBe('Not applicable');
+    });
+    it('reads the stored contributions on a real row, matching the proration note', () => {
+      const r = gasRow(rowsOf([gasSite(0, [gdoc('s', gas(310, '2024-12-20', '2025-01-19'))])], 2025)) as Row & { proration_note?: string };
+      const c = r.contributions![0];
+      expect(contributionShareCell(c)).toBe('19 of 31 days, ×0.613');
+      expect(r.proration_note).toContain('19 of 31 days in reporting year 2025, ×0.613');
+    });
+  });
+});
+
+describe('T5 gap estimates name their document type', () => {
+  const months = (docType: string, fuelType: string, unit: string, n: number, prefix: string) => Array.from({ length: n }, (_, k) => {
+    const m = String(k + 1).padStart(2, '0');
+    return doc(docType, [prop({ fuelType, value: 10, unit, periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${new Date(2025, k + 1, 0).getDate()}`, sourceQuote: '10 gal' })], `${prefix}${k}`);
+  });
+  const est = (o: Partial<CoverageResolution> = {}): CoverageResolution =>
+    ({ locId: 'L1', fuelType: 'diesel', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z', ...o } as CoverageResolution);
+  // Stationary diesel: 6 months. Fleet diesel: 6 months (for the gap tests) or 12 (for pctEstimated).
+  const site = (fleetMonths: number) => loc({ has_diesel_stationary: true, diesel_stationary_unit: 'gallons', has_mobile: true, diesel_mobile_unit: 'gallons',
+    source_docs: [...months('fuel_diesel', 'diesel', 'gallons', 6, 's'), ...months('fleet_fuel', 'diesel', 'gallons', fleetMonths, 'f')] });
+  const W = periodFromYearAndEnd(2025, 12);
+  const gaps = (l: Location, r: CoverageResolution[]) => findUnresolvedCoverage([l], 2025, 12, r).filter(i => i.status === 'gap');
+
+  it('an estimate without documentType is not accepted where the fuel has two document types', () => {
+    expect(validateResolution(est(), site(6))).toBe('Choose which documents this estimate covers.');
+    expect(gaps(site(6), [est()])).toHaveLength(2);
+    const a = applyResolutions(site(6), [est()], W.start, W.end);
+    expect([a.diesel_stationary_amount.value, a.diesel_mobile_amount.value]).toEqual([60, 60]);
+  });
+
+  it('an estimate naming fuel_diesel grosses up and clears stationary diesel only', () => {
+    const r = est({ documentType: 'fuel_diesel' });
+    expect(validateResolution(r, site(6))).toBeNull();
+    const a = applyResolutions(site(6), [r], W.start, W.end);
+    expect([a.diesel_stationary_amount.value, a.diesel_mobile_amount.value]).toEqual([120, 60]);
+    expect(gaps(site(6), [r])).toHaveLength(1);
+  });
+
+  it('a document type not on the site is not accepted', () => {
+    expect(validateResolution(est({ documentType: 'utility_bill_gas' }), site(6))).toBe('The estimate names documents that are not on this site.');
+  });
+
+  it('a stored estimate without documentType still applies where the fuel has one document type', () => {
+    const gasOnly = loc({ has_natural_gas: true, source_docs: months('utility_bill_gas', 'natural_gas', 'mcf', 6, 'g') });
+    const r = est({ fuelType: 'natural_gas' });
+    expect(validateResolution(r, gasOnly)).toBeNull();
+    expect(applyResolutions(gasOnly, [r], W.start, W.end).natural_gas_amount.value).toBe(120);
+  });
+
+  it('pctEstimated keeps stationary and fleet diesel apart: an estimate on one does not count the other', () => {
+    const l = site(12);
+    const r = est({ documentType: 'fuel_diesel' });
+    const d = deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [r] })[0];
+    expect([d.diesel_stationary_amount, d.diesel_mobile_amount]).toEqual([120, 120]);
+    const es = calcInventory([loc({ has_diesel_stationary: true, diesel_stationary_amount: 120, diesel_stationary_unit: 'gallons' })], 'AR6', 2025).s1_total;
+    const ef = calcInventory([loc({ has_mobile: true, diesel_mobile_amount: 120, diesel_mobile_unit: 'gallons' })], 'AR6', 2025).s1_total;
+    const pct = pctEstimated({ locations: [l], reporting_year: 2025, coverage_resolutions: [r] }, 'AR6');
+    expect(pct).toBeCloseTo(0.5 * es / (es + ef) * 100, 9);
+    expect(pct, 'not half of both diesel streams').not.toBeCloseTo(50, 1);
+  });
+});
+
+describe('T5 pctEstimated applies each gross-up to its own meter only', () => {
+  it('two gas meters, only meter B estimated: the share counts B\'s gross-up, not the whole fuel', () => {
+    const bill = (k: number, meter?: string) => {
+      const m = String(k).padStart(2, '0');
+      return { ...doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 100, unit: 'mcf', periodStart: `2025-${m}-01`,
+        periodEnd: `2025-${m}-${new Date(2025, k, 0).getDate()}` })], `${meter ?? 'A'}${k}`), ...(meter ? { meter_label: meter } : {}) };
+    };
+    const l = loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [
+      ...Array.from({ length: 12 }, (_, k) => bill(k + 1)), ...Array.from({ length: 6 }, (_, k) => bill(k + 1, 'B'))] });
+    const r: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50,
+      meterLabel: 'B', note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
+    const inv = { locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [r] };
+    expect(deriveLocations(inv)[0].natural_gas_amount).toBe(2400);
+    // Evidenced 1,800 of 2,400 (A 1,200 + B 600); B's gross-up is 600, a quarter of the figure.
+    expect(pctEstimated(inv, 'AR6')).toBeCloseTo(25, 9);
   });
 });
