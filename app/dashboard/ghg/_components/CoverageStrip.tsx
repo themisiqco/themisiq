@@ -114,7 +114,7 @@ export function CoverageStrip(p: CoverageStripProps) {
             <div>{tone.icon} {prefix}{headline}</div>
             {cov.outOfWindow.length > 0 && (
               <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
-                ℹ️ {cov.outOfWindow.length} bill{cov.outOfWindow.length > 1 ? 's' : ''} outside reporting year {p.reportingYear}, not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
+                {cov.outOfWindow.length === 1 ? '1 bill falls' : `${cov.outOfWindow.length} bills fall`} outside {yearText} and {cov.outOfWindow.length === 1 ? 'is' : 'are'} not counted: {cov.outOfWindow.map(o => o.label).join(', ')}.
               </div>
             )}
             {prorated.map(c => (

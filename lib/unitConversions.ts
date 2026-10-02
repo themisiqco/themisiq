@@ -146,6 +146,16 @@ const TIER2: Record<string, Tier2Fn> = {
 // ---------------------------------------------------------------------------
 // Main entry point.
 // ---------------------------------------------------------------------------
+/**
+ * The units a bill for this fuel can be read in and converted from (T9): the selector units, plus every unit
+ * with a documented conversion. The unit control on a proposal offers exactly these, so a correction can only
+ * name a unit convertToCanonical can convert.
+ */
+export function convertibleUnits(fuelType: FuelType): string[] {
+  const tier2 = Object.keys(TIER2).filter(k => k.startsWith(`${fuelType}:`)).map(k => k.slice(fuelType.length + 1))
+  return [...SELECTOR_UNITS[fuelType], ...tier2.filter(u => !SELECTOR_UNITS[fuelType].includes(u))]
+}
+
 export function convertToCanonical(
   fuelType: FuelType,
   rawValue: number | null | undefined,

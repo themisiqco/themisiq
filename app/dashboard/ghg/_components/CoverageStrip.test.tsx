@@ -84,7 +84,7 @@ describe('coverage strip', () => {
   it('every bill rejected: the message and both answers; "used none" needs a signed-in user', () => {
     const l = site([gdoc('r', { status: 'rejected' })])
     const t = text(draw(l))
-    expect(t).toContain('Every natural gas document for Site A was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.')
+    expect(t).toContain('Every natural gas document for Site A was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no natural gas.')
     expect(t).toContain('Enter the figure manually')
     expect(t).toContain('Confirm this site used no natural gas')
     expect(draw(l, { currentUser: null })).toMatch(/<button[^>]*disabled=""[^>]*>Confirm this site used no natural gas<\/button>/)
@@ -94,6 +94,16 @@ describe('coverage strip', () => {
   it('bills that are not counted show their plain-language reason', () => {
     const t = text(draw(site([gdoc('u', { periodStart: null, periodEnd: null })])))
     expect(t).toContain('u.pdf has no billing period, so it is not counted. Enter the dates as they appear on the bill.')
+  })
+
+  it('bills outside the year: plain wording, singular and plural, no emoji', () => {
+    const one = text(draw(site([gdoc('in', month(1)), gdoc('old', { periodStart: '2024-03-01', periodEnd: '2024-03-31' })])))
+    expect(one).toContain('1 bill falls outside reporting year 2025 and is not counted: Mar 2024.')
+    const two = text(draw(site([gdoc('in', month(1)), gdoc('o1', { periodStart: '2024-03-01', periodEnd: '2024-03-31' }), gdoc('o2', { periodStart: '2024-04-01', periodEnd: '2024-04-30' })])))
+    expect(two).toContain('2 bills fall outside reporting year 2025 and are not counted: Mar 2024, Apr 2024.')
+    expect(one + two).not.toContain('ℹ')
+    const march = text(draw(site([gdoc('in', { periodStart: '2024-05-01', periodEnd: '2024-05-31' }), gdoc('old', { periodStart: '2023-03-01', periodEnd: '2023-03-31' })]), { fiscalYearEndMonth: 3 }))
+    expect(march).toContain('1 bill falls outside the year ending 31 March 2025 and is not counted: Mar 2023.')
   })
 
   it('nothing to say: no strip', () => {

@@ -14,6 +14,8 @@ import type { PriorYearState, InventorySummary, ComparabilityCapture, Comparabil
 import { figuresForSave } from '../../../lib/ghg/savePayload'
 import { upsertResolution } from '../../../lib/ghg/coverageActions'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
+import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
+import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
 import type { YearDataStatus } from '../../../lib/ghg/series'
@@ -32,7 +34,7 @@ import {
   detectGridRegion, gridRegionForCountry, pickEF,
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
-  deriveLocations, deriveStoredLocations, documentsBacking, findUnresolvedCoverage, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+  deriveLocations, deriveStoredLocations, documentsBacking, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
@@ -1104,6 +1106,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
                     periodStart: f.periodStart ?? null,
                     periodEnd: f.periodEnd ?? null,
                     periodConfidence: f.periodConfidence ?? null,
+                    // Rule R5 (T9): where the dates came from. A month-only reading needs the customer to
+                    // confirm its days before the proposal can be confirmed (acceptanceProblem).
+                    periodOrigin: f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,
                     confidence: f.confidence,
                     sourceQuote: f.sourceQuote ?? null,
                     notes: f.notes ?? null,
@@ -1274,7 +1279,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         ...locs[locIdx],
         source_docs: locs[locIdx].source_docs.map(d => {
           if (d.id !== docId || !d.extracted) return d
-          return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...patch } : p) }
+          // guardConfirm (T9, rule R5): a patch can never confirm a month-only proposal whose days the
+          // customer has not confirmed. Only the target proposal is touched.
+          return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...guardConfirm(p, patch) } : p) }
         }),
       }
       return { ...inv, locations: locs }
@@ -3460,7 +3467,7 @@ const PROPOSAL_BADGE: Record<ConciergeStatus, string> = {
   confirmed:           'Confirmed',
   extracted:           'To confirm',
   needs_manual_review: 'Needs review',
-  rejected:            'Rejected',   // never set today — mapped only to keep the union exhaustive
+  rejected:            'Rejected',   // set by the Reject control (T9); Undo returns the bill to its earlier status
 }
 
 // And the colour, from status too — same Record shape so the two cannot answer differently.
@@ -3485,6 +3492,10 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
+  // T9: the dates or unit editor open on one proposal, `${docId}:${propIdx}`. `confirm` is the month-only
+  // step at acceptance (rule R5).
+  const [periodEditing, setPeriodEditing] = useState<{ key: string; confirm: boolean } | null>(null)
+  const [unitEditing, setUnitEditing] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const hasConcierge = useHasConcierge()   // concierge tier held → auto-extraction; else manual entry
   // Reads the SAME set the upload handler skips on, so the drop zone can never promise a reading
@@ -3567,17 +3578,39 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                       <button onClick={() => { const v = Number(editVal); if (Number.isFinite(v)) { onUpdateProposal(locIdx, doc.id, pi, { value: v, status: 'confirmed' }); setEditing(null) } }} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Save</button>
                       <button onClick={() => setEditing(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#f8f7f5', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Cancel</button>
                     </div>
+                  ) : p.status === 'rejected' ? (
+                    // Rejected (T9): not counted, kept on the document as evidence. Undo puts it back as it was.
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      <button disabled={!currentUser} onClick={() => currentUser && onUpdateProposal(locIdx, doc.id, pi, undoRejection(p, { by: currentUser, at: new Date().toISOString() }))} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Undo</button>
+                    </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       {p.status === 'confirmed' ? (
                         <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
                       ) : (
-                        <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Confirm</button>
+                        <button onClick={() => acceptanceProblem(p)
+                          ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
+                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Confirm</button>
                       )}
-                      <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit</button>
+                      <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit figure</button>
+                      <button onClick={() => { setUnitEditing(null); setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: false }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit dates</button>
+                      {unitEditable(p) && (
+                        <button onClick={() => { setPeriodEditing(null); setUnitEditing(`${doc.id}:${pi}`) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit unit</button>
+                      )}
                       <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'needs_manual_review' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: 'var(--color-state-warn)', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Flag for review</button>
+                      <button disabled={!currentUser} onClick={() => { if (!currentUser) return; setPeriodEditing(null); setUnitEditing(null); onUpdateProposal(locIdx, doc.id, pi, rejectProposal(p, { by: currentUser, at: new Date().toISOString() })) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#B91C1C', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Reject</button>
                     </div>
                   )}
+                  {/* T9: dates and unit, answered on the proposal itself; and where they came from. */}
+                  {periodEditing?.key === `${doc.id}:${pi}` && (
+                    <PeriodEditor p={p} confirm={periodEditing.confirm} message={periodEditing.confirm ? acceptanceProblem(p) : null} by={currentUser}
+                      onSave={patch => { onUpdateProposal(locIdx, doc.id, pi, patch); setPeriodEditing(null) }} onCancel={() => setPeriodEditing(null)} />
+                  )}
+                  {unitEditing === `${doc.id}:${pi}` && (
+                    <UnitEditor p={p} by={currentUser}
+                      onSave={patch => { onUpdateProposal(locIdx, doc.id, pi, patch); setUnitEditing(null) }} onCancel={() => setUnitEditing(null)} />
+                  )}
+                  <ProposalNotes p={p} />
                 </div>
               ))}
             </div>

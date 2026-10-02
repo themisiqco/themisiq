@@ -3781,7 +3781,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
 
     it('raises an export-blocking issue offering a manual figure or "used none"', () => {
       expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected', field: 'natural_gas_amount',
-        message: 'Every natural gas document for Plant was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.' });
+        message: 'Every natural gas document for Plant was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no natural gas.' });
     });
 
     it('confirming "used none" records who and when, shows in workings, writes 0, clears the issue and the declaration gate', () => {

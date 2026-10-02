@@ -1580,6 +1580,20 @@ interface ExtractedProposal {
   sourceQuote: string | null
   notes: string | null
   status: ConciergeStatus
+  // T9 (rule R5): where the billing dates came from. Set at extraction from periodConfidence (high →
+  // printed, medium → billing_month); customer_confirmed once the customer confirms or enters the dates.
+  // Absent on proposals saved before T9: periodOriginOf reads periodConfidence for those.
+  periodOrigin?: PeriodOrigin | null
+  periodConfirmedAt?: string
+  periodConfirmedBy?: { userId: string; email: string }
+  // T9 ruling: what was READ from the bill, kept the first time the dates or unit are changed, so a verifier
+  // can see the original beside the correction (verbatim source values are never lost).
+  asRead?: { periodStart: string | null; periodEnd: string | null; unit: string | null }
+  // T9: every change the customer made to the dates or unit, with who and when, in order.
+  corrections?: { fields: ('period' | 'unit')[]; at: string; by: { userId: string; email: string } }[]
+  // T9 (Reject and Undo): every rejection and every undo, with who, when and the status before it, in order.
+  // A rejected proposal stays on its document as evidence; it is simply not counted.
+  statusLog?: { action: 'rejected' | 'undone'; at: string; by: { userId: string; email: string }; statusBefore: ConciergeStatus }[]
 }
 
 interface SourceDoc {
@@ -3057,7 +3071,7 @@ export const COVERAGE_MESSAGE = {
   overlap: (fileA: string, fileB: string, from: string, to: string) =>
     `${fileA} and ${fileB} cover the same days (${from} to ${to}). Choose Same bill, count it once, or Different meters or accounts.`,
   all_rejected: (fuel: string, site: string) =>
-    `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.`,
+    `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
   // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
@@ -3138,6 +3152,35 @@ export interface BillContribution {
   periodProblem?: InvalidPeriodKind
   reasonRef?: string
   meteredSplit?: { evidenceDocId: string; inYearValue: number }
+  /** T9: what was read from the bill, present once the customer changed the dates or unit. */
+  asRead?: ExtractedProposal['asRead']
+  /** T9: the customer's changes to the dates or unit, with who and when. */
+  corrections?: ExtractedProposal['corrections']
+  /** T9: who rejected the bill, or undid a rejection, and when. */
+  statusLog?: ExtractedProposal['statusLog']
+}
+
+/**
+ * Where a proposal's billing dates came from (rule R5). The recorded periodOrigin wins; a proposal saved
+ * before T9 has none, and reads it from periodConfidence: high → printed, medium → billing_month (the T1
+ * ruling), anything else null, meaning not recorded.
+ */
+export function periodOriginOf(p: Pick<ExtractedProposal, 'periodOrigin' | 'periodConfidence'>): PeriodOrigin | null {
+  if (p.periodOrigin !== undefined && p.periodOrigin !== null) return p.periodOrigin
+  return p.periodConfidence === 'high' ? 'printed' : p.periodConfidence === 'medium' ? 'billing_month' : null
+}
+
+/** The sentence the review shows when a month-only bill is accepted (R5): the customer must confirm its days. */
+export const BILLING_MONTH_CONFIRM_MESSAGE =
+  'This bill only shows the month, so we set the dates to the first and last day of it. Check them against the bill, correct them if needed, then confirm.'
+
+/**
+ * The ACCEPTANCE VALIDATOR (T9, rule R5): why this proposal cannot be confirmed as it stands, or null when it
+ * can. A month-only proposal (billing_month) needs the customer to confirm or correct its dates first, which
+ * sets periodOrigin to customer_confirmed. Every path that confirms a proposal goes through this.
+ */
+export function acceptanceProblem(p: Pick<ExtractedProposal, 'periodOrigin' | 'periodConfidence'>): string | null {
+  return periodOriginOf(p) === 'billing_month' ? BILLING_MONTH_CONFIRM_MESSAGE : null
 }
 
 export type InvalidPeriodKind = 'unparseable' | 'reversed'
@@ -3243,7 +3286,7 @@ export function billContributions(
       meterLabel: d.meter_label ?? null,
       periodStart: p.periodStart,
       periodEndExclusive: endExcl ? iso(endExcl) : null,
-      periodOrigin: p.periodConfidence === 'high' ? 'printed' : p.periodConfidence === 'medium' ? 'billing_month' : null,
+      periodOrigin: periodOriginOf(p),
       totalDays,
       inWindowDays,
       share,
@@ -3253,6 +3296,10 @@ export function billContributions(
       reason,
       ...(reason === 'invalid_period' && periodProblem ? { periodProblem } : {}),
       ...(reason === 'same_bill_as' && sameBillAs ? { reasonRef: sameBillAs } : {}),
+      // T9: the original reading and the customer's changes travel with the contribution into workings.
+      ...(p.asRead ? { asRead: p.asRead } : {}),
+      ...(p.corrections?.length ? { corrections: p.corrections } : {}),
+      ...(p.statusLog?.length ? { statusLog: p.statusLog } : {}),
     })
   }))
   return out

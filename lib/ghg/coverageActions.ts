@@ -76,7 +76,7 @@ export function estimateResolution(a: {
     locId: a.locId, fuelType: a.fuelType, kind: 'extrapolate', documentType: a.documentType,
     ...(a.meterLabel ? { meterLabel: a.meterLabel } : {}),
     monthsCovered: m, pctEstimated: a.pctEstimated,
-    note: `${meter}${m} of 12 months evidenced by bills; remaining ${12 - m} month(s) estimated by scaling metered data ×12/${m} (${a.pctEstimated}% estimated).`,
+    note: `${meter}${m} of 12 months evidenced by bills; remaining ${12 - m} month${12 - m === 1 ? '' : 's'} estimated by scaling metered data ×12/${m} (${a.pctEstimated}% estimated).`,
     acknowledgedAt: a.at,
   }
 }
