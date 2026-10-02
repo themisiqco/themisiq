@@ -1,5 +1,5 @@
 -- supabase/migrations/20261002_ghg_derivation_version.sql
--- NOT RUN.
+-- RUN 2 October 2026 (confirmed: smallint, not null, default 2; 29 rows at version 2).
 --
 -- T7 (docs/review/design-derived-figures.md, section 11). Adds ghg_inventories.derivation_version.
 -- Written against db/dumps/schema_public_20261001_1057.sql, where the column does not exist.

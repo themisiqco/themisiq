@@ -15,6 +15,8 @@ import { figuresForSave } from '../../../lib/ghg/savePayload'
 import { upsertResolution } from '../../../lib/ghg/coverageActions'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
 import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
+import { FigureInput } from './_components/FigureInput'
+import { addOverride, removeOverride } from '../../../lib/ghg/overrides'
 import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
@@ -34,7 +36,7 @@ import {
   detectGridRegion, gridRegionForCountry, pickEF,
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
-  deriveLocations, deriveStoredLocations, documentsBacking, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
@@ -550,24 +552,6 @@ function LockedDocUpload({ label }: { label: string }) {
     </div>
   )
 }
-// A FIGURE BACKED BY DOCUMENTS IS SHOWN, NOT TYPED (section 3.3, T7 ruling). When a field has confirmed or
-// pending bills, deriveLocations works its figure out from them and nothing typed here would count, so the
-// input is read-only and says where the figure comes from. Switching such a field to a typed figure, with a
-// reason, is T10. A field with no backing documents is the customer's to type, as before.
-function FigureInput({ loc, field, onChange, style }: { loc: Location; field: keyof Location; onChange: (v: number) => void; style: React.CSSProperties }) {
-  const n = documentsBacking(loc, field)
-  const value = (loc as unknown as Record<string, number>)[String(field)]
-  const { flex, ...inputOwn } = style
-  // The id lets the coverage strip's "Enter the figure manually" put the cursor here (T8).
-  if (n === 0) return <input id={`figure-${loc.id}-${String(field)}`} type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
-  return (
-    <div style={flex != null ? { flex } : undefined}>
-      <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
-      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>From {n} document{n === 1 ? '' : 's'}</div>
-    </div>
-  )
-}
-
 function GHGPage() {
   const [step, setStep] = useState(0)
   /** Why an ?id= in the URL did not open, or null. Set by the load effect, shown above the page. */
@@ -1313,6 +1297,19 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // inventory.locations holds only what the customer typed and the documents. Index-aligned with
   // inventory.locations (deriveLocations maps in order), so derivedLocations[i] is inventory.locations[i].
   const derivedLocations = useMemo(() => deriveLocations(inventory), [inventory])
+  // T10: "Enter this figure manually instead", with a reason, and "Use the bills instead". The figure starts
+  // from what the documents gave (derivedLocations), so switching never drops it to zero on its own.
+  const overrideFigure = (locIdx: number, field: keyof Location, reason: string) => {
+    if (!currentUser) return
+    const startFrom = Number((derivedLocations[locIdx] as unknown as Record<string, number>)[String(field)] ?? 0)
+    const at = new Date().toISOString()
+    setInventory(inv => ({ ...inv, locations: inv.locations.map((l, i) => i !== locIdx ? l : { ...l, ...addOverride(l, { field, reason, by: currentUser, at, startFrom }) }) }))
+  }
+  const switchToBills = (locIdx: number, field: keyof Location) => {
+    if (!currentUser) return
+    const at = new Date().toISOString()
+    setInventory(inv => ({ ...inv, locations: inv.locations.map((l, i) => i !== locIdx ? l : { ...l, ...removeOverride(l, { field, by: currentUser, at }) }) }))
+  }
   const needsMarketBased = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
@@ -2140,11 +2137,11 @@ workings: saved.workings,
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {ngUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
+                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total natural gas: ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
-                    <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} style={inputStyle} />
+                    <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
                         {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit)}
@@ -2160,11 +2157,11 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {propaneUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
+                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
-                    <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} style={inputStyle} />
+                    <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
@@ -2175,11 +2172,11 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {liquidUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
+                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
-                    <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} style={inputStyle} />
+                    <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
@@ -2207,7 +2204,7 @@ workings: saved.workings,
                     ))}
                   </div>
                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
-                    <input type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
@@ -2223,7 +2220,7 @@ workings: saved.workings,
                     ))}
                   </div>
                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
-                    <input type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
@@ -2235,8 +2232,8 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                   <Field label={`Gasoline for company vehicles: ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} style={{ ...inputStyle, flex: 1 }} />
-                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                      <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'gasoline_amount', r)} onUseBills={() => switchToBills(activeLocation, 'gasoline_amount')} style={{ ...inputStyle, flex: 1 }} />
+                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
                         {liquidUnitOptions(loc.country).map(([val, label]) => (
                           <option key={val} value={val}>{label}</option>
                         ))}
@@ -2245,8 +2242,8 @@ workings: saved.workings,
                   </Field>
                   <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} style={{ ...inputStyle, flex: 1 }} />
-                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                      <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_mobile_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_mobile_amount')} style={{ ...inputStyle, flex: 1 }} />
+                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
                         {liquidUnitOptions(loc.country).map(([val, label]) => (
                           <option key={val} value={val}>{label}</option>
                         ))}
@@ -2271,7 +2268,7 @@ workings: saved.workings,
                   <div style={{ background: '#FEF3E2', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#633806' }}>Check refrigeration service records: refrigerant purchased for top-up = refrigerant leaked (GHG Protocol methodology)</div>
                   <Field label="Refrigerant type"><select value={loc.refrigerant_type} onChange={e => updateLocation(activeLocation, 'refrigerant_type', e.target.value)} style={inputStyle}><option value="r410a">R-410A</option><option value="r22">R-22</option><option value="r134a">R-134a</option><option value="r404a">R-404A</option><option value="r507">R-507</option></select></Field>
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
-                    <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <input id={`figure-${loc.id}-refrigerant_purchased_kg`} type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
@@ -2282,7 +2279,7 @@ workings: saved.workings,
               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                 <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
-                  <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} style={inputStyle} />
+                  <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
                 </Field>
                 {validateElectricity(loc.electricity_kwh) && (
                   <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
@@ -2360,7 +2357,7 @@ workings: saved.workings,
                     ))}
                   </div>
                   <Field label={`Total purchased steam: ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
-                    <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <input id={`figure-${loc.id}-purchased_steam_mmbtu`} type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {/* ── WHAT WE CAN AND CANNOT PRICE HERE, PER JURISDICTION ────────────────────
                       Replaces a blanket "we apply one published factor whatever network supplies it",
@@ -2544,7 +2541,7 @@ workings: saved.workings,
               {derivedLocations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
-                    <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} style={inputStyle} />
+                    <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(i, 'renewable_electricity_kwh', r)} onUseBills={() => switchToBills(i, 'renewable_electricity_kwh')} style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
                 </div>
@@ -2558,7 +2555,7 @@ workings: saved.workings,
               {inventory.locations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
                   <Field label={`${loc.name}: Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
-                    <input type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <input id={`figure-${loc.id}-biogenic_co2_mt`} type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {/* Biogenic was the only figure in the wizard with no evidence path — every other
                       number a verifier reads can be traced to a document. Nothing else needed wiring:
@@ -3024,7 +3021,7 @@ workings: saved.workings,
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
                         )}
                         {unresolvedCoverage.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving ({unresolvedCoverage.map(u => u.status).join(', ')})</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving. Each one is explained under its upload.</div>
                         )}
                         {unresolvedGridLocations.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
@@ -3502,6 +3499,9 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
   // that will not happen. Three states, not two: no concierge; concierge on a type it reads;
   // concierge on a type it does not.
   const conciergeReads = hasConcierge && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)
+  // Uploads with nothing read from them that block export (T10 ruling); every other such upload is evidence.
+  const unreadBlocking = new Set(findUnresolvedCoverage([location], reportingYear, fiscalYearEndMonth, coverageResolutions)
+    .filter(i => i.status === 'none').flatMap(i => i.docIds ?? []))
   return (
     <div
       onDragOver={e => { e.preventDefault(); setDragActive(true) }}
@@ -3548,6 +3548,10 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
           {/* Why this document carries no figures. Abstention is NEUTRAL, not amber: the reader
               declining to guess is the system working, and colouring it as a fault would push a
               customer to re-upload a file that will rightly abstain again. */}
+          {/* T10 ruling: an upload with nothing read from it is evidence when its fuel already has a figure. */}
+          {(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id) && (
+            <div style={{ marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5, color: '#555553' }}>Uploaded as evidence. No figure was read from it.</div>
+          )}
           {doc.read_note && (
             <div style={{
               marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5,

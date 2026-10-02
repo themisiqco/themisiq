@@ -14,7 +14,7 @@
 import { useState } from 'react'
 import {
   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
-  parseLocalDate, reportingYearLabel, fieldFor,
+  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME,
   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
 } from '../../../../lib/ghg/engine'
 import {
@@ -89,7 +89,10 @@ export function CoverageStrip(p: CoverageStripProps) {
   const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off'].includes(i.status)
     && (i.docIds ?? []).some(id => docIdsHere.has(id)) && i.message)
 
-  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0) return null
+  // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
+  const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
+
+  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0) return null
   const yearText = reportingYearLabel(win).inText
   const many = groups.size > 1
 
@@ -163,6 +166,20 @@ export function CoverageStrip(p: CoverageStripProps) {
               onClick={() => p.currentUser && p.onAdd(usedNoneResolution({
                 locId: location.id, fuelType: i.fuelType, field: i.field as string, fuelName: fuelName(i.fuelType), by: p.currentUser, at: now(),
               }))}>Confirm this site used no {fuelName(i.fuelType)}</button>
+          </div>
+        </div>
+      ))}
+      {unread.map(i => (
+        <div key={`unread|${(i.docIds ?? []).join(',')}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
+          <div>⚠ {i.message}</div>
+          <div style={row}>
+            <button style={warnButton} onClick={() => p.onEnterManually((i.fields ?? [])[0])}>Enter the figure manually</button>
+            {(i.fields ?? []).map(f => (
+              <button key={f} style={{ ...plainButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
+                onClick={() => p.currentUser && p.onAdd(usedNoneResolution({
+                  locId: location.id, fuelType: i.fuelType || f, field: f, fuelName: FIELD_NAME[f] ?? f, by: p.currentUser, at: now(),
+                }))}>Confirm this site used no {FIELD_NAME[f] ?? f}</button>
+            ))}
           </div>
         </div>
       ))}

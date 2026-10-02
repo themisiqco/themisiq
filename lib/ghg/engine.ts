@@ -1661,6 +1661,32 @@ interface Location {
   // Per-stream "this site has no such supply" attestations. Absent (undefined/missing entry) means
   // NOBODY has answered → the stream is UNDECLARED and blocks export. See findUndeclaredStreams.
   stream_attestations?: StreamAttestation[]
+  // T10 (section 3.3, ruling Q1): document-backed figures the customer chose to enter by hand instead, each
+  // with a required reason, who and when. While one is active, the field's documents stay as evidence but are
+  // not counted (contribution reason manual_override), and the typed value on the field is the figure.
+  manual_overrides?: ManualOverride[]
+  // T10 ruling: overrides the customer removed ("Use the bills instead"), with who and when, so the history
+  // stays in the record.
+  manual_overrides_removed?: (ManualOverride & { removedAt: string; removedBy: { userId: string; email: string } })[]
+}
+
+interface ManualOverride {
+  field: string
+  reason: string
+  at: string
+  by: { userId: string; email: string }
+}
+
+/** The override in force for a field, if any (T10). */
+export function activeOverride(loc: Pick<Location, 'manual_overrides'>, field: keyof Location | string): ManualOverride | undefined {
+  return (loc.manual_overrides ?? []).filter(o => o.field === String(field)).at(-1)
+}
+
+/** Why an override cannot be recorded, or null (T10): a reason is required, and who made it. */
+export function overrideProblem(o: { reason: string; by?: { userId: string; email: string } | null }): string | null {
+  if (!o.reason.trim()) return 'Give a reason for entering this figure manually.'
+  if (!o.by?.userId || !o.by?.email) return 'An override must record who made it.'
+  return null
 }
 
 // Derive the reporting period from a reporting year + fiscal year-end MONTH (1-12).
@@ -3035,7 +3061,7 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
       return null
     }
     case 'used_none':
-      if (!r.field || !(r.field in FIELD_STREAM)) return 'Name the figure that is being confirmed as none.'
+      if (!r.field || !USED_NONE_FIELDS.has(r.field)) return 'Name the figure that is being confirmed as none.'
       if (!r.by?.userId || !r.by?.email) return 'A confirmation must record who confirmed it.'
       return null
     case 'duplicate':
@@ -3056,7 +3082,40 @@ const FIELD_STREAM: Partial<Record<keyof Location, DeclarableStream>> = {
   diesel_mobile_amount: 'mobile',
   gasoline_amount: 'mobile',
   electricity_kwh: 'electricity',
+  // T10 ruling on unread uploads: "used none" is offered for every field a document type supports, so these
+  // streams can be answered that way too.
+  fuel_oil_distillate_amount: 'fuel_oil_distillate',
+  fuel_oil_residual_amount: 'fuel_oil_residual',
+  purchased_steam_mmbtu: 'purchased_steam',
+  refrigerant_purchased_kg: 'refrigerants',
 }
+
+// The fields each document type is evidence for (T10 ruling on unread uploads). A document with nothing read
+// from it is evidence when any of these already has a figure; otherwise it blocks, naming them.
+export const DOC_TYPE_FIELDS: Record<string, (keyof Location)[]> = {
+  utility_bill_gas: ['natural_gas_amount'],
+  utility_electricity: ['electricity_kwh'],
+  fuel_propane: ['propane_amount'],
+  fuel_diesel: ['diesel_stationary_amount'],
+  fleet_fuel: ['gasoline_amount', 'diesel_mobile_amount'],
+  fuel_oil: ['fuel_oil_distillate_amount', 'fuel_oil_residual_amount'],
+  purchased_steam: ['purchased_steam_mmbtu'],
+  service_record: ['refrigerant_purchased_kg'],
+  renewable_cert: ['renewable_electricity_kwh'],
+  biogenic: ['biogenic_co2_mt'],
+}
+// How each of those fields is named to the customer.
+export const FIELD_NAME: Record<string, string> = {
+  natural_gas_amount: 'natural gas', electricity_kwh: 'electricity', propane_amount: 'propane',
+  diesel_stationary_amount: 'diesel', gasoline_amount: 'gasoline', diesel_mobile_amount: 'diesel',
+  fuel_oil_distillate_amount: 'heating oil', fuel_oil_residual_amount: 'heavy fuel oil',
+  purchased_steam_mmbtu: 'purchased steam', refrigerant_purchased_kg: 'refrigerant',
+  renewable_electricity_kwh: 'renewable electricity', biogenic_co2_mt: 'biomass',
+}
+/** "a", "a and b", "a, b and c". */
+export const listInWords = (xs: string[]): string =>
+  xs.length <= 2 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
+const USED_NONE_FIELDS = new Set(Object.values(DOC_TYPE_FIELDS).flat().map(String))
 const FUEL_NAME: Record<string, string> = {
   natural_gas: 'natural gas', propane: 'propane', diesel: 'diesel', gasoline: 'gasoline', electricity: 'electricity',
 }
@@ -3073,6 +3132,9 @@ export const COVERAGE_MESSAGE = {
   all_rejected: (fuel: string, site: string) =>
     `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
   // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
+  // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
+  unread: (file: string, fuels: string, site: string) =>
+    `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
 }
@@ -3270,6 +3332,8 @@ export function billContributions(
     const sameBillAs = excludedBy.get(`${d.id}|${p.fuelType}`)
     const reason: ContributionReason =
       p.status !== 'confirmed' ? 'not_confirmed'
+      // T10: the customer entered this figure by hand instead; the bill stays as evidence, not counted.
+      : activeOverride(loc, map.amount) ? 'manual_override'
       : sameBillAs ? 'same_bill_as'
       : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
       : periodProblem ? 'invalid_period'
@@ -3366,7 +3430,8 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
     d.extracted?.forEach((p, pi) => {
       if (p.status !== 'confirmed' || p.value == null) return
       const map = fieldFor(d.document_type, p.fuelType)
-      if (!map) return
+      // T10: an overridden field is the customer's typed figure, not the documents', so it has no entry here.
+      if (!map || activeOverride(loc, map.amount)) return
       const key = String(map.amount)
       if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, documentType: d.document_type, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
       acc[key].rawSum += p.value
@@ -3423,7 +3488,10 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
   // used_none (T3 ruling "all documents rejected"): a field confirmed as zero, with no confirmed document,
   // is written as 0, so a figure left from earlier bills cannot stand. A confirmed document outranks it.
   for (const r of resolutions) {
-    if (r.kind !== 'used_none' || !r.field || out[r.field]) continue
+    // A typed figure supersedes an earlier "used none" (T10): confirming none and then entering a figure
+    // must not silently zero the figure the customer entered.
+    if (r.kind !== 'used_none' || !r.field || out[r.field] || activeOverride(loc, r.field)
+      || Number((loc as unknown as Record<string, unknown>)[r.field] ?? 0) > 0) continue
     out[r.field] = { field: r.field as keyof Location, rawSum: 0, value: 0, adjustment: null, mixedUnits: false,
       fuelTypes: [r.fuelType], quotes: [], docIds: [], filePaths: [], refs: [] }
   }
@@ -3473,7 +3541,8 @@ export function deriveLocations(inventory: {
     loc.source_docs.forEach(d => d.extracted?.forEach(p => {
       if (p.value == null || (p.status !== 'extracted' && p.status !== 'needs_manual_review')) return
       const map = fieldFor(d.document_type, p.fuelType)
-      if (map) set(map.amount, 0)
+      // T10: an overridden field keeps the typed figure, whatever its documents say.
+      if (map && !activeOverride(loc, map.amount)) set(map.amount, 0)
     }))
     // Then every field applyResolutions covers (any confirmed proposal, or a used_none confirmation).
     for (const a of Object.values(applyResolutions(loc, resolutions, win.start, win.end))) {
@@ -3543,6 +3612,8 @@ interface Provenance {
   // (outside the year, the same bill as another, undated, invalid period, mixed units, not confirmed).
   // Stored in workings, so the verifier page and the PDF never recompute it.
   contributions?: BillContribution[]
+  // T10: the reason this document-backed figure was entered by hand instead, with who and when.
+  manual_override?: { reason: string; at: string; by: { userId: string; email: string } }
 }
 
 // Document-backed fields that get a zero row when every confirmed bill is silently excluded (T5 ruling).
@@ -3737,6 +3808,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const a = applied[String(field)]
       const contrib = contributionsFor(field)
       const withContrib = (p: Provenance): Provenance => contrib.length ? { ...p, contributions: contrib } : p
+      // T10: entered by hand instead of from its documents. Manual, with the reason, who and when; the
+      // documents are listed as contributions not counted, reason manual_override.
+      const override = activeOverride(loc, field)
+      if (override) return withContrib({ entry_method: 'manual', manual_override: { reason: override.reason, at: override.at, by: override.by } })
       if (!a || a.docIds.length === 0) return withContrib({ entry_method: 'manual' })
       const quotes = a.quotes
       if (a.adjustment && a.adjustment.kind === 'prorate') {
@@ -3976,6 +4051,8 @@ export interface CoverageIssue {
   // group's document type); field on all_rejected (which figure "used none" or a typed figure answers).
   documentType?: string
   field?: string
+  // T10: the fields an unread upload (status none) is evidence for, each answerable by a typed figure or used_none.
+  fields?: string[]
   docIds?: string[]
   meterLabel?: string | null
 }
@@ -4007,9 +4084,19 @@ export function findUnresolvedCoverage(
     const contributions = billContributions(loc, resolutions, coverageWin)
     const out: CoverageIssue[] = []
 
-    // A document with no proposals at all: nothing was read, so it cannot be placed. Unchanged.
+    // A document with nothing read from it (T10 ruling). EVIDENCE, not a blocker, when any field its
+    // document type supports already has a figure: typed, from another counted bill, or a used_none
+    // confirmation. Otherwise it blocks, naming the file, the fuel(s) and the site, and the strip offers
+    // "Enter the figure manually" and "Confirm this site used no {fuel}" for each field.
+    const derivedHere = deriveLocations({ locations: [loc], reporting_year: reportingYear, fiscal_year_end_month: fiscalYearEndMonth, coverage_resolutions: allResolutions })[0]
+    const hasFigure = (f: keyof Location) => Number((derivedHere as unknown as Record<string, unknown>)[String(f)] ?? 0) > 0
+      || resolutions.some(r => r.kind === 'used_none' && r.field === String(f))
     loc.source_docs.forEach(d => {
-      if ((d.extracted?.length ?? 0) === 0) out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id] })
+      if ((d.extracted?.length ?? 0) > 0) return
+      const fields = DOC_TYPE_FIELDS[d.document_type] ?? []
+      if (fields.length === 0 || fields.some(hasFigure)) return
+      out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id],
+        fields: fields.map(String), message: COVERAGE_MESSAGE.unread(d.file_name, listInWords(fields.map(f => FIELD_NAME[String(f)] ?? String(f))), site) })
     })
 
     // Not-counted bills the customer must be told about.

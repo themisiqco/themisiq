@@ -1,0 +1,939 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index f73fa3c..f90be74 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -78,7 +78,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
+ - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
+ - **Coverage gate is keyed per `(document_type, fuelType, meter_label)` and returns every issue, not a single status.** Overlap compares full bill periods, not their in-year days, so two copies of a bill outside the year still raise an overlap. An overlap is resolved only as `same_bill` (one document counts, the others are retained as evidence) or `different_meters` (both count, the second meter named); no resolution may leave two counted bills over the same days. Only accepted resolutions (passing `validateResolution`) affect figures, issues or audit rows; legacy `duplicate` and `straddle` are never accepted. A straddle is not an issue: it is prorated by its own days. No silent zero: an undated, invalid-period or mixed-units bill, or a field whose documents were all rejected with no figure entered, raises an export-blocking issue naming the document. Only `outside_year` and `same_bill_as` may leave a bill uncounted without one; a `used_none` confirmation records who confirmed it and when. A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
+ - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
+-- **Run `npx vitest run lib/ghg/engine.test.ts` (309 passed, 1 todo — verified 2 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
++- **Run `npx vitest run lib/ghg/engine.test.ts` (320 passed, 1 todo — verified 2 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+ 
+ ---
+ 
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.test.tsx b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+index f32982e..a3bc1ec 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.test.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+@@ -106,6 +106,15 @@ describe('coverage strip', () => {
+     expect(march).toContain('1 bill falls outside the year ending 31 March 2025 and is not counted: Mar 2023.')
+   })
+ 
++  it('an unread upload with no figure: the message and both actions; with a figure: nothing to resolve', () => {
++    const unread: SourceDoc = { id: 'scan', file_name: 'scan.pdf', document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: '/scan.pdf', extracted: [] }
++    const t = text(draw(site([unread])))
++    expect(t).toContain('scan.pdf is uploaded for natural gas at Site A, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no natural gas.')
++    expect(t).toContain('Enter the figure manually')
++    expect(t).toContain('Confirm this site used no natural gas')
++    expect(draw({ ...site([unread]), natural_gas_amount: 400 })).toBe('')
++  })
++
+   it('nothing to say: no strip', () => {
+     expect(draw(site([]))).toBe('')
+   })
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.tsx b/app/dashboard/ghg/_components/CoverageStrip.tsx
+index fbf3b08..f836edd 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.tsx
+@@ -14,7 +14,7 @@
+ import { useState } from 'react'
+ import {
+   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
+-  parseLocalDate, reportingYearLabel, fieldFor,
++  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME,
+   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
+ } from '../../../../lib/ghg/engine'
+ import {
+@@ -89,7 +89,10 @@ export function CoverageStrip(p: CoverageStripProps) {
+   const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off'].includes(i.status)
+     && (i.docIds ?? []).some(id => docIdsHere.has(id)) && i.message)
+ 
+-  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0) return null
++  // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
++  const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
++
++  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0) return null
+   const yearText = reportingYearLabel(win).inText
+   const many = groups.size > 1
+ 
+@@ -166,6 +169,20 @@ export function CoverageStrip(p: CoverageStripProps) {
+           </div>
+         </div>
+       ))}
++      {unread.map(i => (
++        <div key={`unread|${(i.docIds ?? []).join(',')}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
++          <div>⚠ {i.message}</div>
++          <div style={row}>
++            <button style={warnButton} onClick={() => p.onEnterManually((i.fields ?? [])[0])}>Enter the figure manually</button>
++            {(i.fields ?? []).map(f => (
++              <button key={f} style={{ ...plainButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
++                onClick={() => p.currentUser && p.onAdd(usedNoneResolution({
++                  locId: location.id, fuelType: i.fuelType || f, field: f, fuelName: FIELD_NAME[f] ?? f, by: p.currentUser, at: now(),
++                }))}>Confirm this site used no {FIELD_NAME[f] ?? f}</button>
++            ))}
++          </div>
++        </div>
++      ))}
+       {notices.map((i, k) => (
+         <div key={`notice|${k}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
+           ⚠ {i.message}
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 80dd2a8..a7dc381 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -15,6 +15,8 @@ import { figuresForSave } from '../../../lib/ghg/savePayload'
+ import { upsertResolution } from '../../../lib/ghg/coverageActions'
+ import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
+ import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
++import { FigureInput } from './_components/FigureInput'
++import { addOverride, removeOverride } from '../../../lib/ghg/overrides'
+ import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
+ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
+ import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
+@@ -34,7 +36,7 @@ import {
+   detectGridRegion, gridRegionForCountry, pickEF,
+   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
+   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
+-  deriveLocations, deriveStoredLocations, documentsBacking, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
++  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+   streamState, DECLARABLE_STREAMS,
+   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
+   findSteamFactorGaps, steamFactorFor,
+@@ -550,24 +552,6 @@ function LockedDocUpload({ label }: { label: string }) {
+     </div>
+   )
+ }
+-// A FIGURE BACKED BY DOCUMENTS IS SHOWN, NOT TYPED (section 3.3, T7 ruling). When a field has confirmed or
+-// pending bills, deriveLocations works its figure out from them and nothing typed here would count, so the
+-// input is read-only and says where the figure comes from. Switching such a field to a typed figure, with a
+-// reason, is T10. A field with no backing documents is the customer's to type, as before.
+-function FigureInput({ loc, field, onChange, style }: { loc: Location; field: keyof Location; onChange: (v: number) => void; style: React.CSSProperties }) {
+-  const n = documentsBacking(loc, field)
+-  const value = (loc as unknown as Record<string, number>)[String(field)]
+-  const { flex, ...inputOwn } = style
+-  // The id lets the coverage strip's "Enter the figure manually" put the cursor here (T8).
+-  if (n === 0) return <input id={`figure-${loc.id}-${String(field)}`} type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={style} />
+-  return (
+-    <div style={flex != null ? { flex } : undefined}>
+-      <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
+-      <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>From {n} document{n === 1 ? '' : 's'}</div>
+-    </div>
+-  )
+-}
+-
+ function GHGPage() {
+   const [step, setStep] = useState(0)
+   /** Why an ?id= in the URL did not open, or null. Set by the load effect, shown above the page. */
+@@ -1313,6 +1297,19 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // inventory.locations holds only what the customer typed and the documents. Index-aligned with
+   // inventory.locations (deriveLocations maps in order), so derivedLocations[i] is inventory.locations[i].
+   const derivedLocations = useMemo(() => deriveLocations(inventory), [inventory])
++  // T10: "Enter this figure manually instead", with a reason, and "Use the bills instead". The figure starts
++  // from what the documents gave (derivedLocations), so switching never drops it to zero on its own.
++  const overrideFigure = (locIdx: number, field: keyof Location, reason: string) => {
++    if (!currentUser) return
++    const startFrom = Number((derivedLocations[locIdx] as unknown as Record<string, number>)[String(field)] ?? 0)
++    const at = new Date().toISOString()
++    setInventory(inv => ({ ...inv, locations: inv.locations.map((l, i) => i !== locIdx ? l : { ...l, ...addOverride(l, { field, reason, by: currentUser, at, startFrom }) }) }))
++  }
++  const switchToBills = (locIdx: number, field: keyof Location) => {
++    if (!currentUser) return
++    const at = new Date().toISOString()
++    setInventory(inv => ({ ...inv, locations: inv.locations.map((l, i) => i !== locIdx ? l : { ...l, ...removeOverride(l, { field, by: currentUser, at }) }) }))
++  }
+   const needsMarketBased = inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri')
+   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
+   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
+@@ -2140,11 +2137,11 @@ workings: saved.workings,
+                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                     {ngUnitOptions(loc.country).map(([val, label]) => (
+-                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
++                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+                   <Field label={`Total natural gas: ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
+-                    <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} style={inputStyle} />
++                    <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
+                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
+                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+                         {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit)}
+@@ -2160,11 +2157,11 @@ workings: saved.workings,
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                     {propaneUnitOptions(loc.country).map(([val, label]) => (
+-                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
++                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
+-                    <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} style={inputStyle} />
++                    <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                 </div>
+@@ -2175,11 +2172,11 @@ workings: saved.workings,
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                     {liquidUnitOptions(loc.country).map(([val, label]) => (
+-                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
++                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
+-                    <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} style={inputStyle} />
++                    <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                 </div>
+@@ -2207,7 +2204,7 @@ workings: saved.workings,
+                     ))}
+                   </div>
+                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+-                    <input type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                 </div>
+@@ -2223,7 +2220,7 @@ workings: saved.workings,
+                     ))}
+                   </div>
+                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+-                    <input type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                 </div>
+@@ -2235,8 +2232,8 @@ workings: saved.workings,
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
+                   <Field label={`Gasoline for company vehicles: ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
+                     <div style={{ display: 'flex', gap: 8 }}>
+-                      <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} style={{ ...inputStyle, flex: 1 }} />
+-                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
++                      <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'gasoline_amount', r)} onUseBills={() => switchToBills(activeLocation, 'gasoline_amount')} style={{ ...inputStyle, flex: 1 }} />
++                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                         {liquidUnitOptions(loc.country).map(([val, label]) => (
+                           <option key={val} value={val}>{label}</option>
+                         ))}
+@@ -2245,8 +2242,8 @@ workings: saved.workings,
+                   </Field>
+                   <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
+                     <div style={{ display: 'flex', gap: 8 }}>
+-                      <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} style={{ ...inputStyle, flex: 1 }} />
+-                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
++                      <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_mobile_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_mobile_amount')} style={{ ...inputStyle, flex: 1 }} />
++                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                         {liquidUnitOptions(loc.country).map(([val, label]) => (
+                           <option key={val} value={val}>{label}</option>
+                         ))}
+@@ -2271,7 +2268,7 @@ workings: saved.workings,
+                   <div style={{ background: '#FEF3E2', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#633806' }}>Check refrigeration service records: refrigerant purchased for top-up = refrigerant leaked (GHG Protocol methodology)</div>
+                   <Field label="Refrigerant type"><select value={loc.refrigerant_type} onChange={e => updateLocation(activeLocation, 'refrigerant_type', e.target.value)} style={inputStyle}><option value="r410a">R-410A</option><option value="r22">R-22</option><option value="r134a">R-134a</option><option value="r404a">R-404A</option><option value="r507">R-507</option></select></Field>
+                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
+-                    <input type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <input id={`figure-${loc.id}-refrigerant_purchased_kg`} type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
+                 </div>
+@@ -2282,7 +2279,7 @@ workings: saved.workings,
+               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
+               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
+                 <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
+-                  <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} style={inputStyle} />
++                  <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
+                 </Field>
+                 {validateElectricity(loc.electricity_kwh) && (
+                   <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+@@ -2360,7 +2357,7 @@ workings: saved.workings,
+                     ))}
+                   </div>
+                   <Field label={`Total purchased steam: ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
+-                    <input type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <input id={`figure-${loc.id}-purchased_steam_mmbtu`} type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+                   {/* ── WHAT WE CAN AND CANNOT PRICE HERE, PER JURISDICTION ────────────────────
+                       Replaces a blanket "we apply one published factor whatever network supplies it",
+@@ -2544,7 +2541,7 @@ workings: saved.workings,
+               {derivedLocations.map((loc, i) => (
+                 <div key={loc.id} style={{ marginBottom: 14 }}>
+                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
+-                    <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} style={inputStyle} />
++                    <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(i, 'renewable_electricity_kwh', r)} onUseBills={() => switchToBills(i, 'renewable_electricity_kwh')} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
+                 </div>
+@@ -2558,7 +2555,7 @@ workings: saved.workings,
+               {inventory.locations.map((loc, i) => (
+                 <div key={loc.id} style={{ marginBottom: 14 }}>
+                   <Field label={`${loc.name}: Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
+-                    <input type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
++                    <input id={`figure-${loc.id}-biogenic_co2_mt`} type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+                   {/* Biogenic was the only figure in the wizard with no evidence path — every other
+                       number a verifier reads can be traced to a document. Nothing else needed wiring:
+@@ -3024,7 +3021,7 @@ workings: saved.workings,
+                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
+                         )}
+                         {unresolvedCoverage.length > 0 && (
+-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving ({unresolvedCoverage.map(u => u.status).join(', ')})</div>
++                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving. Each one is explained under its upload.</div>
+                         )}
+                         {unresolvedGridLocations.length > 0 && (
+                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
+@@ -3502,6 +3499,9 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+   // that will not happen. Three states, not two: no concierge; concierge on a type it reads;
+   // concierge on a type it does not.
+   const conciergeReads = hasConcierge && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)
++  // Uploads with nothing read from them that block export (T10 ruling); every other such upload is evidence.
++  const unreadBlocking = new Set(findUnresolvedCoverage([location], reportingYear, fiscalYearEndMonth, coverageResolutions)
++    .filter(i => i.status === 'none').flatMap(i => i.docIds ?? []))
+   return (
+     <div
+       onDragOver={e => { e.preventDefault(); setDragActive(true) }}
+@@ -3548,6 +3548,10 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+           {/* Why this document carries no figures. Abstention is NEUTRAL, not amber: the reader
+               declining to guess is the system working, and colouring it as a fault would push a
+               customer to re-upload a file that will rightly abstain again. */}
++          {/* T10 ruling: an upload with nothing read from it is evidence when its fuel already has a figure. */}
++          {(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id) && (
++            <div style={{ marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5, color: '#555553' }}>Uploaded as evidence. No figure was read from it.</div>
++          )}
+           {doc.read_note && (
+             <div style={{
+               marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5,
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 1571f85..9f2950b 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -3789,7 +3789,10 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+       expect(validateResolution(usedNone, rejected())).toBeNull();
+       expect(issues(rejected(), 2025, [usedNone]).filter(i => i.status === 'all_rejected')).toEqual([]);
+       expect(findUndeclaredStreams([rejected()], [usedNone]).map(x => x.stream)).not.toContain('natural_gas');
+-      expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'a stale figure is overwritten with 0').toBe(0);
++      // T10 ruling: since T7 a stored value can only have been typed, and a typed figure above 0 supersedes an
++      // earlier "used none" (it stays in the record but no longer applies).
++      expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount, 'a typed figure supersedes used none').toBeUndefined();
++      expect(applyResolutions(rejected(0), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'nothing typed: used none is 0').toBe(0);
+       const row = buildWorkings([rejected()], 'AR6', 2025, [usedNone]).find(w => w.gwp_basis === 'coverage_resolution');
+       expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example at 2026-03-01T10:00:00Z');
+       expect(row?.resolved_at).toBe('2026-03-01T10:00:00Z');
+@@ -3797,7 +3800,8 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+ 
+     it('used_none must record who', () => {
+       expect(validateResolution({ ...usedNone, by: undefined }, rejected())).toBe('A confirmation must record who confirmed it.');
+-      expect(validateResolution({ ...usedNone, field: 'renewable_electricity_kwh' }, rejected())).toBe('Name the figure that is being confirmed as none.');
++      // T10: every field a document type supports can be confirmed as none; a field no document backs cannot.
++      expect(validateResolution({ ...usedNone, field: 'revenue_millions' }, rejected())).toBe('Name the figure that is being confirmed as none.');
+     });
+ 
+     it('entering a manual figure also clears it; one rejected and one confirmed document does not raise it', () => {
+@@ -3850,7 +3854,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+   it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
+     const r = rng(11);
+     const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
+-    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0 };
++    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0, unread: 0 };
+     for (let t = 0; t < 400; t++) {
+       const n = 1 + Math.floor(r() * 3);
+       const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
+@@ -3862,6 +3866,9 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+         return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
+       });
+       const switchOn = r() < 0.75;
++      // T10 ruling: sometimes an upload with nothing read from it sits beside the bills.
++      const unread = r() < 0.3;
++      if (unread) docs.push({ ...doc('utility_bill_gas', [], 'unread'), file_name: 'unread.pdf' });
+       const l = loc({ has_natural_gas: switchOn, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
+       const resolutions: CoverageResolution[] = r() < 0.2
+         ? [res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u', email: 'e@x.example' } })] : [];
+@@ -3874,6 +3881,13 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+         expect(issues(l, 2025, resolutions).some(i => i.status === 'stream_off'), `trial ${t}: switch off over confirmed bills`).toBe(true);
+         seen.streamOff++;
+       }
++      // An unread upload for a fuel with no figure and no "used none" blocks; with a figure it is evidence.
++      if (unread) {
++        const blocksUnread = issues(l, 2025, resolutions).some(i => i.status === 'none');
++        const hasUsedNone = resolutions.some(x => x.kind === 'used_none');
++        expect(blocksUnread, `trial ${t}: unread upload, derived ${derived}, used none ${hasUsedNone}`).toBe(derived === 0 && !hasUsedNone);
++        if (blocksUnread) seen.unread++;
++      }
+       if (figure > 0) continue;
+       // A gap is left out: it would satisfy this in almost every trial and hide whether the
+       // no-silent-zero issues themselves fire.
+@@ -3890,6 +3904,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+     // Each way out was actually reached, so the property is not passing vacuously.
+     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
+     expect(seen.streamOff).toBeGreaterThan(20);
++    expect(seen.unread).toBeGreaterThan(10);
+   });
+ });
+ 
+@@ -4009,11 +4024,13 @@ describe('T4 deriveLocations', () => {
+     expect(findUnresolvedCoverage([site], 2025, 12, []).some(i => i.status === 'mixed_units')).toBe(true);
+   });
+ 
+-  it('used none: 0, even over a stale stored value', () => {
+-    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))]);
++  // T10 ruling: since T7 a stored value is only ever typed, and a typed figure above 0 supersedes "used none".
++  it('used none: 0 while nothing is typed; a typed figure supersedes it', () => {
+     const usedNone: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount',
+       by: { userId: 'u', email: 'e@x.example' }, note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' } as CoverageResolution;
+-    expect(derivedGas(inv([site], 2025, 12, [usedNone]))).toBe(0);
++    const rejectedBill = [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))];
++    expect(derivedGas(inv([gasSite(0, rejectedBill)], 2025, 12, [usedNone]))).toBe(0);
++    expect(derivedGas(inv([gasSite(300, rejectedBill)], 2025, 12, [usedNone]))).toBe(300);
+   });
+ 
+   it('the unit comes from the documents where the figure is derived', () => {
+@@ -4528,3 +4545,41 @@ describe('T7 deriveStoredLocations: readers of a stored row derive first', () =>
+     expect(deriveStoredLocations(row(bad))).toBe(bad);
+   });
+ });
++
++// ── T10 ruling: an upload with nothing read from it ────────────────────────────────────────────────────
++describe('T10 unread uploads: evidence when the fuel has a figure, a blocker naming what to do when not', () => {
++  const unreadDoc = (id: string, document_type = 'utility_bill_gas'): SourceDoc => ({ ...doc(document_type, [], id), file_name: `${id}.pdf` });
++  const site = (o: Partial<Location>) => loc({ name: 'Site A', has_natural_gas: true, natural_gas_unit: 'mcf', ...o });
++  const none = (l: Location, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], 2025, 12, r).filter(i => i.status === 'none');
++  const usedNone = (field: string, fuelType = 'natural_gas'): CoverageResolution => ({ locId: 'L1', fuelType, kind: 'used_none', field,
++    by: { userId: 'u', email: 'e@x.example' }, note: 'n', acknowledgedAt: '2026-10-02T09:00:00Z' } as CoverageResolution);
++
++  it('beside a typed figure it is evidence, not a blocker', () => {
++    expect(none(site({ natural_gas_amount: 400, source_docs: [unreadDoc('scan')] }))).toEqual([]);
++  });
++  it('beside a counted bill of the same type it is evidence', () => {
++    expect(none(site({ source_docs: [unreadDoc('scan'), doc('utility_bill_gas', [prop({ periodStart: '2025-01-01', periodEnd: '2025-01-31' })], 'bill')] }))).toEqual([]);
++  });
++  it('with no figure it blocks, naming the file, the fuel and the site', () => {
++    expect(none(site({ source_docs: [unreadDoc('scan')] }))).toEqual([{ locId: 'L1', fuelType: 'natural_gas', status: 'none', docIds: ['scan'],
++      fields: ['natural_gas_amount'],
++      message: 'scan.pdf is uploaded for natural gas at Site A, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no natural gas.' }]);
++  });
++  it('a document type covering several fuels lists them', () => {
++    expect(none(site({ source_docs: [unreadDoc('fleet', 'fleet_fuel')] }))[0].message).toContain('uploaded for gasoline and diesel at Site A')
++    expect(none(site({ source_docs: [unreadDoc('oil', 'fuel_oil')] }))[0].message).toContain('confirm this site used no heating oil and heavy fuel oil.')
++  });
++  it('each action clears it: a typed figure, or "used none"', () => {
++    const blocked = site({ source_docs: [unreadDoc('scan')] });
++    expect(none({ ...blocked, natural_gas_amount: 250 })).toEqual([]);
++    expect(none(blocked, [usedNone('natural_gas_amount')])).toEqual([]);
++    const oil = site({ source_docs: [unreadDoc('oil', 'fuel_oil')] });
++    const r = usedNone('fuel_oil_distillate_amount', 'fuel_oil');
++    expect(validateResolution(r, oil), '"used none" works for fields the reader never fills').toBeNull();
++    expect(none(oil, [r])).toEqual([]);
++    expect(findUndeclaredStreams([{ ...oil, has_fuel_oil_distillate: true }], [r]).map(u => u.stream)).not.toContain('fuel_oil_distillate');
++  });
++  it('a document type with no fields of its own never blocks', () => {
++    expect(none(site({ source_docs: [unreadDoc('other', 'something_else')] }))).toEqual([]);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 49d7c7e..0089df2 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -1661,6 +1661,32 @@ interface Location {
+   // Per-stream "this site has no such supply" attestations. Absent (undefined/missing entry) means
+   // NOBODY has answered → the stream is UNDECLARED and blocks export. See findUndeclaredStreams.
+   stream_attestations?: StreamAttestation[]
++  // T10 (section 3.3, ruling Q1): document-backed figures the customer chose to enter by hand instead, each
++  // with a required reason, who and when. While one is active, the field's documents stay as evidence but are
++  // not counted (contribution reason manual_override), and the typed value on the field is the figure.
++  manual_overrides?: ManualOverride[]
++  // T10 ruling: overrides the customer removed ("Use the bills instead"), with who and when, so the history
++  // stays in the record.
++  manual_overrides_removed?: (ManualOverride & { removedAt: string; removedBy: { userId: string; email: string } })[]
++}
++
++interface ManualOverride {
++  field: string
++  reason: string
++  at: string
++  by: { userId: string; email: string }
++}
++
++/** The override in force for a field, if any (T10). */
++export function activeOverride(loc: Pick<Location, 'manual_overrides'>, field: keyof Location | string): ManualOverride | undefined {
++  return (loc.manual_overrides ?? []).filter(o => o.field === String(field)).at(-1)
++}
++
++/** Why an override cannot be recorded, or null (T10): a reason is required, and who made it. */
++export function overrideProblem(o: { reason: string; by?: { userId: string; email: string } | null }): string | null {
++  if (!o.reason.trim()) return 'Give a reason for entering this figure manually.'
++  if (!o.by?.userId || !o.by?.email) return 'An override must record who made it.'
++  return null
+ }
+ 
+ // Derive the reporting period from a reporting year + fiscal year-end MONTH (1-12).
+@@ -3035,7 +3061,7 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
+       return null
+     }
+     case 'used_none':
+-      if (!r.field || !(r.field in FIELD_STREAM)) return 'Name the figure that is being confirmed as none.'
++      if (!r.field || !USED_NONE_FIELDS.has(r.field)) return 'Name the figure that is being confirmed as none.'
+       if (!r.by?.userId || !r.by?.email) return 'A confirmation must record who confirmed it.'
+       return null
+     case 'duplicate':
+@@ -3056,7 +3082,40 @@ const FIELD_STREAM: Partial<Record<keyof Location, DeclarableStream>> = {
+   diesel_mobile_amount: 'mobile',
+   gasoline_amount: 'mobile',
+   electricity_kwh: 'electricity',
++  // T10 ruling on unread uploads: "used none" is offered for every field a document type supports, so these
++  // streams can be answered that way too.
++  fuel_oil_distillate_amount: 'fuel_oil_distillate',
++  fuel_oil_residual_amount: 'fuel_oil_residual',
++  purchased_steam_mmbtu: 'purchased_steam',
++  refrigerant_purchased_kg: 'refrigerants',
++}
++
++// The fields each document type is evidence for (T10 ruling on unread uploads). A document with nothing read
++// from it is evidence when any of these already has a figure; otherwise it blocks, naming them.
++export const DOC_TYPE_FIELDS: Record<string, (keyof Location)[]> = {
++  utility_bill_gas: ['natural_gas_amount'],
++  utility_electricity: ['electricity_kwh'],
++  fuel_propane: ['propane_amount'],
++  fuel_diesel: ['diesel_stationary_amount'],
++  fleet_fuel: ['gasoline_amount', 'diesel_mobile_amount'],
++  fuel_oil: ['fuel_oil_distillate_amount', 'fuel_oil_residual_amount'],
++  purchased_steam: ['purchased_steam_mmbtu'],
++  service_record: ['refrigerant_purchased_kg'],
++  renewable_cert: ['renewable_electricity_kwh'],
++  biogenic: ['biogenic_co2_mt'],
+ }
++// How each of those fields is named to the customer.
++export const FIELD_NAME: Record<string, string> = {
++  natural_gas_amount: 'natural gas', electricity_kwh: 'electricity', propane_amount: 'propane',
++  diesel_stationary_amount: 'diesel', gasoline_amount: 'gasoline', diesel_mobile_amount: 'diesel',
++  fuel_oil_distillate_amount: 'heating oil', fuel_oil_residual_amount: 'heavy fuel oil',
++  purchased_steam_mmbtu: 'purchased steam', refrigerant_purchased_kg: 'refrigerant',
++  renewable_electricity_kwh: 'renewable electricity', biogenic_co2_mt: 'biomass',
++}
++/** "a", "a and b", "a, b and c". */
++export const listInWords = (xs: string[]): string =>
++  xs.length <= 2 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
++const USED_NONE_FIELDS = new Set(Object.values(DOC_TYPE_FIELDS).flat().map(String))
+ const FUEL_NAME: Record<string, string> = {
+   natural_gas: 'natural gas', propane: 'propane', diesel: 'diesel', gasoline: 'gasoline', electricity: 'electricity',
+ }
+@@ -3073,6 +3132,9 @@ export const COVERAGE_MESSAGE = {
+   all_rejected: (fuel: string, site: string) =>
+     `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
+   // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
++  // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
++  unread: (file: string, fuels: string, site: string) =>
++    `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
+   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
+     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
+ }
+@@ -3270,6 +3332,8 @@ export function billContributions(
+     const sameBillAs = excludedBy.get(`${d.id}|${p.fuelType}`)
+     const reason: ContributionReason =
+       p.status !== 'confirmed' ? 'not_confirmed'
++      // T10: the customer entered this figure by hand instead; the bill stays as evidence, not counted.
++      : activeOverride(loc, map.amount) ? 'manual_override'
+       : sameBillAs ? 'same_bill_as'
+       : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
+       : periodProblem ? 'invalid_period'
+@@ -3366,7 +3430,8 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+     d.extracted?.forEach((p, pi) => {
+       if (p.status !== 'confirmed' || p.value == null) return
+       const map = fieldFor(d.document_type, p.fuelType)
+-      if (!map) return
++      // T10: an overridden field is the customer's typed figure, not the documents', so it has no entry here.
++      if (!map || activeOverride(loc, map.amount)) return
+       const key = String(map.amount)
+       if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, documentType: d.document_type, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
+       acc[key].rawSum += p.value
+@@ -3423,7 +3488,10 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+   // used_none (T3 ruling "all documents rejected"): a field confirmed as zero, with no confirmed document,
+   // is written as 0, so a figure left from earlier bills cannot stand. A confirmed document outranks it.
+   for (const r of resolutions) {
+-    if (r.kind !== 'used_none' || !r.field || out[r.field]) continue
++    // A typed figure supersedes an earlier "used none" (T10): confirming none and then entering a figure
++    // must not silently zero the figure the customer entered.
++    if (r.kind !== 'used_none' || !r.field || out[r.field] || activeOverride(loc, r.field)
++      || Number((loc as unknown as Record<string, unknown>)[r.field] ?? 0) > 0) continue
+     out[r.field] = { field: r.field as keyof Location, rawSum: 0, value: 0, adjustment: null, mixedUnits: false,
+       fuelTypes: [r.fuelType], quotes: [], docIds: [], filePaths: [], refs: [] }
+   }
+@@ -3473,7 +3541,8 @@ export function deriveLocations(inventory: {
+     loc.source_docs.forEach(d => d.extracted?.forEach(p => {
+       if (p.value == null || (p.status !== 'extracted' && p.status !== 'needs_manual_review')) return
+       const map = fieldFor(d.document_type, p.fuelType)
+-      if (map) set(map.amount, 0)
++      // T10: an overridden field keeps the typed figure, whatever its documents say.
++      if (map && !activeOverride(loc, map.amount)) set(map.amount, 0)
+     }))
+     // Then every field applyResolutions covers (any confirmed proposal, or a used_none confirmation).
+     for (const a of Object.values(applyResolutions(loc, resolutions, win.start, win.end))) {
+@@ -3543,6 +3612,8 @@ interface Provenance {
+   // (outside the year, the same bill as another, undated, invalid period, mixed units, not confirmed).
+   // Stored in workings, so the verifier page and the PDF never recompute it.
+   contributions?: BillContribution[]
++  // T10: the reason this document-backed figure was entered by hand instead, with who and when.
++  manual_override?: { reason: string; at: string; by: { userId: string; email: string } }
+ }
+ 
+ // Document-backed fields that get a zero row when every confirmed bill is silently excluded (T5 ruling).
+@@ -3737,6 +3808,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+       const a = applied[String(field)]
+       const contrib = contributionsFor(field)
+       const withContrib = (p: Provenance): Provenance => contrib.length ? { ...p, contributions: contrib } : p
++      // T10: entered by hand instead of from its documents. Manual, with the reason, who and when; the
++      // documents are listed as contributions not counted, reason manual_override.
++      const override = activeOverride(loc, field)
++      if (override) return withContrib({ entry_method: 'manual', manual_override: { reason: override.reason, at: override.at, by: override.by } })
+       if (!a || a.docIds.length === 0) return withContrib({ entry_method: 'manual' })
+       const quotes = a.quotes
+       if (a.adjustment && a.adjustment.kind === 'prorate') {
+@@ -3976,6 +4051,8 @@ export interface CoverageIssue {
+   // group's document type); field on all_rejected (which figure "used none" or a typed figure answers).
+   documentType?: string
+   field?: string
++  // T10: the fields an unread upload (status none) is evidence for, each answerable by a typed figure or used_none.
++  fields?: string[]
+   docIds?: string[]
+   meterLabel?: string | null
+ }
+@@ -4007,9 +4084,19 @@ export function findUnresolvedCoverage(
+     const contributions = billContributions(loc, resolutions, coverageWin)
+     const out: CoverageIssue[] = []
+ 
+-    // A document with no proposals at all: nothing was read, so it cannot be placed. Unchanged.
++    // A document with nothing read from it (T10 ruling). EVIDENCE, not a blocker, when any field its
++    // document type supports already has a figure: typed, from another counted bill, or a used_none
++    // confirmation. Otherwise it blocks, naming the file, the fuel(s) and the site, and the strip offers
++    // "Enter the figure manually" and "Confirm this site used no {fuel}" for each field.
++    const derivedHere = deriveLocations({ locations: [loc], reporting_year: reportingYear, fiscal_year_end_month: fiscalYearEndMonth, coverage_resolutions: allResolutions })[0]
++    const hasFigure = (f: keyof Location) => Number((derivedHere as unknown as Record<string, unknown>)[String(f)] ?? 0) > 0
++      || resolutions.some(r => r.kind === 'used_none' && r.field === String(f))
+     loc.source_docs.forEach(d => {
+-      if ((d.extracted?.length ?? 0) === 0) out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id] })
++      if ((d.extracted?.length ?? 0) > 0) return
++      const fields = DOC_TYPE_FIELDS[d.document_type] ?? []
++      if (fields.length === 0 || fields.some(hasFigure)) return
++      out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id],
++        fields: fields.map(String), message: COVERAGE_MESSAGE.unread(d.file_name, listInWords(fields.map(f => FIELD_NAME[String(f)] ?? String(f))), site) })
+     })
+ 
+     // Not-counted bills the customer must be told about.
+diff --git a/supabase/migrations/20261002_ghg_derivation_version.sql b/supabase/migrations/20261002_ghg_derivation_version.sql
+index 93ac264..de0a72f 100644
+--- a/supabase/migrations/20261002_ghg_derivation_version.sql
++++ b/supabase/migrations/20261002_ghg_derivation_version.sql
+@@ -1,5 +1,5 @@
+ -- supabase/migrations/20261002_ghg_derivation_version.sql
+--- NOT RUN.
++-- RUN 2 October 2026 (confirmed: smallint, not null, default 2; 29 rows at version 2).
+ --
+ -- T7 (docs/review/design-derived-figures.md, section 11). Adds ghg_inventories.derivation_version.
+ -- Written against db/dumps/schema_public_20261001_1057.sql, where the column does not exist.
+diff --git a/lib/ghg/overrides.ts b/lib/ghg/overrides.ts
+new file mode 100644
+index 0000000..0f9cc3a
+--- /dev/null
++++ b/lib/ghg/overrides.ts
+@@ -0,0 +1,38 @@
++// lib/ghg/overrides.ts
++//
++// SWITCHING A DOCUMENT-BACKED FIGURE TO MANUAL, AND BACK (T10). Pure: no React, no clock (the caller passes
++// the time). Each function returns the patch for ONE location.
++//
++// Section 3.3 (ruling Q1): the customer chooses "Enter this figure manually instead" and must give a reason.
++// The documents stay as evidence; their contributions read counted: false, reason manual_override, and the
++// typed value on the field is the figure. T10 ruling: "Use the bills instead" removes the override, and the
++// removal is kept with who and when in manual_overrides_removed.
++
++import { activeOverride, overrideProblem, type Location } from './engine'
++
++type Who = { userId: string; email: string }
++
++/**
++ * Switch `field` to manual. `startFrom` is the figure the field starts at, normally the figure the documents
++ * gave, so switching never drops the figure to zero on its own; the customer then types the right one.
++ * Throws when the reason is empty or who is missing, so nothing is recorded without them.
++ */
++export function addOverride(loc: Location, a: { field: keyof Location; reason: string; by: Who; at: string; startFrom: number }): Partial<Location> {
++  const problem = overrideProblem({ reason: a.reason, by: a.by })
++  if (problem) throw new Error(problem)
++  return {
++    manual_overrides: [...(loc.manual_overrides ?? []).filter(o => o.field !== String(a.field)),
++      { field: String(a.field), reason: a.reason.trim(), at: a.at, by: a.by }],
++    [a.field]: a.startFrom,
++  } as Partial<Location>
++}
++
++/** "Use the bills instead": the override goes, and is kept with who removed it and when. */
++export function removeOverride(loc: Location, a: { field: keyof Location; by: Who; at: string }): Partial<Location> {
++  const current = activeOverride(loc, a.field)
++  if (!current) return {}
++  return {
++    manual_overrides: (loc.manual_overrides ?? []).filter(o => o.field !== String(a.field)),
++    manual_overrides_removed: [...(loc.manual_overrides_removed ?? []), { ...current, removedAt: a.at, removedBy: a.by }],
++  }
++}
+diff --git a/lib/ghg/overrides.test.ts b/lib/ghg/overrides.test.ts
+new file mode 100644
+index 0000000..e68c667
+--- /dev/null
++++ b/lib/ghg/overrides.test.ts
+@@ -0,0 +1,127 @@
++// lib/ghg/overrides.test.ts
++//
++// T10: a document-backed figure entered by hand instead, with a required reason (section 3.3, ruling Q1),
++// and switched back ("Use the bills instead", T10 ruling).
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { addOverride, removeOverride } from './overrides'
++import {
++  emptyLocation, deriveLocations, calcInventory, buildWorkings, billContributions, findUnresolvedCoverage,
++  periodFromYearAndEnd, overrideProblem, activeOverride, pctEstimated,
++  type Location, type SourceDoc, type ExtractedProposal, type CoverageResolution,
++} from './engine'
++import { buildMonthlyEmissions, reconcile } from './monthlyEmissions'
++import { calcGas, pickEF, getGridFactor, isResolvedGridRegion } from './engine'
++
++const AT = '2026-10-02T09:00:00.000Z'
++const BY = { userId: 'u-1', email: 'jo@acme.example' }
++const prop = (o: Partial<ExtractedProposal>): ExtractedProposal => ({
++  fuelType: 'natural_gas', rawValue: 100, rawUnit: 'mcf', value: 100, unit: 'mcf', periodStart: '2025-01-01',
++  periodEnd: '2025-01-31', confidence: 'high', sourceQuote: 'q', notes: null, status: 'confirmed', ...o,
++})
++const gdoc = (id: string, p: ExtractedProposal): SourceDoc =>
++  ({ id, file_name: `${id}.pdf`, document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: `/${id}.pdf`, extracted: [p] })
++const site = (docs: SourceDoc[], o: Partial<Location> = {}): Location =>
++  ({ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs, ...o })
++const inv = (l: Location, r: CoverageResolution[] = []) => ({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: r })
++const derived = (l: Location) => deriveLocations(inv(l))[0]
++// Apply a patch, then the customer types `typed` into the now-editable field.
++const overridden = (l: Location, reason: string, typed?: number) => {
++  const next = { ...l, ...addOverride(l, { field: 'natural_gas_amount', reason, by: BY, at: AT, startFrom: derived(l).natural_gas_amount }) }
++  return typed == null ? next : { ...next, natural_gas_amount: typed }
++}
++const statuses = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).map(i => i.status)
++
++describe('switching to manual needs a reason', () => {
++  it('an empty or blank reason is refused, and so is a missing who', () => {
++    expect(overrideProblem({ reason: '', by: BY })).toBe('Give a reason for entering this figure manually.')
++    expect(overrideProblem({ reason: '   ', by: BY })).toBe('Give a reason for entering this figure manually.')
++    expect(overrideProblem({ reason: 'ok', by: null })).toBe('An override must record who made it.')
++    expect(() => addOverride(site([]), { field: 'natural_gas_amount', reason: ' ', by: BY, at: AT, startFrom: 0 })).toThrow('Give a reason')
++  })
++  it('records the field, the reason (trimmed), who and when', () => {
++    const l = overridden(site([gdoc('a', prop({}))]), '  Bill is for the landlord meter  ')
++    expect(l.manual_overrides).toEqual([{ field: 'natural_gas_amount', reason: 'Bill is for the landlord meter', at: AT, by: BY }])
++  })
++})
++
++describe('an overridden field uses the typed figure', () => {
++  it('the typed value is the figure, in totals too; the bill is not counted', () => {
++    const l = overridden(site([gdoc('a', prop({}))]), 'Bill covers two sites', 250)
++    expect(derived(l).natural_gas_amount).toBe(250)
++    const alone = calcInventory([site([], { natural_gas_amount: 250 })], 'AR6', 2025).s1_total
++    expect(calcInventory(deriveLocations(inv(l)), 'AR6', 2025).s1_total).toBeCloseTo(alone, 12)
++  })
++  it('switching starts from the figure the bills gave, so it never drops to zero on its own', () => {
++    expect(derived(overridden(site([gdoc('a', prop({}))]), 'r')).natural_gas_amount).toBe(100)
++  })
++  it('contributions read manual_override, not counted, and the document stays', () => {
++    const l = overridden(site([gdoc('a', prop({}))]), 'r', 250)
++    expect(billContributions(l, [], periodFromYearAndEnd(2025, 12))).toMatchObject([{ docId: 'a', counted: false, reason: 'manual_override' }])
++    expect(l.source_docs.map(d => d.id)).toEqual(['a'])
++  })
++  it('the workings row is manual and carries the reason, who and when, with the uncounted bill', () => {
++    const l = overridden(site([gdoc('a', prop({}))]), 'Bill covers two sites', 250)
++    const rows = buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; entry_method?: string; activity_data?: number; manual_override?: unknown; contributions?: { reason: string }[] }[]
++    const r = rows.find(x => x.stream === 'natural_gas')!
++    expect(r).toMatchObject({ entry_method: 'manual', activity_data: 250, manual_override: { reason: 'Bill covers two sites', at: AT, by: BY } })
++    expect(r.contributions?.map(c => c.reason)).toEqual(['manual_override'])
++  })
++})
++
++describe('a customer with an unusable document can finish', () => {
++  for (const [label, docs, issue] of [
++    ['undated', [gdoc('u', prop({ periodStart: null, periodEnd: null }))], 'undated'],
++    ['mixed units', [gdoc('a', prop({})), gdoc('b', prop({ unit: 'therms', rawUnit: 'therms', periodStart: '2025-02-01', periodEnd: '2025-02-28' }))], 'mixed_units'],
++    ['a gap', [gdoc('a', prop({}))], 'gap'],
++  ] as const) {
++    it(`${label}: the issue clears once the figure is entered by hand`, () => {
++      const l = site([...docs])
++      expect(statuses(l)).toContain(issue)
++      expect(statuses(overridden(l, 'Unusable bill', 1200))).not.toContain(issue)
++    })
++  }
++  it('the overridden field is not estimated, and monthly writes nothing for it: reconcile is zero', () => {
++    const l = overridden(site([gdoc('a', prop({}))]), 'r', 1200)
++    expect(pctEstimated(inv(l), 'AR6')).toBe(0)
++    const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion }
++    const m = buildMonthlyEmissions(inv(l), deps, 'AR6')
++    expect(m.slices).toEqual([])
++    expect(m.skipped.map(s => s.reason)).toEqual(['not counted: manual_override'])
++    expect(reconcile(m.slices, inv(l), 'AR6').reconciles).toBe(true)
++  })
++})
++
++describe('"Use the bills instead" (T10 ruling)', () => {
++  it('the bills count again, and the removal is kept with who and when', () => {
++    const on = overridden(site([gdoc('a', prop({}))]), 'Bill covers two sites', 250)
++    const off = { ...on, ...removeOverride(on, { field: 'natural_gas_amount', by: { userId: 'u-2', email: 'sam@acme.example' }, at: '2026-10-03T10:00:00.000Z' }) }
++    expect(activeOverride(off, 'natural_gas_amount')).toBeUndefined()
++    expect(derived(off).natural_gas_amount, 'from the bill again; the typed 250 is ignored').toBe(100)
++    expect(off.manual_overrides_removed).toEqual([{ field: 'natural_gas_amount', reason: 'Bill covers two sites', at: AT, by: BY,
++      removedAt: '2026-10-03T10:00:00.000Z', removedBy: { userId: 'u-2', email: 'sam@acme.example' } }])
++    expect(removeOverride(off, { field: 'natural_gas_amount', by: BY, at: AT }), 'nothing to remove: no change').toEqual({})
++  })
++})
++
++describe('the page: unread uploads and the export summary (T10 ruling)', () => {
++  const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
++  it('no bare status codes in the export summary', () => {
++    expect(page).not.toContain("unresolvedCoverage.map(u => u.status)")
++    expect(page).toContain('resolving. Each one is explained under its upload.')
++  })
++  it('an unread upload that does not block is labelled as evidence', () => {
++    expect(page).toContain('Uploaded as evidence. No figure was read from it.')
++    expect(page).toContain("(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id)")
++  })
++  it('every field an unread upload can name has an input "Enter the figure manually" can reach', () => {
++    for (const f of ['natural_gas_amount', 'propane_amount', 'diesel_stationary_amount', 'gasoline_amount', 'diesel_mobile_amount', 'electricity_kwh', 'renewable_electricity_kwh']) {
++      expect(page, f).toContain(`<FigureInput loc={loc} field="${f}"`)
++    }
++    for (const f of ['fuel_oil_distillate_amount', 'fuel_oil_residual_amount', 'refrigerant_purchased_kg', 'purchased_steam_mmbtu', 'biogenic_co2_mt']) {
++      expect(page, f).toContain(`<input id={\`figure-\${loc.id}-${f}\`}`)
++    }
++  })
++})
+diff --git a/app/dashboard/ghg/_components/FigureInput.tsx b/app/dashboard/ghg/_components/FigureInput.tsx
+new file mode 100644
+index 0000000..03737d6
+--- /dev/null
++++ b/app/dashboard/ghg/_components/FigureInput.tsx
+@@ -0,0 +1,72 @@
++// app/dashboard/ghg/_components/FigureInput.tsx
++//
++// ONE FIGURE ON STEP 2, AND WHERE IT COMES FROM (T7, T10).
++//   - No backing documents: the customer's typed figure, editable, as always.
++//   - Backed by documents (confirmed or pending bills): worked out from them and shown read-only, "From N
++//     documents" (section 3.3, T7 ruling), with "Enter this figure manually instead", which asks for a reason.
++//   - Overridden (T10): editable again, saying who switched it, when and why, with "Use the bills instead".
++// Moved out of page.tsx in T10 so each state can be rendered in a test.
++//
++// All text here is shown to the customer: plain language, no em dash.
++
++import { useState } from 'react'
++import { documentsBacking, activeOverride, type Location } from '../../../../lib/ghg/engine'
++import { plainDate } from '../../../../lib/ghg/coverageActions'
++
++export type FigureInputProps = {
++  loc: Location                       // the DERIVED location (its figure is what the totals use)
++  field: keyof Location
++  onChange: (v: number) => void
++  style: React.CSSProperties
++  by: { userId: string; email: string } | null   // who switches; both switches are disabled without one
++  onOverride: (reason: string) => void
++  onUseBills: () => void
++}
++
++const link = { fontSize: 11, padding: 0, marginLeft: 8, background: 'none', border: 'none', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' } as const
++const small = { fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' } as const
++const note = { fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4, lineHeight: 1.5 } as const
++
++export function FigureInput({ loc, field, onChange, style, by, onOverride, onUseBills }: FigureInputProps) {
++  const [asking, setAsking] = useState(false)
++  const [reason, setReason] = useState('')
++  const n = documentsBacking(loc, field)
++  const override = activeOverride(loc, field)
++  const value = (loc as unknown as Record<string, number>)[String(field)]
++  const { flex, ...inputOwn } = style
++  const docs = `${n} document${n === 1 ? '' : 's'}`
++  // The id lets the coverage strip's "Enter the figure manually" put the cursor here (T8).
++  const editable = (s: React.CSSProperties) =>
++    <input id={`figure-${loc.id}-${String(field)}`} type="number" value={value || ''} onChange={e => onChange(Number(e.target.value))} placeholder="0" style={s} />
++  if (n === 0) return editable(style)
++  if (override) {
++    return (
++      <div style={flex != null ? { flex } : undefined}>
++        {editable(inputOwn)}
++        <div style={note}>
++          Entered manually by {override.by.email} on {plainDate(override.at)} instead of from {docs}. Reason: {override.reason}
++          <button disabled={!by} onClick={onUseBills} style={{ ...link, opacity: by ? 1 : 0.5 }}>Use the bills instead</button>
++        </div>
++      </div>
++    )
++  }
++  return (
++    <div style={flex != null ? { flex } : undefined}>
++      <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
++      <div style={note}>
++        From {docs}
++        {!asking && <button disabled={!by} onClick={() => setAsking(true)} style={{ ...link, opacity: by ? 1 : 0.5 }}>Enter this figure manually instead</button>}
++      </div>
++      {asking && (
++        <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
++          <input aria-label="Reason for entering this figure manually" value={reason} onChange={e => setReason(e.target.value)}
++            placeholder="Why are you entering this figure instead of using the bills?"
++            style={{ fontSize: 12, padding: '4px 8px', border: '0.5px solid #e8e7e4', borderRadius: 6, minWidth: 260, flex: 1 }} />
++          <button disabled={!reason.trim() || !by} onClick={() => { onOverride(reason.trim()); setAsking(false); setReason('') }}
++            style={{ ...small, fontWeight: 600, opacity: reason.trim() && by ? 1 : 0.5 }}>Switch to manual</button>
++          <button onClick={() => { setAsking(false); setReason('') }} style={small}>Cancel</button>
++        </div>
++      )}
++    </div>
++  )
++}
+diff --git a/app/dashboard/ghg/_components/FigureInput.test.tsx b/app/dashboard/ghg/_components/FigureInput.test.tsx
+new file mode 100644
+index 0000000..7d2c5cf
+--- /dev/null
++++ b/app/dashboard/ghg/_components/FigureInput.test.tsx
+@@ -0,0 +1,49 @@
++// app/dashboard/ghg/_components/FigureInput.test.tsx
++//
++// T10: a figure's three states on step 2: typed, from documents (with the switch to manual), and overridden.
++
++import { describe, it, expect } from 'vitest'
++import { renderToStaticMarkup } from 'react-dom/server'
++import { FigureInput } from './FigureInput'
++import { emptyLocation, type Location, type ExtractedProposal } from '@/lib/ghg/engine'
++
++const BY = { userId: 'u-1', email: 'jo@acme.example' }
++const prop: ExtractedProposal = { fuelType: 'natural_gas', rawValue: 100, rawUnit: 'mcf', value: 100, unit: 'mcf', periodStart: '2025-01-01',
++  periodEnd: '2025-01-31', confidence: 'high', sourceQuote: 'q', notes: null, status: 'confirmed' }
++const withDoc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Site A'), natural_gas_amount: 100, ...o,
++  source_docs: [{ id: 'a', file_name: 'a.pdf', document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: '/a.pdf', extracted: [prop] }] })
++const draw = (loc: Location, by: typeof BY | null = BY) => renderToStaticMarkup(
++  <FigureInput loc={loc} field="natural_gas_amount" onChange={() => {}} style={{}} by={by} onOverride={() => {}} onUseBills={() => {}} />)
++const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
++
++describe('FigureInput', () => {
++  it('typed: an editable input and nothing else', () => {
++    const h = draw({ ...emptyLocation('L1', 'Site A'), natural_gas_amount: 40 })
++    expect(h).toMatch(/^<input id="figure-L1-natural_gas_amount" type="number"[^>]*value="40"/)
++    expect(h).not.toContain('From ')
++  })
++  it('from documents: read-only, with the switch to manual', () => {
++    const h = draw(withDoc())
++    expect(h).toContain('readOnly=""')
++    expect(text(h)).toContain('From 1 document')
++    expect(h).toContain('>Enter this figure manually instead</button>')
++  })
++  it('plural documents read correctly', () => {
++    const two: Location = { ...withDoc(), source_docs: [...withDoc().source_docs, { ...withDoc().source_docs[0], id: 'b' }] }
++    expect(text(draw(two))).toContain('From 2 documents')
++    const over = { ...two, manual_overrides: [{ field: 'natural_gas_amount', reason: 'r', at: '2026-10-02T12:00:00.000Z', by: BY }] }
++    expect(text(draw(over))).toContain('instead of from 2 documents.')
++  })
++
++  it('the switch needs a signed-in user', () => {
++    expect(draw(withDoc(), null)).toMatch(/<button disabled=""[^>]*>Enter this figure manually instead<\/button>/)
++  })
++  it('overridden: editable again, saying who, when and why, with the way back', () => {
++    const h = draw(withDoc({ natural_gas_amount: 250, manual_overrides: [{ field: 'natural_gas_amount', reason: 'Bill covers two sites', at: '2026-10-02T12:00:00.000Z', by: BY }] }))
++    expect(h).toMatch(/id="figure-L1-natural_gas_amount" type="number"[^>]*value="250"/)
++    expect(h).not.toContain('readOnly')
++    expect(text(h)).toContain('Entered manually by jo@acme.example on 2 October 2026 instead of from 1 document. Reason: Bill covers two sites')
++    expect(h).toContain('>Use the bills instead</button>')
++    expect(h).not.toContain('—')
++  })
++})

@@ -106,6 +106,15 @@ describe('coverage strip', () => {
     expect(march).toContain('1 bill falls outside the year ending 31 March 2025 and is not counted: Mar 2023.')
   })
 
+  it('an unread upload with no figure: the message and both actions; with a figure: nothing to resolve', () => {
+    const unread: SourceDoc = { id: 'scan', file_name: 'scan.pdf', document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: '/scan.pdf', extracted: [] }
+    const t = text(draw(site([unread])))
+    expect(t).toContain('scan.pdf is uploaded for natural gas at Site A, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no natural gas.')
+    expect(t).toContain('Enter the figure manually')
+    expect(t).toContain('Confirm this site used no natural gas')
+    expect(draw({ ...site([unread]), natural_gas_amount: 400 })).toBe('')
+  })
+
   it('nothing to say: no strip', () => {
     expect(draw(site([]))).toBe('')
   })

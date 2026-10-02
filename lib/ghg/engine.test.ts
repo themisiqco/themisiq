@@ -3789,7 +3789,10 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
       expect(validateResolution(usedNone, rejected())).toBeNull();
       expect(issues(rejected(), 2025, [usedNone]).filter(i => i.status === 'all_rejected')).toEqual([]);
       expect(findUndeclaredStreams([rejected()], [usedNone]).map(x => x.stream)).not.toContain('natural_gas');
-      expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'a stale figure is overwritten with 0').toBe(0);
+      // T10 ruling: since T7 a stored value can only have been typed, and a typed figure above 0 supersedes an
+      // earlier "used none" (it stays in the record but no longer applies).
+      expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount, 'a typed figure supersedes used none').toBeUndefined();
+      expect(applyResolutions(rejected(0), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'nothing typed: used none is 0').toBe(0);
       const row = buildWorkings([rejected()], 'AR6', 2025, [usedNone]).find(w => w.gwp_basis === 'coverage_resolution');
       expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example at 2026-03-01T10:00:00Z');
       expect(row?.resolved_at).toBe('2026-03-01T10:00:00Z');
@@ -3797,7 +3800,8 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
 
     it('used_none must record who', () => {
       expect(validateResolution({ ...usedNone, by: undefined }, rejected())).toBe('A confirmation must record who confirmed it.');
-      expect(validateResolution({ ...usedNone, field: 'renewable_electricity_kwh' }, rejected())).toBe('Name the figure that is being confirmed as none.');
+      // T10: every field a document type supports can be confirmed as none; a field no document backs cannot.
+      expect(validateResolution({ ...usedNone, field: 'revenue_millions' }, rejected())).toBe('Name the figure that is being confirmed as none.');
     });
 
     it('entering a manual figure also clears it; one rejected and one confirmed document does not raise it', () => {
@@ -3850,7 +3854,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
   it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
     const r = rng(11);
     const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
-    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0 };
+    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0, unread: 0 };
     for (let t = 0; t < 400; t++) {
       const n = 1 + Math.floor(r() * 3);
       const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
@@ -3862,6 +3866,9 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
         return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
       });
       const switchOn = r() < 0.75;
+      // T10 ruling: sometimes an upload with nothing read from it sits beside the bills.
+      const unread = r() < 0.3;
+      if (unread) docs.push({ ...doc('utility_bill_gas', [], 'unread'), file_name: 'unread.pdf' });
       const l = loc({ has_natural_gas: switchOn, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
       const resolutions: CoverageResolution[] = r() < 0.2
         ? [res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u', email: 'e@x.example' } })] : [];
@@ -3873,6 +3880,13 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
       if (!switchOn && confirmedBills) {
         expect(issues(l, 2025, resolutions).some(i => i.status === 'stream_off'), `trial ${t}: switch off over confirmed bills`).toBe(true);
         seen.streamOff++;
+      }
+      // An unread upload for a fuel with no figure and no "used none" blocks; with a figure it is evidence.
+      if (unread) {
+        const blocksUnread = issues(l, 2025, resolutions).some(i => i.status === 'none');
+        const hasUsedNone = resolutions.some(x => x.kind === 'used_none');
+        expect(blocksUnread, `trial ${t}: unread upload, derived ${derived}, used none ${hasUsedNone}`).toBe(derived === 0 && !hasUsedNone);
+        if (blocksUnread) seen.unread++;
       }
       if (figure > 0) continue;
       // A gap is left out: it would satisfy this in almost every trial and hide whether the
@@ -3890,6 +3904,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
     // Each way out was actually reached, so the property is not passing vacuously.
     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
     expect(seen.streamOff).toBeGreaterThan(20);
+    expect(seen.unread).toBeGreaterThan(10);
   });
 });
 
@@ -4009,11 +4024,13 @@ describe('T4 deriveLocations', () => {
     expect(findUnresolvedCoverage([site], 2025, 12, []).some(i => i.status === 'mixed_units')).toBe(true);
   });
 
-  it('used none: 0, even over a stale stored value', () => {
-    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))]);
+  // T10 ruling: since T7 a stored value is only ever typed, and a typed figure above 0 supersedes "used none".
+  it('used none: 0 while nothing is typed; a typed figure supersedes it', () => {
     const usedNone: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount',
       by: { userId: 'u', email: 'e@x.example' }, note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' } as CoverageResolution;
-    expect(derivedGas(inv([site], 2025, 12, [usedNone]))).toBe(0);
+    const rejectedBill = [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))];
+    expect(derivedGas(inv([gasSite(0, rejectedBill)], 2025, 12, [usedNone]))).toBe(0);
+    expect(derivedGas(inv([gasSite(300, rejectedBill)], 2025, 12, [usedNone]))).toBe(300);
   });
 
   it('the unit comes from the documents where the figure is derived', () => {
@@ -4526,5 +4543,43 @@ describe('T7 deriveStoredLocations: readers of a stored row derive first', () =>
     expect((deriveStoredLocations(row(old)) as Location[])[0].natural_gas_amount).toBe(50);
     const bad = [{ ...loc({}), source_docs: [{ id: 'x', document_type: 'utility_bill_gas', extracted: 'not an array' }] }];
     expect(deriveStoredLocations(row(bad))).toBe(bad);
+  });
+});
+
+// ── T10 ruling: an upload with nothing read from it ────────────────────────────────────────────────────
+describe('T10 unread uploads: evidence when the fuel has a figure, a blocker naming what to do when not', () => {
+  const unreadDoc = (id: string, document_type = 'utility_bill_gas'): SourceDoc => ({ ...doc(document_type, [], id), file_name: `${id}.pdf` });
+  const site = (o: Partial<Location>) => loc({ name: 'Site A', has_natural_gas: true, natural_gas_unit: 'mcf', ...o });
+  const none = (l: Location, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], 2025, 12, r).filter(i => i.status === 'none');
+  const usedNone = (field: string, fuelType = 'natural_gas'): CoverageResolution => ({ locId: 'L1', fuelType, kind: 'used_none', field,
+    by: { userId: 'u', email: 'e@x.example' }, note: 'n', acknowledgedAt: '2026-10-02T09:00:00Z' } as CoverageResolution);
+
+  it('beside a typed figure it is evidence, not a blocker', () => {
+    expect(none(site({ natural_gas_amount: 400, source_docs: [unreadDoc('scan')] }))).toEqual([]);
+  });
+  it('beside a counted bill of the same type it is evidence', () => {
+    expect(none(site({ source_docs: [unreadDoc('scan'), doc('utility_bill_gas', [prop({ periodStart: '2025-01-01', periodEnd: '2025-01-31' })], 'bill')] }))).toEqual([]);
+  });
+  it('with no figure it blocks, naming the file, the fuel and the site', () => {
+    expect(none(site({ source_docs: [unreadDoc('scan')] }))).toEqual([{ locId: 'L1', fuelType: 'natural_gas', status: 'none', docIds: ['scan'],
+      fields: ['natural_gas_amount'],
+      message: 'scan.pdf is uploaded for natural gas at Site A, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no natural gas.' }]);
+  });
+  it('a document type covering several fuels lists them', () => {
+    expect(none(site({ source_docs: [unreadDoc('fleet', 'fleet_fuel')] }))[0].message).toContain('uploaded for gasoline and diesel at Site A')
+    expect(none(site({ source_docs: [unreadDoc('oil', 'fuel_oil')] }))[0].message).toContain('confirm this site used no heating oil and heavy fuel oil.')
+  });
+  it('each action clears it: a typed figure, or "used none"', () => {
+    const blocked = site({ source_docs: [unreadDoc('scan')] });
+    expect(none({ ...blocked, natural_gas_amount: 250 })).toEqual([]);
+    expect(none(blocked, [usedNone('natural_gas_amount')])).toEqual([]);
+    const oil = site({ source_docs: [unreadDoc('oil', 'fuel_oil')] });
+    const r = usedNone('fuel_oil_distillate_amount', 'fuel_oil');
+    expect(validateResolution(r, oil), '"used none" works for fields the reader never fills').toBeNull();
+    expect(none(oil, [r])).toEqual([]);
+    expect(findUndeclaredStreams([{ ...oil, has_fuel_oil_distillate: true }], [r]).map(u => u.stream)).not.toContain('fuel_oil_distillate');
+  });
+  it('a document type with no fields of its own never blocks', () => {
+    expect(none(site({ source_docs: [unreadDoc('other', 'something_else')] }))).toEqual([]);
   });
 });
