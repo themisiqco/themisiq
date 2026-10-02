@@ -28,7 +28,7 @@ import {
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
-  billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution,
+  billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
   validateResolution, COVERAGE_MESSAGE,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
@@ -96,7 +96,7 @@ describe('GROUP A — straddle', () => {
     for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
       const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes(choice)]);
       expect(rows.filter(r => r.gwp_basis === 'coverage_resolution'), choice).toEqual([]);
-      expect(ngRow(rows)?.proration_note, choice).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387');
+      expect(ngRow(rows)?.proration_note, choice).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
     }
   });
 
@@ -3588,7 +3588,7 @@ describe('T2 applyResolutions folds billContributions', () => {
     expect(a.value).toBeCloseTo(310 * 19 / 31 + 310 * 17 / 31, 9);
     expect(a.adjustment).toMatchObject({ kind: 'prorate', method: 'Prorated by billing days' });
     expect(a.adjustment?.basis).toBe(
-      '2024-12-20 to 2025-01-19: 19 of 31 days in FY2025, ×0.613; then 2025-12-15 to 2026-01-14: 17 of 31 days in FY2025, ×0.548');
+      '2024-12-20 to 2025-01-19: 19 of 31 days in reporting year 2025, ×0.613; then 2025-12-15 to 2026-01-14: 17 of 31 days in reporting year 2025, ×0.548');
   });
 
   it('the extrapolation gross-up applies AFTER the fold, and the gross-up drives the stamp', () => {
@@ -3597,7 +3597,7 @@ describe('T2 applyResolutions folds billContributions', () => {
     const a = applied(l, [ext], 2025).natural_gas_amount;
     expect(a.value).toBeCloseTo((310 * 19 / 31) * (12 / 6), 9);
     expect(a.adjustment?.kind).toBe('extrapolate');
-    expect(a.adjustment?.basis.startsWith('2024-12-20 to 2025-01-19: 19 of 31 days in FY2025, ×0.613; then ')).toBe(true);
+    expect(a.adjustment?.basis.startsWith('2024-12-20 to 2025-01-19: 19 of 31 days in reporting year 2025, ×0.613; then ')).toBe(true);
     const row = buildWorkings([{ ...l, has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf' }], 'AR6', 2025, [ext]).find(r => r.source === 'Natural gas');
     expect(row?.entry_method).toBe('concierge-extrapolated');
     expect(row?.proration_note).toBeUndefined();
@@ -3621,7 +3621,7 @@ describe('T2 applyResolutions folds billContributions', () => {
   it('the proration note has no em dash and names each bill, its days and its share', () => {
     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, []);
     const note = ngRow(rows)?.proration_note as string;
-    expect(note).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387');
+    expect(note).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
     expect(note).not.toContain('\u2014');
   });
 
@@ -3873,5 +3873,49 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
     }
     // Each way out was actually reached, so the property is not passing vacuously.
     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
+  });
+});
+
+// ── T3a: the reporting-year label, built in one place from the window ─────────────────────────────────
+// reporting_year is the calendar year in which the window ENDS (periodFromYearAndEnd: end = last day of the
+// year-end month IN reporting_year), so FY2025 with a March year end is 1 Apr 2024 to 31 Mar 2025.
+describe('T3a reportingYearLabel', () => {
+  const label = (y: number, m: number) => reportingYearLabel(periodFromYearAndEnd(y, m));
+
+  it('December year end: the bare year, and "reporting year {y}" in running text', () => {
+    expect(label(2024, 12)).toEqual({ label: '2024', inText: 'reporting year 2024' });
+  });
+
+  it('any other year end: "the year ending {last day}", read off the window', () => {
+    expect(label(2025, 3)).toEqual({ label: 'the year ending 31 March 2025', inText: 'the year ending 31 March 2025' });
+    expect(label(2025, 6).inText).toBe('the year ending 30 June 2025');
+    expect(label(2025, 1).inText).toBe('the year ending 31 January 2025');
+  });
+
+  it('February year end: 29 in a leap year, 28 otherwise', () => {
+    expect(label(2024, 2).inText).toBe('the year ending 29 February 2024');
+    expect(label(2025, 2).inText).toBe('the year ending 28 February 2025');
+  });
+
+  it('the proration note uses it: December and March year ends, with no em dash', () => {
+    const dec = ngRow(buildWorkings([straddleGasLoc()], 'AR6', 2024, []))?.proration_note as string;
+    expect(dec).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
+    const mar = loc({ has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2025-03-20', periodEnd: '2025-04-19' })])] });
+    const note = ngRow(buildWorkings([mar], 'AR6', 2025, [], 3))?.proration_note as string;
+    expect(note).toBe('2025-03-20 to 2025-04-19: 12 of 31 days in the year ending 31 March 2025, ×0.387');
+    for (const n of [dec, note]) expect(n).not.toContain('\u2014');
+  });
+
+  it('source: the label is built only in reportingYearLabel (no FY${...}, no other "reporting year ${" or "year ending ${")', () => {
+    const src = stripTsComments(readFileSync(join(__dirname, 'engine.ts'), 'utf8'));
+    const start = src.indexOf('export function reportingYearLabel(');
+    const helper = src.slice(start, src.indexOf('\n}\n', start));
+    const rest = src.slice(0, start) + src.slice(start + helper.length);
+    expect(helper).toMatch(/reporting year \$\{/);
+    expect(helper).toMatch(/year ending \$\{/);
+    expect(rest).not.toMatch(/FY\s?\$\{/);
+    expect(rest).not.toMatch(/reporting year \$\{/);
+    expect(rest).not.toMatch(/year ending \$\{/);
   });
 });

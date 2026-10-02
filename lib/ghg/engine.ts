@@ -1663,6 +1663,22 @@ function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number 
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   return { start, end, label: `${fmt(start)} – ${fmt(end)}` }
 }
+// The reporting year as a customer reads it, built from the window periodFromYearAndEnd returns (`end` is the
+// last day IN the year), never from reporting_year and a month. THE ONE PLACE THIS LABEL IS BUILT.
+// "FY2024" was ambiguous for a non-December year end (the year ending in 2024, or the one starting in it), so
+// a non-December year is named by its actual last day, read off the window.
+//   December year end: label '2024', inText 'reporting year 2024'.
+//   Any other year end: label and inText 'the year ending 31 March 2025'.
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+export function reportingYearLabel(win: { start: Date; end: Date }): { label: string; inText: string } {
+  const e = win.end
+  if (e.getMonth() === 11 && e.getDate() === 31) {
+    const y = String(e.getFullYear())
+    return { label: y, inText: `reporting year ${y}` }
+  }
+  const ending = `the year ending ${e.getDate()} ${MONTH_NAMES[e.getMonth()]} ${e.getFullYear()}`
+  return { label: ending, inText: ending }
+}
 // ── Concierge coverage analysis (spec: docs/pricing-and-concierge-spec-v4.md addendum) ──
 // Pure function. Given a fuel's CONFIRMED proposals (each carrying a billing period)
 // and the reporting-year window, classifies data completeness so the wizard can
@@ -3203,7 +3219,7 @@ export interface AppliedField {
     // in T3: a duplicate resolution is never accepted.)
     kind: 'extrapolate' | 'prorate'
     method: string        // human-readable, flows verbatim into workings
-    basis: string         // e.g. "9 of 12 months; ×12/9" | "2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387"
+    basis: string         // e.g. "9 of 12 months; ×12/9" | "2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387"
     factor: number        // multiplier applied to rawSum (1 = unchanged)
   }
   mixedUnits: boolean     // true → do not write; caller flags for manual review
@@ -3219,7 +3235,7 @@ export interface AppliedField {
 export const PRORATE_METHOD = 'Prorated by billing days'
 
 export function applyResolutions(loc: Location, allResolutions: CoverageResolution[], winStart: Date, winEnd: Date): Record<string, AppliedField> {
-  const year = winEnd.getFullYear()
+  const yearText = reportingYearLabel({ start: winStart, end: winEnd }).inText
   // Only ACCEPTED resolutions reach a figure (T3). A legacy duplicate or straddle, or an invalid one, does not.
   const resolutions = acceptedResolutions(loc, allResolutions)
   const contributions = billContributions(loc, resolutions, { start: winStart, end: winEnd })
@@ -3281,7 +3297,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
       // basis states the REAL arithmetic, in application order (per-bill proration, THEN extrapolate).
       const meterTag = (m: string | null) => (m == null ? '' : `${m}: `)
       const parts: string[] = prorated.map(c =>
-        `${meterTag(c.meterLabel)}${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in FY${year}, ×${(c.share ?? 0).toFixed(3)}`)
+        `${meterTag(c.meterLabel)}${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in ${yearText}, ×${(c.share ?? 0).toFixed(3)}`)
       for (const e of extrs) parts.push(`${meterTag(e.meter)}${resolutionBasis(e.r)}`)
       // primary drives kind + method: extrapolate (the gross-up) if present, else proration.
       const kind: NonNullable<AppliedField['adjustment']>['kind'] = extrs.length > 0 ? 'extrapolate' : 'prorate'
