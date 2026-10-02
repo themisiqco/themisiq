@@ -427,6 +427,16 @@ The tests are grouped by task in section 11. They include all of these:
 | T3: used_none | A new resolution `{kind: 'used_none', locId, fuelType, field, by, at}`. It writes 0 to the field, gives the audit row "Site used none, confirmed by {email} at {time}", clears the all-rejected issue, and also answers the declarations gate for that stream. |
 | T3: meter label | `SourceDoc.meter_label` is the one source of the label. `different_meters` is an audit record whose label must match the document's; it does not set the label. `extrapolate` gains `meterLabel`, and the gross-up is applied per meter. |
 | T3: messages | Undated: "{file} has no billing period, so it is not counted. Enter the dates as they appear on the bill." Mixed units: "The {fuel} bills for {site} are in different units ({units}: {files}), so none of them is counted. Correct the units, or enter the figure manually." Overlap: "{fileA} and {fileB} cover the same days ({from} to {to}). Choose Same bill, count it once, or Different meters or accounts." All rejected: "Every {fuel} document for {site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none." Invalid period uses `INVALID_PERIOD_MESSAGE` (T1 ruling). |
+| T3c: NGA | Confirmed: NGA edition N covers activity from 1 July N to 30 June N+1, and the majority rule counts those activity years. |
+| T3c: class (b) year | Class (b) matches the data year to the **majority year** of the reporting window, not the bare `reporting_year`. |
+| T3c: unclean datasets | All six recommendations in factor-year-selection.md 8.3 accepted: ECCC grid class (b), re-keyed by data year; EEA grid class (b); MfE grid and T&D class (b), keyed by series year; ECCC combustion class (a); ECCC mobile class (b); IPCC 2006 defaults exempt from selection and disclosed as fixed defaults. |
+| T3c: D3, H1, C2 | Accepted as recommended. D3: a September DESNZ year uses the majority fallback (Y). H1: EPA Hub edition N is for activity year N, stated on the methodology page as our reading. C2: ECCC grid re-keyed by NIR data year (T3d). |
+| T3c: unpublished edition | A required edition that has not been published blocks, with a message saying the factors for that year have not been published yet. This is distinct from an edition that is published but not loaded. |
+| Sequencing | T3b, T3c and T3d move to a separate branch, `factor-years`, created from main after derived-figures merges. In T3d, editions for reporting year 2025 are loaded first, then 2024, then 2026. |
+| Merge set | derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8 (widened), T9 (widened), T12, T10. T11 and T13 follow on main. T8 and T9 are widened as described in section 11; T12 moves after T9, and T10 after T12. |
+| T3b: label forms | Replaces the proposed "YE" forms. Non-December year ends read "Apr 2024 to Mar 2025" in menus, tiles and headings; "2024–25" on chart axes only; "2024-04_to_2025-03" in filenames. December year ends read "2025" in all three. No "YE" or "FY" abbreviations in customer-facing labels. Running text keeps T3a's "the year ending 31 March 2025". |
+| T3b: SB 253 first-report window | From CARB's Final Regulation Order, Title 17 CCR §96076(c) (text in the T3b entry). The first report (due 10 November 2026) covers the fiscal year ending **after 1 February 2025 and on or before 1 February 2026**. A fiscal year ending on or before 1 February in a calendar year reports the year ending in that calendar year; one ending later reports the year ending in the previous calendar year. Optionally, the most recent preceding year may be reported where its data is available. Status: adopted by CARB (Executive Order R-26-006) and resubmitted to OAL on 21 September 2026; OAL approval not yet reached, so it carries the same 'proposed' handling as `SB253_DATE_STATUS`. |
+| T3b: optional election and allowlist | Optional-election banner confirmed, for a window ending after 1 February 2026: "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it." The EU deadline string "FY2024 (large EU companies)" stays on the source-guard allowlist. |
 
 ---
 
@@ -435,6 +445,11 @@ The tests are grouped by task in section 11. They include all of these:
 Each task is one reviewable diff with its own tests. Run `npx vitest run lib/ghg/engine.test.ts` before and after
 every engine task: the passing count only goes up. Run `npm run build` after every task. Tasks T1 to T13 are the
 core derived-figures work. T14 to T17 come after it, as ruled.
+
+**Merge set (ruling, section 10).** derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8, T9,
+T12, T10. T11 and T13 follow on main. T3b, T3c and T3d are on the `factor-years` branch, created from main after
+that merge. The tasks below are listed in that order. T3a has no entry of its own: it is the patch
+docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the proration note).
 
 ### T1. Engine: `billContributions` (pure, not yet wired)
 - **Files:** lib/ghg/engine.ts (new function, `BillContribution` type); lib/ghg/engine.test.ts.
@@ -523,23 +538,80 @@ core derived-figures work. T14 to T17 come after it, as ruled.
   totals equal saved workings.
 - **Done:** document-backed figures are never stored as authoritative values; the build passes.
 
-### T8. UI: coverage strip
-- **Files:** app/dashboard/ghg/page.tsx (strip at 3495-3600: straddle disclosure in place of buttons; "Same bill,
-  count it once" with document choice; "Different meters or accounts" with meter-label input); component test.
+### T8. UI: coverage strip (widened)
+- **Files:** app/dashboard/ghg/page.tsx:
+  - **Straddle disclosure in place of the straddle buttons.** The strip says the bill is prorated by its own
+    days and shows the share. No "this year" or "next year" button remains, since the engine ignores those
+    choices (T2).
+  - **Overlap controls.**
+    - "Same bill, count it once" with a choice of which document counts.
+    - "Different meters or accounts" with a meter-label input. The label is written to `SourceDoc.meter_label`,
+      and the resolution's label must match it (T3 ruling).
+  - **"Used none" control** on the all-rejected issue. It writes `{kind: 'used_none', locId, fuelType, field,
+    by: {userId, email}, acknowledgedAt}` from the signed-in user, so it records who and when. It sits beside
+    "Enter the figure manually", which focuses the field.
+  - **Meter label on gap estimates.** The extrapolate control on a meter's gap writes `meterLabel`, so each
+    meter is grossed up by its own coverage.
+  - **Resolutions keyed by document and meter.** `addCoverageResolution` (page.tsx:1276) today replaces any
+    resolution with the same location, fuel and kind, so two overlap choices for one fuel, or estimates for two
+    meters, overwrite each other. The new keys:
+    - `same_bill`: by `countedDocId` plus `excludedDocIds`;
+    - `different_meters`: by `docId`;
+    - `extrapolate`: by `(fuelType, meterLabel)`;
+    - `used_none`: by `(locId, fuelType, field)`.
+  - Component tests.
 - **SQL:** none.
-- **Tests:** controls write `same_bill` and `different_meters` with the validated shape; no "Confirm not a
-  duplicate" or this/next-year buttons remain.
-- **Done:** every overlap can be resolved only in a way that leaves no double count.
+- **Tests:**
+  - The controls write `same_bill`, `different_meters`, `used_none` and meter-labelled `extrapolate` in the
+    shape `validateResolution` accepts.
+  - Two overlaps for one fuel, and gaps on two meters, are each kept.
+  - `used_none` records the signed-in user's id and email and the time.
+  - No "Confirm not a duplicate" control remains, and no this-year or next-year straddle buttons.
+  - A straddle shows its prorated share.
+- **Done:** every overlap can be resolved only in a way that leaves no double count. Every gap can be estimated
+  per meter. An all-rejected field can be answered either way. No resolution overwrites another.
 
-### T9. UI: date confirmation for month-only periods
-- **Files:** app/dashboard/ghg/page.tsx (`periodOrigin` mapped from `periodConfidence` at extraction, around
-  1055-1076; confirmation step at acceptance); lib/ghg/engine.ts (acceptance validator); tests.
+### T9. UI: billing period and unit on any proposal; month-only confirmation (widened)
+- **Files:**
+  - **app/dashboard/ghg/page.tsx:**
+    - **Edit controls on every proposal in review**, beside the value edit at 3643: the billing start, the
+      billing end and the unit.
+      - This answers the undated, invalid-period and mixed-units messages ("Enter the dates as they appear on
+        the bill", "Check the dates and correct them", "Correct the units"), which have no control today.
+      - An edit keeps the source document and records that the customer entered or corrected the value.
+    - **Month-only confirmation, as before:** `periodOrigin` is mapped from `periodConfidence` at extraction
+      (around 1055-1076), and a month-only proposal needs a confirmation step at acceptance.
+  - **lib/ghg/engine.ts:**
+    - an acceptance validator;
+    - the proposal records `periodOrigin` and who corrected the period or unit, and when.
+  - Tests.
 - **SQL:** none.
-- **Tests:** a `billing_month` proposal cannot reach `confirmed` without date confirmation; confirmation records
-  origin, time and user; legacy medium proposals read `billing_month`.
-- **Done:** no new month-only bill is counted on estimated dates without the customer's confirmation.
+- **Tests:**
+  - **Month-only:**
+    - a `billing_month` proposal cannot reach `confirmed` without date confirmation;
+    - confirmation records origin, time and user;
+    - legacy medium proposals read `billing_month`.
+  - **Undated or invalid period:** entering valid dates turns the contribution from `undated` or
+    `invalid_period` into counted (or prorated), and clears the issue.
+  - **Mixed units:** correcting a unit clears the mixed-units issue and counts every proposal.
+  - **Records:** a corrected period or unit is recorded with who and when, and the workings row shows it was
+    entered by the customer.
+  - **No silent change:** an edit never changes another proposal.
+- **Done:**
+  - Every undated, invalid-period and mixed-units issue can be answered on the proposal itself.
+  - No new month-only bill is counted on estimated dates without the customer's confirmation.
+
+### T12. Trends: monthly by inventory
+- **Order:** after T9, before T10 (merge-set ruling, section 10). It depends on nothing after T6.
+- **Files:** lib/ghg/loadMonthly.ts (filter `inventory_id`); app/dashboard/ghg/trends/page.tsx (pass the selected
+  inventory id, 112); tests.
+- **SQL:** none (`inventory_id` and the `(inventory_id, period_month)` index exist).
+- **Tests:** two inventories with slices in the same calendar year are not mixed; a fiscal-year inventory shows its
+  own months.
+- **Done:** the monthly chart shows exactly the selected inventory's evidenced months.
 
 ### T10. UI and engine: manual override with a reason
+- **Order:** after T12; the last task in the derived-figures merge set.
 - **Files:** lib/ghg/engine.ts (`manual_overrides` honoured in contributions and workings); app/dashboard/ghg/page.tsx
   (control and reason input); tests.
 - **SQL:** none.
@@ -548,6 +620,7 @@ core derived-figures work. T14 to T17 come after it, as ruled.
 - **Done:** a customer with an unusable document can finish, and the reason travels with the figure.
 
 ### T11. Verifier page: contributions, reasons, estimated dates
+- **Order:** after derived-figures merges, on main.
 - **Files:** app/verify/[token]/page.tsx (render from stored `workings`); lib/ghg/verifierWhitelist.test.ts if a new
   field crosses the projection; tests.
 - **SQL:** none (fields live inside the `workings` jsonb the RPC already returns).
@@ -555,21 +628,355 @@ core derived-figures work. T14 to T17 come after it, as ruled.
   no engine calculation imported into the page.
 - **Done:** a verifier can see, per figure, which documents counted, which did not, and why.
 
-### T12. Trends: monthly by inventory
-- **Files:** lib/ghg/loadMonthly.ts (filter `inventory_id`); app/dashboard/ghg/trends/page.tsx (pass the selected
-  inventory id, 112); tests.
-- **SQL:** none (`inventory_id` and the `(inventory_id, period_month)` index exist).
-- **Tests:** two inventories with slices in the same calendar year are not mixed; a fiscal-year inventory shows its
-  own months.
-- **Done:** the monthly chart shows exactly the selected inventory's evidenced months.
-
 ### T13. Core close-out
+- **Order:** after derived-figures merges, on main.
 - **Files:** remove dead paths (legacy straddle and duplicate writers, the stale-field fallback); update
   docs/review/ghg-findings.md statuses for F-09, F-10, F-11 (as fixed, with commit references added by Lisa);
   propose CLAUDE.md invariant wording.
 - **SQL:** none.
 - **Tests:** full suite; engine count not lower than before T1.
 - **Done:** F-09, F-10 and F-11 are closed by tests that would fail on the old code.
+
+### Factor-years branch: T3b, T3c, T3d
+Branch `factor-years`, created from main after derived-figures merges (sequencing ruling, section 10). Order:
+T3b, T3c, T3d.
+
+### T3b. Reporting-year labels, Scope 3 year end, SB 253 banner from the window
+- **Branch:** `factor-years`. **Depends on:** T3a (`reportingYearLabel`).
+- **Scope:** every customer-facing reporting-year label in finding F-12 (docs/review/ghg-findings.md), except:
+  - the engine factor notes at engine.ts:1003-1004, 1133-1134 and 1148-1149, which T3c replaces;
+  - the stored proration note, which T3a already fixed.
+
+  F-12's line numbers are at de782a6. Re-check each by printing it before editing.
+- **Helper** (ruling, section 10). `reportingYearLabel` returns every form, so it stays the one place a label
+  is made:
+  - `heading`, for menus, tiles and headings. December: "2025". Other year ends: "Apr 2024 to Mar 2025", the
+    window's first and last months.
+  - `axis`, for chart axes only. December: "2025". Other year ends: "2024–25".
+  - `fileTag`, for filenames. December: "2025". Other year ends: "2024-04_to_2025-03".
+  - `inText` (from T3a), for running text: "reporting year 2025" or "the year ending 31 March 2025".
+  - T3a's `label` is replaced by `heading`.
+  - No form uses "YE" or "FY".
+- **Files:**
+  - **app/dashboard/ghg/page.tsx:**
+    - duplicate alert 1666;
+    - year dropdown 1802 (`heading` in place of "FY{yr}", keeping the date range);
+    - prior-year labels 1853, 1856, 2634, 2638, using the prior window's label;
+    - activity-data field labels 2116, 2136, 2151, 2179, 2195, 2206, 2216, 2254, 2332. Their hint "Sum of all
+      12 monthly bills" becomes "Sum of the bills covering {window start} to {window end}";
+    - review subtitle 2584;
+    - export preview tile 2969;
+    - **framework CSV** 3115: keep "Reporting year", and add rows "Reporting period" (window start and end)
+      and "Year end";
+    - CDP CSV prior-year rows 3135-3136;
+    - CSV filename 3207 (`fileTag`);
+    - inventory list 3246;
+    - coverage strip 3530.
+  - **app/dashboard/ghg/trends/page.tsx and lib/ghg/series.ts:**
+    - load `fiscal_year_end_month` with each year's inventory;
+    - labels at trends 283, 329-330, 337, 414, 465, 501 and 514 (`heading` or `inText`), and the chart axes
+      at 360 and 449 (`axis`);
+    - labels at series.ts 345, 348, 371, 373, 389.
+  - **app/verify/[token]/page.tsx:** header 747 shows the label and the window dates. The page must receive
+    `fiscal_year_end_month`; if it does not cross the RPC today, add it and update
+    lib/ghg/verifierWhitelist.test.ts.
+  - **lib/assurancePdf.ts:**
+    - cover 139 and methods table 259 show the label and a "Reporting period" row;
+    - document ref 117 and filename 386 use `fileTag`.
+  - **app/dashboard/scope3/page.tsx:**
+    - **Scope 3 gets the year end from the linked GHG inventory.** `scope3_inventories` has no year columns;
+      it joins `ghg_inventories` on `inventory_id`.
+      - The bind query that sets the state at 1515-1521 also selects `fiscal_year_end_month` and keeps it in
+        state.
+      - The inventory list query at 1576 selects it too, so the picker at 4473 can label each entry.
+    - Labels at 2968 (CSV row, plus "Reporting period"), 3041 (filename, `fileTag`), 3126, 3147, 4180 and
+      4383.
+  - **app/api/scope3/spend-factor/route.ts and lib/emissionFactors/spendResolver.server.ts:**
+    - The request carries the window's start and end dates as well as the year. Validate them beside the year
+      check at route.ts:320.
+    - `price_year_mismatch` (spendResolver.server.ts:259) becomes "the window is not wholly inside the price
+      year", replacing "price year ≠ reporting_year".
+    - The disclosure at route.ts:708-712 states the window dates. Proposed: "Your reporting year runs from
+      {start} to {end}, but this edition's price data ends at {pv}. Spend is treated as being at {pv} prices,
+      so price changes after {pv} are not reflected."
+  - **SB 253 banner, app/dashboard/ghg/page.tsx:2894.**
+    - **Today's test is wrong, not just imprecise.** `sb253FirstYear = sb253Only && year <= 2024` shows the
+      banner for 2024 and earlier. Under §96076(c), the first report covers a 2025 inventory, or a January
+      2026 one, and for those the banner does not show.
+    - **Replacement:** a window is the first-report year when its end date is after 1 February 2025 and on or
+      before 1 February 2026.
+      - Constants in lib/sb253.ts: `SB253_FIRST_REPORT_WINDOW_END_AFTER = '2025-02-01'` and
+        `SB253_FIRST_REPORT_WINDOW_END_ON_OR_BEFORE = '2026-02-01'`.
+      - Every window in the app ends on a month end. So this means a January year end in reporting year 2026,
+        or any other year end in reporting year 2025.
+    - **Status handling, as `SB253_DATE_STATUS`:**
+      - The constants carry `SB253_FIRST_REPORT_WINDOW_STATUS = 'proposed'` until OAL approves.
+      - The banner names that posture, for example "(proposed regulation, not yet final)".
+      - Promoting it to 'final' needs the OAL approval date recorded beside it.
+    - ⚑ **Optional election, §96076(c)(2).** An entity whose year ends after 1 February may instead report
+      its most recent preceding year where the data is available. A window ending after 1 February 2026 can
+      therefore also be a first report, by choice. **Confirmed (section 10):** for those windows, a second
+      banner variant reading "If you choose to file this year as your first SB 253 report, Scope 3 isn't
+      required in it." It carries the same 'proposed' status. It shows only for a window ending after
+      1 February 2026 and on or before the first-report date in `SB253_FIRST_REPORT_DATE`.
+    - **Citation for the code comment**, all from CARB's rulemaking page
+      (https://ww2.arb.ca.gov/rulemaking/2025/california-corporate-greenhouse-gas-reporting-and-climate-related-financial-risk):
+
+      | Source and section | Quote (verbatim, under 15 words) |
+      |---|---|
+      | Final Regulation Order, September 2026, §96076(c)(1) [1] | "If the reporting entity’s fiscal year ends on or before February 1" |
+      | Same, (c)(1), continued | "the fiscal year ending in the current calendar year" |
+      | Same, (c)(2) | "the fiscal year ending in the previous calendar year" |
+      | Same, (c)(2), option | "their most recent preceding fiscal year" ... "where that data is available" |
+      | Same, §96076(a) | "on or before November 10, 2026" |
+      | Same, §96076(a) | "Scope 3 emissions reporting is not required for 2026 reporting." |
+      | Board-approved order, February 2026, §96076(b)(1) [2] | "ends on or before February 1 in a calendar year" (same cutoff; deadline "August 10, 2026") |
+      | 15-Day Proposed Regulation Text, Appendix A-1, July 2026, §96076(c) [3] | the same cutoff; the deadline struck from August to November 10 |
+      | Executive Order R-26-006 [4] | sections 96070 to 96077 "are adopted as set forth in the “Final Regulation Order”" |
+      | Same | "Executed this 18th day of September, 2026" (the file is named "signed 9.21.26") |
+      | Rulemaking page | "The Final Package was resubmitted to OAL on September 21, 2026." |
+      | Rulemaking page, Final Approval / OAL Action | "This stage has not yet been reached." |
+
+      The documents:
+      - [1] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/Final%20Regulation%20Order_Final.pdf
+      - [2] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/final%20regulation%20order_draft.pdf
+      - [3] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/15-Day%20Change%20Reg%20Text%20SB%20253-261.pdf
+      - [4] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/24.%20Executive%20Order_cs%20signed%209.21.26.pdf
+
+      All fetched 2 Oct 2026. The 1 February cutoff is identical in the 45-day proposed text (December 2025),
+      the February order, the 15-day text and the September order. Only the deadline moved.
+  - **Tests:** lib/ghg/engine.test.ts (helper forms), page and route tests, and lib/ghg/verifierWhitelist.test.ts
+    if the projection changes.
+- **Out of scope, with reasons:**
+  - Audit-diff labels (page.tsx:3721, verify 300, assurancePdf.ts:70) show stored values verbatim, which is
+    what an audit trail should do.
+  - "FY" meaning something else (the EU deadline at engine.ts:1536, Australia's "FY basis" at 1206, the bot
+    prompt) is not a reporting-year label.
+  - Monthly calendar-year stamping is handled by T6 and T12. Factor years are handled by T3c.
+- **SQL:** none, unless the verifier projection lacks `fiscal_year_end_month`. Then the RPC change is part of
+  this task, and its migration is parsed offline before Lisa runs it.
+- **Tests:**
+  - **Helper:** `heading`, `axis` and `fileTag` for December, March, June, September and a leap-year
+    February end. No form contains "YE" or "FY".
+  - **December is unchanged:** every surface reads "2025" or "reporting year 2025" as today.
+  - **March year end:** menus, tiles and headings show "Apr 2024 to Mar 2025", chart axes "2024–25",
+    filenames "2024-04_to_2025-03", running text "the year ending 31 March 2025". The field hint names
+    1 April 2024 to 31 March 2025.
+  - **CSVs** (GHG framework, CDP, Scope 3) carry the "Reporting period" and "Year end" rows.
+  - **Scope 3:**
+    - a bound inventory with a March year end gets that year end;
+    - `price_year_mismatch` is true for a 1 Apr 2024 to 31 Mar 2025 window with price year 2024, and false
+      for a calendar 2024 window with price year 2024;
+    - the disclosure names the window dates.
+  - **SB 253:**
+    - The banner shows for reporting year 2025 at every year end from February to December, and for a
+      January year end in reporting year 2026.
+    - It does not show for reporting year 2024, nor for a January 2025 year end.
+    - It names the 'proposed' status.
+    - The optional-election variant shows for a window ending after 1 February 2026 (for example a March 2026
+      year end), with the confirmed wording.
+    - A test pins the two constants to the cited §96076(c) dates.
+  - **Source guard, extending T3a's:** in each file listed above, no `FY${`, no "YE ", no `reporting year ${`
+    and no rendered `${...reporting_year}` interpolation outside the helper. The EU deadline string
+    "FY2024 (large EU companies)" (engine.ts:1536) is allowlisted as a regulatory deadline, not a
+    reporting-year label. It stays (ruling, section 10). An allowlist covers code uses: filters,
+    keys and comparisons.
+  - No em dash in any new string.
+- **Done:**
+  - No customer-facing surface in F-12 prints a bare year or "FY" for a non-December year without the year end.
+  - December-year-end surfaces read exactly as before.
+  - Scope 3 knows the year end and discloses price years against the window.
+  - The SB 253 banner is decided from the window end against the cited §96076(c) dates, with 'proposed' status.
+  - The source guard covers every file.
+  - `npm run build` passes.
+
+### T3c. Engine: factor edition selection by rule, no year substitution
+**Branch:** `factor-years`, created from main after derived-figures merges (sequencing ruling, section 10).
+Rulings: docs/review/factor-year-selection.md, section 8. Depends on T3a (`reportingYearLabel`), which
+supplies every year label below. Follows T3b on the same branch.
+
+- **Files:**
+  - **lib/ghg/factorEditionRegistry.ts (new, pure).** One entry per edition of every year-keyed dataset:
+    `{ dataset, edition, class: 'a' | 'b', dataYear?, activityPeriod?, published: { date, source },
+    corrections: [{ date, source, note }], held }`.
+    - `source` is the URL of the publication's own page or release notes.
+    - An entry with no `published.date` is never selected (ruling of 1 Oct 2026, first set).
+    - Seeded with the dates recorded in factor-year-selection.md sections 4 and 8: DESNZ 2022 to 2026,
+      eGRID2021 to 2023 with eGRID2023 revisions 1 and 2, AIB 2024 and 2025, Green-e by edition. Each date
+      not yet verified verbatim is marked as such.
+  - **`selectEdition(dataset, window, reportingYear, frozen?)`** in the same file returns either
+    `{ edition, rule, basis }` or `{ missing: { dataset, edition, rule, basis } }`. The rules:
+    - **Class (a), DESNZ:**
+      - calendar year: edition Y;
+      - April to March: majority (DESNZ's own approach);
+      - July to June: the newest edition first published on or before the window's last day;
+      - any other year end: the majority fallback (flag D3).
+    - **Class (a), others:** the majority rule, ties to the year the window ends. NGA counts its activity
+      years, 1 Jul N to 30 Jun N+1 (section 8.2).
+    - **Class (b):**
+      - if an edition exists whose data year matches, use it;
+      - otherwise, the newest edition published on or before the preparation date;
+      - a frozen selection is returned unchanged.
+      - "Matches" means the data year equals the window's **majority year** (ruling, section 10).
+    - **Values come from the edition's latest correction** (ruling D2). The registry records which
+      correction the held values reflect.
+  - **lib/ghg/engine.ts:**
+    - `getGridFactor` (1120-1135), `getResidualFactor` (1170-1238) and `nzTdLoss` (993-1006) take the
+      selected edition, not `year`.
+    - **Nearest-year substitution is removed:** the `y <= year` loops at 1128-1130, 1180, 1200, 1214 and 995,
+      and the forward move to `years[0]`.
+    - `GRID_EF`, `RESIDUAL_*` and `NZ_TD_LOSS` are keyed by edition, per section 8.3. The ECCC re-key waits for
+      T3d; until then ECCC keeps its keys, mapped in the registry.
+    - Combustion (`EF_UK`, `EF_AU`, `EF_NZ`, `EF`) and steam gain an edition key, holding today's single
+      edition. A required edition that is not held is then missing, not silently priced by the held one.
+    - `calcLocation`, `calcInventory`, `fuelEmissionsByType`, `pctEstimated`, `publishersForLocation`,
+      `findUnpriceableLocations` and `buildWorkings` take the window (or `fiscal_year_end_month`) alongside the
+      year. `publishersForLocation` currently calls `buildWorkings` without the fiscal month (2521).
+    - **Unpriced line:** a missing edition throws `MissingEditionError`. The line is left unpriced: excluded
+      from every total, not counted as zero, and the location's other lines are still priced.
+      - Its workings row carries the message and `result_tco2e: null`.
+      - A new coverage issue, status `edition_missing`, blocks export.
+      - Message when the edition is published but not loaded: "{Publisher} {edition} {family} factors are
+        needed for {reportingYearLabel inText} and are not loaded, so this line is not counted. Export is
+        blocked until they are loaded."
+      - Message when the edition is not published (ruling, section 10): "The {publisher} {family} factors for
+        {year} have not been published yet, so this line is not counted. Export is blocked until they are
+        published and loaded."
+      - IPCC 2006 defaults are exempt: never missing, disclosed as fixed defaults.
+      - This is a line-level path. The existing location-level factor-gap path (`MissingEmissionFactorError`,
+        GROUP L) is unchanged.
+    - **Workings rows** for every factor carry `factor_edition`, `selection_rule`, `selection_basis`,
+      `edition_published`, `edition_corrected` and, for class (b), `selected_on`.
+      - `factor_vintage` becomes the selected edition's label.
+      - The notes at 1003-1004, 1133-1134 and 1148-1149 ("applied to {year} inventory (latest|earliest vintage
+        held)") are replaced by the selection basis (wording below). No note can say "vintage held" again,
+        because substitution no longer happens.
+  - **lib/ghg/factorEditions.ts:** `buildFactorEditions` (223, call at 288) records the selected edition
+    label, not `usedYear`. `factorEditionsForSave` keeps its fallback.
+  - **lib/ghg/monthlyEmissions.ts:217:** receives the selection from the engine, not its own
+    `getGridFactor(region, reportingYear)` call, so the monthly series and the annual figure use one edition.
+  - **lib/ghg/loadSeries.ts:133:** passes the inventory's year and window (today it defaults to 2024).
+  - **app/dashboard/ghg/page.tsx:**
+    - Pass `inventory.fiscal_year_end_month` at the call sites in factor-year-selection.md section 6: 1348,
+      1370, 1430, 1634, 1647, 1656, 1676-1679, 2068, 2668, 2676, 3089, 3163, 3195.
+    - Replace the hard-coded edition labels at 2271-2278 and the grid display at 2022, 2283-2284 with the
+      selection.
+    - Write the class (b) selection to the new column on first save, and read it back on every later save.
+    - Render the `edition_missing` issue in the export gate list.
+  - **app/methodology/page.tsx** 67, 71: the disclosure paragraph below.
+  - **app/verify/[token]/page.tsx and lib/assurancePdf.ts:**
+    - render the new workings fields: edition, rule, basis, dates;
+    - lib/ghg/verifierWhitelist.test.ts, if a new field crosses the RPC;
+    - the PDF methods table (assurancePdf.ts:259) gains the window and the factor-year rule.
+  - **lib/ghg/engine.test.ts, lib/ghg/factorEditionRegistry.test.ts (new).**
+  - **CLAUDE.md:** proposed invariant wording (Lisa applies): "Factor editions are chosen by
+    `selectEdition` from the reporting window and the registry. No selector takes a bare year and none
+    substitutes a different year. A missing edition is an unpriced line with an export-blocking issue."
+- **SQL:** `supabase/migrations/2026MMDD_ghg_factor_selection.sql` adds
+  `ghg_inventories.factor_selection jsonb not null default '{}'`.
+  - It holds the frozen class (b) selections as `{dataset: {edition, data_year, rule, selected_on}}`.
+  - It is a separate column because `factor_editions` is recomputed on every save ("a non-empty recompute
+    always wins", factorEditions.ts:340). A frozen selection cannot live in a value that is rewritten.
+  - No RLS change. No new GRANT: table privileges cover a new column. The header records a pre-check that
+    `information_schema.column_privileges` shows no column-level grants on `ghg_inventories`.
+  - Parse offline before Lisa runs it.
+  - Pre-launch (section 4): there are no customer inventories, so every inventory's class (b) selection is
+    made on its first save after T3c, dated that day.
+- **Tests:**
+  - **Majority rule:** December, March, June and September year ends for 2024, 2025 and 2026, including a leap
+    year. The tie rule is unit-tested on a synthetic window, since no month-end window can tie.
+  - **DESNZ:**
+    - March 2025 selects 2024;
+    - June 2024 selects 2023 (the 2024 edition was first published 8 Jul 2024);
+    - June 2025 selects 2025;
+    - September uses the fallback;
+    - an edition with no recorded date is never selected.
+  - **NGA:** each year end maps per section 8.2.
+  - **Class (b):**
+    - the data-year match uses the majority year: March 2025 matches data year 2024;
+    - a data-year match is used when registered;
+    - otherwise the newest published on or before the preparation date;
+    - a frozen selection survives a re-save after a newer edition is registered;
+    - `selected_on` is recorded.
+  - **Corrections:** values come from the latest correction, and publication and correction dates appear in
+    workings.
+  - **No substitution:**
+    - Source test: no `<= year` selection loop, and no `years[0]` fallback, in any selector.
+    - Property test: for every dataset × window, the edition used is the rule's edition, or the line is
+      unpriced. It is never another held edition.
+  - **Unpriced line:**
+    - excluded, not counted as zero;
+    - the location's other lines are still priced;
+    - the `edition_missing` issue blocks export;
+    - the message names the publisher, the edition, the family and the year label, with no em dash;
+    - an unpublished edition gives the "not been published yet" message, not the "not loaded" one;
+    - IPCC 2006 defaults are never reported missing.
+  - **Single source:** monthly and annual figures use the same edition (both read the selection).
+  - **Records:** `factor_editions` records the selected edition label, and `sameFactorEditions` still
+    detects a change between years.
+  - **Methodology page:** source test for the disclosure paragraph.
+  - Engine test count only goes up.
+- **Done:**
+  - Every year-keyed factor is chosen by `selectEdition` from the window, and no code path substitutes a year.
+  - Every workings row names its edition, rule, basis, and publication and correction dates, plus the
+    selection date for class (b).
+  - A required edition that is not held leaves its line unpriced, with the message and an export-blocking issue.
+  - The methodology page states the rule.
+  - `npm run build` passes.
+  - **Expected consequence:** some inventories that price today will block, because of editions not yet held
+    (factor-year-selection.md section 8.4). T3d clears those.
+- **Disclosure text** (drafts; year labels from `reportingYearLabel`):
+  - **Methodology page:**
+    > Each emission factor comes from the edition its publisher directs for the reporting year. For UK
+    > (DESNZ) factors we follow DESNZ's guidance: a year ending in March uses the factors for the calendar
+    > year in which it starts, and a year ending in June uses the newest factors published on or before its
+    > last day. For other annual factor sets, we use the edition for the year that contains most of the
+    > reporting year. For data published some years after the period it describes (eGRID, Green-e, AIB,
+    > EEA, ECCC grid intensities), we use the edition for the reporting year where one exists, and otherwise
+    > the newest edition published when the inventory was first prepared; that choice is fixed in the saved
+    > inventory with its date. We never substitute another year's factors: if a required edition is not yet
+    > available, the affected line is not counted and the inventory cannot be exported until it is.
+  - **Workings notes:**
+    - Majority: "2024 factors: 2024 contains 275 of the 365 days in the year ending 31 March 2025."
+    - DESNZ March: "DESNZ 2024 factors for the year ending 31 March 2025, following DESNZ guidance for April
+      to March years."
+    - DESNZ June: "DESNZ 2025 factors (published 10 June 2025), the newest published by 30 June 2025,
+      following DESNZ guidance for July to June years."
+    - Class (b), data-year match: "eGRID2024: data year 2024 matches reporting year 2024."
+    - Class (b), newest available: "eGRID2023 (released 15 January 2025, revision 2 of 12 June 2025): the
+      newest edition when this inventory was first prepared on 1 October 2026; no 2025 data year was
+      published."
+    - Correction: "Values as corrected on 31 July 2026."
+
+### T3d. Factors: load the editions the rules require
+- **Branch:** `factor-years`.
+- **Depends on:** T3c (registry and edition keys).
+- **Order:** editions for reporting year 2025 first, then 2024, then 2026 (sequencing ruling). Each year is its
+  own reviewable diff.
+- **Scope:** every edition marked "to load" in factor-year-selection.md section 8.4, plus the T3c items marked
+  for research:
+  - EEA's data-year series;
+  - ECCC NIR Part 3 Annex 13, for the data-year re-key (flag C2);
+  - MfE T&D 2024;
+  - identifying which EPA Hub edition the held US combustion values come from (engine.ts:65-71).
+- **Files:**
+  - **lib/ghg/factors/{publisher}-{edition}.ts (new, one file per edition).** Values transcribed from the
+    primary source. Every value carries a citation: document, table, row and column, and the correction
+    it reflects.
+  - **lib/ghg/engine.ts:** the edition-keyed tables import from these files.
+  - **lib/ghg/factorEditionRegistry.ts:** `held: true`, with publication and correction dates.
+  - **app/methodology/page.tsx and `EF_SOURCES`:** citations for the new editions.
+- **SQL:** none.
+- **Tests:**
+  - every value carries a citation;
+  - spot values per edition against the source, at least one per table;
+  - the held DESNZ 2026 values reflect the 31 Jul 2026 correction;
+  - each section 8.4 case that blocked under T3c now prices with the required edition and no
+    `edition_missing` issue;
+  - every edition marked held has a recorded publication date.
+- **Done:** every edition the rules require for 2024 to 2026 at the four year ends is held and cited, or is
+  recorded as not yet published. No `edition_missing` issue remains except for editions not yet published.
+  `npm run build` passes.
 
 ### T14. `metered_split`
 - **Files:** lib/ghg/engine.ts (resolution type, validation, contribution override); lib/ghg/monthlyEmissions.ts
