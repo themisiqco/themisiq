@@ -423,6 +423,10 @@ The tests are grouped by task in section 11. They include all of these:
 | T2: release | T2 is committed but not pushed to main until T3 (blocking issues for undated, invalid_period, mixed_units) and T8 (strip controls) land with it. |
 | T3: no silent zero | Of the not-counted reasons, only `outside_year` and `same_bill_as` may be silent. `undated`, `invalid_period` and `mixed_units` must each raise an export-blocking coverage issue with a plain-language message, so a field can never drop to zero without the customer being told. (`not_confirmed` from `extracted` or `needs_manual_review` already blocks export through the pending-proposal gate, page.tsx:1301. A `rejected` proposal does not block on its own; the all-rejected case is the next ruling.) |
 | T3: all documents rejected | When every document for a field is rejected and no manual figure is entered, raise an export-blocking issue offering "Enter the figure manually" or "Confirm this site used none". Confirming records who and when, appears in workings and on the verifier page, and clears the issue. Entering a manual figure clears it the same way (the field then has `entry_method: 'manual'`, per section 3.3). |
+| T3: who | A confirmation stores the user id and email (`by: {userId, email}`). The email is what workings and the verifier page show. |
+| T3: used_none | A new resolution `{kind: 'used_none', locId, fuelType, field, by, at}`. It writes 0 to the field, gives the audit row "Site used none, confirmed by {email} at {time}", clears the all-rejected issue, and also answers the declarations gate for that stream. |
+| T3: meter label | `SourceDoc.meter_label` is the one source of the label. `different_meters` is an audit record whose label must match the document's; it does not set the label. `extrapolate` gains `meterLabel`, and the gross-up is applied per meter. |
+| T3: messages | Undated: "{file} has no billing period, so it is not counted. Enter the dates as they appear on the bill." Mixed units: "The {fuel} bills for {site} are in different units ({units}: {files}), so none of them is counted. Correct the units, or enter the figure manually." Overlap: "{fileA} and {fileB} cover the same days ({from} to {to}). Choose Same bill, count it once, or Different meters or accounts." All rejected: "Every {fuel} document for {site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none." Invalid period uses `INVALID_PERIOD_MESSAGE` (T1 ruling). |
 
 ---
 
@@ -455,7 +459,9 @@ core derived-figures work. T14 to T17 come after it, as ruled.
 
 ### T3. Engine: coverage with full-period overlap, meter key, `same_bill` / `different_meters`
 - **Files:** lib/ghg/engine.ts (`analyzeCoverage`, `findUnresolvedCoverage`, resolution validation, the `straddle`
-  issue removed); engine.test.ts. Proposed CLAUDE.md wording for the coverage-gate invariant (Lisa applies).
+  issue removed); engine.test.ts; app/dashboard/ghg/page.tsx (`findUndeclaredStreams` receives the resolutions, so
+  `used_none` answers the declarations gate). Proposed CLAUDE.md wording for the coverage-gate invariant (Lisa
+  applies).
 - **SQL:** none.
 - **Tests:** Scenario B + Bill 2 in FY2026 and in FY2025 (overlap both times); `same_bill` excludes and retains;
   `different_meters` needs a label and splits groups; legacy `duplicate` unresolved; the no-double-count property

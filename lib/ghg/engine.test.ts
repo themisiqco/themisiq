@@ -29,6 +29,7 @@ import {
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution,
+  validateResolution, COVERAGE_MESSAGE,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
@@ -171,9 +172,12 @@ describe('exclusiveEnd — mid-month ends are inclusive', () => {
     expect(r.gaps.length).toBe(0);          // THE FIX: zero phantom gaps at any interior boundary
     expect(r.monthsCovered).toBe(12);       // every month fully covered
     expect(r.status).not.toBe('gap');       // the phantom-gap bug is gone
-    // status is 'straddle' (not 'full'): the two FY-edge cycles legitimately cross Jan 1 and need a
-    // proration choice. That is correct — mid-month cycles can't align to a calendar year. See report.
-    expect(r.status).toBe('straddle');
+    // T3: was 'straddle'. A straddle is no longer an issue (the two FY-edge cycles are prorated
+    // automatically by their own days, rule R2), so a fully covered year is 'full'. The straddles are
+    // still listed for display.
+    expect(r.status).toBe('full');
+    expect(r.issues).toEqual([]);
+    expect(r.straddles.length).toBe(2);
   });
 });
 
@@ -200,14 +204,17 @@ describe('GROUP B — silent absence', () => {
     expect(r.status).toBe('none');
   });
 
-  it("B3b the gate must SURFACE 'none' for a doc whose confirmed proposals carry no dates (currently the periods.length===0 early-return discards it)", () => {
+  // T3: was status 'none'. A confirmed bill with no dates now raises its own 'undated' issue, with a
+  // plain-language message naming the document (ruling "no silent zero").
+  it("B3b the gate must SURFACE an undated confirmed bill as 'undated', with its message", () => {
     const l = loc({
       id: 'B3', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
       // confirmed gas proposal but NO period dates → periods is empty → early-return swallows 'none'.
       source_docs: [doc('utility_bill_gas', [prop({ periodStart: null, periodEnd: null })])],
     });
     const unresolved = findUnresolvedCoverage([l], 2024, 12, []);
-    expect(unresolved.some(u => u.status === 'none')).toBe(true); // ← currently false: 'none' never surfaces
+    expect(unresolved).toContainEqual(expect.objectContaining({ status: 'undated', docIds: ['doc1'],
+      message: 'utility_bill_gas.pdf has no billing period, so it is not counted. Enter the dates as they appear on the bill.' }));
   });
 });
 
@@ -3508,8 +3515,8 @@ describe('T1 billContributions', () => {
     expect(JSON.stringify(l)).toBe(before);
   });
 
-  // T1's guard was "nothing calls it yet". T2 wires it into applyResolutions, and only there.
-  it('is called only by applyResolutions (wired in T2)', () => {
+  // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage.
+  it('is called only by applyResolutions and findUnresolvedCoverage (T2, T3)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
@@ -3521,10 +3528,12 @@ describe('T1 billContributions', () => {
       const n = (src.match(/billContributions\(/g) ?? []).length;
       return n ? [`${f}: ${n}`] : [];
     });
-    expect(calls).toEqual(['lib/ghg/engine.ts: 1']);
+    expect(calls).toEqual(['lib/ghg/engine.ts: 2']);
     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
-    const body = engineSrc.slice(engineSrc.indexOf('export function applyResolutions('));
-    expect(body.slice(0, body.indexOf('\n}\n')), 'the one call is inside applyResolutions').toMatch(/billContributions\(/);
+    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(']) {
+      const body = engineSrc.slice(engineSrc.indexOf(fn));
+      expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
+    }
   });
 
   it('exclusiveEnd has exactly one definition in lib/ and app/ (CLAUDE.md invariant)', () => {
@@ -3643,5 +3652,226 @@ describe('T2 applyResolutions folds billContributions', () => {
     expect(applied(l, [], 2026).electricity_kwh.value).toBe(2350);
     // In FY2025 both are outside the year: 0, where before T2 both were summed in full (F-10).
     expect(applied(l, [], 2025).electricity_kwh.value).toBe(0);
+  });
+});
+
+// ── T3: coverage with full-period overlap, meter key, same_bill / different_meters, no silent zero ─────
+// docs/review/design-derived-figures.md section 11 T3 and the T3 rulings in section 10.
+describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+  const W = (y: number) => periodFromYearAndEnd(y, 12);
+  const elec = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, periodConfidence: 'high', sourceQuote: `${value} kWh`, ...o });
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, ...o });
+  const edoc = (id: string, p: ExtractedProposal, meter?: string): SourceDoc =>
+    ({ ...doc('utility_electricity', [p], id), file_name: `${id}.pdf`, ...(meter ? { meter_label: meter } : {}) });
+  const res = (o: Partial<CoverageResolution>): CoverageResolution =>
+    ({ locId: 'L1', fuelType: 'electricity', kind: 'extrapolate', note: 'n', acknowledgedAt: '2026-03-01T10:00:00Z', ...o } as CoverageResolution);
+  // Scenario B with Scenario A's Bill 2: identical January 2026 periods.
+  const scenarioB = (meter?: string) => loc({ source_docs: [
+    edoc('bill2', elec(1200, '2026-01-01', '2026-02-01')),
+    edoc('monthOnly', elec(1150, '2026-01-01', '2026-01-31', { periodConfidence: 'medium' }), meter),
+  ] });
+  const issues = (l: Location, y: number, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], y, 12, r);
+  const value = (l: Location, y: number, r: CoverageResolution[] = []) => applyResolutions(l, r, W(y).start, W(y).end).electricity_kwh?.value;
+  const OVERLAP_MSG = 'bill2.pdf and monthOnly.pdf cover the same days (2026-01-01 to 2026-01-31). Choose Same bill, count it once, or Different meters or accounts.';
+
+  it('Scenario B + Bill 2, FY2026: overlap raised with a message naming both documents and the shared days', () => {
+    expect(issues(scenarioB(), 2026).filter(i => i.status === 'overlap')).toEqual([
+      { locId: 'L1', fuelType: 'electricity', status: 'overlap', docIds: ['bill2', 'monthOnly'], meterLabel: null, message: OVERLAP_MSG }]);
+  });
+
+  it('Scenario B + Bill 2, FY2025: the overlap is STILL raised (full periods), though both contribute 0', () => {
+    expect(issues(scenarioB(), 2025).filter(i => i.status === 'overlap').map(i => i.message)).toEqual([OVERLAP_MSG]);
+    expect(value(scenarioB(), 2025)).toBe(0);
+  });
+
+  it('same_bill: the excluded document is retained as evidence, not counted, and the overlap clears', () => {
+    const r = res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['monthOnly'] });
+    const l = scenarioB();
+    expect(validateResolution(r, l)).toBeNull();
+    expect(value(l, 2026, [r])).toBe(1200);
+    expect(issues(l, 2026, [r]).filter(i => i.status === 'overlap')).toEqual([]);
+    const c = billContributions(l, [r], W(2026)).find(x => x.docId === 'monthOnly')!;
+    expect(c).toMatchObject({ counted: false, reason: 'same_bill_as', reasonRef: 'bill2' });
+    expect(l.source_docs.map(d => d.id), 'retained').toEqual(['bill2', 'monthOnly']);
+    expect(buildWorkings([{ ...l, electricity_kwh: 1200, grid_region: 'US_CA' }], 'AR6', 2026, [r])
+      .filter(w => w.gwp_basis === 'coverage_resolution').map(w => w.emission_factor)).toEqual(['Same bill, counted once']);
+  });
+
+  it('same_bill validation: one counted document, not also excluded, all on the site with this fuel', () => {
+    const l = scenarioB();
+    expect(validateResolution(res({ kind: 'same_bill', excludedDocIds: ['monthOnly'] }), l)).toBe('Choose the document that counts.');
+    expect(validateResolution(res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: [] }), l)).toBe('Choose the document that is the same bill.');
+    expect(validateResolution(res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['bill2'] }), l)).toBe('The document that counts cannot also be excluded.');
+    expect(validateResolution(res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['nope'] }), l)).toBe('Every document named must be on this site and carry this fuel.');
+  });
+
+  it('different_meters: needs a label that matches the document; then the groups split and both count', () => {
+    expect(validateResolution(res({ kind: 'different_meters', docId: 'monthOnly', meterLabel: '  ' }), scenarioB())).toBe('Name the meter or account for the second document.');
+    expect(validateResolution(res({ kind: 'different_meters', docId: 'monthOnly', meterLabel: 'Meter 2' }), scenarioB())).toBe("The meter name must match the document's meter label.");
+    const l = scenarioB('Meter 2');
+    const r = res({ kind: 'different_meters', docId: 'monthOnly', meterLabel: 'Meter 2' });
+    expect(validateResolution(r, l)).toBeNull();
+    expect(issues(l, 2026, [r]).filter(i => i.status === 'overlap')).toEqual([]);
+    expect(value(l, 2026, [r])).toBe(2350);
+  });
+
+  it('legacy duplicate is not accepted: the overlap stays, the figure is unchanged, no audit row', () => {
+    const dup = res({ kind: 'duplicate' });
+    expect(validateResolution(dup, scenarioB())).toBe('This resolution is no longer accepted. Choose Same bill, count it once, or Different meters or accounts.');
+    expect(issues(scenarioB(), 2026, [dup]).filter(i => i.status === 'overlap')).toHaveLength(1);
+    expect(value(scenarioB(), 2026, [dup])).toBe(2350);
+    expect(buildWorkings([{ ...scenarioB(), electricity_kwh: 2350, grid_region: 'US_CA' }], 'AR6', 2026, [dup])
+      .filter(w => w.gwp_basis === 'coverage_resolution')).toEqual([]);
+  });
+
+  it('meter-keyed gaps: each meter is its own group; an estimate clears only its own meter, grossed by its own factor', () => {
+    const months = (n: number, meter?: string, prefix = 'a') => Array.from({ length: n }, (_, i) => {
+      const m = String(i + 1).padStart(2, '0');
+      const last = new Date(2025, i + 1, 0).getDate();
+      return edoc(`${prefix}${i}`, elec(100, `2025-${m}-01`, `2025-${m}-${last}`), meter);
+    });
+    const l = loc({ source_docs: [...months(12), ...months(6, 'B', 'b')] });
+    expect(issues(l, 2025).filter(i => i.status === 'gap')).toEqual([{ locId: 'L1', fuelType: 'electricity', status: 'gap', meterLabel: 'B' }]);
+    const wrongMeter = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50 });
+    expect(issues(l, 2025, [wrongMeter]).filter(i => i.status === 'gap'), 'a default-meter estimate does not clear meter B').toHaveLength(1);
+    const meterB = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, meterLabel: 'B' });
+    expect(issues(l, 2025, [meterB]).filter(i => i.status === 'gap')).toEqual([]);
+    expect(value(l, 2025, [meterB])).toBe(1200 + 600 * 2);
+  });
+
+  it('no silent zero: undated, both invalid_period kinds and mixed_units each raise a blocking issue naming the document', () => {
+    const l = loc({ source_docs: [
+      { ...doc('utility_bill_gas', [gas(10, null, null)], 'u'), file_name: 'u.pdf' },
+      { ...doc('utility_bill_gas', [gas(10, '2025-03-10', '2025-03-01')], 'rev'), file_name: 'rev.pdf' },
+      { ...doc('utility_bill_gas', [gas(10, 'Mar 2025', '2025-03-31')], 'bad'), file_name: 'bad.pdf' },
+    ] });
+    const got = issues(l, 2025);
+    expect(got).toContainEqual(expect.objectContaining({ status: 'undated', message: COVERAGE_MESSAGE.undated('u.pdf') }));
+    expect(got).toContainEqual(expect.objectContaining({ status: 'invalid_period', docIds: ['rev'], message: INVALID_PERIOD_MESSAGE.reversed('rev.pdf', '2025-03-10', '2025-03-01') }));
+    expect(got).toContainEqual(expect.objectContaining({ status: 'invalid_period', docIds: ['bad'], message: INVALID_PERIOD_MESSAGE.unparseable('bad.pdf', 'Mar 2025', '2025-03-31') }));
+    const mixed = loc({ name: 'Plant', source_docs: [
+      { ...doc('utility_bill_gas', [gas(1, '2025-01-01', '2025-01-31', { unit: 'mcf' })], 'm1'), file_name: 'm1.pdf' },
+      { ...doc('utility_bill_gas', [gas(1, '2025-02-01', '2025-02-28', { unit: 'therms' })], 'm2'), file_name: 'm2.pdf' },
+    ] });
+    expect(issues(mixed, 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'mixed_units', docIds: ['m1', 'm2'],
+      message: 'The natural gas bills for Plant are in different units (mcf, therms: m1.pdf, m2.pdf), so none of them is counted. Correct the units, or enter the figure manually.' });
+  });
+
+  it('no silent zero: outside_year and same_bill_as raise no issue of their own', () => {
+    const outside = loc({ source_docs: [edoc('old', elec(500, '2024-03-01', '2024-03-31'))] });
+    expect(issues(outside, 2025).filter(i => i.docIds?.includes('old') && i.status !== 'gap')).toEqual([]);
+    const r = res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['monthOnly'] });
+    expect(issues(scenarioB(), 2026, [r]).filter(i => i.docIds?.includes('monthOnly'))).toEqual([]);
+  });
+
+  describe('all documents rejected', () => {
+    const rejected = (amount = 0) => loc({ name: 'Plant', has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: 'mcf', source_docs: [
+      { ...doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' })], 'r1'), file_name: 'r1.pdf' },
+      { ...doc('utility_bill_gas', [gas(100, '2025-02-01', '2025-02-28', { status: 'rejected' })], 'r2'), file_name: 'r2.pdf' },
+    ] });
+    const usedNone = res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u-1', email: 'jo@acme.example' } });
+
+    it('raises an export-blocking issue offering a manual figure or "used none"', () => {
+      expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected',
+        message: 'Every natural gas document for Plant was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.' });
+    });
+
+    it('confirming "used none" records who and when, shows in workings, writes 0, clears the issue and the declaration gate', () => {
+      expect(findUndeclaredStreams([rejected()]).map(x => x.stream)).toContain('natural_gas');
+      expect(validateResolution(usedNone, rejected())).toBeNull();
+      expect(issues(rejected(), 2025, [usedNone]).filter(i => i.status === 'all_rejected')).toEqual([]);
+      expect(findUndeclaredStreams([rejected()], [usedNone]).map(x => x.stream)).not.toContain('natural_gas');
+      expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'a stale figure is overwritten with 0').toBe(0);
+      const row = buildWorkings([rejected()], 'AR6', 2025, [usedNone]).find(w => w.gwp_basis === 'coverage_resolution');
+      expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example at 2026-03-01T10:00:00Z');
+      expect(row?.resolved_at).toBe('2026-03-01T10:00:00Z');
+    });
+
+    it('used_none must record who', () => {
+      expect(validateResolution({ ...usedNone, by: undefined }, rejected())).toBe('A confirmation must record who confirmed it.');
+      expect(validateResolution({ ...usedNone, field: 'renewable_electricity_kwh' }, rejected())).toBe('Name the figure that is being confirmed as none.');
+    });
+
+    it('entering a manual figure also clears it; one rejected and one confirmed document does not raise it', () => {
+      expect(issues(rejected(250), 2025).filter(i => i.status === 'all_rejected')).toEqual([]);
+      const mixedStatus = loc({ source_docs: [
+        doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' })], 'r1'),
+        doc('utility_bill_gas', [gas(100, '2025-02-01', '2025-02-28')], 'c1'),
+      ] });
+      expect(issues(mixedStatus, 2025).filter(i => i.status === 'all_rejected')).toEqual([]);
+    });
+  });
+
+  // ── Property tests (seeded, deterministic) ──────────────────────────────────────────────────────
+  const rng = (seed: number) => () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  it('property: once no overlap issue remains, no two counted bills in one group share a day', () => {
+    const r = rng(7);
+    let blocked = 0, checked = 0;
+    for (let t = 0; t < 300; t++) {
+      const n = 2 + Math.floor(r() * 4);
+      const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
+        const start = new Date(2025, Math.floor(r() * 12), 1 + Math.floor(r() * 27));
+        const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + Math.floor(r() * 60));
+        return edoc(`d${i}`, elec(100, iso(start), iso(end)), r() < 0.2 ? 'M2' : undefined);
+      });
+      const l = loc({ source_docs: docs });
+      const resolutions: CoverageResolution[] = [];
+      if (r() < 0.6) {
+        const counted = `d${Math.floor(r() * n)}`;
+        const excluded = docs.map(d => d.id).filter(id => id !== counted && r() < 0.5);
+        if (excluded.length) resolutions.push(res({ kind: 'same_bill', countedDocId: counted, excludedDocIds: excluded }));
+      }
+      if (r() < 0.3) resolutions.push(res({ kind: 'duplicate' }));
+      if (issues(l, 2025, resolutions).some(i => i.status === 'overlap')) { blocked++; continue; }
+      const cs = billContributions(l, resolutions, W(2025)).filter(c => c.counted);
+      if (cs.length > 1) checked++;
+      for (let a = 0; a < cs.length; a++) for (let b = a + 1; b < cs.length; b++) {
+        if (cs[a].meterLabel !== cs[b].meterLabel) continue;
+        const aS = cs[a].periodStart as string, aE = cs[a].periodEndExclusive as string;
+        const bS = cs[b].periodStart as string, bE = cs[b].periodEndExclusive as string;
+        expect(aS >= bE || bS >= aE, `trial ${t}: ${cs[a].docId} and ${cs[b].docId} both counted over shared days`).toBe(true);
+      }
+    }
+    expect(blocked, 'some trials overlap').toBeGreaterThan(20); expect(checked, 'some trials count 2+ bills').toBeGreaterThan(20);
+  });
+
+  it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
+    const r = rng(11);
+    const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
+    const seen = { blocking: 0, silent: 0, usedNone: 0 };
+    for (let t = 0; t < 400; t++) {
+      const n = 1 + Math.floor(r() * 3);
+      const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
+        const kind = pick(['in', 'out', 'undated', 'reversed', 'unparseable'] as const);
+        const dates: [string | null, string | null] =
+          kind === 'in' ? ['2025-03-01', '2025-03-31'] : kind === 'out' ? ['2024-03-01', '2024-03-31']
+          : kind === 'undated' ? [null, null] : kind === 'reversed' ? ['2025-03-10', '2025-03-01'] : ['Mar 2025', '2025-03-31'];
+        const status = pick(['confirmed', 'confirmed', 'rejected', 'extracted'] as const);
+        return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
+      });
+      const l = loc({ has_natural_gas: true, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
+      const resolutions: CoverageResolution[] = r() < 0.2
+        ? [res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u', email: 'e@x.example' } })] : [];
+      const a = applyResolutions(l, resolutions, W(2025).start, W(2025).end).natural_gas_amount;
+      const figure = a ? (a.mixedUnits ? 0 : a.value) : l.natural_gas_amount;
+      if (figure > 0) continue;
+      // A gap is left out: it would satisfy this in almost every trial and hide whether the
+      // no-silent-zero issues themselves fire.
+      const blocking = issues(l, 2025, resolutions).some(i => i.status !== 'gap');
+      // An unconfirmed proposal blocks export through conciergePending, in the same conciergeReady gate
+      // as the coverage issues (app/dashboard/ghg/page.tsx), so it counts as blocking here.
+      const pending = docs.some(d => d.extracted!.some(p => p.status === 'extracted' || p.status === 'needs_manual_review'));
+      const decided = billContributions(l, resolutions, W(2025)).filter(c => c.reason !== 'not_confirmed');
+      const onlySilent = decided.length > 0 && decided.every(c => c.reason === 'outside_year' || c.reason === 'same_bill_as');
+      const usedNone = resolutions.some(x => x.kind === 'used_none');
+      if (blocking) seen.blocking++; else if (onlySilent) seen.silent++; else if (usedNone) seen.usedNone++;
+      expect(blocking || pending || onlySilent || usedNone, `trial ${t}: ${JSON.stringify(decided.map(c => c.reason))}`).toBe(true);
+    }
+    // Each way out was actually reached, so the property is not passing vacuously.
+    expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
   });
 });

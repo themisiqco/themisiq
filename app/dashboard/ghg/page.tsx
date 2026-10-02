@@ -1299,8 +1299,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
   const conciergePending = inventory.locations.flatMap(l => l.source_docs).flatMap(d => d.extracted ?? []).filter(p => p.status === 'extracted' || p.status === 'needs_manual_review')
-  // Coverage gate (step 9b) — pure engine function. Per location × document_type, run analyzeCoverage
-  // and flag any gap/overlap/straddle lacking a matching resolution. conciergeReady composes over it.
+  // Coverage gate (step 9b) — pure engine function. Per location × document_type × fuel × meter: gaps and
+  // overlaps lacking an accepted resolution, plus the no-silent-zero issues (undated, invalid_period,
+  // mixed_units, all_rejected). A straddle is not an issue (T3). conciergeReady composes over it.
   const coverageResolutions = inventory.coverage_resolutions ?? []
   const unresolvedCoverage = findUnresolvedCoverage(inventory.locations, inventory.reporting_year, inventory.fiscal_year_end_month, coverageResolutions)
   const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
@@ -1324,7 +1325,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // nor an explicit attestation is UNDECLARED — absence must not export as an attested zero. Remedy is
   // data or attestation, NOT acknowledgement (unlike a coverage gap). Gated at the same four sites as
   // gridReady, with its own amber message; deliberately NOT gating the step-2 Continue.
-  const undeclaredStreams = findUndeclaredStreams(inventory.locations)
+  // coverageResolutions: an accepted 'used_none' (T3) answers the declaration for its stream.
+  const undeclaredStreams = findUndeclaredStreams(inventory.locations, coverageResolutions)
   const declarationsReady = undeclaredStreams.length === 0
   // SPLIT BY WHY THE STREAM BLOCKS, because the two states need OPPOSITE instructions and one message
   // cannot carry both. "Enter the data or attest absent" is right for a stream nobody was asked about
