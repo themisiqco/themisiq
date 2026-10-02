@@ -11,7 +11,7 @@
 //     convertToCanonical, the same audited conversion as at extraction. It never relabels the converted unit.
 //   - Rule R5: a month-only proposal cannot be confirmed until the customer confirms or corrects its dates.
 
-import { acceptanceProblem, type ExtractedProposal } from './engine'
+import { acceptanceProblem, valueProblem, type ExtractedProposal } from './engine'
 import { convertToCanonical, type FuelType } from '../unitConversions'
 
 export type Editor = { userId: string; email: string }
@@ -79,7 +79,9 @@ export function rejectProposal(p: ExtractedProposal, a: { by: Editor; at: string
 export function undoRejection(p: ExtractedProposal, a: { by: Editor; at: string }): Patch {
   const last = [...(p.statusLog ?? [])].reverse().find(e => e.action === 'rejected')
   const before = last?.statusBefore ?? 'extracted'
-  const status = before === 'confirmed' && acceptanceProblem(p) !== null ? 'extracted' : before
+  // T10a: a bill with no figure goes back to "Needs review", since it cannot be confirmed.
+  const status = before === 'confirmed' && valueProblem(p) !== null ? 'needs_manual_review'
+    : before === 'confirmed' && acceptanceProblem(p) !== null ? 'extracted' : before
   return {
     status,
     statusLog: [...(p.statusLog ?? []), { action: 'undone', at: a.at, by: a.by, statusBefore: 'rejected' }],
@@ -92,7 +94,8 @@ export function undoRejection(p: ExtractedProposal, a: { by: Editor; at: string 
  */
 export function guardConfirm(p: ExtractedProposal, patch: Patch): Patch {
   if (patch.status !== 'confirmed') return patch
-  if (acceptanceProblem({ ...p, ...patch }) === null) return patch
+  // T10a: nor a proposal with no figure. "Edit figure" passes, because its patch carries the figure.
+  if (acceptanceProblem({ ...p, ...patch }) === null && valueProblem({ ...p, ...patch }) === null) return patch
   const rest = { ...patch }
   delete rest.status
   return rest

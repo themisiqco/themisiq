@@ -61,6 +61,7 @@ const UNIT_ALIASES: Record<string, string> = {
   kwh: 'kwh', 'kw h': 'kwh', 'kw-h': 'kwh', 'kilowatt hour': 'kwh', 'kilowatt hours': 'kwh',
   mwh: 'mwh', 'megawatt hour': 'mwh', 'megawatt hours': 'mwh',
   gj: 'gj', gigajoule: 'gj', gigajoules: 'gj',
+  mj: 'mj', megajoule: 'mj', megajoules: 'mj',
   // natural gas
   therm: 'therms', therms: 'therms',
   mcf: 'mcf',
@@ -118,6 +119,12 @@ const TIER2: Record<string, Tier2Fn> = {
   'natural_gas:gj': (v) => {
     const value = round(v / GJ_PER_MMBTU);
     return { value, unit: 'mmbtu', conversionNote: `${fmt(v)} GJ ÷ ${GJ_PER_MMBTU} = ${fmt(value)} MMBtu` };
+  },
+  // T10a: Australian gas bills print energy in MJ ("6 944 MJ"). 1 GJ = 1,000 MJ exactly (SI), then the GJ path.
+  'natural_gas:mj': (v) => {
+    const gj = v / 1000;
+    const value = round(gj / GJ_PER_MMBTU);
+    return { value, unit: 'mmbtu', conversionNote: `${fmt(v)} MJ ÷ 1,000 = ${fmt(gj)} GJ; ÷ ${GJ_PER_MMBTU} = ${fmt(value)} MMBtu` };
   },
 
   // Electricity — everything reduces to kWh

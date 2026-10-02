@@ -10,12 +10,12 @@
 import { useState } from 'react'
 import { periodOriginOf, type ExtractedProposal } from '../../../../lib/ghg/engine'
 import { editPeriod, editUnit, type Editor } from '../../../../lib/ghg/proposalEdits'
-import { convertibleUnits, type FuelType } from '../../../../lib/unitConversions'
+import { convertibleUnits, normalizeUnit, type FuelType } from '../../../../lib/unitConversions'
 import { plainDate } from '../../../../lib/ghg/coverageActions'
 
 /** How each unit is written for the customer. A unit not listed is shown as stored. */
 export const UNIT_LABEL: Record<string, string> = {
-  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
+  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', mj: 'MJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
   gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
 }
 const unitLabel = (u: string | null) => (u ? UNIT_LABEL[u] ?? u : 'no unit')
@@ -62,7 +62,9 @@ export function UnitEditor({ p, by, onSave, onCancel }: {
   p: ExtractedProposal; by: Editor | null; onSave: (patch: Partial<ExtractedProposal>) => void; onCancel: () => void
 }) {
   const options = convertibleUnits(p.fuelType as FuelType)
-  const [unit, setUnit] = useState(p.rawUnit && options.includes(p.rawUnit) ? p.rawUnit : options[0])
+  // The bill's own unit as read, normalised ("MJ" reads as mj), when the conversion can handle it.
+  const read = normalizeUnit(p.rawUnit)
+  const [unit, setUnit] = useState(read && options.includes(read) ? read : options[0])
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Unit on the bill</span>

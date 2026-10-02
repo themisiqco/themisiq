@@ -86,7 +86,7 @@ export function CoverageStrip(p: CoverageStripProps) {
   // plain-language messages for bills that are not counted (their controls arrive in T9).
   const fieldsHere = new Set(docs.flatMap(d => (d.extracted ?? []).map(x => fieldFor(docType, x.fuelType)?.amount)).filter(Boolean).map(String))
   const allRejected = issues.filter(i => i.status === 'all_rejected' && i.field && fieldsHere.has(i.field))
-  const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off'].includes(i.status)
+  const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off', 'no_value'].includes(i.status)
     && (i.docIds ?? []).some(id => docIdsHere.has(id)) && i.message)
 
   // Uploads with nothing read from them and no figure for any field they support (T10 ruling).

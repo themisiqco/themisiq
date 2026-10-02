@@ -41,6 +41,10 @@ describe('unit editor', () => {
     for (const u of ['Mcf', 'therms', 'MMBtu', 'm³', 'kWh', 'Ccf', 'GJ']) expect(t).toContain(u)
     expect(t).toContain('Save unit')
   })
+  it('starts on the bill\'s own unit as read, normalised: "MJ" selects MJ', () => {
+    const html = renderToStaticMarkup(<UnitEditor p={prop({ rawUnit: 'MJ', value: null, unit: null })} by={BY} onSave={noop} onCancel={noop} />)
+    expect(html).toMatch(/<option value="mj" selected="">MJ<\/option>/)
+  })
   it('is offered only where more than one unit is possible', () => {
     expect(unitEditable(prop({}))).toBe(true)
     expect(unitEditable(prop({ fuelType: 'electricity', unit: 'kwh', rawUnit: 'kwh' }))).toBe(true)

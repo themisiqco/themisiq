@@ -2,7 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
-import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations } from './ghg/engine'
+import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
 import { countryRefusal } from './ghg/engine'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
 // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
@@ -246,6 +246,8 @@ export function generateAssurancePDF(
       // this is about which way to be wrong if it ever happens, and inventing a citation is the worse
       // way. Both exports now behave the same, which is also one less thing to explain.
       ...combustionCitations.map(src => ['Combustion factors', src]),
+      // T10a: how a cited factor became the per-unit figure applied, where we derived it (Australian gas).
+      ...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),
       ...gridCitations.map(src => ['Electricity factors', src]),
       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
       // From the same locations as the two citation lists above, so it appears exactly when they cite it.

@@ -31,13 +31,14 @@ import {
   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
   deriveLocations,
   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
-  documentsBacking, deriveStoredLocations,
+  documentsBacking, deriveStoredLocations, factorDerivationsFor,
 } from './engine';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { contributionShareCell } from './workingsCells';
+import { convertToCanonical } from '../unitConversions';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -3854,7 +3855,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
   it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
     const r = rng(11);
     const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
-    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0, unread: 0 };
+    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0, unread: 0, noValue: 0 };
     for (let t = 0; t < 400; t++) {
       const n = 1 + Math.floor(r() * 3);
       const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
@@ -3863,7 +3864,9 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
           kind === 'in' ? ['2025-03-01', '2025-03-31'] : kind === 'out' ? ['2024-03-01', '2024-03-31']
           : kind === 'undated' ? [null, null] : kind === 'reversed' ? ['2025-03-10', '2025-03-01'] : ['Mar 2025', '2025-03-31'];
         const status = pick(['confirmed', 'confirmed', 'rejected', 'extracted'] as const);
-        return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
+        // T10a: sometimes no figure could be read (value null), as with an unconverted unit.
+        const value = r() < 0.15 ? null : 100;
+        return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, value, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
       });
       const switchOn = r() < 0.75;
       // T10 ruling: sometimes an upload with nothing read from it sits beside the bills.
@@ -3880,6 +3883,11 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
       if (!switchOn && confirmedBills) {
         expect(issues(l, 2025, resolutions).some(i => i.status === 'stream_off'), `trial ${t}: switch off over confirmed bills`).toBe(true);
         seen.streamOff++;
+      }
+      // T10a: a confirmed proposal with no figure always blocks, naming its document.
+      if (docs.some(d => d.extracted!.some(p => p.status === 'confirmed' && p.value == null))) {
+        expect(issues(l, 2025, resolutions).some(i => i.status === 'no_value'), `trial ${t}: confirmed with no figure`).toBe(true);
+        seen.noValue++;
       }
       // An unread upload for a fuel with no figure and no "used none" blocks; with a figure it is evidence.
       if (unread) {
@@ -3905,6 +3913,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
     expect(seen.streamOff).toBeGreaterThan(20);
     expect(seen.unread).toBeGreaterThan(10);
+    expect(seen.noValue).toBeGreaterThan(10);
   });
 });
 
@@ -4581,5 +4590,80 @@ describe('T10 unread uploads: evidence when the fuel has a figure, a blocker nam
   });
   it('a document type with no fields of its own never blocks', () => {
     expect(none(site({ source_docs: [unreadDoc('other', 'something_else')] }))).toEqual([]);
+  });
+});
+
+// ── T10a: a confirmed proposal with no figure; Australian gas in MJ ───────────────────────────────────
+describe('T10a no figure, and MJ gas', () => {
+  const melbourneBill = (id: string, mj: number, k: number, o: Partial<ExtractedProposal> = {}) => {
+    const m = String(k).padStart(2, '0');
+    const conv = convertToCanonical('natural_gas', mj, 'MJ');
+    return { ...doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', rawValue: mj, rawUnit: 'MJ', value: conv.value, unit: conv.unit,
+      conversionNote: conv.conversionNote, periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${new Date(2025, k, 0).getDate()}`, sourceQuote: `${mj} MJ`, ...o })], id), file_name: `${id}.pdf` };
+  };
+  const melbourne = (docs: SourceDoc[]) => loc({ name: 'Melbourne', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', has_natural_gas: true, natural_gas_unit: 'm3', source_docs: docs });
+
+  it('6 944 MJ converts through GJ to MMBtu, with the arithmetic in the note', () => {
+    const c = convertToCanonical('natural_gas', 6944, 'MJ');
+    expect(c).toMatchObject({ tier: 2, unit: 'mmbtu' });
+    expect(c.value).toBeCloseTo(6.944 / 1.05505585262, 6);
+    expect(c.conversionNote).toBe('6,944 MJ ÷ 1,000 = 6.944 GJ; ÷ 1.05505585262 = 6.5816 MMBtu');
+    expect(convertToCanonical('natural_gas', 6944, 'megajoules').value).toBe(c.value);
+  });
+
+  it('prices against the AU (NGA) factor: 54.367 kg CO2e per MMBtu, from 51.53 per GJ', () => {
+    const l = melbourne([melbourneBill('jan', 6944, 1)]);
+    const d = deriveLocations({ locations: [l], reporting_year: 2025 })[0];
+    expect(d.natural_gas_unit).toBe('mmbtu');
+    expect(findUnpriceableLocations([d], 'AR6', 2025)).toEqual([]);
+    const t = calcInventory([d], 'AR6', 2025).s1_total;
+    expect(t).toBeCloseTo((6944 / 1000 / 1.05505585262) * 54.367 / 1000, 7);   // value is rounded to 6 dp
+    expect(t).toBeCloseTo(6.944 * 51.53 / 1000, 4);   // the same as NGA's per-GJ factor on the GJ read
+    const row = (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; ef_source?: string }[]).find(r => r.stream === 'natural_gas')!;
+    expect(row.ef_source).toContain('NGA');
+  });
+
+  it('every surface carries the AU gas derivation, not just the derived figure', () => {
+    const MMBTU = '51.53 kg CO2e/GJ (DCCEEW NGA 2025 Table 4) × 1.05505585262 GJ/MMBtu = 54.367 kg CO2e/MMBtu';
+    const M3 = '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³';
+    const row = (unit: Location['natural_gas_unit'], amount: number, country = 'AU') => (buildWorkings([loc({ name: 'Melbourne', country, state: 'VIC', grid_region: 'AU_VIC',
+      has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: unit })], 'AR6', 2025, [], 12) as { stream?: string; note?: string; emission_factor?: string }[])
+      .find(r => r.stream === 'natural_gas')!;
+    // Workings row, and so the verifier page (which renders a row's note, rowNoteOf).
+    expect(row('mmbtu', 6.581642).note).toBe(MMBTU);
+    expect(row('mmbtu', 6.581642).emission_factor).toContain('54.367');
+    expect(row('m3', 1000).note).toBe(M3);
+    expect(row('mcf', 10, 'US').note, 'only where we derived the figure').toBeUndefined();
+    // The PDF and XLSX methods tables.
+    const melb = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 6.58, natural_gas_unit: 'mmbtu' });
+    expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }])).toEqual([MMBTU]);
+    expect(factorDerivationsFor([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })])).toEqual([]);
+    const root = join(__dirname, '..', '..');
+    expect(readFileSync(join(root, 'app/verify/[token]/page.tsx'), 'utf8')).toContain('{rowNoteOf(w) && (');
+    expect(readFileSync(join(root, 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),");
+    expect(readFileSync(join(root, 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain("...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),");
+  });
+
+  it('a confirmed proposal with no figure blocks, naming the document', () => {
+    const l = melbourne([melbourneBill('jan', 6944, 1, { value: null, unit: null, status: 'confirmed' })]);
+    expect(findUnresolvedCoverage([l], 2025, 12, []).filter(i => i.status === 'no_value')).toEqual([{ locId: 'L1', fuelType: 'natural_gas', status: 'no_value', docIds: ['jan'],
+      message: 'jan.pdf is confirmed, but no figure could be read from it, so it is not counted. Edit the unit or the figure, or reject the bill.' }]);
+  });
+
+  it('every bill for a field rejected, all with no figure: the all-rejected issue is raised (found by the property test)', () => {
+    const l = melbourne([melbourneBill('jan', 6944, 1, { value: null, unit: null, status: 'rejected' })]);
+    expect(findUnresolvedCoverage([l], 2025, 12, []).map(i => i.status)).toContain('all_rejected');
+  });
+
+  it('the Melbourne run-through: five MJ bills saved with no figure block; correcting the unit counts them all', () => {
+    const readings = [6944, 7120, 8015, 9230, 10110];
+    const saved = melbourne(readings.map((mj, k) => melbourneBill(`b${k}`, mj, k + 1, { value: null, unit: null, status: 'confirmed' })));
+    expect(findUnresolvedCoverage([saved], 2025, 12, []).filter(i => i.status === 'no_value')).toHaveLength(5);
+    expect(deriveLocations({ locations: [saved], reporting_year: 2025 })[0].natural_gas_amount, 'the silent zero this fixes').toBe(0);
+    // "Edit unit" → MJ on each, which re-converts from the raw reading (T9).
+    const fixed = { ...saved, source_docs: saved.source_docs.map(d => ({ ...d, extracted: d.extracted!.map(p => ({ ...p, ...convertFields(p) })) })) };
+    function convertFields(p: ExtractedProposal) { const c = convertToCanonical('natural_gas', p.rawValue, 'mj'); return { rawUnit: 'mj', value: c.value, unit: c.unit } }
+    expect(findUnresolvedCoverage([fixed], 2025, 12, []).filter(i => i.status === 'no_value')).toEqual([]);
+    expect(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0].natural_gas_amount).toBeCloseTo(readings.reduce((a, b) => a + b, 0) / 1000 / 1.05505585262, 5);
   });
 });

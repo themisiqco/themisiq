@@ -610,6 +610,31 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
   return EU_DERIVATION[EU_DERIVATION_ALIAS[key] ?? key]
 }
 
+// AUSTRALIAN GAS: THE ARITHMETIC FROM NGA'S PUBLISHED FIGURES TO THE PER-UNIT FACTOR WE APPLY (T10a).
+// NGA publishes natural gas per GJ (a combined Scope 1 factor) with an energy content per m³; the engine
+// stores per-unit figures. Without this a verifier reads "54.367 kg/mmbtu" cited to NGA, a number NGA never
+// printed. The note goes on the workings row (and so the verifier page) and the PDF/XLSX methods tables.
+const AU_DERIVATION: Record<string, string> = {
+  natural_gas_mmbtu: `51.53 kg CO2e/GJ (DCCEEW NGA 2025 Table 4) × ${GJ_PER_MMBTU} GJ/MMBtu = 54.367 kg CO2e/MMBtu`,
+  natural_gas_m3: '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³',
+}
+function auDerivationNote(loc: Location, key: string): string | undefined {
+  if (efJurisdiction(loc) !== 'AU') return undefined
+  return AU_DERIVATION[key]
+}
+
+/**
+ * The factor derivations behind the figures these locations price (T10a): one line per distinct derivation,
+ * for the PDF and XLSX methods tables. Australian natural gas today. Refused locations are dropped, as in
+ * combustionSourcesFor.
+ */
+export function factorDerivationsFor(locations: readonly { country?: string; has_natural_gas?: boolean; natural_gas_amount?: number; natural_gas_unit?: string }[]): string[] {
+  return [...new Set(locations
+    .filter(l => !countryRefusal(l) && l.has_natural_gas && (l.natural_gas_amount ?? 0) > 0)
+    .map(l => auDerivationNote(l as Location, `natural_gas_${l.natural_gas_unit}`))
+    .filter((d): d is string => !!d))]
+}
+
 // Australia combustion factors — DCCEEW National Greenhouse Accounts (NGA) Factors 2025 (AR5 basis).
 // NGA publishes an energy-content factor (GJ/unit) and a combined Scope 1 EF per GJ; effective per-unit
 // values are PRE-COMPUTED here (energy_content × combined-EF/GJ) and stored AS-IS in `co2` with ch4:0,
@@ -622,6 +647,10 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
 const EF_AU = {
   // Natural gas (NGA Table 4, ex-Table 39 energy content): 0.0393 GJ/m³ × 51.53 kgCO2e/GJ = 2.0251 → 2.025 kg/m³.
   natural_gas_m3: { co2: 2.025, ch4: 0, n2o: 0 },
+  // T10a: the same NGA factor on an ENERGY basis, for bills that print energy (MJ or GJ) rather than volume.
+  // NGA publishes it per GJ, so no energy content is assumed: 51.53 kgCO2e/GJ × 1.05505585262 GJ/MMBtu
+  // = 54.3670 → 54.367 kg/MMBtu (MMBtu is the canonical energy unit lib/unitConversions converts GJ and MJ to).
+  natural_gas_mmbtu: { co2: 54.367, ch4: 0, n2o: 0 },
   // Diesel oil (NGA Table 4/Table 1): 38.6 GJ/kL × 70.2 kgCO2e/GJ ÷ 1000 = 2.70972 → 2.710 kg/L.
   diesel_litre: { co2: 2.710, ch4: 0, n2o: 0 },
   diesel_mobile_litre: { co2: 2.710, ch4: 0, n2o: 0 },
@@ -2014,7 +2043,8 @@ function ngUnitOptions(country: string): Array<[string, string]> {
   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
   if (ctry === 'NZ') return [['kwh', 'kWh']]
-  if (ctry === 'AU') return [['m3', 'm³']]
+  // AU: m3, and MMBtu for energy-basis bills (MJ and GJ convert to it; T10a), priced from NGA's per-GJ factor.
+  if (ctry === 'AU') return [['m3', 'm³'], ['mmbtu', 'MMBtu']]
   if (EU_COUNTRIES.includes(ctry)) return [['m3', 'm³']]
   return [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
 }
@@ -3132,6 +3162,9 @@ export const COVERAGE_MESSAGE = {
   all_rejected: (fuel: string, site: string) =>
     `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
   // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
+  // T10a: a proposal confirmed with no figure (saved before confirming one was refused).
+  no_value: (file: string) =>
+    `${file} is confirmed, but no figure could be read from it, so it is not counted. Edit the unit or the figure, or reject the bill.`,
   // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
   unread: (file: string, fuels: string, site: string) =>
     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
@@ -3243,6 +3276,17 @@ export const BILLING_MONTH_CONFIRM_MESSAGE =
  */
 export function acceptanceProblem(p: Pick<ExtractedProposal, 'periodOrigin' | 'periodConfidence'>): string | null {
   return periodOriginOf(p) === 'billing_month' ? BILLING_MONTH_CONFIRM_MESSAGE : null
+}
+
+/** T10a: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
+export const NO_VALUE_MESSAGE = 'No figure could be read from this bill. Edit the unit or the figure, or reject the bill.'
+
+/**
+ * T10a: a proposal with no figure (value null: an unreadable number, or a unit with no conversion) can never be
+ * confirmed. Confirming it counted nothing and raised nothing, so the figure fell to zero in silence.
+ */
+export function valueProblem(p: Pick<ExtractedProposal, 'value'>): string | null {
+  return p.value == null ? NO_VALUE_MESSAGE : null
 }
 
 export type InvalidPeriodKind = 'unparseable' | 'reversed'
@@ -3723,7 +3767,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const efShown = ratio === 1 ? ef : { co2: ef.co2 * ratio, ch4: ef.ch4 * ratio, n2o: ef.n2o * ratio }
     // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
     // priced by a density-derived factor. Joined rather than one overwriting the other.
-    const note = [convNote, euDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
+    const note = [convNote, euDerivationNote(loc, efKey), auDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
     // table has no year dimension: EF_UK is DEFRA 2026 whichever year is being reported, so the vintage
@@ -4044,7 +4088,7 @@ export interface CoverageIssue {
   locId: string
   fuelType: string
   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
-  // "no silent zero"), stream_off (T6 ruling), none (a document with nothing read from it, unchanged).
+  // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
   // T8: what the strip needs to place the issue and act on it. documentType on gap and overlap (the coverage
@@ -4084,6 +4128,12 @@ export function findUnresolvedCoverage(
     const contributions = billContributions(loc, resolutions, coverageWin)
     const out: CoverageIssue[] = []
 
+    // T10a: a CONFIRMED proposal with no figure produces no contribution row (T1), so without this it counted
+    // nothing and raised nothing. It blocks, naming the document.
+    loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
+      if (p.status === 'confirmed' && p.value == null)
+        out.push({ locId: loc.id, fuelType: p.fuelType, status: 'no_value', docIds: [d.id], message: COVERAGE_MESSAGE.no_value(d.file_name) })
+    }))
     // A document with nothing read from it (T10 ruling). EVIDENCE, not a blocker, when any field its
     // document type supports already has a figure: typed, from another counted bill, or a used_none
     // confirmation. Otherwise it blocks, naming the file, the fuel(s) and the site, and the strip offers
@@ -4122,7 +4172,8 @@ export function findUnresolvedCoverage(
     // All documents for a field rejected, no figure entered, no used_none.
     const byField = new Map<string, { fuelType: string; statuses: string[] }>()
     loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
-      if (p.value == null) return
+      // T10a: a proposal with no figure is still a document for its field. Skipping it let a field whose only
+      // bills had no figure and were rejected fall to zero with no issue (found by the property test).
       const map = fieldFor(d.document_type, p.fuelType)
       if (!map) return
       const e = byField.get(String(map.amount)) ?? { fuelType: p.fuelType, statuses: [] }

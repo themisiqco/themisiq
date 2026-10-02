@@ -96,7 +96,8 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
       .toContain('gridCitations.map(src =>')
     // sourceAttributionsForLocations joined this import on 17 Sep 2026: the licence attribution is derived
     // from the same locations as the citation rows.
-    expect(pdfSrc).toContain("import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations } from './ghg/engine'")
+    // factorDerivationsFor joined it on 2 Oct 2026 (T10a): the Australian gas derivation, from the same locations.
+    expect(pdfSrc).toContain("import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'")
     expect(pdfSrc, 'the country-blind constant must not be the combustion row again')
       .not.toContain("['Combustion factors', efSources.combustion]")
     expect(pdfSrc, 'the six-jurisdiction catalogue must not be the electricity row again')

@@ -1,0 +1,532 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index f90be74..fc18f6c 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -78,7 +78,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
+ - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
+ - **Coverage gate is keyed per `(document_type, fuelType, meter_label)` and returns every issue, not a single status.** Overlap compares full bill periods, not their in-year days, so two copies of a bill outside the year still raise an overlap. An overlap is resolved only as `same_bill` (one document counts, the others are retained as evidence) or `different_meters` (both count, the second meter named); no resolution may leave two counted bills over the same days. Only accepted resolutions (passing `validateResolution`) affect figures, issues or audit rows; legacy `duplicate` and `straddle` are never accepted. A straddle is not an issue: it is prorated by its own days. No silent zero: an undated, invalid-period or mixed-units bill, or a field whose documents were all rejected with no figure entered, raises an export-blocking issue naming the document. Only `outside_year` and `same_bill_as` may leave a bill uncounted without one; a `used_none` confirmation records who confirmed it and when. A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
+ - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
+-- **Run `npx vitest run lib/ghg/engine.test.ts` (320 passed, 1 todo — verified 2 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
++- **Run `npx vitest run lib/ghg/engine.test.ts` (326 passed, 1 todo — verified 2 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+ 
+ ---
+ 
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.tsx b/app/dashboard/ghg/_components/CoverageStrip.tsx
+index f836edd..627a05d 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.tsx
+@@ -86,7 +86,7 @@ export function CoverageStrip(p: CoverageStripProps) {
+   // plain-language messages for bills that are not counted (their controls arrive in T9).
+   const fieldsHere = new Set(docs.flatMap(d => (d.extracted ?? []).map(x => fieldFor(docType, x.fuelType)?.amount)).filter(Boolean).map(String))
+   const allRejected = issues.filter(i => i.status === 'all_rejected' && i.field && fieldsHere.has(i.field))
+-  const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off'].includes(i.status)
++  const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off', 'no_value'].includes(i.status)
+     && (i.docIds ?? []).some(id => docIdsHere.has(id)) && i.message)
+ 
+   // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
+diff --git a/app/dashboard/ghg/_components/ProposalEdits.test.tsx b/app/dashboard/ghg/_components/ProposalEdits.test.tsx
+index 425126b..36a5721 100644
+--- a/app/dashboard/ghg/_components/ProposalEdits.test.tsx
++++ b/app/dashboard/ghg/_components/ProposalEdits.test.tsx
+@@ -41,6 +41,10 @@ describe('unit editor', () => {
+     for (const u of ['Mcf', 'therms', 'MMBtu', 'm³', 'kWh', 'Ccf', 'GJ']) expect(t).toContain(u)
+     expect(t).toContain('Save unit')
+   })
++  it('starts on the bill\'s own unit as read, normalised: "MJ" selects MJ', () => {
++    const html = renderToStaticMarkup(<UnitEditor p={prop({ rawUnit: 'MJ', value: null, unit: null })} by={BY} onSave={noop} onCancel={noop} />)
++    expect(html).toMatch(/<option value="mj" selected="">MJ<\/option>/)
++  })
+   it('is offered only where more than one unit is possible', () => {
+     expect(unitEditable(prop({}))).toBe(true)
+     expect(unitEditable(prop({ fuelType: 'electricity', unit: 'kwh', rawUnit: 'kwh' }))).toBe(true)
+diff --git a/app/dashboard/ghg/_components/ProposalEdits.tsx b/app/dashboard/ghg/_components/ProposalEdits.tsx
+index 298e7d6..decd94c 100644
+--- a/app/dashboard/ghg/_components/ProposalEdits.tsx
++++ b/app/dashboard/ghg/_components/ProposalEdits.tsx
+@@ -10,12 +10,12 @@
+ import { useState } from 'react'
+ import { periodOriginOf, type ExtractedProposal } from '../../../../lib/ghg/engine'
+ import { editPeriod, editUnit, type Editor } from '../../../../lib/ghg/proposalEdits'
+-import { convertibleUnits, type FuelType } from '../../../../lib/unitConversions'
++import { convertibleUnits, normalizeUnit, type FuelType } from '../../../../lib/unitConversions'
+ import { plainDate } from '../../../../lib/ghg/coverageActions'
+ 
+ /** How each unit is written for the customer. A unit not listed is shown as stored. */
+ export const UNIT_LABEL: Record<string, string> = {
+-  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
++  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', mj: 'MJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
+   gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
+ }
+ const unitLabel = (u: string | null) => (u ? UNIT_LABEL[u] ?? u : 'no unit')
+@@ -62,7 +62,9 @@ export function UnitEditor({ p, by, onSave, onCancel }: {
+   p: ExtractedProposal; by: Editor | null; onSave: (patch: Partial<ExtractedProposal>) => void; onCancel: () => void
+ }) {
+   const options = convertibleUnits(p.fuelType as FuelType)
+-  const [unit, setUnit] = useState(p.rawUnit && options.includes(p.rawUnit) ? p.rawUnit : options[0])
++  // The bill's own unit as read, normalised ("MJ" reads as mj), when the conversion can handle it.
++  const read = normalizeUnit(p.rawUnit)
++  const [unit, setUnit] = useState(read && options.includes(read) ? read : options[0])
+   return (
+     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Unit on the bill</span>
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index a7dc381..ebd496e 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -34,9 +34,9 @@ import {
+   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS, canonicalCountryCode,
+   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
+   detectGridRegion, gridRegionForCountry, pickEF,
+-  combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
++  combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
+   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
+-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
++  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+   streamState, DECLARABLE_STREAMS,
+   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
+   findSteamFactorGaps, steamFactorFor,
+@@ -3176,6 +3176,8 @@ workings: saved.workings,
+       [''],
+       ['METHODS'],
+       ...combustionSourcesFor(derivedLocations).map(src => ['Combustion factors', src]),
++      // T10a: the same derivation lines as the assurance PDF's methods table.
++      ...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),
+       ...gridSourcesFor(derivedLocations).map(src => ['Electricity factors', src]),
+       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
+       ...sourceAttributionsForLocations(derivedLocations).flatMap(a => [
+@@ -3592,9 +3594,10 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                       {p.status === 'confirmed' ? (
+                         <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
+                       ) : (
+-                        <button onClick={() => acceptanceProblem(p)
++                        // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.
++                        <button disabled={valueProblem(p) !== null} onClick={() => valueProblem(p) ? undefined : acceptanceProblem(p)
+                           ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
+-                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Confirm</button>
++                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: valueProblem(p) ? 0.5 : 1 }}>Confirm</button>
+                       )}
+                       <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit figure</button>
+                       <button onClick={() => { setUnitEditing(null); setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: false }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit dates</button>
+@@ -3605,6 +3608,9 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                       <button disabled={!currentUser} onClick={() => { if (!currentUser) return; setPeriodEditing(null); setUnitEditing(null); onUpdateProposal(locIdx, doc.id, pi, rejectProposal(p, { by: currentUser, at: new Date().toISOString() })) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#B91C1C', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Reject</button>
+                     </div>
+                   )}
++                  {p.status !== 'rejected' && valueProblem(p) && (
++                    <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>{valueProblem(p)}</div>
++                  )}
+                   {/* T9: dates and unit, answered on the proposal itself; and where they came from. */}
+                   {periodEditing?.key === `${doc.id}:${pi}` && (
+                     <PeriodEditor p={p} confirm={periodEditing.confirm} message={periodEditing.confirm ? acceptanceProblem(p) : null} by={currentUser}
+diff --git a/lib/assurancePdf.ts b/lib/assurancePdf.ts
+index 67439c5..e4c370c 100644
+--- a/lib/assurancePdf.ts
++++ b/lib/assurancePdf.ts
+@@ -2,7 +2,7 @@ import jsPDF from 'jspdf'
+ import autoTable from 'jspdf-autotable'
+ import { disclaimerParas } from './disclaimer'
+ import { auditTrailLine } from './auditTrailNotice'
+-import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations } from './ghg/engine'
++import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
+ import { countryRefusal } from './ghg/engine'
+ import { countryRefusalText } from './ghg/countryRefusalCopy'
+ // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
+@@ -246,6 +246,8 @@ export function generateAssurancePDF(
+       // this is about which way to be wrong if it ever happens, and inventing a citation is the worse
+       // way. Both exports now behave the same, which is also one less thing to explain.
+       ...combustionCitations.map(src => ['Combustion factors', src]),
++      // T10a: how a cited factor became the per-unit figure applied, where we derived it (Australian gas).
++      ...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),
+       ...gridCitations.map(src => ['Electricity factors', src]),
+       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
+       // From the same locations as the two citation lists above, so it appears exactly when they cite it.
+diff --git a/lib/ghg/combustionSources.test.ts b/lib/ghg/combustionSources.test.ts
+index 7916fd0..fe72a76 100644
+--- a/lib/ghg/combustionSources.test.ts
++++ b/lib/ghg/combustionSources.test.ts
+@@ -96,7 +96,8 @@ describe('combustion citations follow the jurisdiction that priced them', () =>
+       .toContain('gridCitations.map(src =>')
+     // sourceAttributionsForLocations joined this import on 17 Sep 2026: the licence attribution is derived
+     // from the same locations as the citation rows.
+-    expect(pdfSrc).toContain("import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations } from './ghg/engine'")
++    // factorDerivationsFor joined it on 2 Oct 2026 (T10a): the Australian gas derivation, from the same locations.
++    expect(pdfSrc).toContain("import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'")
+     expect(pdfSrc, 'the country-blind constant must not be the combustion row again')
+       .not.toContain("['Combustion factors', efSources.combustion]")
+     expect(pdfSrc, 'the six-jurisdiction catalogue must not be the electricity row again')
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 9f2950b..c55fdca 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -31,13 +31,14 @@ import {
+   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
+   deriveLocations,
+   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
+-  documentsBacking, deriveStoredLocations,
++  documentsBacking, deriveStoredLocations, factorDerivationsFor,
+ } from './engine';
+ import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
+ import { NOT_PROVIDED } from '../notProvided';
+ import { countryRefusalText } from './countryRefusalCopy';
+ import { stripTsComments } from '../testing/stripComments';
+ import { contributionShareCell } from './workingsCells';
++import { convertToCanonical } from '../unitConversions';
+ 
+ // ── fixture builders ─────────────────────────────────────────────────────────
+ const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
+@@ -3854,7 +3855,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+   it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
+     const r = rng(11);
+     const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
+-    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0, unread: 0 };
++    const seen = { blocking: 0, silent: 0, usedNone: 0, streamOff: 0, unread: 0, noValue: 0 };
+     for (let t = 0; t < 400; t++) {
+       const n = 1 + Math.floor(r() * 3);
+       const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
+@@ -3863,7 +3864,9 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+           kind === 'in' ? ['2025-03-01', '2025-03-31'] : kind === 'out' ? ['2024-03-01', '2024-03-31']
+           : kind === 'undated' ? [null, null] : kind === 'reversed' ? ['2025-03-10', '2025-03-01'] : ['Mar 2025', '2025-03-31'];
+         const status = pick(['confirmed', 'confirmed', 'rejected', 'extracted'] as const);
+-        return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
++        // T10a: sometimes no figure could be read (value null), as with an unconverted unit.
++        const value = r() < 0.15 ? null : 100;
++        return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, value, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
+       });
+       const switchOn = r() < 0.75;
+       // T10 ruling: sometimes an upload with nothing read from it sits beside the bills.
+@@ -3881,6 +3884,11 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+         expect(issues(l, 2025, resolutions).some(i => i.status === 'stream_off'), `trial ${t}: switch off over confirmed bills`).toBe(true);
+         seen.streamOff++;
+       }
++      // T10a: a confirmed proposal with no figure always blocks, naming its document.
++      if (docs.some(d => d.extracted!.some(p => p.status === 'confirmed' && p.value == null))) {
++        expect(issues(l, 2025, resolutions).some(i => i.status === 'no_value'), `trial ${t}: confirmed with no figure`).toBe(true);
++        seen.noValue++;
++      }
+       // An unread upload for a fuel with no figure and no "used none" blocks; with a figure it is evidence.
+       if (unread) {
+         const blocksUnread = issues(l, 2025, resolutions).some(i => i.status === 'none');
+@@ -3905,6 +3913,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+     expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
+     expect(seen.streamOff).toBeGreaterThan(20);
+     expect(seen.unread).toBeGreaterThan(10);
++    expect(seen.noValue).toBeGreaterThan(10);
+   });
+ });
+ 
+@@ -4583,3 +4592,78 @@ describe('T10 unread uploads: evidence when the fuel has a figure, a blocker nam
+     expect(none(site({ source_docs: [unreadDoc('other', 'something_else')] }))).toEqual([]);
+   });
+ });
++
++// ── T10a: a confirmed proposal with no figure; Australian gas in MJ ───────────────────────────────────
++describe('T10a no figure, and MJ gas', () => {
++  const melbourneBill = (id: string, mj: number, k: number, o: Partial<ExtractedProposal> = {}) => {
++    const m = String(k).padStart(2, '0');
++    const conv = convertToCanonical('natural_gas', mj, 'MJ');
++    return { ...doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', rawValue: mj, rawUnit: 'MJ', value: conv.value, unit: conv.unit,
++      conversionNote: conv.conversionNote, periodStart: `2025-${m}-01`, periodEnd: `2025-${m}-${new Date(2025, k, 0).getDate()}`, sourceQuote: `${mj} MJ`, ...o })], id), file_name: `${id}.pdf` };
++  };
++  const melbourne = (docs: SourceDoc[]) => loc({ name: 'Melbourne', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', has_natural_gas: true, natural_gas_unit: 'm3', source_docs: docs });
++
++  it('6 944 MJ converts through GJ to MMBtu, with the arithmetic in the note', () => {
++    const c = convertToCanonical('natural_gas', 6944, 'MJ');
++    expect(c).toMatchObject({ tier: 2, unit: 'mmbtu' });
++    expect(c.value).toBeCloseTo(6.944 / 1.05505585262, 6);
++    expect(c.conversionNote).toBe('6,944 MJ ÷ 1,000 = 6.944 GJ; ÷ 1.05505585262 = 6.5816 MMBtu');
++    expect(convertToCanonical('natural_gas', 6944, 'megajoules').value).toBe(c.value);
++  });
++
++  it('prices against the AU (NGA) factor: 54.367 kg CO2e per MMBtu, from 51.53 per GJ', () => {
++    const l = melbourne([melbourneBill('jan', 6944, 1)]);
++    const d = deriveLocations({ locations: [l], reporting_year: 2025 })[0];
++    expect(d.natural_gas_unit).toBe('mmbtu');
++    expect(findUnpriceableLocations([d], 'AR6', 2025)).toEqual([]);
++    const t = calcInventory([d], 'AR6', 2025).s1_total;
++    expect(t).toBeCloseTo((6944 / 1000 / 1.05505585262) * 54.367 / 1000, 7);   // value is rounded to 6 dp
++    expect(t).toBeCloseTo(6.944 * 51.53 / 1000, 4);   // the same as NGA's per-GJ factor on the GJ read
++    const row = (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; ef_source?: string }[]).find(r => r.stream === 'natural_gas')!;
++    expect(row.ef_source).toContain('NGA');
++  });
++
++  it('every surface carries the AU gas derivation, not just the derived figure', () => {
++    const MMBTU = '51.53 kg CO2e/GJ (DCCEEW NGA 2025 Table 4) × 1.05505585262 GJ/MMBtu = 54.367 kg CO2e/MMBtu';
++    const M3 = '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³';
++    const row = (unit: Location['natural_gas_unit'], amount: number, country = 'AU') => (buildWorkings([loc({ name: 'Melbourne', country, state: 'VIC', grid_region: 'AU_VIC',
++      has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: unit })], 'AR6', 2025, [], 12) as { stream?: string; note?: string; emission_factor?: string }[])
++      .find(r => r.stream === 'natural_gas')!;
++    // Workings row, and so the verifier page (which renders a row's note, rowNoteOf).
++    expect(row('mmbtu', 6.581642).note).toBe(MMBTU);
++    expect(row('mmbtu', 6.581642).emission_factor).toContain('54.367');
++    expect(row('m3', 1000).note).toBe(M3);
++    expect(row('mcf', 10, 'US').note, 'only where we derived the figure').toBeUndefined();
++    // The PDF and XLSX methods tables.
++    const melb = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 6.58, natural_gas_unit: 'mmbtu' });
++    expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }])).toEqual([MMBTU]);
++    expect(factorDerivationsFor([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })])).toEqual([]);
++    const root = join(__dirname, '..', '..');
++    expect(readFileSync(join(root, 'app/verify/[token]/page.tsx'), 'utf8')).toContain('{rowNoteOf(w) && (');
++    expect(readFileSync(join(root, 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),");
++    expect(readFileSync(join(root, 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain("...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),");
++  });
++
++  it('a confirmed proposal with no figure blocks, naming the document', () => {
++    const l = melbourne([melbourneBill('jan', 6944, 1, { value: null, unit: null, status: 'confirmed' })]);
++    expect(findUnresolvedCoverage([l], 2025, 12, []).filter(i => i.status === 'no_value')).toEqual([{ locId: 'L1', fuelType: 'natural_gas', status: 'no_value', docIds: ['jan'],
++      message: 'jan.pdf is confirmed, but no figure could be read from it, so it is not counted. Edit the unit or the figure, or reject the bill.' }]);
++  });
++
++  it('every bill for a field rejected, all with no figure: the all-rejected issue is raised (found by the property test)', () => {
++    const l = melbourne([melbourneBill('jan', 6944, 1, { value: null, unit: null, status: 'rejected' })]);
++    expect(findUnresolvedCoverage([l], 2025, 12, []).map(i => i.status)).toContain('all_rejected');
++  });
++
++  it('the Melbourne run-through: five MJ bills saved with no figure block; correcting the unit counts them all', () => {
++    const readings = [6944, 7120, 8015, 9230, 10110];
++    const saved = melbourne(readings.map((mj, k) => melbourneBill(`b${k}`, mj, k + 1, { value: null, unit: null, status: 'confirmed' })));
++    expect(findUnresolvedCoverage([saved], 2025, 12, []).filter(i => i.status === 'no_value')).toHaveLength(5);
++    expect(deriveLocations({ locations: [saved], reporting_year: 2025 })[0].natural_gas_amount, 'the silent zero this fixes').toBe(0);
++    // "Edit unit" → MJ on each, which re-converts from the raw reading (T9).
++    const fixed = { ...saved, source_docs: saved.source_docs.map(d => ({ ...d, extracted: d.extracted!.map(p => ({ ...p, ...convertFields(p) })) })) };
++    function convertFields(p: ExtractedProposal) { const c = convertToCanonical('natural_gas', p.rawValue, 'mj'); return { rawUnit: 'mj', value: c.value, unit: c.unit } }
++    expect(findUnresolvedCoverage([fixed], 2025, 12, []).filter(i => i.status === 'no_value')).toEqual([]);
++    expect(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0].natural_gas_amount).toBeCloseTo(readings.reduce((a, b) => a + b, 0) / 1000 / 1.05505585262, 5);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 0089df2..b569cd4 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -610,6 +610,31 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
+   return EU_DERIVATION[EU_DERIVATION_ALIAS[key] ?? key]
+ }
+ 
++// AUSTRALIAN GAS: THE ARITHMETIC FROM NGA'S PUBLISHED FIGURES TO THE PER-UNIT FACTOR WE APPLY (T10a).
++// NGA publishes natural gas per GJ (a combined Scope 1 factor) with an energy content per m³; the engine
++// stores per-unit figures. Without this a verifier reads "54.367 kg/mmbtu" cited to NGA, a number NGA never
++// printed. The note goes on the workings row (and so the verifier page) and the PDF/XLSX methods tables.
++const AU_DERIVATION: Record<string, string> = {
++  natural_gas_mmbtu: `51.53 kg CO2e/GJ (DCCEEW NGA 2025 Table 4) × ${GJ_PER_MMBTU} GJ/MMBtu = 54.367 kg CO2e/MMBtu`,
++  natural_gas_m3: '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³',
++}
++function auDerivationNote(loc: Location, key: string): string | undefined {
++  if (efJurisdiction(loc) !== 'AU') return undefined
++  return AU_DERIVATION[key]
++}
++
++/**
++ * The factor derivations behind the figures these locations price (T10a): one line per distinct derivation,
++ * for the PDF and XLSX methods tables. Australian natural gas today. Refused locations are dropped, as in
++ * combustionSourcesFor.
++ */
++export function factorDerivationsFor(locations: readonly { country?: string; has_natural_gas?: boolean; natural_gas_amount?: number; natural_gas_unit?: string }[]): string[] {
++  return [...new Set(locations
++    .filter(l => !countryRefusal(l) && l.has_natural_gas && (l.natural_gas_amount ?? 0) > 0)
++    .map(l => auDerivationNote(l as Location, `natural_gas_${l.natural_gas_unit}`))
++    .filter((d): d is string => !!d))]
++}
++
+ // Australia combustion factors — DCCEEW National Greenhouse Accounts (NGA) Factors 2025 (AR5 basis).
+ // NGA publishes an energy-content factor (GJ/unit) and a combined Scope 1 EF per GJ; effective per-unit
+ // values are PRE-COMPUTED here (energy_content × combined-EF/GJ) and stored AS-IS in `co2` with ch4:0,
+@@ -622,6 +647,10 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
+ const EF_AU = {
+   // Natural gas (NGA Table 4, ex-Table 39 energy content): 0.0393 GJ/m³ × 51.53 kgCO2e/GJ = 2.0251 → 2.025 kg/m³.
+   natural_gas_m3: { co2: 2.025, ch4: 0, n2o: 0 },
++  // T10a: the same NGA factor on an ENERGY basis, for bills that print energy (MJ or GJ) rather than volume.
++  // NGA publishes it per GJ, so no energy content is assumed: 51.53 kgCO2e/GJ × 1.05505585262 GJ/MMBtu
++  // = 54.3670 → 54.367 kg/MMBtu (MMBtu is the canonical energy unit lib/unitConversions converts GJ and MJ to).
++  natural_gas_mmbtu: { co2: 54.367, ch4: 0, n2o: 0 },
+   // Diesel oil (NGA Table 4/Table 1): 38.6 GJ/kL × 70.2 kgCO2e/GJ ÷ 1000 = 2.70972 → 2.710 kg/L.
+   diesel_litre: { co2: 2.710, ch4: 0, n2o: 0 },
+   diesel_mobile_litre: { co2: 2.710, ch4: 0, n2o: 0 },
+@@ -2014,7 +2043,8 @@ function ngUnitOptions(country: string): Array<[string, string]> {
+   if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
+   if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
+   if (ctry === 'NZ') return [['kwh', 'kWh']]
+-  if (ctry === 'AU') return [['m3', 'm³']]
++  // AU: m3, and MMBtu for energy-basis bills (MJ and GJ convert to it; T10a), priced from NGA's per-GJ factor.
++  if (ctry === 'AU') return [['m3', 'm³'], ['mmbtu', 'MMBtu']]
+   if (EU_COUNTRIES.includes(ctry)) return [['m3', 'm³']]
+   return [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
+ }
+@@ -3132,6 +3162,9 @@ export const COVERAGE_MESSAGE = {
+   all_rejected: (fuel: string, site: string) =>
+     `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
+   // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
++  // T10a: a proposal confirmed with no figure (saved before confirming one was refused).
++  no_value: (file: string) =>
++    `${file} is confirmed, but no figure could be read from it, so it is not counted. Edit the unit or the figure, or reject the bill.`,
+   // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
+   unread: (file: string, fuels: string, site: string) =>
+     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
+@@ -3245,6 +3278,17 @@ export function acceptanceProblem(p: Pick<ExtractedProposal, 'periodOrigin' | 'p
+   return periodOriginOf(p) === 'billing_month' ? BILLING_MONTH_CONFIRM_MESSAGE : null
+ }
+ 
++/** T10a: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
++export const NO_VALUE_MESSAGE = 'No figure could be read from this bill. Edit the unit or the figure, or reject the bill.'
++
++/**
++ * T10a: a proposal with no figure (value null: an unreadable number, or a unit with no conversion) can never be
++ * confirmed. Confirming it counted nothing and raised nothing, so the figure fell to zero in silence.
++ */
++export function valueProblem(p: Pick<ExtractedProposal, 'value'>): string | null {
++  return p.value == null ? NO_VALUE_MESSAGE : null
++}
++
+ export type InvalidPeriodKind = 'unparseable' | 'reversed'
+ // The plain-language sentence for each kind, naming the document and the dates as stored. Defined here so
+ // T3's export-blocking issue and any surface that explains a row use the same words.
+@@ -3723,7 +3767,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+     const efShown = ratio === 1 ? ef : { co2: ef.co2 * ratio, ch4: ef.ch4 * ratio, n2o: ef.n2o * ratio }
+     // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
+     // priced by a density-derived factor. Joined rather than one overwriting the other.
+-    const note = [convNote, euDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
++    const note = [convNote, euDerivationNote(loc, efKey), auDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
+     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
+     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
+     // table has no year dimension: EF_UK is DEFRA 2026 whichever year is being reported, so the vintage
+@@ -4044,7 +4088,7 @@ export interface CoverageIssue {
+   locId: string
+   fuelType: string
+   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
+-  // "no silent zero"), stream_off (T6 ruling), none (a document with nothing read from it, unchanged).
++  // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a).
+   status: string
+   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
+   // T8: what the strip needs to place the issue and act on it. documentType on gap and overlap (the coverage
+@@ -4084,6 +4128,12 @@ export function findUnresolvedCoverage(
+     const contributions = billContributions(loc, resolutions, coverageWin)
+     const out: CoverageIssue[] = []
+ 
++    // T10a: a CONFIRMED proposal with no figure produces no contribution row (T1), so without this it counted
++    // nothing and raised nothing. It blocks, naming the document.
++    loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
++      if (p.status === 'confirmed' && p.value == null)
++        out.push({ locId: loc.id, fuelType: p.fuelType, status: 'no_value', docIds: [d.id], message: COVERAGE_MESSAGE.no_value(d.file_name) })
++    }))
+     // A document with nothing read from it (T10 ruling). EVIDENCE, not a blocker, when any field its
+     // document type supports already has a figure: typed, from another counted bill, or a used_none
+     // confirmation. Otherwise it blocks, naming the file, the fuel(s) and the site, and the strip offers
+@@ -4122,7 +4172,8 @@ export function findUnresolvedCoverage(
+     // All documents for a field rejected, no figure entered, no used_none.
+     const byField = new Map<string, { fuelType: string; statuses: string[] }>()
+     loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
+-      if (p.value == null) return
++      // T10a: a proposal with no figure is still a document for its field. Skipping it let a field whose only
++      // bills had no figure and were rejected fall to zero with no issue (found by the property test).
+       const map = fieldFor(d.document_type, p.fuelType)
+       if (!map) return
+       const e = byField.get(String(map.amount)) ?? { fuelType: p.fuelType, statuses: [] }
+diff --git a/lib/ghg/proposalEdits.test.ts b/lib/ghg/proposalEdits.test.ts
+index 121884f..744cf46 100644
+--- a/lib/ghg/proposalEdits.test.ts
++++ b/lib/ghg/proposalEdits.test.ts
+@@ -9,7 +9,7 @@ import { join } from 'node:path'
+ import { editPeriod, editUnit, guardConfirm, rejectProposal, undoRejection } from './proposalEdits'
+ import {
+   emptyLocation, acceptanceProblem, periodOriginOf, billContributions, findUnresolvedCoverage, periodFromYearAndEnd,
+-  deriveLocations, buildWorkings, BILLING_MONTH_CONFIRM_MESSAGE,
++  deriveLocations, buildWorkings, BILLING_MONTH_CONFIRM_MESSAGE, NO_VALUE_MESSAGE,
+   type Location, type SourceDoc, type ExtractedProposal,
+ } from './engine'
+ import { convertibleUnits } from '../unitConversions'
+@@ -121,7 +121,7 @@ describe('mixed units: correcting the bill\'s unit re-converts and counts every
+     expect(fixed).toMatchObject({ value: null, status: 'needs_manual_review', rawUnit: 'kwh' })
+   })
+   it('the unit control offers only units the conversion handles', () => {
+-    expect(convertibleUnits('natural_gas')).toEqual(['mcf', 'therms', 'mmbtu', 'm3', 'kwh', 'ccf', 'gj'])
++    expect(convertibleUnits('natural_gas')).toEqual(['mcf', 'therms', 'mmbtu', 'm3', 'kwh', 'ccf', 'gj', 'mj'])
+     expect(convertibleUnits('electricity')).toEqual(['kwh', 'mwh', 'gj'])
+     expect(convertibleUnits('diesel')).toEqual(['gallons', 'litres'])
+   })
+@@ -217,3 +217,30 @@ describe('Reject and Undo (T9 ruling)', () => {
+     expect(page).toContain(") : p.status === 'rejected' ? (")
+   })
+ })
++
++describe('T10a: a proposal with no figure can never be confirmed', () => {
++  const blank = prop({ rawValue: 6944, rawUnit: 'MJ', value: null, unit: null, status: 'needs_manual_review' })
++  it('Confirm is refused, and so is any patch that confirms without a figure', () => {
++    expect(apply(blank, { status: 'confirmed' }).status).toBe('needs_manual_review')
++    expect(apply(blank, { notes: 'x', status: 'confirmed' })).toMatchObject({ notes: 'x', status: 'needs_manual_review' })
++  })
++  it('"Edit figure" confirms, because its patch carries the figure', () => {
++    expect(apply(blank, { value: 6.58, status: 'confirmed' })).toMatchObject({ value: 6.58, status: 'confirmed' })
++  })
++  it('"Edit unit" to MJ gives it a figure, and it can then be confirmed', () => {
++    const fixed = apply(blank, editUnit(blank, { unit: 'mj', by: BY, at: AT }))
++    expect(fixed.value).toBeCloseTo(6.581642, 6)
++    expect(apply(fixed, { status: 'confirmed' }).status).toBe('confirmed')
++  })
++  it('Undo on a rejected bill with no figure goes back to Needs review, never silently stays rejected', () => {
++    const wasConfirmed = prop({ value: null, unit: null, status: 'confirmed' })
++    const r = apply(wasConfirmed, rejectProposal(wasConfirmed, { by: BY, at: AT }))
++    expect(apply(r, undoRejection(r, { by: BY, at: AT })).status).toBe('needs_manual_review')
++  })
++  it('the page disables Confirm and says what to do', () => {
++    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
++    expect(page).toContain('<button disabled={valueProblem(p) !== null}')
++    expect(page).toContain("{p.status !== 'rejected' && valueProblem(p) && (")
++    expect(NO_VALUE_MESSAGE).toBe('No figure could be read from this bill. Edit the unit or the figure, or reject the bill.')
++  })
++})
+diff --git a/lib/ghg/proposalEdits.ts b/lib/ghg/proposalEdits.ts
+index aad3c83..bc9c433 100644
+--- a/lib/ghg/proposalEdits.ts
++++ b/lib/ghg/proposalEdits.ts
+@@ -11,7 +11,7 @@
+ //     convertToCanonical, the same audited conversion as at extraction. It never relabels the converted unit.
+ //   - Rule R5: a month-only proposal cannot be confirmed until the customer confirms or corrects its dates.
+ 
+-import { acceptanceProblem, type ExtractedProposal } from './engine'
++import { acceptanceProblem, valueProblem, type ExtractedProposal } from './engine'
+ import { convertToCanonical, type FuelType } from '../unitConversions'
+ 
+ export type Editor = { userId: string; email: string }
+@@ -79,7 +79,9 @@ export function rejectProposal(p: ExtractedProposal, a: { by: Editor; at: string
+ export function undoRejection(p: ExtractedProposal, a: { by: Editor; at: string }): Patch {
+   const last = [...(p.statusLog ?? [])].reverse().find(e => e.action === 'rejected')
+   const before = last?.statusBefore ?? 'extracted'
+-  const status = before === 'confirmed' && acceptanceProblem(p) !== null ? 'extracted' : before
++  // T10a: a bill with no figure goes back to "Needs review", since it cannot be confirmed.
++  const status = before === 'confirmed' && valueProblem(p) !== null ? 'needs_manual_review'
++    : before === 'confirmed' && acceptanceProblem(p) !== null ? 'extracted' : before
+   return {
+     status,
+     statusLog: [...(p.statusLog ?? []), { action: 'undone', at: a.at, by: a.by, statusBefore: 'rejected' }],
+@@ -92,7 +94,8 @@ export function undoRejection(p: ExtractedProposal, a: { by: Editor; at: string
+  */
+ export function guardConfirm(p: ExtractedProposal, patch: Patch): Patch {
+   if (patch.status !== 'confirmed') return patch
+-  if (acceptanceProblem({ ...p, ...patch }) === null) return patch
++  // T10a: nor a proposal with no figure. "Edit figure" passes, because its patch carries the figure.
++  if (acceptanceProblem({ ...p, ...patch }) === null && valueProblem({ ...p, ...patch }) === null) return patch
+   const rest = { ...patch }
+   delete rest.status
+   return rest
+diff --git a/lib/unitConversions.ts b/lib/unitConversions.ts
+index a187fac..65bcefd 100644
+--- a/lib/unitConversions.ts
++++ b/lib/unitConversions.ts
+@@ -61,6 +61,7 @@ const UNIT_ALIASES: Record<string, string> = {
+   kwh: 'kwh', 'kw h': 'kwh', 'kw-h': 'kwh', 'kilowatt hour': 'kwh', 'kilowatt hours': 'kwh',
+   mwh: 'mwh', 'megawatt hour': 'mwh', 'megawatt hours': 'mwh',
+   gj: 'gj', gigajoule: 'gj', gigajoules: 'gj',
++  mj: 'mj', megajoule: 'mj', megajoules: 'mj',
+   // natural gas
+   therm: 'therms', therms: 'therms',
+   mcf: 'mcf',
+@@ -119,6 +120,12 @@ const TIER2: Record<string, Tier2Fn> = {
+     const value = round(v / GJ_PER_MMBTU);
+     return { value, unit: 'mmbtu', conversionNote: `${fmt(v)} GJ ÷ ${GJ_PER_MMBTU} = ${fmt(value)} MMBtu` };
+   },
++  // T10a: Australian gas bills print energy in MJ ("6 944 MJ"). 1 GJ = 1,000 MJ exactly (SI), then the GJ path.
++  'natural_gas:mj': (v) => {
++    const gj = v / 1000;
++    const value = round(gj / GJ_PER_MMBTU);
++    return { value, unit: 'mmbtu', conversionNote: `${fmt(v)} MJ ÷ 1,000 = ${fmt(gj)} GJ; ÷ ${GJ_PER_MMBTU} = ${fmt(value)} MMBtu` };
++  },
+ 
+   // Electricity — everything reduces to kWh
+   'electricity:mwh': (v) => {

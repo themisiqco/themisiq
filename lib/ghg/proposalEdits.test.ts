@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { editPeriod, editUnit, guardConfirm, rejectProposal, undoRejection } from './proposalEdits'
 import {
   emptyLocation, acceptanceProblem, periodOriginOf, billContributions, findUnresolvedCoverage, periodFromYearAndEnd,
-  deriveLocations, buildWorkings, BILLING_MONTH_CONFIRM_MESSAGE,
+  deriveLocations, buildWorkings, BILLING_MONTH_CONFIRM_MESSAGE, NO_VALUE_MESSAGE,
   type Location, type SourceDoc, type ExtractedProposal,
 } from './engine'
 import { convertibleUnits } from '../unitConversions'
@@ -121,7 +121,7 @@ describe('mixed units: correcting the bill\'s unit re-converts and counts every 
     expect(fixed).toMatchObject({ value: null, status: 'needs_manual_review', rawUnit: 'kwh' })
   })
   it('the unit control offers only units the conversion handles', () => {
-    expect(convertibleUnits('natural_gas')).toEqual(['mcf', 'therms', 'mmbtu', 'm3', 'kwh', 'ccf', 'gj'])
+    expect(convertibleUnits('natural_gas')).toEqual(['mcf', 'therms', 'mmbtu', 'm3', 'kwh', 'ccf', 'gj', 'mj'])
     expect(convertibleUnits('electricity')).toEqual(['kwh', 'mwh', 'gj'])
     expect(convertibleUnits('diesel')).toEqual(['gallons', 'litres'])
   })
@@ -215,5 +215,32 @@ describe('Reject and Undo (T9 ruling)', () => {
     expect(page).toContain("undoRejection(p, { by: currentUser, at: new Date().toISOString() })")
     expect(page).toContain(">Undo</button>")
     expect(page).toContain(") : p.status === 'rejected' ? (")
+  })
+})
+
+describe('T10a: a proposal with no figure can never be confirmed', () => {
+  const blank = prop({ rawValue: 6944, rawUnit: 'MJ', value: null, unit: null, status: 'needs_manual_review' })
+  it('Confirm is refused, and so is any patch that confirms without a figure', () => {
+    expect(apply(blank, { status: 'confirmed' }).status).toBe('needs_manual_review')
+    expect(apply(blank, { notes: 'x', status: 'confirmed' })).toMatchObject({ notes: 'x', status: 'needs_manual_review' })
+  })
+  it('"Edit figure" confirms, because its patch carries the figure', () => {
+    expect(apply(blank, { value: 6.58, status: 'confirmed' })).toMatchObject({ value: 6.58, status: 'confirmed' })
+  })
+  it('"Edit unit" to MJ gives it a figure, and it can then be confirmed', () => {
+    const fixed = apply(blank, editUnit(blank, { unit: 'mj', by: BY, at: AT }))
+    expect(fixed.value).toBeCloseTo(6.581642, 6)
+    expect(apply(fixed, { status: 'confirmed' }).status).toBe('confirmed')
+  })
+  it('Undo on a rejected bill with no figure goes back to Needs review, never silently stays rejected', () => {
+    const wasConfirmed = prop({ value: null, unit: null, status: 'confirmed' })
+    const r = apply(wasConfirmed, rejectProposal(wasConfirmed, { by: BY, at: AT }))
+    expect(apply(r, undoRejection(r, { by: BY, at: AT })).status).toBe('needs_manual_review')
+  })
+  it('the page disables Confirm and says what to do', () => {
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain('<button disabled={valueProblem(p) !== null}')
+    expect(page).toContain("{p.status !== 'rejected' && valueProblem(p) && (")
+    expect(NO_VALUE_MESSAGE).toBe('No figure could be read from this bill. Edit the unit or the figure, or reject the bill.')
   })
 })

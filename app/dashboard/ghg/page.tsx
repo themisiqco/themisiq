@@ -34,9 +34,9 @@ import {
   GRID_REGIONS_CA, GRID_REGIONS_US, FRAMEWORKS, canonicalCountryCode,
   isResolvedGridRegion, getGridFactor, getResidualFactor, residualRegionFor,
   detectGridRegion, gridRegionForCountry, pickEF,
-  combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations,
+  combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
+  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
@@ -3176,6 +3176,8 @@ workings: saved.workings,
       [''],
       ['METHODS'],
       ...combustionSourcesFor(derivedLocations).map(src => ['Combustion factors', src]),
+      // T10a: the same derivation lines as the assurance PDF's methods table.
+      ...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),
       ...gridSourcesFor(derivedLocations).map(src => ['Electricity factors', src]),
       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
       ...sourceAttributionsForLocations(derivedLocations).flatMap(a => [
@@ -3592,9 +3594,10 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                       {p.status === 'confirmed' ? (
                         <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
                       ) : (
-                        <button onClick={() => acceptanceProblem(p)
+                        // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.
+                        <button disabled={valueProblem(p) !== null} onClick={() => valueProblem(p) ? undefined : acceptanceProblem(p)
                           ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
-                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Confirm</button>
+                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: valueProblem(p) ? 0.5 : 1 }}>Confirm</button>
                       )}
                       <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit figure</button>
                       <button onClick={() => { setUnitEditing(null); setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: false }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit dates</button>
@@ -3604,6 +3607,9 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                       <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'needs_manual_review' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: 'var(--color-state-warn)', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Flag for review</button>
                       <button disabled={!currentUser} onClick={() => { if (!currentUser) return; setPeriodEditing(null); setUnitEditing(null); onUpdateProposal(locIdx, doc.id, pi, rejectProposal(p, { by: currentUser, at: new Date().toISOString() })) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#B91C1C', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Reject</button>
                     </div>
+                  )}
+                  {p.status !== 'rejected' && valueProblem(p) && (
+                    <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>{valueProblem(p)}</div>
                   )}
                   {/* T9: dates and unit, answered on the proposal itself; and where they came from. */}
                   {periodEditing?.key === `${doc.id}:${pi}` && (
