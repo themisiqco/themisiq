@@ -1,0 +1,818 @@
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 3f43056..3251f75 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -1299,8 +1299,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // Concierge export gate: block export while any proposal is unconfirmed ('extracted') or flagged ('needs_manual_review').
+   // No proposals (manual-entry users) -> trivially ready. Coverage-completeness is a separate check (step 9b).
+   const conciergePending = inventory.locations.flatMap(l => l.source_docs).flatMap(d => d.extracted ?? []).filter(p => p.status === 'extracted' || p.status === 'needs_manual_review')
+-  // Coverage gate (step 9b) — pure engine function. Per location × document_type, run analyzeCoverage
+-  // and flag any gap/overlap/straddle lacking a matching resolution. conciergeReady composes over it.
++  // Coverage gate (step 9b) — pure engine function. Per location × document_type × fuel × meter: gaps and
++  // overlaps lacking an accepted resolution, plus the no-silent-zero issues (undated, invalid_period,
++  // mixed_units, all_rejected). A straddle is not an issue (T3). conciergeReady composes over it.
+   const coverageResolutions = inventory.coverage_resolutions ?? []
+   const unresolvedCoverage = findUnresolvedCoverage(inventory.locations, inventory.reporting_year, inventory.fiscal_year_end_month, coverageResolutions)
+   const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
+@@ -1324,7 +1325,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   // nor an explicit attestation is UNDECLARED — absence must not export as an attested zero. Remedy is
+   // data or attestation, NOT acknowledgement (unlike a coverage gap). Gated at the same four sites as
+   // gridReady, with its own amber message; deliberately NOT gating the step-2 Continue.
+-  const undeclaredStreams = findUndeclaredStreams(inventory.locations)
++  // coverageResolutions: an accepted 'used_none' (T3) answers the declaration for its stream.
++  const undeclaredStreams = findUndeclaredStreams(inventory.locations, coverageResolutions)
+   const declarationsReady = undeclaredStreams.length === 0
+   // SPLIT BY WHY THE STREAM BLOCKS, because the two states need OPPOSITE instructions and one message
+   // cannot carry both. "Enter the data or attest absent" is right for a stream nobody was asked about
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index c1171aa..022ddd3 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -29,6 +29,7 @@ import {
+   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
+   type DeclarableStream,
+   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution,
++  validateResolution, COVERAGE_MESSAGE,
+ } from './engine';
+ import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+ import { NOT_PROVIDED } from '../notProvided';
+@@ -171,9 +172,12 @@ describe('exclusiveEnd — mid-month ends are inclusive', () => {
+     expect(r.gaps.length).toBe(0);          // THE FIX: zero phantom gaps at any interior boundary
+     expect(r.monthsCovered).toBe(12);       // every month fully covered
+     expect(r.status).not.toBe('gap');       // the phantom-gap bug is gone
+-    // status is 'straddle' (not 'full'): the two FY-edge cycles legitimately cross Jan 1 and need a
+-    // proration choice. That is correct — mid-month cycles can't align to a calendar year. See report.
+-    expect(r.status).toBe('straddle');
++    // T3: was 'straddle'. A straddle is no longer an issue (the two FY-edge cycles are prorated
++    // automatically by their own days, rule R2), so a fully covered year is 'full'. The straddles are
++    // still listed for display.
++    expect(r.status).toBe('full');
++    expect(r.issues).toEqual([]);
++    expect(r.straddles.length).toBe(2);
+   });
+ });
+ 
+@@ -200,14 +204,17 @@ describe('GROUP B — silent absence', () => {
+     expect(r.status).toBe('none');
+   });
+ 
+-  it("B3b the gate must SURFACE 'none' for a doc whose confirmed proposals carry no dates (currently the periods.length===0 early-return discards it)", () => {
++  // T3: was status 'none'. A confirmed bill with no dates now raises its own 'undated' issue, with a
++  // plain-language message naming the document (ruling "no silent zero").
++  it("B3b the gate must SURFACE an undated confirmed bill as 'undated', with its message", () => {
+     const l = loc({
+       id: 'B3', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
+       // confirmed gas proposal but NO period dates → periods is empty → early-return swallows 'none'.
+       source_docs: [doc('utility_bill_gas', [prop({ periodStart: null, periodEnd: null })])],
+     });
+     const unresolved = findUnresolvedCoverage([l], 2024, 12, []);
+-    expect(unresolved.some(u => u.status === 'none')).toBe(true); // ← currently false: 'none' never surfaces
++    expect(unresolved).toContainEqual(expect.objectContaining({ status: 'undated', docIds: ['doc1'],
++      message: 'utility_bill_gas.pdf has no billing period, so it is not counted. Enter the dates as they appear on the bill.' }));
+   });
+ });
+ 
+@@ -3508,8 +3515,8 @@ describe('T1 billContributions', () => {
+     expect(JSON.stringify(l)).toBe(before);
+   });
+ 
+-  // T1's guard was "nothing calls it yet". T2 wires it into applyResolutions, and only there.
+-  it('is called only by applyResolutions (wired in T2)', () => {
++  // T1's guard was "nothing calls it yet". T2 wired it into applyResolutions; T3 adds findUnresolvedCoverage.
++  it('is called only by applyResolutions and findUnresolvedCoverage (T2, T3)', () => {
+     const root = join(__dirname, '..', '..');
+     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+       const rel = `${dir}/${n}`;
+@@ -3521,10 +3528,12 @@ describe('T1 billContributions', () => {
+       const n = (src.match(/billContributions\(/g) ?? []).length;
+       return n ? [`${f}: ${n}`] : [];
+     });
+-    expect(calls).toEqual(['lib/ghg/engine.ts: 1']);
++    expect(calls).toEqual(['lib/ghg/engine.ts: 2']);
+     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
+-    const body = engineSrc.slice(engineSrc.indexOf('export function applyResolutions('));
+-    expect(body.slice(0, body.indexOf('\n}\n')), 'the one call is inside applyResolutions').toMatch(/billContributions\(/);
++    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(']) {
++      const body = engineSrc.slice(engineSrc.indexOf(fn));
++      expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
++    }
+   });
+ 
+   it('exclusiveEnd has exactly one definition in lib/ and app/ (CLAUDE.md invariant)', () => {
+@@ -3645,3 +3654,224 @@ describe('T2 applyResolutions folds billContributions', () => {
+     expect(applied(l, [], 2025).electricity_kwh.value).toBe(0);
+   });
+ });
++
++// ── T3: coverage with full-period overlap, meter key, same_bill / different_meters, no silent zero ─────
++// docs/review/design-derived-figures.md section 11 T3 and the T3 rulings in section 10.
++describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
++  const W = (y: number) => periodFromYearAndEnd(y, 12);
++  const elec = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, periodConfidence: 'high', sourceQuote: `${value} kWh`, ...o });
++  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, ...o });
++  const edoc = (id: string, p: ExtractedProposal, meter?: string): SourceDoc =>
++    ({ ...doc('utility_electricity', [p], id), file_name: `${id}.pdf`, ...(meter ? { meter_label: meter } : {}) });
++  const res = (o: Partial<CoverageResolution>): CoverageResolution =>
++    ({ locId: 'L1', fuelType: 'electricity', kind: 'extrapolate', note: 'n', acknowledgedAt: '2026-03-01T10:00:00Z', ...o } as CoverageResolution);
++  // Scenario B with Scenario A's Bill 2: identical January 2026 periods.
++  const scenarioB = (meter?: string) => loc({ source_docs: [
++    edoc('bill2', elec(1200, '2026-01-01', '2026-02-01')),
++    edoc('monthOnly', elec(1150, '2026-01-01', '2026-01-31', { periodConfidence: 'medium' }), meter),
++  ] });
++  const issues = (l: Location, y: number, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], y, 12, r);
++  const value = (l: Location, y: number, r: CoverageResolution[] = []) => applyResolutions(l, r, W(y).start, W(y).end).electricity_kwh?.value;
++  const OVERLAP_MSG = 'bill2.pdf and monthOnly.pdf cover the same days (2026-01-01 to 2026-01-31). Choose Same bill, count it once, or Different meters or accounts.';
++
++  it('Scenario B + Bill 2, FY2026: overlap raised with a message naming both documents and the shared days', () => {
++    expect(issues(scenarioB(), 2026).filter(i => i.status === 'overlap')).toEqual([
++      { locId: 'L1', fuelType: 'electricity', status: 'overlap', docIds: ['bill2', 'monthOnly'], meterLabel: null, message: OVERLAP_MSG }]);
++  });
++
++  it('Scenario B + Bill 2, FY2025: the overlap is STILL raised (full periods), though both contribute 0', () => {
++    expect(issues(scenarioB(), 2025).filter(i => i.status === 'overlap').map(i => i.message)).toEqual([OVERLAP_MSG]);
++    expect(value(scenarioB(), 2025)).toBe(0);
++  });
++
++  it('same_bill: the excluded document is retained as evidence, not counted, and the overlap clears', () => {
++    const r = res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['monthOnly'] });
++    const l = scenarioB();
++    expect(validateResolution(r, l)).toBeNull();
++    expect(value(l, 2026, [r])).toBe(1200);
++    expect(issues(l, 2026, [r]).filter(i => i.status === 'overlap')).toEqual([]);
++    const c = billContributions(l, [r], W(2026)).find(x => x.docId === 'monthOnly')!;
++    expect(c).toMatchObject({ counted: false, reason: 'same_bill_as', reasonRef: 'bill2' });
++    expect(l.source_docs.map(d => d.id), 'retained').toEqual(['bill2', 'monthOnly']);
++    expect(buildWorkings([{ ...l, electricity_kwh: 1200, grid_region: 'US_CA' }], 'AR6', 2026, [r])
++      .filter(w => w.gwp_basis === 'coverage_resolution').map(w => w.emission_factor)).toEqual(['Same bill, counted once']);
++  });
++
++  it('same_bill validation: one counted document, not also excluded, all on the site with this fuel', () => {
++    const l = scenarioB();
++    expect(validateResolution(res({ kind: 'same_bill', excludedDocIds: ['monthOnly'] }), l)).toBe('Choose the document that counts.');
++    expect(validateResolution(res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: [] }), l)).toBe('Choose the document that is the same bill.');
++    expect(validateResolution(res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['bill2'] }), l)).toBe('The document that counts cannot also be excluded.');
++    expect(validateResolution(res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['nope'] }), l)).toBe('Every document named must be on this site and carry this fuel.');
++  });
++
++  it('different_meters: needs a label that matches the document; then the groups split and both count', () => {
++    expect(validateResolution(res({ kind: 'different_meters', docId: 'monthOnly', meterLabel: '  ' }), scenarioB())).toBe('Name the meter or account for the second document.');
++    expect(validateResolution(res({ kind: 'different_meters', docId: 'monthOnly', meterLabel: 'Meter 2' }), scenarioB())).toBe("The meter name must match the document's meter label.");
++    const l = scenarioB('Meter 2');
++    const r = res({ kind: 'different_meters', docId: 'monthOnly', meterLabel: 'Meter 2' });
++    expect(validateResolution(r, l)).toBeNull();
++    expect(issues(l, 2026, [r]).filter(i => i.status === 'overlap')).toEqual([]);
++    expect(value(l, 2026, [r])).toBe(2350);
++  });
++
++  it('legacy duplicate is not accepted: the overlap stays, the figure is unchanged, no audit row', () => {
++    const dup = res({ kind: 'duplicate' });
++    expect(validateResolution(dup, scenarioB())).toBe('This resolution is no longer accepted. Choose Same bill, count it once, or Different meters or accounts.');
++    expect(issues(scenarioB(), 2026, [dup]).filter(i => i.status === 'overlap')).toHaveLength(1);
++    expect(value(scenarioB(), 2026, [dup])).toBe(2350);
++    expect(buildWorkings([{ ...scenarioB(), electricity_kwh: 2350, grid_region: 'US_CA' }], 'AR6', 2026, [dup])
++      .filter(w => w.gwp_basis === 'coverage_resolution')).toEqual([]);
++  });
++
++  it('meter-keyed gaps: each meter is its own group; an estimate clears only its own meter, grossed by its own factor', () => {
++    const months = (n: number, meter?: string, prefix = 'a') => Array.from({ length: n }, (_, i) => {
++      const m = String(i + 1).padStart(2, '0');
++      const last = new Date(2025, i + 1, 0).getDate();
++      return edoc(`${prefix}${i}`, elec(100, `2025-${m}-01`, `2025-${m}-${last}`), meter);
++    });
++    const l = loc({ source_docs: [...months(12), ...months(6, 'B', 'b')] });
++    expect(issues(l, 2025).filter(i => i.status === 'gap')).toEqual([{ locId: 'L1', fuelType: 'electricity', status: 'gap', meterLabel: 'B' }]);
++    const wrongMeter = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50 });
++    expect(issues(l, 2025, [wrongMeter]).filter(i => i.status === 'gap'), 'a default-meter estimate does not clear meter B').toHaveLength(1);
++    const meterB = res({ kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, meterLabel: 'B' });
++    expect(issues(l, 2025, [meterB]).filter(i => i.status === 'gap')).toEqual([]);
++    expect(value(l, 2025, [meterB])).toBe(1200 + 600 * 2);
++  });
++
++  it('no silent zero: undated, both invalid_period kinds and mixed_units each raise a blocking issue naming the document', () => {
++    const l = loc({ source_docs: [
++      { ...doc('utility_bill_gas', [gas(10, null, null)], 'u'), file_name: 'u.pdf' },
++      { ...doc('utility_bill_gas', [gas(10, '2025-03-10', '2025-03-01')], 'rev'), file_name: 'rev.pdf' },
++      { ...doc('utility_bill_gas', [gas(10, 'Mar 2025', '2025-03-31')], 'bad'), file_name: 'bad.pdf' },
++    ] });
++    const got = issues(l, 2025);
++    expect(got).toContainEqual(expect.objectContaining({ status: 'undated', message: COVERAGE_MESSAGE.undated('u.pdf') }));
++    expect(got).toContainEqual(expect.objectContaining({ status: 'invalid_period', docIds: ['rev'], message: INVALID_PERIOD_MESSAGE.reversed('rev.pdf', '2025-03-10', '2025-03-01') }));
++    expect(got).toContainEqual(expect.objectContaining({ status: 'invalid_period', docIds: ['bad'], message: INVALID_PERIOD_MESSAGE.unparseable('bad.pdf', 'Mar 2025', '2025-03-31') }));
++    const mixed = loc({ name: 'Plant', source_docs: [
++      { ...doc('utility_bill_gas', [gas(1, '2025-01-01', '2025-01-31', { unit: 'mcf' })], 'm1'), file_name: 'm1.pdf' },
++      { ...doc('utility_bill_gas', [gas(1, '2025-02-01', '2025-02-28', { unit: 'therms' })], 'm2'), file_name: 'm2.pdf' },
++    ] });
++    expect(issues(mixed, 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'mixed_units', docIds: ['m1', 'm2'],
++      message: 'The natural gas bills for Plant are in different units (mcf, therms: m1.pdf, m2.pdf), so none of them is counted. Correct the units, or enter the figure manually.' });
++  });
++
++  it('no silent zero: outside_year and same_bill_as raise no issue of their own', () => {
++    const outside = loc({ source_docs: [edoc('old', elec(500, '2024-03-01', '2024-03-31'))] });
++    expect(issues(outside, 2025).filter(i => i.docIds?.includes('old') && i.status !== 'gap')).toEqual([]);
++    const r = res({ kind: 'same_bill', countedDocId: 'bill2', excludedDocIds: ['monthOnly'] });
++    expect(issues(scenarioB(), 2026, [r]).filter(i => i.docIds?.includes('monthOnly'))).toEqual([]);
++  });
++
++  describe('all documents rejected', () => {
++    const rejected = (amount = 0) => loc({ name: 'Plant', has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: 'mcf', source_docs: [
++      { ...doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' })], 'r1'), file_name: 'r1.pdf' },
++      { ...doc('utility_bill_gas', [gas(100, '2025-02-01', '2025-02-28', { status: 'rejected' })], 'r2'), file_name: 'r2.pdf' },
++    ] });
++    const usedNone = res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u-1', email: 'jo@acme.example' } });
++
++    it('raises an export-blocking issue offering a manual figure or "used none"', () => {
++      expect(issues(rejected(), 2025)).toContainEqual({ locId: 'L1', fuelType: 'natural_gas', status: 'all_rejected',
++        message: 'Every natural gas document for Plant was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.' });
++    });
++
++    it('confirming "used none" records who and when, shows in workings, writes 0, clears the issue and the declaration gate', () => {
++      expect(findUndeclaredStreams([rejected()]).map(x => x.stream)).toContain('natural_gas');
++      expect(validateResolution(usedNone, rejected())).toBeNull();
++      expect(issues(rejected(), 2025, [usedNone]).filter(i => i.status === 'all_rejected')).toEqual([]);
++      expect(findUndeclaredStreams([rejected()], [usedNone]).map(x => x.stream)).not.toContain('natural_gas');
++      expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'a stale figure is overwritten with 0').toBe(0);
++      const row = buildWorkings([rejected()], 'AR6', 2025, [usedNone]).find(w => w.gwp_basis === 'coverage_resolution');
++      expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example at 2026-03-01T10:00:00Z');
++      expect(row?.resolved_at).toBe('2026-03-01T10:00:00Z');
++    });
++
++    it('used_none must record who', () => {
++      expect(validateResolution({ ...usedNone, by: undefined }, rejected())).toBe('A confirmation must record who confirmed it.');
++      expect(validateResolution({ ...usedNone, field: 'renewable_electricity_kwh' }, rejected())).toBe('Name the figure that is being confirmed as none.');
++    });
++
++    it('entering a manual figure also clears it; one rejected and one confirmed document does not raise it', () => {
++      expect(issues(rejected(250), 2025).filter(i => i.status === 'all_rejected')).toEqual([]);
++      const mixedStatus = loc({ source_docs: [
++        doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' })], 'r1'),
++        doc('utility_bill_gas', [gas(100, '2025-02-01', '2025-02-28')], 'c1'),
++      ] });
++      expect(issues(mixedStatus, 2025).filter(i => i.status === 'all_rejected')).toEqual([]);
++    });
++  });
++
++  // ── Property tests (seeded, deterministic) ──────────────────────────────────────────────────────
++  const rng = (seed: number) => () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
++  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
++
++  it('property: once no overlap issue remains, no two counted bills in one group share a day', () => {
++    const r = rng(7);
++    let blocked = 0, checked = 0;
++    for (let t = 0; t < 300; t++) {
++      const n = 2 + Math.floor(r() * 4);
++      const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
++        const start = new Date(2025, Math.floor(r() * 12), 1 + Math.floor(r() * 27));
++        const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + Math.floor(r() * 60));
++        return edoc(`d${i}`, elec(100, iso(start), iso(end)), r() < 0.2 ? 'M2' : undefined);
++      });
++      const l = loc({ source_docs: docs });
++      const resolutions: CoverageResolution[] = [];
++      if (r() < 0.6) {
++        const counted = `d${Math.floor(r() * n)}`;
++        const excluded = docs.map(d => d.id).filter(id => id !== counted && r() < 0.5);
++        if (excluded.length) resolutions.push(res({ kind: 'same_bill', countedDocId: counted, excludedDocIds: excluded }));
++      }
++      if (r() < 0.3) resolutions.push(res({ kind: 'duplicate' }));
++      if (issues(l, 2025, resolutions).some(i => i.status === 'overlap')) { blocked++; continue; }
++      const cs = billContributions(l, resolutions, W(2025)).filter(c => c.counted);
++      if (cs.length > 1) checked++;
++      for (let a = 0; a < cs.length; a++) for (let b = a + 1; b < cs.length; b++) {
++        if (cs[a].meterLabel !== cs[b].meterLabel) continue;
++        const aS = cs[a].periodStart as string, aE = cs[a].periodEndExclusive as string;
++        const bS = cs[b].periodStart as string, bE = cs[b].periodEndExclusive as string;
++        expect(aS >= bE || bS >= aE, `trial ${t}: ${cs[a].docId} and ${cs[b].docId} both counted over shared days`).toBe(true);
++      }
++    }
++    expect(blocked, 'some trials overlap').toBeGreaterThan(20); expect(checked, 'some trials count 2+ bills').toBeGreaterThan(20);
++  });
++
++  it('property: a field with documents never reaches zero silently (blocking issue, pending proposal, silent reason, or used_none)', () => {
++    const r = rng(11);
++    const pick = <T,>(xs: T[]) => xs[Math.floor(r() * xs.length)];
++    const seen = { blocking: 0, silent: 0, usedNone: 0 };
++    for (let t = 0; t < 400; t++) {
++      const n = 1 + Math.floor(r() * 3);
++      const docs: SourceDoc[] = Array.from({ length: n }, (_, i) => {
++        const kind = pick(['in', 'out', 'undated', 'reversed', 'unparseable'] as const);
++        const dates: [string | null, string | null] =
++          kind === 'in' ? ['2025-03-01', '2025-03-31'] : kind === 'out' ? ['2024-03-01', '2024-03-31']
++          : kind === 'undated' ? [null, null] : kind === 'reversed' ? ['2025-03-10', '2025-03-01'] : ['Mar 2025', '2025-03-31'];
++        const status = pick(['confirmed', 'confirmed', 'rejected', 'extracted'] as const);
++        return { ...doc('utility_bill_gas', [gas(100, dates[0], dates[1], { status, unit: pick(['mcf', 'mcf', 'therms']) })], `d${i}`), file_name: `d${i}.pdf` };
++      });
++      const l = loc({ has_natural_gas: true, natural_gas_amount: 0, natural_gas_unit: 'mcf', source_docs: docs });
++      const resolutions: CoverageResolution[] = r() < 0.2
++        ? [res({ fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount', by: { userId: 'u', email: 'e@x.example' } })] : [];
++      const a = applyResolutions(l, resolutions, W(2025).start, W(2025).end).natural_gas_amount;
++      const figure = a ? (a.mixedUnits ? 0 : a.value) : l.natural_gas_amount;
++      if (figure > 0) continue;
++      // A gap is left out: it would satisfy this in almost every trial and hide whether the
++      // no-silent-zero issues themselves fire.
++      const blocking = issues(l, 2025, resolutions).some(i => i.status !== 'gap');
++      // An unconfirmed proposal blocks export through conciergePending, in the same conciergeReady gate
++      // as the coverage issues (app/dashboard/ghg/page.tsx), so it counts as blocking here.
++      const pending = docs.some(d => d.extracted!.some(p => p.status === 'extracted' || p.status === 'needs_manual_review'));
++      const decided = billContributions(l, resolutions, W(2025)).filter(c => c.reason !== 'not_confirmed');
++      const onlySilent = decided.length > 0 && decided.every(c => c.reason === 'outside_year' || c.reason === 'same_bill_as');
++      const usedNone = resolutions.some(x => x.kind === 'used_none');
++      if (blocking) seen.blocking++; else if (onlySilent) seen.silent++; else if (usedNone) seen.usedNone++;
++      expect(blocking || pending || onlySilent || usedNone, `trial ${t}: ${JSON.stringify(decided.map(c => c.reason))}`).toBe(true);
++    }
++    // Each way out was actually reached, so the property is not passing vacuously.
++    expect(seen.blocking).toBeGreaterThan(20); expect(seen.silent).toBeGreaterThan(5); expect(seen.usedNone).toBeGreaterThan(5);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 116933b..9ee8178 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -1782,12 +1782,14 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
+     for (; i < jExcl; i++) coverCount[i]++
+   })
+ 
+-  // Overlap pairs: any two bills sharing ≥1 in-window day.
++  // Overlap pairs: any two bills whose FULL canonical periods share ≥1 day (rule R3, T3). Not clipped to
++  // the window: two bills overlapping only outside the reporting year are still the same days billed
++  // twice, and before T3 they were never compared (finding F-10 for a 2025 inventory).
+   const overlapPairs: CoverageResult['overlaps'] = []
+   for (let a = 0; a < periods.length; a++) {
+     for (let b = a + 1; b < periods.length; b++) {
+-      const aS = Math.max(0, idxOf(periods[a].start)), aE = Math.min(totalDaysInWin, idxOf(exclusiveEnd(periods[a].end)))
+-      const bS = Math.max(0, idxOf(periods[b].start)), bE = Math.min(totalDaysInWin, idxOf(exclusiveEnd(periods[b].end)))
++      const aS = periods[a].start.getTime(), aE = exclusiveEnd(periods[a].end).getTime()
++      const bS = periods[b].start.getTime(), bE = exclusiveEnd(periods[b].end).getTime()
+       if (Math.max(aS, bS) < Math.min(aE, bE)) overlapPairs.push({ a: periods[a], b: periods[b] })
+     }
+   }
+@@ -1813,16 +1815,15 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
+   const issues: CoverageResult['issues'] = []
+   if (gaps.length > 0) issues.push('gap')
+   if (overlapPairs.length > 0) issues.push('overlap')
+-  if (straddles.length > 0) issues.push('straddle')
++  // A straddle is NOT an issue since T2/T3: the bill is prorated automatically by its own days (rule R2).
++  // `straddles` is still returned, for display.
+   let status: CoverageResult['status'] = 'full'
+   if (gaps.length > 0) status = 'gap'
+   if (overlapPairs.length > 0) status = 'overlap'
+-  if (straddles.length > 0 && gaps.length === 0 && overlapPairs.length === 0) status = 'straddle'
+   // Summary lists EVERY issue present, so the display never advertises just one of several problems.
+   const summaryParts: string[] = []
+   if (issues.includes('gap')) summaryParts.push(`missing ${gaps.map(g => g.label).join(', ')}`)
+   if (issues.includes('overlap')) summaryParts.push(`${overlapPairs.length} month(s) covered by more than one bill`)
+-  if (issues.includes('straddle')) summaryParts.push(`${straddles.length} bill(s) cross the reporting-year boundary`)
+   return {
+     status,
+     issues,
+@@ -1845,15 +1846,29 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
+ interface CoverageResolution {
+   locId: string
+   fuelType: string
+-  kind: 'extrapolate' | 'duplicate' | 'straddle'
++  // Written kinds (T3): extrapolate, same_bill, different_meters, used_none. 'duplicate' and 'straddle' are
++  // LEGACY: readable, never accepted (validateResolution), so they change no figure and resolve no issue.
++  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle'
+   // extrapolate: gross up partial-year data by coverage ratio
+   monthsCovered?: number          // for extrapolate: e.g. 11
+   pctEstimated?: number           // for extrapolate: e.g. 8.3
+-  // straddle: day-level proration choice
++  // extrapolate: which meter's gap (absent or null = the default single meter). different_meters: the
++  // label given, which must equal the document's own meter_label (the one source the engine groups by).
++  meterLabel?: string | null
++  // same_bill: the document that counts, and the ones retained as evidence but not counted.
++  countedDocId?: string
++  excludedDocIds?: string[]
++  // different_meters: the document the meter label was given to.
++  docId?: string
++  // used_none: the location field confirmed as zero.
++  field?: string
++  // Who confirmed (used_none: required). The account's user id and email at the time of confirming.
++  by?: { userId: string; email: string }
++  // LEGACY straddle: day-level proration choice (ignored since T2)
+   straddleChoice?: 'this_year' | 'next_year' | 'prorate'
+   daysInYear?: number
+   totalDays?: number
+-  // duplicate: which doc/proposal was dropped
++  // LEGACY duplicate: which doc/proposal was dropped
+   droppedDocId?: string
+   note: string                    // human-readable, flows into workings
+   acknowledgedAt: string          // ISO timestamp
+@@ -2888,6 +2903,9 @@ function fuelTypeForDocType(docType: string): string | null {
+ // drift apart — the divergence they used to have IS the SEV 0 bug.
+ function resolutionMethod(r: CoverageResolution): string {
+   return r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
++    : r.kind === 'same_bill' ? 'Same bill, counted once'
++    : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
++    : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
+     : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
+     : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
+     : r.kind
+@@ -2904,9 +2922,81 @@ function resolutionBasis(r: CoverageResolution): string {
+       : `boundary-straddling bill resolved by ${r.straddleChoice}`
+   }
+   if (r.kind === 'duplicate') return 'overlapping bills accepted as-is; no double-count adjustment applied'
++  if (r.kind === 'same_bill') return `document ${r.countedDocId} counted; ${(r.excludedDocIds ?? []).join(', ')} retained as evidence, not counted`
+   return r.note
+ }
+ 
++// ── T3: RESOLUTION VALIDATION, COVERAGE MESSAGES, FIELD TABLES ───────────────────────────────────────
++// docs/review/design-derived-figures.md, section 11 T3, and the T3 rulings in section 10.
++//
++// A resolution is ACCEPTED only if it validates against the location. Every engine path reads accepted
++// resolutions only, so an invalid or legacy one changes no figure, resolves no issue and gets no audit row.
++// 'duplicate' and 'straddle' are never accepted: 'duplicate' left a known double count in the total
++// (rule R4), and 'straddle' is replaced by automatic proration (rule R2, T2).
++export function validateResolution(r: CoverageResolution, loc: Location): string | null {
++  if (r.locId !== loc.id) return 'Resolution is for a different location.'
++  const docs = loc.source_docs
++  const hasFuel = (docId: string) =>
++    docs.some(d => d.id === docId && (d.extracted ?? []).some(p => p.fuelType === r.fuelType))
++  switch (r.kind) {
++    case 'extrapolate':
++      return r.monthsCovered && r.monthsCovered > 0 ? null : 'An estimate needs the number of months covered by bills.'
++    case 'same_bill': {
++      const ex = r.excludedDocIds ?? []
++      if (!r.countedDocId) return 'Choose the document that counts.'
++      if (ex.length === 0) return 'Choose the document that is the same bill.'
++      if (ex.includes(r.countedDocId)) return 'The document that counts cannot also be excluded.'
++      if (![r.countedDocId, ...ex].every(hasFuel)) return 'Every document named must be on this site and carry this fuel.'
++      return null
++    }
++    case 'different_meters': {
++      const label = (r.meterLabel ?? '').trim()
++      if (!label) return 'Name the meter or account for the second document.'
++      const doc = docs.find(d => d.id === r.docId)
++      if (!doc) return 'The document named is not on this site.'
++      if ((doc.meter_label ?? '') !== label) return "The meter name must match the document's meter label."
++      return null
++    }
++    case 'used_none':
++      if (!r.field || !(r.field in FIELD_STREAM)) return 'Name the figure that is being confirmed as none.'
++      if (!r.by?.userId || !r.by?.email) return 'A confirmation must record who confirmed it.'
++      return null
++    case 'duplicate':
++      return 'This resolution is no longer accepted. Choose Same bill, count it once, or Different meters or accounts.'
++    case 'straddle':
++      return 'This resolution is no longer accepted. Bills that cross the year boundary are prorated by their own days.'
++  }
++}
++export const acceptedResolutions = (loc: Location, resolutions: CoverageResolution[]): CoverageResolution[] =>
++  resolutions.filter(r => r.locId === loc.id && validateResolution(r, loc) === null)
++
++// The declarable stream each document-backed field belongs to, for used_none and the declarations gate.
++// renewable_electricity_kwh is not a stream (it reduces market-based Scope 2), so it cannot be used_none.
++const FIELD_STREAM: Partial<Record<keyof Location, DeclarableStream>> = {
++  natural_gas_amount: 'natural_gas',
++  propane_amount: 'propane',
++  diesel_stationary_amount: 'diesel_stationary',
++  diesel_mobile_amount: 'mobile',
++  gasoline_amount: 'mobile',
++  electricity_kwh: 'electricity',
++}
++const FUEL_NAME: Record<string, string> = {
++  natural_gas: 'natural gas', propane: 'propane', diesel: 'diesel', gasoline: 'gasoline', electricity: 'electricity',
++}
++
++// The plain-language messages behind the export-blocking coverage issues (T3 ruling "no silent zero", and
++// "all documents rejected"). Shown by the strip in T8. invalid_period uses INVALID_PERIOD_MESSAGE (T1).
++export const COVERAGE_MESSAGE = {
++  undated: (file: string) =>
++    `${file} has no billing period, so it is not counted. Enter the dates as they appear on the bill.`,
++  mixed_units: (fuel: string, site: string, units: string[], files: string[]) =>
++    `The ${fuel} bills for ${site} are in different units (${units.join(', ')}: ${files.join(', ')}), so none of them is counted. Correct the units, or enter the figure manually.`,
++  overlap: (fileA: string, fileB: string, from: string, to: string) =>
++    `${fileA} and ${fileB} cover the same days (${from} to ${to}). Choose Same bill, count it once, or Different meters or accounts.`,
++  all_rejected: (fuel: string, site: string) =>
++    `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used none.`,
++}
++
+ // ── BILL CONTRIBUTIONS (docs/review/design-derived-figures.md, task T1) ─────────────────────────
+ //
+ // One row per proposal that carries a value and maps to a location field: what that bill contributes to
+@@ -2992,12 +3082,18 @@ function isRealIsoDate(s: string): boolean {
+   return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
+ }
+ 
+-// `_resolutions` is accepted now so the signature is the one T3, T10 and T14 extend; T1 reads none of them.
++// `resolutions`: T3 reads accepted same_bill resolutions (excluded documents → same_bill_as). T10 and T14
++// extend it.
+ export function billContributions(
+   loc: Location,
+-  _resolutions: CoverageResolution[],
++  resolutions: CoverageResolution[],
+   win: { start: Date; end: Date },
+ ): BillContribution[] {
++  // same_bill (T3): documents excluded by an accepted resolution, keyed docId → the document that counts.
++  const excludedBy = new Map<string, string>()
++  for (const r of acceptedResolutions(loc, resolutions)) {
++    if (r.kind === 'same_bill') for (const id of r.excludedDocIds ?? []) excludedBy.set(`${id}|${r.fuelType}`, r.countedDocId as string)
++  }
+   const DAY = 86400000
+   const dayCount = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / DAY)
+   const iso = (d: Date): string =>
+@@ -3012,6 +3108,7 @@ export function billContributions(
+   const unitsByField = new Map<string, Set<string>>()
+   loc.source_docs.forEach(d => d.extracted?.forEach(p => {
+     if (p.status !== 'confirmed' || p.value == null) return
++    if (excludedBy.has(`${d.id}|${p.fuelType}`)) return   // not counted, so it cannot make a field mixed
+     const map = fieldFor(d.document_type, p.fuelType)
+     if (!map) return
+     const units = unitsByField.get(String(map.amount)) ?? new Set<string>()
+@@ -3048,8 +3145,10 @@ export function billContributions(
+       }
+     }
+ 
++    const sameBillAs = excludedBy.get(`${d.id}|${p.fuelType}`)
+     const reason: ContributionReason =
+       p.status !== 'confirmed' ? 'not_confirmed'
++      : sameBillAs ? 'same_bill_as'
+       : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
+       : periodProblem ? 'invalid_period'
+       : totalDays === null ? 'undated'
+@@ -3074,6 +3173,7 @@ export function billContributions(
+       counted: reason === 'counted' || reason === 'prorated',
+       reason,
+       ...(reason === 'invalid_period' && periodProblem ? { periodProblem } : {}),
++      ...(reason === 'same_bill_as' && sameBillAs ? { reasonRef: sameBillAs } : {}),
+     })
+   }))
+   return out
+@@ -3099,9 +3199,9 @@ export interface AppliedField {
+   value: number           // the figure actually used
+   unit?: string
+   adjustment: null | {
+-    // 'prorate' is automatic (rule R2), not a customer resolution. 'duplicate' is the legacy resolution
+-    // (no effect on the value; replaced in T3).
+-    kind: 'extrapolate' | 'prorate' | 'duplicate'
++    // 'prorate' is automatic (rule R2), not a customer resolution. (The legacy 'duplicate' adjustment is gone
++    // in T3: a duplicate resolution is never accepted.)
++    kind: 'extrapolate' | 'prorate'
+     method: string        // human-readable, flows verbatim into workings
+     basis: string         // e.g. "9 of 12 months; ×12/9" | "2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387"
+     factor: number        // multiplier applied to rawSum (1 = unchanged)
+@@ -3118,8 +3218,10 @@ export interface AppliedField {
+ // provenance note the verifier reads cannot word it two ways.
+ export const PRORATE_METHOD = 'Prorated by billing days'
+ 
+-export function applyResolutions(loc: Location, resolutions: CoverageResolution[], winStart: Date, winEnd: Date): Record<string, AppliedField> {
++export function applyResolutions(loc: Location, allResolutions: CoverageResolution[], winStart: Date, winEnd: Date): Record<string, AppliedField> {
+   const year = winEnd.getFullYear()
++  // Only ACCEPTED resolutions reach a figure (T3). A legacy duplicate or straddle, or an invalid one, does not.
++  const resolutions = acceptedResolutions(loc, allResolutions)
+   const contributions = billContributions(loc, resolutions, { start: winStart, end: winEnd })
+   const isoDay = (d: Date): string =>
+     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+@@ -3155,34 +3257,47 @@ export function applyResolutions(loc: Location, resolutions: CoverageResolution[
+   for (const [key, a] of Object.entries(acc)) {
+     const mixedUnits = a.units.size > 1
+     const unit = a.units.size === 1 ? [...a.units][0] : undefined
+-    const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === a.fuelType && !!r.monthsCovered && r.monthsCovered > 0)
+-    const dup = resolutions.find(r => r.kind === 'duplicate' && r.locId === loc.id && r.fuelType === a.fuelType)
+-
+     // THE FOLD: each counted bill contributes its value × its own in-window share. Nothing else reaches
+     // the figure — not a bill outside the year, not an undated or invalid-period bill, not a stored
+-    // straddle choice.
++    // straddle choice, not a bill excluded as the same bill as another.
+     const counted = contributions.filter(c => String(c.field) === key && c.counted)
+-    const foldedSum = counted.reduce((s, c) => s + c.value * (c.share ?? 0), 0)
+-    // EXTRAPOLATION gross-up applies AFTER the fold. ORDER MATTERS.
+-    const extrFactor = (extr && extr.monthsCovered) ? 12 / extr.monthsCovered : 1
+-    const value = mixedUnits ? a.rawSum : foldedSum * extrFactor
++    // EXTRAPOLATION gross-up applies AFTER the fold, PER METER (T3 ruling): each meter's counted sum is
++    // grossed up by that meter's own acknowledged coverage. An extrapolate resolution names its meter
++    // (absent or null = the default single meter).
++    const meters = new Map<string | null, number>()
++    for (const c of counted) meters.set(c.meterLabel, (meters.get(c.meterLabel) ?? 0) + c.value * (c.share ?? 0))
++    const extrs: { meter: string | null; r: CoverageResolution }[] = []
++    let grossed = 0
++    for (const [meter, sum] of meters) {
++      const r = resolutions.find(x => x.kind === 'extrapolate' && x.fuelType === a.fuelType && (x.meterLabel ?? null) === meter)
++      if (r) extrs.push({ meter, r })
++      grossed += sum * (r && r.monthsCovered ? 12 / r.monthsCovered : 1)
++    }
++    const value = mixedUnits ? a.rawSum : grossed
+ 
+     const prorated = counted.filter(c => c.reason === 'prorated')
+     let adjustment: AppliedField['adjustment'] = null
+-    if (extr || prorated.length > 0 || dup) {
++    if (extrs.length > 0 || prorated.length > 0) {
+       // basis states the REAL arithmetic, in application order (per-bill proration, THEN extrapolate).
++      const meterTag = (m: string | null) => (m == null ? '' : `${m}: `)
+       const parts: string[] = prorated.map(c =>
+-        `${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in FY${year}, ×${(c.share ?? 0).toFixed(3)}`)
+-      if (extr) parts.push(resolutionBasis(extr))
+-      if (dup && prorated.length === 0 && !extr) parts.push(resolutionBasis(dup))
+-      // primary drives kind + method: extrapolate (the gross-up) if present, else proration, else the duplicate.
+-      const kind: NonNullable<AppliedField['adjustment']>['kind'] = extr ? 'extrapolate' : prorated.length > 0 ? 'prorate' : 'duplicate'
+-      const method = kind === 'prorate' ? PRORATE_METHOD : resolutionMethod((extr ?? dup)!)
++        `${meterTag(c.meterLabel)}${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in FY${year}, ×${(c.share ?? 0).toFixed(3)}`)
++      for (const e of extrs) parts.push(`${meterTag(e.meter)}${resolutionBasis(e.r)}`)
++      // primary drives kind + method: extrapolate (the gross-up) if present, else proration.
++      const kind: NonNullable<AppliedField['adjustment']>['kind'] = extrs.length > 0 ? 'extrapolate' : 'prorate'
++      const method = kind === 'prorate' ? PRORATE_METHOD : extrs.map(e => `${meterTag(e.meter)}${resolutionMethod(e.r)}`).join('; ')
+       adjustment = { kind, method, basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
+     }
+ 
+     out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
+   }
++  // used_none (T3 ruling "all documents rejected"): a field confirmed as zero, with no confirmed document,
++  // is written as 0, so a figure left from earlier bills cannot stand. A confirmed document outranks it.
++  for (const r of resolutions) {
++    if (r.kind !== 'used_none' || !r.field || out[r.field]) continue
++    out[r.field] = { field: r.field as keyof Location, rawSum: 0, value: 0, adjustment: null, mixedUnits: false,
++      fuelTypes: [r.fuelType], quotes: [], docIds: [], filePaths: [], refs: [] }
++  }
+   return out
+ }
+ 
+@@ -3547,10 +3662,12 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+   // Every gap/overlap/straddle the user resolved is recorded here so a verifier
+   // sees the method and basis behind any estimated or adjusted figure. Spec: line 462.
+   for (const r of resolutions) {
+-    // A stored 'straddle' resolution is IGNORED by the figure since T2 (straddling bills are prorated
+-    // automatically by their own days), so it gets no audit row: a row must not claim a method the figure
+-    // did not apply. The proration itself is disclosed on the figure's own row (concierge-prorated).
+-    if (r.kind === 'straddle') continue
++    // Only ACCEPTED resolutions get an audit row (T3): a row must not claim a method the figure did not
++    // apply. That excludes a stored 'straddle' (ignored since T2; straddling bills are prorated
++    // automatically and disclosed on the figure's own row) and a stored 'duplicate' (never accepted: it
++    // left a known double count), and any resolution that does not validate against its location.
++    const owner = locations.find(l => l.id === r.locId)
++    if (!owner || validateResolution(r, owner) !== null) continue
+     // Method string comes from the SAME resolutionMethod() that fills AppliedField.adjustment.method,
+     // so the audit row and the figure's provenance stamp can never claim different things.
+     rows.push({
+@@ -3581,49 +3698,114 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
+ // it clear the gate for the other — silent partial extrapolation (the C1 bug). Each fuel is now its own
+ // group, requiring its own resolution. And the gate iterates cov.ISSUES (all conditions), not the scalar
+ // status, so a gap masked by an overlap can't slip through (the D1 bug).
++export interface CoverageIssue {
++  locId: string
++  fuelType: string
++  // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
++  // "no silent zero"), none (a document with nothing read from it, unchanged).
++  status: string
++  message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
++  docIds?: string[]
++  meterLabel?: string | null
++}
++
++// Every export-blocking coverage issue. Coverage groups are keyed (document_type, fuelType, meter_label)
++// (ruling C6(a)); a document with no meter_label is the default single meter.
++//   gap      a group with in-window days uncovered and no accepted extrapolate for THAT meter.
++//   overlap  two documents in one group whose full periods share a day. No resolution clears it directly:
++//            Same bill (same_bill) takes one out of the group, Different meters (meter labels) splits the
++//            group. Legacy 'duplicate' is not accepted, so it leaves the overlap standing (rule R4).
++//   undated, invalid_period, mixed_units   a confirmed bill that is not counted for a reason the customer
++//            must be told (T3 ruling: only outside_year and same_bill_as may be silent).
++//   all_rejected   every document for a field rejected, no figure entered (the field is 0), and no
++//            accepted used_none.
++//   none     a document with no figure read from it at all (unchanged from before T3).
+ export function findUnresolvedCoverage(
+   locations: Location[],
+   reportingYear: number,
+   fiscalYearEndMonth: number,
+-  resolutions: CoverageResolution[]
+-): { locId: string; fuelType: string; status: string }[] {
++  allResolutions: CoverageResolution[]
++): CoverageIssue[] {
+   const coverageWin = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+-  const KIND_FOR: Record<'gap' | 'overlap' | 'straddle', CoverageResolution['kind']> =
+-    { gap: 'extrapolate', overlap: 'duplicate', straddle: 'straddle' }
++  const isoDay = (d: Date): string =>
++    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+   return locations.flatMap(loc => {
+-    // Group confirmed DATED proposals by (docType, fuelType). Each group is its own coverage unit.
+-    const groups = new Map<string, { fuelType: string; periods: CoveragePeriod[] }>()
+-    // A doc whose confirmed proposals carry NO usable dates yields a 'none' (must date the bills — no
+-    // resolution can clear it). Label with the doc's known fuel if any, else the docType's canonical fuel;
+-    // fleet_fuel (two fuels) can't be labelled from nothing → fuelType '' (one 'none' row per such doc).
+-    const noneFuels: string[] = []
++    const resolutions = acceptedResolutions(loc, allResolutions)
++    const site = loc.name || 'Location'
++    const fileOf = (docId: string) => loc.source_docs.find(d => d.id === docId)?.file_name ?? docId
++    const contributions = billContributions(loc, resolutions, coverageWin)
++    const out: CoverageIssue[] = []
++
++    // A document with no proposals at all: nothing was read, so it cannot be placed. Unchanged.
+     loc.source_docs.forEach(d => {
+-      const confirmed = (d.extracted ?? []).filter(p => p.status === 'confirmed')
+-      const dated = confirmed.filter(p => p.periodStart && p.periodEnd)
+-      dated.forEach(p => {
+-        const key = `${d.document_type}|${p.fuelType}`
+-        const g = groups.get(key) ?? { fuelType: p.fuelType, periods: [] }
+-        g.periods.push({ docId: d.id, pi: 0, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
+-        groups.set(key, g)
+-      })
+-      if (dated.length === 0 && confirmed.length > 0) {
+-        // Confirmed but undated → 'none'. Label from the confirmed proposal's fuel, else the docType's.
+-        noneFuels.push(confirmed.find(p => p.fuelType)?.fuelType ?? fuelTypeForDocType(d.document_type) ?? '')
+-      } else if ((d.extracted?.length ?? 0) === 0) {
+-        // No extracted proposals at all — can't read a fuel. One 'none' row; fleet_fuel → '' (don't invent).
+-        noneFuels.push(fuelTypeForDocType(d.document_type) ?? '')
+-      }
++      if ((d.extracted?.length ?? 0) === 0) out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id] })
+     })
+ 
+-    const out: { locId: string; fuelType: string; status: string }[] = []
+-    noneFuels.forEach(fuelType => out.push({ locId: loc.id, fuelType, status: 'none' }))
+-    for (const [, g] of groups) {
++    // Not-counted bills the customer must be told about.
++    for (const c of contributions) {
++      if (c.reason === 'undated') {
++        out.push({ locId: loc.id, fuelType: c.fuelType, status: 'undated', docIds: [c.docId], meterLabel: c.meterLabel,
++          message: COVERAGE_MESSAGE.undated(fileOf(c.docId)) })
++      } else if (c.reason === 'invalid_period' && c.periodProblem) {
++        const p = loc.source_docs.find(d => d.id === c.docId)?.extracted?.[c.proposalIndex]
++        out.push({ locId: loc.id, fuelType: c.fuelType, status: 'invalid_period', docIds: [c.docId], meterLabel: c.meterLabel,
++          message: INVALID_PERIOD_MESSAGE[c.periodProblem](fileOf(c.docId), p?.periodStart ?? '', p?.periodEnd ?? '') })
++      }
++    }
++    const mixedByField = new Map<string, BillContribution[]>()
++    for (const c of contributions) if (c.reason === 'mixed_units') mixedByField.set(String(c.field), [...(mixedByField.get(String(c.field)) ?? []), c])
++    for (const cs of mixedByField.values()) {
++      const units = [...new Set(cs.map(c => c.unit ?? ''))].filter(Boolean)
++      const files = [...new Set(cs.map(c => fileOf(c.docId)))]
++      out.push({ locId: loc.id, fuelType: cs[0].fuelType, status: 'mixed_units', docIds: [...new Set(cs.map(c => c.docId))],
++        message: COVERAGE_MESSAGE.mixed_units(FUEL_NAME[cs[0].fuelType] ?? cs[0].fuelType, site, units, files) })
++    }
++
++    // All documents for a field rejected, no figure entered, no used_none.
++    const byField = new Map<string, { fuelType: string; statuses: string[] }>()
++    loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
++      if (p.value == null) return
++      const map = fieldFor(d.document_type, p.fuelType)
++      if (!map) return
++      const e = byField.get(String(map.amount)) ?? { fuelType: p.fuelType, statuses: [] }
++      e.statuses.push(p.status)
++      byField.set(String(map.amount), e)
++    }))
++    for (const [field, e] of byField) {
++      if (!e.statuses.every(st => st === 'rejected')) continue
++      const entered = Number((loc as unknown as Record<string, unknown>)[field] ?? 0) > 0
++      const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
++      if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected',
++        message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
++    }
++
++    // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
++    // (document_type, fuelType, meter_label). Same-bill exclusions, undated, invalid and mixed bills are
++    // not placed (each is reported above, or is a resolved overlap).
++    const groups = new Map<string, { fuelType: string; meterLabel: string | null; periods: CoveragePeriod[] }>()
++    for (const c of contributions) {
++      if (!(c.counted || c.reason === 'outside_year') || !c.periodStart || !c.periodEndExclusive) continue
++      const d = loc.source_docs.find(x => x.id === c.docId)!
++      const key = `${d.document_type}|${c.fuelType}|${c.meterLabel ?? ''}`
++      const g = groups.get(key) ?? { fuelType: c.fuelType, meterLabel: c.meterLabel, periods: [] }
++      const p = d.extracted![c.proposalIndex]
++      g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
++      groups.set(key, g)
++    }
++    for (const g of groups.values()) {
+       const cov = analyzeCoverage(g.periods, coverageWin.start, coverageWin.end)
+-      const hasRes = (kind: CoverageResolution['kind']) =>
+-        resolutions.some(r => r.kind === kind && r.locId === loc.id && r.fuelType === g.fuelType)
+-      // Require a resolution for EVERY issue present. Any unresolved issue blocks; report them together.
+-      const unresolvedIssues = cov.issues.filter(iss => !hasRes(KIND_FOR[iss]))
+-      if (unresolvedIssues.length > 0) out.push({ locId: loc.id, fuelType: g.fuelType, status: unresolvedIssues.join('+') })
++      if (cov.issues.includes('gap')) {
++        const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel)
++        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel })
++      }
++      for (const pair of cov.overlaps) {
++        const from = pair.a.start > pair.b.start ? pair.a.start : pair.b.start
++        const endA = exclusiveEnd(pair.a.end), endB = exclusiveEnd(pair.b.end)
++        const toExcl = endA < endB ? endA : endB
++        const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
++        out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel,
++          message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), isoDay(from), isoDay(to)) })
++      }
+     }
+     return out
+   })
+@@ -3740,15 +3922,22 @@ export function streamState(loc: Location, s: DeclarableStream): StreamState {
+ // question asked, "answered yes, no figure" needs a number. The wizard's copy does not yet distinguish
+ // them and tells the customer to enter the data or attest absent, which is right for both.
+ export function findUndeclaredStreams(
+-  locations: Location[]
++  locations: Location[],
++  resolutions: CoverageResolution[] = []
+ ): { locId: string; locName: string; stream: DeclarableStream; state: StreamState }[] {
+   return locations.flatMap(loc => {
+     const attested = new Set((loc.stream_attestations ?? []).map(a => a.stream))
++    // An accepted used_none (T3) is a recorded figure of zero for its stream, with who and when: it
++    // answers both 'undeclared' and 'declared_unquantified', so confirming "this site used none" unblocks.
++    const usedNone = new Set(acceptedResolutions(loc, resolutions)
++      .filter(r => r.kind === 'used_none' && r.field)
++      .map(r => FIELD_STREAM[r.field as keyof Location])
++      .filter((x): x is DeclarableStream => !!x))
+     return DECLARABLE_STREAMS
+       .map(stream => ({ stream, state: streamState(loc, stream) }))
+       // An attestation answers 'undeclared' — nobody had been asked, now someone has. It does NOT
+       // answer 'declared_unquantified': a site cannot attest a stream absent and also report using it.
+-      .filter(({ stream, state }) => state !== 'quantified' && !(state === 'undeclared' && attested.has(stream)))
++      .filter(({ stream, state }) => state !== 'quantified' && !usedNone.has(stream) && !(state === 'undeclared' && attested.has(stream)))
+       .map(({ stream, state }) => ({ locId: loc.id, locName: loc.name || 'Location', stream, state }))
+   })
+ }

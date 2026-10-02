@@ -1,0 +1,412 @@
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -3084,6 +3084,13 @@
+  * confirmed proposals and any coverage resolutions on file.
+  * Pure. Called by the component's write path AND by buildWorkings — so the
+  * figure in the total and the figure in the audit trail cannot diverge.
++ *
++ * T2 (docs/review/design-derived-figures.md): the figure is the FOLD OF billContributions — the sum of
++ * each counted bill's value × its own in-window share — then the extrapolation gross-up. So a bill wholly
++ * outside the reporting year contributes nothing (rule R1, finding F-09), a straddling bill is prorated
++ * automatically by its own days (rule R2), and undated or invalid-period bills are not counted (T1
++ * rulings). A stored 'straddle' resolution is IGNORED: the customer's this-year / next-year / prorate
++ * choice no longer reaches the figure, and buildWorkings writes no audit row for it.
+  */
+ export interface AppliedField {
+   field: keyof Location
+@@ -3092,9 +3099,11 @@
+   value: number           // the figure actually used
+   unit?: string
+   adjustment: null | {
+-    kind: 'extrapolate' | 'straddle' | 'duplicate'
++    // 'prorate' is automatic (rule R2), not a customer resolution. 'duplicate' is the legacy resolution
++    // (no effect on the value; replaced in T3).
++    kind: 'extrapolate' | 'prorate' | 'duplicate'
+     method: string        // human-readable, flows verbatim into workings
+-    basis: string         // e.g. "9 of 12 months; ×12/9" | "12 of 31 days in FY"
++    basis: string         // e.g. "9 of 12 months; ×12/9" | "2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387"
+     factor: number        // multiplier applied to rawSum (1 = unchanged)
+   }
+   mixedUnits: boolean     // true → do not write; caller flags for manual review
+@@ -3104,26 +3113,26 @@
+   filePaths: string[]
+   refs: { docId: string; pi: number }[]   // (docId, proposal index) feeding this field — for the write path's mixed-unit flip
+ }
++
++// The method label on a figure prorated by billing days. One string, so the figure's adjustment and the
++// provenance note the verifier reads cannot word it two ways.
++export const PRORATE_METHOD = 'Prorated by billing days'
+ 
+ export function applyResolutions(loc: Location, resolutions: CoverageResolution[], winStart: Date, winEnd: Date): Record<string, AppliedField> {
+-  const DAY = 86400000
+-  const winEexcl = new Date(winEnd.getFullYear(), winEnd.getMonth(), winEnd.getDate() + 1)
+   const year = winEnd.getFullYear()
+-  // Does THIS proposal's canonical [start, exclusiveEnd(end)) interval straddle the window? Same
+-  // convention as analyzeCoverage's detector, so the strip, the figure and the audit trail agree.
+-  const proposalStraddles = (periodStart: string | null, periodEnd: string | null): boolean => {
+-    if (!periodStart || !periodEnd) return false
+-    const s = parseLocalDate(periodStart)
+-    const e = exclusiveEnd(parseLocalDate(periodEnd))
+-    const total = Math.round((e.getTime() - s.getTime()) / DAY)
+-    const ovS = s > winStart ? s : winStart
+-    const ovE = e < winEexcl ? e : winEexcl
+-    const inWin = Math.max(0, Math.round((ovE.getTime() - ovS.getTime()) / DAY))
+-    return inWin > 0 && inWin < total
++  const contributions = billContributions(loc, resolutions, { start: winStart, end: winEnd })
++  const isoDay = (d: Date): string =>
++    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
++  // The last covered day of a contribution, for the basis text: the exclusive end minus one day.
++  const lastCoveredDay = (endExclusive: string): string => {
++    const e = parseLocalDate(endExclusive)
++    return isoDay(new Date(e.getFullYear(), e.getMonth(), e.getDate() - 1))
+   }
+ 
+-  // 1. Gather confirmed proposals per target field (via the shared fieldFor join key).
+-  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[]; props: { value: number; periodStart: string | null; periodEnd: string | null }[] }
++  // 1. Gather confirmed proposals per target field (via the shared fieldFor join key). Provenance — quotes,
++  //    document ids, file paths, refs — is unchanged from before T2: every confirmed proposal with a value.
++  //    Per-bill provenance (which bills counted, and why the others did not) arrives with T5.
++  type Acc = { field: keyof Location; unitField?: keyof Location; rawSum: number; units: Set<string>; fuelType: string; fuelTypes: Set<string>; quotes: string[]; docIds: string[]; filePaths: string[]; refs: { docId: string; pi: number }[] }
+   const acc: Record<string, Acc> = {}
+   loc.source_docs.forEach(d => {
+     d.extracted?.forEach((p, pi) => {
+@@ -3131,9 +3140,8 @@
+       const map = fieldFor(d.document_type, p.fuelType)
+       if (!map) return
+       const key = String(map.amount)
+-      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [], props: [] }
++      if (!acc[key]) acc[key] = { field: map.amount, unitField: map.unit, rawSum: 0, units: new Set(), fuelType: p.fuelType, fuelTypes: new Set(), quotes: [], docIds: [], filePaths: [], refs: [] }
+       acc[key].rawSum += p.value
+-      acc[key].props.push({ value: p.value, periodStart: p.periodStart, periodEnd: p.periodEnd })
+       if (p.unit) acc[key].units.add(p.unit)
+       acc[key].fuelTypes.add(p.fuelType)
+       acc[key].refs.push({ docId: d.id, pi })
+@@ -3148,40 +3156,29 @@
+     const mixedUnits = a.units.size > 1
+     const unit = a.units.size === 1 ? [...a.units][0] : undefined
+     const extr = resolutions.find(r => r.kind === 'extrapolate' && r.locId === loc.id && r.fuelType === a.fuelType && !!r.monthsCovered && r.monthsCovered > 0)
+-    const strad = resolutions.find(r => r.kind === 'straddle' && r.locId === loc.id && r.fuelType === a.fuelType)
+     const dup = resolutions.find(r => r.kind === 'duplicate' && r.locId === loc.id && r.fuelType === a.fuelType)
+ 
+-    // STRADDLE scaling is PER-PROPOSAL — only the straddling bill(s) are scaled; the other bills for
+-    // this field are left untouched (scaling the whole sum would corrupt eleven correct bills).
+-    const straddleFactor =
+-      strad?.straddleChoice === 'next_year' ? 0
+-      : strad?.straddleChoice === 'this_year' ? 1
+-      : strad?.straddleChoice === 'prorate' ? (strad.totalDays ? (strad.daysInYear ?? 0) / strad.totalDays : 1)
+-      : 1
+-    const straddledSum = strad
+-      ? a.props.reduce((s, pr) => s + pr.value * (proposalStraddles(pr.periodStart, pr.periodEnd) ? straddleFactor : 1), 0)
+-      : a.rawSum
+-    // EXTRAPOLATION gross-up applies AFTER the per-proposal straddle scaling. ORDER MATTERS.
++    // THE FOLD: each counted bill contributes its value × its own in-window share. Nothing else reaches
++    // the figure — not a bill outside the year, not an undated or invalid-period bill, not a stored
++    // straddle choice.
++    const counted = contributions.filter(c => String(c.field) === key && c.counted)
++    const foldedSum = counted.reduce((s, c) => s + c.value * (c.share ?? 0), 0)
++    // EXTRAPOLATION gross-up applies AFTER the fold. ORDER MATTERS.
+     const extrFactor = (extr && extr.monthsCovered) ? 12 / extr.monthsCovered : 1
+-    const value = mixedUnits ? a.rawSum : straddledSum * extrFactor
++    const value = mixedUnits ? a.rawSum : foldedSum * extrFactor
+ 
++    const prorated = counted.filter(c => c.reason === 'prorated')
+     let adjustment: AppliedField['adjustment'] = null
+-    if (extr || strad || dup) {
+-      // basis states the REAL arithmetic, in application order (straddle per-proposal, THEN extrapolate).
+-      const parts: string[] = []
+-      if (strad) {
+-        const tot = strad.totalDays ?? 0, din = strad.daysInYear ?? 0
+-        parts.push(
+-          strad.straddleChoice === 'next_year' ? `next_year: straddling bill excluded (0 of ${tot} days counted)`
+-          : strad.straddleChoice === 'this_year' ? `this_year: straddling bill counted in full (${tot} of ${tot} days)`
+-          : `prorate: ${din} of ${tot} days in FY${year}; straddling bill scaled ×${(tot ? din / tot : 1).toFixed(3)}`
+-        )
+-      }
++    if (extr || prorated.length > 0 || dup) {
++      // basis states the REAL arithmetic, in application order (per-bill proration, THEN extrapolate).
++      const parts: string[] = prorated.map(c =>
++        `${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in FY${year}, ×${(c.share ?? 0).toFixed(3)}`)
+       if (extr) parts.push(resolutionBasis(extr))
+-      if (dup && !strad && !extr) parts.push(resolutionBasis(dup))
+-      // primary drives kind + method: extrapolate (the gross-up) if present, else the straddle/duplicate.
+-      const primary = extr ?? strad ?? dup!
+-      adjustment = { kind: primary.kind, method: resolutionMethod(primary), basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
++      if (dup && prorated.length === 0 && !extr) parts.push(resolutionBasis(dup))
++      // primary drives kind + method: extrapolate (the gross-up) if present, else proration, else the duplicate.
++      const kind: NonNullable<AppliedField['adjustment']>['kind'] = extr ? 'extrapolate' : prorated.length > 0 ? 'prorate' : 'duplicate'
++      const method = kind === 'prorate' ? PRORATE_METHOD : resolutionMethod((extr ?? dup)!)
++      adjustment = { kind, method, basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
+     }
+ 
+     out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
+@@ -3196,8 +3193,13 @@
+   source_quotes?: string[]
+   source_doc_ids?: string[]
+   source_file_paths?: string[]
+-  entry_method: 'manual' | 'concierge' | 'concierge-extrapolated'
++  // concierge-prorated (T2): read off confirmed bills, with at least one bill apportioned to the reporting
++  // year by its own billing days. ALLOCATED, NOT ESTIMATED: every unit traces to a bill.
++  entry_method: 'manual' | 'concierge' | 'concierge-prorated' | 'concierge-extrapolated'
+   extrapolation_note?: string
++  // The per-bill day arithmetic behind a concierge-prorated figure. Separate from extrapolation_note,
++  // which the verifier page reads as an estimate.
++  proration_note?: string
+ }
+ 
+ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12) {
+@@ -3376,6 +3378,10 @@
+       const a = applied[String(field)]
+       const quotes = a?.quotes ?? []
+       if (!quotes.length) return { entry_method: 'manual' }
++      if (a && a.adjustment && a.adjustment.kind === 'prorate') {
++        return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
++          entry_method: 'concierge-prorated', proration_note: a.adjustment.basis }
++      }
+       if (a && a.adjustment) {
+         return { source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+           entry_method: 'concierge-extrapolated', extrapolation_note: `${a.adjustment.method} — ${a.adjustment.basis}` }
+@@ -3541,6 +3547,10 @@
+   // Every gap/overlap/straddle the user resolved is recorded here so a verifier
+   // sees the method and basis behind any estimated or adjusted figure. Spec: line 462.
+   for (const r of resolutions) {
++    // A stored 'straddle' resolution is IGNORED by the figure since T2 (straddling bills are prorated
++    // automatically by their own days), so it gets no audit row: a row must not claim a method the figure
++    // did not apply. The proration itself is disclosed on the figure's own row (concierge-prorated).
++    if (r.kind === 'straddle') continue
+     // Method string comes from the SAME resolutionMethod() that fills AppliedField.adjustment.method,
+     // so the audit row and the figure's provenance stamp can never claim different things.
+     rows.push({
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -75,30 +75,36 @@
+     expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 2); // ≈ 38.71
+   });
+ 
+-  it("A2 next_year → workings gas figure should be 0 (bill belongs to next FY)", () => {
++  // T2: a stored straddle choice is IGNORED. The straddling bill is prorated automatically by its own
++  // days (12 of 31 in FY2024), whatever the legacy resolution said. Was: next_year → 0.
++  it("A2 legacy next_year is ignored → the bill is prorated by its own days, 100 × 12/31", () => {
+     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('next_year')]);
+-    expect(ngRow(rows)?.activity_data).toBe(0);
++    expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 6);
+   });
+ 
+-  it("A3 this_year → workings gas figure should be 100 (full bill counts this FY)", () => {
+-    // NOTE: this asserts the SAME 100 the engine already echoes, so at the engine seam
+-    // this is expected to PASS even today. The audited failure is in the component
+-    // field-write path (not engine-testable). Flagged in the Phase-2 report.
++  // T2: was this_year → 100. The legacy choice is ignored; the bill is prorated by its own days.
++  it("A3 legacy this_year is ignored → the bill is prorated by its own days, 100 × 12/31", () => {
+     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('this_year')]);
+-    expect(ngRow(rows)?.activity_data).toBe(100);
++    expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 6);
+   });
+ 
+-  it("A4 buildWorkings must not advertise a method it didn't apply — a 'prorate' resolution row implies the gas figure was prorated", () => {
+-    const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('prorate')]);
+-    const resRow = rows.find(r => r.gwp_basis === 'coverage_resolution' && String(r.emission_factor).includes('prorate'));
+-    expect(resRow, 'expected a straddle "prorate" coverage-resolution row').toBeTruthy();
+-    // The workings claim proration; the actual figure must agree with that claim.
+-    expect(ngRow(rows)?.activity_data).toBeCloseTo(100 * 12 / 31, 2);
++  // T2: was "a 'prorate' resolution row implies the figure was prorated". The legacy resolution no longer
++  // reaches the figure, so it gets no audit row at all (a row must not claim a method not applied); the
++  // proration is disclosed on the figure's own row instead.
++  it("A4 a legacy straddle resolution gets NO audit row; the proration is disclosed on the gas row itself", () => {
++    for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
++      const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes(choice)]);
++      expect(rows.filter(r => r.gwp_basis === 'coverage_resolution'), choice).toEqual([]);
++      expect(ngRow(rows)?.proration_note, choice).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387');
++    }
+   });
+ 
+   it("A5 a straddle-adjusted number must NOT be stamped entry_method 'concierge' (that means read verbatim off bills)", () => {
+     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes('prorate')]);
+     expect(ngRow(rows)?.entry_method).not.toBe('concierge');
++    // T2: it is stamped concierge-prorated (allocated, not estimated), and carries no extrapolation note.
++    expect(ngRow(rows)?.entry_method).toBe('concierge-prorated');
++    expect(ngRow(rows)?.extrapolation_note).toBeUndefined();
+   });
+ });
+ 
+@@ -3502,16 +3508,23 @@
+     expect(JSON.stringify(l)).toBe(before);
+   });
+ 
+-  it('is not yet wired: nothing outside its definition and the tests calls it (T1 done criterion)', () => {
++  // T1's guard was "nothing calls it yet". T2 wires it into applyResolutions, and only there.
++  it('is called only by applyResolutions (wired in T2)', () => {
+     const root = join(__dirname, '..', '..');
+     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+       const rel = `${dir}/${n}`;
+       if (n === 'node_modules' || n.startsWith('.')) return [];
+       return statSync(join(root, rel)).isDirectory() ? walk(rel) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [rel] : [];
+     });
+-    const callers = [...walk('lib'), ...walk('app')].filter(f =>
+-      /billContributions\(/.test(stripTsComments(readFileSync(join(root, f), 'utf8')).replace(/export function billContributions\(/, '')));
+-    expect(callers).toEqual([]);
++    const calls = [...walk('lib'), ...walk('app')].flatMap(f => {
++      const src = stripTsComments(readFileSync(join(root, f), 'utf8')).replace(/export function billContributions\(/, '');
++      const n = (src.match(/billContributions\(/g) ?? []).length;
++      return n ? [`${f}: ${n}`] : [];
++    });
++    expect(calls).toEqual(['lib/ghg/engine.ts: 1']);
++    const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
++    const body = engineSrc.slice(engineSrc.indexOf('export function applyResolutions('));
++    expect(body.slice(0, body.indexOf('\n}\n')), 'the one call is inside applyResolutions').toMatch(/billContributions\(/);
+   });
+ 
+   it('exclusiveEnd has exactly one definition in lib/ and app/ (CLAUDE.md invariant)', () => {
+@@ -3527,5 +3540,108 @@
+       return n ? [`${f}: ${n}`] : [];
+     });
+     expect(defs).toEqual(['lib/ghg/engine.ts: 1']);
++  });
++});
++
++// ── T2: applyResolutions as the fold of billContributions (design doc section 11) ─────────────────────
++// The figure is Σ counted bills' value × own share, then the extrapolation gross-up. Scenarios A and B are in
++// docs/review/recalc/scenarios-additions.md.
++describe('T2 applyResolutions folds billContributions', () => {
++  const w = (y: number) => periodFromYearAndEnd(y, 12);
++  const elec = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, periodConfidence: 'high', sourceQuote: `${value} kWh`, ...o });
++  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, ...o });
++  const scenarioA = () => loc({
++    source_docs: [
++      doc('utility_electricity', [elec(1000, '2025-12-01', '2026-01-01')], 'bill1'),
++      doc('utility_electricity', [elec(1200, '2026-01-01', '2026-02-01')], 'bill2'),
++    ],
++  });
++  const applied = (l: Location, res: CoverageResolution[], y: number) => applyResolutions(l, res, w(y).start, w(y).end);
++
++  it('Scenario A: a bill wholly outside the year contributes 0 (F-09); FY2025 counts Bill 1 only, FY2026 Bill 2 only', () => {
++    const a25 = applied(scenarioA(), [], 2025).electricity_kwh;
++    expect(a25.value).toBe(1000);
++    expect(a25.rawSum, 'rawSum is still every confirmed bill').toBe(2200);
++    expect(a25.adjustment).toBeNull();
++    expect(applied(scenarioA(), [], 2026).electricity_kwh.value).toBe(1200);
++  });
++
++  it('two straddling bills are each prorated by their OWN days, not one shared ratio', () => {
++    const l = loc({
++      source_docs: [
++        doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')], 'start'), // 19 of 31 in FY2025
++        doc('utility_bill_gas', [gas(310, '2025-12-15', '2026-01-14')], 'end'),   // 17 of 31 in FY2025
++      ],
++    });
++    const a = applied(l, [], 2025).natural_gas_amount;
++    expect(a.value).toBeCloseTo(310 * 19 / 31 + 310 * 17 / 31, 9);
++    expect(a.adjustment).toMatchObject({ kind: 'prorate', method: 'Prorated by billing days' });
++    expect(a.adjustment?.basis).toBe(
++      '2024-12-20 to 2025-01-19: 19 of 31 days in FY2025, ×0.613; then 2025-12-15 to 2026-01-14: 17 of 31 days in FY2025, ×0.548');
+   });
++
++  it('the extrapolation gross-up applies AFTER the fold, and the gross-up drives the stamp', () => {
++    const l = loc({ source_docs: [doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')])] });
++    const ext: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2025-06-01T00:00:00Z' };
++    const a = applied(l, [ext], 2025).natural_gas_amount;
++    expect(a.value).toBeCloseTo((310 * 19 / 31) * (12 / 6), 9);
++    expect(a.adjustment?.kind).toBe('extrapolate');
++    expect(a.adjustment?.basis.startsWith('2024-12-20 to 2025-01-19: 19 of 31 days in FY2025, ×0.613; then ')).toBe(true);
++    const row = buildWorkings([{ ...l, has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf' }], 'AR6', 2025, [ext]).find(r => r.source === 'Natural gas');
++    expect(row?.entry_method).toBe('concierge-extrapolated');
++    expect(row?.proration_note).toBeUndefined();
++  });
++
++  it('a stored straddle resolution is ignored: every legacy choice gives the same figure as none', () => {
++    const l = loc({ source_docs: [doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')])] });
++    const none = applied(l, [], 2025).natural_gas_amount.value;
++    for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
++      expect(applied(l, [{ ...straddleRes(choice), daysInYear: 1, totalDays: 31 }], 2025).natural_gas_amount.value, choice).toBe(none);
++    }
++  });
++
++  it('buildWorkings still writes audit rows for resolutions that reach the figure (extrapolate), not for a legacy straddle', () => {
++    const l = loc({ has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf', source_docs: [doc('utility_bill_gas', [gas(310, '2025-01-01', '2025-06-30')])] });
++    const ext: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50, note: '6 of 12', acknowledgedAt: '2025-06-01T00:00:00Z' };
++    const rows = buildWorkings([l], 'AR6', 2025, [ext, straddleRes('next_year')]);
++    expect(rows.filter(r => r.gwp_basis === 'coverage_resolution').map(r => r.activity_unit)).toEqual(['extrapolate']);
++  });
++
++  it('the proration note has no em dash and names each bill, its days and its share', () => {
++    const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, []);
++    const note = ngRow(rows)?.proration_note as string;
++    expect(note).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in FY2024, ×0.387');
++    expect(note).not.toContain('\u2014');
++  });
++
++  it('undated and invalid-period bills are not counted (T1 rulings); a dated bill beside them still is', () => {
++    const l = loc({
++      source_docs: [doc('utility_bill_gas', [
++        gas(100, '2025-03-01', '2025-03-31'),
++        gas(50, null, null),
++        gas(40, '2025-03-10', '2025-03-01'),
++        gas(30, 'Mar 2025', '2025-03-31'),
++      ])],
++    });
++    expect(applied(l, [], 2025).natural_gas_amount.value).toBe(100);
++  });
++
++  it('mixed units: unchanged, mixedUnits true and value = rawSum (the write path skips it)', () => {
++    const l = loc({ source_docs: [doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { unit: 'mcf' }), gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' })])] });
++    const a = applied(l, [], 2025).natural_gas_amount;
++    expect(a.mixedUnits).toBe(true);
++    expect(a.value).toBe(300);
++  });
++
++  it('Scenario B with Bill 2 in FY2026: both January bills are counted (overlap resolution is T3)', () => {
++    const l = loc({ source_docs: [
++      doc('utility_electricity', [elec(1200, '2026-01-01', '2026-02-01')], 'bill2'),
++      doc('utility_electricity', [elec(1150, '2026-01-01', '2026-01-31', { periodConfidence: 'medium' })], 'monthOnly'),
++    ] });
++    expect(applied(l, [], 2026).electricity_kwh.value).toBe(2350);
++    // In FY2025 both are outside the year: 0, where before T2 both were summed in full (F-10).
++    expect(applied(l, [], 2025).electricity_kwh.value).toBe(0);
++  });
+ });
+--- a/app/verify/[token]/page.tsx
++++ b/app/verify/[token]/page.tsx
+@@ -60,7 +60,8 @@
+   quantification_method?: string
+   result_tco2e: number | null
+   // Concierge provenance (present only for bill-sourced rows). Lets a verifier trace a figure
+-  // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates.
++  // back to the quote read off the bill; 'concierge-extrapolated' rows are grossed-up estimates;
++  // 'concierge-prorated' rows are bill-sourced with a bill apportioned to the year by its billing days.
+   source_quotes?: string[]
+   source_doc_ids?: string[]
+   // Index-aligned with source_quotes: the storage path behind quote[i]. Used ONLY as a lookup key
+@@ -68,8 +69,11 @@
+   // (source_doc_ids cannot serve here: the engine DEDUPES it while pushing filePaths once per quote,
+   // so source_doc_ids[i] is not "the document behind quote i".)
+   source_file_paths?: string[]
+-  entry_method?: 'manual' | 'concierge' | 'concierge-extrapolated'
++  entry_method?: 'manual' | 'concierge' | 'concierge-prorated' | 'concierge-extrapolated'
+   extrapolation_note?: string
++  // The per-bill day arithmetic behind a concierge-prorated figure. Not an estimate: rendered without
++  // the "Estimated" label extrapolation_note carries.
++  proration_note?: string
+   // A convert-then-apply step, where one was needed: fuel oil entered in litres and steam entered
+   // in GJ are converted to the unit their published factor is per, and this records the arithmetic.
+   // Distinct from extrapolation_note, which is about PROVENANCE (a grossed-up estimate) and renders
+@@ -1016,6 +1020,9 @@
+                       <span>{w.source}</span>
+                       {w.entry_method === 'concierge' && (
+                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-brand)', background: 'color-mix(in srgb, var(--color-brand) 8%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
++                      )}
++                      {w.entry_method === 'concierge-prorated' && (
++                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced, prorated</span>
+                       )}
+                       {w.entry_method === 'concierge-extrapolated' && (
+                         <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
+@@ -1032,6 +1039,9 @@
+                           )
+                         })}</div>
+                       )}
++                      {w.proration_note && (
++                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Prorated by billing days: {w.proration_note}</div>
++                      )}
+                       {w.extrapolation_note && (
+                         <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Estimated — {w.extrapolation_note}</div>
+                       )}

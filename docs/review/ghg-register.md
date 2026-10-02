@@ -1,0 +1,426 @@
+# GHG module methodology register (Scope 1, 2 and 3)
+
+Read-only review of the working tree on 1 Oct 2026. No app code, config or migrations were changed, no git
+commands were run, no database was read or written, and no `.env` or credential file was opened.
+
+**How this was compiled.** Five read-only passes (factor tables and GWP; Scope 2, proration and year-on-year;
+Scope 3; location limits and pricing remnants; customer-facing copy), each citing `file:line`. The findings
+marked ✔ were re-checked directly against the source before this file was written. All other rows are as
+reported by those passes and carry their line references; line numbers are for the working tree on 1 Oct 2026
+and will drift as files change.
+
+**Not checked.** Anything that lives only in the live database: whether the trigger and columns match the
+migrations, whether a `factor_editions` row is active, and what `entitlements.location_allowance` holds for
+real customers. API export routes other than those named were not reviewed.
+
+Columns in every register table: ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes.
+
+---
+
+## 1. Scope 1 combustion factor tables (`lib/ghg/engine.ts`)
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| EF-01 | `EF` (US) | Per-unit kg CO2, CH4, N2O for gas, propane, diesel, fuel oil, gasoline, steam. Also the fallback table for other countries' missing keys (see EF-14). | `EF_SOURCES.combustion` "US EPA (2024) Emission Factors for Greenhouse Gas Inventories" (755); `COMBUSTION_EDITION.US` "US EPA 2024" (859) | engine.ts:107-198 | Yes: workings Factor source/vintage (app/dashboard/ghg/page.tsx:2706-2707), verifier page (app/verify/[token]/page.tsx:1162), assurance PDF (lib/assurancePdf.ts:227, 247), CSV (page.tsx:3147) | The header says "EDITION UNVERIFIED": values were read from the 2025 Hub workbook (engine.ts:65-68), but the citation says 2024. Propane CO2 corrected 13 Aug 2026 (112-138). `ammonia: 0` is never priced (170). |
+| EF-02 | `EF.steam_mmbtu` / `STEAM_EF.US` | EPA Table 7 steam factor as a gas split (66.33 / 0.00125 / 0.000125 kg per mmBtu). | "US EPA (2025) GHG Emission Factors Hub, Table 7 — Steam and Heat (natural gas at 80% thermal efficiency; combustion only…)" (779); `STEAM_EDITION.US` "US EPA 2025 Table 7" (878) | engine.ts:197, 2249 | Yes: workings ef_source and vintage (3321-3322) | The comment at 193-196 says this factor is "applied to every country". It is not: `STEAM_EF` is per jurisdiction (2246-2289). |
+| EF-03 | `EF_CA` | ECCC per-unit factors. CH4/N2O use a fixed end-use row (Industrial / Refineries and Others / All Other Uses). | Comment "ECCC 'Emission factors and reference values' v3.0 (Oct 2025)" (200); `combustion_ca` "ECCC (2025) Emission factors and reference values v3.0" (756); edition "ECCC 2025 v3.0" (860) | engine.ts:241-272 | Yes: as EF-01; methodology page app/methodology/page.tsx:67 | The end use is fixed, with no selector, and is not disclosed on the row (219-224). A comment uses 3.78541 L/gal (246); the code elsewhere uses 3.785411784. |
+| EF-04 | `EF_CA_NG_CO2_M3` | Per-province natural gas CO2 (kg/m3), overriding `EF_CA` in `pickEF`. | "ECCC Tables 1.1-1.3, MARKETABLE column", "verified against v3.0, LF, 13 Aug 2026" | engine.ts:281-284 (applied 2442-2448) | Indirectly (row cites `combustion_ca`); methodology page:67 mentions "ECCC marketable values" | none |
+| EF-05 | `M3_PER_MCF` | 1000/35.3147 m3 per mcf. | none cited | engine.ts:285 | No | A comment at 243 says 28.3168. |
+| EF-06 | `EF_UK` | DEFRA 2026 Fuels-tab combined CO2e in `co2` (CH4/N2O set to 0). Includes `steam_kwh`. | "DEFRA/DESNZ 2026 … (full set, Fuels tab)" (287-288); `combustion_uk` = `defraCitation(2026)` → "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting" (757; lib/ghg/defraPublication.ts:61-64); edition "DEFRA 2026" (861) | engine.ts:324-394 | Yes: workings, PDF, CSV; OGL attribution (assurancePdf.ts:252-253; page.tsx:3150-3153) | One edition with no year dimension: a 2025 inventory is priced at 2026 values (296-301). The row is stamped `GWP_AS_PUBLISHED` (3084). |
+| EF-07 | `EF_UK.steam_kwh` / `STEAM_EF.UK` | DEFRA district heat, 0.17529 kg CO2e/kWh. | "flat file v1.2 (updated 2026-07-10), Scope 2 sheet, 'Heat and steam' > 'District heat and steam'" (373); `STEAM_EDITION.UK` "DEFRA 2026" (879) | engine.ts:393, 2255 | Yes: workings (`citeWithLocator`) | Cites the flat file v1.2; the rest of `EF_UK` cites the full set with no version. |
+| EF-08 | `EF_EU` | IPCC 2006 / MRR mass-basis factors converted to per-litre and per-m3 with densities. Gas split. | "EU MRR Reg. (EU) 2018/2066, Annex VI Table 1 — IPCC (2006) Vol.2 defaults; published mass-basis, per-volume derived" (769); edition "IPCC 2006" (862) | engine.ts:503-550 | Yes: workings, PDF, CSV; methodology page:67 | All densities are uncited (416-437). The CH4 sector table (2.2/2.3) has no selector (449-470). A comment at 518 cites "Ch.1 Table 1.4" while the header cites MRR Annex VI. |
+| EF-09 | `EU_DERIVATION` | Per-row disclosure of the density arithmetic. | Text says "density is from neither cited source" | engine.ts:568-611 | Yes: workings row note (3124) | none |
+| EF-10 | `EF_AU` | DCCEEW per-unit combined CO2e (energy content × EF per GJ), CH4/N2O set to 0. | "DCCEEW National Greenhouse Accounts (NGA) Factors 2025 (AR5 basis)" (613); `combustion_au` "DCCEEW NGA Factors 2025 (AR5)" (770); edition "DCCEEW NGA 2025" (863) | engine.ts:622-650 | Yes: workings, PDF, CSV. **Not on the methodology page.** | No `fuel_oil_gallon` key, so the US value is used (648; see EF-14). |
+| EF-11 | `EF_NZ` (commercial / industrial) | MfE combined CO2e, chosen by `Location.nz_use_class`. | "MfE 'Measuring Emissions' 2026 (v2)" (652); `combustion_nz` "NZ MfE Measuring Emissions 2026 v2 (as-published basis…)" (771); edition "MfE 2026 v2" (864) | engine.ts:672-701 | Yes: workings, PDF, CSV. **Not on the methodology page.** | The use class is not shown on any row (665-670). Gasoline uses the transport petrol row; mobile diesel reuses the stationary value (676-678). Most mcf, m3, gallon and litre propane keys are absent. |
+| EF-12 | `MOBILE_CA` | ECCC mobile g/L factors by vehicle class. **Not wired.** | "Environment and Climate Change Canada (2026) National Inventory Report 1990–2024 … Annex 6, Table A6.1-15 … p. 541" | lib/ghg/mobile.ts:67-72, 188 | No | Says "Both trace to ECCC (2017)" (mobile.ts:26). Stale pointer "EF_NZ:179" (mobile.ts:5; actual engine.ts:676). |
+| EF-13 | `MOBILE_IPCC` / `IPCC_CO2_KG_PER_TJ` | IPCC mobile CH4/N2O (kg/TJ), CO2 per TJ. **Not wired.** | "2006 IPCC Guidelines … Vol.2 (Energy)", Tables 3.2.2, 3.3.1, 1.4 | mobile.ts:218-236, 238, 289-294 | No | none |
+| EF-14 ✔ | `pickEF` fallback | For UK, EU, AU, NZ and CA, a key missing from the country table silently takes the US `EF` value (`?? (EF as any)[key]`). The row still cites the country's own publisher. | none | engine.ts:2420-2440; citation via `combustionSource` 2535-2543 | Yes: the figure and its (wrong) citation | Reachable keys were not traced against every unit picker. |
+| UC-01..06 | Unit conversion constants | `L_PER_GAL` 3.785411784, `LB_PER_KG`, `GJ_PER_MMBTU` 1.05505585262, kWh/MJ/GJ, `PROPANE_LB_PER_GAL` 4.24, ccf→mcf ×0.1 | "(exact, NIST)", "(IEA)", "(exact, SI)"; propane "(EIA / NPGA)" with "VERIFY PROVENANCE before this goes near a real inventory" | lib/unitConversions.ts:38-52, 115 | Only through Tier 2 conversion notes, e.g. "propane @60°F" (137, 142) | The propane density is self-flagged as unverified. |
+
+## 2. Scope 2 grid, residual-mix, steam and T&D tables (`lib/ghg/engine.ts`)
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| GRID-US | `GRID_EF` US states + `US_AVG` | eGRID2023 state output rates, keyed 2023 only. | Comment "EPA eGRID2023 state output rates" (909); `electricity_us` "US EPA eGRID2023" (791) | engine.ts:910-923 | Yes: workings; banner hardcodes "(eGRID 2023)" (page.tsx:2272, 2276); state dropdown (2282) | No revision named (the residual table cites "eGRID2023 Rev2", 803). Every 2024-2026 inventory takes 2023 with a fallback note. `US_AVG` is returned silently for an unknown region (1126). |
+| GRID-CA | `GRID_EF` provinces | Consumption intensities keyed 2024, 2025, 2026. | "ECCC 'Emission factors and reference values' v3.0 (Oct 2025), NIR 1990-2023 consumption intensities" (895); `electricity_ca` "ECCC (2025) … v3.0" (792) | engine.ts:896-908 | Yes: workings (vintage = usedYear, 3245); banner "ECCC v3.0" (2276) | Year keys are applicability sets over NIR 1990-2023 data. NB and PE identical in every year. |
+| GRID-UK | `GRID_EF.UK` | 2025: 0.177; 2026: 0.13096. | Comments name the 2025 and 2026 workbooks (924-934); `electricity_uk` = `defraCitation()` with no year (793-799) | engine.ts:934 | Yes: workings; banner `DEFRA ${usedYear}` (2274) | The code's own comment: "26% single-year fall … worth a second look before this reaches a customer report" (932-933). 3 vs 5 decimal places. |
+| GRID-EU | `GRID_EF` EU members + `EU_AVG` | EEA generation intensities keyed 2023. | "EEA 'GHG emission intensity of electricity generation, country level' (2023)" (935); `electricity_eu` "EEA (2023)…" (800) | engine.ts:937-944 | Yes: workings; banner "EEA 2023"; methodology page:67 | Whether "(2023)" is publication or data year is not stated; the code treats it as the data year. |
+| GRID-AU | `GRID_EF` AU states + `AU_AVG` | DCCEEW state Scope 2 factors keyed 2025. | "DCCEEW NGA Factors 2025, Table 1 Scope 2 (kg CO2e/kWh, AR5 basis)" (945-946); `electricity_au` (801) | engine.ts:950-952 | Yes: workings; banners (2269, 2276). **Not on the methodology page.** | Keyed by edition year: 2023/2024 inventories resolve forward to 2025. |
+| GRID-NZ | `GRID_EF.NZ` | National factors 2023-2025. | "MfE 'Measuring Emissions' 2026 (v2)" (953); `electricity_nz` (802) | engine.ts:955 | Yes: workings; banner hardcodes "NZ MfE 2026" (2274) | The banner shows the edition while factor_vintage shows the data year. A 2026 inventory takes 2025. |
+| TD-NZ | `NZ_TD_LOSS` / `nzTdLoss` | NZ T&D losses as a separate Scope 3 Cat 3 line (opt-in), 2025 only. | "MfE 2026 (v2)" (958); vintage `MfE ${ty}` (1000) | engine.ts:961, 993-1006, 3271 | Yes: workings row, gwp_basis `scope3-cat3` | The gate compares `loc.country === 'NZ'` without canonicalising (2657). |
+| RES-EU | `RESIDUAL_EU` | AIB residual mix, gCO2/kWh, keyed 2024; Austria null (full disclosure). | "AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e" (804) | engine.ts:1028-1039 | Yes: workings; PDF residual table (assurancePdf.ts:269-284); CSV (page.tsx:3157-3163); methodology page:71 | Stamped `GWP_AS_PUBLISHED` (correct). |
+| RES-US | `RESIDUAL_US` | Green-e residual CO2 + eGRID CH4/N2O by subregion, keyed 2023; GWP applied at run time. | "Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O" (803) | engine.ts:1045-1073 | As RES-EU | The edition label is derived with a hardcoded "+2" offset (1231-1232). |
+| RES-AU ✔ | `RESIDUAL_AU` | National residual mix factor 0.81 kg CO2e/kWh, keyed 2025. | "DCCEEW National Greenhouse Accounts Factors 2025, Table 2 — national Residual Mix Factor … FINANCIAL-YEAR basis … 3-year average" (805) | engine.ts:1094 | Yes: workings, PDF and CSV residual rows. **Not on the methodology page (line 71).** | **Mis-stamped GWP basis.** The market-based row's `gwp_basis` is `res.applicable && res.source !== EF_SOURCES.residual_eu ? gwpVersion : GWP_AS_PUBLISHED` (3266). Only EU is exempted, so an AU row reads "AR6" on a figure DCCEEW published combined on AR5. |
+| STEAM-OTHER | `STEAM_EF` CA / AU / NZ / EU | Records "unpublished" or "not_searched" with guidance; no factor. | Search notes (2258, 2267, 2277) | engine.ts:2256-2288 | Yes: wizard guidance (~2342-2371) | Steam with no factor and no supplier figure is priced at 0 and blocks export (2638-2641; `findSteamFactorGaps` 3587). |
+| STEAM-SUP | `steam_supplier` | Customer-entered supplier factor. | "Supplier-specific factor supplied by the district energy provider (see row note)" (785) | engine.ts:785, 2320-2331 | Yes: workings | No vintage recorded, by design (871-876). |
+| CAT-ELEC | `EF_SOURCES.electricity` | Catalogue string for six jurisdictions. | "US EPA eGRID2023 (US) / ECCC v3.0 (CA) / DEFRA 2025+2026 (UK) / EEA 2023 (EU) / DCCEEW NGA 2025 (AU) / NZ MfE 2026 (NZ)" | engine.ts:789 | No reader outside tests | The comment at 786-788 says the GHG page reads it; it does not. |
+| LOC | `EF_SOURCE_LOCATORS` / `citeWithLocator` | Adds sheet/row locators, UK only. | UK entries only | engine.ts:732-752 | Steam only (2255) | Not applied to UK combustion or electricity rows (2458, 2538). |
+| YEAR | Year-aware factor selection | `getGridFactor(region, year)`: exact year → that year, no note; otherwise latest year ≤ reporting year; otherwise earliest held, with "(latest/earliest vintage held)" note. Residual mix and NZ T&D use the same rule. Selectable reporting years: 2023 to current (lib/reportingYears.ts:39, 48-53). | n/a | engine.ts:1120-1135, 1146-1149; page.tsx:2020, 2269-2282 | Yes: workings factor_vintage and note (3241-3245). Banners hardcode publisher labels and do not show the fallback note (page.tsx:2269-2276). | Today: US and EU 2024-2026 inventories take 2023; AU takes 2025; NZ 2026 takes 2025; CA 2023 and UK 2023-2024 resolve forward. |
+
+## 3. GWP routing
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| GWP-01 | `GWP` AR4 / AR5 / AR6 | CO2 1; CH4 fossil/biogenic 25/25, 28/28, 29.8/27.0; N2O 298, 265, 273. `calcGas` multiplies CH4/N2O mass by these. | Comment only, no IPCC table cited (46-47) | engine.ts:48-52, 2573-2582 | Yes: values on the methodology page (app/methodology/page.tsx:63) | `CH4_biogenic` is never used (biogenic never passed true). A second AR6 copy exists at lib/flag/params.ts:14. |
+| GWP-02 | `REFRIGERANT_GWP` | GWP-100 for r22, r134a, r404a, r410a, r507 per AR set; fugitive = kg × GWP. | No source. "Blends … composition-derived — CONFIRM before assurance" (54-56) | engine.ts:57-63 (used 2627, 3235) | Yes: workings row prints `GWP₁₀₀ ${ref_gwp}`, cites `gwp_ar6` (3236) | An unknown refrigerant type gives GWP 0 via `?? 0` (2627, 3235). Blend values unconfirmed. |
+| GWP-03 | `EF_SOURCES.gwp_ar4/ar5/ar6` | Citation strings. | gwp_ar6 "IPCC AR6 (2021) — the GWP set for every framework … There is no setting to change it." (813-815) | engine.ts:813-815 | Yes: PDF "GWP values (AR6)" (assurancePdf.ts:258); CSV (page.tsx:3155) | none |
+| GWP-04 | `FRAMEWORKS[].gwp` | SB 253, CDP, ESRS E1, GRI 305, EcoVadis, IFRS S2 all 'AR6'. | The label is the citation | engine.ts:1499, 1506, 1536, 1543, 1553, 1560 | Yes: cards "GWP: {fw.gwp}" (page.tsx:1738, 2601); CSV `IPCC ${fw.gwp}` (2968, 3109); PDF (assurancePdf.ts:168, 182) | page.tsx:3193 casts `fw.gwp as 'AR4' \| 'AR5'`, which no longer matches the runtime value. |
+| GWP-05 | Routing | Totals computed on AR6 only (page.tsx:1428); saved `gwp_version: 'AR6'` (1638). Workings use the export framework's GWP (2662). Per-row `gwp_basis`: CH4 and N2O both 0 → `GWP_AS_PUBLISHED`, else `gwpVersion` (engine.ts:3080-3085). Grid rows always as-published (3245). PDF residual rows hardcode 'AR6' (page.tsx:3087); CSV residual rows use `fw.gwp` (3161). | `GWP_AS_PUBLISHED` "as-published — see factor source" (892) | engine.ts:892, 3084, 3245, 3266 | Yes: workings "GWP basis" column (page.tsx:502, 2709; verifier :994) | See RES-AU. The CSV header and PDF state one basis, "IPCC AR6", for the whole file, while UK, AU and NZ rows are AR5-combined as published. |
+| GWP-06 | `publishersForLocation` | Short publisher labels from priced rows; adds "IPCC {gwp} GWP" only if a row applied the set. | `COMBUSTION_EDITION`, `GRID_PUBLISHER`, `STEAM_EDITION` | engine.ts:2497-2518 | Yes: live results panel (page.tsx:1368, 2463) | Leaves market-based rows out deliberately (2490-2505). |
+| GWP-07 | Edition labels / `factor_editions` | Stored in `ghg_inventories.factor_editions` and `factor_vintage`. | As above | engine.ts:858-880; lib/ghg/factorEditions.ts:173-180, 277, 288, 323 | Yes: verifier "Emission factor editions" (app/verify/[token]/page.tsx:859-929) | none |
+| GWP-S3 | Scope 3 GWP basis | DEFRA (Cats 3, 5, 6, 7, 12) and EXIOBASE (Cats 1, 2, 4) are AR5. Per-category sentences exist for Cats 3, 5, 6, 7, 12 and compare with the bound inventory's basis. **Cats 1, 2 and 4 get no GWP sentence**; EXIOBASE is recorded as `not_recorded`. Cat 15 shows "Not recorded". No mixed-basis statement on the total. | EXIOBASE "AR5 (GWP100), IPCC 2010" (lib/emissionFactors/exiobaseFactors2019ixi.json:15); DEFRA AR5 (defraWaste2026.json:11, defraTravel2026.json:20, defraEnergy2026.json:57) | lib/scope3/gwpSentence.ts:18-24; lib/scope3/methodSummary.ts:242-272 (243); app/dashboard/scope3/page.tsx:1921, 1996, 2002, 2029, 2944 | Partly | The EXIOBASE file itself says the basis "must say so beside the figure, not only here" (ixi.json:26). The methodology page says AR6 for every framework and names only DEFRA, DCCEEW and NZ MfE as as-published exceptions (methodology:63). |
+
+## 4. Scope 2 logic
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| S2-01 | Location-based | Grid kWh × `getGridFactor(grid_region, year)` + purchased steam. An unresolved grid region leaves the electricity term out entirely (no US average fallback in totals). | Via `gridSource(loc)` | engine.ts:2633-2636; workings 3240-3245; `isResolvedGridRegion` 1099 | Yes: totals, PDF, CSV | The live results label "Scope 2 (electricity)" includes steam (page.tsx:2448; engine.ts:2643). |
+| S2-02 | Market-based and residual mix | `uncovered_kwh = max(0, electricity_kwh − renewable_electricity_kwh)`; covered kWh at zero; uncovered × residual factor. Residual region: `residual_region`, else an `EU_` grid region, else country AU, else none. No residual mix (Austria null, unknown region, US with no subregion) → grid factor plus a note. Nearest year with a note. | See RES-EU / RES-US / RES-AU | engine.ts:1163-1238, 2644-2654, 3248-3266 | Yes: ESRS/GRI only (page.tsx:2613, 2971); CSV methods block (3158-3165); PDF residual table (assurancePdf.ts:269-284); methodology page:71; US subregion picker (page.tsx:2308) | The picker calls the grid fallback "a conservative fallback" (2308); nothing checks conservatism. Methodology:71 omits the AU residual mix. |
+| S2-03 | Contractual instruments | `renewable_electricity_kwh` typed by hand or filled from confirmed `renewable_cert` proposals. No check of vintage, geography, retirement, double counting, or claim > consumption (floored by `max`). No supplier-specific electricity factor; supplier factor exists for steam only. | Scope 2 Quality Criteria: not found anywhere in lib or app | engine.ts:2644-2647, 2858, 2320-2337 | Yes: hint "Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none." (page.tsx:2514) | The market-based workings row is stamped `entry_method: 'manual'` even when the kWh came from a REC document (3265-3266). |
+| S2-04 | Dual reporting | Both computed and written every time; market-based shown and exported only when ESRS or GRI is selected. Scope 1+2 totals, monthly, reconcile and SBTi all use location-based. | Copy: "ESRS E1 and GRI 305 require … both" (page.tsx:2511); "following the GHG Protocol Scope 2 Guidance dual-reporting requirement" (methodology:71) | engine.ts:2660; page.tsx:1298, 1635, 2971, 3128; assurancePdf.ts:176, 182 | Yes (ESRS/GRI only) | Under any other framework the customer sees location-based only. |
+
+## 5. Proration, monthly vs annual, coverage, workings, export gate, units
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| PRO-01 | Bill proration across months | Each confirmed, dated bill priced once, split across calendar months by share of days over `[start, exclusiveEnd(end))`; each slice stamped with its calendar year. Monthly always AR6. Unconfirmed, undated, zero-span, unmapped, unresolved-grid, refused-country and unpriceable bills skipped and listed. | none | lib/ghg/monthlyEmissions.ts:101-133, 166-260 (split 236-253) | Yes: monthly chart (app/dashboard/ghg/trends/page.tsx:520-540) via lib/ghg/loadMonthly.ts:81-87 | Out-of-year days of a straddling bill are written under the other calendar year and appear in that year's chart (`loadMonthly` filters by company and year only, 84-85). Slices follow calendar years, not fiscal years. |
+| PRO-02 | `exclusiveEnd()` / `daysBetween` | `exclusiveEnd`: end on the 1st is already exclusive; otherwise +1 day. Engine `daysBetween` is inclusive and exported but has no caller; coverage uses its own half-open `dayCount`; monthly uses a local half-open count. | none | engine.ts:1699-1715, 1738, 3632; monthlyEmissions.ts:102-112 | No | Matches the CLAUDE.md "two contracts" rule. |
+| PRO-03 ✔ | Bills outside the reporting year | `analyzeCoverage` lists them as `outOfWindow` and the coverage strip says they are "not counted". **`applyResolutions` sums every confirmed proposal with no date-window filter**; straddle scaling touches only bills partly in the window. A bill wholly outside the year flows into the annual figure in full. | none | Copy: page.tsx:3526-3528. Code: engine.ts:2952-2968 (gather), 2979-2989 (straddle only) | Yes: the strip's statement and the annual totals | Code vs copy disagreement and a calculation defect. |
+| PRO-04 | Straddling bills (annual) | Resolution `next_year` ×0, `this_year` ×1, `prorate` × daysInYear/totalDays, applied per straddling bill before extrapolation. | none | engine.ts:1740-1763, 2938-2948, 2979-2989, 2998-3003 | Yes: coverage strip; workings basis text | One resolution per location and fuel applies the same factor to every straddling bill, though `daysInYear`/`totalDays` describe one bill (2978, 2989). |
+| EST-01 | Monthly = evidenced only; annual = evidenced + estimated | Monthly records bill-backed consumption only. Annual extrapolation × 12/monthsCovered; a month is covered only if every day is. `pctEstimated()` is emissions-weighted. | Code comment "MONTHLY IS EVIDENCED-ONLY, BY DESIGN" (monthlyEmissions.ts:18-24) | engine.ts:2818-2851, 2886-2898, 2990-2991 | Partly: trends note "Months without dated bills are omitted…" (trends/page.tsx:536-539); strip "N/12 months from bills; remaining estimated (X% estimated)" (page.tsx:3524); climate-ghg/page.tsx:119 states the rule | Two different "% estimated" figures reach the customer: the strip's is month-based, the stored `pct_estimated` is emissions-weighted. `rawSum` includes partly covered months while `monthsCovered` counts whole months, so ×12/m can overstate. |
+| EST-02 ✔ | `reconcile()` / `unexplained_delta` | Compares evidenced monthly with annual (S1 + S2 location) less expected gross-up; < 0.01 = reconciled. | none | monthlyEmissions.ts:282-342 | **No: no production caller** (tests only) | If wired as written: gross-ups match by fuel only, not location (314); gross-up fixed at 12 (313, 317, 333); manual figures and out-of-window bills would show as unexplained. |
+| COV-01 | Coverage analysis | Day-level, half-open window; all conditions in `issues[]`; grouped by (docType, fuelType); out-of-window bills raise no issue. | Method comment only | engine.ts:1662-1835; `findUnresolvedCoverage` 3399-3445 | Yes: coverage strip (page.tsx:3510-3530) | `findUnresolvedCoverage` hard-codes `pi: 0` (3423). |
+| COV-02 | `applyResolutions()` / `buildWorkings()` | Single definition of each figure: sum of confirmed proposals → per-bill straddle scaling → extrapolation. Mixed units → value not written, proposals flagged `needs_manual_review` (page.tsx:1250-1262). Workings carry `entry_method` concierge / concierge-extrapolated / manual plus resolution rows. | none | engine.ts:2933-3015, 3028-3389 | Yes: workings table, verifier page, PDF | Comments say a duplicate resolution "drops a double-count" (2826, 1853); the code and its basis text apply no adjustment ("overlapping bills accepted as-is; no double-count adjustment applied", 2888, 2903). |
+| GATE-01 | Export gate | No `canExport` symbol and no `customer_approved` field exist in code. The gate is `dataConfirmed && conciergeReady && gridReady && declarationsReady && pricingReady && steamFactorsReady`; `conciergeReady` = no proposal `extracted` or `needs_manual_review` and every coverage issue resolved. Client-side only. | CLAUDE.md:65 and docs/ghg-verifier-grade-roadmap.md:41 describe `canExport = dataConfirmed && coverage resolved && (concierge ⇒ customer_approved)` | page.tsx:1301-1306, 1322, 1328, 1363, 1395, 3018-3046 | Yes: lock text (3013); attestation checkbox (3017-3019) | The documented formula is out of date in name and composition. No server-side gate found in the files reviewed. |
+| UNIT-01 | Unit-conversion cascade | Tier 1 unit already offered → kept; Tier 2 documented conversion with `conversionNote`; Tier 3 → `needs_manual_review`. Concierge extraction only; low read confidence also goes to review. | NIST, IEA, SI; propane density "VERIFY PROVENANCE" | lib/unitConversions.ts:22-52, 104-180; called page.tsx:1055-1076 | Indirectly: conversion note in the proposal review | none |
+| UNIT-02 | Unit-switch defect (CLAUDE.md, OPEN) | **Still present.** Unit selectors call `updateLocation(idx, '<fuel>_unit', val)`, which writes the label and leaves the amount untouched. Second path: `unitsForCountryChange` falls back to `opts[0]` when the new country does not offer the unit, again without converting. | none | page.tsx:931-940 (selectors 2111, 2131, 2146, 2174, 2190, 2207, 2217, 2327); engine.ts:2065-2078 | Yes: Energy & fuel step | The comment at engine.ts:2058-2060 holds only when the new country offers the unit. |
+
+## 6. Year-on-year comparability
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| YOY-01 | Comparability disclosure | Tier A compares Scope 1/2 size (withheld if the prior year is unverifiable); Tier B compares location count, fuels, jurisdictions and boundary; the customer states whether anything changed. Does not ask about base-year recalculation. Does **not** observe GWP basis or factor edition. | "ISO 14064-3:2019 clause 6.3.1.5" | lib/ghg/comparability.ts:1-52, 101-114, 326, 637 | Yes: wizard (page.tsx:1861-1930); verifier (app/verify/[token]/page.tsx:751-772). **Not in the assurance PDF.** | The FAQ says the comparison discloses "which factor editions were applied" (climate-ghg/page.tsx:305); the comparability record has no edition observation. Editions do appear on the trends page (trends/page.tsx:226). |
+| YOY-02 | GWP, factor-edition, estimation and Scope 3 consistency flags | `gwpConsistent`, `estimationConsistent`, `factorEditionState`, Scope 3 coverage drift: shown, never blocking. | Factor-edition copy: "Emission factors changed between years: year-over-year movement reflects both operational change and the factor revision…" | lib/ghg/series.ts:463-472, 602; lib/ghg/factorEditions.ts:444-452 | Yes: trends/page.tsx:288-313, 484-488; sbti/page.tsx:1040-1048 | none |
+| YOY-03 | Base-year recalculation | `baseYearDrift`: frozen base year vs live, 0.5% tolerance; over tolerance returns `baseline_review`, no grade, never updates the baseline. | none | lib/sbti.ts:296-302, 359-365, 421-466 | Yes: "Review baseline" (app/dashboard/sbti/page.tsx:126, 487, 728) | No GHG-side recalculation policy or trigger exists. |
+
+## 7. Scope 3
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| S3-01 | Cat 1 purchased goods (calculator) | `exiobase_spend`: EXIOBASE industry (ixi) factor for the chosen sector in the region of the primary supply country; spend from `total_spend` at `purchaser` basis; order: entered override → supplier figure → priced line; a miss counts 0 and is excluded, no default factor. | "EXIOBASE 3 … 3.8.2 … published 2021-10-21 … doi 10.5281/zenodo.5589597 … CC BY-SA 4.0" (lib/emissionFactors/spend.ts:218-251); factor year 2019, EUR, basic prices (ixi.json:12-14) | lib/scope3/categoryMethods.ts:77; app/dashboard/scope3/page.tsx:221, 1405-1425, 1851-1863 | Yes: pill "EXIOBASE spend" (2431); CSV Method (3009); basis (2469-2473); lib/scope3/dataSources.ts:108 | 2019 factors. The data-source copy does not name EXIOBASE. |
+| S3-02 | Cat 2 capital goods | `exiobase_spend` on the product (pxp) table; spend from `annual_spend`. | As S3-01 (pxp metadata) | categoryMethods.ts:87; page.tsx:222, 4070-4080 | Yes: pill; CSV "Product used" (2797) | none |
+| S3-03 | Cat 3 fuel- and energy-related | Re-prices the bound GHG inventory on DEFRA WTT factors; electricity and heat get WTT of generation, T&D loss, WTT of loss, on location-based. Non-UK locations use UK factors, flagged `uk_stand_in`. | "UK DEFRA/DESNZ (2026) GHG Conversion Factors…" full set v1, AR5 (defraEnergy2026.json, gwp_basis 57); Scope 3 Standard p.70 and Scope 2 Guidance §1.10 p.10 (categoryMethods.ts:343-344) | categoryMethods.ts:95, 319-348; lib/scope3/cat3Energy.ts:253, 371 | Yes: "Activity data" pill; dataSources.ts:64-67; CSV (2833); GWP sentence (2029) | Stale comments: page.tsx:2391-2393 ("CANNOT FIRE YET"); dataSources.ts:15-27 (flat 0.5). |
+| S3-04 | Cat 4 upstream transport | `exiobase_spend` (ixi) from `annual_spend`. | As S3-01 | categoryMethods.ts:96; page.tsx:223 | Yes: dataSources.ts:69-72; pill | Spend-based only; no tonne-km method. |
+| S3-05 | Cat 5 waste | `waste_factors`: tonnes × kg CO2e/t per material and route; empty cell = route absent, not zero. | DEFRA/DESNZ 2026 "Waste disposal", v1, AR5, OGL v3.0 (defraWaste2026.json:1-30) | categoryMethods.ts:97, 291-299; lib/scope3/wasteRows.ts:47; page.tsx:1869-1876 | Yes: pill; dataSources.ts:112; GWP sentence (1921, 1943) | UK factors wherever the waste is. |
+| S3-06 | Cat 6 business travel | Flights per leg (passenger-km × DEFRA + WTT); rail per journey; **hotels not priced**. Non-UK haul bands at 482.8032 and 3,701.4912 km. Radiative forcing **on by default**. Unknown cabin = average passenger. | DEFRA/DESNZ 2026 (defraTravel2026.json, AR5 line 20); US EPA Hub (2025) for the bands only, "NO EPA figure used" (lib/scope3/businessTravel.ts:15-20) | categoryMethods.ts:101; businessTravel.ts:12-24, 40-46, 101, 152, 186, 301; businessTravelCopy.ts:94-118, 153-163 | Yes: "How this is priced" panel (page.tsx:3618-3623); CSV RF header | Non-UK rail uses UK factors. Category guidance still says "(flights, rail, hotels, rental cars)" (page.tsx:111). |
+| S3-07 | Cat 7 commuting | Per group: employees × one-way km × 2 × days/week × weeks/year × DEFRA land factor + WTT; car/motorbike ÷ occupancy; homeworking priced for UK only. **No default distance** (the 15 km, petrol-car and 235-day defaults were removed); an old-shape record shows as not priced. | DEFRA 2026 "Business travel- land" and "Homeworking", AR5; homeworking "from the EcoAct 2020 methodology"; Scope 3 Standard p.46 (commutingCopy.ts:76) | categoryMethods.ts:102-105; lib/scope3/commuting.ts:18-32, 79, 337; commutingCopy.ts:60-98 | Yes: dataSources.ts:114; pill; CSV basis (2549) | The memory note "Cat 7 commute distance defaults to 15 km" is resolved in code. |
+| S3-08..14 | Cats 8, 9, 10, 11, 13, 14 | `no_method`: "Not calculated by ThemisIQ: no emission factor is applied and no estimate is produced." Entered figure used as primary data; a saved `annual_spend` is reported as held and not used. The flat 0.5 `GENERIC_SPEND_FACTOR` was deleted 25 Sep 2026. | None by design; "GHG Protocol Scope 3 chapter 11.1" (lib/emissionFactors.ts:66) | categoryMethods.ts:115-121, 286-290; page.tsx:2495-2511 | Yes: pill "Not calculated" (2432); CSV; dataSources.ts:74-101 | Stale comment page.tsx:194-204 ("EIGHT categories keep the flat 0.5"). |
+| S3-12 | Cat 12 end-of-life | `end_of_life_factors`: per material, tonnes split by customer across routes × DEFRA waste factor. | DEFRA 2026 Waste disposal, AR5; "formula [12.1] of the GHG Protocol's Technical Guidance" (categoryMethods.ts:312-313) | categoryMethods.ts:119, 300-318; lib/scope3/endOfLife.ts:125 | Yes: pill; CSV "End-of-life split without a source" (2984-2986) | UK factors wherever sold (disclosed). |
+| S3-15 | Cat 15 investments (PCAF) | Attribution = outstanding / (EVIC, equity+debt, or asset value), capped 100%, × investee emissions. Score 1 verified, 2 otherwise, 3 if physical activity given; portfolio score emissions-weighted. Score 4/5 proxy removed. | "PCAF Global GHG Accounting and Reporting Standard for the Financial Industry", **no edition or year** (lib/pcaf/types.ts:5-6); "Sovereign + Dec-2025 additions OUT of scope" (12-13, 23) | lib/pcaf/attribution.ts:1-80; lib/pcaf/estimate.ts:22-48; lib/scope3/cat15.ts:181-195 | Yes: methodology page:110-119; CSV GWP "Not recorded" (2944); pill | Copy says scores "1 … and 2 otherwise" (cat15.ts:191-192); code allows 3 (estimate.ts:37-45), unreachable from the UI (no physical-activity inputs). |
+| S3-16 ✔ | Cat 1 hybrid (Supplier Portal bridge) | Supplier's allocated figure if > 0 ("supplier-specific"); otherwise, if spend is USD, spend × `EMISSION_FACTORS.spend['Other']` (0.5 kg/USD) / 1000 ("spend-based"); non-USD → `currency_flags` and uncovered; nothing → uncovered. "Use X mt as Cat 1" then sets `has_supplier_data=true` and `supplier_emissions`. | "per the GHG Protocol Scope 3 Technical Guidance (Category 1)", no edition (route.ts:5). The 0.5 factor's provenance is null for source, year and region (lib/emissionFactors.ts:53-57). The route calls it a "documented conservative default" (185). | app/api/campaigns/[id]/scope3-cat1/route.ts:1-23, 145-228, 277-278; page.tsx:1619-1625 | Yes: "Not included" list (3594-3598); currency warning (3600-3603); method note (3605); methodology page:295 | **Mislabelled.** After "Use X mt", the figure shows as "Primary data" (page.tsx:2379), basis "Supplier-specific … no emission factor was applied" (2460-2461), CSV "Entered as a figure; no spend-based estimate was made" (2775-2777), and CSV Method "EXIOBASE spend-based" (3009), even when the total includes flat-factor lines. lib/emissionFactors.ts:4-7 and route.ts:15-16 say the calculator and the bridge use identical factors; they do not (page.tsx:135-140). |
+| S3-17 | Spend adjustment (`spendAdjustment.ts`) | Adjusts spend, never the factor: `amount × to_eur2019_per_unit` from the edition; caller-supplied deflation removed; guard against double price-year conversion; disclosure names the edition, region and RoW coverage; 1e6 divisor in the resolver only. | Edition `exiobase-3.8.2-2019-cpi2024-spendconv`, data_vintage 2024, base_year 2019 (spendConversions.json:3-6); World Bank WDI `FP.CPI.TOTL`, `PA.NUS.FCRF`, `NY.GDP.MKTP.CD`, last_updated 2026-07-13; Taiwan DGBAS (priceIndices.json sources); Climatiq convention (spendAdjustment.ts:29-36) | lib/emissionFactors/spendAdjustment.ts:1-43, 193-250, 270-283; spendResolver.server.ts:236-251 | Yes: line disclosures (route.ts:641) on the card (page.tsx:2350) and CSV (2820) | Stale: spend.ts:154-157 ("caller-supplied index"); spend.ts:3-4, 475-481 and spendResolver.server.ts:14 ("not wired"). |
+| S3-18 | Purchaser-to-basic price | Not corrected: the page sends `purchaser`, EXIOBASE is basic, so `price_basis_mismatch` is always true and disclosed. | "The 3.8.2 archive carries no margin matrices" (spendAdjustment.ts:54-60) | page.tsx:1419-1424; route.ts:642-649 | Yes: "…No conversion between the two was made, because the factor source publishes no margin data…" (route.ts:644-647) | Known, disclosed bias, size not estimated. |
+| S3-19 | Price vintage vs reporting year | A reporting year other than 2024 is treated as 2024 prices, with the lag disclosed. | "latest year with CPI for ≥80% of 212 countries" (priceIndices.json:3) | app/api/scope3/spend-factor/route.ts:704-715 | Yes: route disclosure | A 2026 inventory is priced at 2024 prices. |
+| S3-20 | Currency (Cats 1, 2, 4) | USD, EUR, GBP, CAD, AUD only, one currency per inventory; conversion folded into `to_eur2019_per_unit` (World Bank annual-average FX, 2024 vintage). Others rejected. | `currency_as_of: "2024-07-01"` (priceIndices.json:114) | page.tsx:3151-3154; route.ts:83, 140-145, 321, 362-366 | Yes: selector; error "Supported currencies are USD, EUR, GBP, CAD and AUD." (321) | No per-line currency. |
+| S3-21 | Currency (Cat 1 bridge) | Non-USD flagged and excluded, never converted; a missing currency defaults to `'USD'`. | none | scope3-cat1/route.ts:165, 168-183 | Yes: page.tsx:3600-3603; methodology page:295 | A null currency is silently treated as USD (165). |
+| S3-22 | `lib/fx.ts` (ECB) | ECB reference rates for 29 currencies dated 2026-07-01. Not used by Scope 3. | "ECB euro foreign exchange reference rates, 1 July 2026 (14:15 CET daily fixing)" (22-23) | lib/fx.ts:22-85 | No (for Scope 3) | none |
+| S3-23 | RoW region flagging | Country → EXIOBASE region via countryRegions.json (212 countries, 49 regions; 169 in five RoW buckets). A RoW country is assigned to its bucket, whose scalar is a GDP-weighted composite with `gdp_coverage_pct`. | Bjelle et al. (2020), J. Econ. Struct. 9:14, doi 10.1186/s40008-020-0182-y, CC BY 4.0 (countryRegions.json; row_bucket_note line 28) | route.ts:148-163, 407-417; lib/emissionFactors/regionNames.ts; spendAdjustment.ts:218-226 | Yes: picker "✓ {country}: RoW … (regional average)" vs "country-specific factor" (page.tsx:3251-3259); CSV region row (2813-2816); batch RoW count (route.ts:723-729, CSV only, 2+ lines) | The CC BY 4.0 attribution for the concordance is not rendered on the page. |
+| S3-24 | Region with no factor | No neighbouring-region fallback: a miss returns `no_factor` with a notice; zero cells count as absent; 14 secondary-material products return `absent`. | "Climatiq's region_fallback also defaults to off" (route.ts:19-22) | route.ts:538-583; spendResolver.server.ts:109-114, 324-394 | Yes: `NoFactorNotice` (page.tsx:144-160); route notice (561-569) | A resolver fallback arm exists (265-278, 375-391) with no caller. |
+| S3-25 | Active factor edition gate | The route needs exactly one `factor_editions.is_active` row matching `spendConversions.json`; otherwise 503/500. | migrations 20260916_factor_editions.sql:20, 68; 20260916_edition_spendconv.sql:56 ("DOES NOT ACTIVATE ANYTHING") | route.ts:461-528 | Yes: "Spend-based estimates are not available at the moment…" (334) | No activating migration found (commented example at factor_editions.sql:476). Live state not checked: if nothing is active, Cats 1, 2 and 4 price nothing. |
+| S3-26 | `EMISSION_FACTORS.spend` / `DEFAULT_SPEND_EF` | 13 sectors in kg/USD, default 0.5. Only Scope 3 reader is the bridge. | "What is recorded about where the values … came from: nothing" (lib/emissionFactors.ts:43-57) | lib/emissionFactors.ts:12-41 | Indirectly (S3-16; methodology page:295 prints 0.5 kg CO2e per US dollar) | `electricity: 0.000233 // kg CO2e per kWh (UK average)` (36): unsourced, implausible unit, no reader. |
+| S3-27 | Intensity position / uncertainty | Flags factors in the bottom or top 3%; states the region's rank in its sector; states EXIOBASE "publishes no uncertainty values". | `publishes_uncertainty: false`, with the note that the full archive was not re-opened to confirm it (spend.ts:233-238) | spend.ts:391-431; route.ts:690-703 | Yes: line disclosures | The uncertainty claim is unconfirmed by the code's own note. |
+| S3-28 | Confidence pills | high = "Primary data", medium = "Activity data", exiobase_spend = "EXIOBASE spend", low = "Not calculated". | n/a | page.tsx:2374-2433 | Yes: results grid (4235-4236); CSV Confidence (3010) | The data-quality summary pills (4176-4178) count high/medium/low only; EXIOBASE-priced categories appear in no pill. |
+| S3-29 | CSV export | Header block (total, exclusions, Cat 12 split, Cat 6 RF); columns Category, Name, mt CO2e, Method, Confidence, Status, In total, Exclusion justification; ESTIMATE BASIS and METHODOLOGY NOTE blocks; footer "GHG Protocol Scope 3 Standard"; file `{company}_Scope3_{year}.csv`. | n/a | page.tsx:2763-2822, 2957-3041 | Yes | No GWP row for Cats 1, 2, 4. The Method column prints the default method even when an entered figure was used, contradicting the METHODOLOGY NOTE block in the same file. Bridge per-supplier lines are not exported. |
+| S3-30 | Scope 3 PDF | not found | n/a | not found | No | none |
+
+## 8. Location-count limits and enforcement
+
+**Current state ✔.** Every `GHG_TIERS[*].locationAllowance` is `null` (lib/pricing.ts:180-184), so every
+enforcement point below is wired but inactive: checkout and invoices send `''`, the webhook writes NULL, and
+both the client wall and the database trigger treat NULL as uncapped. GHG is sold by employee band
+(lib/pricing.ts:162-185). Concierge is now a flat onboarding fee plus a per-source charge
+(`CONCIERGE_ONBOARDING_USD` 1,395 and `CONCIERGE_SOURCE_USD`; lib/pricing.ts:469-485), with a 60-source
+self-serve cap that is a source limit, not a location limit.
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| LOC-01 | `useGhgLocationAllowance()` | Reads `entitlements.location_allowance` for module ghg. Fail-open: no session, read error or missing row → null (uncapped). | n/a | lib/useEntitlement.ts:199-226 | No | Comment at 197 ("sales-managed 20+ 'contact us'") is stale. |
+| LOC-02 | `addLocation` check | Refuses a new location and shows the wall when `allowance != null && !loading && count >= allowance`; repeated in the state updater. Fail-open. | n/a | app/dashboard/ghg/page.tsx:645-646, 994, 997 | Yes (wall) | Unreachable while allowances are null. |
+| LOC-03 | Upgrade wall | "You've reached your plan's location limit ({locationAllowance})"; "Your current plan covers up to {n} location(s). Upgrade to add more…" → /pricing. | n/a | page.tsx:2044-2051, 2082-2089 | Yes | Unreachable today. |
+| LOC-04 | Checkout | `ghgAllowance = locationAllowanceForTier(tier)` (null); writes metadata `ghg_location_allowance: ''`; reads `location_allowance` but no longer uses it (503 on read error). | n/a | app/api/checkout/route.ts:74, 123, 144-151, 213-219, 288 | No | none |
+| LOC-05 | Admin create-invoice | Same derivation and metadata convention; unused read with 503. | n/a | app/api/admin/create-invoice/route.ts:10-18, 157, 212-217, 274 | No | Header documents the earlier fail-open bug. |
+| LOC-06 | Stripe webhook | `ghgAllowance = raw ? Number(raw) : null` (fail-open); writes `location_allowance` for ghg on every purchase, overwriting any prior value. | n/a | app/api/webhooks/stripe/route.ts:181-182, 245, 252-254 | No | Unlike `ghg_tier` and `source_allowance`, the prior value is not preserved. |
+| LOC-07 | `locationAllowanceForTier` | New model reads `GHG_TIERS[tier].locationAllowance`; legacy branch {starter 3, professional 10, advisory 20}. | n/a | lib/pricing.ts:124-132 | No | Comment at 124-126 ("Essentials 3 / Pro 15 / Advisory null") is stale. |
+| LOC-08 | Concierge location bands in `ADDONS` | `concierge-basic` "(up to 5 locations)" $799; `concierge-standard` "(6–15 locations)" $1,499; `concierge-enterprise` "(16+ locations)" custom quote; `conciergeTierForLocations` ≤5/≤15/else. | n/a | lib/pricing.ts:359-412 | Only if a legacy `addOns` key is posted (Stripe line names) | `conciergeTierForLocations` has no caller. lib/pricing.ts:444-450 marks these bands superseded by docs/pricing-and-concierge-spec-v5.md. |
+| LOC-09 | Database trigger `enforce_ghg_location_allowance()` | Raises if no active GHG row (fail-closed); counts `jsonb_array_length(locations_data)` (fail-open if unparseable); raises "Location limit reached for your plan (% of % allowed)" when allowance is not null and count > allowance; NULL = uncapped. BEFORE INSERT OR UPDATE on `ghg_inventories`. | n/a | supabase/migrations/20260618_ghg_location_allowance.sql:48-130 | Yes (error text, unreachable today) | Per CLAUDE.md:22-23 the column and trigger are DB-only objects. |
+
+**SQL that references location limits (every file found).**
+
+| File | Line(s) | Statement or reference |
+|---|---|---|
+| supabase/migrations/20260618_ghg_location_allowance.sql | 48 | `ADD COLUMN IF NOT EXISTS location_allowance integer;` |
+| same | 49-50 | Column comment "GHG location ceiling: Essentials 3 / Professional 15 / Advisory uncapped. NULL = uncapped." (stale) |
+| same | 65, 70, 78-95 | `CREATE OR REPLACE FUNCTION enforce_ghg_location_allowance()`; no-active-row exceptions |
+| same | 101-105 | `loc_count := jsonb_array_length(NEW.locations_data); EXCEPTION WHEN OTHERS THEN RETURN NEW;` |
+| same | 107-112 | `SELECT e.location_allowance INTO allowance … AND e.term_end > now() LIMIT 1;` |
+| same | 115-116 | `IF allowance IS NOT NULL AND loc_count > allowance THEN RAISE EXCEPTION 'Location limit reached for your plan …'` |
+| same | 127-130 | `CREATE TRIGGER trg_enforce_ghg_location_allowance BEFORE INSERT OR UPDATE ON ghg_inventories …` |
+| supabase/migrations/20260811_entitlements_definition.sql | 71 (comments 27, 63-65) | `location_allowance integer NULL,` |
+| supabase/migrations/20260928_concierge_source_model.sql | 27, 44, 47-48, 60, 62; 52-54; 91 | Comments ("location_allowance stays null: Advisory is uncapped"); `source_allowance` column and `= 60` (a source cap, "Nothing enforces … yet") |
+| supabase/migrations/20260928_concierge_source_model_rollback.sql | 44, 73 | `source_allowance = null`; drop column |
+| supabase/migrations/20260928_ghg_employee_bands.sql | 17 | Comment: location_allowance keeps its meaning "until the batch that retires the cap" |
+| supabase/migrations/20260701_deals_location_count.sql | 3 | Comment "(GHG_TIERS: <=3 Essentials, 4-15 Professional, 16+ Advisory)" (stale band) |
+| supabase/migrations/20260707_verifier_access_baseline_and_consent.sql | 5 | Comment reference to the trigger |
+| supabase/migrations/20260811_deals_free_tier_cap.sql | 31, 33 | Comment reference |
+| supabase/migrations/20260909_verifier_invite_term_gate.sql | 76, 121 | Comment reference |
+| supabase/migrations/20260913_module_entitlement_triggers.sql | 28, 59, 113 | Comment reference |
+| supabase/migrations/20260930_s211_read_write_split.sql | 25 | Comment reference |
+| db/dumps/schema_public_20260816.sql | 339, 383, 392, 1397, 1407, 3627 | Function, `SELECT location_allowance`, `RAISE`, column, column comment, trigger |
+| db/dumps/schema_public_20260819_0800.sql | 339, 383, 392, 3641, 3651, 6455 | same |
+| db/dumps/schema_public_20260914_0856.sql | 512, 556, 565, 5492, 5502, 9058 | same |
+| db/dumps/schema_public_20260924_1400.sql | 570, 614, 623, 5649, 5659, 9768 | same |
+| db/dumps/schema_public_20260927_1928.sql | 1369, 1413, 1422, 10333, 10345, 15867 | same |
+| db/dumps/schema_public_20261001_1057.sql | 570, 614, 623, 5942, 5958, 10285 | same; column comment "Live model: Essentials 3 / Professional 15 / Advisory NULL (uncapped)" (stale) |
+| supabase/verify/*.sql | n/a | not found |
+| scripts/*.sql | n/a | not found (no .sql files in scripts/) |
+
+## 9. Customer-facing methodology statements
+
+Verdicts: **A** agrees with the code, **D** disagrees, **P** partly disagrees or overstates, **CV** cannot be
+verified from the repository. Every **D** and **P** is repeated in section (a).
+
+| ID | Statement (short) | File:line | What the code does | Verdict |
+|---|---|---|---|---|
+| CG-01 | "Pre-filled CARB SB 253 export" | app/climate-ghg/page.tsx:25, 30 | Export is a generic CSV (`generateExport`, ghg page.tsx:3101-3208); scripts/fill_carb_template.py has no caller. | D |
+| CG-02 | "…the source document kept behind every figure" | climate-ghg:90-91 | Documents only where uploaded (uploads paid-only, ghg page.tsx:538-547); manual rows carry none (engine.ts:3203). | P |
+| CG-03 ✔ | "Scope 1: … fugitive and process emissions" | climate-ghg:113 | No process-emissions field or calculation (engine.ts:1604-1647, 2629). | D |
+| CG-04 | Scope 2 location and market in parallel, residual citation | climate-ghg:114 | engine.ts:2643-2654, 3245-3266. | A |
+| CG-05 | `scope3ScopeClaim()` | climate-ghg:118, 138 | Derived from METHOD_BY_CATEGORY (methodSummary.ts:392-398). | A |
+| CG-06 | "Monthly from evidenced data only, annual from evidenced plus estimated…" | climate-ghg:119 | monthlyEmissions.ts:18-24. | A |
+| CG-07 | Scope 3 method families list | climate-ghg:138 | No family for the flat 0.5 kg/USD factor that still prices Portal Cat 1 lines (scope3-cat1/route.ts:185-193). | P |
+| CG-08 | "Every saved change logged" | climate-ghg:145 | Matches lib/auditTrailNotice.ts; triggers live in the DB (lib/modulePages.ts:72-78). | CV |
+| CG-09 | "One inventory exports to CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously" | climate-ghg:147-148 | One CSV per framework, one button at a time (ghg page.tsx:3022); no C7 or by-gas breakdown (3106-3200). | D |
+| CG-10 | "…with US EPA combustion factors elsewhere" | climate-ghg:158 | Unsupported countries are refused and excluded (engine.ts:1386-1408). | D |
+| CG-11 | "IPCC AR6 GWPs by default; … applied as published" | climate-ghg:158 | engine.ts:3076-3085; no setting exists (815). | A |
+| CG-12 | SB 253 date and status | climate-ghg:160, 307 | lib/sb253.ts:33-40. | A |
+| CG-13 | "gaps are flagged rather than filled silently" | climate-ghg:182 | Gate at ghg page.tsx:2994-2996, 3013, 3022; extrapolation only after acknowledgement (3534-3545). | A |
+| CG-14 | "the GWP set each framework requires, and proration…" | climate-ghg:183 | All AR6; proration is a customer choice (3567-3570). | A |
+| CG-15 | "…an assurance pack and a verifier view" | climate-ghg:184 | The assurance PDF has no workings page (PDF-01). | P |
+| CG-16 | "follow a total back to the bill it came from" | climate-ghg:193 | As CG-02. | P |
+| CG-17 | FAQ: extractor reads electricity, gas, diesel, propane, gasoline automatically | climate-ghg:299 | Matches lib/ghg/conciergeDocTypes.ts; does not say it needs a Concierge entitlement (ghg page.tsx:644, 1040-1046). | P |
+| CG-18 | FAQ: "your verifier sees the same view you do" | climate-ghg:301 | The verifier page withholds revenue and intensity (verify:963-965) and shows changed field names, not values (1413-1415). | D |
+| CG-19 | FAQ: six jurisdictions have their own factor editions | climate-ghg:303 | lib/ghg/factorEditions.ts:50. | A |
+| CG-20 | FAQ: "Everywhere else uses US EPA combustion factors, and the workings row says so" | climate-ghg:303 | Refused, nothing priced (engine.ts:3154-3177). | D |
+| CG-21 | FAQ: unconvertible units flagged for review | climate-ghg:303 | lib/unitConversions.ts:178-179. | A |
+| CG-22 ✔ | FAQ: "refrigerants are a declared gap rather than a silent one" | climate-ghg:303 | Refrigerants are calculated (engine.ts:58-62, 2627-2628, 3234-3236). | D |
+| CG-23 | FAQ: comparison discloses "which factor editions were applied" | climate-ghg:305 | No edition observation in comparability (comparability.ts:103-114). | P |
+| CG-24 | faq.ts: you approve every figure before it goes in | app/climate-ghg/faq.ts:60 | Only confirmed proposals write; pending ones block export. | A |
+| CG-25 | faq.ts: "We identify every data source…" | faq.ts:56 | A service description. | CV |
+| M-01 | Frameworks "required by SB 253, CDP, ESRS E1, GRI 305, and IFRS S2" | app/methodology/page.tsx:52 | Regulatory claim. | CV |
+| M-02 | AR6 for every framework; CH4 29.8 / 27.0, N2O 273 | methodology:63 | engine.ts:49-51, 1496-1565. | A |
+| M-03 | "applied as published and the workings row says so" | methodology:63 | engine.ts:3084, 892. | A |
+| M-04 | "The GWP basis is stamped on every export" | methodology:63 | CSV and PDF stamp one "IPCC AR6" for the whole file (ghg page.tsx:3109; assurancePdf.ts:168) while UK/AU/NZ rows are AR5-combined. | P |
+| M-05 | "US locations use US EPA (2024) factors" | methodology:67 | The code says values were read from the 2025 workbook, edition unverified (engine.ts:65-68). | CV |
+| M-06 ✔ | "…rather than the user-selected AR4/AR5 set" | methodology:67 | No selector (engine.ts:806-815; ghg page.tsx:1638). | D |
+| M-07 | EU MRR/IPCC mass basis, densities shown | methodology:67 | engine.ts:769, 3124. | A |
+| M-08 ✔ | "Locations outside the US, Canada, UK, and EU fall back to US EPA combustion factors" | methodology:67 | Refused, not priced (engine.ts:1380-1410). | D |
+| M-09 | Factor lists name US, CA, UK, EU only | methodology:67 | AU (DCCEEW) and NZ (MfE) are priced (engine.ts:770-771, 801-802). | P |
+| M-10 | Electricity: eGRID 2023, ECCC NIR, DEFRA 2025 and 2026, EEA 2023 | methodology:67 | engine.ts:789-802, 895. | A |
+| M-11 | Residual mix on non-contracted load; "Contracted volumes are not deducted from the grid average"; AIB, Green-e; Austria fallback | methodology:71 | Sources and fallback agree. In the fallback branch the grid factor is applied to non-contracted kWh, which is a deduction from the grid average (engine.ts:2650, 2654). AU residual mix not mentioned. | P |
+| M-12 | "aligned with ISO 14064-3 and ISAE 3410 limited assurance requirements" | methodology:75 | n/a | CV |
+| M-13 | Omitted location makes the year unknown | methodology:84-86 | lib/ghg/series.ts:55-67. | A |
+| M-14 | Scope 3 standard + scope claim | methodology:103 | Derived. | A |
+| M-15 | "every export names the method used for each category in that inventory" | methodology:107 (methodSummary.ts:138) | The CSV Method column prints the default method when an entered figure was used (scope3 page.tsx:3009). | D |
+| M-16 | "For Category 1, supplier-specific figures, where entered, are used instead" | methodSummary.ts:114 | A Portal figure is treated as supplier-specific though it may contain flat-factor estimates (S3-16). | P |
+| M-17 | Category 15 passage | methodology:119 | lib/scope3/cat15.ts. | A |
+| M-18 | "every export counts the exclusions made without one" | methodology:127 | scope3 page.tsx:2981-2988, 3001-3015. | A |
+| M-19 | Supplier Portal 0.5 kg CO2e per US dollar, other currencies flagged and left out | methodology:295 | scope3-cat1/route.ts:185-193, 277-278. | A |
+| M-20 | Supplier register Cat 1 "no supplier is priced there" | methodology:293 | Supply-chain module not reviewed. | CV |
+| M-21 | "Every number ThemisIQ produces is grounded in a recognised international standard … We don't invent methodologies" | methodology:416 | The Portal 0.5 kg/USD factor has no recorded source, year or region (lib/emissionFactors.ts:41-57). | D |
+| M-22 | "Last reviewed: July 2026" | methodology:430 | Factor and copy changes logged through September 2026. | CV |
+| W-01 | "collects your data once and generates each report automatically" | ghg page.tsx:1721, 1747 | One CSV per framework from one inventory. | A |
+| W-02 | Framework cards: GRI "by gas (CO₂, CH₄, N₂O, HFCs separately)"; ESRS "biogenic, by gas"; EcoVadis "revenue and employee intensity ratios" | engine.ts:1537, 1544, 1554 (rendered ghg page.tsx:1737) | No gas or HFC split in the CSV (3119-3136); per-employee intensity on screen (2973) but not in the CSV. | D (GRI, ESRS), P (EcoVadis) |
+| W-05 | "You never need to look up emission factors" | ghg page.tsx:2074 | Steam in a jurisdiction with no published factor needs a supplier factor (2364-2370, 3010-3012). | P |
+| W-06 | "Ammonia has zero global warming potential" | ghg page.tsx:2236 | engine.ts:2628. | A |
+| W-07 | Refrigerant top-up = leakage (GHG Protocol) | ghg page.tsx:2239 | engine.ts:2628, 3236. | A |
+| W-08 | Grid source labels | ghg page.tsx:2269-2276 | engine.ts:789-802. | A |
+| W-09 | NZ T&D as separate Scope 3 Cat 3 line | ghg page.tsx:2302 | engine.ts:2655-2659, 3269-3272. | A |
+| W-10 | "market-based will use the grid-average factor as a conservative fallback" | ghg page.tsx:2308 | No conservatism check; covered kWh still zero (engine.ts:2647-2654). | P |
+| W-11 | Steam: published factor, supplier override, no factor → unquantified and export locked | ghg page.tsx:2358-2367 | engine.ts:1627-1630, 3278-3299. | A |
+| W-12 | "An undeclared stream is not the same as zero … Required before export." | ghg page.tsx:2415 | engine.ts:3359-3363. | A |
+| W-13 | Live results "Scope 2 (electricity)" | ghg page.tsx:2448 | Value includes steam (engine.ts:2643). | D |
+| W-14 | "Market-based Scope 2 subtracts electricity from renewable energy contracts" | ghg page.tsx:2511 | engine.ts:2647. | A |
+| W-15 | "Your complete GHG inventory for …" | ghg page.tsx:2582 | No completeness test (comment at 362-366 says so). | D |
+| W-16 | Checklist "Full formula shown for every emission source" (always ticked) | ghg page.tsx:2863 | Declaration and exclusion rows show no formula (2699-2797). | P |
+| W-17 | Checklist "All locations included in boundary" (ticked when any location exists) | ghg page.tsx:2866 | Refused or unpriceable locations are excluded from totals (engine.ts:2751-2756). | D |
+| W-18 | SB 253 banner "Scope 3 not required for your first reporting year", shown when `year <= 2024` | ghg page.tsx:2891-2892, 2907 | The first report covers FY2025 (lib/sb253.ts:33), which never sees the banner. | D |
+| W-19 | "Use the Scope 3 Complete Calculator for all 15 categories" | ghg page.tsx:2935 | Six categories are `no_method`. | P |
+| W-22 | CSV "GWP basis: IPCC AR6" for the whole file | ghg page.tsx:3109 | As M-04. | P |
+| W-23 | CSV "covered kWh counted at zero" | ghg page.tsx:3158 | engine.ts:2647. | A |
+| W-24 | "…recorded automatically … in a tamper-evident log" | ghg page.tsx:3786, 3798 | Append-only by permission; no hash chain (lib/auditTrailNotice.ts; the comment at assurancePdf.ts:319 records that "tamper-evident" was withdrawn there). | D |
+| W-25 | "entries cannot be edited or deleted" | ghg page.tsx:3808 | Enforced in the DB, not in the repo. | CV |
+| W-26 | Verifier invite: "full audit trail" | ghg page.tsx:3983 | The verifier sees changed field names, not values (verify:1413-1415). | P |
+| W-31 | Extrapolation "×12/n"; "day-level proration" | ghg page.tsx:3541, 3568 | engine.ts:2886-2896, 2982-2983. | A |
+| PDF-01 ✔ | "It documents … methodology, calculation workings, source-document index, and an append-only audit trail" | lib/assurancePdf.ts:157 | Pages: cover, Emissions Summary, Methodology & Emission Factors, Source Document Index, Audit Trail, Important Notice (161-358). No workings page. | D |
+| PDF-02 | "IPCC {gwp}" per framework | assurancePdf.ts:168 | As M-04. | P |
+| V-01 | "Every figure on this page was priced by a published factor table" | app/verify/[token]/page.tsx:882-885 | Refrigerant and supplier-steam rows are not published tables (factorEditions.ts:122-126). | P |
+| V-05 | Emissions summary `(x ?? 0).toFixed(3)` | verify:960-962 | Renders a missing total as 0.000, against the page's own "null is not zero" rule (1265). | P |
+| MP-01 | Verifier sees "Scope 3 Category 1 where you have opted in" | lib/modulePages.ts:124-125 | The opt-in shares the full 15-category coverage table (verify:1285-1320). | P (understates) |
+| FW-01 | "Your Scope 1, 2 and 3 inventory is built … audit-trail first" | app/frameworks/page.tsx:77 | `scope3_inventories` has no audit trigger (verify:1242-1254). | P |
+| FW-03 | "One-click, pre-filled SB 253 emissions export" | frameworks:86 | As CG-01. | D |
+| FW-04 | ESRS E1 "datapoints mapped directly"; CDP "Export-ready answers … C6" | frameworks:89-90 | The CSV holds totals only (ghg page.tsx:3119-3136). | P |
+| FW-05 | GRI 305 "split by CO2, CH4, N2O and HFCs" | frameworks:100 | As W-02. | D |
+| FW-06 | Assurance pack and verifier portal assembled for ISO 14064-3 | frameworks:163 | The PDF has no workings (PDF-01). | P |
+| HP-01 | GHG card "Scope 1, 2 and 3 inventory with an audit trail behind every figure" | app/page.tsx:402 | No audit trigger on `scope3_inventories`. | D |
+| HP-02 | "We fully disclose all our methodologies" | app/page.tsx:258 | The methodology page omits AU and NZ factors (M-09). | P |
+| SC-01 | Cat 6 "(flights, rail, hotels, rental cars)" | scope3 page.tsx:111 | Hotels excluded; no rental-car input (businessTravelCopy.ts:111-113). | D |
+| SC-05 | "ThemisIQ follows the GHG Protocol … Scope 3 … Standard" | scope3 page.tsx:3273 | The methodology page softened the same claim to "works to" (methodology:99-103). | P |
+| SC-07 | "ThemisIQ will calculate emissions using the best available method" | scope3 page.tsx:3423 | Six categories are not calculated. | D |
+| SC-08 | Portal: "estimated from the spend you recorded (sector default)" | scope3 page.tsx:3515 | One flat 0.5 kg/USD for every sector (route.ts:185-193). | D |
+| SC-09 | Portal method note "Hybrid Cat 1 (GHG Protocol) … sector default 'Other'" | scope3-cat1/route.ts:277-278 (rendered 3605) | methodSummary.ts:307-312 says no method has been "hybrid". | P |
+| SC-10 | Cat 15 "PCAF-aligned, not PCAF-certified"; no tier-4/5 estimate | scope3 page.tsx:3906, 3925 | Agrees. | A |
+| SC-12 | Data-quality pills | scope3 page.tsx:4176-4178 | EXIOBASE-priced categories appear in no pill. | P |
+| SC-13 | "Your complete inventory is ready"; "You only pay to unlock results & export" | scope3 page.tsx:4316, 4318 | No completeness check; saving is also paid-only (4398-4413). | D / P |
+| SC-14 ✔ | "Supplier-specific … no emission factor was applied"; CSV "no spend-based estimate was made"; "Primary data" | scope3 page.tsx:2379, 2460-2461, 2775-2777 | See S3-16. | D |
+| SC-15 | CSV "Method" column | scope3 page.tsx:3009 | Default method printed even when an entered figure was used. | D |
+| SC-16 | "generate CSRD ESRS E1-6 disclosure tables" | scope3 page.tsx:4431 | No ESRS table generator; CSV only (2957-3046). | D (tables), A (year-on-year) |
+| SC-17 | Banner "All 15 categories" | scope3 page.tsx:4522 | Six not calculated; a comment defends the wording (4515-4521). | P |
+| CX-01 | Extraction prompt: "A blank that gets flagged for human entry" | app/api/concierge/extract/route.ts:70 | The page drops `value == null` proposals (ghg page.tsx:1060); the model's notes are stored but never rendered (3624-3636). | D |
+| CX-02 | "conversion happens later in a separate, audited step" | extract/route.ts:76 | Tier 2 note rendered (ghg page.tsx:3636). | A |
+| OB-01 | SB 253 obligation "exports it on the CARB template" | lib/obligations.ts:108 | As CG-01. | D |
+| CE-01 | Factor list without AU or NZ; verifier link described as "secure" | app/calculate-emissions/page.tsx:655 | As M-09; the GHG page withdrew "secure" (ghg page.tsx:3974-3981). | P |
+
+**Other surfaces checked.** No customer-facing Word methodology documents for GHG are in the repo (the only
+methodology PDF, public/themisiq-materiality-methodology.pdf, covers materiality). `lib/pdf/*` holds layout
+helpers only, no GHG methodology text. scripts/fill_carb_template.py has no caller in app/ or lib/.
+
+---
+
+## (a) Code vs customer-facing copy: disagreements
+
+Statements that say something the code does not do. ✔ = re-checked directly.
+
+1. ✔ **Bills outside the reporting year.** The coverage strip says they are "not counted" (app/dashboard/ghg/page.tsx:3528); `applyResolutions` includes them in the annual figure in full (lib/ghg/engine.ts:2952-2968). (PRO-03)
+2. ✔ **Process emissions** claimed in Scope 1 (app/climate-ghg/page.tsx:113); no input or calculation exists.
+3. ✔ **US EPA fallback for other countries** (climate-ghg:158, 303; app/methodology/page.tsx:67); unsupported countries are refused and excluded (engine.ts:1380-1410).
+4. ✔ **"User-selected AR4/AR5 set"** (methodology:67); there is no GWP selector (engine.ts:806-815).
+5. ✔ **Refrigerants "a declared gap rather than a silent one"** (climate-ghg:303); refrigerants are calculated.
+6. **CARB template export** (climate-ghg:25, 30, 147-148; frameworks:86; lib/obligations.ts:108); the product exports a generic CSV and the CARB filler script is never called.
+7. **"Simultaneously" and "CDP C6 and C7"** (climate-ghg:148); export is one framework at a time with no C7 breakdown.
+8. **"By gas" and "HFCs separately"** for GRI 305 and ESRS E1 (engine.ts:1537, 1544; frameworks:100); the CSV has no gas or HFC split.
+9. ✔ **Assurance PDF "calculation workings"** (lib/assurancePdf.ts:157); no workings page is generated.
+10. **"Tamper-evident log"** (ghg page.tsx:3786, 3798); the log is append-only by permission, with no hash chain.
+11. **"Your verifier sees the same view you do"** (climate-ghg:301); the verifier page withholds revenue, intensity and audit values.
+12. **Audit trail "behind every figure" for Scope 3** (app/page.tsx:402; frameworks:77); `scope3_inventories` has no audit trigger.
+13. ✔ **Portal Cat 1 figure labelled "Primary data" / "Supplier-specific … no emission factor was applied" / "no spend-based estimate was made"** (scope3 page.tsx:2379, 2460-2461, 2775-2777); the figure can include lines estimated at an unsourced flat 0.5 kg/USD (scope3-cat1/route.ts:185).
+14. **"Sector default"** for Portal suppliers (scope3 page.tsx:3515); one flat factor applies to every sector.
+15. **"Every number … grounded in a recognised international standard"** (methodology:416); the Portal factor has no recorded source.
+16. **"Every export names the method used for each category"** (methodology:107); the Scope 3 CSV Method column shows the default method when an entered figure was used, contradicting its own METHODOLOGY NOTE block.
+17. **"Best available method"** (scope3 page.tsx:3423); six categories are not calculated.
+18. **Cat 6 "hotels, rental cars"** (scope3 page.tsx:111); hotels are excluded and rental cars have no input.
+19. **"Your complete GHG inventory" / "Your complete inventory is ready"** (ghg page.tsx:2582; scope3 page.tsx:4316); nothing checks completeness.
+20. **Checklist "All locations included in boundary"** ticked whenever any location exists (ghg page.tsx:2866); refused or unpriceable locations are excluded from totals.
+21. **"Scope 2 (electricity)"** label (ghg page.tsx:2448); the value includes purchased steam.
+22. **SB 253 first-year Scope 3 banner** shown only for `year <= 2024` (ghg page.tsx:2891-2892); the first SB 253 report covers FY2025.
+23. **"Contracted volumes are not deducted from the grid average"** (methodology:71) and **"a conservative fallback"** (ghg page.tsx:2308); in the fallback branch the grid factor is applied to non-contracted load only, and nothing tests conservatism.
+24. **One GWP basis, "IPCC AR6", stamped on the whole CSV and per framework in the PDF** (ghg page.tsx:3109; assurancePdf.ts:168) while UK, AU and NZ rows are AR5-combined as published; and ✔ the AU residual-mix row itself is stamped AR6 (engine.ts:3266).
+25. **Comparability "which factor editions were applied"** (climate-ghg:305); the comparability record has no edition observation.
+26. **"ESRS E1-6 disclosure tables"** in the Scope 3 upgrade copy (scope3 page.tsx:4431); no generator exists.
+27. **Extraction "a blank that gets flagged for human entry"** (extract/route.ts:70); null values are dropped and the model's notes are not shown.
+28. **Duplicate resolution "drops a double-count"** (engine.ts code comments 1853, 2826); no adjustment is applied, and the basis text shown to customers says so (2888, 2903). The customer-facing text is accurate; the code comments are not.
+29. **Documented export gate** (`canExport … customer_approved`, CLAUDE.md:65 and docs/ghg-verifier-grade-roadmap.md:41) does not match the gate in code (ghg page.tsx:1301-1306, 3022). Internal documents only.
+30. **Methodology page omissions**: AU (DCCEEW) and NZ (MfE) combustion and electricity factors, and the AU residual mix, are priced but not listed (methodology:67, 71). The page is dated "Last reviewed: July 2026" (430).
+
+**Calculation defects found in passing, not copy disagreements:**
+- ✔ `pickEF` silently uses the US EPA value when a non-US table lacks a key, while citing the country's own publisher (engine.ts:2420-2440).
+- ✔ `reconcile()` has no production caller (monthlyEmissions.ts:282-342), and would mis-report if wired as written (EST-02).
+- The annual gross-up can overstate when partly covered months are present (EST-01).
+- The unit-switch defect is still open, with a second path through a country change (UNIT-02).
+- An unknown refrigerant type is priced at GWP 0 (engine.ts:2627, 3235).
+- A null currency on the Cat 1 bridge is treated as USD (scope3-cat1/route.ts:165).
+
+## (b) Remaining references to location bands or superseded Concierge pricing
+
+Current model ✔: GHG priced by employee band, every `locationAllowance` null (lib/pricing.ts:162-185);
+Concierge a flat onboarding fee plus per-source charge (lib/pricing.ts:461-485), with
+docs/pricing-and-concierge-spec-v5.md as the current specification (lib/pricing.ts:444-450).
+
+**Customer-facing**
+
+| File:line | Text | Problem |
+|---|---|---|
+| ✔ app/calculate-emissions/page.tsx:588, 692 | "The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}." | Location basis is wrong, and with null allowances the sentence renders with blanks. |
+| app/calculate-emissions/page.tsx:145 | FAQ structured data: "priced by number of locations; Concierge from $799; Advisory is custom" | All three stale. Shown to search engines. |
+| app/climate-ghg/page.tsx:216-219 | "Priced by locations, not by seats." / "an inventory for three sites is not the same work as one for fifteen" | Pricing is by employee band. |
+| app/climate-ghg/page.tsx:162 | "Unlimited locations on the entry tier. Larger allowances and an uncapped tier are in the picker." | Every tier is uncapped; no larger allowances exist. |
+| app/climate-ghg/faq.ts:38, 56 | "Onboarding is a one-time fee based on your GHG tier." | The onboarding fee is flat. |
+| app/order/page.tsx:200 | "GHG Advisory (uncapped locations) is tailored to your footprint, so it's priced individually." | Advisory has a published price; Enterprise is the quote tier. |
+| app/order/page.tsx:115 | "· uncapped" | Correct but framed by location. |
+| app/pricing/page.tsx:638 | "unlimited locations" on every tier | Current but redundant. |
+| app/dashboard/ghg/page.tsx:2047-2048, 2085-2086 | Location-limit wall copy | Unreachable today. |
+| lib/pricing.ts:368, 381, 385-386, 391-392 | ADDONS labels "Concierge · Basic (up to 5 locations)" $799, "Standard (6–15 locations)" $1,499, "Enterprise (16+ locations)" | Reach Stripe line names and invoices only if a legacy `addOns` key is posted (checkout :174; create-invoice ~160). |
+| lib/deals/assessment.ts:614-617, 633 | `DEAL_REPORT_SMALL_MAX = 3`, `DEAL_REPORT_MID_MAX = 15`; `sites <= 3 ? 'starter' : sites <= 15 ? 'professional' : null` | A location ladder used for deal-report GHG pricing when headcount is absent; not in lib/pricing.ts. Feeds customer-facing deal reports and the share page. |
+| lib/deals/assessment.ts:538-539, 592 | `CONSULTANT_LOCATION_FACTOR` ≤3/≤15 "reuse GHG_TIERS thresholds"; "(Advisory GHG, 16+ locations)" | Stale thresholds and comment. |
+| app/deals/[token]/page.tsx:140, 187 | "Professional (4 to 15 sites) or a quote (16+)" | Stale band. |
+| Emails | n/a | not found |
+
+**Internal (comments, docs, tests)**
+
+| File:line | Text |
+|---|---|
+| CLAUDE.md:236-240 | "Only GHG scales by location … Hard enforcement, upgrade wall"; "Concierge add-on … priced on actual location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom quote" (stale) |
+| docs/pricing-and-concierge-spec-v4.md:21-23, 31-34, 60-62, 83, 101 | $999 / $2,499 / $4,999; 3 / 10 / 20 locations; Concierge ≤5 $799 / 6–15 $1,499 / 16+; location enforcement (marked historical) |
+| docs/pricing-and-concierge-spec-v5.md:14-16, 45-46 | v4 bands described as history |
+| docs/design/ghg-page-rebuild.html:161-162 | "From $4,900/yr", "Up to 3 locations" (stale mock) |
+| docs/verification-billing-spec.md:1, 11, 19-21, 49, 113 | Verification Readiness spec ($1,499 base, $499 add-on, /verification-readiness), superseded |
+| docs/workplan-sbti-targets-v2_1.md:143, 179 | Verification Readiness cross-sell |
+| docs/cbam-see-phase1-implementation-spec.md:763 | "(cf. GHG location bands: client wall + Postgres trigger)" |
+| lib/pricing.ts:113-117 | `TIER_PRICING` 1499/999, 2499, 4999 (retired ladder, labelled) |
+| lib/pricing.ts:124-126, 359-362, 402-404, 443-448, 587 | Stale allowance and band comments; 443-448 says app/pricing/page.tsx reads `ADDONS`, which it no longer does |
+| lib/useEntitlement.ts:153-155, 197 | Concierge sold as three tier add-ons; "sales-managed 20+ contact us" |
+| lib/checkout.ts:18 | `addOns: ['concierge-basic']   // old model, until Batch 4` |
+| app/api/checkout/route.ts:131 | "Add-ons (Verification Readiness + the Concierge tiers)" |
+| app/climate-ghg/page.tsx:95-97 | "starter is 3 locations, professional 15, advisory uncapped with priceUSD null" |
+| app/pricing/page.tsx:648-652 | Comment "the tier the buyer picks is a location count" |
+| supabase/migrations/20260618_ghg_location_allowance.sql:49-50; all six db/dumps column comments | "Essentials 3 / Professional 15 / Advisory uncapped" |
+| supabase/migrations/20260701_deals_location_count.sql:3 | "(GHG_TIERS: <=3 Essentials, 4-15 Professional, 16+ Advisory)" |
+| lib/pricing.test.ts:117-140, 297 | Concierge basic/enterprise band tests, "Concierge — Enterprise (16+ locations)", `priceLine('Concierge — Basic', 799)` |
+| lib/deals/ghgPriceBasis.test.ts:54; lib/deals/assessment.test.ts:966, 1006 | "10 sites Professional, 20 sites a quote"; "3 and 15 locations" |
+| `FULL_PLATFORM_PRICE`, `ADDONS.verification`, app/verification-readiness | not found in code (only in CLAUDE.md and docs/ghg-verifier-grade-roadmap.md as retired) |
+
+## (c) Internal vocabulary visible to customers
+
+Only strings that render to a customer are listed. ✔ = re-checked directly.
+
+**GHG dashboard (app/dashboard/ghg/page.tsx)**
+1. ✔ **"Step 7: undefined"** in the GHG assistant on the Audit trail tab. `STEPS` has seven tabs (1495) but `WIZARD_STEP_NAMES` has six (lib/ghg/wizardSteps.ts:12-19). Every question on that tab is then refused by the bot route as `invalid_step` (app/api/ghg-bot/route.ts:245) and shown as a generic error.
+2. Raw coverage statuses in the export gate: "gap", "overlap", "straddle", "none" (2995).
+3. Raw jurisdiction codes ("CA", "EU") in the steam-gap message (3011).
+4. Raw `gwp_basis` values in the workings "GWP basis" column: `excluded`, `declaration`, `scope3-cat3` (2709, 2734, 2756, 2776, 2794, 2820; values from engine.ts:3153, 3271, 3293, 3348).
+5. Raw refrigerant and grid keys in the workings Source: `Refrigerant (r410a)` (engine.ts:3236; the dropdown shows "R-410A"), `Electricity (US_CA / EU_FR / AU_NSW)`, `residual mix {usedRegion}` (engine.ts:3245, 3266). Also on the verifier page (verify:1016).
+6. Raw unit tokens in activity cells: "mmbtu", "gj", "mcf", "kWh uncovered" (lib/ghg/workingsCells.ts:116; engine.ts:3043, 3266, 3291, 3312).
+7. Raw grid region keys in the wizard: "Grid: US_CA", "Grid region: AU_NSW / EU_FR" (2020, 2269, 2274, 2276).
+8. Raw grid region keys in the CSV LOCATION BREAKDOWN (3185, 3194).
+9. Raw values in the audit-trail diff: framework ids "sb253, cdp, esrs, gri, ecovadis, ifrs", boundary "operational_control", status "draft" (`fmt()` 3730-3735; rendered 3861-3864). The same raw values appear in the PDF audit table (lib/assurancePdf.ts:81-85, 330).
+10. Raw database and storage error messages through `alert()` (1205, 1585, 1660, 1666 "Save failed: " + Postgres message, 3076, 3946, 3955) and inline (1031, 1159, 3821).
+11. Raw extraction-route errors inside "We couldn't read this one: …" (1108), including "Extraction is not configured: ANTHROPIC_API_KEY is missing on the server." (app/api/concierge/extract/route.ts:130), "No supported fuelTypes requested" (164), "document (base64) is required" (161), `Unsupported mediaType "…"` (173), the raw storage message (148), "Extraction service error" (226), "Could not parse extraction result" (272).
+12. Lowercase canonical units on extracted figures: "1,234 kwh", "5 mcf" (3628, 3640).
+
+**Assurance PDF (lib/assurancePdf.ts)**
+13. Raw document types in the "Document type" column: `utility_bill_gas`, `fleet_fuel`, `renewable_cert` (301), although `docTypeLabel` exists in lib/ghg/conciergeDocTypes.ts.
+
+**Verifier page (app/verify/[token]/page.tsx)**
+14. Raw framework id "ifrs": `FRAMEWORK_NAMES` uses the key `ifrs_s2` but the engine id is `ifrs` (engine.ts:1559), so the header prints "ifrs" (256-258, 719, 743).
+15. Raw `gwp_basis` values `coverage_resolution`, `excluded`, `declaration`, `scope3-cat3` (1165).
+16. Coverage resolution rows with raw tokens: "Coverage resolution: natural_gas" (engine.ts:3373); "Straddle — this_year / next_year / prorate" (engine.ts:2889, 2901; rendered 1146, 1036); stored notes "Overlapping bills detected for natural_gas" (ghg page.tsx:3556, 3587; rendered via `rowNoteOf` 1142).
+17. Scope "0" on exclusion and coverage rows (engine.ts:3151, 3375; rendered 1126).
+18. Raw factor-family keys "combustion", "electricity", "steam" in the factor-edition table (933).
+19. Raw snapshot method enum "mixed / supplier-specific / spend-based" (1343; lib/scope3/categorySnapshot.ts:77).
+20. Portal basis with the internal sector key: "(sector default 'Other')" (scope3-cat1/route.ts:193; rendered 1372).
+21. Raw error codes and messages: "HTTP {status} ({error_code})" (556, 1207), the raw load error (600), "The database reported: {scope3Error}" (1234), `err.message` (571).
+
+**Scope 3 dashboard (app/dashboard/scope3/page.tsx)**
+22. Portal method note with the internal key: "Hybrid Cat 1 (GHG Protocol) … sector default 'Other'" (scope3-cat1/route.ts:277-278; rendered 3605).
+23. ISO code fallback "⚠ {countryIso2}: not in the country list" (3241). Minor.
+
+Not found: rendered "TODO", "Stage" or "Phase N" strings in the GHG, Scope 3 and verifier pages, the assurance PDF, lib/ghg or lib/scope3 (matches were comments only).

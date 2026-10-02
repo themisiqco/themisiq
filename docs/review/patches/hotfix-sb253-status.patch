@@ -1,0 +1,93 @@
+diff --git a/app/api/ghg-bot/route.ts b/app/api/ghg-bot/route.ts
+index 187d388..a6b744d 100644
+--- a/app/api/ghg-bot/route.ts
++++ b/app/api/ghg-bot/route.ts
+@@ -45,7 +45,7 @@
+ export const runtime = 'nodejs'
+ 
+ import { NextRequest, NextResponse } from 'next/server'
+-import { SB253_FIRST_REPORT_DATE } from '../../../lib/sb253'
++import { SB253_FIRST_REPORT_DATE, SB253_PROCESS_STATUS } from '../../../lib/sb253'
+ import { assistantScope3Basis, assistantScope3GwpClause } from '../../../lib/scope3/methodSummary'
+ import { CAT6_TAKES } from '../../../lib/scope3/businessTravelCopy'
+ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
+@@ -128,7 +128,7 @@ function buildSystemPrompt(currentStep: number): string {
+ ABOUT THEMISIQ: ThemisIQ is a compliance platform for GHG inventories. Scope 1 and 2 are entered once in this wizard and exported to each framework the customer selected, without re-entry — Scope 3 is a separate module, with its own inputs, so "once" describes Scope 1 and 2 rather than the whole platform. Exports UNLOCK RATHER THAN RUN AUTOMATICALLY: every location has to be priceable and its streams declared, every coverage question and grid region resolved, the data confirmed, and, in concierge mode, the extracted figures approved. Until then the export buttons stay disabled and the wizard names what is outstanding, so never tell a customer a report will be produced automatically. The assessment at www.themisiq.co/assess helps companies determine which frameworks apply to them.
+ 
+ FRAMEWORK GUIDANCE:
+-- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). CARB has PROPOSED ${SB253_FIRST_REPORT_DATE} for the first report (Scope 1 and 2); it is NOT FINAL and still requires OAL approval, so never state it as a settled deadline. If unsure whether they qualify, direct them to www.themisiq.co/assess.
++- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). CARB has PROPOSED ${SB253_FIRST_REPORT_DATE} for the first report (Scope 1 and 2). ${SB253_PROCESS_STATUS} Until OAL approves it the date is NOT FINAL, so never state it as a settled deadline. If unsure whether they qualify, direct them to www.themisiq.co/assess.
+ - CDP: Voluntary but widely requested by investors and large customers. If a customer or investor has asked them to complete CDP, they need this. Direct undecided users to www.themisiq.co/assess.
+ - ESRS E1: Mandatory for large EU-incorporated companies under EU CSRD. Deadline was FY2024 for the largest companies. If they have EU operations or are incorporated in the EU, they likely need this.
+ - GRI 305: Most widely used voluntary emissions standard globally. Used for sustainability reports, supply chain questionnaires, and stakeholder communications. Not mandatory but widely expected by customers and ESG raters.
+@@ -157,7 +157,7 @@ KEY TECHNICAL FACTS:
+ COMMON QUESTIONS AND ANSWERS:
+ - "What's California nexus?" = Having operations, employees, customers, or sales in California. Even one employee working remotely in California can create nexus.
+ - "Our revenue is just under $1B" = SB 253 threshold is $1B+ global revenue. If under, you likely don't need to file but should monitor as thresholds may change.
+-- "When is the SB 253 deadline?" = CARB has proposed ${SB253_FIRST_REPORT_DATE} for the first report, but it is not final — it still needs OAL approval and has already moved twice. ThemisIQ keeps the date current; the wizard takes about 20 minutes with bills in hand.
++- "When is the SB 253 deadline?" = CARB has proposed ${SB253_FIRST_REPORT_DATE} for the first report, but it is not final: ${SB253_PROCESS_STATUS} The date has already changed once, from 10 August 2026. ThemisIQ keeps the date current; the wizard takes about 20 minutes with bills in hand.
+ - "Operational vs financial control?" = Operational control means you include facilities where you control operations. Financial control means you include entities where you have financial control. Most companies use operational control.
+ - "Do I include subsidiaries?" = Under operational control, yes — include any facility your company operates. Under equity share, include proportional to ownership.
+ - "What if our landlord pays electricity?" = If you don't pay the utility bill directly you may not hold the data. Ask your landlord or property manager for the consumption figures or a copy of the bills; many will share them. If they won't, enter what you do have and say so in your workings — ThemisIQ leaves a location it has no figure for out of the totals and names the gap, rather than counting it as zero.
+diff --git a/lib/emDashCopy.test.ts b/lib/emDashCopy.test.ts
+index f4063d0..a85a071 100644
+--- a/lib/emDashCopy.test.ts
++++ b/lib/emDashCopy.test.ts
+@@ -328,7 +328,7 @@ const SWEEP_BUDGET: Record<string, number> = {
+   //     what makes the extractor abstain rather than guess a consumption figure. A prompt is input to a
+   //     model, not copy read by a person, and editing its punctuation is editing a model's instructions.
+   'app/api/concierge/extract/route.ts': 11,
+-  'app/api/ghg-bot/route.ts': 19,
++  'app/api/ghg-bot/route.ts': 18,
+   //   · THREE ARE console.warn SERVER LOGS in the materiality routes: a reporting-period conflict and a
+   //     partial topic-label resolve. They reach a log, never a screen.
+   'app/api/materiality/resilience/route.ts': 3,
+diff --git a/lib/sb253.ts b/lib/sb253.ts
+index f0b22b0..ff44397 100644
+--- a/lib/sb253.ts
++++ b/lib/sb253.ts
+@@ -7,9 +7,17 @@
+ // first-report date, subject to Office of Administrative Law approval. CARB submitted it to OAL on
+ // 20 May 2026 and then WITHDREW it, to clarify certain requirements and to defer the date from
+ // 10 August to 10 November 2026. Modified text was published 27 July 2026 with public comment closing
+-// 11 August 2026; as of 12 August 2026 the package has not returned to OAL. So 10 August was never in
+-// force either — it died with the withdrawal — and 10 November 2026 is a PROPOSAL, not law. That is
+-// why SB253_DATE_STATUS exists and why every surface must carry it.
++// 11 August 2026. So 10 August was never in force either — it died with the withdrawal.
++//
++// UPDATED 2 October 2026: ADOPTED BY CARB, RESUBMITTED, AND STILL NOT LAW. CARB adopted sections
++// 96070-96077 by Executive Order R-26-006 ("Executed this 18th day of September, 2026"; the PDF's file
++// name says "signed 9.21.26") and resubmitted the Final Package to OAL on 21 September 2026. CARB's
++// rulemaking page shows "Final Approval / OAL Action: This stage has not yet been reached." So
++// 10 November 2026 remains a PROPOSAL until OAL approves, which is why SB253_DATE_STATUS stays
++// 'proposed' and why every surface must carry it. Source, fetched 2 October 2026:
++// https://ww2.arb.ca.gov/rulemaking/2025/california-corporate-greenhouse-gas-reporting-and-climate-related-financial-risk
++// (the page header still reads "last reviewed May 20, 2026" although its body records the
++// 21 September resubmission; the Executive Order is linked from the same page).
+ //
+ // ✅ VERIFIED AGAINST PRIMARY SOURCES, 12 August 2026 — CARB's Notice of Public Availability of
+ // Modified Text (15-Day Notice), published 27 July 2026, and CARB's rulemaking page for the California
+@@ -40,7 +48,13 @@ export const SB253_DATE_STATUS = 'proposed'
+ export const SB253_SCOPE3_FROM = '2027'
+ 
+ export const SB253_CITATION =
+-  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026, not yet approved'
++  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026, adopted by CARB Executive Order R-26-006 on 18 September 2026 and resubmitted to OAL on 21 September 2026, not yet approved by OAL'
++
++// Where the regulation stands, in plain language, for any surface that explains the posture: the
++// status sentence below and the GHG assistant's prompt both read it, so the two cannot drift apart.
++// Promote nothing here to final until OAL approval is recorded with its date.
++export const SB253_PROCESS_STATUS =
++  'CARB adopted the regulation on 18 September 2026 and sent it to the Office of Administrative Law (OAL) for approval on 21 September 2026. OAL has not approved it yet.'
+ 
+ // The statute alone, for a slot that needs the instrument but not its history — a directory card,
+ // a chip, a table cell. SB261_CITATION is the sibling and is deliberately the same shape.
+@@ -57,7 +71,7 @@ export const SB253_PROGRAMME_URL = 'https://ww2.arb.ca.gov/our-work/programs/cal
+ // that it is not final, what remains outstanding, and that it has moved — so a reader can judge how
+ // much to rely on it rather than being handed a countdown.
+ export const SB253_STATUS_SENTENCE =
+-  'CARB has proposed 10 November 2026 for the first SB 253 report: Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.'
++  `CARB has proposed 10 November 2026 for the first SB 253 report: Scope 1 and 2 for the prior fiscal year. ${SB253_PROCESS_STATUS} Until it does, the date is proposed, not final. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.`
+ 
+ // For a chip, tag or nav-width slot where the sentence will not fit. Carries the posture in the
+ // shortest honest form; if even this does not fit, the surface should name no date.
