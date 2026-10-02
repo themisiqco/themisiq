@@ -11,7 +11,7 @@
 // calcInventory, analyzeCoverage) it is pinned there; where it is purely a component
 // closure it is marked `it.todo` with the reason. See the Phase-2 report.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
@@ -28,10 +28,12 @@ import {
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
+  billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
+import { stripTsComments } from '../testing/stripComments';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -3304,5 +3306,226 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     // ...and NOTHING on the row says which class produced it.
     expect(rowOf(commercial).ef_source, 'same citation for both classes').toBe(rowOf(industrial).ef_source);
     expect(JSON.stringify(rowOf(industrial)), 'use class appears nowhere on the row').not.toContain('industrial');
+  });
+});
+
+// ── T1: billContributions (docs/review/design-derived-figures.md, section 11) ─────────────────────────
+// Pure and not yet wired: T2 folds these rows into applyResolutions. Day counts are half-open on the
+// canonical period [start, exclusiveEnd(end)) (ruling C4). Scenarios A and B are in
+// docs/review/recalc/scenarios-additions.md.
+describe('T1 billContributions', () => {
+  const win2025 = periodFromYearAndEnd(2025, 12);
+  const win2026 = periodFromYearAndEnd(2026, 12);
+  const elec = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, periodConfidence: 'high', sourceQuote: `${value} kWh`, ...o });
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, periodConfidence: 'high', ...o });
+  // Scenario A: two adjacent bills with first-of-month end dates.
+  const scenarioA = () => loc({
+    source_docs: [
+      doc('utility_electricity', [elec(1000, '2025-12-01', '2026-01-01')], 'bill1'),
+      doc('utility_electricity', [elec(1200, '2026-01-01', '2026-02-01')], 'bill2'),
+    ],
+  });
+  const byDoc = (rows: BillContribution[], id: string) => rows.find(r => r.docId === id)!;
+
+  it('Scenario A, FY2025: Bill 1 counted 31/31, Bill 2 outside the year', () => {
+    const rows = billContributions(scenarioA(), [], win2025);
+    expect(rows).toHaveLength(2);
+    expect(byDoc(rows, 'bill1')).toEqual({
+      docId: 'bill1', proposalIndex: 0, fuelType: 'electricity', field: 'electricity_kwh', meterLabel: null,
+      periodStart: '2025-12-01', periodEndExclusive: '2026-01-01', periodOrigin: 'printed',
+      totalDays: 31, inWindowDays: 31, share: 1, value: 1000, unit: 'kwh', counted: true, reason: 'counted',
+    });
+    expect(byDoc(rows, 'bill2')).toMatchObject({
+      periodStart: '2026-01-01', periodEndExclusive: '2026-02-01',
+      totalDays: 31, inWindowDays: 0, share: 0, counted: false, reason: 'outside_year',
+    });
+  });
+
+  it('Scenario A, FY2026: the reverse', () => {
+    const rows = billContributions(scenarioA(), [], win2026);
+    expect(byDoc(rows, 'bill1')).toMatchObject({ totalDays: 31, inWindowDays: 0, share: 0, counted: false, reason: 'outside_year' });
+    expect(byDoc(rows, 'bill2')).toMatchObject({ totalDays: 31, inWindowDays: 31, share: 1, counted: true, reason: 'counted' });
+  });
+
+  it('"Dec 1 – Jan 1" is 31 days, not 32: the printed first-of-month end is the first uncovered day', () => {
+    const [row] = billContributions(loc({ source_docs: [doc('utility_electricity', [elec(1, '2025-12-01', '2026-01-01')])] }), [], win2025);
+    expect(row.totalDays).toBe(31);
+    expect(row.periodEndExclusive).toBe('2026-01-01');
+  });
+
+  it('"Dec 20 – Jan 19" is 31 days with 12 in FY2025: prorated by its own days', () => {
+    const [row] = billContributions(loc({ source_docs: [doc('utility_electricity', [elec(3100, '2025-12-20', '2026-01-19')])] }), [], win2025);
+    expect(row).toMatchObject({ totalDays: 31, inWindowDays: 12, counted: true, reason: 'prorated', periodEndExclusive: '2026-01-20' });
+    expect(row.share).toBeCloseTo(12 / 31, 12);
+  });
+
+  it('two straddling bills of one fuel each carry their OWN share (not one ratio for both)', () => {
+    const rows = billContributions(loc({
+      source_docs: [
+        doc('utility_bill_gas', [gas(310, '2024-12-20', '2025-01-19')], 'start'),   // 19 of 31 days in FY2025
+        doc('utility_bill_gas', [gas(310, '2025-12-15', '2026-01-14')], 'end'),     // 17 of 31 days in FY2025
+      ],
+    }), [], win2025);
+    expect(byDoc(rows, 'start')).toMatchObject({ totalDays: 31, inWindowDays: 19, reason: 'prorated', counted: true });
+    expect(byDoc(rows, 'end')).toMatchObject({ totalDays: 31, inWindowDays: 17, reason: 'prorated', counted: true });
+    expect(byDoc(rows, 'start').share).toBeCloseTo(19 / 31, 12);
+    expect(byDoc(rows, 'end').share).toBeCloseTo(17 / 31, 12);
+  });
+
+  it('unconfirmed proposals get a row, not counted, reason not_confirmed; a null value gets no row', () => {
+    const rows = billContributions(loc({
+      source_docs: [doc('utility_bill_gas', [
+        gas(10, '2025-01-01', '2025-01-31', { status: 'extracted' }),
+        gas(20, '2025-02-01', '2025-02-28', { status: 'needs_manual_review' }),
+        gas(30, '2025-03-01', '2025-03-31', { status: 'rejected' }),
+        gas(0, '2025-04-01', '2025-04-30', { value: null }),
+      ])],
+    }), [], win2025);
+    expect(rows.map(r => [r.proposalIndex, r.reason, r.counted])).toEqual([
+      [0, 'not_confirmed', false], [1, 'not_confirmed', false], [2, 'not_confirmed', false],
+    ]);
+  });
+
+  it('mixed units: every confirmed row of the field is not counted; an unconfirmed row keeps not_confirmed', () => {
+    const rows = billContributions(loc({
+      source_docs: [doc('utility_bill_gas', [
+        gas(100, '2025-01-01', '2025-01-31', { unit: 'mcf' }),
+        gas(100, '2025-02-01', '2025-02-28', { unit: 'therms' }),
+        gas(100, '2025-03-01', '2025-03-31', { unit: 'm3', status: 'extracted' }),
+      ])],
+    }), [], win2025);
+    expect(rows.map(r => [r.reason, r.counted])).toEqual([['mixed_units', false], ['mixed_units', false], ['not_confirmed', false]]);
+    // A different field with one unit is unaffected by the gas field's mix.
+    const other = billContributions(loc({
+      source_docs: [
+        doc('utility_bill_gas', [gas(100, '2025-01-01', '2025-01-31', { unit: 'mcf' }), gas(100, '2025-02-01', '2025-02-28', { unit: 'therms' })], 'g'),
+        doc('utility_electricity', [elec(500, '2025-01-01', '2025-01-31')], 'e'),
+      ],
+    }), [], win2025);
+    expect(byDoc(other, 'e')).toMatchObject({ reason: 'counted', counted: true });
+  });
+
+  it('undated: missing dates is not counted, with no day figures', () => {
+    const [row] = billContributions(loc({
+      source_docs: [doc('utility_bill_gas', [gas(10, null, null, { periodConfidence: 'low' })])],
+    }), [], win2025);
+    expect(row).toMatchObject({ reason: 'undated', counted: false, totalDays: null, inWindowDays: null, share: null, periodEndExclusive: null });
+    expect(row.periodOrigin).toBeNull();
+  });
+
+  it('invalid_period: an end before the start is its own reason, not counted, with no day figures', () => {
+    const rows = billContributions(loc({
+      source_docs: [doc('utility_bill_gas', [
+        gas(10, '2025-03-10', '2025-03-01'),
+        gas(10, '2025-03-10', '2025-03-09'),   // end the day before the start: zero days, still invalid
+        gas(10, '2025-03-10', '2025-03-10'),   // one-day bill: valid
+      ])],
+    }), [], win2025);
+    expect(rows.map(r => r.reason)).toEqual(['invalid_period', 'invalid_period', 'counted']);
+    for (const r of rows.slice(0, 2)) {
+      expect(r).toMatchObject({ counted: false, periodProblem: 'reversed', totalDays: null, inWindowDays: null, share: null, periodEndExclusive: null });
+    }
+    expect(rows[2].periodProblem, 'only invalid_period rows carry a periodProblem').toBeUndefined();
+    expect(rows[0].periodStart, 'the stored start is kept verbatim').toBe('2025-03-10');
+    expect(rows[2].totalDays).toBe(1);
+  });
+
+  it('invalid_period, unparseable: a date string present but not a real date is invalid_period, not undated', () => {
+    const rows = billContributions(loc({
+      source_docs: [doc('utility_bill_gas', [
+        gas(10, 'Jan 2025', '2025-01-31'),          // not yyyy-mm-dd
+        gas(10, '2025-01-01', 'unknown'),           // end not a date
+        gas(10, '2025-02-01', '2025-02-30'),        // 30 February: Date would roll it to 2 March
+        gas(10, '2025-13-01', '2025-13-31'),        // month 13
+      ])],
+    }), [], win2025);
+    for (const r of rows) {
+      expect(r).toMatchObject({ reason: 'invalid_period', periodProblem: 'unparseable', counted: false, totalDays: null, inWindowDays: null, share: null, periodEndExclusive: null });
+    }
+    expect(rows[0].periodStart, 'the stored string is kept verbatim').toBe('Jan 2025');
+  });
+
+  it('the two invalid_period kinds have distinct plain-language messages naming the document and dates', () => {
+    const unparseable = INVALID_PERIOD_MESSAGE.unparseable('bill_jan.pdf', 'Jan 2025', '2025-01-31');
+    const reversed = INVALID_PERIOD_MESSAGE.reversed('bill_mar.pdf', '2025-03-10', '2025-03-01');
+    expect(unparseable).toBe('The billing period on bill_jan.pdf could not be read as dates ("Jan 2025" to "2025-01-31"). Enter the dates as they appear on the bill.');
+    expect(reversed).toBe('The billing period on bill_mar.pdf ends before it starts (2025-03-10 to 2025-03-01). Check the dates and correct them.');
+    expect(unparseable).not.toBe(reversed);
+    for (const m of [unparseable, reversed]) expect(m).not.toMatch(/\u2014|invalid_period|periodProblem/);
+  });
+
+  it('precedence: not_confirmed and mixed_units outrank invalid_period', () => {
+    const rows = billContributions(loc({
+      source_docs: [doc('utility_bill_gas', [
+        gas(10, '2025-03-10', '2025-03-01', { status: 'extracted' }),
+        gas(10, '2025-03-10', '2025-03-01', { unit: 'mcf' }),
+        gas(10, '2025-04-01', '2025-04-30', { unit: 'therms' }),
+      ])],
+    }), [], win2025);
+    expect(rows.map(r => r.reason)).toEqual(['not_confirmed', 'mixed_units', 'mixed_units']);
+  });
+
+  it('periodOrigin: high → printed, medium → billing_month (Scenario B), missing → null', () => {
+    const rows = billContributions(loc({
+      source_docs: [doc('utility_electricity', [
+        elec(1, '2025-05-01', '2025-05-31', { periodConfidence: 'high' }),
+        elec(1, '2026-01-01', '2026-01-31', { periodConfidence: 'medium' }),
+        elec(1, '2025-06-01', '2025-06-30', { periodConfidence: undefined }),
+      ])],
+    }), [], win2026);
+    expect(rows.map(r => r.periodOrigin)).toEqual(['printed', 'billing_month', null]);
+    // Scenario B: "Jan 2026" stored as Jan 1 to Jan 31 is [2026-01-01, 2026-02-01), counted in FY2026.
+    expect(rows[1]).toMatchObject({ periodEndExclusive: '2026-02-01', totalDays: 31, inWindowDays: 31, reason: 'counted' });
+  });
+
+  it('meterLabel is the document meter_label, null for the default single meter', () => {
+    const rows = billContributions(loc({
+      source_docs: [
+        doc('utility_electricity', [elec(1, '2025-01-01', '2025-01-31')], 'a'),
+        { ...doc('utility_electricity', [elec(1, '2025-01-01', '2025-01-31')], 'b'), meter_label: 'Meter 2' },
+      ],
+    }), [], win2025);
+    expect(byDoc(rows, 'a').meterLabel).toBeNull();
+    expect(byDoc(rows, 'b').meterLabel).toBe('Meter 2');
+  });
+
+  it('a (document_type, fuelType) with no field produces no row', () => {
+    expect(billContributions(loc({ source_docs: [doc('service_record', [gas(5, '2025-01-01', '2025-01-31')])] }), [], win2025)).toEqual([]);
+  });
+
+  it('is pure: the location is not mutated', () => {
+    const l = scenarioA();
+    const before = JSON.stringify(l);
+    billContributions(l, [], win2025);
+    expect(JSON.stringify(l)).toBe(before);
+  });
+
+  it('is not yet wired: nothing outside its definition and the tests calls it (T1 done criterion)', () => {
+    const root = join(__dirname, '..', '..');
+    const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+      const rel = `${dir}/${n}`;
+      if (n === 'node_modules' || n.startsWith('.')) return [];
+      return statSync(join(root, rel)).isDirectory() ? walk(rel) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [rel] : [];
+    });
+    const callers = [...walk('lib'), ...walk('app')].filter(f =>
+      /billContributions\(/.test(stripTsComments(readFileSync(join(root, f), 'utf8')).replace(/export function billContributions\(/, '')));
+    expect(callers).toEqual([]);
+  });
+
+  it('exclusiveEnd has exactly one definition in lib/ and app/ (CLAUDE.md invariant)', () => {
+    const root = join(__dirname, '..', '..');
+    const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+      const rel = `${dir}/${n}`;
+      if (n === 'node_modules' || n.startsWith('.')) return [];
+      return statSync(join(root, rel)).isDirectory() ? walk(rel) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [rel] : [];
+    });
+    const defs = [...walk('lib'), ...walk('app')].flatMap(f => {
+      const src = stripTsComments(readFileSync(join(root, f), 'utf8'));
+      const n = (src.match(/(?:function\s+exclusiveEnd\s*\(|(?:const|let|var)\s+exclusiveEnd\s*=)/g) ?? []).length;
+      return n ? [`${f}: ${n}`] : [];
+    });
+    expect(defs).toEqual(['lib/ghg/engine.ts: 1']);
   });
 });

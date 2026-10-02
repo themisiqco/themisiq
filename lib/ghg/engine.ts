@@ -1599,6 +1599,9 @@ interface SourceDoc {
   //   'not_read'   — no attempt was made (document type or file type the reader does not handle).
   read_outcome?: 'abstained' | 'failed' | 'not_read'
   read_note?: string                // one plain sentence shown to the customer
+  // The meter or account this document belongs to, when a location has more than one per fuel. Absent is
+  // the default single meter. Read by billContributions (T1); set by the 'different_meters' resolution (T3).
+  meter_label?: string
 }
 
 interface Location {
@@ -2902,6 +2905,178 @@ function resolutionBasis(r: CoverageResolution): string {
   }
   if (r.kind === 'duplicate') return 'overlapping bills accepted as-is; no double-count adjustment applied'
   return r.note
+}
+
+// ── BILL CONTRIBUTIONS (docs/review/design-derived-figures.md, task T1) ─────────────────────────
+//
+// One row per proposal that carries a value and maps to a location field: what that bill contributes to
+// the figure for the reporting window, and why. PURE, and NOT YET CALLED: T2 re-expresses applyResolutions
+// as the fold of these rows. Until then nothing reads it, so it changes no figure.
+//
+// ⚠️ DAYS ARE HALF-OPEN ON THE CANONICAL PERIOD [start, exclusiveEnd(end)). Ruled C4 in the design doc:
+// "inclusive" means inclusive of the LAST COVERED DAY, which is exclusiveEnd(end) − 1. So "Dec 1 – Jan 1"
+// is 31 days, not 32, and the per-bill share reconciles with the half-open monthly split. This uses the
+// same arithmetic analyzeCoverage uses for its window (dayCount); it does NOT use the inclusive
+// daysBetween, and neither function is changed. exclusiveEnd is the one definition, reused.
+//
+// REASONS, in order of precedence. Rulings recorded on 1 Oct 2026 (design doc, T1 decisions):
+//   not_confirmed  any status other than 'confirmed'. A row, so every document's status reads from one list.
+//   mixed_units    the field's confirmed proposals carry more than one unit: EVERY confirmed row of that
+//                  field, matching today's whole-field behaviour (no figure until the units agree).
+//   invalid_period confirmed, both dates present, but the period cannot be used. Two kinds, each with its
+//                  own plain-language message (INVALID_PERIOD_MESSAGE): 'unparseable', a date string that is
+//                  not a real yyyy-mm-dd date (including one like 2025-02-30, which JavaScript would silently
+//                  roll to 2 March); and 'reversed', both dates real but the end before the start (no days in
+//                  the canonical period). Not counted. Distinct from undated (ruled).
+//   undated        confirmed, but no usable period: dates missing. No evidence of in-year days, so no
+//                  contribution; the coverage gate's 'none' still blocks export.
+// T3 RULING: of the not-counted reasons only outside_year and same_bill_as may be silent. undated,
+// invalid_period and mixed_units must each raise an export-blocking coverage issue with a plain-language
+// message, so a field can never drop to zero without the customer being told. T1 only labels the rows.
+//   outside_year   no day inside the window (rule R1).
+//   prorated       some days inside, some outside: share = inWindowDays / totalDays, per bill (rule R2).
+//   counted        every day inside.
+// A proposal with value null produces NO row (ruled): there is no figure to count or exclude, and the
+// document's read_outcome already says why. A proposal whose (document_type, fuelType) maps to no field
+// produces no row either, as applyResolutions skips it today.
+// same_bill_as, exact_duplicate_of and manual_override are reserved for T3, T15 and T10; nothing sets them yet.
+//
+// `value` is the bill's full canonical value. What it contributes is value × share when counted (T2).
+// `periodStart` is kept VERBATIM as stored; `periodEndExclusive` is the canonical boundary.
+// `periodOrigin`: 'high' → printed, 'medium' → billing_month (rule R5); anything else, including a missing
+// periodConfidence, is null, meaning not recorded (ruled). `meterLabel` null is the default single meter (ruled).
+export type PeriodOrigin = 'printed' | 'billing_month' | 'customer_confirmed'
+export type ContributionReason =
+  | 'counted' | 'prorated' | 'outside_year' | 'undated' | 'invalid_period' | 'not_confirmed' | 'mixed_units'
+  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override'
+export interface BillContribution {
+  docId: string
+  proposalIndex: number
+  fuelType: string
+  field: keyof Location
+  meterLabel: string | null
+  periodStart: string | null
+  periodEndExclusive: string | null
+  periodOrigin: PeriodOrigin | null
+  totalDays: number | null
+  inWindowDays: number | null
+  share: number | null
+  value: number
+  unit: string | null
+  counted: boolean
+  reason: ContributionReason
+  /** Set only when reason is invalid_period: which kind, so T3 can show the matching message. */
+  periodProblem?: InvalidPeriodKind
+  reasonRef?: string
+  meteredSplit?: { evidenceDocId: string; inYearValue: number }
+}
+
+export type InvalidPeriodKind = 'unparseable' | 'reversed'
+// The plain-language sentence for each kind, naming the document and the dates as stored. Defined here so
+// T3's export-blocking issue and any surface that explains a row use the same words.
+export const INVALID_PERIOD_MESSAGE: Record<InvalidPeriodKind, (fileName: string, start: string, end: string) => string> = {
+  unparseable: (fileName, start, end) =>
+    `The billing period on ${fileName} could not be read as dates ("${start}" to "${end}"). Enter the dates as they appear on the bill.`,
+  reversed: (fileName, start, end) =>
+    `The billing period on ${fileName} ends before it starts (${start} to ${end}). Check the dates and correct them.`,
+}
+
+// A stored period date that is a real calendar date in yyyy-mm-dd form. parseLocalDate reads the first ten
+// characters and lets the Date constructor roll over (2025-02-30 becomes 2 March), so validity is checked
+// here by reading the parts and confirming they survive the round trip unchanged.
+function isRealIsoDate(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
+  if (!m) return false
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const dt = new Date(y, mo - 1, d)
+  return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
+}
+
+// `_resolutions` is accepted now so the signature is the one T3, T10 and T14 extend; T1 reads none of them.
+export function billContributions(
+  loc: Location,
+  _resolutions: CoverageResolution[],
+  win: { start: Date; end: Date },
+): BillContribution[] {
+  const DAY = 86400000
+  const dayCount = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / DAY)
+  const iso = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  // The window as periodFromYearAndEnd returns it: `end` is the last day IN the year, so the exclusive
+  // boundary is end + 1 day. Same construction as analyzeCoverage and applyResolutions.
+  const winS = new Date(win.start.getFullYear(), win.start.getMonth(), win.start.getDate())
+  const winEexcl = new Date(win.end.getFullYear(), win.end.getMonth(), win.end.getDate() + 1)
+
+  // Units per field across CONFIRMED proposals with a value: the same set applyResolutions tests for
+  // mixedUnits, so the two cannot disagree on which fields are mixed.
+  const unitsByField = new Map<string, Set<string>>()
+  loc.source_docs.forEach(d => d.extracted?.forEach(p => {
+    if (p.status !== 'confirmed' || p.value == null) return
+    const map = fieldFor(d.document_type, p.fuelType)
+    if (!map) return
+    const units = unitsByField.get(String(map.amount)) ?? new Set<string>()
+    if (p.unit) units.add(p.unit)
+    unitsByField.set(String(map.amount), units)
+  }))
+
+  const out: BillContribution[] = []
+  loc.source_docs.forEach(d => d.extracted?.forEach((p, pi) => {
+    if (p.value == null) return
+    const map = fieldFor(d.document_type, p.fuelType)
+    if (!map) return
+
+    let endExcl: Date | null = null
+    let totalDays: number | null = null
+    let inWindowDays: number | null = null
+    let share: number | null = null
+    let periodProblem: InvalidPeriodKind | null = null
+    if (p.periodStart && p.periodEnd && (!isRealIsoDate(p.periodStart) || !isRealIsoDate(p.periodEnd))) {
+      periodProblem = 'unparseable'
+    } else if (p.periodStart && p.periodEnd) {
+      const start = parseLocalDate(p.periodStart)
+      const e = exclusiveEnd(parseLocalDate(p.periodEnd))
+      const t = dayCount(start, e)
+      // Both dates real, and the end falls before the start: the canonical period has no days.
+      if (t <= 0) periodProblem = 'reversed'
+      if (t > 0) {
+        endExcl = e
+        totalDays = t
+        const ovS = start > winS ? start : winS
+        const ovE = e < winEexcl ? e : winEexcl
+        inWindowDays = Math.max(0, dayCount(ovS, ovE))
+        share = inWindowDays / t
+      }
+    }
+
+    const reason: ContributionReason =
+      p.status !== 'confirmed' ? 'not_confirmed'
+      : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
+      : periodProblem ? 'invalid_period'
+      : totalDays === null ? 'undated'
+      : inWindowDays === 0 ? 'outside_year'
+      : (inWindowDays as number) < totalDays ? 'prorated'
+      : 'counted'
+
+    out.push({
+      docId: d.id,
+      proposalIndex: pi,
+      fuelType: p.fuelType,
+      field: map.amount,
+      meterLabel: d.meter_label ?? null,
+      periodStart: p.periodStart,
+      periodEndExclusive: endExcl ? iso(endExcl) : null,
+      periodOrigin: p.periodConfidence === 'high' ? 'printed' : p.periodConfidence === 'medium' ? 'billing_month' : null,
+      totalDays,
+      inWindowDays,
+      share,
+      value: p.value,
+      unit: p.unit,
+      counted: reason === 'counted' || reason === 'prorated',
+      reason,
+      ...(reason === 'invalid_period' && periodProblem ? { periodProblem } : {}),
+    })
+  }))
+  return out
 }
 
 /**
