@@ -88,6 +88,8 @@ export type YearExclusion =
 
 /** Subset of a saved ghg_inventories row needed for the series. */
 export interface InventoryRow {
+  // The saved inventory this row is (T12): the monthly drill-down loads exactly this inventory's slices.
+  inventory_id?: string | null;
   company_id: string | null;         // stable identity; null = unlinked (skipped)
   company_name: string;              // display label only
   reporting_year: number;
@@ -138,6 +140,8 @@ export interface InventoryRow {
 
 export interface SeriesYear {
   year: number;
+  /** The inventory this year's figures come from (T12). Null only for a row saved without one. */
+  inventoryId: string | null;
   /**
    * EVERY figure below is null when dataStatus !== 'ok'. The year is still emitted — dropping it
    * would let a chart draw a straight line from the year before to the year after, which is a
@@ -508,6 +512,7 @@ export function buildCompanySeries(
       if (status !== "ok") {
         return {
           year: r.reporting_year,
+          inventoryId: r.inventory_id ?? null,
           scope1: null,
           scope2Location: null,
           scope2Market: null,
@@ -553,6 +558,7 @@ export function buildCompanySeries(
 
       return {
         year: r.reporting_year,
+        inventoryId: r.inventory_id ?? null,
         scope1: r.scope1_total,
         scope2Location: r.scope2_location_total,
         scope2Market: num(r.scope2_market_total),

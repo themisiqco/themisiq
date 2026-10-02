@@ -23,6 +23,9 @@ import { scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift }
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
+
+// Shown in place of the monthly chart when the selected year's inventory cannot be identified (T12).
+const MONTHLY_NO_INVENTORY = "this year's inventory could not be identified, so its monthly detail cannot be shown"
 import { useEntitlementState } from '../../../../lib/useEntitlement'
 
 // Brand palette for the three scopes.
@@ -105,16 +108,22 @@ export default function TrendsPage() {
     if (selectedSeries) setSelectedYear(selectedSeries.years.at(-1)?.year ?? null)
   }, [selectedSeries?.companyId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch monthly rows for the selected company + year.
+  // Fetch the monthly rows of the INVENTORY behind the selected year (T12): the same inventory the annual
+  // figures come from, so the chart shows exactly its months. A year ending in March shows April to March.
+  const selectedInventoryId = selectedSeries?.years.find((y) => y.year === selectedYear)?.inventoryId ?? null
   useEffect(() => {
-    if (selectedSeries?.companyId && selectedYear != null) {
-      setMonthlyLoading(true)
-      loadMonthly(selectedSeries.companyId, selectedYear).then((r) => {
-        setMonthly(r)
-        setMonthlyLoading(false)
-      })
+    if (selectedYear == null || !selectedSeries) return
+    if (!selectedInventoryId) {
+      // Not reachable for a saved row (every inventory has an id), but an empty chart must say why.
+      setMonthly({ buckets: [], measuredMonths: 0, totalTco2e: 0, error: MONTHLY_NO_INVENTORY })
+      return
     }
-  }, [selectedSeries?.companyId, selectedYear])
+    setMonthlyLoading(true)
+    loadMonthly(selectedInventoryId).then((r) => {
+      setMonthly(r)
+      setMonthlyLoading(false)
+    })
+  }, [selectedSeries, selectedYear, selectedInventoryId])
 
   // Fetch S1/S2 sbti_targets (both near_term + net_zero) for the SBTi target overlay.
   // RLS scopes to the logged-in user. On error / no rows → empty → no overlay (chart = Move 1).

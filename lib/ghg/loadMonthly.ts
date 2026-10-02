@@ -1,8 +1,15 @@
 /**
  * Monthly emissions — data load for the trends drill-down.
  * --------------------------------------------------------------------------
- * Reads ghg_monthly_emissions for a given company + reporting_year and buckets
- * the flat rows into per-month chart data (scope1/scope2/scope3 stacked).
+ * Reads ghg_monthly_emissions for ONE saved inventory and buckets the flat rows
+ * into per-month chart data (scope1/scope2/scope3 stacked).
+ *
+ * BY INVENTORY, NOT BY COMPANY AND CALENDAR YEAR (T12, ruling Q2). Each slice is a calendar month tagged
+ * with the inventory it came from (inventory_id), and since T6 an inventory writes only the months inside
+ * its own reporting window. So filtering on the inventory shows exactly that inventory's evidenced
+ * months: a year ending in March shows April to March, and two inventories with slices in the same
+ * calendar year are never mixed. reporting_year on a slice is the calendar year of its month and is no
+ * longer used for selection. Served by the (inventory_id, period_month) index.
  *
  * Mirrors loadSeries: browser singleton, getSession-gated, RLS-scoped, graceful
  * error. MUST be called from a 'use client' component (session-dependent).
@@ -70,7 +77,7 @@ export function buildMonthlyBuckets(rows: MonthlyRow[]): MonthlyBucket[] {
     });
 }
 
-export async function loadMonthly(companyId: string, year: number): Promise<LoadMonthlyResult> {
+export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResult> {
   const empty = (error: string | null): LoadMonthlyResult => ({
     buckets: [], measuredMonths: 0, totalTco2e: 0, error,
   });
@@ -82,8 +89,7 @@ export async function loadMonthly(companyId: string, year: number): Promise<Load
     const { data, error } = await supabase
       .from("ghg_monthly_emissions")
       .select("period_month, scope, fuel_type, tco2e, activity_value, activity_unit")
-      .eq("company_id", companyId)
-      .eq("reporting_year", year)
+      .eq("inventory_id", inventoryId)
       .order("period_month", { ascending: true });
 
     if (error) return empty(error.message);

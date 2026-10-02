@@ -165,6 +165,7 @@ interface Scope3Embed {
 
 /** Shape of a raw row back from the embedded select (loosely typed). */
 interface RawRow {
+  id: string;
   company_id: string | null;
   company_name: string | null;
   reporting_year: number;
@@ -201,7 +202,7 @@ interface RawRow {
 // are here because the numeric totals alone cannot be trusted without them — the payload cost buys
 // the difference between a plotted figure and a plotted guess.
 const SELECT =
-  "company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
+  "id, company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
   "scope2_market_total, revenue_millions, employee_count, gwp_version, pct_estimated, " +
   // Small (one object, a handful of short strings) and NOT derivable from anything else selected
   // here: workings carries factor_vintage per grid row but nothing for combustion editions, and only
@@ -257,6 +258,7 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
       const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year);
       mapped.push({
         ...completeness,
+        inventory_id: r.id,
         company_id: r.company_id,
         company_name: r.company_name ?? "",
         reporting_year: r.reporting_year,

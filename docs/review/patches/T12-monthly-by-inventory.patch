@@ -1,0 +1,257 @@
+diff --git a/app/dashboard/ghg/trends/page.tsx b/app/dashboard/ghg/trends/page.tsx
+index 19e4b9b..5281d4b 100644
+--- a/app/dashboard/ghg/trends/page.tsx
++++ b/app/dashboard/ghg/trends/page.tsx
+@@ -23,6 +23,9 @@ import { scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift }
+ import { supabase } from '../../../../lib/supabase'
+ import { computeTrajectory } from '../../../../lib/sbti'
+ import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
++
++// Shown in place of the monthly chart when the selected year's inventory cannot be identified (T12).
++const MONTHLY_NO_INVENTORY = "this year's inventory could not be identified, so its monthly detail cannot be shown"
+ import { useEntitlementState } from '../../../../lib/useEntitlement'
+ 
+ // Brand palette for the three scopes.
+@@ -105,16 +108,22 @@ export default function TrendsPage() {
+     if (selectedSeries) setSelectedYear(selectedSeries.years.at(-1)?.year ?? null)
+   }, [selectedSeries?.companyId]) // eslint-disable-line react-hooks/exhaustive-deps
+ 
+-  // Fetch monthly rows for the selected company + year.
++  // Fetch the monthly rows of the INVENTORY behind the selected year (T12): the same inventory the annual
++  // figures come from, so the chart shows exactly its months. A year ending in March shows April to March.
++  const selectedInventoryId = selectedSeries?.years.find((y) => y.year === selectedYear)?.inventoryId ?? null
+   useEffect(() => {
+-    if (selectedSeries?.companyId && selectedYear != null) {
+-      setMonthlyLoading(true)
+-      loadMonthly(selectedSeries.companyId, selectedYear).then((r) => {
+-        setMonthly(r)
+-        setMonthlyLoading(false)
+-      })
++    if (selectedYear == null || !selectedSeries) return
++    if (!selectedInventoryId) {
++      // Not reachable for a saved row (every inventory has an id), but an empty chart must say why.
++      setMonthly({ buckets: [], measuredMonths: 0, totalTco2e: 0, error: MONTHLY_NO_INVENTORY })
++      return
+     }
+-  }, [selectedSeries?.companyId, selectedYear])
++    setMonthlyLoading(true)
++    loadMonthly(selectedInventoryId).then((r) => {
++      setMonthly(r)
++      setMonthlyLoading(false)
++    })
++  }, [selectedSeries, selectedYear, selectedInventoryId])
+ 
+   // Fetch S1/S2 sbti_targets (both near_term + net_zero) for the SBTi target overlay.
+   // RLS scopes to the logged-in user. On error / no rows → empty → no overlay (chart = Move 1).
+diff --git a/lib/ghg/loadMonthly.ts b/lib/ghg/loadMonthly.ts
+index baf8255..33bc88c 100644
+--- a/lib/ghg/loadMonthly.ts
++++ b/lib/ghg/loadMonthly.ts
+@@ -1,8 +1,15 @@
+ /**
+  * Monthly emissions — data load for the trends drill-down.
+  * --------------------------------------------------------------------------
+- * Reads ghg_monthly_emissions for a given company + reporting_year and buckets
+- * the flat rows into per-month chart data (scope1/scope2/scope3 stacked).
++ * Reads ghg_monthly_emissions for ONE saved inventory and buckets the flat rows
++ * into per-month chart data (scope1/scope2/scope3 stacked).
++ *
++ * BY INVENTORY, NOT BY COMPANY AND CALENDAR YEAR (T12, ruling Q2). Each slice is a calendar month tagged
++ * with the inventory it came from (inventory_id), and since T6 an inventory writes only the months inside
++ * its own reporting window. So filtering on the inventory shows exactly that inventory's evidenced
++ * months: a year ending in March shows April to March, and two inventories with slices in the same
++ * calendar year are never mixed. reporting_year on a slice is the calendar year of its month and is no
++ * longer used for selection. Served by the (inventory_id, period_month) index.
+  *
+  * Mirrors loadSeries: browser singleton, getSession-gated, RLS-scoped, graceful
+  * error. MUST be called from a 'use client' component (session-dependent).
+@@ -70,7 +77,7 @@ export function buildMonthlyBuckets(rows: MonthlyRow[]): MonthlyBucket[] {
+     });
+ }
+ 
+-export async function loadMonthly(companyId: string, year: number): Promise<LoadMonthlyResult> {
++export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResult> {
+   const empty = (error: string | null): LoadMonthlyResult => ({
+     buckets: [], measuredMonths: 0, totalTco2e: 0, error,
+   });
+@@ -82,8 +89,7 @@ export async function loadMonthly(companyId: string, year: number): Promise<Load
+     const { data, error } = await supabase
+       .from("ghg_monthly_emissions")
+       .select("period_month, scope, fuel_type, tco2e, activity_value, activity_unit")
+-      .eq("company_id", companyId)
+-      .eq("reporting_year", year)
++      .eq("inventory_id", inventoryId)
+       .order("period_month", { ascending: true });
+ 
+     if (error) return empty(error.message);
+diff --git a/lib/ghg/loadSeries.ts b/lib/ghg/loadSeries.ts
+index e27b77c..da6b928 100644
+--- a/lib/ghg/loadSeries.ts
++++ b/lib/ghg/loadSeries.ts
+@@ -165,6 +165,7 @@ interface Scope3Embed {
+ 
+ /** Shape of a raw row back from the embedded select (loosely typed). */
+ interface RawRow {
++  id: string;
+   company_id: string | null;
+   company_name: string | null;
+   reporting_year: number;
+@@ -201,7 +202,7 @@ interface RawRow {
+ // are here because the numeric totals alone cannot be trusted without them — the payload cost buys
+ // the difference between a plotted figure and a plotted guess.
+ const SELECT =
+-  "company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
++  "id, company_id, company_name, reporting_year, scope1_total, scope2_location_total, " +
+   "scope2_market_total, revenue_millions, employee_count, gwp_version, pct_estimated, " +
+   // Small (one object, a handful of short strings) and NOT derivable from anything else selected
+   // here: workings carries factor_vintage per grid row but nothing for combustion editions, and only
+@@ -257,6 +258,7 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
+       const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year);
+       mapped.push({
+         ...completeness,
++        inventory_id: r.id,
+         company_id: r.company_id,
+         company_name: r.company_name ?? "",
+         reporting_year: r.reporting_year,
+diff --git a/lib/ghg/series.ts b/lib/ghg/series.ts
+index e5d7a13..47de5ad 100644
+--- a/lib/ghg/series.ts
++++ b/lib/ghg/series.ts
+@@ -88,6 +88,8 @@ export type YearExclusion =
+ 
+ /** Subset of a saved ghg_inventories row needed for the series. */
+ export interface InventoryRow {
++  // The saved inventory this row is (T12): the monthly drill-down loads exactly this inventory's slices.
++  inventory_id?: string | null;
+   company_id: string | null;         // stable identity; null = unlinked (skipped)
+   company_name: string;              // display label only
+   reporting_year: number;
+@@ -138,6 +140,8 @@ export interface InventoryRow {
+ 
+ export interface SeriesYear {
+   year: number;
++  /** The inventory this year's figures come from (T12). Null only for a row saved without one. */
++  inventoryId: string | null;
+   /**
+    * EVERY figure below is null when dataStatus !== 'ok'. The year is still emitted — dropping it
+    * would let a chart draw a straight line from the year before to the year after, which is a
+@@ -508,6 +512,7 @@ export function buildCompanySeries(
+       if (status !== "ok") {
+         return {
+           year: r.reporting_year,
++          inventoryId: r.inventory_id ?? null,
+           scope1: null,
+           scope2Location: null,
+           scope2Market: null,
+@@ -553,6 +558,7 @@ export function buildCompanySeries(
+ 
+       return {
+         year: r.reporting_year,
++        inventoryId: r.inventory_id ?? null,
+         scope1: r.scope1_total,
+         scope2Location: r.scope2_location_total,
+         scope2Market: num(r.scope2_market_total),
+diff --git a/lib/ghg/loadMonthly.test.ts b/lib/ghg/loadMonthly.test.ts
+new file mode 100644
+index 0000000..c7a6e33
+--- /dev/null
++++ b/lib/ghg/loadMonthly.test.ts
+@@ -0,0 +1,98 @@
++// lib/ghg/loadMonthly.test.ts
++//
++// T12: the Trends monthly view loads ONE inventory's slices, so a fiscal-year inventory shows its own
++// months and two inventories with slices in the same calendar year are never mixed.
++
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++
++// A stand-in for ghg_monthly_emissions: rows carry inventory_id, company_id and reporting_year, and the
++// stub applies .eq() filters the way the database would, recording which columns were filtered on.
++type Slice = { inventory_id: string; company_id: string; reporting_year: number; period_month: string; scope: number; fuel_type: string; tco2e: number; activity_value: number | null; activity_unit: string | null }
++const table: Slice[] = []
++const filtered: string[] = []
++vi.mock('../supabase', () => ({
++  supabase: {
++    auth: { getSession: async () => ({ data: { session: { user: { id: 'u' } } } }) },
++    from: () => {
++      const conds: [string, unknown][] = []
++      const q = {
++        select: () => q,
++        eq: (col: string, v: unknown) => { conds.push([col, v]); filtered.push(col); return q },
++        order: async () => ({ data: table.filter(r => conds.every(([c, v]) => (r as Record<string, unknown>)[c] === v))
++          .sort((a, b) => a.period_month.localeCompare(b.period_month)), error: null }),
++      }
++      return q
++    },
++  },
++}))
++
++import { loadMonthly } from './loadMonthly'
++import { buildMonthlyEmissions } from './monthlyEmissions'
++import { calcGas, pickEF, getGridFactor, isResolvedGridRegion, emptyLocation, type Location, type ExtractedProposal } from './engine'
++
++const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion }
++const bill = (start: string, end: string): ExtractedProposal => ({ fuelType: 'natural_gas', rawValue: 100, rawUnit: 'mcf', value: 100, unit: 'mcf',
++  periodStart: start, periodEnd: end, confidence: 'high', sourceQuote: 'q', notes: null, status: 'confirmed' })
++const months = (from: [number, number], n: number) => Array.from({ length: n }, (_, k) => {
++  const d = new Date(from[0], from[1] - 1 + k, 1)
++  const y = d.getFullYear(), m = d.getMonth() + 1
++  return bill(`${y}-${String(m).padStart(2, '0')}-01`, `${y}-${String(m).padStart(2, '0')}-${new Date(y, m, 0).getDate()}`)
++})
++const site = (bills: ExtractedProposal[]): Location => ({ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_unit: 'mcf',
++  source_docs: bills.map((p, i) => ({ id: `d${i}`, file_name: `d${i}.pdf`, document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: `/d${i}.pdf`, extracted: [p] })) })
++// Write an inventory's slices the way the save does (page.tsx maps each slice with its inventory_id).
++const save = (inventoryId: string, reporting_year: number, fiscal_year_end_month: number, bills: ExtractedProposal[]) => {
++  for (const s of buildMonthlyEmissions({ locations: [site(bills)], reporting_year, fiscal_year_end_month }, deps, 'AR6').slices) {
++    table.push({ inventory_id: inventoryId, company_id: 'C1', reporting_year: s.reporting_year, period_month: s.period_month,
++      scope: s.scope, fuel_type: s.fuel_type, tco2e: s.tco2e, activity_value: s.activity_value, activity_unit: s.activity_unit })
++  }
++}
++
++beforeEach(() => { table.length = 0; filtered.length = 0 })
++
++describe('Trends monthly view, by inventory (T12)', () => {
++  it('filters on the inventory only, not on company and calendar year', async () => {
++    save('inv-2025', 2025, 12, months([2025, 1], 3))
++    const r = await loadMonthly('inv-2025')
++    expect(filtered).toEqual(['inventory_id'])
++    expect(r.buckets.map(b => b.month)).toEqual(['2025-01', '2025-02', '2025-03'])
++  })
++
++  it('a year ending in March shows April to March, in that order, not the calendar year', async () => {
++    // Bills from January 2024 to June 2025: the year ending 31 March 2025 keeps April 2024 to March 2025.
++    save('inv-fy25', 2025, 3, months([2024, 1], 18))
++    const r = await loadMonthly('inv-fy25')
++    expect(r.buckets.map(b => b.month)).toEqual([
++      '2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'])
++    expect(r.buckets.map(b => b.monthLabel)).toEqual(['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'])
++    expect(r.measuredMonths).toBe(12)
++  })
++
++  it('two inventories with slices in the same calendar year are not mixed', async () => {
++    // Same company, both with months in calendar 2025: the year ending March 2025 and calendar 2025.
++    save('inv-fy25', 2025, 3, months([2024, 4], 12))
++    save('inv-cal25', 2025, 12, months([2025, 1], 12))
++    const fy = await loadMonthly('inv-fy25')
++    const cal = await loadMonthly('inv-cal25')
++    expect(fy.buckets.map(b => b.month)).toEqual(months([2024, 4], 12).map(p => p.periodStart!.slice(0, 7)))
++    expect(cal.buckets.map(b => b.month)).toEqual(months([2025, 1], 12).map(p => p.periodStart!.slice(0, 7)))
++    // January to March 2025 belong to both inventories' windows; each shows only its own figure.
++    const janFy = fy.buckets.find(b => b.month === '2025-01')!.total
++    const janCal = cal.buckets.find(b => b.month === '2025-01')!.total
++    expect(janFy, 'one bill each, so each inventory shows one bill\'s January, not both added together').toBe(janCal)
++    expect(cal.totalTco2e).toBeCloseTo(fy.totalTco2e, 4)
++  })
++
++  it('the Trends page passes the selected year\'s inventory, and the series carries it', () => {
++    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/trends/page.tsx'), 'utf8')
++    expect(page).toContain('const selectedInventoryId = selectedSeries?.years.find((y) => y.year === selectedYear)?.inventoryId ?? null')
++    expect(page).toContain('loadMonthly(selectedInventoryId)')
++    const series = readFileSync(join(process.cwd(), 'lib/ghg/series.ts'), 'utf8')
++    expect((series.match(/inventoryId: r\.inventory_id \?\? null,/g) ?? []).length, 'both kinds of year carry it').toBe(2)
++    const load = readFileSync(join(process.cwd(), 'lib/ghg/loadSeries.ts'), 'utf8')
++    expect(load).toContain('"id, company_id, company_name, reporting_year, ')
++    expect(load).toContain('inventory_id: r.id,')
++  })
++})
