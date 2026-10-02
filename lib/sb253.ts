@@ -7,9 +7,17 @@
 // first-report date, subject to Office of Administrative Law approval. CARB submitted it to OAL on
 // 20 May 2026 and then WITHDREW it, to clarify certain requirements and to defer the date from
 // 10 August to 10 November 2026. Modified text was published 27 July 2026 with public comment closing
-// 11 August 2026; as of 12 August 2026 the package has not returned to OAL. So 10 August was never in
-// force either — it died with the withdrawal — and 10 November 2026 is a PROPOSAL, not law. That is
-// why SB253_DATE_STATUS exists and why every surface must carry it.
+// 11 August 2026. So 10 August was never in force either — it died with the withdrawal.
+//
+// UPDATED 2 October 2026: ADOPTED BY CARB, RESUBMITTED, AND STILL NOT LAW. CARB adopted sections
+// 96070-96077 by Executive Order R-26-006 ("Executed this 18th day of September, 2026"; the PDF's file
+// name says "signed 9.21.26") and resubmitted the Final Package to OAL on 21 September 2026. CARB's
+// rulemaking page shows "Final Approval / OAL Action: This stage has not yet been reached." So
+// 10 November 2026 remains a PROPOSAL until OAL approves, which is why SB253_DATE_STATUS stays
+// 'proposed' and why every surface must carry it. Source, fetched 2 October 2026:
+// https://ww2.arb.ca.gov/rulemaking/2025/california-corporate-greenhouse-gas-reporting-and-climate-related-financial-risk
+// (the page header still reads "last reviewed May 20, 2026" although its body records the
+// 21 September resubmission; the Executive Order is linked from the same page).
 //
 // ✅ VERIFIED AGAINST PRIMARY SOURCES, 12 August 2026 — CARB's Notice of Public Availability of
 // Modified Text (15-Day Notice), published 27 July 2026, and CARB's rulemaking page for the California
@@ -40,7 +48,13 @@ export const SB253_DATE_STATUS = 'proposed'
 export const SB253_SCOPE3_FROM = '2027'
 
 export const SB253_CITATION =
-  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026, not yet approved'
+  'California Health & Safety Code §38532; CARB initial regulation (Title 17 CCR §§96070-96077) approved by the Board 26 February 2026, withdrawn from OAL review, modified text published 27 July 2026, adopted by CARB Executive Order R-26-006 on 18 September 2026 and resubmitted to OAL on 21 September 2026, not yet approved by OAL'
+
+// Where the regulation stands, in plain language, for any surface that explains the posture: the
+// status sentence below and the GHG assistant's prompt both read it, so the two cannot drift apart.
+// Promote nothing here to final until OAL approval is recorded with its date.
+export const SB253_PROCESS_STATUS =
+  'CARB adopted the regulation on 18 September 2026 and sent it to the Office of Administrative Law (OAL) for approval on 21 September 2026. OAL has not approved it yet.'
 
 // The statute alone, for a slot that needs the instrument but not its history — a directory card,
 // a chip, a table cell. SB261_CITATION is the sibling and is deliberately the same shape.
@@ -57,7 +71,7 @@ export const SB253_PROGRAMME_URL = 'https://ww2.arb.ca.gov/our-work/programs/cal
 // that it is not final, what remains outstanding, and that it has moved — so a reader can judge how
 // much to rely on it rather than being handed a countdown.
 export const SB253_STATUS_SENTENCE =
-  'CARB has proposed 10 November 2026 for the first SB 253 report: Scope 1 and 2 for the prior fiscal year. The date is not final: the modified regulation closed public comment on 11 August 2026 and still requires OAL approval. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.'
+  `CARB has proposed 10 November 2026 for the first SB 253 report: Scope 1 and 2 for the prior fiscal year. ${SB253_PROCESS_STATUS} Until it does, the date is proposed, not final. An earlier date of 10 August 2026 was approved and then withdrawn before it took effect.`
 
 // For a chip, tag or nav-width slot where the sentence will not fit. Carries the posture in the
 // shortest honest form; if even this does not fit, the surface should name no date.

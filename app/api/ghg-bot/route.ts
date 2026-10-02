@@ -45,7 +45,7 @@
 export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { SB253_FIRST_REPORT_DATE } from '../../../lib/sb253'
+import { SB253_FIRST_REPORT_DATE, SB253_PROCESS_STATUS } from '../../../lib/sb253'
 import { assistantScope3Basis, assistantScope3GwpClause } from '../../../lib/scope3/methodSummary'
 import { CAT6_TAKES } from '../../../lib/scope3/businessTravelCopy'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
@@ -128,7 +128,7 @@ function buildSystemPrompt(currentStep: number): string {
 ABOUT THEMISIQ: ThemisIQ is a compliance platform for GHG inventories. Scope 1 and 2 are entered once in this wizard and exported to each framework the customer selected, without re-entry — Scope 3 is a separate module, with its own inputs, so "once" describes Scope 1 and 2 rather than the whole platform. Exports UNLOCK RATHER THAN RUN AUTOMATICALLY: every location has to be priceable and its streams declared, every coverage question and grid region resolved, the data confirmed, and, in concierge mode, the extracted figures approved. Until then the export buttons stay disabled and the wizard names what is outstanding, so never tell a customer a report will be produced automatically. The assessment at www.themisiq.co/assess helps companies determine which frameworks apply to them.
 
 FRAMEWORK GUIDANCE:
-- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). CARB has PROPOSED ${SB253_FIRST_REPORT_DATE} for the first report (Scope 1 and 2); it is NOT FINAL and still requires OAL approval, so never state it as a settled deadline. If unsure whether they qualify, direct them to www.themisiq.co/assess.
+- SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). CARB has PROPOSED ${SB253_FIRST_REPORT_DATE} for the first report (Scope 1 and 2). ${SB253_PROCESS_STATUS} Until OAL approves it the date is NOT FINAL, so never state it as a settled deadline. If unsure whether they qualify, direct them to www.themisiq.co/assess.
 - CDP: Voluntary but widely requested by investors and large customers. If a customer or investor has asked them to complete CDP, they need this. Direct undecided users to www.themisiq.co/assess.
 - ESRS E1: Mandatory for large EU-incorporated companies under EU CSRD. Deadline was FY2024 for the largest companies. If they have EU operations or are incorporated in the EU, they likely need this.
 - GRI 305: Most widely used voluntary emissions standard globally. Used for sustainability reports, supply chain questionnaires, and stakeholder communications. Not mandatory but widely expected by customers and ESG raters.
@@ -157,7 +157,7 @@ KEY TECHNICAL FACTS:
 COMMON QUESTIONS AND ANSWERS:
 - "What's California nexus?" = Having operations, employees, customers, or sales in California. Even one employee working remotely in California can create nexus.
 - "Our revenue is just under $1B" = SB 253 threshold is $1B+ global revenue. If under, you likely don't need to file but should monitor as thresholds may change.
-- "When is the SB 253 deadline?" = CARB has proposed ${SB253_FIRST_REPORT_DATE} for the first report, but it is not final — it still needs OAL approval and has already moved twice. ThemisIQ keeps the date current; the wizard takes about 20 minutes with bills in hand.
+- "When is the SB 253 deadline?" = CARB has proposed ${SB253_FIRST_REPORT_DATE} for the first report, but it is not final: ${SB253_PROCESS_STATUS} The date has already changed once, from 10 August 2026. ThemisIQ keeps the date current; the wizard takes about 20 minutes with bills in hand.
 - "Operational vs financial control?" = Operational control means you include facilities where you control operations. Financial control means you include entities where you have financial control. Most companies use operational control.
 - "Do I include subsidiaries?" = Under operational control, yes — include any facility your company operates. Under equity share, include proportional to ownership.
 - "What if our landlord pays electricity?" = If you don't pay the utility bill directly you may not hold the data. Ask your landlord or property manager for the consumption figures or a copy of the bills; many will share them. If they won't, enter what you do have and say so in your workings — ThemisIQ leaves a location it has no figure for out of the totals and names the gap, rather than counting it as zero.
