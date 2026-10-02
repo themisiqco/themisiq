@@ -29,6 +29,7 @@ import {
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
   type DeclarableStream,
   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
+  deriveLocations,
   validateResolution, COVERAGE_MESSAGE,
 } from './engine';
 import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
@@ -3917,5 +3918,177 @@ describe('T3a reportingYearLabel', () => {
     expect(rest).not.toMatch(/FY\s?\$\{/);
     expect(rest).not.toMatch(/reporting year \$\{/);
     expect(rest).not.toMatch(/year ending \$\{/);
+  });
+});
+
+// ── T4: deriveLocations, and totals equal workings by construction ──────────────────────────────────
+// docs/review/design-derived-figures.md section 11 T4, and the T4 ruling in section 10: a field with a
+// pending proposal is document-backed (0 until confirmed); an all-rejected field, or one with no
+// proposals, keeps its stored value as the typed figure.
+describe('T4 deriveLocations', () => {
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, sourceQuote: `${value} mcf`, ...o });
+  const gdoc = (id: string, p: ExtractedProposal) => doc('utility_bill_gas', [p], id);
+  const inv = (locations: Location[], reporting_year = 2025, fiscal_year_end_month = 12, coverage_resolutions: CoverageResolution[] = []) =>
+    ({ locations, reporting_year, fiscal_year_end_month, coverage_resolutions });
+  const gasSite = (amount: number, docs: SourceDoc[], o: Partial<Location> = {}) =>
+    loc({ has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: 'mcf', source_docs: docs, ...o });
+  const derivedGas = (i: ReturnType<typeof inv>) => deriveLocations(i)[0].natural_gas_amount;
+
+  it('a confirmed in-year bill is the figure, whatever the stored field says', () => {
+    expect(derivedGas(inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])]))).toBe(100);
+    expect(derivedGas(inv([gasSite(999, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])]))).toBe(100);
+  });
+
+  describe('staleness regressions (design section 0)', () => {
+    it('remove a document: the figure drops to the remaining bill, and so do the totals', () => {
+      const jan = gdoc('jan', gas(100, '2025-01-01', '2025-01-31'));
+      // The page wrote 200 when Jan and Feb were both confirmed; Feb was removed, and removeDoc does not
+      // touch the field.
+      const afterRemove = inv([gasSite(200, [jan])]);
+      expect(derivedGas(afterRemove)).toBe(100);
+      const derivedTotal = calcInventory(deriveLocations(afterRemove), 'AR6', 2025).s1_total;
+      const oneBill = calcInventory([gasSite(100, [])], 'AR6', 2025).s1_total;
+      expect(derivedTotal).toBeCloseTo(oneBill, 12);
+      expect(calcInventory([gasSite(200, [jan])], 'AR6', 2025).s1_total, 'stored figure was stale').toBeCloseTo(2 * oneBill, 12);
+    });
+
+    it('un-confirm the last proposal: a pending proposal makes the field document-backed, so 0', () => {
+      for (const status of ['extracted', 'needs_manual_review'] as const) {
+        expect(derivedGas(inv([gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status }))])])), status).toBe(0);
+      }
+    });
+
+    it('change the reporting year: a bill outside the new year contributes nothing', () => {
+      const site = gasSite(100, [gdoc('a', gas(100, '2024-03-01', '2024-03-31'))]); // written under 2024
+      expect(derivedGas(inv([site], 2024))).toBe(100);
+      expect(derivedGas(inv([site], 2025))).toBe(0);
+    });
+
+    it('change the year end: the window moves, and the figure with it', () => {
+      const site = gasSite(100, [gdoc('a', gas(100, '2025-04-01', '2025-04-30'))]);
+      expect(derivedGas(inv([site], 2025, 12))).toBe(100);
+      expect(derivedGas(inv([site], 2025, 3)), 'Apr 2025 is outside 1 Apr 2024 to 31 Mar 2025').toBe(0);
+      expect(derivedGas(inv([site], 2026, 3))).toBe(100);
+    });
+  });
+
+  it('all rejected, or no proposals: the stored value stands as the typed figure (3.3, T3 ruling)', () => {
+    expect(derivedGas(inv([gasSite(250, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))])]))).toBe(250);
+    expect(derivedGas(inv([gasSite(250, [])]))).toBe(250);
+  });
+
+  it('a pending proposal with no value backs nothing (T1: no contribution row)', () => {
+    expect(derivedGas(inv([gasSite(250, [gdoc('a', gas(0, '2025-01-01', '2025-01-31', { value: null, status: 'extracted' }))])]))).toBe(250);
+  });
+
+  it('mixed units: 0, unit unchanged, and the export-blocking issue says why', () => {
+    const site = gasSite(300, [
+      gdoc('m1', gas(100, '2025-01-01', '2025-01-31', { unit: 'mcf' })),
+      gdoc('m2', gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' })),
+    ], { natural_gas_unit: 'therms' });
+    const d = deriveLocations(inv([site]))[0];
+    expect(d.natural_gas_amount).toBe(0);
+    expect(d.natural_gas_unit).toBe('therms');
+    expect(findUnresolvedCoverage([site], 2025, 12, []).some(i => i.status === 'mixed_units')).toBe(true);
+  });
+
+  it('used none: 0, even over a stale stored value', () => {
+    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))]);
+    const usedNone: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount',
+      by: { userId: 'u', email: 'e@x.example' }, note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' } as CoverageResolution;
+    expect(derivedGas(inv([site], 2025, 12, [usedNone]))).toBe(0);
+  });
+
+  it('the unit comes from the documents where the figure is derived', () => {
+    const d = deriveLocations(inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))], { natural_gas_unit: 'therms' })]))[0];
+    expect(d.natural_gas_unit).toBe('mcf');
+  });
+
+  it('only document-backed fields change; typed fields and the input are untouched', () => {
+    const site = gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))], { has_propane: true, propane_amount: 40, refrigerant_purchased_kg: 3 });
+    const before = JSON.stringify(site);
+    const d = deriveLocations(inv([site]))[0];
+    expect(d.propane_amount).toBe(40);
+    expect(d.refrigerant_purchased_kg).toBe(3);
+    expect(JSON.stringify(site), 'input not mutated').toBe(before);
+  });
+
+  it('is idempotent: deriving derived locations changes nothing', () => {
+    const i = inv([gasSite(999, [gdoc('a', gas(310, '2024-12-20', '2025-01-19')), gdoc('b', gas(100, '2025-02-01', '2025-02-28', { status: 'extracted' }))])]);
+    const once = deriveLocations(i);
+    expect(deriveLocations({ ...i, locations: once })).toEqual(once);
+  });
+
+  // Totals and workings both read the same derived locations, so they agree by construction. Rows are
+  // mapped to totals the way calcLocation builds them: scope 1 → s1_total; scope 2 location-based →
+  // s2_location; scope 2 market-based rows plus steam → s2_market; scope 3 → s3_td.
+  describe('derived totals equal the sum of buildWorkings rows', () => {
+    const elec = (value: number, periodStart: string, periodEnd: string, o: Partial<ExtractedProposal> = {}) =>
+      prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, sourceQuote: `${value} kWh`, ...o });
+    const fleet = (fuelType: 'gasoline' | 'diesel', value: number, o: Partial<ExtractedProposal> = {}) =>
+      prop({ fuelType, value, unit: 'gallons', periodStart: '2025-03-01', periodEnd: '2025-03-31', sourceQuote: `${value} gal`, ...o });
+    const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 2, pctEstimated: 83,
+      note: '2 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
+    const fixtures: [string, ReturnType<typeof inv>][] = [
+      ['in-year gas', inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])])],
+      ['stale stored gas after a removal', inv([gasSite(500, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])])],
+      ['straddling bill, prorated', inv([gasSite(310, [gdoc('a', gas(310, '2024-12-20', '2025-01-19'))])])],
+      ['out-of-year bill', inv([gasSite(100, [gdoc('a', gas(100, '2024-03-01', '2024-03-31'))])])],
+      ['extrapolated gas', inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31')), gdoc('b', gas(100, '2025-02-01', '2025-02-28'))])], 2025, 12, [extrap])],
+      ['pending only, stale stored', inv([gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))])])],
+      ['all rejected, typed figure', inv([gasSite(250, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))])])],
+      ['mixed units', inv([gasSite(300, [gdoc('m1', gas(100, '2025-01-01', '2025-01-31')), gdoc('m2', gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' }))])])],
+      ['March year end', inv([gasSite(0, [gdoc('a', gas(100, '2024-04-01', '2024-04-30')), gdoc('b', gas(100, '2025-04-01', '2025-04-30'))])], 2025, 3)],
+      ['electricity, market-based and gas together', inv([loc({ has_natural_gas: true, natural_gas_amount: 0, grid_region: 'US_CA', electricity_kwh: 7,
+        renewable_electricity_kwh: 1000, source_docs: [
+          gdoc('g', gas(100, '2025-01-01', '2025-01-31')),
+          doc('utility_electricity', [elec(5000, '2025-01-01', '2025-01-31')], 'e1'),
+          doc('utility_electricity', [elec(6000, '2024-11-01', '2024-11-30')], 'e2'),
+        ] })])],
+      ['fleet fuel, typed propane and refrigerant', inv([loc({ has_mobile: true, gasoline_amount: 9, has_propane: true, propane_amount: 40,
+        has_hfc_refrigerants: true, refrigerant_purchased_kg: 2, source_docs: [doc('fleet_fuel', [fleet('gasoline', 50), fleet('diesel', 20)], 'f')] })])],
+      ['NZ with T&D losses', inv([loc({ country: 'NZ', grid_region: 'NZ', nz_td_losses: true, electricity_kwh: 1,
+        source_docs: [doc('utility_electricity', [elec(10_000, '2025-01-01', '2025-01-31')], 'nz')] })])],
+    ];
+
+    for (const [label, i] of fixtures) {
+      it(label, () => {
+        const derived = deriveLocations(i);
+        const t = calcInventory(derived, 'AR6', i.reporting_year);
+        type Row = { scope?: number; scope2_method?: string; stream?: string; result_tco2e?: number | null };
+        const rows = buildWorkings(derived, 'AR6', i.reporting_year, i.coverage_resolutions, i.fiscal_year_end_month) as Row[];
+        const sum = (f: (r: Row) => boolean) => rows.filter(r => typeof r.result_tco2e === 'number' && f(r)).reduce((a, r) => a + (r.result_tco2e as number), 0);
+        expect(sum(r => r.scope === 1), `${label}: s1`).toBeCloseTo(t.s1_total, 9);
+        expect(sum(r => r.scope === 2 && r.scope2_method !== 'market-based'), `${label}: s2 location`).toBeCloseTo(t.s2_location, 9);
+        expect(sum(r => r.scope === 2 && (r.scope2_method === 'market-based' || r.stream === 'purchased_steam')), `${label}: s2 market`).toBeCloseTo(t.s2_market, 9);
+        expect(sum(r => r.scope === 3), `${label}: s3`).toBeCloseTo(t.s3_td, 9);
+      });
+    }
+
+    it('the fixtures are not vacuous: most price something, and the stale ones differ from stored', () => {
+      const priced = fixtures.filter(([, i]) => { const t = calcInventory(deriveLocations(i), 'AR6', i.reporting_year); return t.s1_total + t.s2_location > 0; });
+      expect(priced.length).toBeGreaterThanOrEqual(fixtures.length - 3);
+      for (const label of ['stale stored gas after a removal', 'out-of-year bill', 'pending only, stale stored']) {
+        const i = fixtures.find(([l]) => l === label)![1];
+        expect(calcInventory(deriveLocations(i), 'AR6', 2025).s1_total, label).not.toBeCloseTo(calcInventory(i.locations, 'AR6', 2025).s1_total, 6);
+      }
+    });
+  });
+
+  it('pctEstimated, fed derived locations, measures the gross-up against the derived total', () => {
+    const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50,
+      note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
+    const months = Array.from({ length: 6 }, (_, k) => gdoc(`m${k}`, gas(100, `2025-0${k + 1}-01`, `2025-0${k + 1}-${new Date(2025, k + 1, 0).getDate()}`)));
+    const i = inv([gasSite(0, months)], 2025, 12, [extrap]); // stored 0: the page never wrote it
+    expect(pctEstimated(i.locations, [extrap], 'AR6', 2025), 'stored: no emissions to measure against').toBe(0);
+    expect(pctEstimated(deriveLocations(i), [extrap], 'AR6', 2025)).toBeCloseTo(50, 9);
+  });
+
+  it('findUnpriceableLocations judges the derived figure: a stale stored figure no document supports is not priced', () => {
+    // An unpriceable unit on a stale field: stored says 100 m3-on-a-UK-site, but the only bill is pending.
+    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'GB', natural_gas_unit: 'm3' });
+    expect(findUnpriceableLocations([site], 'AR6', 2025), 'stored: blocked on a figure nothing supports').toHaveLength(1);
+    expect(findUnpriceableLocations(deriveLocations(inv([site])), 'AR6', 2025)).toEqual([]);
   });
 });

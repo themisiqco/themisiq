@@ -219,6 +219,10 @@ export function factorJurisdiction(loc: Location, family: FactorFamily): FactorJ
  * `year` MUST be the inventory's reporting_year — the same value passed to buildWorkings and
  * calcInventory in the save payload. Passing anything else records editions for a calculation that
  * was never performed.
+ *
+ * `locations` MUST be deriveLocations output (T4), the same locations the save payload's totals and
+ * workings are built from. Stored locations can carry a stale figure for a stream no document now
+ * supports, which would record an edition for a stream the totals do not price.
  */
 export function buildFactorEditions(locations: readonly Location[], year: number): FactorEditions {
   const out: FactorEditions = {}

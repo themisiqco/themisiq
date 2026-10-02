@@ -2769,6 +2769,7 @@ export type UnpriceableLocation =
 // Pure probe, same shape as findUnresolvedCoverage / findUndeclaredStreams: a list of what is
 // wrong, which the component turns into a per-location state, a note on every affected total,
 // and an export gate.
+// `locations` must be deriveLocations output (T4), so a location is judged on the figures it will be priced on.
 export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024): UnpriceableLocation[] {
   const out: UnpriceableLocation[] = []
   for (const loc of locations) {
@@ -2782,6 +2783,7 @@ export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpV
   return out
 }
 
+// `locations` must be deriveLocations output (T4): a stored document-backed field can be stale.
 function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
   return locations.reduce((acc, loc) => {
     // Excluded, never zeroed: a location that cannot be priced contributes nothing and is named on
@@ -2848,6 +2850,9 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
  * Returns null when nothing is estimated AND nothing was concierge-read
  * (a wholly manual inventory has no evidence basis to measure against —
  * null is an absence, not zero).
+ *
+ * `locations` must be deriveLocations output (T4): the share is measured against the figures the
+ * totals are calculated on, not against a stored field that may be stale.
  */
 export function pctEstimated(
   locations: Location[],
@@ -2855,9 +2860,9 @@ export function pctEstimated(
   gwpVersion: GwpVersion,
   year: number
 ): number | null {
-  // Only 'extrapolate' produces estimated emissions. A straddle 'next_year' EXCLUDES emissions
-  // (not estimation); a straddle 'prorate' is a day-level allocation of REAL metered data (not
-  // estimation); a 'duplicate' resolution drops a double-count (not estimation). None are counted.
+  // Only 'extrapolate' produces estimated emissions. Proration by billing days is an allocation of
+  // REAL metered data, not an estimate. Legacy 'straddle' and 'duplicate' resolutions are never accepted
+  // and change no figure (T2, T3), so they are not counted either.
   const extraps = resolutions.filter(r => r.kind === 'extrapolate' && !!r.monthsCovered && r.monthsCovered > 0)
   let estimated = 0
   for (const loc of locations) {
@@ -3315,6 +3320,60 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
       fuelTypes: [r.fuelType], quotes: [], docIds: [], filePaths: [], refs: [] }
   }
   return out
+}
+
+/**
+ * The inventory's locations with every document-backed figure DERIVED from its documents, not read from
+ * the stored field (T4). Feed this, never `inventory.locations`, to calcInventory, pctEstimated,
+ * findUnpriceableLocations, buildWorkings and buildFactorEditions: they all read figures off the
+ * locations they are given, so a stored field the page failed to refresh reaches every total unless the
+ * locations are derived first. With all of them fed the same derived locations, totals equal the sum of
+ * the workings rows by construction.
+ *
+ * WHY THE STORED FIELD CANNOT BE TRUSTED. It is a cache of applyResolutions that only two page handlers
+ * refresh (confirming a proposal, adding a resolution). Removing a document, un-confirming a proposal and
+ * changing the reporting year or year end all leave it describing evidence that is no longer there.
+ *
+ * PER FIELD (rulings in docs/review/design-derived-figures.md section 10):
+ *   - At least one confirmed proposal: the figure is applyResolutions' fold of the counted contributions,
+ *     grossed up per meter. Mixed units: 0, because no mixed-units contribution is counted (T1); the
+ *     export-blocking mixed_units issue says why (T3). A used_none confirmation: 0.
+ *   - No confirmed proposal but at least one PENDING one (extracted, needs_manual_review) with a value:
+ *     document-backed, so 0. The pending-proposal gate already blocks export. (T4 ruling.)
+ *   - Proposals all rejected, or none: the stored value stands, as the customer's typed figure
+ *     (section 3.3; the T3 all-rejected ruling).
+ * A proposal with no value backs nothing (T1: it has no contribution row).
+ *
+ * ⚠️ KNOWN LIMIT UNTIL T7. While the page still writes fields, a stored value on an all-rejected field,
+ * or on a location whose last document was removed, may be a stale copy rather than a typed figure, and
+ * the two cannot be told apart here. T7 stops the writes, after which a stored value is only ever typed.
+ *
+ * Pure: locations in, new locations out. Units are taken from the documents where a figure is derived.
+ */
+export function deriveLocations(inventory: {
+  locations: Location[]
+  reporting_year: number
+  fiscal_year_end_month?: number
+  coverage_resolutions?: CoverageResolution[]
+}): Location[] {
+  const win = periodFromYearAndEnd(inventory.reporting_year, inventory.fiscal_year_end_month ?? 12)
+  const resolutions = inventory.coverage_resolutions ?? []
+  return inventory.locations.map(loc => {
+    const next: Location = { ...loc }
+    const set = (field: keyof Location, v: unknown) => { (next as unknown as Record<string, unknown>)[String(field)] = v }
+    // Pending first: a field with a pending proposal is document-backed even when nothing is confirmed.
+    loc.source_docs.forEach(d => d.extracted?.forEach(p => {
+      if (p.value == null || (p.status !== 'extracted' && p.status !== 'needs_manual_review')) return
+      const map = fieldFor(d.document_type, p.fuelType)
+      if (map) set(map.amount, 0)
+    }))
+    // Then every field applyResolutions covers (any confirmed proposal, or a used_none confirmation).
+    for (const a of Object.values(applyResolutions(loc, resolutions, win.start, win.end))) {
+      set(a.field, a.mixedUnits ? 0 : a.value)
+      if (!a.mixedUnits && a.unitField && a.unit != null) set(a.unitField, a.unit)
+    }
+    return next
+  })
 }
 
 // Provenance stamp attached to a workings row so the verifier can trace a figure back to its bills.

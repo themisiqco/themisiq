@@ -1,0 +1,307 @@
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 8b03f53..757465f 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -29,6 +29,7 @@ import {
+   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
+   type DeclarableStream,
+   billContributions, periodFromYearAndEnd, INVALID_PERIOD_MESSAGE, type BillContribution, reportingYearLabel,
++  deriveLocations,
+   validateResolution, COVERAGE_MESSAGE,
+ } from './engine';
+ import { buildMonthlyEmissions, reconcile } from './monthlyEmissions';
+@@ -3919,3 +3920,175 @@ describe('T3a reportingYearLabel', () => {
+     expect(rest).not.toMatch(/year ending \$\{/);
+   });
+ });
++
++// ── T4: deriveLocations, and totals equal workings by construction ──────────────────────────────────
++// docs/review/design-derived-figures.md section 11 T4, and the T4 ruling in section 10: a field with a
++// pending proposal is document-backed (0 until confirmed); an all-rejected field, or one with no
++// proposals, keeps its stored value as the typed figure.
++describe('T4 deriveLocations', () => {
++  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
++    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, sourceQuote: `${value} mcf`, ...o });
++  const gdoc = (id: string, p: ExtractedProposal) => doc('utility_bill_gas', [p], id);
++  const inv = (locations: Location[], reporting_year = 2025, fiscal_year_end_month = 12, coverage_resolutions: CoverageResolution[] = []) =>
++    ({ locations, reporting_year, fiscal_year_end_month, coverage_resolutions });
++  const gasSite = (amount: number, docs: SourceDoc[], o: Partial<Location> = {}) =>
++    loc({ has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: 'mcf', source_docs: docs, ...o });
++  const derivedGas = (i: ReturnType<typeof inv>) => deriveLocations(i)[0].natural_gas_amount;
++
++  it('a confirmed in-year bill is the figure, whatever the stored field says', () => {
++    expect(derivedGas(inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])]))).toBe(100);
++    expect(derivedGas(inv([gasSite(999, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])]))).toBe(100);
++  });
++
++  describe('staleness regressions (design section 0)', () => {
++    it('remove a document: the figure drops to the remaining bill, and so do the totals', () => {
++      const jan = gdoc('jan', gas(100, '2025-01-01', '2025-01-31'));
++      // The page wrote 200 when Jan and Feb were both confirmed; Feb was removed, and removeDoc does not
++      // touch the field.
++      const afterRemove = inv([gasSite(200, [jan])]);
++      expect(derivedGas(afterRemove)).toBe(100);
++      const derivedTotal = calcInventory(deriveLocations(afterRemove), 'AR6', 2025).s1_total;
++      const oneBill = calcInventory([gasSite(100, [])], 'AR6', 2025).s1_total;
++      expect(derivedTotal).toBeCloseTo(oneBill, 12);
++      expect(calcInventory([gasSite(200, [jan])], 'AR6', 2025).s1_total, 'stored figure was stale').toBeCloseTo(2 * oneBill, 12);
++    });
++
++    it('un-confirm the last proposal: a pending proposal makes the field document-backed, so 0', () => {
++      for (const status of ['extracted', 'needs_manual_review'] as const) {
++        expect(derivedGas(inv([gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status }))])])), status).toBe(0);
++      }
++    });
++
++    it('change the reporting year: a bill outside the new year contributes nothing', () => {
++      const site = gasSite(100, [gdoc('a', gas(100, '2024-03-01', '2024-03-31'))]); // written under 2024
++      expect(derivedGas(inv([site], 2024))).toBe(100);
++      expect(derivedGas(inv([site], 2025))).toBe(0);
++    });
++
++    it('change the year end: the window moves, and the figure with it', () => {
++      const site = gasSite(100, [gdoc('a', gas(100, '2025-04-01', '2025-04-30'))]);
++      expect(derivedGas(inv([site], 2025, 12))).toBe(100);
++      expect(derivedGas(inv([site], 2025, 3)), 'Apr 2025 is outside 1 Apr 2024 to 31 Mar 2025').toBe(0);
++      expect(derivedGas(inv([site], 2026, 3))).toBe(100);
++    });
++  });
++
++  it('all rejected, or no proposals: the stored value stands as the typed figure (3.3, T3 ruling)', () => {
++    expect(derivedGas(inv([gasSite(250, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))])]))).toBe(250);
++    expect(derivedGas(inv([gasSite(250, [])]))).toBe(250);
++  });
++
++  it('a pending proposal with no value backs nothing (T1: no contribution row)', () => {
++    expect(derivedGas(inv([gasSite(250, [gdoc('a', gas(0, '2025-01-01', '2025-01-31', { value: null, status: 'extracted' }))])]))).toBe(250);
++  });
++
++  it('mixed units: 0, unit unchanged, and the export-blocking issue says why', () => {
++    const site = gasSite(300, [
++      gdoc('m1', gas(100, '2025-01-01', '2025-01-31', { unit: 'mcf' })),
++      gdoc('m2', gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' })),
++    ], { natural_gas_unit: 'therms' });
++    const d = deriveLocations(inv([site]))[0];
++    expect(d.natural_gas_amount).toBe(0);
++    expect(d.natural_gas_unit).toBe('therms');
++    expect(findUnresolvedCoverage([site], 2025, 12, []).some(i => i.status === 'mixed_units')).toBe(true);
++  });
++
++  it('used none: 0, even over a stale stored value', () => {
++    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))]);
++    const usedNone: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'used_none', field: 'natural_gas_amount',
++      by: { userId: 'u', email: 'e@x.example' }, note: 'n', acknowledgedAt: '2026-01-01T00:00:00Z' } as CoverageResolution;
++    expect(derivedGas(inv([site], 2025, 12, [usedNone]))).toBe(0);
++  });
++
++  it('the unit comes from the documents where the figure is derived', () => {
++    const d = deriveLocations(inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))], { natural_gas_unit: 'therms' })]))[0];
++    expect(d.natural_gas_unit).toBe('mcf');
++  });
++
++  it('only document-backed fields change; typed fields and the input are untouched', () => {
++    const site = gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))], { has_propane: true, propane_amount: 40, refrigerant_purchased_kg: 3 });
++    const before = JSON.stringify(site);
++    const d = deriveLocations(inv([site]))[0];
++    expect(d.propane_amount).toBe(40);
++    expect(d.refrigerant_purchased_kg).toBe(3);
++    expect(JSON.stringify(site), 'input not mutated').toBe(before);
++  });
++
++  it('is idempotent: deriving derived locations changes nothing', () => {
++    const i = inv([gasSite(999, [gdoc('a', gas(310, '2024-12-20', '2025-01-19')), gdoc('b', gas(100, '2025-02-01', '2025-02-28', { status: 'extracted' }))])]);
++    const once = deriveLocations(i);
++    expect(deriveLocations({ ...i, locations: once })).toEqual(once);
++  });
++
++  // Totals and workings both read the same derived locations, so they agree by construction. Rows are
++  // mapped to totals the way calcLocation builds them: scope 1 → s1_total; scope 2 location-based →
++  // s2_location; scope 2 market-based rows plus steam → s2_market; scope 3 → s3_td.
++  describe('derived totals equal the sum of buildWorkings rows', () => {
++    const elec = (value: number, periodStart: string, periodEnd: string, o: Partial<ExtractedProposal> = {}) =>
++      prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, sourceQuote: `${value} kWh`, ...o });
++    const fleet = (fuelType: 'gasoline' | 'diesel', value: number, o: Partial<ExtractedProposal> = {}) =>
++      prop({ fuelType, value, unit: 'gallons', periodStart: '2025-03-01', periodEnd: '2025-03-31', sourceQuote: `${value} gal`, ...o });
++    const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 2, pctEstimated: 83,
++      note: '2 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
++    const fixtures: [string, ReturnType<typeof inv>][] = [
++      ['in-year gas', inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])])],
++      ['stale stored gas after a removal', inv([gasSite(500, [gdoc('a', gas(100, '2025-01-01', '2025-01-31'))])])],
++      ['straddling bill, prorated', inv([gasSite(310, [gdoc('a', gas(310, '2024-12-20', '2025-01-19'))])])],
++      ['out-of-year bill', inv([gasSite(100, [gdoc('a', gas(100, '2024-03-01', '2024-03-31'))])])],
++      ['extrapolated gas', inv([gasSite(0, [gdoc('a', gas(100, '2025-01-01', '2025-01-31')), gdoc('b', gas(100, '2025-02-01', '2025-02-28'))])], 2025, 12, [extrap])],
++      ['pending only, stale stored', inv([gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))])])],
++      ['all rejected, typed figure', inv([gasSite(250, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))])])],
++      ['mixed units', inv([gasSite(300, [gdoc('m1', gas(100, '2025-01-01', '2025-01-31')), gdoc('m2', gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' }))])])],
++      ['March year end', inv([gasSite(0, [gdoc('a', gas(100, '2024-04-01', '2024-04-30')), gdoc('b', gas(100, '2025-04-01', '2025-04-30'))])], 2025, 3)],
++      ['electricity, market-based and gas together', inv([loc({ has_natural_gas: true, natural_gas_amount: 0, grid_region: 'US_CA', electricity_kwh: 7,
++        renewable_electricity_kwh: 1000, source_docs: [
++          gdoc('g', gas(100, '2025-01-01', '2025-01-31')),
++          doc('utility_electricity', [elec(5000, '2025-01-01', '2025-01-31')], 'e1'),
++          doc('utility_electricity', [elec(6000, '2024-11-01', '2024-11-30')], 'e2'),
++        ] })])],
++      ['fleet fuel, typed propane and refrigerant', inv([loc({ has_mobile: true, gasoline_amount: 9, has_propane: true, propane_amount: 40,
++        has_hfc_refrigerants: true, refrigerant_purchased_kg: 2, source_docs: [doc('fleet_fuel', [fleet('gasoline', 50), fleet('diesel', 20)], 'f')] })])],
++      ['NZ with T&D losses', inv([loc({ country: 'NZ', grid_region: 'NZ', nz_td_losses: true, electricity_kwh: 1,
++        source_docs: [doc('utility_electricity', [elec(10_000, '2025-01-01', '2025-01-31')], 'nz')] })])],
++    ];
++
++    for (const [label, i] of fixtures) {
++      it(label, () => {
++        const derived = deriveLocations(i);
++        const t = calcInventory(derived, 'AR6', i.reporting_year);
++        type Row = { scope?: number; scope2_method?: string; stream?: string; result_tco2e?: number | null };
++        const rows = buildWorkings(derived, 'AR6', i.reporting_year, i.coverage_resolutions, i.fiscal_year_end_month) as Row[];
++        const sum = (f: (r: Row) => boolean) => rows.filter(r => typeof r.result_tco2e === 'number' && f(r)).reduce((a, r) => a + (r.result_tco2e as number), 0);
++        expect(sum(r => r.scope === 1), `${label}: s1`).toBeCloseTo(t.s1_total, 9);
++        expect(sum(r => r.scope === 2 && r.scope2_method !== 'market-based'), `${label}: s2 location`).toBeCloseTo(t.s2_location, 9);
++        expect(sum(r => r.scope === 2 && (r.scope2_method === 'market-based' || r.stream === 'purchased_steam')), `${label}: s2 market`).toBeCloseTo(t.s2_market, 9);
++        expect(sum(r => r.scope === 3), `${label}: s3`).toBeCloseTo(t.s3_td, 9);
++      });
++    }
++
++    it('the fixtures are not vacuous: most price something, and the stale ones differ from stored', () => {
++      const priced = fixtures.filter(([, i]) => { const t = calcInventory(deriveLocations(i), 'AR6', i.reporting_year); return t.s1_total + t.s2_location > 0; });
++      expect(priced.length).toBeGreaterThanOrEqual(fixtures.length - 3);
++      for (const label of ['stale stored gas after a removal', 'out-of-year bill', 'pending only, stale stored']) {
++        const i = fixtures.find(([l]) => l === label)![1];
++        expect(calcInventory(deriveLocations(i), 'AR6', 2025).s1_total, label).not.toBeCloseTo(calcInventory(i.locations, 'AR6', 2025).s1_total, 6);
++      }
++    });
++  });
++
++  it('pctEstimated, fed derived locations, measures the gross-up against the derived total', () => {
++    const extrap: CoverageResolution = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 6, pctEstimated: 50,
++      note: '6 of 12', acknowledgedAt: '2026-01-01T00:00:00Z' };
++    const months = Array.from({ length: 6 }, (_, k) => gdoc(`m${k}`, gas(100, `2025-0${k + 1}-01`, `2025-0${k + 1}-${new Date(2025, k + 1, 0).getDate()}`)));
++    const i = inv([gasSite(0, months)], 2025, 12, [extrap]); // stored 0: the page never wrote it
++    expect(pctEstimated(i.locations, [extrap], 'AR6', 2025), 'stored: no emissions to measure against').toBe(0);
++    expect(pctEstimated(deriveLocations(i), [extrap], 'AR6', 2025)).toBeCloseTo(50, 9);
++  });
++
++  it('findUnpriceableLocations judges the derived figure: a stale stored figure no document supports is not priced', () => {
++    // An unpriceable unit on a stale field: stored says 100 m3-on-a-UK-site, but the only bill is pending.
++    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'GB', natural_gas_unit: 'm3' });
++    expect(findUnpriceableLocations([site], 'AR6', 2025), 'stored: blocked on a figure nothing supports').toHaveLength(1);
++    expect(findUnpriceableLocations(deriveLocations(inv([site])), 'AR6', 2025)).toEqual([]);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 90be6a8..6a35858 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -2769,6 +2769,7 @@ export type UnpriceableLocation =
+ // Pure probe, same shape as findUnresolvedCoverage / findUndeclaredStreams: a list of what is
+ // wrong, which the component turns into a per-location state, a note on every affected total,
+ // and an export gate.
++// `locations` must be deriveLocations output (T4), so a location is judged on the figures it will be priced on.
+ export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024): UnpriceableLocation[] {
+   const out: UnpriceableLocation[] = []
+   for (const loc of locations) {
+@@ -2782,6 +2783,7 @@ export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpV
+   return out
+ }
+ 
++// `locations` must be deriveLocations output (T4): a stored document-backed field can be stale.
+ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
+   return locations.reduce((acc, loc) => {
+     // Excluded, never zeroed: a location that cannot be priced contributes nothing and is named on
+@@ -2848,6 +2850,9 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
+  * Returns null when nothing is estimated AND nothing was concierge-read
+  * (a wholly manual inventory has no evidence basis to measure against —
+  * null is an absence, not zero).
++ *
++ * `locations` must be deriveLocations output (T4): the share is measured against the figures the
++ * totals are calculated on, not against a stored field that may be stale.
+  */
+ export function pctEstimated(
+   locations: Location[],
+@@ -2855,9 +2860,9 @@ export function pctEstimated(
+   gwpVersion: GwpVersion,
+   year: number
+ ): number | null {
+-  // Only 'extrapolate' produces estimated emissions. A straddle 'next_year' EXCLUDES emissions
+-  // (not estimation); a straddle 'prorate' is a day-level allocation of REAL metered data (not
+-  // estimation); a 'duplicate' resolution drops a double-count (not estimation). None are counted.
++  // Only 'extrapolate' produces estimated emissions. Proration by billing days is an allocation of
++  // REAL metered data, not an estimate. Legacy 'straddle' and 'duplicate' resolutions are never accepted
++  // and change no figure (T2, T3), so they are not counted either.
+   const extraps = resolutions.filter(r => r.kind === 'extrapolate' && !!r.monthsCovered && r.monthsCovered > 0)
+   let estimated = 0
+   for (const loc of locations) {
+@@ -3317,6 +3322,60 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+   return out
+ }
+ 
++/**
++ * The inventory's locations with every document-backed figure DERIVED from its documents, not read from
++ * the stored field (T4). Feed this, never `inventory.locations`, to calcInventory, pctEstimated,
++ * findUnpriceableLocations, buildWorkings and buildFactorEditions: they all read figures off the
++ * locations they are given, so a stored field the page failed to refresh reaches every total unless the
++ * locations are derived first. With all of them fed the same derived locations, totals equal the sum of
++ * the workings rows by construction.
++ *
++ * WHY THE STORED FIELD CANNOT BE TRUSTED. It is a cache of applyResolutions that only two page handlers
++ * refresh (confirming a proposal, adding a resolution). Removing a document, un-confirming a proposal and
++ * changing the reporting year or year end all leave it describing evidence that is no longer there.
++ *
++ * PER FIELD (rulings in docs/review/design-derived-figures.md section 10):
++ *   - At least one confirmed proposal: the figure is applyResolutions' fold of the counted contributions,
++ *     grossed up per meter. Mixed units: 0, because no mixed-units contribution is counted (T1); the
++ *     export-blocking mixed_units issue says why (T3). A used_none confirmation: 0.
++ *   - No confirmed proposal but at least one PENDING one (extracted, needs_manual_review) with a value:
++ *     document-backed, so 0. The pending-proposal gate already blocks export. (T4 ruling.)
++ *   - Proposals all rejected, or none: the stored value stands, as the customer's typed figure
++ *     (section 3.3; the T3 all-rejected ruling).
++ * A proposal with no value backs nothing (T1: it has no contribution row).
++ *
++ * ⚠️ KNOWN LIMIT UNTIL T7. While the page still writes fields, a stored value on an all-rejected field,
++ * or on a location whose last document was removed, may be a stale copy rather than a typed figure, and
++ * the two cannot be told apart here. T7 stops the writes, after which a stored value is only ever typed.
++ *
++ * Pure: locations in, new locations out. Units are taken from the documents where a figure is derived.
++ */
++export function deriveLocations(inventory: {
++  locations: Location[]
++  reporting_year: number
++  fiscal_year_end_month?: number
++  coverage_resolutions?: CoverageResolution[]
++}): Location[] {
++  const win = periodFromYearAndEnd(inventory.reporting_year, inventory.fiscal_year_end_month ?? 12)
++  const resolutions = inventory.coverage_resolutions ?? []
++  return inventory.locations.map(loc => {
++    const next: Location = { ...loc }
++    const set = (field: keyof Location, v: unknown) => { (next as unknown as Record<string, unknown>)[String(field)] = v }
++    // Pending first: a field with a pending proposal is document-backed even when nothing is confirmed.
++    loc.source_docs.forEach(d => d.extracted?.forEach(p => {
++      if (p.value == null || (p.status !== 'extracted' && p.status !== 'needs_manual_review')) return
++      const map = fieldFor(d.document_type, p.fuelType)
++      if (map) set(map.amount, 0)
++    }))
++    // Then every field applyResolutions covers (any confirmed proposal, or a used_none confirmation).
++    for (const a of Object.values(applyResolutions(loc, resolutions, win.start, win.end))) {
++      set(a.field, a.mixedUnits ? 0 : a.value)
++      if (!a.mixedUnits && a.unitField && a.unit != null) set(a.unitField, a.unit)
++    }
++    return next
++  })
++}
++
+ // Provenance stamp attached to a workings row so the verifier can trace a figure back to its bills.
+ // concierge = read verbatim off confirmed bills; concierge-extrapolated = grossed up for a coverage
+ // gap (number is estimated, quotes are the underlying bills); manual = not concierge-read.
+diff --git a/lib/ghg/factorEditions.ts b/lib/ghg/factorEditions.ts
+index 07994b0..1596850 100644
+--- a/lib/ghg/factorEditions.ts
++++ b/lib/ghg/factorEditions.ts
+@@ -219,6 +219,10 @@ export function factorJurisdiction(loc: Location, family: FactorFamily): FactorJ
+  * `year` MUST be the inventory's reporting_year — the same value passed to buildWorkings and
+  * calcInventory in the save payload. Passing anything else records editions for a calculation that
+  * was never performed.
++ *
++ * `locations` MUST be deriveLocations output (T4), the same locations the save payload's totals and
++ * workings are built from. Stored locations can carry a stale figure for a stream no document now
++ * supports, which would record an edition for a stream the totals do not price.
+  */
+ export function buildFactorEditions(locations: readonly Location[], year: number): FactorEditions {
+   const out: FactorEditions = {}
