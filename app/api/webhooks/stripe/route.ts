@@ -178,9 +178,9 @@ async function grantFromMetadata(
 ) {
   const userId = metadata?.user_id
   const entitlements = metadata?.entitlements
-  const ghgAllowanceRaw = metadata?.ghg_location_allowance
-  const ghgAllowance = ghgAllowanceRaw ? Number(ghgAllowanceRaw) : null
-  // Same empty-string convention as the allowance above: both writers send '' when the key does
+  // FI0: ghg_location_allowance is no longer read. A Checkout Session created before FI0 may still carry
+  // it; it is ignored, because locations are unlimited on every plan and nothing reads the column.
+  // The empty-string convention: both writers send '' when the key does
   // not apply to this order, and '' reads as absent. The writers pass ghg_tier through
   // ghgTierMetaValue, so anything reaching here is one of the three keys the CHECK constraint on
   // entitlements.ghg_tier permits, or ''.
@@ -242,16 +242,11 @@ async function grantFromMetadata(
     user_id: userId,
     module_key,
     source,
-    location_allowance: module_key === 'ghg' ? ghgAllowance : null,
     // ⚠️ PRESERVED WHEN THE ORDER DOES NOT CARRY THEM. A Checkout Session created before these two
     // keys existed can complete after this deploys, and an upsert writing null would erase a tier
     // or a source count that was already correct. The prior row is a FALLBACK, never a default:
     // when the order does carry a value, that value wins, which is what makes a renewal with a
     // different source count work.
-    //
-    // location_allowance deliberately does NOT get the same treatment. Every checkout sends it, and
-    // its null is read as uncapped rather than as absent, so a preserved stale value there would be
-    // worse than a null. Changing that is its own decision and not this one.
     ghg_tier: module_key === 'ghg'
       ? (ghgTier ?? priorByKey.get(module_key)?.ghg_tier ?? null)
       : null,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
+import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -292,10 +292,16 @@ describe('ghgTierForEmployees', () => {
     expect(openEnded).toEqual(['enterprise'])
   })
 
-  it('E5 locations are unlimited on every plan', () => {
+  it('E5 locations are unlimited on every plan: no tier carries a location field (FI0)', () => {
     for (const k of GHG_TIER_KEYS) {
-      expect(GHG_TIERS[k].locationAllowance, `${k} must be uncapped`).toBeNull()
+      expect('locationAllowance' in GHG_TIERS[k], `${k} must not describe a location allowance`).toBe(false)
     }
+  })
+
+  it('E6 each tier is worded by its employee band', () => {
+    expect(ghgEmployeeBandLabel('starter')).toBe('1 to 19 employees')
+    expect(ghgEmployeeBandLabel('professional')).toBe('20 to 99 employees')
+    expect(ghgEmployeeBandLabel('enterprise')).toBe('500 employees or more')
   })
 })
 

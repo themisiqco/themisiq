@@ -7,15 +7,10 @@
 // existing `invoice.paid` webhook branch grants the modules automatically — whether the
 // customer paid by card through Stripe, or by wire to our bank and we marked it paid manually.
 //
-// THE FULL SHAPE IS FOUR KEYS: { user_id, entitlements, source, ghg_location_allowance }.
-// This comment previously named only the first two, and that is how the omission survived: this
-// route sent no ghg_location_allowance at all. grantFromMetadata reads it as
-// `raw ? Number(raw) : null` and writes that to entitlements.location_allowance, where the
-// enforce_ghg_location_allowance() trigger treats NULL as UNCAPPED — so A WRITER THAT OMITS THE
-// KEY GRANTS UNLIMITED LOCATIONS. It fails open, silently, on the paid path. Every writer must
-// satisfy the whole contract, including the empty-string convention for a null allowance.
-// (Consequence while it was missing: GHG Professional is $11,900, above CARD_THRESHOLD_USD, so
-// every self-serve Professional purchase routes HERE — none of them was ever capped at 15.)
+// THE SHAPE IS THE SAME KEYS AS CHECKOUT: user_id, entitlements, source, ghg_tier and the Concierge
+// keys. lib/entitlementMetadata.test.ts pins both writers to one list, because a key present in only
+// one of them is a grant that differs by payment path. FI0: ghg_location_allowance is no longer one of
+// them; locations are unlimited on every plan, and the webhook no longer writes location_allowance.
 //
 // Pricing is computed server-side from lib/pricing.ts — identical source of
 // truth as checkout, so the amount charged and the modules granted cannot drift.
@@ -40,7 +35,6 @@ import {
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
-  locationAllowanceForTier,
   cartQuote,
   NEW_PRICING_ACTIVE,
   conciergeQuote,
@@ -108,7 +102,6 @@ export async function POST(req: NextRequest) {
     const sources: string[] = []
     // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
     // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
-    let ghgAllowance: number | null = null
     let ghgTierForMeta: GhgTier | null = null
     let conciergeMeta: Record<string, string> = {}
 
@@ -151,10 +144,9 @@ export async function POST(req: NextRequest) {
       }
       moduleKeys.forEach((m) => entitlements.add(m))
       sources.push('configurator')
-      // Same derivation as app/api/checkout/route.ts:124 — one helper, one source of truth.
-      // Omitting this is what made every manually-invoiced GHG customer uncapped.
+      // The GHG tier, recorded the same way as app/api/checkout/route.ts, so both writers feed the
+      // webhook the same keys.
       if (moduleKeys.includes('ghg')) {
-        ghgAllowance = locationAllowanceForTier(tier)
         ghgTierForMeta = tier as GhgTier // see the note on the same capture in the checkout route
       }
     }
@@ -209,7 +201,7 @@ export async function POST(req: NextRequest) {
 
       const { data: ownedRows, error: ownedErr } = await supabaseAdmin
         .from('entitlements')
-        .select('module_key, location_allowance')
+        .select('module_key')
         .eq('user_id', userId)
       if (ownedErr) {
         console.error('[admin-invoice] entitlement read failed:', ownedErr.message)
@@ -268,10 +260,6 @@ export async function POST(req: NextRequest) {
       user_id: userId,
       entitlements: Array.from(entitlements).join(','),
       source: 'admin-invoice' + (sources.length ? ` | ${sources.join(' | ')}` : ''),
-      // Stringified EXACTLY as app/api/checkout/route.ts:202 does, empty-string convention included:
-      // Stripe metadata values are strings, and the webhook's `raw ? Number(raw) : null` reads '' as
-      // null → uncapped. Deviating in either direction here silently changes what the customer gets.
-      ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
       // Same key, same empty-string convention, as app/api/checkout/route.ts. Both writers feed one
       // reader, so a key present in only one of them is the defect lib/entitlementMetadata.test.ts
       // exists to catch.

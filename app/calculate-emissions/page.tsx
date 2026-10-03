@@ -20,7 +20,7 @@
 import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
-import { GHG_TIERS, CONCIERGE_SOURCE_USD } from '../../lib/pricing';
+import { GHG_TIERS, CONCIERGE_SOURCE_USD, ghgEmployeeBandLabel } from '../../lib/pricing';
 import Link from "next/link";
 import Footer from '../components/Footer'
 
@@ -142,7 +142,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by number of locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
       },
     },
     {
@@ -585,7 +585,7 @@ export default function CalculateEmissionsPage() {
               </div>
             </div>
 
-            <p className="usd-note">* All prices in USD. The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}. More than that, or unusual cases, are quoted.</p>
+            <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
 
             <div className="support-cta">
               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>Ready to start? See your emissions instantly</Link>
@@ -689,7 +689,7 @@ export default function CalculateEmissionsPage() {
                     <li><span className="pl-name">Advisory: dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
                     <li><span className="pl-name">Scope 3: full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
                   </ul>
-                  <p className="usd-note">* All prices in USD. The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}. More than that, or unusual cases, are quoted.</p>
+                  <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
                 </div>
               </details>
 

@@ -1,0 +1,823 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 51a65e9..7983521 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -49,7 +49,7 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely
+ | Pricing | `lib/pricing.ts` | All prices/tiers/allowances derive from here. Never hardcode a price elsewhere. |
+ | Emission factors | `lib/emissionFactors.ts` | Shared across modules. |
+ | Unit conversions | `lib/unitConversions.ts` | 3-tier cascade (exact match → documented factor → flag `needs_manual_review`). |
+-| Entitlement reads | `lib/useEntitlement.ts` | e.g. `useGhgLocationAllowance()`, user-scoped, fails open to null. |
++| Entitlement reads | `lib/useEntitlement.ts` | e.g. `useEntitlementAccess()`, `useHasConcierge()`, user-scoped. |
+ | Checkout intent | `lib/checkout.ts` | Stores intent in `sessionStorage`, resumes after login. |
+ | Add-on prerequisites | `addOnRequirementsMet` | Single authority enforcing the `ghg → concierge` dependency chain, and the quote-only guard that keeps Concierge Enterprise unsellable through checkout. Both `/api/checkout` and `/api/admin/create-invoice` defer to it. (Was `ghg → concierge → verification` until 10 Aug 2026 — see the retirement note under **Pricing model**.) |
+ 
+@@ -231,8 +231,10 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
+   is SILENTLY DROPPED from the cart — a customer could select a module, pay,
+   and not receive it. A derived test guards this; adding a module to `MODULES`
+   fails that test until it is mapped.
+-- **Only GHG scales by location.** Allowances come from `GHG_TIERS`. Hard
+-  enforcement, upgrade wall, no auto-downgrade.
++- **GHG is priced by employee band, with unlimited locations on every plan.**
++  Bands come from `GHG_TIERS` (`ghgEmployeeBandLabel` words them). The only
++  database rule on a GHG save is the entitlement gate (an active `ghg` pass);
++  no code reads or writes `entitlements.location_allowance` (FI0).
+ - **Concierge add-on** (requires GHG) is a separate axis priced on actual
+   location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom
+   quote. It is now the ONLY add-on.
+diff --git a/app/api/admin/create-invoice/route.ts b/app/api/admin/create-invoice/route.ts
+index c98ca90..9937b67 100644
+--- a/app/api/admin/create-invoice/route.ts
++++ b/app/api/admin/create-invoice/route.ts
+@@ -7,15 +7,10 @@
+ // existing `invoice.paid` webhook branch grants the modules automatically — whether the
+ // customer paid by card through Stripe, or by wire to our bank and we marked it paid manually.
+ //
+-// THE FULL SHAPE IS FOUR KEYS: { user_id, entitlements, source, ghg_location_allowance }.
+-// This comment previously named only the first two, and that is how the omission survived: this
+-// route sent no ghg_location_allowance at all. grantFromMetadata reads it as
+-// `raw ? Number(raw) : null` and writes that to entitlements.location_allowance, where the
+-// enforce_ghg_location_allowance() trigger treats NULL as UNCAPPED — so A WRITER THAT OMITS THE
+-// KEY GRANTS UNLIMITED LOCATIONS. It fails open, silently, on the paid path. Every writer must
+-// satisfy the whole contract, including the empty-string convention for a null allowance.
+-// (Consequence while it was missing: GHG Professional is $11,900, above CARD_THRESHOLD_USD, so
+-// every self-serve Professional purchase routes HERE — none of them was ever capped at 15.)
++// THE SHAPE IS THE SAME KEYS AS CHECKOUT: user_id, entitlements, source, ghg_tier and the Concierge
++// keys. lib/entitlementMetadata.test.ts pins both writers to one list, because a key present in only
++// one of them is a grant that differs by payment path. FI0: ghg_location_allowance is no longer one of
++// them; locations are unlimited on every plan, and the webhook no longer writes location_allowance.
+ //
+ // Pricing is computed server-side from lib/pricing.ts — identical source of
+ // truth as checkout, so the amount charged and the modules granted cannot drift.
+@@ -40,7 +35,6 @@ import {
+   ADDONS,
+   addOnRequirementsMet,
+   configuratorPrice,
+-  locationAllowanceForTier,
+   cartQuote,
+   NEW_PRICING_ACTIVE,
+   conciergeQuote,
+@@ -108,7 +102,6 @@ export async function POST(req: NextRequest) {
+     const sources: string[] = []
+     // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
+     // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
+-    let ghgAllowance: number | null = null
+     let ghgTierForMeta: GhgTier | null = null
+     let conciergeMeta: Record<string, string> = {}
+ 
+@@ -151,10 +144,9 @@ export async function POST(req: NextRequest) {
+       }
+       moduleKeys.forEach((m) => entitlements.add(m))
+       sources.push('configurator')
+-      // Same derivation as app/api/checkout/route.ts:124 — one helper, one source of truth.
+-      // Omitting this is what made every manually-invoiced GHG customer uncapped.
++      // The GHG tier, recorded the same way as app/api/checkout/route.ts, so both writers feed the
++      // webhook the same keys.
+       if (moduleKeys.includes('ghg')) {
+-        ghgAllowance = locationAllowanceForTier(tier)
+         ghgTierForMeta = tier as GhgTier // see the note on the same capture in the checkout route
+       }
+     }
+@@ -209,7 +201,7 @@ export async function POST(req: NextRequest) {
+ 
+       const { data: ownedRows, error: ownedErr } = await supabaseAdmin
+         .from('entitlements')
+-        .select('module_key, location_allowance')
++        .select('module_key')
+         .eq('user_id', userId)
+       if (ownedErr) {
+         console.error('[admin-invoice] entitlement read failed:', ownedErr.message)
+@@ -268,10 +260,6 @@ export async function POST(req: NextRequest) {
+       user_id: userId,
+       entitlements: Array.from(entitlements).join(','),
+       source: 'admin-invoice' + (sources.length ? ` | ${sources.join(' | ')}` : ''),
+-      // Stringified EXACTLY as app/api/checkout/route.ts:202 does, empty-string convention included:
+-      // Stripe metadata values are strings, and the webhook's `raw ? Number(raw) : null` reads '' as
+-      // null → uncapped. Deviating in either direction here silently changes what the customer gets.
+-      ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
+       // Same key, same empty-string convention, as app/api/checkout/route.ts. Both writers feed one
+       // reader, so a key present in only one of them is the defect lib/entitlementMetadata.test.ts
+       // exists to catch.
+diff --git a/app/api/checkout/route.ts b/app/api/checkout/route.ts
+index e66f2b0..eee0be9 100644
+--- a/app/api/checkout/route.ts
++++ b/app/api/checkout/route.ts
+@@ -18,7 +18,6 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAut
+ import {
+   ALL_MODULE_KEYS,
+   TIER_PRICING,
+-  locationAllowanceForTier,
+   ADDONS,
+   addOnRequirementsMet,
+   configuratorPrice,
+@@ -71,10 +70,9 @@ export async function POST(req: NextRequest) {
+     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
+     const modulesInCart = new Set<ModuleKey>()
+     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
+-    let ghgAllowance: number | null = null // GHG location ceiling to write onto the ghg entitlement row
+     let ghgTierForMeta: GhgTier | null = null // GHG tier, recorded so the webhook can write entitlements.ghg_tier
+     let conciergeMeta: Record<string, string> = {}
+-    let ownedRows: { module_key: string; location_allowance: number | null }[] = []
++    let ownedRows: { module_key: string }[] = []
+     const sources: string[] = []
+ 
+     // 2b) Build-your-own (tier + modules)
+@@ -120,10 +118,8 @@ export async function POST(req: NextRequest) {
+       })
+       sources.push('configurator')
+       if (moduleKeys.includes('ghg') && tier) {
+-        ghgAllowance = locationAllowanceForTier(tier) // tier-based ceiling
+-        // The tier itself, recorded for the webhook. location_allowance alone cannot identify it:
+-        // null means Advisory under the current model and uncapped under the old one, and that
+-        // ambiguity is what forces the Concierge onboarding fee to reject rather than guess.
++        // The tier itself, recorded for the webhook. Locations are unlimited on every plan (FI0), so no
++        // location allowance is written: the tier is what identifies the plan.
+         ghgTierForMeta = tier as GhgTier
+       }
+     }
+@@ -141,7 +137,7 @@ export async function POST(req: NextRequest) {
+     if ((body.addOns && body.addOns.length > 0) || body.concierge) {
+       const { data: owned, error: ownedErr } = await supabase
+         .from('entitlements')
+-        .select('module_key, location_allowance')
++        .select('module_key')
+       if (ownedErr) {
+         console.error('[checkout] entitlement read failed:', ownedErr.message)
+         return NextResponse.json(
+@@ -285,8 +281,7 @@ export async function POST(req: NextRequest) {
+       user_id: userId,
+       entitlements, // e.g. "ghg,supply-chain,verification"
+       source: sources.join(' | '),
+-      ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
+-      // The tier behind that allowance. Written whenever GHG is in the cart, and empty otherwise,
++      // The GHG tier. Written whenever GHG is in the cart, and empty otherwise,
+       // following the same empty-string convention: Stripe metadata values are strings and the
+       // webhook reads '' as absent. Batch 3 writes it to entitlements.ghg_tier.
+       ghg_tier: ghgTierMetaValue(ghgTierForMeta),
+diff --git a/app/api/webhooks/stripe/route.ts b/app/api/webhooks/stripe/route.ts
+index cc0d712..f4f32b0 100644
+--- a/app/api/webhooks/stripe/route.ts
++++ b/app/api/webhooks/stripe/route.ts
+@@ -178,9 +178,9 @@ async function grantFromMetadata(
+ ) {
+   const userId = metadata?.user_id
+   const entitlements = metadata?.entitlements
+-  const ghgAllowanceRaw = metadata?.ghg_location_allowance
+-  const ghgAllowance = ghgAllowanceRaw ? Number(ghgAllowanceRaw) : null
+-  // Same empty-string convention as the allowance above: both writers send '' when the key does
++  // FI0: ghg_location_allowance is no longer read. A Checkout Session created before FI0 may still carry
++  // it; it is ignored, because locations are unlimited on every plan and nothing reads the column.
++  // The empty-string convention: both writers send '' when the key does
+   // not apply to this order, and '' reads as absent. The writers pass ghg_tier through
+   // ghgTierMetaValue, so anything reaching here is one of the three keys the CHECK constraint on
+   // entitlements.ghg_tier permits, or ''.
+@@ -242,16 +242,11 @@ async function grantFromMetadata(
+     user_id: userId,
+     module_key,
+     source,
+-    location_allowance: module_key === 'ghg' ? ghgAllowance : null,
+     // ⚠️ PRESERVED WHEN THE ORDER DOES NOT CARRY THEM. A Checkout Session created before these two
+     // keys existed can complete after this deploys, and an upsert writing null would erase a tier
+     // or a source count that was already correct. The prior row is a FALLBACK, never a default:
+     // when the order does carry a value, that value wins, which is what makes a renewal with a
+     // different source count work.
+-    //
+-    // location_allowance deliberately does NOT get the same treatment. Every checkout sends it, and
+-    // its null is read as uncapped rather than as absent, so a preserved stale value there would be
+-    // worse than a null. Changing that is its own decision and not this one.
+     ghg_tier: module_key === 'ghg'
+       ? (ghgTier ?? priorByKey.get(module_key)?.ghg_tier ?? null)
+       : null,
+diff --git a/app/calculate-emissions/page.tsx b/app/calculate-emissions/page.tsx
+index c371e75..84ad8bf 100644
+--- a/app/calculate-emissions/page.tsx
++++ b/app/calculate-emissions/page.tsx
+@@ -20,7 +20,7 @@
+ import type { Metadata } from "next";
+ import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
+ import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
+-import { GHG_TIERS, CONCIERGE_SOURCE_USD } from '../../lib/pricing';
++import { GHG_TIERS, CONCIERGE_SOURCE_USD, ghgEmployeeBandLabel } from '../../lib/pricing';
+ import Link from "next/link";
+ import Footer from '../components/Footer'
+ 
+@@ -142,7 +142,7 @@ const FAQ_LD = {
+       name: "What does it cost?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by number of locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
++        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+       },
+     },
+     {
+@@ -585,7 +585,7 @@ export default function CalculateEmissionsPage() {
+               </div>
+             </div>
+ 
+-            <p className="usd-note">* All prices in USD. The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}. More than that, or unusual cases, are quoted.</p>
++            <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
+ 
+             <div className="support-cta">
+               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>Ready to start? See your emissions instantly</Link>
+@@ -689,7 +689,7 @@ export default function CalculateEmissionsPage() {
+                     <li><span className="pl-name">Advisory: dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
+                     <li><span className="pl-name">Scope 3: full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
+                   </ul>
+-                  <p className="usd-note">* All prices in USD. The GHG module is priced by number of locations: from ${ghgFrom} for up to {GHG_TIERS.starter.locationAllowance} locations, ${ghgPro} for up to {GHG_TIERS.professional.locationAllowance}. More than that, or unusual cases, are quoted.</p>
++                  <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
+                 </div>
+               </details>
+ 
+diff --git a/app/climate-ghg/page.tsx b/app/climate-ghg/page.tsx
+index e7cf416..a1d3e27 100644
+--- a/app/climate-ghg/page.tsx
++++ b/app/climate-ghg/page.tsx
+@@ -3,7 +3,7 @@ import { scope3ScopeClaim, scope3MethodFamilies } from '../../lib/scope3/methodS
+ import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
+ import Nav from '../components/Nav'
+ import Footer from '@/app/components/Footer'
+-import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS } from '@/lib/pricing'
++import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel } from '@/lib/pricing'
+ import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
+ import { MODULE_SUBLINE } from '@/lib/modulePages'
+ import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
+@@ -69,7 +69,6 @@ export default function Page() {
+   const [sbDay, sbMonth, sbYear] = SB253_FIRST_REPORT_DATE.split(' ')
+   const sbShortDate = `${sbDay} ${sbMonth.slice(0, 3)} ${sbYear}`
+   const ghgFrom = GHG_TIERS.starter.priceUSD?.toLocaleString('en-US')
+-  const allowanceLabel = (a: number | null) => (a == null ? 'Unlimited locations' : `Up to ${a} locations`)
+   const TIER_PICKER = '/pricing?modules=ghg#build-your-stack'
+ 
+   return (
+@@ -92,9 +91,9 @@ export default function Page() {
+           </p>
+           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+             <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
+-            {/* ⚠️ "From", AND THE ANCHOR. GHG is the only tiered module: starter is 3 locations,
+-                professional 15, advisory uncapped with priceUSD null. A single price would mislead
+-                anyone above three locations, so this names the floor and links to the picker. */}
++            {/* ⚠️ "From", AND THE ANCHOR. GHG is the only tiered module, sized by employees (FI0), and the top
++                band has priceUSD null. A single price would mislead a larger company, so this names the
++                floor and links to the picker. */}
+             <a href={TIER_PICKER} style={{ ...btnSecondary, textDecoration: 'none' }}>From ${ghgFrom}/yr</a>
+           </div>
+         </div>
+@@ -159,7 +158,7 @@ export default function Page() {
+               { label: 'First SB 253 report', big: sbShortDate,
+                 note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}.` },
+               { label: 'Price', big: `From $${ghgFrom}/yr`,
+-                note: `${allowanceLabel(GHG_TIERS.starter.locationAllowance)} on the entry tier. Larger allowances and an uncapped tier are in the picker.` },
++                note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; larger organisations are in the picker.` },
+             ].map(({ label, big, fw, note }) => (
+               <tr key={label}>
+                 <th style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)', padding: '16px 20px 16px 0', verticalAlign: 'top', width: 210, borderBottom: '1px solid var(--color-line)' }}>{label}</th>
+@@ -213,16 +212,15 @@ export default function Page() {
+       {/* ── 8. PRICING ── */}
+       <ModuleSection tinted>
+         <p style={moduleEyebrow}>Pricing</p>
+-        <h2 style={sectionTitle}>Priced by locations, not by seats.</h2>
++        <h2 style={sectionTitle}>Priced by company size, not by number of sites.</h2>
+         <p style={{ ...bodyCopy, marginTop: '1rem' }}>
+-          GHG is the one tiered module, because an inventory for three sites is not the same work as one
+-          for fifteen. Add modules and the multi-module discount applies automatically: two modules −10%,
++          GHG is the one tiered module, priced by how many people you employ. Every plan covers unlimited
++          locations. Add modules and the multi-module discount applies automatically: two modules −10%,
+           three or more −20%.
+         </p>
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
+-          {/* ⚠️ TIERS AND ALLOWANCES ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. advisory has
+-              priceUSD null and locationAllowance null, which mean "contact us" and "uncapped" — not
+-              zero and not missing. allowanceLabel is the only place that decides how a null reads. */}
++          {/* ⚠️ TIERS AND BANDS ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. A null priceUSD means
++              "contact us", not zero and not missing; ghgEmployeeBandLabel words each band. */}
+           {GHG_TIER_KEYS.map(t => (
+             <div key={t} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-ghg)', borderRadius: 6, padding: '1.5rem' }}>
+               <div style={{ ...moduleEyebrow, marginBottom: 8 }}>{GHG_TIER_LABELS[t]}</div>
+@@ -230,7 +228,7 @@ export default function Page() {
+                 {GHG_TIERS[t].priceUSD == null ? 'Contact us' : `$${GHG_TIERS[t].priceUSD!.toLocaleString('en-US')}`}
+                 {GHG_TIERS[t].priceUSD != null && <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}> / yr</span>}
+               </div>
+-              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginTop: 8 }}>{allowanceLabel(GHG_TIERS[t].locationAllowance)}</div>
++              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginTop: 8 }}>{ghgEmployeeBandLabel(t)}, unlimited locations</div>
+             </div>
+           ))}
+         </div>
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 2f9de15..25f936e 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -24,7 +24,7 @@ import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/pr
+ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
+ import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
+ import type { YearDataStatus } from '../../../lib/ghg/series'
+-import { useEntitlementAccess, useHasConcierge, useGhgLocationAllowance, type EntitlementAccess } from '../../../lib/useEntitlement'
++import { useEntitlementAccess, useHasConcierge, type EntitlementAccess } from '../../../lib/useEntitlement'
+ import { generateAssurancePDF } from '../../../lib/assurancePdf'
+ import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
+ import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
+@@ -684,8 +684,6 @@ const searchParams = useSearchParams()
+   // lose. Everything else that banner says reports a state a customer would want flagged.
+   const noticeIsNeutral = ghgAccess === 'none' && !inventoryId
+   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
+-  const { allowance: locationAllowance, loading: allowanceLoading } = useGhgLocationAllowance()
+-  const [showLocationWall, setShowLocationWall] = useState(false)
+ 
+   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
+   useEffect(() => {
+@@ -1024,14 +1022,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   const newLocationId = () => `loc_${Math.random().toString(36).slice(2, 10)}`
+ 
+   /**
+-   * ⚠️ THE ALLOWANCE IS ENFORCED INSIDE THE UPDATER, WHERE THE COUNT IS CURRENT. The check outside it
+-   * is what the customer SEES — the upgrade wall — and it reads the render, which is right for a single
+-   * click and stale for two in one tick. The inner check is the one that cannot be raced: the second
+-   * add of a double click is REFUSED SILENTLY there (the list is returned unchanged), so the customer
+-   * sees one location appear rather than two, and no wall. That is deliberate: the alternative is a
+-   * wall raised from inside a state updater, which means a side effect in a function React may call
+-   * twice. The allowance itself cannot be exceeded this way, and the database trigger
+-   * enforce_ghg_location_allowance refuses the save if it ever were.
++   * FI0: there is no location limit. Locations are unlimited on every plan, so adding one is never refused
++   * for a count; the database gate checks only that the GHG pass is active.
+    *
+    * The id is generated OUTSIDE the updater, because generating it inside would make the updater impure;
+    * generation is collision-proof on its own, and the updater still refuses an id it somehow already
+@@ -1039,10 +1031,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+    * step here reads the rendered length.
+    */
+   const addLocation = () => {
+-    if (locationAllowance != null && !allowanceLoading && inventory.locations.length >= locationAllowance) { setShowLocationWall(true); return }
+     const id = newLocationId()
+     setInventory(inv => {
+-      if (locationAllowance != null && !allowanceLoading && inv.locations.length >= locationAllowance) return inv
+       if (inv.locations.some(l => l.id === id)) return inv
+       // The NAME counts from the current list, so two adds in one tick are numbered 4 and 5, not 4 and 4.
+       return { ...inv, locations: [...inv.locations, emptyLocation(id, `Location ${inv.locations.length + 1}`)] }
+@@ -2108,16 +2098,6 @@ workings: saved.workings,
+               </div>
+             ))}
+             <button onClick={addLocation} style={{ fontSize: 13, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add location</button>
+-            {showLocationWall && (
+-              <div style={{ marginTop: 12, background: 'var(--color-brand-wash)', border: '0.5px solid var(--color-brand-line)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+-                <div style={{ flex: 1 }}>
+-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
+-                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more: your existing data stays exactly as it is.</div>
+-                  <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
+-                </div>
+-                <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+-              </div>
+-            )}
+           </div>
+         </Field>
+       </div>
+@@ -2149,16 +2129,6 @@ workings: saved.workings,
+             </button>
+           ))}
+           <button onClick={addLocation} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', }}>+ Add location</button>
+-          {showLocationWall && (
+-            <div style={{ width: '100%', marginTop: 8, background: 'var(--color-brand-wash)', border: '0.5px solid var(--color-brand-line)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+-              <div style={{ flex: 1 }}>
+-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
+-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more: your existing data stays exactly as it is.</div>
+-                <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
+-              </div>
+-              <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+-            </div>
+-          )}
+         </div>
+         {/* The blocking state for the location being edited, at the top of its own step — this is
+             where the two things named in the message (the country, and the unit on the bill) are
+diff --git a/app/order/page.tsx b/app/order/page.tsx
+index f94782c..7e1b579 100644
+--- a/app/order/page.tsx
++++ b/app/order/page.tsx
+@@ -18,6 +18,7 @@ import {
+   cartQuote,
+   GHG_TIERS,
+   GHG_TIER_LABELS,
++  ghgEmployeeBandLabel,
+   isGhgTier,
+   FLAT_MODULE_PRICES,
+   type Tier,
+@@ -112,7 +113,7 @@ function OrderInner() {
+   const lineItems = keys.map(k => ({
+     key: k,
+     label: MODULE_LABELS[k] ?? k,
+-    detail: k === 'ghg' ? `${GHG_TIER_LABELS[tier]}${GHG_TIERS[tier].locationAllowance != null ? ` · up to ${GHG_TIERS[tier].locationAllowance} locations` : ' · uncapped'}` : 'Annual',
++    detail: k === 'ghg' ? `${GHG_TIER_LABELS[tier]} · ${ghgEmployeeBandLabel(tier as GhgTier)}` : 'Annual',
+     price: k === 'ghg' ? GHG_TIERS[tier].priceUSD : FLAT_MODULE_PRICES[k as Exclude<ModuleKey, 'ghg'>],
+   }))
+   const subtotal = lineItems.reduce((s, li) => s + (li.price ?? 0), 0)
+diff --git a/app/pricing/page.tsx b/app/pricing/page.tsx
+index 59add66..7239ef8 100644
+--- a/app/pricing/page.tsx
++++ b/app/pricing/page.tsx
+@@ -12,7 +12,7 @@ import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/p
+ // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
+ // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
+ // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
+-import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
++import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
+ import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
+ import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
+ import { SB253_SHORT } from '../../lib/sb253'
+@@ -632,10 +632,8 @@ function PricingPageInner() {
+                       {GHG_TIER_KEYS.map(t => {
+                         const tp = GHG_TIERS[t].priceUSD
+                         const label = GHG_TIER_LABELS[t]
+-                        // Derived, not three literals. null = uncapped (Advisory), which the copy must
+-                        // say rather than leaving the reader to infer from a missing number.
+-                        const alw = GHG_TIERS[t].locationAllowance
+-                        const cap = alw == null ? 'unlimited locations' : `≤${alw} locations`
++                        // FI0: each tier is an employee band, derived from GHG_TIERS, not a location count.
++                        const cap = ghgEmployeeBandLabel(t)
+                         const active = tier === t
+                         return (
+                           <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 'min(130px, 100%)', textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
+@@ -645,10 +643,9 @@ function PricingPageInner() {
+                           </button>
+                         )
+                       })}
+-                      {/* What counts as a location — placed at the point of CHOICE, because the tier
+-                          the buyer picks is a location count and nothing else on this page defines it. */}
++                      {/* At the point of CHOICE: what the tier is sized by (FI0). */}
+                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
+-                        One location = one site with its own electricity supply. All of that site’s energy goes in together (electricity, gas, vehicle fuel, refrigerants), so a site with separate gas and electricity accounts is still one location.
++                        Plans are sized by your number of employees. Every plan covers unlimited locations.
+                       </div>
+                     </div>
+                   )}
+diff --git a/lib/entitlementMetadata.test.ts b/lib/entitlementMetadata.test.ts
+index 54c5160..1eb8018 100644
+--- a/lib/entitlementMetadata.test.ts
++++ b/lib/entitlementMetadata.test.ts
+@@ -1,30 +1,26 @@
+ import { describe, it, expect } from 'vitest'
+ import { readFileSync, readdirSync } from 'node:fs'
+ import { join } from 'node:path'
+-import { GHG_TIERS, locationAllowanceForTier, isFirstConciergePurchase, ghgTierMetaValue, GHG_TIER_KEYS, TIER_PRICING, LEGACY_CONCIERGE_KEYS, CONCIERGE_KEY, type Tier } from './pricing'
++import { stripTsComments } from './testing/stripComments'
++import { GHG_TIERS, isFirstConciergePurchase, ghgTierMetaValue, GHG_TIER_KEYS, TIER_PRICING, LEGACY_CONCIERGE_KEYS, CONCIERGE_KEY, type Tier } from './pricing'
+ 
+-// A WRITER OMITTING THE KEY GRANTS UNLIMITED LOCATIONS.
++// THE TWO WRITERS AND THE ONE READER MUST AGREE ON EVERY KEY.
+ //
+ // Two routes write Stripe metadata that grantFromMetadata reads: app/api/checkout/route.ts (card) and
+-// app/api/admin/create-invoice/route.ts (manual invoice). The webhook reads
+-// `ghg_location_allowance` as `raw ? Number(raw) : null` and writes that to
+-// entitlements.location_allowance, where enforce_ghg_location_allowance() treats NULL as UNCAPPED.
++// app/api/admin/create-invoice/route.ts (manual invoice). A key one writer sends and the other omits is a
++// grant that differs by payment path, silently: the history is create-invoice omitting the location
++// allowance, so every invoiced customer got a different entitlement from a card customer.
+ //
+-// So a writer that omits the key does not fail — it grants unlimited locations, silently, on the paid
+-// path. That is exactly what happened: create-invoice sent { user_id, entitlements, source } and no
+-// allowance, and because GHG Professional ($11,900) exceeds CARD_THRESHOLD_USD ($10,000), EVERY
+-// self-serve Professional purchase routes through that path. None was ever capped at 15.
++// FI0 (docs/review/design-derived-figures.md section 11): LOCATIONS ARE UNLIMITED ON EVERY PLAN, so
++// ghg_location_allowance is gone from the contract. Neither writer sends it, the webhook neither reads it
++// nor writes entitlements.location_allowance, and the database gate checks only the entitlement. These
++// tests now pin that it stays gone, as firmly as they once pinned that it was present.
+ //
+ // ⚠️ WHAT THIS TEST CAN AND CANNOT DO. Neither route exports its metadata object — both are built
+ // inline inside an `export async function POST`, and grantFromMetadata is a module-private async
+ // function that calls Stripe and the Supabase admin client. So this cannot invoke the real writers or
+-// the real reader. It asserts two things instead:
+-//   1. THE DERIVATION, for real, against GHG_TIERS — locationAllowanceForTier is imported and called.
+-//   2. THE CONTRACT, textually — that both route files still contain the key, the same stringify
+-//      expression, and the same helper call; and that the webhook still contains the read expression.
+-// Textual assertions are weaker than invoking the code, but they catch the actual defect class here,
+-// which is a key going MISSING from one writer. See the note at the bottom for what would need to
+-// change to test this properly.
++// the real reader. It asserts the contract textually instead. See the note at the bottom for what would
++// need to change to test this properly.
+ 
+ const ROOT = process.cwd()
+ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
+@@ -33,18 +29,16 @@ const CHECKOUT = 'app/api/checkout/route.ts'
+ const INVOICE = 'app/api/admin/create-invoice/route.ts'
+ const WEBHOOK = 'app/api/webhooks/stripe/route.ts'
+ 
+-// The four keys grantFromMetadata's contract depends on. `source` is informational, the other three
+-// are load-bearing: no user_id or entitlements → nothing granted; no ghg_location_allowance →
+-// uncapped.
+-const REQUIRED_KEYS = ['user_id', 'entitlements', 'source', 'ghg_location_allowance', 'ghg_tier']
++// The keys grantFromMetadata's contract depends on. `source` is informational; no user_id or
++// entitlements → nothing granted; ghg_tier records the band that was sold.
++const REQUIRED_KEYS = ['user_id', 'entitlements', 'source', 'ghg_tier']
+ 
+ // The Concierge keys, added Sep 2026 with the source-based model. Both writers spread a
+ // conciergeMeta object rather than listing these inline, so the assertion is on the spread plus the
+ // keys being present in the file that builds it.
+ //
+-// ⚠️ SAME DEFECT CLASS AS ghg_location_allowance, WHICH IS WHY THEY ARE PINNED HERE. A writer that
+-// omits concierge_source_allowance does not fail: it grants Concierge with no recorded source count,
+-// and whatever Batch 3 enforces against that count silently has nothing to enforce.
++// ⚠️ A writer that omits concierge_source_allowance does not fail: it grants Concierge with no recorded
++// source count, and whatever Batch 3 enforces against that count silently has nothing to enforce.
+ // concierge_onboarding_usd is the exception: it is RECORDED and must never become an entitlement.
+ const CONCIERGE_META_KEYS = [
+   'concierge_uploaded_sources',
+@@ -53,15 +47,6 @@ const CONCIERGE_META_KEYS = [
+   'concierge_onboarding_usd',
+ ]
+ 
+-// The stringify expression both writers must use, verbatim. The empty-string convention is not
+-// cosmetic: '' is what the webhook's truthiness check reads as null → uncapped.
+-const STRINGIFY = `ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : ''`
+-
+-// Mirrors of the two conventions, for asserting SEMANTICS. Labelled as mirrors because they are
+-// copies — if the real expressions change, the textual assertions above fail, not these.
+-const writeConvention = (allowance: number | null): string => (allowance != null ? String(allowance) : '')
+-const readConvention = (raw: string | undefined): number | null => (raw ? Number(raw) : null)
+-
+ // Pull out just the `const metadata = { … }` literal, so a key name appearing elsewhere in a 200-line
+ // route cannot satisfy the assertion. Brace-counted rather than regex-terminated, because the value
+ // expressions contain braces of their own.
+@@ -83,71 +68,37 @@ const hasKey = (literal: string, key: string): boolean =>
+   new RegExp(`(^|[{,\\s])${key}\\s*[:,}]`).test(literal)
+ 
+ describe('the entitlement metadata contract', () => {
+-  it('a writer omitting the key grants unlimited locations', () => {
++  it('both writers carry every key in the contract, and the same set', () => {
+     const checkout = metadataLiteral(read(CHECKOUT))
+     const invoice = metadataLiteral(read(INVOICE))
+-
+-    // Both writers carry every key in the contract — this is the assertion that would have failed
+-    // while create-invoice was silently omitting the allowance.
+     for (const key of REQUIRED_KEYS) {
+       expect(hasKey(checkout, key), `${CHECKOUT} metadata must write ${key}`).toBe(true)
+       expect(hasKey(invoice, key), `${INVOICE} metadata must write ${key}`).toBe(true)
+     }
+-
+-    // THE SAME KEY SET, not merely a superset each. A key on one writer and not the other is the
+-    // defect; checkout may also carry consent keys via spread, which are not part of this contract.
+-    for (const key of REQUIRED_KEYS) {
+-      expect(hasKey(checkout, key)).toBe(hasKey(invoice, key))
+-    }
+-
+-    // And write it the SAME way. Two writers, one reader, one convention.
+-    expect(checkout, `${CHECKOUT} must use the shared stringify convention`).toContain(STRINGIFY)
+-    expect(invoice, `${INVOICE} must use the shared stringify convention`).toContain(STRINGIFY)
+   })
+ 
+-  it('both writers derive the allowance from GHG_TIERS, never a literal', () => {
+-    for (const [file, src] of [[CHECKOUT, read(CHECKOUT)], [INVOICE, read(INVOICE)]] as const) {
+-      expect(src, `${file} must derive via locationAllowanceForTier`).toContain('locationAllowanceForTier')
+-      // The literal this replaced. `ghgAllowance = 3` was the pack path in checkout; a bare integer
+-      // assignment anywhere means a second source of truth for what a tier includes.
+-      expect(src, `${file} must not assign a literal allowance`).not.toMatch(/ghgAllowance = \d/)
++  it('FI0: no writer sends a location allowance, and nothing derives one', () => {
++    // Code only: the route comments explain the removal, and may name what was removed.
++    for (const [file, src] of [[CHECKOUT, stripTsComments(read(CHECKOUT))], [INVOICE, stripTsComments(read(INVOICE))]] as const) {
++      expect(hasKey(metadataLiteral(src), 'ghg_location_allowance'), `${file} must not send ghg_location_allowance`).toBe(false)
++      expect(src, `${file} must not derive an allowance`).not.toContain('locationAllowanceForTier')
++      expect(src, `${file} must not read location_allowance`).not.toContain('location_allowance')
++      expect(src, `${file} must not hold an allowance`).not.toMatch(/ghgAllowance/)
+     }
+   })
+ 
+-  it('the webhook still reads the empty-string convention as null', () => {
+-    // If this expression changes, '' stops meaning uncapped and every advisory/pack purchase changes
+-    // silently. Asserted textually because grantFromMetadata is not exported.
+-    expect(read(WEBHOOK)).toContain('ghgAllowanceRaw ? Number(ghgAllowanceRaw) : null')
+-    expect(read(WEBHOOK)).toContain("location_allowance: module_key === 'ghg' ? ghgAllowance : null")
++  it('FI0: the webhook neither reads the allowance key nor writes entitlements.location_allowance', () => {
++    const src = stripTsComments(read(WEBHOOK))
++    expect(src).not.toContain('ghgAllowanceRaw')
++    expect(src).not.toMatch(/location_allowance\s*:/)
+   })
+ 
+-  // ⚠️ THIS ASSERTED 3 AT STARTER AND 15 AT PROFESSIONAL UNTIL 28 Sep 2026. Locations became
+-  // unlimited on every plan with the employee-band reprice, so every locationAllowance is null and
+-  // there is no ceiling left to write. The test is kept rather than deleted because what it really
+-  // guards is the CONVENTION, not the numbers: the writer sends '' and the reader turns that back
+-  // into null, which enforce_ghg_location_allowance() reads as uncapped. If that round trip ever
+-  // breaks, every purchase silently acquires or loses a cap.
+-  it('a GHG cart writes an uncapped allowance on every tier, and it round-trips as uncapped', () => {
++  it('FI0: no GHG tier carries a location field; every tier is an employee band', () => {
+     for (const tier of GHG_TIER_KEYS) {
+-      const allowance = locationAllowanceForTier(tier)
+-      expect(allowance, `${tier} must be uncapped: locations are unlimited on every plan`).toBeNull()
+-      expect(allowance).toBe(GHG_TIERS[tier].locationAllowance)
+-      expect(writeConvention(allowance)).toBe('')
+-      expect(readConvention(writeConvention(allowance))).toBeNull()
++      expect(Object.keys(GHG_TIERS[tier]).sort(), tier).toEqual(['employees', 'priceUSD'])
+     }
+-    // Sanity on the table itself, so the loop above cannot pass vacuously.
+     expect(Object.keys(GHG_TIERS).length).toBe(GHG_TIER_KEYS.length)
+-  })
+-
+-  it("a non-GHG cart writes '' and round-trips to null — uncapped, which is why the key must be sent", () => {
+-    // No GHG in the cart ⇒ ghgAllowance stays null ⇒ '' ⇒ null. Identical to the advisory tier, whose
+-    // locationAllowance IS null by design.
+-    expect(writeConvention(null)).toBe('')
+-    expect(readConvention('')).toBeNull()
+-    expect(readConvention(undefined)).toBeNull()   // the omitted-key case — indistinguishable from ''
+-    expect(locationAllowanceForTier('advisory')).toBeNull()
+-    expect(readConvention(writeConvention(locationAllowanceForTier('advisory')))).toBeNull()
+-    // The guard both writers use, so a cart without GHG never sets an allowance.
++    // The guard both writers use, so a cart without GHG records no tier.
+     expect(read(CHECKOUT)).toContain("moduleKeys.includes('ghg')")
+     expect(read(INVOICE)).toContain("moduleKeys.includes('ghg')")
+   })
+@@ -156,9 +107,9 @@ describe('the entitlement metadata contract', () => {
+ // ── TO TEST THIS PROPERLY ─────────────────────────────────────────────────────────────────────────
+ // The textual assertions above exist because nothing is extractable. What would need to change:
+ //   1. Extract the metadata builder into lib/ — e.g. buildEntitlementMetadata({ userId, entitlements,
+-//      source, ghgAllowance }): Record<string, string> — and have BOTH routes call it. One writer
++//      source, ghgTier }): Record<string, string> — and have BOTH routes call it. One writer
+ //      instead of two, and the key cannot go missing from one of them.
+-//   2. Export the read side as a pure function — e.g. parseGhgAllowance(raw): number | null — and have
++//   2. Export the read side as a pure function — e.g. parseGhgTier(raw) — and have
+ //      grantFromMetadata call it. Then the round-trip is a real unit test, not a mirrored copy.
+ // Neither is done here: restructuring two live payment routes is not this test's job, and both routes
+ // are on the money path where CLAUDE.md requires the change be proposed and reviewed, not assumed.
+@@ -179,7 +130,7 @@ describe('Concierge purchase metadata', () => {
+     }
+   })
+ 
+-  it('M12 both writers carry ghg_tier beside the allowance, same empty-string convention', () => {
++  it('M12 both writers carry ghg_tier, with the empty-string convention', () => {
+     for (const rel of [CHECKOUT, INVOICE]) {
+       expect(metadataLiteral(read(rel)), `${rel} must write ghg_tier through the guard`).toContain('ghg_tier: ghgTierMetaValue(ghgTierForMeta)')
+     }
+diff --git a/lib/pricing.test.ts b/lib/pricing.test.ts
+index b9f56aa..0fd7e3a 100644
+--- a/lib/pricing.test.ts
++++ b/lib/pricing.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from 'vitest'
+-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
++import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
+ 
+ // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
+ // the single source of truth shared by the configurator (display) and the server
+@@ -292,11 +292,17 @@ describe('ghgTierForEmployees', () => {
+     expect(openEnded).toEqual(['enterprise'])
+   })
+ 
+-  it('E5 locations are unlimited on every plan', () => {
++  it('E5 locations are unlimited on every plan: no tier carries a location field (FI0)', () => {
+     for (const k of GHG_TIER_KEYS) {
+-      expect(GHG_TIERS[k].locationAllowance, `${k} must be uncapped`).toBeNull()
++      expect('locationAllowance' in GHG_TIERS[k], `${k} must not describe a location allowance`).toBe(false)
+     }
+   })
++
++  it('E6 each tier is worded by its employee band', () => {
++    expect(ghgEmployeeBandLabel('starter')).toBe('1 to 19 employees')
++    expect(ghgEmployeeBandLabel('professional')).toBe('20 to 99 employees')
++    expect(ghgEmployeeBandLabel('enterprise')).toBe('500 employees or more')
++  })
+ })
+ 
+ // ── GHG and the volume discount ──────────────────────────────────────────────
+diff --git a/lib/pricing.ts b/lib/pricing.ts
+index 5117403..8ec4242 100644
+--- a/lib/pricing.ts
++++ b/lib/pricing.ts
+@@ -119,18 +119,6 @@ export const TIER_PRICING: Record<LegacyTier, { full: number; early: number }> =
+   advisory:     { full: 4999, early: 4999 },
+ }
+ 
+-// GHG location allowance per tier. Single source of truth — checkout writes this onto
+-// the ghg entitlement row; the GHG wizard + server (NULL = uncapped trigger) enforce it.
+-// Behind NEW_PRICING_ACTIVE: live/old model = Starter 3 / Pro 10 / Advisory 20; new model =
+-// Essentials 3 / Pro 15 / Advisory null (uncapped), sourced from GHG_TIERS. While the flag
+-// is false this is byte-for-byte the old behaviour. Packs (no tier) still default to the
+-// Starter/Essentials floor (3) at their call sites.
+-export function locationAllowanceForTier(tier: Tier): number | null {
+-  return NEW_PRICING_ACTIVE
+-    ? GHG_TIERS[tier].locationAllowance
+-    : ({ starter: 3, professional: 10, advisory: 20 } as Record<Tier, number>)[tier]
+-}
+-
+ // The price actually charged right now for a given tier (respects the switch).
+ export function tierPrice(tier: LegacyTier): number {
+   const p = TIER_PRICING[tier]
+@@ -167,21 +155,27 @@ export type GhgTier = Tier
+ // exhaustive from 1 upward, so ghgTierForEmployees always resolves. `employees.max` null means "and
+ // above", which only the top band carries.
+ //
+-// ⚠️ EVERY locationAllowance IS NULL, AND THAT IS HOW THE CAP WAS RETIRED. Locations are unlimited
+-// on every plan. null already meant uncapped to enforce_ghg_location_allowance() and already
+-// rendered as "Unlimited locations" through allowanceLabel, so setting them null turned the cap off
+-// everywhere at once without a single consumer changing. The column and the trigger branch are dead
+-// weight now and come out in their own batch, where that risk is visible rather than mixed in here.
++// FI0: LOCATIONS ARE UNLIMITED ON EVERY PLAN, AND NOTHING HERE DESCRIBES A LOCATION ALLOWANCE ANY MORE.
++// The per-tier locationAllowance (all null since 28 Sep 2026) and locationAllowanceForTier are removed;
++// checkout, the admin invoice route and the webhook no longer write entitlements.location_allowance, and
++// the database gate (enforce_ghg_location_allowance) keeps only the entitlement check
++// (docs/review/patches/FI0-entitlement-gate-only.sql). The column is dropped later, separately, once
++// no deployed code writes it.
+ export const GHG_TIERS: Record<GhgTier, {
+   priceUSD: number | null
+-  locationAllowance: number | null
+   employees: { min: number; max: number | null }
+ }> = {
+-  starter:      { priceUSD:  475, locationAllowance: null, employees: { min:   1, max:  19 } },
+-  professional: { priceUSD: 1425, locationAllowance: null, employees: { min:  20, max:  99 } },
+-  business:     { priceUSD: 2850, locationAllowance: null, employees: { min: 100, max: 249 } },
+-  advisory:     { priceUSD: 4550, locationAllowance: null, employees: { min: 250, max: 499 } },
+-  enterprise:   { priceUSD: null, locationAllowance: null, employees: { min: 500, max: null } },
++  starter:      { priceUSD:  475, employees: { min:   1, max:  19 } },
++  professional: { priceUSD: 1425, employees: { min:  20, max:  99 } },
++  business:     { priceUSD: 2850, employees: { min: 100, max: 249 } },
++  advisory:     { priceUSD: 4550, employees: { min: 250, max: 499 } },
++  enterprise:   { priceUSD: null, employees: { min: 500, max: null } },
++}
++
++/** FI0: a tier's employee band in words, for copy: "1 to 19 employees", "500 employees or more". */
++export function ghgEmployeeBandLabel(tier: GhgTier): string {
++  const { min, max } = GHG_TIERS[tier].employees
++  return max == null ? `${min.toLocaleString('en-US')} employees or more` : `${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')} employees`
+ }
+ 
+ /**
+diff --git a/lib/useEntitlement.ts b/lib/useEntitlement.ts
+index d69a1ea..a82a566 100644
+--- a/lib/useEntitlement.ts
++++ b/lib/useEntitlement.ts
+@@ -192,36 +192,5 @@ export function useHasConcierge(): boolean {
+   return hasConcierge
+ }
+ 
+-// GHG location allowance (spec: Model A hard enforcement). Reads the integer
+-// ceiling written onto the customer's ghg entitlement row at checkout.
+-// null = uncapped (pre-migration customers or sales-managed 20+ "contact us").
+-// `loading` lets the wall avoid blocking while the value is still being fetched.
+-export function useGhgLocationAllowance(): { allowance: number | null; loading: boolean } {
+-  const [allowance, setAllowance] = useState<number | null>(null)
+-  const [loading, setLoading] = useState(true)
+-  useEffect(() => {
+-    let cancelled = false
+-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+-      if (!session) {
+-        if (!cancelled) { setAllowance(null); setLoading(false) }
+-        return
+-      }
+-      const { data, error } = await supabase
+-        .from('entitlements')
+-        .select('location_allowance')
+-        .eq('module_key', 'ghg')
+-        .eq('user_id', session.user.id)
+-        .maybeSingle()
+-      if (cancelled) return
+-      if (error) {
+-        console.error('[useGhgLocationAllowance] read failed:', error.message)
+-        setAllowance(null); setLoading(false)
+-        return
+-      }
+-      setAllowance(data?.location_allowance ?? null)
+-      setLoading(false)
+-    })
+-    return () => { cancelled = true }
+-  }, [])
+-  return { allowance, loading }
+-}
++// FI0: useGhgLocationAllowance is removed. Locations are unlimited on every plan, so there is no ceiling
++// for the wizard to read.
+--- /dev/null
++++ b/app/locationCapRetired.test.ts
+@@ -0,0 +1,42 @@
++// app/locationCapRetired.test.ts
++//
++// FI0: GHG is priced by company size with unlimited locations. No surface enforces, reads or describes a
++// location limit, and no price note renders a missing number ("for up to  locations").
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync, readdirSync, statSync } from 'node:fs'
++import { join } from 'node:path'
++import { stripTsComments } from '../lib/testing/stripComments'
++
++const ROOT = process.cwd()
++const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
++const walk = (dir: string): string[] => readdirSync(join(ROOT, dir)).flatMap(n => {
++  const rel = `${dir}/${n}`
++  if (statSync(join(ROOT, rel)).isDirectory()) return walk(rel)
++  return /\.(ts|tsx)$/.test(n) && !/\.test\.tsx?$/.test(n) ? [rel] : []
++})
++
++describe('the location cap is retired (FI0)', () => {
++  const files = [...walk('app'), ...walk('lib')]
++
++  it('no code reads, derives or enforces a location allowance', () => {
++    for (const rel of files) {
++      const code = stripTsComments(read(rel))
++      expect(code, rel).not.toMatch(/useGhgLocationAllowance|locationAllowance|location_allowance|showLocationWall/)
++    }
++  })
++
++  it('no customer-facing text describes a location limit or prices by locations', () => {
++    for (const rel of files) {
++      const code = stripTsComments(read(rel))
++      expect(code, rel).not.toMatch(/location limit|priced by number of locations|Priced by locations|Up to \$\{a\} locations|≤\$\{alw\} locations|for up to \{/i)
++    }
++  })
++
++  it('the GHG page heading and the price notes say what the price follows', () => {
++    expect(read('app/climate-ghg/page.tsx')).toContain('Priced by company size, not by number of sites.')
++    const calc = read('app/calculate-emissions/page.tsx')
++    expect((calc.match(/The GHG module is priced by company size, with unlimited locations on every plan: from \$\{ghgFrom\} a year for \{ghgEmployeeBandLabel\('starter'\)\}/g) ?? []).length).toBe(2)
++    expect(read('app/pricing/page.tsx')).toContain('Plans are sized by your number of employees. Every plan covers unlimited locations.')
++  })
++})

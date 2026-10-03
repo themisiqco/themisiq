@@ -12,7 +12,7 @@ import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/p
 // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
 // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
 // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
-import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
@@ -632,10 +632,8 @@ function PricingPageInner() {
                       {GHG_TIER_KEYS.map(t => {
                         const tp = GHG_TIERS[t].priceUSD
                         const label = GHG_TIER_LABELS[t]
-                        // Derived, not three literals. null = uncapped (Advisory), which the copy must
-                        // say rather than leaving the reader to infer from a missing number.
-                        const alw = GHG_TIERS[t].locationAllowance
-                        const cap = alw == null ? 'unlimited locations' : `≤${alw} locations`
+                        // FI0: each tier is an employee band, derived from GHG_TIERS, not a location count.
+                        const cap = ghgEmployeeBandLabel(t)
                         const active = tier === t
                         return (
                           <button key={t} onClick={(e) => { e.stopPropagation(); setTier(t) }} style={{ flex: 1, minWidth: 'min(130px, 100%)', textAlign: 'left', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', background: active ? 'var(--color-brand-wash)' : '#fff', color: 'var(--color-ink)', border: active ? '2px solid var(--color-brand)' : '1px solid #e8e7e4' }}>
@@ -645,10 +643,9 @@ function PricingPageInner() {
                           </button>
                         )
                       })}
-                      {/* What counts as a location — placed at the point of CHOICE, because the tier
-                          the buyer picks is a location count and nothing else on this page defines it. */}
+                      {/* At the point of CHOICE: what the tier is sized by (FI0). */}
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
-                        One location = one site with its own electricity supply. All of that site’s energy goes in together (electricity, gas, vehicle fuel, refrigerants), so a site with separate gas and electricity accounts is still one location.
+                        Plans are sized by your number of employees. Every plan covers unlimited locations.
                       </div>
                     </div>
                   )}

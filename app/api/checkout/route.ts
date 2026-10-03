@@ -18,7 +18,6 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAut
 import {
   ALL_MODULE_KEYS,
   TIER_PRICING,
-  locationAllowanceForTier,
   ADDONS,
   addOnRequirementsMet,
   configuratorPrice,
@@ -71,10 +70,9 @@ export async function POST(req: NextRequest) {
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
     const modulesInCart = new Set<ModuleKey>()
     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
-    let ghgAllowance: number | null = null // GHG location ceiling to write onto the ghg entitlement row
     let ghgTierForMeta: GhgTier | null = null // GHG tier, recorded so the webhook can write entitlements.ghg_tier
     let conciergeMeta: Record<string, string> = {}
-    let ownedRows: { module_key: string; location_allowance: number | null }[] = []
+    let ownedRows: { module_key: string }[] = []
     const sources: string[] = []
 
     // 2b) Build-your-own (tier + modules)
@@ -120,10 +118,8 @@ export async function POST(req: NextRequest) {
       })
       sources.push('configurator')
       if (moduleKeys.includes('ghg') && tier) {
-        ghgAllowance = locationAllowanceForTier(tier) // tier-based ceiling
-        // The tier itself, recorded for the webhook. location_allowance alone cannot identify it:
-        // null means Advisory under the current model and uncapped under the old one, and that
-        // ambiguity is what forces the Concierge onboarding fee to reject rather than guess.
+        // The tier itself, recorded for the webhook. Locations are unlimited on every plan (FI0), so no
+        // location allowance is written: the tier is what identifies the plan.
         ghgTierForMeta = tier as GhgTier
       }
     }
@@ -141,7 +137,7 @@ export async function POST(req: NextRequest) {
     if ((body.addOns && body.addOns.length > 0) || body.concierge) {
       const { data: owned, error: ownedErr } = await supabase
         .from('entitlements')
-        .select('module_key, location_allowance')
+        .select('module_key')
       if (ownedErr) {
         console.error('[checkout] entitlement read failed:', ownedErr.message)
         return NextResponse.json(
@@ -285,8 +281,7 @@ export async function POST(req: NextRequest) {
       user_id: userId,
       entitlements, // e.g. "ghg,supply-chain,verification"
       source: sources.join(' | '),
-      ghg_location_allowance: ghgAllowance != null ? String(ghgAllowance) : '',
-      // The tier behind that allowance. Written whenever GHG is in the cart, and empty otherwise,
+      // The GHG tier. Written whenever GHG is in the cart, and empty otherwise,
       // following the same empty-string convention: Stripe metadata values are strings and the
       // webhook reads '' as absent. Batch 3 writes it to entitlements.ghg_tier.
       ghg_tier: ghgTierMetaValue(ghgTierForMeta),

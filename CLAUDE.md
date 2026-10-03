@@ -49,7 +49,7 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely 
 | Pricing | `lib/pricing.ts` | All prices/tiers/allowances derive from here. Never hardcode a price elsewhere. |
 | Emission factors | `lib/emissionFactors.ts` | Shared across modules. |
 | Unit conversions | `lib/unitConversions.ts` | 3-tier cascade (exact match → documented factor → flag `needs_manual_review`). |
-| Entitlement reads | `lib/useEntitlement.ts` | e.g. `useGhgLocationAllowance()`, user-scoped, fails open to null. |
+| Entitlement reads | `lib/useEntitlement.ts` | e.g. `useEntitlementAccess()`, `useHasConcierge()`, user-scoped. |
 | Checkout intent | `lib/checkout.ts` | Stores intent in `sessionStorage`, resumes after login. |
 | Add-on prerequisites | `addOnRequirementsMet` | Single authority enforcing the `ghg → concierge` dependency chain, and the quote-only guard that keeps Concierge Enterprise unsellable through checkout. Both `/api/checkout` and `/api/admin/create-invoice` defer to it. (Was `ghg → concierge → verification` until 10 Aug 2026 — see the retirement note under **Pricing model**.) |
 
@@ -231,8 +231,10 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
   is SILENTLY DROPPED from the cart — a customer could select a module, pay,
   and not receive it. A derived test guards this; adding a module to `MODULES`
   fails that test until it is mapped.
-- **Only GHG scales by location.** Allowances come from `GHG_TIERS`. Hard
-  enforcement, upgrade wall, no auto-downgrade.
+- **GHG is priced by employee band, with unlimited locations on every plan.**
+  Bands come from `GHG_TIERS` (`ghgEmployeeBandLabel` words them). The only
+  database rule on a GHG save is the entitlement gate (an active `ghg` pass);
+  no code reads or writes `entitlements.location_allowance` (FI0).
 - **Concierge add-on** (requires GHG) is a separate axis priced on actual
   location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom
   quote. It is now the ONLY add-on.

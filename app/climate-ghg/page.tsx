@@ -3,7 +3,7 @@ import { scope3ScopeClaim, scope3MethodFamilies } from '../../lib/scope3/methodS
 import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
-import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS } from '@/lib/pricing'
+import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel } from '@/lib/pricing'
 import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
 import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
@@ -69,7 +69,6 @@ export default function Page() {
   const [sbDay, sbMonth, sbYear] = SB253_FIRST_REPORT_DATE.split(' ')
   const sbShortDate = `${sbDay} ${sbMonth.slice(0, 3)} ${sbYear}`
   const ghgFrom = GHG_TIERS.starter.priceUSD?.toLocaleString('en-US')
-  const allowanceLabel = (a: number | null) => (a == null ? 'Unlimited locations' : `Up to ${a} locations`)
   const TIER_PICKER = '/pricing?modules=ghg#build-your-stack'
 
   return (
@@ -92,9 +91,9 @@ export default function Page() {
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
-            {/* ⚠️ "From", AND THE ANCHOR. GHG is the only tiered module: starter is 3 locations,
-                professional 15, advisory uncapped with priceUSD null. A single price would mislead
-                anyone above three locations, so this names the floor and links to the picker. */}
+            {/* ⚠️ "From", AND THE ANCHOR. GHG is the only tiered module, sized by employees (FI0), and the top
+                band has priceUSD null. A single price would mislead a larger company, so this names the
+                floor and links to the picker. */}
             <a href={TIER_PICKER} style={{ ...btnSecondary, textDecoration: 'none' }}>From ${ghgFrom}/yr</a>
           </div>
         </div>
@@ -159,7 +158,7 @@ export default function Page() {
               { label: 'First SB 253 report', big: sbShortDate,
                 note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}.` },
               { label: 'Price', big: `From $${ghgFrom}/yr`,
-                note: `${allowanceLabel(GHG_TIERS.starter.locationAllowance)} on the entry tier. Larger allowances and an uncapped tier are in the picker.` },
+                note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; larger organisations are in the picker.` },
             ].map(({ label, big, fw, note }) => (
               <tr key={label}>
                 <th style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)', padding: '16px 20px 16px 0', verticalAlign: 'top', width: 210, borderBottom: '1px solid var(--color-line)' }}>{label}</th>
@@ -213,16 +212,15 @@ export default function Page() {
       {/* ── 8. PRICING ── */}
       <ModuleSection tinted>
         <p style={moduleEyebrow}>Pricing</p>
-        <h2 style={sectionTitle}>Priced by locations, not by seats.</h2>
+        <h2 style={sectionTitle}>Priced by company size, not by number of sites.</h2>
         <p style={{ ...bodyCopy, marginTop: '1rem' }}>
-          GHG is the one tiered module, because an inventory for three sites is not the same work as one
-          for fifteen. Add modules and the multi-module discount applies automatically: two modules −10%,
+          GHG is the one tiered module, priced by how many people you employ. Every plan covers unlimited
+          locations. Add modules and the multi-module discount applies automatically: two modules −10%,
           three or more −20%.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
-          {/* ⚠️ TIERS AND ALLOWANCES ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. advisory has
-              priceUSD null and locationAllowance null, which mean "contact us" and "uncapped" — not
-              zero and not missing. allowanceLabel is the only place that decides how a null reads. */}
+          {/* ⚠️ TIERS AND BANDS ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. A null priceUSD means
+              "contact us", not zero and not missing; ghgEmployeeBandLabel words each band. */}
           {GHG_TIER_KEYS.map(t => (
             <div key={t} style={{ background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: '4px solid var(--color-module-ghg)', borderRadius: 6, padding: '1.5rem' }}>
               <div style={{ ...moduleEyebrow, marginBottom: 8 }}>{GHG_TIER_LABELS[t]}</div>
@@ -230,7 +228,7 @@ export default function Page() {
                 {GHG_TIERS[t].priceUSD == null ? 'Contact us' : `$${GHG_TIERS[t].priceUSD!.toLocaleString('en-US')}`}
                 {GHG_TIERS[t].priceUSD != null && <span style={{ fontSize: 13, color: 'var(--color-ink-muted)' }}> / yr</span>}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginTop: 8 }}>{allowanceLabel(GHG_TIERS[t].locationAllowance)}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', marginTop: 8 }}>{ghgEmployeeBandLabel(t)}, unlimited locations</div>
             </div>
           ))}
         </div>

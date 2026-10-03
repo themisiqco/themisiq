@@ -24,7 +24,7 @@ import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/pr
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
 import type { YearDataStatus } from '../../../lib/ghg/series'
-import { useEntitlementAccess, useHasConcierge, useGhgLocationAllowance, type EntitlementAccess } from '../../../lib/useEntitlement'
+import { useEntitlementAccess, useHasConcierge, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
@@ -684,8 +684,6 @@ const searchParams = useSearchParams()
   // lose. Everything else that banner says reports a state a customer would want flagged.
   const noticeIsNeutral = ghgAccess === 'none' && !inventoryId
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
-  const { allowance: locationAllowance, loading: allowanceLoading } = useGhgLocationAllowance()
-  const [showLocationWall, setShowLocationWall] = useState(false)
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
   useEffect(() => {
@@ -1024,14 +1022,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const newLocationId = () => `loc_${Math.random().toString(36).slice(2, 10)}`
 
   /**
-   * ⚠️ THE ALLOWANCE IS ENFORCED INSIDE THE UPDATER, WHERE THE COUNT IS CURRENT. The check outside it
-   * is what the customer SEES — the upgrade wall — and it reads the render, which is right for a single
-   * click and stale for two in one tick. The inner check is the one that cannot be raced: the second
-   * add of a double click is REFUSED SILENTLY there (the list is returned unchanged), so the customer
-   * sees one location appear rather than two, and no wall. That is deliberate: the alternative is a
-   * wall raised from inside a state updater, which means a side effect in a function React may call
-   * twice. The allowance itself cannot be exceeded this way, and the database trigger
-   * enforce_ghg_location_allowance refuses the save if it ever were.
+   * FI0: there is no location limit. Locations are unlimited on every plan, so adding one is never refused
+   * for a count; the database gate checks only that the GHG pass is active.
    *
    * The id is generated OUTSIDE the updater, because generating it inside would make the updater impure;
    * generation is collision-proof on its own, and the updater still refuses an id it somehow already
@@ -1039,10 +1031,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
    * step here reads the rendered length.
    */
   const addLocation = () => {
-    if (locationAllowance != null && !allowanceLoading && inventory.locations.length >= locationAllowance) { setShowLocationWall(true); return }
     const id = newLocationId()
     setInventory(inv => {
-      if (locationAllowance != null && !allowanceLoading && inv.locations.length >= locationAllowance) return inv
       if (inv.locations.some(l => l.id === id)) return inv
       // The NAME counts from the current list, so two adds in one tick are numbered 4 and 5, not 4 and 4.
       return { ...inv, locations: [...inv.locations, emptyLocation(id, `Location ${inv.locations.length + 1}`)] }
@@ -2108,16 +2098,6 @@ workings: saved.workings,
               </div>
             ))}
             <button onClick={addLocation} style={{ fontSize: 13, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add location</button>
-            {showLocationWall && (
-              <div style={{ marginTop: 12, background: 'var(--color-brand-wash)', border: '0.5px solid var(--color-brand-line)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
-                  <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more: your existing data stays exactly as it is.</div>
-                  <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
-                </div>
-                <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
-              </div>
-            )}
           </div>
         </Field>
       </div>
@@ -2149,16 +2129,6 @@ workings: saved.workings,
             </button>
           ))}
           <button onClick={addLocation} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', }}>+ Add location</button>
-          {showLocationWall && (
-            <div style={{ width: '100%', marginTop: 8, background: 'var(--color-brand-wash)', border: '0.5px solid var(--color-brand-line)', borderRadius: 10, padding: '0.9rem 1rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', marginBottom: 3 }}>You&apos;ve reached your plan&apos;s location limit ({locationAllowance})</div>
-                <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>Your current plan covers up to {locationAllowance} location{locationAllowance === 1 ? '' : 's'}. Upgrade to add more: your existing data stays exactly as it is.</div>
-                <a href="/pricing" style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See plans &amp; upgrade →</a>
-              </div>
-              <button onClick={() => setShowLocationWall(false)} style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
-            </div>
-          )}
         </div>
         {/* The blocking state for the location being edited, at the top of its own step — this is
             where the two things named in the message (the country, and the unit on the bill) are

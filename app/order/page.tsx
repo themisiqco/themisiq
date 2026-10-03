@@ -18,6 +18,7 @@ import {
   cartQuote,
   GHG_TIERS,
   GHG_TIER_LABELS,
+  ghgEmployeeBandLabel,
   isGhgTier,
   FLAT_MODULE_PRICES,
   type Tier,
@@ -112,7 +113,7 @@ function OrderInner() {
   const lineItems = keys.map(k => ({
     key: k,
     label: MODULE_LABELS[k] ?? k,
-    detail: k === 'ghg' ? `${GHG_TIER_LABELS[tier]}${GHG_TIERS[tier].locationAllowance != null ? ` · up to ${GHG_TIERS[tier].locationAllowance} locations` : ' · uncapped'}` : 'Annual',
+    detail: k === 'ghg' ? `${GHG_TIER_LABELS[tier]} · ${ghgEmployeeBandLabel(tier as GhgTier)}` : 'Annual',
     price: k === 'ghg' ? GHG_TIERS[tier].priceUSD : FLAT_MODULE_PRICES[k as Exclude<ModuleKey, 'ghg'>],
   }))
   const subtotal = lineItems.reduce((s, li) => s + (li.price ?? 0), 0)

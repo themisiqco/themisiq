@@ -119,18 +119,6 @@ export const TIER_PRICING: Record<LegacyTier, { full: number; early: number }> =
   advisory:     { full: 4999, early: 4999 },
 }
 
-// GHG location allowance per tier. Single source of truth — checkout writes this onto
-// the ghg entitlement row; the GHG wizard + server (NULL = uncapped trigger) enforce it.
-// Behind NEW_PRICING_ACTIVE: live/old model = Starter 3 / Pro 10 / Advisory 20; new model =
-// Essentials 3 / Pro 15 / Advisory null (uncapped), sourced from GHG_TIERS. While the flag
-// is false this is byte-for-byte the old behaviour. Packs (no tier) still default to the
-// Starter/Essentials floor (3) at their call sites.
-export function locationAllowanceForTier(tier: Tier): number | null {
-  return NEW_PRICING_ACTIVE
-    ? GHG_TIERS[tier].locationAllowance
-    : ({ starter: 3, professional: 10, advisory: 20 } as Record<Tier, number>)[tier]
-}
-
 // The price actually charged right now for a given tier (respects the switch).
 export function tierPrice(tier: LegacyTier): number {
   const p = TIER_PRICING[tier]
@@ -167,21 +155,27 @@ export type GhgTier = Tier
 // exhaustive from 1 upward, so ghgTierForEmployees always resolves. `employees.max` null means "and
 // above", which only the top band carries.
 //
-// ⚠️ EVERY locationAllowance IS NULL, AND THAT IS HOW THE CAP WAS RETIRED. Locations are unlimited
-// on every plan. null already meant uncapped to enforce_ghg_location_allowance() and already
-// rendered as "Unlimited locations" through allowanceLabel, so setting them null turned the cap off
-// everywhere at once without a single consumer changing. The column and the trigger branch are dead
-// weight now and come out in their own batch, where that risk is visible rather than mixed in here.
+// FI0: LOCATIONS ARE UNLIMITED ON EVERY PLAN, AND NOTHING HERE DESCRIBES A LOCATION ALLOWANCE ANY MORE.
+// The per-tier locationAllowance (all null since 28 Sep 2026) and locationAllowanceForTier are removed;
+// checkout, the admin invoice route and the webhook no longer write entitlements.location_allowance, and
+// the database gate (enforce_ghg_location_allowance) keeps only the entitlement check
+// (docs/review/patches/FI0-entitlement-gate-only.sql). The column is dropped later, separately, once
+// no deployed code writes it.
 export const GHG_TIERS: Record<GhgTier, {
   priceUSD: number | null
-  locationAllowance: number | null
   employees: { min: number; max: number | null }
 }> = {
-  starter:      { priceUSD:  475, locationAllowance: null, employees: { min:   1, max:  19 } },
-  professional: { priceUSD: 1425, locationAllowance: null, employees: { min:  20, max:  99 } },
-  business:     { priceUSD: 2850, locationAllowance: null, employees: { min: 100, max: 249 } },
-  advisory:     { priceUSD: 4550, locationAllowance: null, employees: { min: 250, max: 499 } },
-  enterprise:   { priceUSD: null, locationAllowance: null, employees: { min: 500, max: null } },
+  starter:      { priceUSD:  475, employees: { min:   1, max:  19 } },
+  professional: { priceUSD: 1425, employees: { min:  20, max:  99 } },
+  business:     { priceUSD: 2850, employees: { min: 100, max: 249 } },
+  advisory:     { priceUSD: 4550, employees: { min: 250, max: 499 } },
+  enterprise:   { priceUSD: null, employees: { min: 500, max: null } },
+}
+
+/** FI0: a tier's employee band in words, for copy: "1 to 19 employees", "500 employees or more". */
+export function ghgEmployeeBandLabel(tier: GhgTier): string {
+  const { min, max } = GHG_TIERS[tier].employees
+  return max == null ? `${min.toLocaleString('en-US')} employees or more` : `${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')} employees`
 }
 
 /**
