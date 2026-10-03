@@ -15,7 +15,9 @@
 //                        would exclude both bills and drop the figure;
 //   - different_meters:  its document;
 //   - extrapolate:       (document type, fuel, meter);
-//   - used_none:         (location, fuel, field).
+//   - used_none:         (location, fuel, field);
+//   - deliveries_complete (T10b): (location, document type, fuel), so confirming again replaces the earlier
+//                        confirmation rather than keeping both.
 // Legacy duplicate and straddle keep the old (location, fuel, kind) key; nothing writes them any more.
 
 import type { CoverageResolution } from './engine'
@@ -30,6 +32,8 @@ export function resolutionKey(r: CoverageResolution): string {
       return `extrapolate|${r.locId}|${r.documentType ?? ''}|${r.fuelType}|${r.meterLabel ?? ''}`
     case 'used_none':
       return `used_none|${r.locId}|${r.fuelType}|${r.field ?? ''}`
+    case 'deliveries_complete':
+      return `deliveries_complete|${r.locId}|${r.documentType ?? ''}|${r.fuelType}`
     default:
       return `${r.kind}|${r.locId}|${r.fuelType}`
   }
@@ -65,11 +69,21 @@ export function differentMetersResolution(a: {
   }
 }
 
-/** A gap estimate for one meter of one document type: that meter's bills grossed up by its own coverage. */
+/** Why no estimate can be built from zero covered months (T10b ruling). Shown by the strip in place of the control. */
+export const NO_MONTHS_TO_ESTIMATE =
+  'No month is fully covered by these bills, so the missing months cannot be estimated from them. Upload the missing bills, or enter the figure yourself.'
+
+/**
+ * A gap estimate for one meter of one document type: that meter's bills grossed up by its own coverage.
+ * T10b: refuses to build one from fewer than 1 covered month. Scaling ×12/0 is not an estimate, and the
+ * engine refuses such a resolution anyway (validateResolution), so building one only stored a record that
+ * changed nothing and told the customer nothing. The strip never offers the control at 0.
+ */
 export function estimateResolution(a: {
   locId: string; fuelType: string; documentType: string; meterLabel: string | null
   monthsCovered: number; pctEstimated: number; at: string
 }): CoverageResolution {
+  if (!(a.monthsCovered >= 1)) throw new Error(NO_MONTHS_TO_ESTIMATE)
   const m = a.monthsCovered
   const meter = a.meterLabel ? `Meter ${a.meterLabel}: ` : ''
   return {
@@ -95,6 +109,23 @@ export function usedNoneResolution(a: {
   return {
     locId: a.locId, fuelType: a.fuelType, kind: 'used_none', field: a.field, by: a.by,
     note: `${a.by.email} confirmed on ${plainDate(a.at)} that this site used no ${a.fuelName}.`,
+    acknowledgedAt: a.at,
+  }
+}
+
+/**
+ * T10b: "These are all the deliveries for this year", for one (document type, fuel) at one site. It records who
+ * and when, and the documents it covers: if those change, the confirmation no longer applies (ruling). The note
+ * repeats the statement the customer clicked, which names the fuel, the site and the window.
+ */
+export function deliveriesCompleteResolution(a: {
+  locId: string; fuelType: string; documentType: string; docIds: string[]; statement: string
+  by: { userId: string; email: string }; at: string
+}): CoverageResolution {
+  return {
+    locId: a.locId, fuelType: a.fuelType, kind: 'deliveries_complete', documentType: a.documentType,
+    docIds: [...a.docIds], by: a.by,
+    note: `${a.by.email} confirmed on ${plainDate(a.at)}: ${a.statement}`,
     acknowledgedAt: a.at,
   }
 }

@@ -189,6 +189,7 @@ export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: st
  * note does, so the two never describe a bill differently:
  *   - prorated:                "12 of 31 days, ×0.387"
  *   - counted, wholly in year: "31 of 31 days"
+ *   - a delivery inside the year (T10b): "Delivered 2025-03-14, counted in full"
  *   - undated or invalid period (no days to count): NOT_APPLICABLE
  *   - any other bill not counted: "Not counted"; the reason, not this cell, says why.
  * Structural type rather than the engine's BillContribution, because the engine imports this file.
@@ -198,10 +199,12 @@ export type ShareCellContribution = {
   inWindowDays: number | null
   totalDays: number | null
   share: number | null
+  deliveryDate?: string
 }
 export const NOT_COUNTED = 'Not counted'
 export function contributionShareCell(c: ShareCellContribution): string {
   if (c.reason === 'undated' || c.reason === 'invalid_period') return NOT_APPLICABLE
+  if (c.reason === 'delivered') return `Delivered ${c.deliveryDate ?? ''}, counted in full`
   if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
   const days = `${c.inWindowDays} of ${c.totalDays} days`
   return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days

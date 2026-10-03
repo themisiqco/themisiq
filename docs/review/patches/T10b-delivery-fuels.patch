@@ -1,0 +1,1311 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index d9378d2..51a65e9 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -71,7 +71,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
+ 
+ - **`app/dashboard/ghg/page.tsx` RENDERS `buildWorkings()` output; never re-derive workings rows in the component.** There is ONE renderer. A second, hand-rolled derivation in `renderStep4` once drifted from the engine and was removed — reintroducing any per-row calc in the component is the regression.
+ - **`applyResolutions()` is the single source of truth for what a figure IS.** Both the write path and the audit trail derive from it, so the number and the method claimed for it cannot disagree.
+-- **`exclusiveEnd()` — ONE definition.** End date on the 1st = exclusive (first-of-next-month billing); every other end date = inclusive last covered day. exclusiveEnd(): one definition, in the engine. The monthly split receives each bill's canonical end on its contribution and never converts an end date itself.
++- **`exclusiveEnd()` — ONE definition.** End date on the 1st = exclusive (first-of-next-month billing); every other end date = inclusive last covered day. exclusiveEnd(): one definition, in the engine. The monthly split receives each bill's canonical end on its contribution and never converts an end date itself. A one-day period (start = end) covers that day, whatever the date; `canonicalPeriod` is the one place that says so. A delivery (T10b: a single delivery date, no billing period) has no period at all: it counts in full in the year it was delivered.
+ - **`daysBetween` (engine) is INCLUSIVE; `monthlyEmissions.ts` uses a LOCAL half-open count. Two contracts, deliberate — do NOT unify them.** The half-open count is what makes monthly proration reconcile; the inclusive one serves coverage's inclusive ranges.
+ - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
+ - **Coverage gate is keyed per `(document_type, fuelType, meter_label)` and returns every issue, not a single status.** Overlap compares full bill periods, not their in-year days, so two copies of a bill outside the year still raise an overlap. An overlap is resolved only as `same_bill` (one document counts, the others are retained as evidence) or `different_meters` (both count, the second meter named); no resolution may leave two counted bills over the same days. Only accepted resolutions (passing `validateResolution`) affect figures, issues or audit rows; legacy `duplicate` and `straddle` are never accepted. A straddle is not an issue: it is prorated by its own days. No silent zero: an undated, invalid-period or mixed-units bill, or a field whose documents were all rejected with no figure entered, raises an export-blocking issue naming the document. Only `outside_year` and `same_bill_as` may leave a bill uncounted without one; a `used_none` confirmation records who confirmed it and when. A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block.
+diff --git a/app/api/concierge/extract/route.ts b/app/api/concierge/extract/route.ts
+index 5bff408..320f31a 100644
+--- a/app/api/concierge/extract/route.ts
++++ b/app/api/concierge/extract/route.ts
+@@ -45,6 +45,7 @@ interface ExtractionField {
+   unit: string | null
+   periodStart: string | null   // ISO yyyy-mm-dd — billing/service period start
+   periodEnd: string | null     // ISO yyyy-mm-dd — billing/service period end
++  deliveryDate?: string | null // ISO yyyy-mm-dd — T10b: a single delivery or purchase date, when no period is printed
+   periodConfidence: 'high' | 'medium' | 'low' | null
+   sourceQuote: string | null
+   confidence: 'high' | 'medium' | 'low'
+@@ -64,6 +65,7 @@ For EACH figure you report, also extract the billing/service period that the fig
+ - If the document shows an explicit date range (e.g. "Nov 1 - Nov 30, 2024"), use those exact dates.
+ - If it shows only a month or month/year (e.g. "Nov 2024"), use the first and last calendar day of that month and set periodConfidence: "medium".
+ - If no billing period is visible, return periodStart: null, periodEnd: null, periodConfidence: "low".
++- DELIVERIES: if the document records a delivery, purchase or dispense of fuel on a single date and prints no service period (for example a propane or diesel delivery invoice, or a single fuel receipt), return that date as deliveryDate (yyyy-mm-dd), with periodStart: null and periodEnd: null. Never return a delivery date as a one-day period (periodStart equal to periodEnd). If the document prints a statement period (for example a monthly fuel-card or account statement), report that period as periodStart and periodEnd and leave deliveryDate null.
+ 
+ CRITICAL RULES — this feeds a regulatory compliance report, so accuracy matters more than completeness:
+ 1. Only report a figure you can actually see in the document. If a fuel type is not present, return value: null for it.
+@@ -74,7 +76,7 @@ CRITICAL RULES — this feeds a regulatory compliance report, so accuracy matter
+ 6. Do NOT convert units. Report each figure in the unit exactly as printed on the document — conversion happens later in a separate, audited step. Your job is only to read the figure and its unit faithfully.
+ 
+ Respond with ONLY a JSON array (no prose, no markdown fences), one object per requested fuel type, each shaped exactly:
+-{"fuelType": "<one of: ${fuelTypes.join(', ')}>", "value": <number or null>, "unit": "<string or null>", "periodStart": "<yyyy-mm-dd or null>", "periodEnd": "<yyyy-mm-dd or null>", "periodConfidence": "high"|"medium"|"low"|null, "sourceQuote": "<string or null>", "confidence": "high"|"medium"|"low", "notes": "<string or null>"}`
++{"fuelType": "<one of: ${fuelTypes.join(', ')}>", "value": <number or null>, "unit": "<string or null>", "periodStart": "<yyyy-mm-dd or null>", "periodEnd": "<yyyy-mm-dd or null>", "deliveryDate": "<yyyy-mm-dd or null>", "periodConfidence": "high"|"medium"|"low"|null, "sourceQuote": "<string or null>", "confidence": "high"|"medium"|"low", "notes": "<string or null>"}`
+ }
+ 
+ export async function POST(req: NextRequest) {
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.test.tsx b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+index a3bc1ec..7d2c722 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.test.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+@@ -143,3 +143,51 @@ describe('the page wires the strip and writes no ignored resolution', () => {
+     for (const b of ['sameBillResolution(', 'differentMetersResolution(', 'estimateResolution(', 'usedNoneResolution(']) expect(strip).toContain(b)
+   })
+ })
++
++describe('coverage strip: deliveries and the 0-months guard (T10b)', () => {
++  const lpg = (id: string, date: string): SourceDoc => ({
++    id, file_name: `${id}.pdf`, document_type: 'fuel_propane', uploaded_at: '2025-06-01', file_path: `/${id}.pdf`,
++    extracted: [prop({ fuelType: 'propane', value: 180, unit: 'litres', periodStart: date, periodEnd: date })],
++  })
++  const melbourne = (docs: SourceDoc[]): Location => ({ ...emptyLocation('L1', 'Melbourne'), country: 'AU', has_propane: true, propane_unit: 'litres', source_docs: docs })
++  const drawLpg = (l: Location, o: Partial<CoverageStripProps> = {}) => draw(l, { docType: 'fuel_propane', ...o })
++  const STATEMENT = 'These are all the propane deliveries for Melbourne between 1 January 2025 and 31 December 2025.'
++
++  it('deliveries are listed by date with no month count and no estimate, and the confirmation names fuel, site and window', () => {
++    const l = melbourne([lpg('lpg2', '2025-06-23'), lpg('lpg1', '2025-03-14')])
++    const t = text(drawLpg(l))
++    expect(t).toContain('Confirm that the 2 propane deliveries listed for Melbourne are all the propane deliveries between 1 January 2025 and 31 December 2025. Export is blocked until you confirm.')
++    expect(t).toContain('Deliveries are counted in full in the year they were delivered, not spread over months.')
++    expect(t.indexOf('lpg1.pdf: 180 litres, delivered 14 March 2025.')).toBeLessThan(t.indexOf('lpg2.pdf: 180 litres, delivered 23 June 2025.'))
++    expect(t).toContain(STATEMENT)
++    expect(t).not.toContain('months covered')
++    expect(t).not.toContain('Estimate the missing months')
++    expect(drawLpg(l, { currentUser: null })).toMatch(/<button[^>]*disabled=""[^>]*>These are all the propane deliveries/)
++  })
++
++  it('once confirmed, the strip shows who confirmed and when', () => {
++    const l = melbourne([lpg('lpg1', '2025-03-14')])
++    const conf = { locId: 'L1', fuelType: 'propane', kind: 'deliveries_complete' as const, documentType: 'fuel_propane', docIds: ['lpg1'],
++      by: { userId: 'u-1', email: 'jo@acme.example' }, note: `jo@acme.example confirmed on 2 January 2026: ${STATEMENT}`, acknowledgedAt: '2026-01-02T09:00:00.000Z' }
++    const t = text(drawLpg(l, { resolutions: [conf] }))
++    expect(t).toContain(`✓ jo@acme.example confirmed on 2 January 2026: ${STATEMENT}`)
++    expect(t).not.toContain('Export is blocked')
++  })
++
++  it('a gap with no month covered offers no estimate and says why', () => {
++    const t = text(draw(site([gdoc('a', { periodStart: '2025-03-10', periodEnd: '2025-03-20' })])))
++    expect(t).toContain('0 of 12 months covered by bills.')
++    expect(t).not.toContain('Estimate the missing months')
++    expect(t).toContain('No month is fully covered by these bills, so the missing months cannot be estimated from them. Upload the missing bills, or enter the figure yourself.')
++  })
++
++  it('an estimate the engine refuses is shown with its reason, and can be removed', () => {
++    const zero = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate' as const, documentType: 'utility_bill_gas', monthsCovered: 0, pctEstimated: 100,
++      note: 'n', acknowledgedAt: '2026-01-02T09:00:00.000Z' }
++    const l = site([gdoc('a', { periodStart: '2025-03-10', periodEnd: '2025-03-20' })])
++    const t = text(draw(l, { resolutions: [zero], onRemove: () => {} }))
++    expect(t).toContain('An estimate was recorded but cannot be used: An estimate needs the number of months covered by bills.')
++    expect(t).toContain('Remove it')
++    expect(text(draw(l, { resolutions: [zero] }))).not.toContain('Remove it')
++  })
++})
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.tsx b/app/dashboard/ghg/_components/CoverageStrip.tsx
+index 627a05d..a7609ee 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.tsx
+@@ -9,16 +9,22 @@
+ // an issue: it is prorated by its own days, and the strip says so with the share (T2). The old "this year",
+ // "next year" and "Confirm not a duplicate" buttons are gone; the engine ignored what they wrote.
+ //
++// T10b: a DELIVERY-BASED fuel (propane, diesel or fleet fuel bought by delivery) is not checked month by month.
++// Its deliveries are listed with their dates, and the one control is the completeness confirmation, which names
++// the fuel, the site and the window. It is never estimated. "Estimate the missing months" is offered only when
++// at least one month is covered, and an estimate the engine refuses is shown with its reason, never hidden.
++//
+ // All text here is shown to the customer: plain language, no em dash.
+ 
+ import { useState } from 'react'
+ import {
+   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
+-  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME,
++  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords,
+   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
+ } from '../../../../lib/ghg/engine'
+ import {
+   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
++  deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
+ } from '../../../../lib/ghg/coverageActions'
+ 
+ export type CurrentUser = { userId: string; email: string }
+@@ -35,6 +41,9 @@ export type CoverageStripProps = {
+   // resolution never exists without the label it must match.
+   onLabelMeter: (docId: string, label: string, res: CoverageResolution) => void
+   onEnterManually: (field: string) => void
++  // T10b: removes a stored resolution the engine refuses (shown with its reason). Optional: without it the
++  // refused estimate is still shown, with no control.
++  onRemove?: (res: CoverageResolution) => void
+ }
+ 
+ const fuelName = (f: string) => f.replace(/_/g, ' ')
+@@ -79,6 +88,18 @@ export function CoverageStrip(p: CoverageStripProps) {
+     g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(prop.periodStart as string), end: parseLocalDate(prop.periodEnd as string) })
+     groups.set(key, g)
+   }
++  // T10b: the delivery-based fuels of this upload, and their deliveries in date order.
++  const deliveries = contributions
++    .filter(c => c.deliveryDate && (c.counted || c.reason === 'outside_year'))
++    .sort((a, b) => (a.deliveryDate as string).localeCompare(b.deliveryDate as string))
++  const deliveryFuels = [...new Set(deliveries.map(c => c.fuelType))]
++  const site = location.name || 'Location'
++  // Estimates on this upload that the engine refuses: shown with the reason, so a click never vanishes.
++  const refused = p.resolutions
++    .filter(r => r.locId === location.id && r.kind === 'extrapolate' && (r.documentType ?? docType) === docType)
++    .map(r => ({ r, reason: validateResolution(r, location) }))
++    .filter((x): x is { r: CoverageResolution; reason: string } => x.reason !== null)
++
+   const inGroup = (i: { fuelType: string; meterLabel?: string | null; documentType?: string }, fuelType: string, meterLabel: string | null) =>
+     i.documentType === docType && i.fuelType === fuelType && (i.meterLabel ?? null) === meterLabel
+ 
+@@ -92,7 +113,8 @@ export function CoverageStrip(p: CoverageStripProps) {
+   // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
+   const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
+ 
+-  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0) return null
++  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0
++    && deliveryFuels.length === 0 && refused.length === 0) return null
+   const yearText = reportingYearLabel(win).inText
+   const many = groups.size > 1
+ 
+@@ -106,7 +128,11 @@ export function CoverageStrip(p: CoverageStripProps) {
+         const tone = resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' } : { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' }
+         const prefix = many || g.meterLabel ? `${fuelName(g.fuelType)}${g.meterLabel ? `, meter ${g.meterLabel}` : ''}: ` : ''
+         const missing = cov.gaps.map(x => x.label).join(', ')
+-        const headline = cov.status === 'full'
++        // T10b: statements in a delivery-based field are counted for the days they cover; the field's
++        // completeness is the deliveries confirmation below, not a count of months.
++        const headline = deliveryFuels.includes(g.fuelType)
++          ? 'Statements are counted for the days they cover.'
++          : cov.status === 'full'
+           ? 'All 12 months covered by bills.'
+           : resolved && cov.issues.includes('gap')
+             ? `${cov.monthsCovered} of 12 months from bills; the other ${12 - cov.monthsCovered} are estimated (${cov.pctEstimated}% of the total).`
+@@ -125,7 +151,7 @@ export function CoverageStrip(p: CoverageStripProps) {
+                 {fileOf(c.docId)} crosses into another year: {c.inWindowDays} of its {c.totalDays} days are in {yearText}, so {((c.share ?? 0) * 100).toFixed(1)}% of the bill is counted.
+               </div>
+             ))}
+-            {gap && (
++            {gap && cov.monthsCovered >= 1 && (
+               <div style={row}>
+                 <span style={prompt}>Upload the missing bill above, or:</span>
+                 <button style={warnButton} onClick={() => p.onAdd(estimateResolution({
+@@ -134,6 +160,9 @@ export function CoverageStrip(p: CoverageStripProps) {
+                 }))}>Estimate the missing months</button>
+               </div>
+             )}
++            {gap && cov.monthsCovered < 1 && (
++              <div style={{ ...prompt, marginTop: 6 }}>{NO_MONTHS_TO_ESTIMATE}</div>
++            )}
+             {overlaps.map(o => {
+               const [a, b] = o.docIds as [string, string]
+               return (
+@@ -157,6 +186,45 @@ export function CoverageStrip(p: CoverageStripProps) {
+           </div>
+         )
+       })}
++      {deliveryFuels.map(fuel => {
++        const list = deliveries.filter(c => c.fuelType === fuel)
++        const issue = issues.find(i => i.status === 'deliveries_unconfirmed' && i.documentType === docType && i.fuelType === fuel)
++        const conf = p.resolutions.filter(r => r.locId === location.id && r.kind === 'deliveries_complete' && r.documentType === docType && r.fuelType === fuel).at(-1)
++        const tone = issue ? { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' } : { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
++        const statement = deliveriesStatement(fuelName(fuel), site, win)
++        return (
++          <div key={`deliveries|${fuel}`} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
++            <div>{tone.icon} {issue ? issue.message : conf?.note}</div>
++            <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
++              Deliveries are counted in full in the year they were delivered, not spread over months.
++            </div>
++            {list.map(c => (
++              <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 2, fontWeight: 400, color: '#555553' }}>
++                {fileOf(c.docId)}: {c.value.toLocaleString()} {c.unit ?? ''}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
++              </div>
++            ))}
++            {issue && (
++              <div style={row}>
++                <button style={{ ...warnButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
++                  onClick={() => p.currentUser && p.onAdd(deliveriesCompleteResolution({
++                    locId: location.id, fuelType: fuel, documentType: docType, docIds: issue.docIds ?? [], statement,
++                    by: p.currentUser, at: now(),
++                  }))}>{statement}</button>
++              </div>
++            )}
++          </div>
++        )
++      })}
++      {refused.map(({ r, reason }) => (
++        <div key={`refused|${resolutionKey(r)}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
++          <div>⚠ An estimate was recorded but cannot be used: {reason}</div>
++          {p.onRemove && (
++            <div style={row}>
++              <button style={plainButton} onClick={() => p.onRemove?.(r)}>Remove it</button>
++            </div>
++          )}
++        </div>
++      ))}
+       {allRejected.map(i => (
+         <div key={`rejected|${i.field}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
+           <div>⚠ {i.message}</div>
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index ebd496e..8666111 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -12,7 +12,7 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
+ import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
+ import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
+ import { figuresForSave } from '../../../lib/ghg/savePayload'
+-import { upsertResolution } from '../../../lib/ghg/coverageActions'
++import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
+ import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
+ import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
+ import { FigureInput } from './_components/FigureInput'
+@@ -36,7 +36,7 @@ import {
+   detectGridRegion, gridRegionForCountry, pickEF,
+   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
+   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
+-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META,
++  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf,
+   streamState, DECLARABLE_STREAMS,
+   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
+   findSteamFactorGaps, steamFactorFor,
+@@ -1089,10 +1089,14 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+                     conversionNote: conv.conversionNote,
+                     periodStart: f.periodStart ?? null,
+                     periodEnd: f.periodEnd ?? null,
++                    // T10b: a delivery or purchase on a single date, read as a delivery, not a one-day period.
++                    deliveryDate: !f.periodStart && !f.periodEnd && f.deliveryDate ? f.deliveryDate : null,
+                     periodConfidence: f.periodConfidence ?? null,
+                     // Rule R5 (T9): where the dates came from. A month-only reading needs the customer to
+-                    // confirm its days before the proposal can be confirmed (acceptanceProblem).
+-                    periodOrigin: f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,
++                    // confirm its days before the proposal can be confirmed (acceptanceProblem). A delivery
++                    // date is printed, so it is never month-only.
++                    periodOrigin: !f.periodStart && !f.periodEnd && f.deliveryDate ? 'delivery'
++                      : f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,
+                     confidence: f.confidence,
+                     sourceQuote: f.sourceQuote ?? null,
+                     notes: f.notes ?? null,
+@@ -1277,6 +1281,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+   const addCoverageResolution = (res: CoverageResolution) => {
+     setInventory(inv => ({ ...inv, coverage_resolutions: upsertResolution(inv.coverage_resolutions ?? [], res) }))
+   }
++  // T10b: "Remove it" on a stored resolution the engine refuses (an estimate it cannot use), so a refused
++  // record never sits in the inventory unexplained. Removes only the resolution with the same key.
++  const removeCoverageResolution = (res: CoverageResolution) => {
++    setInventory(inv => ({ ...inv, coverage_resolutions: (inv.coverage_resolutions ?? []).filter(r => resolutionKey(r) !== resolutionKey(res)) }))
++  }
+   // "Different meters or accounts": the document's meter label and the resolution that must match it,
+   // written in ONE update so neither exists without the other (T3 ruling: meter_label is the one source).
+   const labelMeter = (locId: string, docId: string, label: string, res: CoverageResolution) => {
+@@ -2148,7 +2157,7 @@ workings: saved.workings,
+                       </div>
+                     )}
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
++                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2163,7 +2172,7 @@ workings: saved.workings,
+                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
+                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
++                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2178,7 +2187,7 @@ workings: saved.workings,
+                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
+                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
++                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2206,7 +2215,7 @@ workings: saved.workings,
+                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                     <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
++                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2222,7 +2231,7 @@ workings: saved.workings,
+                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                     <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
++                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2250,7 +2259,7 @@ workings: saved.workings,
+                       </select>
+                     </div>
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
++                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2270,7 +2279,7 @@ workings: saved.workings,
+                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
+                     <input id={`figure-${loc.id}-refrigerant_purchased_kg`} type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
++                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
+                 </div>
+               )}
+             </div>
+@@ -2343,7 +2352,7 @@ workings: saved.workings,
+                     <a href={EPA_EGRID_POWER_PROFILER_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
+                   </div>
+                 )}
+-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
++                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
+               </div>
+             </div>
+             <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system: Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
+@@ -2413,7 +2422,7 @@ workings: saved.workings,
+                       )}
+                     </>
+                   })()}
+-                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
++                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
+                 </div>
+               )}
+             </QuestionCard>
+@@ -2543,7 +2552,7 @@ workings: saved.workings,
+                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
+                     <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(i, 'renewable_electricity_kwh', r)} onUseBills={() => switchToBills(i, 'renewable_electricity_kwh')} style={inputStyle} />
+                   </Field>
+-                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
++                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
+                 </div>
+               ))}
+             </div>
+@@ -2562,7 +2571,7 @@ workings: saved.workings,
+                       docs live in the locations_data jsonb with no DB constraint on document_type,
+                       and /api/verifier-documents iterates source_docs generically, so this slot
+                       reaches the verifier surface on its own. */}
+-                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
++                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
+                 </div>
+               ))}
+             </div>
+@@ -3487,7 +3496,7 @@ const PROPOSAL_BADGE_COLOUR: Record<ConciergeStatus, { bg: string; color: string
+   rejected:            { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
+ }
+ 
+-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, onLabelMeter, onEnterManually, currentUser, location, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onLabelMeter: (locId: string, docId: string, label: string, res: CoverageResolution) => void; onEnterManually: (locId: string, field: string) => void; currentUser: CurrentUser | null; location: Location; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
++function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, onRemoveCoverageResolution, onLabelMeter, onEnterManually, currentUser, location, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onLabelMeter: (locId: string, docId: string, label: string, res: CoverageResolution) => void; onEnterManually: (locId: string, field: string) => void; currentUser: CurrentUser | null; location: Location; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; onRemoveCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
+   const ref = useRef<HTMLInputElement>(null)
+   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
+   const [editVal, setEditVal] = useState<string>('')
+@@ -3534,7 +3543,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+       {/* The coverage strip (T8): the engine's issues for this upload, per fuel and meter, with the controls
+           that answer them. See ./_components/CoverageStrip.tsx. */}
+       <CoverageStrip location={location} docType={docType} reportingYear={reportingYear} fiscalYearEndMonth={fiscalYearEndMonth}
+-        resolutions={coverageResolutions} currentUser={currentUser} onAdd={onAddCoverageResolution}
++        resolutions={coverageResolutions} currentUser={currentUser} onAdd={onAddCoverageResolution} onRemove={onRemoveCoverageResolution}
+         onLabelMeter={(docId, l, res) => onLabelMeter(locId, docId, l, res)} onEnterManually={field => onEnterManually(locId, field)} />
+       {uploadError && (
+         <div style={{ marginTop: 6, background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 8, padding: '8px 10px', fontSize: 12, color: '#B91C1C', lineHeight: 1.5 }}>
+@@ -3570,7 +3579,10 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                     <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>ThemisIQ read</span>
+                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
+                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
+-                    {(p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
++                    {/* T10b: a delivery shows its delivery date, not a one-day period. */}
++                    {deliveryDateOf(docType, p) !== null
++                      ? <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· delivered {deliveryDateOf(docType, p)}</span>
++                      : (p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
+                     <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: PROPOSAL_BADGE_COLOUR[p.status].bg, color: PROPOSAL_BADGE_COLOUR[p.status].color }}>
+                       {PROPOSAL_BADGE[p.status]}
+                     </span>
+diff --git a/app/dashboard/ghg/trends/page.tsx b/app/dashboard/ghg/trends/page.tsx
+index 5281d4b..c2f08da 100644
+--- a/app/dashboard/ghg/trends/page.tsx
++++ b/app/dashboard/ghg/trends/page.tsx
+@@ -22,7 +22,7 @@ import { FACTOR_EDITION_DISCLOSURE } from '../../../../lib/ghg/factorEditions'
+ import { scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift } from '../../../../lib/ghg/series'
+ import { supabase } from '../../../../lib/supabase'
+ import { computeTrajectory } from '../../../../lib/sbti'
+-import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
++import { loadMonthly, DELIVERY_BASED_NOTE, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
+ 
+ // Shown in place of the monthly chart when the selected year's inventory cannot be identified (T12).
+ const MONTHLY_NO_INVENTORY = "this year's inventory could not be identified, so its monthly detail cannot be shown"
+@@ -547,6 +547,9 @@ export default function TrendsPage() {
+                   {monthly.totalTco2e.toLocaleString()} tCO₂e total. Months without dated bills are omitted.
+                   This is a partial, concierge-sourced view; the yearly chart above is authoritative.
+                 </p>
++                {monthly.deliveryBased && (
++                  <p style={{ marginTop: 4, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>{DELIVERY_BASED_NOTE}</p>
++                )}
+               </>
+             )}
+           </div>
+diff --git a/lib/ghg/conciergeDocTypes.test.ts b/lib/ghg/conciergeDocTypes.test.ts
+index f12f124..633de6b 100644
+--- a/lib/ghg/conciergeDocTypes.test.ts
++++ b/lib/ghg/conciergeDocTypes.test.ts
+@@ -1,7 +1,9 @@
+ import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
+ import {
+   SUPPORTED_FUELS, DOC_TYPE_FUELS, CONCIERGE_UNREAD_DOC_TYPES,
+-  JUDGEMENT_EXCLUDED, docTypeIsReadable, DOC_TYPE_LABELS, docTypeLabel,
++  JUDGEMENT_EXCLUDED, docTypeIsReadable, DOC_TYPE_LABELS, docTypeLabel, DELIVERY_DOC_TYPES,
+ } from './conciergeDocTypes'
+ 
+ // ── What the concierge SENDS must match what the extractor can READ ─────────────────────────────
+@@ -167,3 +169,16 @@ describe('the mapping covers what the wizard uploads', () => {
+     ).toEqual([])
+   })
+ })
++
++describe('delivery-capable document types (T10b)', () => {
++  it('are fuels bought by delivery, every one a known document type; metered supplies are never among them', () => {
++    expect([...DELIVERY_DOC_TYPES].sort()).toEqual(['fleet_fuel', 'fuel_diesel', 'fuel_oil', 'fuel_propane'])
++    for (const t of DELIVERY_DOC_TYPES) expect(DOC_TYPE_FUELS[t], t).toBeDefined()
++    for (const t of ['utility_bill_gas', 'utility_electricity', 'purchased_steam']) expect(DELIVERY_DOC_TYPES.has(t), t).toBe(false)
++  })
++  it('the extraction prompt records a delivery date as a delivery, never as a one-day period', () => {
++    const route = readFileSync(join(process.cwd(), 'app/api/concierge/extract/route.ts'), 'utf8')
++    expect(route).toContain('return that date as deliveryDate (yyyy-mm-dd), with periodStart: null and periodEnd: null. Never return a delivery date as a one-day period')
++    expect(route).toContain('"deliveryDate": "<yyyy-mm-dd or null>"')
++  })
++})
+diff --git a/lib/ghg/conciergeDocTypes.ts b/lib/ghg/conciergeDocTypes.ts
+index a6eb9f6..71733f1 100644
+--- a/lib/ghg/conciergeDocTypes.ts
++++ b/lib/ghg/conciergeDocTypes.ts
+@@ -68,6 +68,13 @@ export const DOC_TYPE_LABELS: Record<string, string> = {
+ export const docTypeLabel = (docType: string): string =>
+   DOC_TYPE_LABELS[docType] ?? 'Source document'
+ 
++// T10b: document types whose readings may be DELIVERIES. Fuel bought by delivery or purchase, not metered by
++// period. Within these types the READING decides (ruling, design doc section 10): a single delivery date and no
++// billing period makes it a delivery, counted in full in the year it was delivered; a reading with a billing
++// period (a fuel-card or account statement, metered LPG) is a statement, prorated by its own days. Gas,
++// electricity and steam are metered and billed by period, so they are never here.
++export const DELIVERY_DOC_TYPES = new Set<string>(['fuel_propane', 'fuel_diesel', 'fleet_fuel', 'fuel_oil'])
++
+ // Document types the concierge does NOT send for extraction.
+ export const CONCIERGE_UNREAD_DOC_TYPES = new Set<string>([
+   'service_record', 'fuel_oil', 'purchased_steam', 'renewable_cert', 'biogenic',
+diff --git a/lib/ghg/coverageActions.test.ts b/lib/ghg/coverageActions.test.ts
+index 2edf3c2..195c8be 100644
+--- a/lib/ghg/coverageActions.test.ts
++++ b/lib/ghg/coverageActions.test.ts
+@@ -5,6 +5,7 @@
+ import { describe, it, expect } from 'vitest'
+ import {
+   resolutionKey, upsertResolution, sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution, plainDate,
++  deliveriesCompleteResolution, NO_MONTHS_TO_ESTIMATE,
+ } from './coverageActions'
+ import {
+   emptyLocation, validateResolution, findUnresolvedCoverage, deriveLocations,
+@@ -138,3 +139,17 @@ describe('the controls resolve the issue they answer', () => {
+     expect(issues(l, [r]).some(i => i.status === 'all_rejected')).toBe(false)
+   })
+ })
++
++describe('T10b: deliveries confirmation and the 0-months guard', () => {
++  it('confirming again replaces the earlier confirmation for the same documents type and fuel', () => {
++    const by = { userId: 'u', email: 'e@x.example' }
++    const a = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: ['x'], statement: 'S.', by, at: AT })
++    const b = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: ['x', 'y'], statement: 'S.', by, at: AT })
++    expect(upsertResolution([a], b)).toEqual([b])
++    expect(a.note).toMatch(/^e@x\.example confirmed on \d{1,2} [A-Z][a-z]+ \d{4}: S\.$/)
++  })
++  it('no estimate below one covered month', () => {
++    expect(() => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null, monthsCovered: 0, pctEstimated: 100, at: AT }))
++      .toThrow(NO_MONTHS_TO_ESTIMATE)
++  })
++})
+diff --git a/lib/ghg/coverageActions.ts b/lib/ghg/coverageActions.ts
+index ff41f45..a5bb4b7 100644
+--- a/lib/ghg/coverageActions.ts
++++ b/lib/ghg/coverageActions.ts
+@@ -15,7 +15,9 @@
+ //                        would exclude both bills and drop the figure;
+ //   - different_meters:  its document;
+ //   - extrapolate:       (document type, fuel, meter);
+-//   - used_none:         (location, fuel, field).
++//   - used_none:         (location, fuel, field);
++//   - deliveries_complete (T10b): (location, document type, fuel), so confirming again replaces the earlier
++//                        confirmation rather than keeping both.
+ // Legacy duplicate and straddle keep the old (location, fuel, kind) key; nothing writes them any more.
+ 
+ import type { CoverageResolution } from './engine'
+@@ -30,6 +32,8 @@ export function resolutionKey(r: CoverageResolution): string {
+       return `extrapolate|${r.locId}|${r.documentType ?? ''}|${r.fuelType}|${r.meterLabel ?? ''}`
+     case 'used_none':
+       return `used_none|${r.locId}|${r.fuelType}|${r.field ?? ''}`
++    case 'deliveries_complete':
++      return `deliveries_complete|${r.locId}|${r.documentType ?? ''}|${r.fuelType}`
+     default:
+       return `${r.kind}|${r.locId}|${r.fuelType}`
+   }
+@@ -65,11 +69,21 @@ export function differentMetersResolution(a: {
+   }
+ }
+ 
+-/** A gap estimate for one meter of one document type: that meter's bills grossed up by its own coverage. */
++/** Why no estimate can be built from zero covered months (T10b ruling). Shown by the strip in place of the control. */
++export const NO_MONTHS_TO_ESTIMATE =
++  'No month is fully covered by these bills, so the missing months cannot be estimated from them. Upload the missing bills, or enter the figure yourself.'
++
++/**
++ * A gap estimate for one meter of one document type: that meter's bills grossed up by its own coverage.
++ * T10b: refuses to build one from fewer than 1 covered month. Scaling ×12/0 is not an estimate, and the
++ * engine refuses such a resolution anyway (validateResolution), so building one only stored a record that
++ * changed nothing and told the customer nothing. The strip never offers the control at 0.
++ */
+ export function estimateResolution(a: {
+   locId: string; fuelType: string; documentType: string; meterLabel: string | null
+   monthsCovered: number; pctEstimated: number; at: string
+ }): CoverageResolution {
++  if (!(a.monthsCovered >= 1)) throw new Error(NO_MONTHS_TO_ESTIMATE)
+   const m = a.monthsCovered
+   const meter = a.meterLabel ? `Meter ${a.meterLabel}: ` : ''
+   return {
+@@ -98,3 +112,20 @@ export function usedNoneResolution(a: {
+     acknowledgedAt: a.at,
+   }
+ }
++
++/**
++ * T10b: "These are all the deliveries for this year", for one (document type, fuel) at one site. It records who
++ * and when, and the documents it covers: if those change, the confirmation no longer applies (ruling). The note
++ * repeats the statement the customer clicked, which names the fuel, the site and the window.
++ */
++export function deliveriesCompleteResolution(a: {
++  locId: string; fuelType: string; documentType: string; docIds: string[]; statement: string
++  by: { userId: string; email: string }; at: string
++}): CoverageResolution {
++  return {
++    locId: a.locId, fuelType: a.fuelType, kind: 'deliveries_complete', documentType: a.documentType,
++    docIds: [...a.docIds], by: a.by,
++    note: `${a.by.email} confirmed on ${plainDate(a.at)}: ${a.statement}`,
++    acknowledgedAt: a.at,
++  }
++}
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index c55fdca..27a8082 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -32,7 +32,9 @@ import {
+   deriveLocations,
+   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
+   documentsBacking, deriveStoredLocations, factorDerivationsFor,
++  canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
+ } from './engine';
++import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE } from './coverageActions';
+ import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
+ import { NOT_PROVIDED } from '../notProvided';
+ import { countryRefusalText } from './countryRefusalCopy';
+@@ -4667,3 +4669,162 @@ describe('T10a no figure, and MJ gas', () => {
+     expect(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0].natural_gas_amount).toBeCloseTo(readings.reduce((a, b) => a + b, 0) / 1000 / 1.05505585262, 5);
+   });
+ });
++
++describe('T10b delivery-based fuels', () => {
++  // The run-through: six Melbourne LPG invoices, 90 kg each (177.143 L), one delivery date each, no billing
++  // period, in a year ending 30 September 2025. Before T10b each was stored as a one-day period.
++  const W = periodFromYearAndEnd(2025, 9);
++  const DATES = ['2024-10-14', '2024-12-09', '2025-02-03', '2025-04-14', '2025-06-23', '2025-08-25'];
++  const lpg = (id: string, date: string, o: Partial<ExtractedProposal> = {}): SourceDoc =>
++    ({ ...doc('fuel_propane', [prop({ fuelType: 'propane', rawValue: 90, rawUnit: 'kg', value: 177.143, unit: 'litres',
++      periodStart: date, periodEnd: date, sourceQuote: '90 kg', ...o })], id), file_name: `${id}.pdf` });
++  const site = (docs: SourceDoc[]) => loc({ name: 'Melbourne', country: 'AU', state: 'VIC', grid_region: 'AU_VIC',
++    has_propane: true, propane_unit: 'litres', source_docs: docs });
++  const melbourne = () => site(DATES.map((d, k) => lpg(`lpg${k + 1}`, d)));
++  const issues = (l: Location, r: CoverageResolution[] = [], y = 2025, m = 9) => findUnresolvedCoverage([l], y, m, r);
++  const by = { userId: 'u1', email: 'lisa@example.com' };
++  const confirm = (l: Location, at = '2025-10-02T09:00:00Z') => {
++    const i = issues(l).find(x => x.status === 'deliveries_unconfirmed')!;
++    return deliveriesCompleteResolution({ locId: l.id, fuelType: 'propane', documentType: 'fuel_propane', docIds: i.docIds ?? [],
++      statement: deliveriesStatement('propane', 'Melbourne', W), by, at });
++  };
++
++  it('deliveryDateOf: the reading decides, within delivery-capable document types only', () => {
++    expect(deliveryDateOf('fuel_propane', { periodStart: '2025-03-14', periodEnd: '2025-03-14' }), 'stored before T10b').toBe('2025-03-14');
++    expect(deliveryDateOf('fuel_propane', { periodStart: null, periodEnd: null, deliveryDate: '2025-03-14' })).toBe('2025-03-14');
++    expect(deliveryDateOf('fleet_fuel', { periodStart: '2025-03-01', periodEnd: '2025-03-31' }), 'a statement').toBeNull();
++    expect(deliveryDateOf('utility_bill_gas', { periodStart: '2025-03-14', periodEnd: '2025-03-14' }), 'gas is metered').toBeNull();
++    expect(deliveryDateOf('fuel_diesel', { periodStart: null, periodEnd: null }), 'undated').toBeNull();
++  });
++
++  it('the Melbourne case: each delivery counts in full, never prorated, with its delivery date', () => {
++    const cs = billContributions(melbourne(), [], W);
++    expect(cs.map(c => [c.reason, c.share, c.totalDays, c.deliveryDate, c.periodOrigin])).toEqual(
++      DATES.map(d => ['delivered', 1, null, d, 'delivery']));
++    expect(applyResolutions(melbourne(), [], W.start, W.end).propane_amount?.value).toBeCloseTo(6 * 177.143, 6);
++  });
++
++  it('the Melbourne case: no month count and no gap; export waits for the completeness confirmation', () => {
++    const got = issues(melbourne());
++    expect(got.some(i => i.status === 'gap')).toBe(false);
++    expect(got.filter(i => i.status === 'deliveries_unconfirmed')).toEqual([{ locId: 'L1', fuelType: 'propane', status: 'deliveries_unconfirmed',
++      documentType: 'fuel_propane', docIds: ['lpg1', 'lpg2', 'lpg3', 'lpg4', 'lpg5', 'lpg6'],
++      message: 'Confirm that the 6 propane deliveries listed for Melbourne are all the propane deliveries between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
++  });
++
++  it('the confirmation names fuel, site and window, records who and when, clears the issue and reaches the workings', () => {
++    const l = melbourne();
++    const r = confirm(l);
++    expect(deliveriesStatement('propane', 'Melbourne', W)).toBe('These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025.');
++    expect(r.note).toBe('lisa@example.com confirmed on 2 October 2025: These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025.');
++    expect(validateResolution(r, l)).toBeNull();
++    expect(issues(l, [r])).toEqual([]);
++    const row = buildWorkings([l], 'AR6', 2025, [r], 9).find(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'deliveries_complete');
++    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com at 2025-10-02T09:00:00Z');
++    expect(row?.ef_source).toBe(r.note);
++  });
++
++  it('adding, removing or rejecting a delivery reopens the confirmation, naming who confirmed and when', () => {
++    const l = melbourne();
++    const r = confirm(l);
++    const CHANGED = 'The propane deliveries for Melbourne have changed since lisa@example.com confirmed them on 2 October 2025. Check the list and confirm again. Export is blocked until you do.';
++    const added = { ...l, source_docs: [...l.source_docs, lpg('lpg7', '2025-09-15')] };
++    expect(issues(added, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
++    const removed = { ...l, source_docs: l.source_docs.slice(1) };
++    expect(issues(removed, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
++    const rejected = { ...l, source_docs: l.source_docs.map((d, k) => k === 0 ? { ...d, extracted: d.extracted!.map(p => ({ ...p, status: 'rejected' as const })) } : d) };
++    expect(issues(rejected, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
++    expect(issues(rejected, [confirm(rejected)]), 'confirming again clears it').toEqual([]);
++  });
++
++  it('a full year of deliveries exports after confirmation', () => {
++    const l = site(Array.from({ length: 12 }, (_, k) => lpg(`m${k + 1}`, `2025-${String(k + 1).padStart(2, '0')}-15`)));
++    expect(issues(l, [], 2025, 12).map(i => i.status)).toEqual(['deliveries_unconfirmed']);
++    const i = issues(l, [], 2025, 12)[0];
++    const r = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: i.docIds ?? [],
++      statement: deliveriesStatement('propane', 'Melbourne', periodFromYearAndEnd(2025, 12)), by, at: '2026-01-05T09:00:00Z' });
++    expect(issues(l, [r], 2025, 12)).toEqual([]);
++    expect(deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: [r] })[0].propane_amount).toBeCloseTo(12 * 177.143, 6);
++  });
++
++  it('the window: the day before it opens and the day after it closes count zero; the first and last day count in full', () => {
++    const l = site([lpg('before', '2024-09-30'), lpg('first', '2024-10-01'), lpg('last', '2025-09-30'), lpg('after', '2025-10-01')]);
++    expect(billContributions(l, [], W).map(c => [c.docId, c.reason, c.share])).toEqual([
++      ['before', 'outside_year', 0], ['first', 'delivered', 1], ['last', 'delivered', 1], ['after', 'outside_year', 0]]);
++  });
++
++  it('a delivery on the 1st of a month counts; it is not an invalid period', () => {
++    const c = billContributions(site([lpg('d', '2025-03-01')]), [], W)[0];
++    expect([c.reason, c.share, c.deliveryDate]).toEqual(['delivered', 1, '2025-03-01']);
++  });
++
++  it('a one-day billing period on the 1st covers that day and is not "reversed"', () => {
++    const one = canonicalPeriod(new Date(2025, 2, 1), new Date(2025, 2, 1));
++    expect([one.start.getDate(), one.endExclusive.getMonth(), one.endExclusive.getDate()]).toEqual([1, 2, 2]);
++    expect(canonicalPeriod(new Date(2024, 11, 1), new Date(2025, 0, 1)).endExclusive.getTime(), 'other periods unchanged').toBe(exclusiveEnd(new Date(2025, 0, 1)).getTime());
++    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2025-03-01', periodEnd: '2025-03-01' })], 'g')] });
++    const c = billContributions(gas, [], periodFromYearAndEnd(2025, 12))[0];
++    expect([c.reason, c.totalDays, c.inWindowDays]).toEqual(['counted', 1, 1]);
++  });
++
++  it('a delivery-based group is never estimated', () => {
++    const l = melbourne();
++    expect(isDeliveryGroup(l, 'fuel_propane', 'propane')).toBe(true);
++    const est = { locId: 'L1', fuelType: 'propane', kind: 'extrapolate', documentType: 'fuel_propane', monthsCovered: 6, pctEstimated: 50,
++      note: 'n', acknowledgedAt: '2025-10-02T09:00:00Z' } as CoverageResolution;
++    expect(validateResolution(est, l)).toBe('Deliveries are counted as delivered, not estimated.');
++    expect(applyResolutions(l, [est], W.start, W.end).propane_amount?.value).toBeCloseTo(6 * 177.143, 6);
++  });
++
++  it('the 0-months guard: no estimate is built from zero covered months, and a stored one changes nothing', () => {
++    expect(() => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
++      monthsCovered: 0, pctEstimated: 100, at: '2025-10-02T09:00:00Z' })).toThrow(NO_MONTHS_TO_ESTIMATE);
++    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ value: 50, periodStart: '2025-03-10', periodEnd: '2025-03-20' })], 'g')] });
++    const zero = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', documentType: 'utility_bill_gas', monthsCovered: 0, pctEstimated: 100,
++      note: 'n', acknowledgedAt: '2025-10-02T09:00:00Z' } as CoverageResolution;
++    expect(validateResolution(zero, gas)).toBe('An estimate needs the number of months covered by bills.');
++    expect(applyResolutions(gas, [zero], new Date(2025, 0, 1), new Date(2025, 11, 31)).natural_gas_amount?.value).toBe(50);
++    expect(findUnresolvedCoverage([gas], 2025, 12, [zero]).map(i => i.status)).toContain('gap');
++    const one = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
++      monthsCovered: 1, pctEstimated: 91.7, at: '2025-10-02T09:00:00Z' });
++    expect(validateResolution(one, gas)).toBeNull();
++  });
++
++  it('a statement in a delivery-capable type is prorated and month-checked as before', () => {
++    const fleet = loc({ has_mobile: true, gasoline_unit: 'litres', source_docs: [doc('fleet_fuel', [prop({ fuelType: 'gasoline', value: 400, unit: 'litres',
++      periodStart: '2025-03-01', periodEnd: '2025-03-31' })], 'card')] });
++    const got = findUnresolvedCoverage([fleet], 2025, 12, []);
++    expect(got.map(i => i.status)).toContain('gap');
++    expect(got.some(i => i.status === 'deliveries_unconfirmed')).toBe(false);
++  });
++
++  it('a mixed field: statements are still prorated by their own days, and the field is confirmed as a whole', () => {
++    const statement = doc('fuel_propane', [prop({ fuelType: 'propane', value: 310, unit: 'litres', periodStart: '2024-09-15', periodEnd: '2024-10-14' })], 'stmt');
++    const l = site([statement, lpg('lpg1', '2025-02-03')]);
++    const cs = billContributions(l, [], W);
++    expect(cs.find(c => c.docId === 'stmt')?.reason).toBe('prorated');
++    expect(cs.find(c => c.docId === 'stmt')?.share).toBeCloseTo(14 / 30, 6);
++    const got = issues(l);
++    expect(got.some(i => i.status === 'gap')).toBe(false);
++    expect(got.find(i => i.status === 'deliveries_unconfirmed')?.docIds).toEqual(['stmt', 'lpg1']);
++  });
++
++  it('a delivery returned as a delivery date with no period is the same delivery', () => {
++    const l = site([lpg('new', '', { periodStart: null, periodEnd: null, deliveryDate: '2025-02-03' })]);
++    expect(billContributions(l, [], W).map(c => [c.reason, c.deliveryDate])).toEqual([['delivered', '2025-02-03']]);
++  });
++
++  it('monthly: each delivery lands whole in its delivery month, tagged delivery, and reconciles', () => {
++    const l = melbourne();
++    const inv = { locations: [l], reporting_year: 2025, fiscal_year_end_month: 9, coverage_resolutions: [confirm(l)] };
++    const { slices } = buildMonthlyEmissions(inv, { calcGas, pickEF, getGridFactor, isResolvedGridRegion }, 'AR6');
++    expect(slices.map(s => [s.period_month, s.activity_value, s.pct_in_month, s.basis, s.period_start, s.period_end])).toEqual(
++      DATES.map(d => [`${d.slice(0, 7)}-01`, 177.143, 1, 'delivery', d, d]));
++    expect(reconcile(slices, inv, 'AR6').reconciles).toBe(true);
++  });
++
++  it('sameDocSet ignores order', () => {
++    expect(sameDocSet(['a', 'b'], ['b', 'a'])).toBe(true);
++    expect(sameDocSet(['a', 'b'], ['a'])).toBe(false);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index b569cd4..72561d5 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -34,6 +34,7 @@ import type { FactorEditions } from './factorEditions'
+ // reads in an export and the sentence the customer reads on screen come from ONE module and cannot
+ // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
+ import { countryRefusalText } from './countryRefusalCopy'
++import { DELIVERY_DOC_TYPES } from './conciergeDocTypes'
+ // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
+ // WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
+ // country control is built from, so "a country this platform can express" has ONE definition and
+@@ -1604,6 +1605,9 @@ interface ExtractedProposal {
+   conversionNote?: string
+   periodStart: string | null      // ISO yyyy-mm-dd
+   periodEnd: string | null
++  // T10b: the date a fuel was delivered or bought, read from a delivery document that prints no service period.
++  // Present with periodStart and periodEnd null. deliveryDateOf decides whether a reading is a delivery.
++  deliveryDate?: string | null
+   periodConfidence?: 'high' | 'medium' | 'low' | null
+   confidence: 'high' | 'medium' | 'low'
+   sourceQuote: string | null
+@@ -1748,6 +1752,20 @@ export function reportingYearLabel(win: { start: Date; end: Date }): { label: st
+   const ending = `the year ending ${e.getDate()} ${MONTH_NAMES[e.getMonth()]} ${e.getFullYear()}`
+   return { label: ending, inText: ending }
+ }
++
++/** A calendar date in words, "1 October 2024": the date itself, in local time. */
++export function dateInWords(d: Date): string {
++  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
++}
++
++/**
++ * T10b: the words of the completeness confirmation, naming the fuel, the site and the window (ruling):
++ * "These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025."
++ * The button says it and the stored note repeats it, so what was clicked is what is recorded.
++ */
++export function deliveriesStatement(fuel: string, site: string, win: { start: Date; end: Date }): string {
++  return `These are all the ${fuel} deliveries for ${site} between ${dateInWords(win.start)} and ${dateInWords(win.end)}.`
++}
+ // ── Concierge coverage analysis (spec: docs/pricing-and-concierge-spec-v4.md addendum) ──
+ // Pure function. Given a fuel's CONFIRMED proposals (each carrying a billing period)
+ // and the reporting-year window, classifies data completeness so the wizard can
+@@ -1802,6 +1820,17 @@ function exclusiveEnd(end: Date): Date {
+     : new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1)
+ }
+ 
++// T10b: THE CANONICAL HALF-OPEN PERIOD OF A STORED [start, end]. A one-day period (start = end) covers that
++// day, whatever the date. exclusiveEnd alone read an end on the 1st as exclusive, so start = end = the 1st had
++// no days and was reported as ending before it starts, contradicting the T1 ruling that a one-day bill is
++// valid. Every other period is [start, exclusiveEnd(end)), unchanged. Coverage and contributions both read
++// periods through here, so the two cannot disagree; exclusiveEnd stays the one definition of an end date.
++export function canonicalPeriod(start: Date, end: Date): { start: Date; endExclusive: Date } {
++  const s0 = new Date(start.getFullYear(), start.getMonth(), start.getDate())
++  const sameDay = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth() && start.getDate() === end.getDate()
++  return { start: s0, endExclusive: sameDay ? new Date(s0.getFullYear(), s0.getMonth(), s0.getDate() + 1) : exclusiveEnd(end) }
++}
++
+ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date): CoverageResult {
+   if (periods.length === 0) {
+     return { status: 'none', issues: [], monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], outOfWindow: [], summary: 'No dated bills yet.' }
+@@ -1836,7 +1865,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
+     `${p.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
+   periods.forEach(p => {
+     const pStart = new Date(p.start.getFullYear(), p.start.getMonth(), p.start.getDate())
+-    const pEndExcl = exclusiveEnd(p.end)
++    const pEndExcl = canonicalPeriod(p.start, p.end).endExclusive
+     const totalDays = dayCount(pStart, pEndExcl)
+     const ovStart = pStart > winS ? pStart : winS
+     const ovEndExcl = pEndExcl < winEexcl ? pEndExcl : winEexcl
+@@ -1863,7 +1892,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
+   const coverCount: number[] = new Array(Math.max(0, totalDaysInWin)).fill(0)
+   periods.forEach(p => {
+     let i = Math.max(0, idxOf(p.start))
+-    const jExcl = Math.min(totalDaysInWin, idxOf(exclusiveEnd(p.end)))
++    const jExcl = Math.min(totalDaysInWin, idxOf(canonicalPeriod(p.start, p.end).endExclusive))
+     for (; i < jExcl; i++) coverCount[i]++
+   })
+ 
+@@ -1873,8 +1902,8 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
+   const overlapPairs: CoverageResult['overlaps'] = []
+   for (let a = 0; a < periods.length; a++) {
+     for (let b = a + 1; b < periods.length; b++) {
+-      const aS = periods[a].start.getTime(), aE = exclusiveEnd(periods[a].end).getTime()
+-      const bS = periods[b].start.getTime(), bE = exclusiveEnd(periods[b].end).getTime()
++      const aS = periods[a].start.getTime(), aE = canonicalPeriod(periods[a].start, periods[a].end).endExclusive.getTime()
++      const bS = periods[b].start.getTime(), bE = canonicalPeriod(periods[b].start, periods[b].end).endExclusive.getTime()
+       if (Math.max(aS, bS) < Math.min(aE, bE)) overlapPairs.push({ a: periods[a], b: periods[b] })
+     }
+   }
+@@ -1933,7 +1962,7 @@ interface CoverageResolution {
+   fuelType: string
+   // Written kinds (T3): extrapolate, same_bill, different_meters, used_none. 'duplicate' and 'straddle' are
+   // LEGACY: readable, never accepted (validateResolution), so they change no figure and resolve no issue.
+-  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle'
++  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle' | 'deliveries_complete'
+   // extrapolate: gross up partial-year data by coverage ratio
+   monthsCovered?: number          // for extrapolate: e.g. 11
+   pctEstimated?: number           // for extrapolate: e.g. 8.3
+@@ -1951,6 +1980,9 @@ interface CoverageResolution {
+   docId?: string
+   // used_none: the location field confirmed as zero.
+   field?: string
++  // deliveries_complete (T10b): the documents the customer confirmed as all the deliveries for the year. If the
++  // confirmed deliveries change, the set no longer matches and the confirmation stops applying (ruling).
++  docIds?: string[]
+   // Who confirmed (used_none: required). The account's user id and email at the time of confirming.
+   by?: { userId: string; email: string }
+   // LEGACY straddle: day-level proration choice (ignored since T2)
+@@ -3035,6 +3067,7 @@ function resolutionMethod(r: CoverageResolution): string {
+     : r.kind === 'same_bill' ? 'Same bill, counted once'
+     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
+     : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
++    : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
+     : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
+     : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
+     : r.kind
+@@ -3071,8 +3104,22 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
+     case 'extrapolate': {
+       if (!(r.monthsCovered && r.monthsCovered > 0)) return 'An estimate needs the number of months covered by bills.'
+       const types = new Set(docs.filter(d => (d.extracted ?? []).some(p => p.fuelType === r.fuelType)).map(d => d.document_type))
+-      if (r.documentType != null) return types.has(r.documentType) ? null : 'The estimate names documents that are not on this site.'
+-      return types.size > 1 ? 'Choose which documents this estimate covers.' : null
++      if (r.documentType != null && !types.has(r.documentType)) return 'The estimate names documents that are not on this site.'
++      if (r.documentType == null && types.size > 1) return 'Choose which documents this estimate covers.'
++      // T10b: deliveries are counted as delivered; a delivery-based group is never estimated (ruling).
++      const docType = r.documentType ?? [...types][0]
++      if (docType != null && isDeliveryGroup(loc, docType, r.fuelType)) return 'Deliveries are counted as delivered, not estimated.'
++      return null
++    }
++    case 'deliveries_complete': {
++      if (!r.by?.userId || !r.by?.email) return 'A confirmation must record who confirmed it.'
++      if (!r.documentType) return 'Name the documents these deliveries are on.'
++      const ids = r.docIds ?? []
++      // The ids are a SNAPSHOT of what was confirmed, so a document removed since is not an error here: the
++      // set no longer matches, and findUnresolvedCoverage reopens the issue saying the deliveries changed.
++      if (ids.length === 0) return 'Name the deliveries being confirmed.'
++      if (!isDeliveryGroup(loc, r.documentType, r.fuelType)) return 'These documents are not deliveries, so their coverage is checked by month instead.'
++      return null
+     }
+     case 'same_bill': {
+       const ex = r.excludedDocIds ?? []
+@@ -3100,6 +3147,21 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
+       return 'This resolution is no longer accepted. Bills that cross the year boundary are prorated by their own days.'
+   }
+ }
++/** T10b: two document-id lists name the same documents, order ignored. */
++export function sameDocSet(a: readonly string[], b: readonly string[]): boolean {
++  const A = new Set(a), B = new Set(b)
++  return A.size === B.size && [...A].every(x => B.has(x))
++}
++
++/**
++ * T10b: true when a location's (document type, fuel) group holds a confirmed delivery, so it is checked for
++ * completeness and never estimated. Read from the readings, not the type alone (ruling: the reading decides).
++ */
++export function isDeliveryGroup(loc: Location, documentType: string, fuelType: string): boolean {
++  return loc.source_docs.some(d => d.document_type === documentType
++    && (d.extracted ?? []).some(p => p.fuelType === fuelType && p.status === 'confirmed' && p.value != null && deliveryDateOf(documentType, p) !== null))
++}
++
+ export const acceptedResolutions = (loc: Location, resolutions: CoverageResolution[]): CoverageResolution[] =>
+   resolutions.filter(r => r.locId === loc.id && validateResolution(r, loc) === null)
+ 
+@@ -3168,6 +3230,12 @@ export const COVERAGE_MESSAGE = {
+   // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
+   unread: (file: string, fuels: string, site: string) =>
+     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
++  // T10b: a delivery-based fuel is checked for completeness, not monthly coverage. Until the customer confirms
++  // the deliveries listed are all of them, export waits.
++  deliveries_unconfirmed: (n: number, fuel: string, site: string, from: string, to: string) =>
++    `Confirm that the ${n} ${fuel} deliver${n === 1 ? 'y' : 'ies'} listed for ${site} ${n === 1 ? 'is' : 'are'} all the ${fuel} deliveries between ${from} and ${to}. Export is blocked until you confirm.`,
++  deliveries_changed: (fuel: string, site: string, email: string, date: string) =>
++    `The ${fuel} deliveries for ${site} have changed since ${email} confirmed them on ${date}. Check the list and confirm again. Export is blocked until you do.`,
+   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
+     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
+ }
+@@ -3223,10 +3291,10 @@ export function streamSwitchOff(loc: Location, field: keyof Location | string):
+ // `periodStart` is kept VERBATIM as stored; `periodEndExclusive` is the canonical boundary.
+ // `periodOrigin`: 'high' → printed, 'medium' → billing_month (rule R5); anything else, including a missing
+ // periodConfidence, is null, meaning not recorded (ruled). `meterLabel` null is the default single meter (ruled).
+-export type PeriodOrigin = 'printed' | 'billing_month' | 'customer_confirmed'
++export type PeriodOrigin = 'printed' | 'billing_month' | 'customer_confirmed' | 'delivery'
+ export type ContributionReason =
+   | 'counted' | 'prorated' | 'outside_year' | 'undated' | 'invalid_period' | 'not_confirmed' | 'mixed_units'
+-  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override'
++  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override' | 'delivered'
+ export interface BillContribution {
+   docId: string
+   proposalIndex: number
+@@ -3253,6 +3321,23 @@ export interface BillContribution {
+   corrections?: ExtractedProposal['corrections']
+   /** T9: who rejected the bill, or undid a rejection, and when. */
+   statusLog?: ExtractedProposal['statusLog']
++  /** T10b: the delivery date, when this reading is a delivery (counted in full if inside the year). */
++  deliveryDate?: string
++}
++
++/**
++ * T10b: the delivery date of a reading that is a DELIVERY, or null when it is not one. Rulings (design doc
++ * section 10): within a delivery-capable document type (DELIVERY_DOC_TYPES) the READING decides. A single
++ * delivery date with no billing period is a delivery; so is a reading whose stored period starts and ends on
++ * the same day, which is how a delivery date was stored before T10b (read as a delivery, no migration). A
++ * reading with a period of more than one day is a statement, prorated by its own days. Gas, electricity and
++ * steam are never deliveries.
++ */
++export function deliveryDateOf(documentType: string, p: Pick<ExtractedProposal, 'periodStart' | 'periodEnd' | 'deliveryDate'>): string | null {
++  if (!DELIVERY_DOC_TYPES.has(documentType)) return null
++  if (p.periodStart && p.periodEnd) return p.periodStart.slice(0, 10) === p.periodEnd.slice(0, 10) ? p.periodStart : null
++  if (!p.periodStart && !p.periodEnd && p.deliveryDate) return p.deliveryDate
++  return null
+ }
+ 
+ /**
+@@ -3355,11 +3440,22 @@ export function billContributions(
+     let inWindowDays: number | null = null
+     let share: number | null = null
+     let periodProblem: InvalidPeriodKind | null = null
+-    if (p.periodStart && p.periodEnd && (!isRealIsoDate(p.periodStart) || !isRealIsoDate(p.periodEnd))) {
++    // T10b: a DELIVERY counts in full when its delivery date is inside the window and not at all otherwise.
++    // It is never prorated and has no period, so it never enters the monthly coverage check.
++    const deliveryDate = deliveryDateOf(d.document_type, p)
++    let deliveredInWindow = false
++    if (deliveryDate !== null) {
++      if (!isRealIsoDate(deliveryDate)) periodProblem = 'unparseable'
++      else {
++        const dd = parseLocalDate(deliveryDate)
++        deliveredInWindow = dd >= winS && dd < winEexcl
++        share = deliveredInWindow ? 1 : 0
++      }
++    } else if (p.periodStart && p.periodEnd && (!isRealIsoDate(p.periodStart) || !isRealIsoDate(p.periodEnd))) {
+       periodProblem = 'unparseable'
+     } else if (p.periodStart && p.periodEnd) {
+       const start = parseLocalDate(p.periodStart)
+-      const e = exclusiveEnd(parseLocalDate(p.periodEnd))
++      const e = canonicalPeriod(start, parseLocalDate(p.periodEnd)).endExclusive
+       const t = dayCount(start, e)
+       // Both dates real, and the end falls before the start: the canonical period has no days.
+       if (t <= 0) periodProblem = 'reversed'
+@@ -3381,6 +3477,7 @@ export function billContributions(
+       : sameBillAs ? 'same_bill_as'
+       : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
+       : periodProblem ? 'invalid_period'
++      : deliveryDate !== null ? (deliveredInWindow ? 'delivered' : 'outside_year')
+       : totalDays === null ? 'undated'
+       : inWindowDays === 0 ? 'outside_year'
+       : (inWindowDays as number) < totalDays ? 'prorated'
+@@ -3394,16 +3491,17 @@ export function billContributions(
+       meterLabel: d.meter_label ?? null,
+       periodStart: p.periodStart,
+       periodEndExclusive: endExcl ? iso(endExcl) : null,
+-      periodOrigin: periodOriginOf(p),
++      periodOrigin: deliveryDate !== null ? 'delivery' : periodOriginOf(p),
+       totalDays,
+       inWindowDays,
+       share,
+       value: p.value,
+       unit: p.unit,
+-      counted: reason === 'counted' || reason === 'prorated',
++      counted: reason === 'counted' || reason === 'prorated' || reason === 'delivered',
+       reason,
+       ...(reason === 'invalid_period' && periodProblem ? { periodProblem } : {}),
+       ...(reason === 'same_bill_as' && sameBillAs ? { reasonRef: sameBillAs } : {}),
++      ...(deliveryDate !== null && periodProblem === null ? { deliveryDate } : {}),
+       // T9: the original reading and the customer's changes travel with the contribution into workings.
+       ...(p.asRead ? { asRead: p.asRead } : {}),
+       ...(p.corrections?.length ? { corrections: p.corrections } : {}),
+@@ -4157,7 +4255,7 @@ export function findUnresolvedCoverage(
+       } else if (c.reason === 'invalid_period' && c.periodProblem) {
+         const p = loc.source_docs.find(d => d.id === c.docId)?.extracted?.[c.proposalIndex]
+         out.push({ locId: loc.id, fuelType: c.fuelType, status: 'invalid_period', docIds: [c.docId], meterLabel: c.meterLabel,
+-          message: INVALID_PERIOD_MESSAGE[c.periodProblem](fileOf(c.docId), p?.periodStart ?? '', p?.periodEnd ?? '') })
++          message: INVALID_PERIOD_MESSAGE[c.periodProblem](fileOf(c.docId), p?.periodStart ?? p?.deliveryDate ?? '', p?.periodEnd ?? p?.deliveryDate ?? '') })
+       }
+     }
+     const mixedByField = new Map<string, BillContribution[]>()
+@@ -4205,6 +4303,32 @@ export function findUnresolvedCoverage(
+         message: COVERAGE_MESSAGE.stream_off(site, meta.verb, meta.name, e.n, FUEL_NAME[e.fuelType] ?? e.fuelType) })
+     }
+ 
++    // T10b: DELIVERY-BASED GROUPS, keyed (document_type, fuelType). A group with any confirmed delivery is
++    // checked for COMPLETENESS, not monthly coverage (ruling): no gap, no estimate, and export waits until the
++    // customer confirms that the deliveries listed are all of them. The confirmation covers every confirmed
++    // reading of the group, statements included (a mixed field is confirmed as a whole), and it applies only
++    // while that set is unchanged: adding, removing or rejecting a delivery reopens it (ruling).
++    const docTypeOf = (docId: string) => loc.source_docs.find(x => x.id === docId)?.document_type ?? ''
++    const placed = (c: BillContribution) => c.counted || c.reason === 'outside_year'
++    const deliveryGroups = new Map<string, { documentType: string; fuelType: string; n: number }>()
++    for (const c of contributions) {
++      if (!c.deliveryDate || !placed(c)) continue
++      const key = `${docTypeOf(c.docId)}|${c.fuelType}`
++      const g = deliveryGroups.get(key) ?? { documentType: docTypeOf(c.docId), fuelType: c.fuelType, n: 0 }
++      g.n += 1
++      deliveryGroups.set(key, g)
++    }
++    for (const g of deliveryGroups.values()) {
++      const docIds = [...new Set(contributions.filter(c => placed(c) && c.fuelType === g.fuelType && docTypeOf(c.docId) === g.documentType).map(c => c.docId))]
++      const conf = resolutions.filter(r => r.kind === 'deliveries_complete' && r.fuelType === g.fuelType && r.documentType === g.documentType).at(-1)
++      if (conf && sameDocSet(conf.docIds ?? [], docIds)) continue
++      const fuel = FUEL_NAME[g.fuelType] ?? g.fuelType
++      out.push({ locId: loc.id, fuelType: g.fuelType, status: 'deliveries_unconfirmed', documentType: g.documentType, docIds,
++        message: conf
++          ? COVERAGE_MESSAGE.deliveries_changed(fuel, site, conf.by?.email ?? 'someone', dateInWords(new Date(conf.acknowledgedAt)))
++          : COVERAGE_MESSAGE.deliveries_unconfirmed(g.n, fuel, site, dateInWords(coverageWin.start), dateInWords(coverageWin.end)) })
++    }
++
+     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
+     // (document_type, fuelType, meter_label). Same-bill exclusions, undated, invalid and mixed bills are
+     // not placed (each is reported above, or is a resolved overlap).
+@@ -4220,14 +4344,15 @@ export function findUnresolvedCoverage(
+     }
+     for (const g of groups.values()) {
+       const cov = analyzeCoverage(g.periods, coverageWin.start, coverageWin.end)
+-      if (cov.issues.includes('gap')) {
++      // T10b: a delivery-based group has no monthly gap; its statements are still checked for overlaps.
++      if (cov.issues.includes('gap') && !deliveryGroups.has(`${g.documentType}|${g.fuelType}`)) {
+         const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel
+           && (r.documentType == null || r.documentType === g.documentType))
+         if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel, documentType: g.documentType })
+       }
+       for (const pair of cov.overlaps) {
+         const from = pair.a.start > pair.b.start ? pair.a.start : pair.b.start
+-        const endA = exclusiveEnd(pair.a.end), endB = exclusiveEnd(pair.b.end)
++        const endA = canonicalPeriod(pair.a.start, pair.a.end).endExclusive, endB = canonicalPeriod(pair.b.start, pair.b.end).endExclusive
+         const toExcl = endA < endB ? endA : endB
+         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
+         out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,
+diff --git a/lib/ghg/loadMonthly.test.ts b/lib/ghg/loadMonthly.test.ts
+index c7a6e33..e45ec33 100644
+--- a/lib/ghg/loadMonthly.test.ts
++++ b/lib/ghg/loadMonthly.test.ts
+@@ -9,7 +9,7 @@ import { join } from 'node:path'
+ 
+ // A stand-in for ghg_monthly_emissions: rows carry inventory_id, company_id and reporting_year, and the
+ // stub applies .eq() filters the way the database would, recording which columns were filtered on.
+-type Slice = { inventory_id: string; company_id: string; reporting_year: number; period_month: string; scope: number; fuel_type: string; tco2e: number; activity_value: number | null; activity_unit: string | null }
++type Slice = { inventory_id: string; company_id: string; reporting_year: number; period_month: string; scope: number; fuel_type: string; tco2e: number; activity_value: number | null; activity_unit: string | null; period_start?: string | null; period_end?: string | null }
+ const table: Slice[] = []
+ const filtered: string[] = []
+ vi.mock('../supabase', () => ({
+@@ -28,7 +28,7 @@ vi.mock('../supabase', () => ({
+   },
+ }))
+ 
+-import { loadMonthly } from './loadMonthly'
++import { loadMonthly, isDeliveryRow, DELIVERY_BASED_NOTE } from './loadMonthly'
+ import { buildMonthlyEmissions } from './monthlyEmissions'
+ import { calcGas, pickEF, getGridFactor, isResolvedGridRegion, emptyLocation, type Location, type ExtractedProposal } from './engine'
+ 
+@@ -96,3 +96,21 @@ describe('Trends monthly view, by inventory (T12)', () => {
+     expect(load).toContain('inventory_id: r.id,')
+   })
+ })
++
++describe('delivery-based months (T10b)', () => {
++  const row = (fuel_type: string, period_start: string, period_end: string): Slice => ({ inventory_id: 'inv-d', company_id: 'C1', reporting_year: 2025,
++    period_month: `${period_start.slice(0, 7)}-01`, scope: 1, fuel_type, tco2e: 0.27, activity_value: 177.143, activity_unit: 'litres', period_start, period_end })
++  it('a propane, diesel or petrol row with one date is a delivery; a gas or electricity bill never is', () => {
++    expect(isDeliveryRow(row('propane', '2025-03-14', '2025-03-14'))).toBe(true)
++    expect(isDeliveryRow(row('diesel', '2025-03-01', '2025-03-31')), 'a statement').toBe(false)
++    expect(isDeliveryRow(row('natural_gas', '2025-03-01', '2025-03-01')), 'a one-day gas bill').toBe(false)
++  })
++  it('the monthly view flags a year that holds deliveries, so the chart can say how they are counted', async () => {
++    table.push(row('propane', '2025-03-14', '2025-03-14'))
++    expect((await loadMonthly('inv-d')).deliveryBased).toBe(true)
++    table.length = 0
++    table.push(row('natural_gas', '2025-03-01', '2025-03-31'))
++    expect((await loadMonthly('inv-d')).deliveryBased).toBe(false)
++    expect(DELIVERY_BASED_NOTE).toBe('Delivery-based: fuel bought by delivery is counted in the month it was delivered, not the month it was used.')
++  })
++})
+diff --git a/lib/ghg/loadMonthly.ts b/lib/ghg/loadMonthly.ts
+index 33bc88c..fdc6c53 100644
+--- a/lib/ghg/loadMonthly.ts
++++ b/lib/ghg/loadMonthly.ts
+@@ -29,8 +29,27 @@ export interface MonthlyRow {
+   tco2e: number;
+   activity_value: number | null;
+   activity_unit: string | null;
++  // T10b: read so a delivery row can be recognised (isDeliveryRow). Optional: older callers omit them.
++  period_start?: string | null;
++  period_end?: string | null;
+ }
+ 
++// T10b: the fuels that come only from delivery-capable documents (propane, diesel, fleet fuel). Gas and
++// electricity never do, so a one-day period on those is a bill, not a delivery.
++const DELIVERY_FUELS = new Set(["propane", "diesel", "gasoline"]);
++
++/**
++ * T10b: a stored monthly row that is ONE DELIVERY, placed whole in the month it was delivered. The monthly
++ * split writes a delivery with period_start = period_end = its delivery date, which is also how a delivery was
++ * stored before T10b (ruling: such a reading is a delivery). No column records it, so this is the one test.
++ */
++export function isDeliveryRow(r: Pick<MonthlyRow, "fuel_type" | "period_start" | "period_end">): boolean {
++  return DELIVERY_FUELS.has(r.fuel_type) && !!r.period_start && r.period_start.slice(0, 10) === (r.period_end ?? "").slice(0, 10);
++}
++
++/** T10b: the note shown under the monthly chart when any month holds a delivery. */
++export const DELIVERY_BASED_NOTE = "Delivery-based: fuel bought by delivery is counted in the month it was delivered, not the month it was used.";
++
+ /** One bar in the monthly chart: a month with stacked scope totals. */
+ export interface MonthlyBucket {
+   month: string;            // 'YYYY-MM' label
+@@ -46,6 +65,7 @@ export interface LoadMonthlyResult {
+   measuredMonths: number;            // distinct months with data (0-12)
+   totalTco2e: number;                // sum across all buckets
+   error: string | null;
++  deliveryBased?: boolean;           // T10b: at least one row is a delivery (isDeliveryRow)
+ }
+ 
+ const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+@@ -88,7 +108,7 @@ export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResul
+ 
+     const { data, error } = await supabase
+       .from("ghg_monthly_emissions")
+-      .select("period_month, scope, fuel_type, tco2e, activity_value, activity_unit")
++      .select("period_month, scope, fuel_type, tco2e, activity_value, activity_unit, period_start, period_end")
+       .eq("inventory_id", inventoryId)
+       .order("period_month", { ascending: true });
+ 
+@@ -98,7 +118,7 @@ export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResul
+     const buckets = buildMonthlyBuckets(rows);
+     const totalTco2e = +buckets.reduce((a, b) => a + b.total, 0).toFixed(4);
+ 
+-    return { buckets, measuredMonths: buckets.length, totalTco2e, error: null };
++    return { buckets, measuredMonths: buckets.length, totalTco2e, error: null, deliveryBased: rows.some(isDeliveryRow) };
+   } catch (e) {
+     return empty(e instanceof Error ? e.message : "Failed to load monthly data.");
+   }
+diff --git a/lib/ghg/monthlyEmissions.ts b/lib/ghg/monthlyEmissions.ts
+index 3348e9c..3ec1f8f 100644
+--- a/lib/ghg/monthlyEmissions.ts
++++ b/lib/ghg/monthlyEmissions.ts
+@@ -107,6 +107,10 @@ export interface MonthlySlice {
+   period_start: string | null;
+   period_end: string | null;
+   pct_in_month: number;            // fraction of the bill allocated to this month
++  // In memory only (T10b), like location_id: 'delivery' when the slice is one delivery placed whole in the
++  // month it was delivered. The stored row says the same by period_start = period_end = the delivery date
++  // (isDeliveryRow in lib/ghg/loadMonthly.ts), so no column is needed.
++  basis?: "delivery";
+ }
+ 
+ export interface SkippedBill {
+@@ -269,6 +273,31 @@ export function buildMonthlyEmissions(
+         efSource = resolved.efKey;
+       }
+ 
++      // T10b: A DELIVERY goes whole into the calendar month it was delivered (ruling). It is counted only when
++      // its date is inside the window, so the month is always inside the window too, and Σ slices still equals
++      // the annual figure before any gross-up (a delivery-based field is never grossed up).
++      if (c.reason === "delivered" && c.deliveryDate) {
++        const dd = parseLocalDate(c.deliveryDate);
++        slices.push({
++          location_id: loc.id,
++          period_month: monthKey(dd),
++          reporting_year: dd.getFullYear(),
++          scope: resolved.scope,
++          location_name: loc.name ?? null,
++          fuel_type: c.fuelType,
++          activity_value: +c.value.toFixed(6),
++          activity_unit: c.unit,
++          tco2e: +billTotal.toFixed(6),
++          gwp_version: gwp,
++          ef_source: efSource,
++          period_start: c.deliveryDate,
++          period_end: c.deliveryDate,
++          pct_in_month: 1,
++          basis: "delivery",
++        });
++        continue;
++      }
++
+       // IN-WINDOW DAYS ONLY. A counted bill always has a usable period (undated and invalid ones are
+       // never counted), and totalDays is its full span, so each month's fraction is of the whole bill and
+       // the in-window months sum to its share.
+diff --git a/lib/ghg/proposalEdits.test.ts b/lib/ghg/proposalEdits.test.ts
+index 744cf46..9728bc9 100644
+--- a/lib/ghg/proposalEdits.test.ts
++++ b/lib/ghg/proposalEdits.test.ts
+@@ -67,7 +67,9 @@ describe('month-only bills (rule R5)', () => {
+ 
+   it('the page maps the origin at extraction and guards every patch', () => {
+     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+-    expect(page).toContain("periodOrigin: f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,")
++    // T10b: a delivery date (no period) is a delivery; otherwise the R5 mapping is unchanged.
++    expect(page).toContain("periodOrigin: !f.periodStart && !f.periodEnd && f.deliveryDate ? 'delivery'")
++    expect(page).toContain(": f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,")
+     expect(page).toContain('i === propIdx ? { ...p, ...guardConfirm(p, patch) } : p')
+   })
+ })
+diff --git a/lib/ghg/workingsCells.test.ts b/lib/ghg/workingsCells.test.ts
+index 8a54c7c..83b798d 100644
+--- a/lib/ghg/workingsCells.test.ts
++++ b/lib/ghg/workingsCells.test.ts
+@@ -5,7 +5,7 @@ import { buildWorkings, emptyLocation, type Location } from './engine'
+ import {
+   workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
+   workingsFactorSourceCell,
+-  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS, RESULT_DP,
++  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS, RESULT_DP, contributionShareCell,
+ } from './workingsCells'
+ import { NOT_PROVIDED } from '../notProvided'
+ import { stripTsComments } from '../testing/stripComments'
+@@ -222,3 +222,10 @@ describe('workings cell rendering', () => {
+ 
+   })
+ })
++
++describe('the share cell for a delivery (T10b)', () => {
++  it('reads as delivered and counted in full', () => {
++    expect(contributionShareCell({ reason: 'delivered', inWindowDays: null, totalDays: null, share: 1, deliveryDate: '2025-03-14' }))
++      .toBe('Delivered 2025-03-14, counted in full')
++  })
++})
+diff --git a/lib/ghg/workingsCells.ts b/lib/ghg/workingsCells.ts
+index 05ee7f5..54e276d 100644
+--- a/lib/ghg/workingsCells.ts
++++ b/lib/ghg/workingsCells.ts
+@@ -189,6 +189,7 @@ export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: st
+  * note does, so the two never describe a bill differently:
+  *   - prorated:                "12 of 31 days, ×0.387"
+  *   - counted, wholly in year: "31 of 31 days"
++ *   - a delivery inside the year (T10b): "Delivered 2025-03-14, counted in full"
+  *   - undated or invalid period (no days to count): NOT_APPLICABLE
+  *   - any other bill not counted: "Not counted"; the reason, not this cell, says why.
+  * Structural type rather than the engine's BillContribution, because the engine imports this file.
+@@ -198,10 +199,12 @@ export type ShareCellContribution = {
+   inWindowDays: number | null
+   totalDays: number | null
+   share: number | null
++  deliveryDate?: string
+ }
+ export const NOT_COUNTED = 'Not counted'
+ export function contributionShareCell(c: ShareCellContribution): string {
+   if (c.reason === 'undated' || c.reason === 'invalid_period') return NOT_APPLICABLE
++  if (c.reason === 'delivered') return `Delivered ${c.deliveryDate ?? ''}, counted in full`
+   if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
+   const days = `${c.inWindowDays} of ${c.totalDays} days`
+   return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days

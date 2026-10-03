@@ -143,3 +143,51 @@ describe('the page wires the strip and writes no ignored resolution', () => {
     for (const b of ['sameBillResolution(', 'differentMetersResolution(', 'estimateResolution(', 'usedNoneResolution(']) expect(strip).toContain(b)
   })
 })
+
+describe('coverage strip: deliveries and the 0-months guard (T10b)', () => {
+  const lpg = (id: string, date: string): SourceDoc => ({
+    id, file_name: `${id}.pdf`, document_type: 'fuel_propane', uploaded_at: '2025-06-01', file_path: `/${id}.pdf`,
+    extracted: [prop({ fuelType: 'propane', value: 180, unit: 'litres', periodStart: date, periodEnd: date })],
+  })
+  const melbourne = (docs: SourceDoc[]): Location => ({ ...emptyLocation('L1', 'Melbourne'), country: 'AU', has_propane: true, propane_unit: 'litres', source_docs: docs })
+  const drawLpg = (l: Location, o: Partial<CoverageStripProps> = {}) => draw(l, { docType: 'fuel_propane', ...o })
+  const STATEMENT = 'These are all the propane deliveries for Melbourne between 1 January 2025 and 31 December 2025.'
+
+  it('deliveries are listed by date with no month count and no estimate, and the confirmation names fuel, site and window', () => {
+    const l = melbourne([lpg('lpg2', '2025-06-23'), lpg('lpg1', '2025-03-14')])
+    const t = text(drawLpg(l))
+    expect(t).toContain('Confirm that the 2 propane deliveries listed for Melbourne are all the propane deliveries between 1 January 2025 and 31 December 2025. Export is blocked until you confirm.')
+    expect(t).toContain('Deliveries are counted in full in the year they were delivered, not spread over months.')
+    expect(t.indexOf('lpg1.pdf: 180 litres, delivered 14 March 2025.')).toBeLessThan(t.indexOf('lpg2.pdf: 180 litres, delivered 23 June 2025.'))
+    expect(t).toContain(STATEMENT)
+    expect(t).not.toContain('months covered')
+    expect(t).not.toContain('Estimate the missing months')
+    expect(drawLpg(l, { currentUser: null })).toMatch(/<button[^>]*disabled=""[^>]*>These are all the propane deliveries/)
+  })
+
+  it('once confirmed, the strip shows who confirmed and when', () => {
+    const l = melbourne([lpg('lpg1', '2025-03-14')])
+    const conf = { locId: 'L1', fuelType: 'propane', kind: 'deliveries_complete' as const, documentType: 'fuel_propane', docIds: ['lpg1'],
+      by: { userId: 'u-1', email: 'jo@acme.example' }, note: `jo@acme.example confirmed on 2 January 2026: ${STATEMENT}`, acknowledgedAt: '2026-01-02T09:00:00.000Z' }
+    const t = text(drawLpg(l, { resolutions: [conf] }))
+    expect(t).toContain(`✓ jo@acme.example confirmed on 2 January 2026: ${STATEMENT}`)
+    expect(t).not.toContain('Export is blocked')
+  })
+
+  it('a gap with no month covered offers no estimate and says why', () => {
+    const t = text(draw(site([gdoc('a', { periodStart: '2025-03-10', periodEnd: '2025-03-20' })])))
+    expect(t).toContain('0 of 12 months covered by bills.')
+    expect(t).not.toContain('Estimate the missing months')
+    expect(t).toContain('No month is fully covered by these bills, so the missing months cannot be estimated from them. Upload the missing bills, or enter the figure yourself.')
+  })
+
+  it('an estimate the engine refuses is shown with its reason, and can be removed', () => {
+    const zero = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate' as const, documentType: 'utility_bill_gas', monthsCovered: 0, pctEstimated: 100,
+      note: 'n', acknowledgedAt: '2026-01-02T09:00:00.000Z' }
+    const l = site([gdoc('a', { periodStart: '2025-03-10', periodEnd: '2025-03-20' })])
+    const t = text(draw(l, { resolutions: [zero], onRemove: () => {} }))
+    expect(t).toContain('An estimate was recorded but cannot be used: An estimate needs the number of months covered by bills.')
+    expect(t).toContain('Remove it')
+    expect(text(draw(l, { resolutions: [zero] }))).not.toContain('Remove it')
+  })
+})

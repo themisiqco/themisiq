@@ -29,7 +29,26 @@ export interface MonthlyRow {
   tco2e: number;
   activity_value: number | null;
   activity_unit: string | null;
+  // T10b: read so a delivery row can be recognised (isDeliveryRow). Optional: older callers omit them.
+  period_start?: string | null;
+  period_end?: string | null;
 }
+
+// T10b: the fuels that come only from delivery-capable documents (propane, diesel, fleet fuel). Gas and
+// electricity never do, so a one-day period on those is a bill, not a delivery.
+const DELIVERY_FUELS = new Set(["propane", "diesel", "gasoline"]);
+
+/**
+ * T10b: a stored monthly row that is ONE DELIVERY, placed whole in the month it was delivered. The monthly
+ * split writes a delivery with period_start = period_end = its delivery date, which is also how a delivery was
+ * stored before T10b (ruling: such a reading is a delivery). No column records it, so this is the one test.
+ */
+export function isDeliveryRow(r: Pick<MonthlyRow, "fuel_type" | "period_start" | "period_end">): boolean {
+  return DELIVERY_FUELS.has(r.fuel_type) && !!r.period_start && r.period_start.slice(0, 10) === (r.period_end ?? "").slice(0, 10);
+}
+
+/** T10b: the note shown under the monthly chart when any month holds a delivery. */
+export const DELIVERY_BASED_NOTE = "Delivery-based: fuel bought by delivery is counted in the month it was delivered, not the month it was used.";
 
 /** One bar in the monthly chart: a month with stacked scope totals. */
 export interface MonthlyBucket {
@@ -46,6 +65,7 @@ export interface LoadMonthlyResult {
   measuredMonths: number;            // distinct months with data (0-12)
   totalTco2e: number;                // sum across all buckets
   error: string | null;
+  deliveryBased?: boolean;           // T10b: at least one row is a delivery (isDeliveryRow)
 }
 
 const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -88,7 +108,7 @@ export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResul
 
     const { data, error } = await supabase
       .from("ghg_monthly_emissions")
-      .select("period_month, scope, fuel_type, tco2e, activity_value, activity_unit")
+      .select("period_month, scope, fuel_type, tco2e, activity_value, activity_unit, period_start, period_end")
       .eq("inventory_id", inventoryId)
       .order("period_month", { ascending: true });
 
@@ -98,7 +118,7 @@ export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResul
     const buckets = buildMonthlyBuckets(rows);
     const totalTco2e = +buckets.reduce((a, b) => a + b.total, 0).toFixed(4);
 
-    return { buckets, measuredMonths: buckets.length, totalTco2e, error: null };
+    return { buckets, measuredMonths: buckets.length, totalTco2e, error: null, deliveryBased: rows.some(isDeliveryRow) };
   } catch (e) {
     return empty(e instanceof Error ? e.message : "Failed to load monthly data.");
   }

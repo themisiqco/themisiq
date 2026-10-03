@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   resolutionKey, upsertResolution, sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution, plainDate,
+  deliveriesCompleteResolution, NO_MONTHS_TO_ESTIMATE,
 } from './coverageActions'
 import {
   emptyLocation, validateResolution, findUnresolvedCoverage, deriveLocations,
@@ -136,5 +137,19 @@ describe('the controls resolve the issue they answer', () => {
     expect(issues(l, []).some(i => i.status === 'all_rejected')).toBe(true)
     const r = usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas', by: { userId: 'u', email: 'e@x.example' }, at: AT })
     expect(issues(l, [r]).some(i => i.status === 'all_rejected')).toBe(false)
+  })
+})
+
+describe('T10b: deliveries confirmation and the 0-months guard', () => {
+  it('confirming again replaces the earlier confirmation for the same documents type and fuel', () => {
+    const by = { userId: 'u', email: 'e@x.example' }
+    const a = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: ['x'], statement: 'S.', by, at: AT })
+    const b = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: ['x', 'y'], statement: 'S.', by, at: AT })
+    expect(upsertResolution([a], b)).toEqual([b])
+    expect(a.note).toMatch(/^e@x\.example confirmed on \d{1,2} [A-Z][a-z]+ \d{4}: S\.$/)
+  })
+  it('no estimate below one covered month', () => {
+    expect(() => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null, monthsCovered: 0, pctEstimated: 100, at: AT }))
+      .toThrow(NO_MONTHS_TO_ESTIMATE)
   })
 })

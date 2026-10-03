@@ -32,7 +32,9 @@ import {
   deriveLocations,
   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
   documentsBacking, deriveStoredLocations, factorDerivationsFor,
+  canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
 } from './engine';
+import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE } from './coverageActions';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
@@ -4665,5 +4667,164 @@ describe('T10a no figure, and MJ gas', () => {
     function convertFields(p: ExtractedProposal) { const c = convertToCanonical('natural_gas', p.rawValue, 'mj'); return { rawUnit: 'mj', value: c.value, unit: c.unit } }
     expect(findUnresolvedCoverage([fixed], 2025, 12, []).filter(i => i.status === 'no_value')).toEqual([]);
     expect(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0].natural_gas_amount).toBeCloseTo(readings.reduce((a, b) => a + b, 0) / 1000 / 1.05505585262, 5);
+  });
+});
+
+describe('T10b delivery-based fuels', () => {
+  // The run-through: six Melbourne LPG invoices, 90 kg each (177.143 L), one delivery date each, no billing
+  // period, in a year ending 30 September 2025. Before T10b each was stored as a one-day period.
+  const W = periodFromYearAndEnd(2025, 9);
+  const DATES = ['2024-10-14', '2024-12-09', '2025-02-03', '2025-04-14', '2025-06-23', '2025-08-25'];
+  const lpg = (id: string, date: string, o: Partial<ExtractedProposal> = {}): SourceDoc =>
+    ({ ...doc('fuel_propane', [prop({ fuelType: 'propane', rawValue: 90, rawUnit: 'kg', value: 177.143, unit: 'litres',
+      periodStart: date, periodEnd: date, sourceQuote: '90 kg', ...o })], id), file_name: `${id}.pdf` });
+  const site = (docs: SourceDoc[]) => loc({ name: 'Melbourne', country: 'AU', state: 'VIC', grid_region: 'AU_VIC',
+    has_propane: true, propane_unit: 'litres', source_docs: docs });
+  const melbourne = () => site(DATES.map((d, k) => lpg(`lpg${k + 1}`, d)));
+  const issues = (l: Location, r: CoverageResolution[] = [], y = 2025, m = 9) => findUnresolvedCoverage([l], y, m, r);
+  const by = { userId: 'u1', email: 'lisa@example.com' };
+  const confirm = (l: Location, at = '2025-10-02T09:00:00Z') => {
+    const i = issues(l).find(x => x.status === 'deliveries_unconfirmed')!;
+    return deliveriesCompleteResolution({ locId: l.id, fuelType: 'propane', documentType: 'fuel_propane', docIds: i.docIds ?? [],
+      statement: deliveriesStatement('propane', 'Melbourne', W), by, at });
+  };
+
+  it('deliveryDateOf: the reading decides, within delivery-capable document types only', () => {
+    expect(deliveryDateOf('fuel_propane', { periodStart: '2025-03-14', periodEnd: '2025-03-14' }), 'stored before T10b').toBe('2025-03-14');
+    expect(deliveryDateOf('fuel_propane', { periodStart: null, periodEnd: null, deliveryDate: '2025-03-14' })).toBe('2025-03-14');
+    expect(deliveryDateOf('fleet_fuel', { periodStart: '2025-03-01', periodEnd: '2025-03-31' }), 'a statement').toBeNull();
+    expect(deliveryDateOf('utility_bill_gas', { periodStart: '2025-03-14', periodEnd: '2025-03-14' }), 'gas is metered').toBeNull();
+    expect(deliveryDateOf('fuel_diesel', { periodStart: null, periodEnd: null }), 'undated').toBeNull();
+  });
+
+  it('the Melbourne case: each delivery counts in full, never prorated, with its delivery date', () => {
+    const cs = billContributions(melbourne(), [], W);
+    expect(cs.map(c => [c.reason, c.share, c.totalDays, c.deliveryDate, c.periodOrigin])).toEqual(
+      DATES.map(d => ['delivered', 1, null, d, 'delivery']));
+    expect(applyResolutions(melbourne(), [], W.start, W.end).propane_amount?.value).toBeCloseTo(6 * 177.143, 6);
+  });
+
+  it('the Melbourne case: no month count and no gap; export waits for the completeness confirmation', () => {
+    const got = issues(melbourne());
+    expect(got.some(i => i.status === 'gap')).toBe(false);
+    expect(got.filter(i => i.status === 'deliveries_unconfirmed')).toEqual([{ locId: 'L1', fuelType: 'propane', status: 'deliveries_unconfirmed',
+      documentType: 'fuel_propane', docIds: ['lpg1', 'lpg2', 'lpg3', 'lpg4', 'lpg5', 'lpg6'],
+      message: 'Confirm that the 6 propane deliveries listed for Melbourne are all the propane deliveries between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
+  });
+
+  it('the confirmation names fuel, site and window, records who and when, clears the issue and reaches the workings', () => {
+    const l = melbourne();
+    const r = confirm(l);
+    expect(deliveriesStatement('propane', 'Melbourne', W)).toBe('These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025.');
+    expect(r.note).toBe('lisa@example.com confirmed on 2 October 2025: These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025.');
+    expect(validateResolution(r, l)).toBeNull();
+    expect(issues(l, [r])).toEqual([]);
+    const row = buildWorkings([l], 'AR6', 2025, [r], 9).find(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'deliveries_complete');
+    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com at 2025-10-02T09:00:00Z');
+    expect(row?.ef_source).toBe(r.note);
+  });
+
+  it('adding, removing or rejecting a delivery reopens the confirmation, naming who confirmed and when', () => {
+    const l = melbourne();
+    const r = confirm(l);
+    const CHANGED = 'The propane deliveries for Melbourne have changed since lisa@example.com confirmed them on 2 October 2025. Check the list and confirm again. Export is blocked until you do.';
+    const added = { ...l, source_docs: [...l.source_docs, lpg('lpg7', '2025-09-15')] };
+    expect(issues(added, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
+    const removed = { ...l, source_docs: l.source_docs.slice(1) };
+    expect(issues(removed, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
+    const rejected = { ...l, source_docs: l.source_docs.map((d, k) => k === 0 ? { ...d, extracted: d.extracted!.map(p => ({ ...p, status: 'rejected' as const })) } : d) };
+    expect(issues(rejected, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
+    expect(issues(rejected, [confirm(rejected)]), 'confirming again clears it').toEqual([]);
+  });
+
+  it('a full year of deliveries exports after confirmation', () => {
+    const l = site(Array.from({ length: 12 }, (_, k) => lpg(`m${k + 1}`, `2025-${String(k + 1).padStart(2, '0')}-15`)));
+    expect(issues(l, [], 2025, 12).map(i => i.status)).toEqual(['deliveries_unconfirmed']);
+    const i = issues(l, [], 2025, 12)[0];
+    const r = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: i.docIds ?? [],
+      statement: deliveriesStatement('propane', 'Melbourne', periodFromYearAndEnd(2025, 12)), by, at: '2026-01-05T09:00:00Z' });
+    expect(issues(l, [r], 2025, 12)).toEqual([]);
+    expect(deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: [r] })[0].propane_amount).toBeCloseTo(12 * 177.143, 6);
+  });
+
+  it('the window: the day before it opens and the day after it closes count zero; the first and last day count in full', () => {
+    const l = site([lpg('before', '2024-09-30'), lpg('first', '2024-10-01'), lpg('last', '2025-09-30'), lpg('after', '2025-10-01')]);
+    expect(billContributions(l, [], W).map(c => [c.docId, c.reason, c.share])).toEqual([
+      ['before', 'outside_year', 0], ['first', 'delivered', 1], ['last', 'delivered', 1], ['after', 'outside_year', 0]]);
+  });
+
+  it('a delivery on the 1st of a month counts; it is not an invalid period', () => {
+    const c = billContributions(site([lpg('d', '2025-03-01')]), [], W)[0];
+    expect([c.reason, c.share, c.deliveryDate]).toEqual(['delivered', 1, '2025-03-01']);
+  });
+
+  it('a one-day billing period on the 1st covers that day and is not "reversed"', () => {
+    const one = canonicalPeriod(new Date(2025, 2, 1), new Date(2025, 2, 1));
+    expect([one.start.getDate(), one.endExclusive.getMonth(), one.endExclusive.getDate()]).toEqual([1, 2, 2]);
+    expect(canonicalPeriod(new Date(2024, 11, 1), new Date(2025, 0, 1)).endExclusive.getTime(), 'other periods unchanged').toBe(exclusiveEnd(new Date(2025, 0, 1)).getTime());
+    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2025-03-01', periodEnd: '2025-03-01' })], 'g')] });
+    const c = billContributions(gas, [], periodFromYearAndEnd(2025, 12))[0];
+    expect([c.reason, c.totalDays, c.inWindowDays]).toEqual(['counted', 1, 1]);
+  });
+
+  it('a delivery-based group is never estimated', () => {
+    const l = melbourne();
+    expect(isDeliveryGroup(l, 'fuel_propane', 'propane')).toBe(true);
+    const est = { locId: 'L1', fuelType: 'propane', kind: 'extrapolate', documentType: 'fuel_propane', monthsCovered: 6, pctEstimated: 50,
+      note: 'n', acknowledgedAt: '2025-10-02T09:00:00Z' } as CoverageResolution;
+    expect(validateResolution(est, l)).toBe('Deliveries are counted as delivered, not estimated.');
+    expect(applyResolutions(l, [est], W.start, W.end).propane_amount?.value).toBeCloseTo(6 * 177.143, 6);
+  });
+
+  it('the 0-months guard: no estimate is built from zero covered months, and a stored one changes nothing', () => {
+    expect(() => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
+      monthsCovered: 0, pctEstimated: 100, at: '2025-10-02T09:00:00Z' })).toThrow(NO_MONTHS_TO_ESTIMATE);
+    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ value: 50, periodStart: '2025-03-10', periodEnd: '2025-03-20' })], 'g')] });
+    const zero = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', documentType: 'utility_bill_gas', monthsCovered: 0, pctEstimated: 100,
+      note: 'n', acknowledgedAt: '2025-10-02T09:00:00Z' } as CoverageResolution;
+    expect(validateResolution(zero, gas)).toBe('An estimate needs the number of months covered by bills.');
+    expect(applyResolutions(gas, [zero], new Date(2025, 0, 1), new Date(2025, 11, 31)).natural_gas_amount?.value).toBe(50);
+    expect(findUnresolvedCoverage([gas], 2025, 12, [zero]).map(i => i.status)).toContain('gap');
+    const one = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
+      monthsCovered: 1, pctEstimated: 91.7, at: '2025-10-02T09:00:00Z' });
+    expect(validateResolution(one, gas)).toBeNull();
+  });
+
+  it('a statement in a delivery-capable type is prorated and month-checked as before', () => {
+    const fleet = loc({ has_mobile: true, gasoline_unit: 'litres', source_docs: [doc('fleet_fuel', [prop({ fuelType: 'gasoline', value: 400, unit: 'litres',
+      periodStart: '2025-03-01', periodEnd: '2025-03-31' })], 'card')] });
+    const got = findUnresolvedCoverage([fleet], 2025, 12, []);
+    expect(got.map(i => i.status)).toContain('gap');
+    expect(got.some(i => i.status === 'deliveries_unconfirmed')).toBe(false);
+  });
+
+  it('a mixed field: statements are still prorated by their own days, and the field is confirmed as a whole', () => {
+    const statement = doc('fuel_propane', [prop({ fuelType: 'propane', value: 310, unit: 'litres', periodStart: '2024-09-15', periodEnd: '2024-10-14' })], 'stmt');
+    const l = site([statement, lpg('lpg1', '2025-02-03')]);
+    const cs = billContributions(l, [], W);
+    expect(cs.find(c => c.docId === 'stmt')?.reason).toBe('prorated');
+    expect(cs.find(c => c.docId === 'stmt')?.share).toBeCloseTo(14 / 30, 6);
+    const got = issues(l);
+    expect(got.some(i => i.status === 'gap')).toBe(false);
+    expect(got.find(i => i.status === 'deliveries_unconfirmed')?.docIds).toEqual(['stmt', 'lpg1']);
+  });
+
+  it('a delivery returned as a delivery date with no period is the same delivery', () => {
+    const l = site([lpg('new', '', { periodStart: null, periodEnd: null, deliveryDate: '2025-02-03' })]);
+    expect(billContributions(l, [], W).map(c => [c.reason, c.deliveryDate])).toEqual([['delivered', '2025-02-03']]);
+  });
+
+  it('monthly: each delivery lands whole in its delivery month, tagged delivery, and reconciles', () => {
+    const l = melbourne();
+    const inv = { locations: [l], reporting_year: 2025, fiscal_year_end_month: 9, coverage_resolutions: [confirm(l)] };
+    const { slices } = buildMonthlyEmissions(inv, { calcGas, pickEF, getGridFactor, isResolvedGridRegion }, 'AR6');
+    expect(slices.map(s => [s.period_month, s.activity_value, s.pct_in_month, s.basis, s.period_start, s.period_end])).toEqual(
+      DATES.map(d => [`${d.slice(0, 7)}-01`, 177.143, 1, 'delivery', d, d]));
+    expect(reconcile(slices, inv, 'AR6').reconciles).toBe(true);
+  });
+
+  it('sameDocSet ignores order', () => {
+    expect(sameDocSet(['a', 'b'], ['b', 'a'])).toBe(true);
+    expect(sameDocSet(['a', 'b'], ['a'])).toBe(false);
   });
 });

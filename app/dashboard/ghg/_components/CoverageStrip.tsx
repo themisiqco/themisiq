@@ -9,16 +9,22 @@
 // an issue: it is prorated by its own days, and the strip says so with the share (T2). The old "this year",
 // "next year" and "Confirm not a duplicate" buttons are gone; the engine ignored what they wrote.
 //
+// T10b: a DELIVERY-BASED fuel (propane, diesel or fleet fuel bought by delivery) is not checked month by month.
+// Its deliveries are listed with their dates, and the one control is the completeness confirmation, which names
+// the fuel, the site and the window. It is never estimated. "Estimate the missing months" is offered only when
+// at least one month is covered, and an estimate the engine refuses is shown with its reason, never hidden.
+//
 // All text here is shown to the customer: plain language, no em dash.
 
 import { useState } from 'react'
 import {
   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
-  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME,
+  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords,
   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
 } from '../../../../lib/ghg/engine'
 import {
   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
+  deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
 } from '../../../../lib/ghg/coverageActions'
 
 export type CurrentUser = { userId: string; email: string }
@@ -35,6 +41,9 @@ export type CoverageStripProps = {
   // resolution never exists without the label it must match.
   onLabelMeter: (docId: string, label: string, res: CoverageResolution) => void
   onEnterManually: (field: string) => void
+  // T10b: removes a stored resolution the engine refuses (shown with its reason). Optional: without it the
+  // refused estimate is still shown, with no control.
+  onRemove?: (res: CoverageResolution) => void
 }
 
 const fuelName = (f: string) => f.replace(/_/g, ' ')
@@ -79,6 +88,18 @@ export function CoverageStrip(p: CoverageStripProps) {
     g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(prop.periodStart as string), end: parseLocalDate(prop.periodEnd as string) })
     groups.set(key, g)
   }
+  // T10b: the delivery-based fuels of this upload, and their deliveries in date order.
+  const deliveries = contributions
+    .filter(c => c.deliveryDate && (c.counted || c.reason === 'outside_year'))
+    .sort((a, b) => (a.deliveryDate as string).localeCompare(b.deliveryDate as string))
+  const deliveryFuels = [...new Set(deliveries.map(c => c.fuelType))]
+  const site = location.name || 'Location'
+  // Estimates on this upload that the engine refuses: shown with the reason, so a click never vanishes.
+  const refused = p.resolutions
+    .filter(r => r.locId === location.id && r.kind === 'extrapolate' && (r.documentType ?? docType) === docType)
+    .map(r => ({ r, reason: validateResolution(r, location) }))
+    .filter((x): x is { r: CoverageResolution; reason: string } => x.reason !== null)
+
   const inGroup = (i: { fuelType: string; meterLabel?: string | null; documentType?: string }, fuelType: string, meterLabel: string | null) =>
     i.documentType === docType && i.fuelType === fuelType && (i.meterLabel ?? null) === meterLabel
 
@@ -92,7 +113,8 @@ export function CoverageStrip(p: CoverageStripProps) {
   // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
   const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
 
-  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0) return null
+  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0
+    && deliveryFuels.length === 0 && refused.length === 0) return null
   const yearText = reportingYearLabel(win).inText
   const many = groups.size > 1
 
@@ -106,7 +128,11 @@ export function CoverageStrip(p: CoverageStripProps) {
         const tone = resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' } : { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' }
         const prefix = many || g.meterLabel ? `${fuelName(g.fuelType)}${g.meterLabel ? `, meter ${g.meterLabel}` : ''}: ` : ''
         const missing = cov.gaps.map(x => x.label).join(', ')
-        const headline = cov.status === 'full'
+        // T10b: statements in a delivery-based field are counted for the days they cover; the field's
+        // completeness is the deliveries confirmation below, not a count of months.
+        const headline = deliveryFuels.includes(g.fuelType)
+          ? 'Statements are counted for the days they cover.'
+          : cov.status === 'full'
           ? 'All 12 months covered by bills.'
           : resolved && cov.issues.includes('gap')
             ? `${cov.monthsCovered} of 12 months from bills; the other ${12 - cov.monthsCovered} are estimated (${cov.pctEstimated}% of the total).`
@@ -125,7 +151,7 @@ export function CoverageStrip(p: CoverageStripProps) {
                 {fileOf(c.docId)} crosses into another year: {c.inWindowDays} of its {c.totalDays} days are in {yearText}, so {((c.share ?? 0) * 100).toFixed(1)}% of the bill is counted.
               </div>
             ))}
-            {gap && (
+            {gap && cov.monthsCovered >= 1 && (
               <div style={row}>
                 <span style={prompt}>Upload the missing bill above, or:</span>
                 <button style={warnButton} onClick={() => p.onAdd(estimateResolution({
@@ -133,6 +159,9 @@ export function CoverageStrip(p: CoverageStripProps) {
                   monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, at: now(),
                 }))}>Estimate the missing months</button>
               </div>
+            )}
+            {gap && cov.monthsCovered < 1 && (
+              <div style={{ ...prompt, marginTop: 6 }}>{NO_MONTHS_TO_ESTIMATE}</div>
             )}
             {overlaps.map(o => {
               const [a, b] = o.docIds as [string, string]
@@ -157,6 +186,45 @@ export function CoverageStrip(p: CoverageStripProps) {
           </div>
         )
       })}
+      {deliveryFuels.map(fuel => {
+        const list = deliveries.filter(c => c.fuelType === fuel)
+        const issue = issues.find(i => i.status === 'deliveries_unconfirmed' && i.documentType === docType && i.fuelType === fuel)
+        const conf = p.resolutions.filter(r => r.locId === location.id && r.kind === 'deliveries_complete' && r.documentType === docType && r.fuelType === fuel).at(-1)
+        const tone = issue ? { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' } : { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' }
+        const statement = deliveriesStatement(fuelName(fuel), site, win)
+        return (
+          <div key={`deliveries|${fuel}`} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
+            <div>{tone.icon} {issue ? issue.message : conf?.note}</div>
+            <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
+              Deliveries are counted in full in the year they were delivered, not spread over months.
+            </div>
+            {list.map(c => (
+              <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 2, fontWeight: 400, color: '#555553' }}>
+                {fileOf(c.docId)}: {c.value.toLocaleString()} {c.unit ?? ''}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
+              </div>
+            ))}
+            {issue && (
+              <div style={row}>
+                <button style={{ ...warnButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
+                  onClick={() => p.currentUser && p.onAdd(deliveriesCompleteResolution({
+                    locId: location.id, fuelType: fuel, documentType: docType, docIds: issue.docIds ?? [], statement,
+                    by: p.currentUser, at: now(),
+                  }))}>{statement}</button>
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {refused.map(({ r, reason }) => (
+        <div key={`refused|${resolutionKey(r)}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
+          <div>⚠ An estimate was recorded but cannot be used: {reason}</div>
+          {p.onRemove && (
+            <div style={row}>
+              <button style={plainButton} onClick={() => p.onRemove?.(r)}>Remove it</button>
+            </div>
+          )}
+        </div>
+      ))}
       {allRejected.map(i => (
         <div key={`rejected|${i.field}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
           <div>⚠ {i.message}</div>

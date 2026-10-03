@@ -5,7 +5,7 @@ import { buildWorkings, emptyLocation, type Location } from './engine'
 import {
   workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
   workingsFactorSourceCell,
-  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS, RESULT_DP,
+  ALL_LOCATIONS, NOT_APPLICABLE, NOT_QUANTIFIED, COVERAGE_ROW_BASIS, RESULT_DP, contributionShareCell,
 } from './workingsCells'
 import { NOT_PROVIDED } from '../notProvided'
 import { stripTsComments } from '../testing/stripComments'
@@ -220,5 +220,12 @@ describe('workings cell rendering', () => {
       expect(verifier.includes(shape), `${VERIFIER} renders ${shape} in a cell again`).toBe(false)
     }
 
+  })
+})
+
+describe('the share cell for a delivery (T10b)', () => {
+  it('reads as delivered and counted in full', () => {
+    expect(contributionShareCell({ reason: 'delivered', inWindowDays: null, totalDays: null, share: 1, deliveryDate: '2025-03-14' }))
+      .toBe('Delivered 2025-03-14, counted in full')
   })
 })

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   SUPPORTED_FUELS, DOC_TYPE_FUELS, CONCIERGE_UNREAD_DOC_TYPES,
-  JUDGEMENT_EXCLUDED, docTypeIsReadable, DOC_TYPE_LABELS, docTypeLabel,
+  JUDGEMENT_EXCLUDED, docTypeIsReadable, DOC_TYPE_LABELS, docTypeLabel, DELIVERY_DOC_TYPES,
 } from './conciergeDocTypes'
 
 // ── What the concierge SENDS must match what the extractor can READ ─────────────────────────────
@@ -165,5 +167,18 @@ describe('the mapping covers what the wizard uploads', () => {
       `\n\nTO FIX: either add the fuel to the right entry in DOC_TYPE_FUELS in ${FILE}, or remove it from\n` +
       `SUPPORTED_FUELS and from the route's FUEL_GUIDANCE.\n`,
     ).toEqual([])
+  })
+})
+
+describe('delivery-capable document types (T10b)', () => {
+  it('are fuels bought by delivery, every one a known document type; metered supplies are never among them', () => {
+    expect([...DELIVERY_DOC_TYPES].sort()).toEqual(['fleet_fuel', 'fuel_diesel', 'fuel_oil', 'fuel_propane'])
+    for (const t of DELIVERY_DOC_TYPES) expect(DOC_TYPE_FUELS[t], t).toBeDefined()
+    for (const t of ['utility_bill_gas', 'utility_electricity', 'purchased_steam']) expect(DELIVERY_DOC_TYPES.has(t), t).toBe(false)
+  })
+  it('the extraction prompt records a delivery date as a delivery, never as a one-day period', () => {
+    const route = readFileSync(join(process.cwd(), 'app/api/concierge/extract/route.ts'), 'utf8')
+    expect(route).toContain('return that date as deliveryDate (yyyy-mm-dd), with periodStart: null and periodEnd: null. Never return a delivery date as a one-day period')
+    expect(route).toContain('"deliveryDate": "<yyyy-mm-dd or null>"')
   })
 })

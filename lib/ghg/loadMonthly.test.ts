@@ -9,7 +9,7 @@ import { join } from 'node:path'
 
 // A stand-in for ghg_monthly_emissions: rows carry inventory_id, company_id and reporting_year, and the
 // stub applies .eq() filters the way the database would, recording which columns were filtered on.
-type Slice = { inventory_id: string; company_id: string; reporting_year: number; period_month: string; scope: number; fuel_type: string; tco2e: number; activity_value: number | null; activity_unit: string | null }
+type Slice = { inventory_id: string; company_id: string; reporting_year: number; period_month: string; scope: number; fuel_type: string; tco2e: number; activity_value: number | null; activity_unit: string | null; period_start?: string | null; period_end?: string | null }
 const table: Slice[] = []
 const filtered: string[] = []
 vi.mock('../supabase', () => ({
@@ -28,7 +28,7 @@ vi.mock('../supabase', () => ({
   },
 }))
 
-import { loadMonthly } from './loadMonthly'
+import { loadMonthly, isDeliveryRow, DELIVERY_BASED_NOTE } from './loadMonthly'
 import { buildMonthlyEmissions } from './monthlyEmissions'
 import { calcGas, pickEF, getGridFactor, isResolvedGridRegion, emptyLocation, type Location, type ExtractedProposal } from './engine'
 
@@ -94,5 +94,23 @@ describe('Trends monthly view, by inventory (T12)', () => {
     const load = readFileSync(join(process.cwd(), 'lib/ghg/loadSeries.ts'), 'utf8')
     expect(load).toContain('"id, company_id, company_name, reporting_year, ')
     expect(load).toContain('inventory_id: r.id,')
+  })
+})
+
+describe('delivery-based months (T10b)', () => {
+  const row = (fuel_type: string, period_start: string, period_end: string): Slice => ({ inventory_id: 'inv-d', company_id: 'C1', reporting_year: 2025,
+    period_month: `${period_start.slice(0, 7)}-01`, scope: 1, fuel_type, tco2e: 0.27, activity_value: 177.143, activity_unit: 'litres', period_start, period_end })
+  it('a propane, diesel or petrol row with one date is a delivery; a gas or electricity bill never is', () => {
+    expect(isDeliveryRow(row('propane', '2025-03-14', '2025-03-14'))).toBe(true)
+    expect(isDeliveryRow(row('diesel', '2025-03-01', '2025-03-31')), 'a statement').toBe(false)
+    expect(isDeliveryRow(row('natural_gas', '2025-03-01', '2025-03-01')), 'a one-day gas bill').toBe(false)
+  })
+  it('the monthly view flags a year that holds deliveries, so the chart can say how they are counted', async () => {
+    table.push(row('propane', '2025-03-14', '2025-03-14'))
+    expect((await loadMonthly('inv-d')).deliveryBased).toBe(true)
+    table.length = 0
+    table.push(row('natural_gas', '2025-03-01', '2025-03-31'))
+    expect((await loadMonthly('inv-d')).deliveryBased).toBe(false)
+    expect(DELIVERY_BASED_NOTE).toBe('Delivery-based: fuel bought by delivery is counted in the month it was delivered, not the month it was used.')
   })
 })

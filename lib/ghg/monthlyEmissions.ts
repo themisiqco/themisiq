@@ -107,6 +107,10 @@ export interface MonthlySlice {
   period_start: string | null;
   period_end: string | null;
   pct_in_month: number;            // fraction of the bill allocated to this month
+  // In memory only (T10b), like location_id: 'delivery' when the slice is one delivery placed whole in the
+  // month it was delivered. The stored row says the same by period_start = period_end = the delivery date
+  // (isDeliveryRow in lib/ghg/loadMonthly.ts), so no column is needed.
+  basis?: "delivery";
 }
 
 export interface SkippedBill {
@@ -267,6 +271,31 @@ export function buildMonthlyEmissions(
           continue;
         }
         efSource = resolved.efKey;
+      }
+
+      // T10b: A DELIVERY goes whole into the calendar month it was delivered (ruling). It is counted only when
+      // its date is inside the window, so the month is always inside the window too, and Σ slices still equals
+      // the annual figure before any gross-up (a delivery-based field is never grossed up).
+      if (c.reason === "delivered" && c.deliveryDate) {
+        const dd = parseLocalDate(c.deliveryDate);
+        slices.push({
+          location_id: loc.id,
+          period_month: monthKey(dd),
+          reporting_year: dd.getFullYear(),
+          scope: resolved.scope,
+          location_name: loc.name ?? null,
+          fuel_type: c.fuelType,
+          activity_value: +c.value.toFixed(6),
+          activity_unit: c.unit,
+          tco2e: +billTotal.toFixed(6),
+          gwp_version: gwp,
+          ef_source: efSource,
+          period_start: c.deliveryDate,
+          period_end: c.deliveryDate,
+          pct_in_month: 1,
+          basis: "delivery",
+        });
+        continue;
       }
 
       // IN-WINDOW DAYS ONLY. A counted bill always has a usable period (undated and invalid ones are

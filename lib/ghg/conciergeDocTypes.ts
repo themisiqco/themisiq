@@ -68,6 +68,13 @@ export const DOC_TYPE_LABELS: Record<string, string> = {
 export const docTypeLabel = (docType: string): string =>
   DOC_TYPE_LABELS[docType] ?? 'Source document'
 
+// T10b: document types whose readings may be DELIVERIES. Fuel bought by delivery or purchase, not metered by
+// period. Within these types the READING decides (ruling, design doc section 10): a single delivery date and no
+// billing period makes it a delivery, counted in full in the year it was delivered; a reading with a billing
+// period (a fuel-card or account statement, metered LPG) is a statement, prorated by its own days. Gas,
+// electricity and steam are metered and billed by period, so they are never here.
+export const DELIVERY_DOC_TYPES = new Set<string>(['fuel_propane', 'fuel_diesel', 'fleet_fuel', 'fuel_oil'])
+
 // Document types the concierge does NOT send for extraction.
 export const CONCIERGE_UNREAD_DOC_TYPES = new Set<string>([
   'service_record', 'fuel_oil', 'purchased_steam', 'renewable_cert', 'biogenic',

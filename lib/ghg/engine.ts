@@ -34,6 +34,7 @@ import type { FactorEditions } from './factorEditions'
 // reads in an export and the sentence the customer reads on screen come from ONE module and cannot
 // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
 import { countryRefusalText } from './countryRefusalCopy'
+import { DELIVERY_DOC_TYPES } from './conciergeDocTypes'
 // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
 // WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
 // country control is built from, so "a country this platform can express" has ONE definition and
@@ -1604,6 +1605,9 @@ interface ExtractedProposal {
   conversionNote?: string
   periodStart: string | null      // ISO yyyy-mm-dd
   periodEnd: string | null
+  // T10b: the date a fuel was delivered or bought, read from a delivery document that prints no service period.
+  // Present with periodStart and periodEnd null. deliveryDateOf decides whether a reading is a delivery.
+  deliveryDate?: string | null
   periodConfidence?: 'high' | 'medium' | 'low' | null
   confidence: 'high' | 'medium' | 'low'
   sourceQuote: string | null
@@ -1748,6 +1752,20 @@ export function reportingYearLabel(win: { start: Date; end: Date }): { label: st
   const ending = `the year ending ${e.getDate()} ${MONTH_NAMES[e.getMonth()]} ${e.getFullYear()}`
   return { label: ending, inText: ending }
 }
+
+/** A calendar date in words, "1 October 2024": the date itself, in local time. */
+export function dateInWords(d: Date): string {
+  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/**
+ * T10b: the words of the completeness confirmation, naming the fuel, the site and the window (ruling):
+ * "These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025."
+ * The button says it and the stored note repeats it, so what was clicked is what is recorded.
+ */
+export function deliveriesStatement(fuel: string, site: string, win: { start: Date; end: Date }): string {
+  return `These are all the ${fuel} deliveries for ${site} between ${dateInWords(win.start)} and ${dateInWords(win.end)}.`
+}
 // ── Concierge coverage analysis (spec: docs/pricing-and-concierge-spec-v4.md addendum) ──
 // Pure function. Given a fuel's CONFIRMED proposals (each carrying a billing period)
 // and the reporting-year window, classifies data completeness so the wizard can
@@ -1802,6 +1820,17 @@ function exclusiveEnd(end: Date): Date {
     : new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1)
 }
 
+// T10b: THE CANONICAL HALF-OPEN PERIOD OF A STORED [start, end]. A one-day period (start = end) covers that
+// day, whatever the date. exclusiveEnd alone read an end on the 1st as exclusive, so start = end = the 1st had
+// no days and was reported as ending before it starts, contradicting the T1 ruling that a one-day bill is
+// valid. Every other period is [start, exclusiveEnd(end)), unchanged. Coverage and contributions both read
+// periods through here, so the two cannot disagree; exclusiveEnd stays the one definition of an end date.
+export function canonicalPeriod(start: Date, end: Date): { start: Date; endExclusive: Date } {
+  const s0 = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const sameDay = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth() && start.getDate() === end.getDate()
+  return { start: s0, endExclusive: sameDay ? new Date(s0.getFullYear(), s0.getMonth(), s0.getDate() + 1) : exclusiveEnd(end) }
+}
+
 function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date): CoverageResult {
   if (periods.length === 0) {
     return { status: 'none', issues: [], monthsCovered: 0, coverageRatio: 0, pctEstimated: 0, gaps: [], overlaps: [], straddles: [], outOfWindow: [], summary: 'No dated bills yet.' }
@@ -1836,7 +1865,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
     `${p.start.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`
   periods.forEach(p => {
     const pStart = new Date(p.start.getFullYear(), p.start.getMonth(), p.start.getDate())
-    const pEndExcl = exclusiveEnd(p.end)
+    const pEndExcl = canonicalPeriod(p.start, p.end).endExclusive
     const totalDays = dayCount(pStart, pEndExcl)
     const ovStart = pStart > winS ? pStart : winS
     const ovEndExcl = pEndExcl < winEexcl ? pEndExcl : winEexcl
@@ -1863,7 +1892,7 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
   const coverCount: number[] = new Array(Math.max(0, totalDaysInWin)).fill(0)
   periods.forEach(p => {
     let i = Math.max(0, idxOf(p.start))
-    const jExcl = Math.min(totalDaysInWin, idxOf(exclusiveEnd(p.end)))
+    const jExcl = Math.min(totalDaysInWin, idxOf(canonicalPeriod(p.start, p.end).endExclusive))
     for (; i < jExcl; i++) coverCount[i]++
   })
 
@@ -1873,8 +1902,8 @@ function analyzeCoverage(periods: CoveragePeriod[], winStart: Date, winEnd: Date
   const overlapPairs: CoverageResult['overlaps'] = []
   for (let a = 0; a < periods.length; a++) {
     for (let b = a + 1; b < periods.length; b++) {
-      const aS = periods[a].start.getTime(), aE = exclusiveEnd(periods[a].end).getTime()
-      const bS = periods[b].start.getTime(), bE = exclusiveEnd(periods[b].end).getTime()
+      const aS = periods[a].start.getTime(), aE = canonicalPeriod(periods[a].start, periods[a].end).endExclusive.getTime()
+      const bS = periods[b].start.getTime(), bE = canonicalPeriod(periods[b].start, periods[b].end).endExclusive.getTime()
       if (Math.max(aS, bS) < Math.min(aE, bE)) overlapPairs.push({ a: periods[a], b: periods[b] })
     }
   }
@@ -1933,7 +1962,7 @@ interface CoverageResolution {
   fuelType: string
   // Written kinds (T3): extrapolate, same_bill, different_meters, used_none. 'duplicate' and 'straddle' are
   // LEGACY: readable, never accepted (validateResolution), so they change no figure and resolve no issue.
-  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle'
+  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle' | 'deliveries_complete'
   // extrapolate: gross up partial-year data by coverage ratio
   monthsCovered?: number          // for extrapolate: e.g. 11
   pctEstimated?: number           // for extrapolate: e.g. 8.3
@@ -1951,6 +1980,9 @@ interface CoverageResolution {
   docId?: string
   // used_none: the location field confirmed as zero.
   field?: string
+  // deliveries_complete (T10b): the documents the customer confirmed as all the deliveries for the year. If the
+  // confirmed deliveries change, the set no longer matches and the confirmation stops applying (ruling).
+  docIds?: string[]
   // Who confirmed (used_none: required). The account's user id and email at the time of confirming.
   by?: { userId: string; email: string }
   // LEGACY straddle: day-level proration choice (ignored since T2)
@@ -3035,6 +3067,7 @@ function resolutionMethod(r: CoverageResolution): string {
     : r.kind === 'same_bill' ? 'Same bill, counted once'
     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
     : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
+    : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
     : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
     : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
     : r.kind
@@ -3071,8 +3104,22 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
     case 'extrapolate': {
       if (!(r.monthsCovered && r.monthsCovered > 0)) return 'An estimate needs the number of months covered by bills.'
       const types = new Set(docs.filter(d => (d.extracted ?? []).some(p => p.fuelType === r.fuelType)).map(d => d.document_type))
-      if (r.documentType != null) return types.has(r.documentType) ? null : 'The estimate names documents that are not on this site.'
-      return types.size > 1 ? 'Choose which documents this estimate covers.' : null
+      if (r.documentType != null && !types.has(r.documentType)) return 'The estimate names documents that are not on this site.'
+      if (r.documentType == null && types.size > 1) return 'Choose which documents this estimate covers.'
+      // T10b: deliveries are counted as delivered; a delivery-based group is never estimated (ruling).
+      const docType = r.documentType ?? [...types][0]
+      if (docType != null && isDeliveryGroup(loc, docType, r.fuelType)) return 'Deliveries are counted as delivered, not estimated.'
+      return null
+    }
+    case 'deliveries_complete': {
+      if (!r.by?.userId || !r.by?.email) return 'A confirmation must record who confirmed it.'
+      if (!r.documentType) return 'Name the documents these deliveries are on.'
+      const ids = r.docIds ?? []
+      // The ids are a SNAPSHOT of what was confirmed, so a document removed since is not an error here: the
+      // set no longer matches, and findUnresolvedCoverage reopens the issue saying the deliveries changed.
+      if (ids.length === 0) return 'Name the deliveries being confirmed.'
+      if (!isDeliveryGroup(loc, r.documentType, r.fuelType)) return 'These documents are not deliveries, so their coverage is checked by month instead.'
+      return null
     }
     case 'same_bill': {
       const ex = r.excludedDocIds ?? []
@@ -3100,6 +3147,21 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
       return 'This resolution is no longer accepted. Bills that cross the year boundary are prorated by their own days.'
   }
 }
+/** T10b: two document-id lists name the same documents, order ignored. */
+export function sameDocSet(a: readonly string[], b: readonly string[]): boolean {
+  const A = new Set(a), B = new Set(b)
+  return A.size === B.size && [...A].every(x => B.has(x))
+}
+
+/**
+ * T10b: true when a location's (document type, fuel) group holds a confirmed delivery, so it is checked for
+ * completeness and never estimated. Read from the readings, not the type alone (ruling: the reading decides).
+ */
+export function isDeliveryGroup(loc: Location, documentType: string, fuelType: string): boolean {
+  return loc.source_docs.some(d => d.document_type === documentType
+    && (d.extracted ?? []).some(p => p.fuelType === fuelType && p.status === 'confirmed' && p.value != null && deliveryDateOf(documentType, p) !== null))
+}
+
 export const acceptedResolutions = (loc: Location, resolutions: CoverageResolution[]): CoverageResolution[] =>
   resolutions.filter(r => r.locId === loc.id && validateResolution(r, loc) === null)
 
@@ -3168,6 +3230,12 @@ export const COVERAGE_MESSAGE = {
   // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
   unread: (file: string, fuels: string, site: string) =>
     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
+  // T10b: a delivery-based fuel is checked for completeness, not monthly coverage. Until the customer confirms
+  // the deliveries listed are all of them, export waits.
+  deliveries_unconfirmed: (n: number, fuel: string, site: string, from: string, to: string) =>
+    `Confirm that the ${n} ${fuel} deliver${n === 1 ? 'y' : 'ies'} listed for ${site} ${n === 1 ? 'is' : 'are'} all the ${fuel} deliveries between ${from} and ${to}. Export is blocked until you confirm.`,
+  deliveries_changed: (fuel: string, site: string, email: string, date: string) =>
+    `The ${fuel} deliveries for ${site} have changed since ${email} confirmed them on ${date}. Check the list and confirm again. Export is blocked until you do.`,
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
 }
@@ -3223,10 +3291,10 @@ export function streamSwitchOff(loc: Location, field: keyof Location | string): 
 // `periodStart` is kept VERBATIM as stored; `periodEndExclusive` is the canonical boundary.
 // `periodOrigin`: 'high' → printed, 'medium' → billing_month (rule R5); anything else, including a missing
 // periodConfidence, is null, meaning not recorded (ruled). `meterLabel` null is the default single meter (ruled).
-export type PeriodOrigin = 'printed' | 'billing_month' | 'customer_confirmed'
+export type PeriodOrigin = 'printed' | 'billing_month' | 'customer_confirmed' | 'delivery'
 export type ContributionReason =
   | 'counted' | 'prorated' | 'outside_year' | 'undated' | 'invalid_period' | 'not_confirmed' | 'mixed_units'
-  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override'
+  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override' | 'delivered'
 export interface BillContribution {
   docId: string
   proposalIndex: number
@@ -3253,6 +3321,23 @@ export interface BillContribution {
   corrections?: ExtractedProposal['corrections']
   /** T9: who rejected the bill, or undid a rejection, and when. */
   statusLog?: ExtractedProposal['statusLog']
+  /** T10b: the delivery date, when this reading is a delivery (counted in full if inside the year). */
+  deliveryDate?: string
+}
+
+/**
+ * T10b: the delivery date of a reading that is a DELIVERY, or null when it is not one. Rulings (design doc
+ * section 10): within a delivery-capable document type (DELIVERY_DOC_TYPES) the READING decides. A single
+ * delivery date with no billing period is a delivery; so is a reading whose stored period starts and ends on
+ * the same day, which is how a delivery date was stored before T10b (read as a delivery, no migration). A
+ * reading with a period of more than one day is a statement, prorated by its own days. Gas, electricity and
+ * steam are never deliveries.
+ */
+export function deliveryDateOf(documentType: string, p: Pick<ExtractedProposal, 'periodStart' | 'periodEnd' | 'deliveryDate'>): string | null {
+  if (!DELIVERY_DOC_TYPES.has(documentType)) return null
+  if (p.periodStart && p.periodEnd) return p.periodStart.slice(0, 10) === p.periodEnd.slice(0, 10) ? p.periodStart : null
+  if (!p.periodStart && !p.periodEnd && p.deliveryDate) return p.deliveryDate
+  return null
 }
 
 /**
@@ -3355,11 +3440,22 @@ export function billContributions(
     let inWindowDays: number | null = null
     let share: number | null = null
     let periodProblem: InvalidPeriodKind | null = null
-    if (p.periodStart && p.periodEnd && (!isRealIsoDate(p.periodStart) || !isRealIsoDate(p.periodEnd))) {
+    // T10b: a DELIVERY counts in full when its delivery date is inside the window and not at all otherwise.
+    // It is never prorated and has no period, so it never enters the monthly coverage check.
+    const deliveryDate = deliveryDateOf(d.document_type, p)
+    let deliveredInWindow = false
+    if (deliveryDate !== null) {
+      if (!isRealIsoDate(deliveryDate)) periodProblem = 'unparseable'
+      else {
+        const dd = parseLocalDate(deliveryDate)
+        deliveredInWindow = dd >= winS && dd < winEexcl
+        share = deliveredInWindow ? 1 : 0
+      }
+    } else if (p.periodStart && p.periodEnd && (!isRealIsoDate(p.periodStart) || !isRealIsoDate(p.periodEnd))) {
       periodProblem = 'unparseable'
     } else if (p.periodStart && p.periodEnd) {
       const start = parseLocalDate(p.periodStart)
-      const e = exclusiveEnd(parseLocalDate(p.periodEnd))
+      const e = canonicalPeriod(start, parseLocalDate(p.periodEnd)).endExclusive
       const t = dayCount(start, e)
       // Both dates real, and the end falls before the start: the canonical period has no days.
       if (t <= 0) periodProblem = 'reversed'
@@ -3381,6 +3477,7 @@ export function billContributions(
       : sameBillAs ? 'same_bill_as'
       : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
       : periodProblem ? 'invalid_period'
+      : deliveryDate !== null ? (deliveredInWindow ? 'delivered' : 'outside_year')
       : totalDays === null ? 'undated'
       : inWindowDays === 0 ? 'outside_year'
       : (inWindowDays as number) < totalDays ? 'prorated'
@@ -3394,16 +3491,17 @@ export function billContributions(
       meterLabel: d.meter_label ?? null,
       periodStart: p.periodStart,
       periodEndExclusive: endExcl ? iso(endExcl) : null,
-      periodOrigin: periodOriginOf(p),
+      periodOrigin: deliveryDate !== null ? 'delivery' : periodOriginOf(p),
       totalDays,
       inWindowDays,
       share,
       value: p.value,
       unit: p.unit,
-      counted: reason === 'counted' || reason === 'prorated',
+      counted: reason === 'counted' || reason === 'prorated' || reason === 'delivered',
       reason,
       ...(reason === 'invalid_period' && periodProblem ? { periodProblem } : {}),
       ...(reason === 'same_bill_as' && sameBillAs ? { reasonRef: sameBillAs } : {}),
+      ...(deliveryDate !== null && periodProblem === null ? { deliveryDate } : {}),
       // T9: the original reading and the customer's changes travel with the contribution into workings.
       ...(p.asRead ? { asRead: p.asRead } : {}),
       ...(p.corrections?.length ? { corrections: p.corrections } : {}),
@@ -4157,7 +4255,7 @@ export function findUnresolvedCoverage(
       } else if (c.reason === 'invalid_period' && c.periodProblem) {
         const p = loc.source_docs.find(d => d.id === c.docId)?.extracted?.[c.proposalIndex]
         out.push({ locId: loc.id, fuelType: c.fuelType, status: 'invalid_period', docIds: [c.docId], meterLabel: c.meterLabel,
-          message: INVALID_PERIOD_MESSAGE[c.periodProblem](fileOf(c.docId), p?.periodStart ?? '', p?.periodEnd ?? '') })
+          message: INVALID_PERIOD_MESSAGE[c.periodProblem](fileOf(c.docId), p?.periodStart ?? p?.deliveryDate ?? '', p?.periodEnd ?? p?.deliveryDate ?? '') })
       }
     }
     const mixedByField = new Map<string, BillContribution[]>()
@@ -4205,6 +4303,32 @@ export function findUnresolvedCoverage(
         message: COVERAGE_MESSAGE.stream_off(site, meta.verb, meta.name, e.n, FUEL_NAME[e.fuelType] ?? e.fuelType) })
     }
 
+    // T10b: DELIVERY-BASED GROUPS, keyed (document_type, fuelType). A group with any confirmed delivery is
+    // checked for COMPLETENESS, not monthly coverage (ruling): no gap, no estimate, and export waits until the
+    // customer confirms that the deliveries listed are all of them. The confirmation covers every confirmed
+    // reading of the group, statements included (a mixed field is confirmed as a whole), and it applies only
+    // while that set is unchanged: adding, removing or rejecting a delivery reopens it (ruling).
+    const docTypeOf = (docId: string) => loc.source_docs.find(x => x.id === docId)?.document_type ?? ''
+    const placed = (c: BillContribution) => c.counted || c.reason === 'outside_year'
+    const deliveryGroups = new Map<string, { documentType: string; fuelType: string; n: number }>()
+    for (const c of contributions) {
+      if (!c.deliveryDate || !placed(c)) continue
+      const key = `${docTypeOf(c.docId)}|${c.fuelType}`
+      const g = deliveryGroups.get(key) ?? { documentType: docTypeOf(c.docId), fuelType: c.fuelType, n: 0 }
+      g.n += 1
+      deliveryGroups.set(key, g)
+    }
+    for (const g of deliveryGroups.values()) {
+      const docIds = [...new Set(contributions.filter(c => placed(c) && c.fuelType === g.fuelType && docTypeOf(c.docId) === g.documentType).map(c => c.docId))]
+      const conf = resolutions.filter(r => r.kind === 'deliveries_complete' && r.fuelType === g.fuelType && r.documentType === g.documentType).at(-1)
+      if (conf && sameDocSet(conf.docIds ?? [], docIds)) continue
+      const fuel = FUEL_NAME[g.fuelType] ?? g.fuelType
+      out.push({ locId: loc.id, fuelType: g.fuelType, status: 'deliveries_unconfirmed', documentType: g.documentType, docIds,
+        message: conf
+          ? COVERAGE_MESSAGE.deliveries_changed(fuel, site, conf.by?.email ?? 'someone', dateInWords(new Date(conf.acknowledgedAt)))
+          : COVERAGE_MESSAGE.deliveries_unconfirmed(g.n, fuel, site, dateInWords(coverageWin.start), dateInWords(coverageWin.end)) })
+    }
+
     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
     // (document_type, fuelType, meter_label). Same-bill exclusions, undated, invalid and mixed bills are
     // not placed (each is reported above, or is a resolved overlap).
@@ -4220,14 +4344,15 @@ export function findUnresolvedCoverage(
     }
     for (const g of groups.values()) {
       const cov = analyzeCoverage(g.periods, coverageWin.start, coverageWin.end)
-      if (cov.issues.includes('gap')) {
+      // T10b: a delivery-based group has no monthly gap; its statements are still checked for overlaps.
+      if (cov.issues.includes('gap') && !deliveryGroups.has(`${g.documentType}|${g.fuelType}`)) {
         const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel
           && (r.documentType == null || r.documentType === g.documentType))
         if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel, documentType: g.documentType })
       }
       for (const pair of cov.overlaps) {
         const from = pair.a.start > pair.b.start ? pair.a.start : pair.b.start
-        const endA = exclusiveEnd(pair.a.end), endB = exclusiveEnd(pair.b.end)
+        const endA = canonicalPeriod(pair.a.start, pair.a.end).endExclusive, endB = canonicalPeriod(pair.b.start, pair.b.end).endExclusive
         const toExcl = endA < endB ? endA : endB
         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
         out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,

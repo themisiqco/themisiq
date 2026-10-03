@@ -22,7 +22,7 @@ import { FACTOR_EDITION_DISCLOSURE } from '../../../../lib/ghg/factorEditions'
 import { scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift } from '../../../../lib/ghg/series'
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
-import { loadMonthly, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
+import { loadMonthly, DELIVERY_BASED_NOTE, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
 
 // Shown in place of the monthly chart when the selected year's inventory cannot be identified (T12).
 const MONTHLY_NO_INVENTORY = "this year's inventory could not be identified, so its monthly detail cannot be shown"
@@ -547,6 +547,9 @@ export default function TrendsPage() {
                   {monthly.totalTco2e.toLocaleString()} tCO₂e total. Months without dated bills are omitted.
                   This is a partial, concierge-sourced view; the yearly chart above is authoritative.
                 </p>
+                {monthly.deliveryBased && (
+                  <p style={{ marginTop: 4, fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>{DELIVERY_BASED_NOTE}</p>
+                )}
               </>
             )}
           </div>

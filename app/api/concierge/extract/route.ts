@@ -45,6 +45,7 @@ interface ExtractionField {
   unit: string | null
   periodStart: string | null   // ISO yyyy-mm-dd — billing/service period start
   periodEnd: string | null     // ISO yyyy-mm-dd — billing/service period end
+  deliveryDate?: string | null // ISO yyyy-mm-dd — T10b: a single delivery or purchase date, when no period is printed
   periodConfidence: 'high' | 'medium' | 'low' | null
   sourceQuote: string | null
   confidence: 'high' | 'medium' | 'low'
@@ -64,6 +65,7 @@ For EACH figure you report, also extract the billing/service period that the fig
 - If the document shows an explicit date range (e.g. "Nov 1 - Nov 30, 2024"), use those exact dates.
 - If it shows only a month or month/year (e.g. "Nov 2024"), use the first and last calendar day of that month and set periodConfidence: "medium".
 - If no billing period is visible, return periodStart: null, periodEnd: null, periodConfidence: "low".
+- DELIVERIES: if the document records a delivery, purchase or dispense of fuel on a single date and prints no service period (for example a propane or diesel delivery invoice, or a single fuel receipt), return that date as deliveryDate (yyyy-mm-dd), with periodStart: null and periodEnd: null. Never return a delivery date as a one-day period (periodStart equal to periodEnd). If the document prints a statement period (for example a monthly fuel-card or account statement), report that period as periodStart and periodEnd and leave deliveryDate null.
 
 CRITICAL RULES — this feeds a regulatory compliance report, so accuracy matters more than completeness:
 1. Only report a figure you can actually see in the document. If a fuel type is not present, return value: null for it.
@@ -74,7 +76,7 @@ CRITICAL RULES — this feeds a regulatory compliance report, so accuracy matter
 6. Do NOT convert units. Report each figure in the unit exactly as printed on the document — conversion happens later in a separate, audited step. Your job is only to read the figure and its unit faithfully.
 
 Respond with ONLY a JSON array (no prose, no markdown fences), one object per requested fuel type, each shaped exactly:
-{"fuelType": "<one of: ${fuelTypes.join(', ')}>", "value": <number or null>, "unit": "<string or null>", "periodStart": "<yyyy-mm-dd or null>", "periodEnd": "<yyyy-mm-dd or null>", "periodConfidence": "high"|"medium"|"low"|null, "sourceQuote": "<string or null>", "confidence": "high"|"medium"|"low", "notes": "<string or null>"}`
+{"fuelType": "<one of: ${fuelTypes.join(', ')}>", "value": <number or null>, "unit": "<string or null>", "periodStart": "<yyyy-mm-dd or null>", "periodEnd": "<yyyy-mm-dd or null>", "deliveryDate": "<yyyy-mm-dd or null>", "periodConfidence": "high"|"medium"|"low"|null, "sourceQuote": "<string or null>", "confidence": "high"|"medium"|"low", "notes": "<string or null>"}`
 }
 
 export async function POST(req: NextRequest) {

@@ -67,7 +67,9 @@ describe('month-only bills (rule R5)', () => {
 
   it('the page maps the origin at extraction and guards every patch', () => {
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
-    expect(page).toContain("periodOrigin: f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,")
+    // T10b: a delivery date (no period) is a delivery; otherwise the R5 mapping is unchanged.
+    expect(page).toContain("periodOrigin: !f.periodStart && !f.periodEnd && f.deliveryDate ? 'delivery'")
+    expect(page).toContain(": f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,")
     expect(page).toContain('i === propIdx ? { ...p, ...guardConfirm(p, patch) } : p')
   })
 })

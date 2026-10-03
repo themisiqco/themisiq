@@ -483,6 +483,21 @@ The tests are grouped by task in section 11. They include all of these:
 | T18 scope (2 Oct 2026) | T18 is in scope, no longer proposed. Core pre-launch work with T11 and T17. |
 | FI0: location cap retired (2 Oct 2026) | GHG is priced by employee count with unlimited locations. Part (b) of `enforce_ghg_location_allowance()`, the location cap, is retired. Part (a), the entitlement gate (an active `ghg` pass with `term_end > now()`, else "expired" or "requires the GHG module"), stays, with the em dash in "still on screen — purchase" replaced by a full stop. FI0 runs on its own small branch off main: NOT RUN SQL replacing the function with the gate only; stop writing `location_allowance` for GHG; remove the client wall and the location-limit copy; tests that a 25-location inventory saves with an active pass and is refused without one. |
 | Trigger capture (2 Oct 2026) | Write docs/review/patches/capture-triggers.sql (NOT RUN), an idempotent capture of `log_audit()` and `audit_ghg_inventories` exactly as live. **Finding:** of the two triggers reported as missing from the migrations, only `audit_ghg_inventories` is. `log_audit()` is in 20260726_capture_audit_log_infrastructure.sql, and `enforce_ghg_location_allowance()` with its trigger is in 20260618_ghg_location_allowance.sql; both are identical to the 1 Oct 2026 dump. The capture creates the audit trigger only if absent; otherwise it compares the live definition and raises on a difference. docs/review/live-trigger-functions.sql did not exist when this was written; diff against it before running. |
+| T10b: diagnosis (run-through, 2 Oct 2026) | Six Melbourne LPG delivery invoices (90 kg each, one delivery date, no billing period) were read as one-day periods, because the extraction prompt has no rule for a delivery date (route.ts:61-66). They were counted in full, but covered six days and no whole month, so coverage reported 0 of 12 months and blocked export. "Estimate the missing months" was offered anyway (CoverageStrip.tsx:128-135). Clicking it stores an `extrapolate` with `monthsCovered: 0` and the note "×12/0", which `validateResolution` refuses (engine.ts:3072). There is no division by zero, Infinity or NaN, and the gross-up is guarded as well (3512), but nothing changes and the customer is not told why. Latent, same root: a one-day period dated the 1st has zero days under `exclusiveEnd` and is reported as "ends before it starts" (engine.ts:1799-1803, 3365). The 177.143 L is the uncited US propane density (FI4). Full diagnosis in T10b. |
+| T10b: delivery documents (2 Oct 2026) | A delivery document (identified by document type and/or a single delivery date with no billing period) counts in full if its delivery date is within the reporting window, and zero otherwise. It is not prorated. |
+| T10b: completeness, not coverage (2 Oct 2026) | Delivery-based fields are excluded from the monthly gap and coverage check. Instead the customer gives a one-click confirmation, "These are all the deliveries for this year", recording who and when. Until it is given, export is blocked with a plain message. Gap estimation is never offered for delivery-based fields. |
+| T10b: monthly split (2 Oct 2026) | Each delivery is assigned to its delivery month, labelled delivery-based. |
+| T10b: extraction (2 Oct 2026) | The extraction prompt records a delivery date as a delivery, not as a one-day billing period. |
+| T10b: which types (2 Oct 2026) | To be ruled; proposal in T10b. Delivery-based: `fuel_propane`, `fuel_diesel`, `fleet_fuel`, `fuel_oil`. Periodic: gas, electricity, steam. ⚑ Ambiguous, flagged: metered LPG, diesel account statements and fuel-card statements carry billing periods. The proposal is that the reading decides within those types (a single delivery date and no period makes it a delivery). A field holding both kinds also needs a ruling. |
+| T10b: stock adjustment (2 Oct 2026) | Post-launch only: an optional opening and closing stock adjustment. |
+| T10b: estimate guard (2 Oct 2026) | Independently of delivery handling, the estimate action refuses when 0 months are covered. |
+| T10b: the reading decides (2 Oct 2026, ruled) | Within a delivery-capable document type (`fuel_propane`, `fuel_diesel`, `fleet_fuel`, `fuel_oil`), the reading decides: a single delivery date and no billing period make it a delivery; a reading with a billing period is a statement, prorated by its own days and month-checked as today. |
+| T10b: mixed field (2 Oct 2026, ruled) | A field holding both deliveries and statements uses the completeness confirmation (no monthly gap check, no estimate). Statements are still prorated by their own days. |
+| T10b: confirmation reopens (2 Oct 2026, ruled) | The confirmation records the documents it covered. Adding, removing, rejecting or withdrawing a delivery reopens it. |
+| T10b: readings saved before T10b (2 Oct 2026, ruled) | A reading on a delivery-type field with periodStart = periodEnd and no deliveryDate reads as a delivery on that date. No data migration. |
+| T10b: one-day periods (2 Oct 2026, ruled) | The CLAUDE.md `exclusiveEnd` wording ("a one-day period (start = end) covers that day, whatever the date; canonicalPeriod is the one place that says so") is included in the T10b patch. |
+| T10b: confirmation text (2 Oct 2026, ruled) | The confirmation names the fuel, the site and the window, for example: "These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025." |
+| T10b: sequencing (2 Oct 2026) | T10b blocks the derived-figures merge. It joins the merge set after T10 (and the committed T10a). |
 | Launch (2 Oct 2026) | The commercial launch has moved from 1 November 2026 to a date to be set once the GHG module is complete. Order and estimate for the remaining work: section 12. |
 | Sequencing (2 Oct 2026) | The `factor-integrity` branch (FI1 to FI10) is created from main after derived-figures merges. `factor-years` (T3b, T3c, T3d) is created from main after `factor-integrity` merges. |
 | T3b: optional election and allowlist | Optional-election banner confirmed, for a window ending after 1 February 2026: "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it." The EU deadline string "FY2024 (large EU companies)" stays on the source-guard allowlist. |
@@ -497,7 +512,7 @@ core derived-figures work. T14 to T16 come after it, as ruled. T11, T17 and T18 
 (ruling of 2 Oct 2026).
 
 **Merge set (ruling, section 10).** derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8, T9,
-T12, T10. T11 and T13 follow on main. FI1 to FI10 are on the `factor-integrity` branch, created from main after
+T12, T10, T10a, T10b. T11 and T13 follow on main. FI1 to FI10 are on the `factor-integrity` branch, created from main after
 that merge; T3b, T3c and T3d are on the `factor-years` branch, created from main after `factor-integrity` merges
 (sequencing ruling of 2 Oct 2026). The tasks below are listed in that order. T3a has no entry of its own: it is the patch
 docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the proration note).
@@ -675,6 +690,182 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
   row carries the reason.
 - **Done:** a customer with an unusable document can finish, and the reason travels with the figure.
 
+### T10b. Delivery-based fuels: count by delivery date, confirm completeness, never estimate (blocks the merge)
+- **Branch:** `derived-figures`, before merge (run-through finding of 2 Oct 2026; rulings in section 10, "T10b").
+- **Estimate:** M to L, 3 diffs, 3 to 4 days:
+  1. the extraction rule, the data model and contributions;
+  2. coverage, the completeness confirmation, the strip and the estimate guard;
+  3. the monthly split and the trends label.
+
+**Diagnosis** (code at `3e37755`; summary in section 10, "T10b: diagnosis"):
+- **The extraction prompt has no rule for a delivery date.** It asks for "the billing/service period" and says
+  to return nulls when "no billing period is visible" (app/api/concierge/extract/route.ts:61-66). For each
+  90 kg invoice the model returned periodStart = periodEnd = the delivery date.
+  - Had it returned nulls, each invoice would have been `undated` and blocked with a plain message (T3).
+  - Instead each became a valid one-day billing period: `dayCount(start, exclusiveEnd(end)) = 1`
+    (engine.ts:3361-3372).
+  - Counted in full when inside the year: share 1, reason `counted`. Hence Scope 1 +1.65 t: 6 × 177.143 L ×
+    1.557 kg/L (`EF_AU.propane_litre`).
+- **Coverage.** `analyzeCoverage` (engine.ts:1805-1925) builds a day map (1858-1869) and counts a month as
+  covered only if every day of it is covered (1882-1892). Six one-day periods cover six days and no whole
+  month: `monthsCovered` 0, twelve gaps, "0 of 12 months covered". The gap is export-blocking through
+  `findUnresolvedCoverage` (engine.ts:4115).
+- **"Estimate the missing months" with 0 months covered: no divide by zero, no Infinity, no NaN. The click
+  silently does nothing.**
+  - The strip offers the button on any gap (CoverageStrip.tsx:128-135), whatever `monthsCovered` is.
+  - `estimateResolution` (lib/ghg/coverageActions.ts:69-82) builds `monthsCovered: 0` and stores the note "0 of
+    12 months evidenced by bills; remaining 12 months estimated by scaling metered data ×12/0 (100%
+    estimated)."
+  - `validateResolution` refuses it: `!(r.monthsCovered && r.monthsCovered > 0)` gives "An estimate needs the
+    number of months covered by bills." (engine.ts:3072). So it is never accepted (engine paths read accepted
+    resolutions only), and no figure, gap or audit row changes.
+  - The gross-up has its own guard as well: `r && r.monthsCovered ? 12 / r.monthsCovered : 1` (engine.ts:3512).
+    `resolutionMethod` (3034) and `adjustmentBasis` (3043-3046) are reached only for accepted resolutions.
+    `pctEstimated` (2983-3001) reads `estimated` from accepted contributions, so it is unchanged.
+  - **Net effect:** a refused resolution, with "×12/0" in its note, is stored in `coverage_resolutions` and saved.
+    The gap and the export block stay, and the customer sees nothing happen and no reason why.
+- **Latent defect, same root.** A one-day period dated the 1st of a month has no days.
+  - `exclusiveEnd` treats an end on the 1st as exclusive (engine.ts:1799-1803), so start = end = 2025-03-01
+    gives `t = 0` and `periodProblem: 'reversed'` (engine.ts:3365). The bill is then shown as "ends before it
+    starts".
+  - That contradicts the T1 ruling that a one-day bill (end = start) is valid. A delivery on the 1st would hit
+    it today.
+- **Not T10b:** the 177.143 L comes from the uncited US propane density (lib/unitConversions.ts:48-52,
+  146-150), 90 kg × 1.96826 L/kg. That is FI4.
+
+**Design (rulings, section 10)**
+- **Which document types are delivery-based** (proposal, from `DOC_TYPE_FUELS` and `DOC_TYPE_LABELS`,
+  lib/ghg/conciergeDocTypes.ts:27-62):
+
+  | Document type | Label | Proposed | Note |
+  |---|---|---|---|
+  | `fuel_propane` | Propane delivery record | **delivery-based** | ⚑ Ambiguous: metered LPG (a piped network, or a metered tank billed by reading) comes as a periodic bill with a service period. |
+  | `fuel_diesel` | Diesel purchase record | **delivery-based** | ⚑ Ambiguous: a supplier's monthly account statement covers a period. |
+  | `fleet_fuel` | Fleet fuel record | **delivery-based** | ⚑ Ambiguous, most of all: a fuel-card statement covers a month and lists many purchases, while a single receipt is one purchase. |
+  | `fuel_oil` | Fuel oil delivery record | **delivery-based** | Not read by the concierge today (`CONCIERGE_UNREAD_DOC_TYPES`), so it affects only typed figures and any future extraction. |
+  | `utility_bill_gas` | Gas bill | periodic | Metered, billed by period. |
+  | `utility_electricity` | Electricity bill | periodic | Metered, billed by period. |
+  | `purchased_steam` | Steam / district heating bill | periodic | Metered; not read today. |
+  | `service_record`, `renewable_cert`, `biogenic` | | not applicable | Not consumption read by date. |
+
+  **Proposed rule for the ambiguous types:** the reading decides, not the type alone.
+  - In a delivery-capable type, a reading with a delivery date and no billing period is a **delivery**.
+  - A reading with a billing period (a fuel-card or account statement, or metered LPG) stays a **periodic
+    reading**: prorated by its own days (R2), and covered by the month check as today.
+  - ⚑ For Lisa: a field holding both kinds. The proposal is to treat it as delivery-based for completeness: no
+    gap check, and the completeness confirmation covers every document. Each periodic reading is still
+    prorated by its own days.
+- **The reading.** `ExtractedProposal` gains `deliveryDate: string | null`, and `periodOrigin` gains
+  `'delivery'`.
+  - The extraction prompt (route.ts:61-66 and the propane, diesel and gasoline lines of `FUEL_GUIDANCE`, 33-38)
+    gains a rule: "If the document records a delivery, purchase or dispense on a single date and prints no
+    service period, return that date as deliveryDate, with periodStart and periodEnd null. Never return a
+    delivery date as a one-day period."
+  - **Readings saved before T10b** (pre-launch, section 4): in a delivery-capable type, a reading with
+    periodStart = periodEnd and no deliveryDate is read as a delivery on that date. ⚑ Proposed read rule; no
+    data migration.
+- **Counting** (`billContributions`, engine.ts:3340-3412):
+  - A delivery contributes its full value when its delivery date is inside the reporting window (inclusive of
+    both ends), with the new reason **`delivered`** (counted, share 1, `totalDays` and `inWindowDays` null,
+    `deliveryDate` set).
+  - Otherwise it contributes `outside_year`, which the T3 ruling already allows to be silent.
+  - It is never prorated.
+  - The month-only confirmation (R5) does not apply: a delivery date is a printed date.
+  - A delivery reading with neither a delivery date nor a period stays `undated` and blocks, as today.
+- **Coverage and completeness:**
+  - `findUnresolvedCoverage` and the strip skip the month check for a delivery-based group (document type,
+    fuel, meter). Such a group never shows "N of 12 months covered", never shows a gap, and never offers
+    "Estimate the missing months".
+  - Instead, a new export-blocking issue, **`deliveries_unconfirmed`**: "Confirm that the {n} {fuel}
+    deliveries listed for {site} are all the deliveries in {year label}. Export is blocked until you
+    confirm."
+  - The strip shows the deliveries in date order and one button: **"These are all the deliveries for this
+    year"**.
+  - It writes a new resolution `{ kind: 'deliveries_complete', locId, fuelType, documentType, docIds, by, at,
+    note }`, keyed in `resolutionKey` (lib/ghg/coverageActions.ts:23-36) by (location, document type, fuel). Its
+    note reads "{email} confirmed on {date} that these {n} deliveries are all the {fuel} deliveries for
+    {site} in {year label}."
+  - It appears in the workings as a coverage-resolution row, with who and when (T18 shape).
+  - ⚑ **Proposed, not ruled:** the confirmation records the set of documents it covered. If a delivery is
+    later added, removed, rejected or withdrawn, the set no longer matches, the confirmation stops applying,
+    and the issue reopens with "The deliveries have changed since {email} confirmed them on {date}. Confirm
+    again." Without this, a confirmation would silently cover a set it never saw.
+  - "Used none" (T3) still answers a field with no deliveries.
+- **Estimation is never offered for a delivery-based field:** `validateResolution` refuses an `extrapolate`
+  whose group is delivery-based ("Deliveries are counted as delivered, not estimated."), and the strip renders
+  no estimate control for one.
+- **The 0-months guard** (independent of delivery handling, ruling):
+  - the strip offers "Estimate the missing months" only when `monthsCovered >= 1`;
+  - at 0 it shows "No month is fully covered by these bills, so the missing months cannot be estimated from
+    them. Upload the missing bills, or enter the figure yourself.";
+  - `estimateResolution` refuses to build one with `monthsCovered < 1` (it throws, and the strip never calls
+    it);
+  - `validateResolution`'s refusal (engine.ts:3072) stays as the backstop;
+  - a stored resolution the engine refuses is shown in the strip as "An estimate was recorded but cannot be
+    used: {reason}.", with "Remove it". It is never invisible.
+- **One-day periods:** a period with start = end means that one day.
+  - The fix goes in one place: a `canonicalPeriod(start, end)` helper used by both `analyzeCoverage` and
+    `billContributions`. It returns `[start, start + 1 day)` when start = end, and `[start, exclusiveEnd(end))`
+    otherwise.
+  - ⚑ This touches the `exclusiveEnd` invariant in CLAUDE.md. `exclusiveEnd` itself is unchanged, and the
+    proposed CLAUDE.md wording (Lisa applies) is: "A one-day period (start = end) covers that day, whatever the
+    date; canonicalPeriod is the one place that says so."
+- **Monthly split** (lib/ghg/monthlyEmissions.ts):
+  - Each delivery goes in full to the calendar month of its delivery date, and only if that date is inside
+    the window (Q2 ruling: slices are calendar months tagged with their inventory). The slice is tagged
+    `basis: 'delivery'`.
+  - Trends (T12) label delivery-based slices "Delivery-based: counted in the month delivered, not the month
+    used."
+  - `reconcile` stays at zero unexplained delta: the annual figure and the monthly figures are the same sum.
+- **Post-launch only, not in T10b:** an optional opening and closing stock adjustment (a stock count at the
+  start and end of the year, to turn deliveries into consumption). Recorded as a ruling. No design here.
+
+- **Files:**
+  - app/api/concierge/extract/route.ts (prompt and the `deliveryDate` field in the returned shape);
+  - lib/ghg/conciergeDocTypes.ts (`DELIVERY_DOC_TYPES`, with its test);
+  - lib/ghg/engine.ts (types, `canonicalPeriod`, `billContributions`, `analyzeCoverage` / `findUnresolvedCoverage`
+    for delivery groups, `validateResolution`, the `deliveries_complete` resolution, its audit row and its
+    method text);
+  - lib/ghg/coverageActions.ts (`deliveriesCompleteResolution`, the key, the `estimateResolution` guard);
+  - app/dashboard/ghg/_components/CoverageStrip.tsx (the delivery list, the confirmation, the 0-months message,
+    refused-estimate display);
+  - lib/ghg/monthlyEmissions.ts;
+  - the trends page label;
+  - app/dashboard/ghg/_components/ProposalEdits.tsx (the review shows "Delivered on {date}" instead of a period);
+  - tests.
+- **SQL:** none (`locations_data` and `coverage_resolutions` are jsonb).
+- **Tests:**
+  - **The Melbourne case, as a fixture:** six 90 kg LPG deliveries on six dates in the year.
+    - Each contributes `delivered` with share 1.
+    - The strip shows no month count and no estimate control, and shows the confirmation.
+    - Export is blocked with `deliveries_unconfirmed` until it is given.
+    - After confirmation, the issue clears and the workings carry who and when.
+  - **A full year of deliveries exports after confirmation:** twelve monthly deliveries, all inside the
+    window, confirmed. No coverage issue remains, and export is allowed (with every other gate met).
+  - A delivery dated one day before the window opens, and one dated the day after it closes, contribute
+    `outside_year` with zero. One dated on the first day and one dated on the last day both count in full.
+  - A delivery on the 1st of a month counts. It is not `invalid_period`.
+  - A one-day billing period on the 1st (a periodic document) covers that day and is not "reversed".
+  - **The 0-months guard:**
+    - with a gap and `monthsCovered` 0, the strip renders no "Estimate the missing months" and shows the
+      message;
+    - `estimateResolution({ monthsCovered: 0, ... })` throws;
+    - a stored `extrapolate` with `monthsCovered` 0 is refused by `validateResolution`, changes no figure, and is
+      shown as refused in the strip;
+    - with `monthsCovered` 1, the estimate is offered and grosses up by 12.
+  - An `extrapolate` on a delivery-based group is refused.
+  - **Confirmation set** (if the proposed rule is ruled in): after confirmation, a seventh delivery reopens the
+    issue with the "changed since" message.
+  - **Extraction:** the prompt contains the delivery rule. A route test with a mocked model response carrying
+    `deliveryDate` and null period passes it through.
+  - **Monthly:** each delivery lands in its delivery month, tagged `delivery`, and `reconcile` is zero.
+  - A periodic reading in a delivery-capable type (a fuel-card statement with a period) is prorated and
+    month-checked as today.
+  - Messages carry no em dash. Engine count only goes up.
+- **Done:** a site that buys fuel by delivery can export once the customer confirms its deliveries are
+  complete. No delivery is prorated or estimated, and no estimate can be recorded from zero covered months
+  without the customer being told why.
+
 ### T11. Verifier page: contributions, reasons, estimated dates
 - **Classification:** core pre-launch work (ruling of 2 Oct 2026, section 10). It supplies the data trail a
   verifier follows from each figure back to its documents (ISO 14064-3 cl. 6.1.3.2), and the documented
@@ -710,6 +901,51 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
   - It goes through `guardConfirm` per bill, so a month-only bill or one with no figure is never accepted by
     the batch.
   - Reason: the customer's approval of each AI reading is the control a verifier will test.
+- **Bills with no figure: status, message and help (added 2 Oct 2026).**
+  - **"Needs attention", not "Confirmed".**
+    - **Today:** a bill confirmed before T10a but with no figure (value null) shows the green "Confirmed" badge
+      (`PROPOSAL_BADGE` / `PROPOSAL_BADGE_COLOUR`, app/dashboard/ghg/page.tsx:3465-3488, rendered at 3575) and
+      "✓ Confirmed" (3595). Meanwhile it raises the T10a export-blocking issue.
+    - **Change:** such a bill shows the status "Needs attention" in the amber `needs_manual_review` colours, and
+      no "✓ Confirmed".
+    - Both badge and line read one helper, `proposalDisplayStatus(p)` (status `confirmed` and `valueProblem(p)`
+      not null gives `needs_attention`), so the two cannot disagree.
+    - The stored status is unchanged: this is display only. The export-blocking issue is unchanged.
+  - **The message under a disabled Confirm.** `NO_VALUE_MESSAGE` (lib/ghg/engine.ts:3282, returned by
+    `valueProblem` at 3288, shown at page.tsx:3611-3612) becomes one of two messages:
+    - **Default:** "We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself,
+      or reject the bill if it shouldn't be included."
+    - **When the reading has a quote and an unrecognised unit:** "We read "{quote}" from this bill, but we can't
+      use that unit for {fuel} yet. Choose the unit from the list, or enter the figure yourself."
+      - "Has a quote": `sourceQuote` is non-empty.
+      - "Unrecognised unit": `convertToCanonical(fuelType, rawValue, rawUnit)` returns tier 3 (lib/unitConversions.ts),
+        the same test that left the figure empty at extraction.
+      - `{fuel}` is the plain fuel name the review already shows ("natural gas"), not the key.
+      - `{quote}` is the source quote verbatim.
+    - `valueProblem` takes the fields it needs (`value`, `sourceQuote`, `fuelType`, `rawValue`, `rawUnit`), so
+      every caller gets the same sentence: the disabled Confirm (3598), the message (3611-3612), and
+      `guardConfirm` / `undoRejection` (lib/ghg/proposalEdits.ts:83, 98), which read only whether it is null.
+    - **Wording check:** "Choose the unit from the list" refers to the "Edit unit" control, which offers
+      `convertibleUnits(fuelType)` (ProposalEdits.tsx:64). "Enter the figure yourself" refers to "Edit figure".
+      ⚑ If the button labels change, the messages change with them.
+    - **Typography:** the customer's text uses straight quotes around {quote}, as written in the ruling.
+      ⚑ Confirm, if the site uses curly quotes elsewhere.
+  - **Help / FAQ entry "Why can't I confirm this bill?"**
+    - The text is to be supplied by Lisa. It is not drafted here.
+    - ⚑ The surface is not yet named. Candidates: the GHG FAQ on app/climate-ghg/page.tsx, or a help link beside
+      the disabled Confirm's message, pointing to that entry. Linking from the message is what makes it
+      findable at the moment it is needed.
+    - If it goes into a page that emits FAQ structured data (as app/calculate-emissions/page.tsx:145 does), it
+      goes in both the visible list and the JSON-LD, from one constant.
+  - **Tests:**
+    - a confirmed proposal with value null renders "Needs attention" in amber, not "Confirmed" and not
+      "✓ Confirmed";
+    - a confirmed proposal with a value still renders "Confirmed";
+    - `valueProblem` returns the default sentence for a null value with no quote, and the quote sentence (with
+      the quote and the plain fuel name) for a null value with a quote and a tier-3 unit;
+    - a null value with a quote but a recognised unit gets the default sentence;
+    - both sentences carry no em dash;
+    - the FAQ entry renders under its heading and, if the page has JSON-LD, appears there with the same text.
 - **Tests:** full suite; engine count not lower than before T1.
 - **Done:** F-09, F-10 and F-11 are closed by tests that would fail on the old code.
 
@@ -2052,6 +2288,7 @@ revision round, build and commit.
 
 | # | Item | Branch | Size, diffs | Days | Why here |
 |---|---|---|---|---|---|
+| 0 | T10b delivery-based fuels and the 0-months estimate guard | `derived-figures` | M to L, 3 | 3 to 4 | **Blocks the merge** (run-through finding). Today a site that buys fuel by delivery cannot export, and the only action offered silently does nothing. |
 | 1 | Derived-figures run-through fixes, then merge | `derived-figures` | M to L, 1 to 3 | 2 to 4 | Everything else is created from main after this merge. The fix list is whatever the run-through produced. The only open item known in this session is the live results panel disappearing, with no cause found in code; it needs a reproduction first. |
 | 1a | FI0 retire the location cap (and capture-triggers.sql) | `fi0-location-cap` | M, 2 | 1.5 to 2 | Independent of every other branch. Copy is wrong in the code at `3e37755`, and in production if main carries the same pricing (⚑ not checked: no git was run): the calculate-emissions note renders "for up to  locations", and three pages still say GHG is priced by locations. The SQL is low-risk and can run as soon as it is reviewed. |
 | 2 | T13 core close-out | main | S, 1 | 1 | Removes the dead paths (legacy straddle and duplicate writers) before FI1 rewrites the same engine code, and closes F-09 to F-11 with tests. |
@@ -2089,8 +2326,8 @@ revision round, build and commit.
 
 ### 12.3 Overall estimate
 
-**Sum of the items: 52 to 70 working days. Realistic: about 63 working days, roughly 12 to 13 weeks, with a range
-of 57 to 74.** FI0 (1.5 to 2 days) was added on 2 Oct 2026. This includes F-06 in T3c and T18 at its full scope (withdraw and delete, tombstones, typed-figure
+**Sum of the items: 55 to 74 working days. Realistic: about 66 working days, roughly 13 weeks, with a range of 60
+to 78.** FI0 (1.5 to 2 days) and T10b (3 to 4 days) were added on 2 Oct 2026. This includes F-06 in T3c and T18 at its full scope (withdraw and delete, tombstones, typed-figure
 entries), both added on 2 Oct 2026. It excludes the ⚑ option (b) document-level purge of `audit_log`, which
 would add SQL and about 2 to 3 days. The realistic figure allows for waiting on decisions and sources, and for findings from the
 run-throughs that the plan cannot list in advance.
