@@ -4,7 +4,7 @@
 //
 // STAGE 1b: renders the pre-configured order and the CARD path only (total ≤ $10k), reusing the
 // EXISTING startCheckout money funnel (which bounces logged-out buyers through signup→resume→Stripe).
-// The QUOTE path (>$10k or GHG Advisory) shows a placeholder — Stage 2 builds the real quote form.
+// The QUOTE path (>$10k or GHG Enterprise) shows a placeholder — Stage 2 builds the real quote form.
 //
 // ⚠️ LIVE MONEY: the card-path startCheckout call is byte-identical to the pricing page's. We NEVER
 // call startCheckout when the cart requires a quote/invoice (it 400s by design).
@@ -70,7 +70,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function OrderInner() {
   const searchParams = useSearchParams()
   const [submitting, setSubmitting] = useState(false)
-  // Quote-request form (>$10k / Advisory path) — email-only, no payment.
+  // Quote-request form (>$10k / Enterprise path) — email-only, no payment.
   // `hp` is the honeypot's LOCAL state name; the wire field is HONEYPOT_FIELD, shared with the route
   // and with /assess so one edit moves all three. See lib/assessmentSubmitGuard.ts.
   const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' })
@@ -109,7 +109,7 @@ function OrderInner() {
   const quote = cartQuote({ modules: keys, ghgTier: tier as GhgTier })
   const cardEligible = !quote.requiresQuote && !quote.requiresInvoice
 
-  // Line items (list prices). GHG at the tier price; others flat. null = Advisory (quote).
+  // Line items (list prices). GHG at the tier price; others flat. null = Enterprise (quote).
   const lineItems = keys.map(k => ({
     key: k,
     label: MODULE_LABELS[k] ?? k,
@@ -193,12 +193,12 @@ function OrderInner() {
             subtitle="ThemisIQ sells to businesses only. Confirm the details below to continue to secure payment."
           />
         ) : (
-          // QUOTE path (>$10k or GHG Advisory) — placeholder this stage. NEVER routes to card checkout.
+          // QUOTE path (>$10k or GHG Enterprise) — placeholder this stage. NEVER routes to card checkout.
           <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 14, padding: '1.75rem' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
             <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 16 }}>
               {quote.requiresQuote
-                ? 'GHG Advisory (uncapped locations) is tailored to your footprint, so it’s priced individually.'
+                ? `GHG ${GHG_TIER_LABELS.enterprise} (${ghgEmployeeBandLabel('enterprise')}) is tailored to your organization, so it’s priced individually.`
                 : 'Orders above $10,000 are completed by invoice rather than card.'} Our team will prepare a quote and walk you through next steps.
             </div>
 

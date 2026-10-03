@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     const phone   = vPhone ? esc(vPhone) : NOT_PROVIDED
     const modules = vModules.length ? esc(vModules.join(', ')) : NOT_PROVIDED
     const tier    = esc(vTier || NOT_PROVIDED)
-    const total   = typeof order?.totalUSD === 'number' && (order.totalUSD as number) > 0 ? `$${(order.totalUSD as number).toLocaleString()}` : 'Custom / Advisory'
+    const total   = typeof order?.totalUSD === 'number' && (order.totalUSD as number) > 0 ? `$${(order.totalUSD as number).toLocaleString()}` : 'Custom / Enterprise'
     const ref     = vRef ? esc(vRef) : null
 
     // ── Internal notification (the one we act on) ──────────────────────────────

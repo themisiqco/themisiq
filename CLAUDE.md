@@ -51,7 +51,7 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely 
 | Unit conversions | `lib/unitConversions.ts` | 3-tier cascade (exact match → documented factor → flag `needs_manual_review`). |
 | Entitlement reads | `lib/useEntitlement.ts` | e.g. `useEntitlementAccess()`, `useHasConcierge()`, user-scoped. |
 | Checkout intent | `lib/checkout.ts` | Stores intent in `sessionStorage`, resumes after login. |
-| Add-on prerequisites | `addOnRequirementsMet` | Single authority enforcing the `ghg → concierge` dependency chain, and the quote-only guard that keeps Concierge Enterprise unsellable through checkout. Both `/api/checkout` and `/api/admin/create-invoice` defer to it. (Was `ghg → concierge → verification` until 10 Aug 2026 — see the retirement note under **Pricing model**.) |
+| Bill Review orders | `billReviewOrder` (`lib/billReviewOrder.ts`) | Single authority for what Bill Review (internal key `concierge`) may be sold and at what price: an active GHG plan, the onboarding tier, the source count, Enterprise as a quote, human reading and connected sources refused until sellable. Both `/api/checkout` and `/api/admin/create-invoice` call it, and it prices through `billReviewQuote`, which /pricing displays from. (Replaced `addOnRequirementsMet` and the location-band add-ons in Oct 2026.) |
 
 ---
 
@@ -232,12 +232,19 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
   and not receive it. A derived test guards this; adding a module to `MODULES`
   fails that test until it is mapped.
 - **GHG is priced by employee band, with unlimited locations on every plan.**
-  Bands come from `GHG_TIERS` (`ghgEmployeeBandLabel` words them). The only
+  Bands are the EU company size categories (Small 1-49, Medium 50-249, Large
+  250-999, Enterprise 1,000+ quoted), from `GHG_TIERS`; labels from
+  `GHG_TIER_LABELS`, keys unchanged (`starter`, `professional`, `advisory`,
+  `enterprise`). `ghgEmployeeBandLabel` words them. The only
   database rule on a GHG save is the entitlement gate (an active `ghg` pass);
   no code reads or writes `entitlements.location_allowance` (FI0).
-- **Concierge add-on** (requires GHG) is a separate axis priced on actual
-  location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom
-  quote. It is now the ONLY add-on.
+- **Bill Review add-on** (formerly Concierge; requires an active GHG plan) is
+  the ONLY add-on. Onboarding is priced by GHG tier and reading (AI-read or
+  human-read) and includes the first year for a tier's data sources; each extra
+  source in year 1 and every active source at renewal is a flat per-source fee.
+  Every value is in `lib/pricing.ts` (`BILL_REVIEW_*`, `billReviewQuote`).
+  Human reading is priced but not yet sellable (`BILL_REVIEW_HUMAN_READING_SELLABLE`).
+  Verification Readiness is included in Bill Review, not sold separately.
 - **Verification Readiness ($1,499/yr) was RETIRED 10 Aug 2026** — `ADDONS.verification`,
   its `AddOnKey` member, the `requiresAddOnAnyOf` type field and the
   `addOnRequirementsMet` branch reading it are all removed, along with

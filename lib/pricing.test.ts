@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
+import { cartQuote, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, priceLineQty, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, GHG_TIER_LABELS, GHG_SIZE_BASIS_NOTE, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, BILL_REVIEW_HUMAN_READING_SELLABLE, type ModuleKey, type GhgTier } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -113,139 +113,92 @@ describe('LEGACY_PRICING_PAGE_ID — cart reachability', () => {
 // POST /api/checkout { addOns:['concierge-enterprise'] } with GHG owned would mint a real
 // entitlement for free. addOnRequirementsMet (the single authority BOTH routes defer to) and
 // priceLine (fail-loud backstop) close that hole. These pin it shut.
-describe('add-on purchasability — quote-only guard', () => {
-  it('N1 concierge-enterprise is rejected even when GHG is owned (quote-only, not just a prereq gap)', () => {
-    const r = addOnRequirementsMet('concierge-enterprise', ['ghg'])
-    expect(r.ok).toBe(false)
-    expect(r.reason).toMatch(/quote-only/i)
-    // The point: owning GHG is NOT enough — the enterprise tier is unsellable via checkout.
-    expect(ADDONS['concierge-enterprise'].isCustomQuote).toBe(true)
-  })
-
-  it('N2 concierge-basic with GHG owned → ok (the guard must not over-block sellable tiers)', () => {
-    expect(addOnRequirementsMet('concierge-basic', ['ghg']).ok).toBe(true)
-    expect(ADDONS['concierge-basic'].isCustomQuote).toBeUndefined()
-  })
-
-  it('N3 concierge-basic without GHG → rejected (existing ghg→concierge dependency still holds)', () => {
-    const r = addOnRequirementsMet('concierge-basic', [])
-    expect(r.ok).toBe(false)
-    expect(r.reason).toMatch(/ghg/i)
-  })
-
+describe('priceLine backstop', () => {
   it('N4 priceLine refuses a $0 line item (fail-loud backstop; a zero price is not a price)', () => {
-    expect(() => priceLine('Concierge — Enterprise (16+ locations)', 0)).toThrow(/zero price is not a price/i)
-    expect(() => priceLine('anything', -5)).toThrow() // negative also rejected
-    // sanity: a real price builds a normal line item (cents)
-    expect(priceLine('Concierge — Basic', 799).price_data?.unit_amount).toBe(79900)
+    expect(() => priceLine('Anything', 0)).toThrow(/zero price is not a price/)
   })
 })
 
-// ── Concierge, source-based model ──────────────────────────────────────
-describe('conciergeQuote', () => {
-  it('C1 first purchase charges onboarding for the GHG tier, plus every uploaded source', () => {
-    const q = conciergeQuote({ uploadedSources: 4, isFirstPurchase: true })
-    expect(q.onboardingUSD).toBe(CONCIERGE_ONBOARDING_USD)
-    expect(CONCIERGE_ONBOARDING_USD).toBe(1395)
-    expect(q.sourcesUSD).toBe(360)          // 4 x 90
-    expect(q.totalUSD).toBe(1395 + 360)
-    expect(q.lines.map(l => l.quantity)).toEqual([1, 4])
+// ── Bill Review (formerly Concierge), Oct 2026 ───────────────────────────────
+describe('billReviewQuote', () => {
+  const PRICED = ['starter', 'professional', 'advisory'] as const
+
+  it('P1 the published prices: onboarding per plan and reading, included sources, $45 a source', () => {
+    expect(BILL_REVIEW_ONBOARDING_USD.ai).toEqual({ starter: 900, professional: 1800, advisory: 3500, enterprise: null })
+    expect(BILL_REVIEW_ONBOARDING_USD.human).toEqual({ starter: 1200, professional: 2200, advisory: 4200, enterprise: null })
+    expect(BILL_REVIEW_INCLUDED_SOURCES).toEqual({ starter: 10, professional: 30, advisory: 80, enterprise: null })
+    expect(BILL_REVIEW_SOURCE_USD).toBe(45)
   })
 
-  it('C2 renewal charges sources only: onboarding is once per customer, never on renewal', () => {
-    const q = conciergeQuote({ uploadedSources: 4, isFirstPurchase: false })
+  it('P2 a first purchase within the included sources is onboarding alone', () => {
+    for (const tier of PRICED) {
+      const q = billReviewQuote({ tier, reading: 'ai', sources: BILL_REVIEW_INCLUDED_SOURCES[tier] as number, isFirstPurchase: true })
+      expect(q.totalUSD, tier).toBe(BILL_REVIEW_ONBOARDING_USD.ai[tier])
+      expect(q.lines).toHaveLength(1)
+      expect(q.lines[0].label).toBe(`Bill Review onboarding, ${GHG_TIER_LABELS[tier]} plan (includes the first year for ${BILL_REVIEW_INCLUDED_SOURCES[tier]} data sources)`)
+    }
+  })
+
+  it('P3 each source above the included count is $45 in the first year', () => {
+    const q = billReviewQuote({ tier: 'starter', reading: 'ai', sources: 14, isFirstPurchase: true })
+    expect(q.extraSources).toBe(4)
+    expect(q.totalUSD).toBe(900 + 4 * 45)
+    expect(q.lines[1]).toEqual({ label: 'Bill Review data source, first year', unitUSD: 45, quantity: 4 })
+    expect(q.sourceAllowance).toBe(14)
+  })
+
+  it('P4 fewer sources than included still pays onboarding, and the allowance is the included count', () => {
+    const q = billReviewQuote({ tier: 'professional', reading: 'ai', sources: 3, isFirstPurchase: true })
+    expect(q.totalUSD).toBe(1800)
+    expect(q.sourceAllowance).toBe(30)
+  })
+
+  it('P5 human reading uses the human onboarding column and the same $45 a source', () => {
+    const q = billReviewQuote({ tier: 'advisory', reading: 'human', sources: 82, isFirstPurchase: true })
+    expect(q.onboardingUSD).toBe(4200)
+    expect(q.sourcesUSD).toBe(2 * 45)
+    expect(q.lines[0].label).toContain('human reading')
+  })
+
+  it('P6 a later purchase or renewal is $45 for every source, with no onboarding and no tier needed', () => {
+    const q = billReviewQuote({ tier: null, reading: 'ai', sources: 12, isFirstPurchase: false })
+    expect(q.totalUSD).toBe(12 * 45)
     expect(q.onboardingUSD).toBe(0)
-    expect(q.totalUSD).toBe(360)
-    expect(q.lines).toHaveLength(1)
+    expect(q.lines).toEqual([{ label: 'Bill Review data source (1 year)', unitUSD: 45, quantity: 12 }])
   })
 
-  // ⚠️ FLAT, AND THIS ASSERTED THE OPPOSITE UNTIL 28 Sep 2026. The fee was 1250 / 1750 / 2500 by
-  // GHG tier, which is what forced both purchase routes to work out a customer's band before they
-  // could price Concierge. conciergeQuote does not take a tier any more, so there is no tier for
-  // this to vary by: the assertion is that the fee is the same number, once, for everyone.
-  it('C3 onboarding does not vary by plan, and a tier change cannot re-trigger it', () => {
-    const first = conciergeQuote({ uploadedSources: 1, isFirstPurchase: true })
-    expect(first.onboardingUSD).toBe(CONCIERGE_ONBOARDING_USD)
-    // Moving up a plan is a renewal for Concierge purposes: isFirstPurchase is false, so nothing.
-    expect(conciergeQuote({ uploadedSources: 1, isFirstPurchase: false }).onboardingUSD).toBe(0)
+  it('P7 Enterprise is a quote, not a figure', () => {
+    expect(billReviewQuote({ tier: 'enterprise', reading: 'ai', sources: 5, isFirstPurchase: true }).requiresQuote).toBe(true)
   })
 
-  // ⚠️ THE FLAG IS A SALES GATE, NOT A DISPLAY TWEAK. Pricing a connected source while the
-  // connection does not exist would sell a service we cannot deliver.
-  it('C4 connected sources are refused while UTILITY_CONNECT_ENABLED is false', () => {
+  it('P8 a first purchase needs the plan, and bad counts throw rather than coerce', () => {
+    expect(() => billReviewQuote({ tier: null, reading: 'ai', sources: 5, isFirstPurchase: true })).toThrow(/GHG plan is needed/)
+    for (const bad of [0, -1, 2.5, NaN, Infinity]) {
+      expect(() => billReviewQuote({ tier: 'starter', reading: 'ai', sources: bad, isFirstPurchase: true }), String(bad)).toThrow()
+    }
+    expect(() => billReviewQuote({ tier: 'starter', reading: 'ai', sources: BILL_REVIEW_MAX_SELF_SERVE_SOURCES + 1, isFirstPurchase: true })).toThrow(/contact us/)
+  })
+
+  it('P9 connected sources and human reading cannot be sold yet', () => {
     expect(UTILITY_CONNECT_ENABLED).toBe(false)
-    expect(sourceKindSellable('uploaded')).toBe(true)
     expect(sourceKindSellable('connected')).toBe(false)
-    expect(() => conciergeQuote({ uploadedSources: 2, connectedSources: 1, isFirstPurchase: true }))
-      .toThrow(/connected sources cannot be sold yet/i)
-  })
-
-  it('C5 the connected rate is still published, so the page can show it as coming soon', () => {
-    expect(CONCIERGE_SOURCE_USD.connected).toBe(60)
-    expect(CONCIERGE_SOURCE_USD.uploaded).toBe(90)
-  })
-
-  it('C6 zero or negative sources is refused: Concierge with nothing to read is not a purchase', () => {
-    expect(() => conciergeQuote({ uploadedSources: 0, isFirstPurchase: true }))
-      .toThrow(/at least one data source/i)
-    expect(() => conciergeQuote({ uploadedSources: -1, isFirstPurchase: true }))
-      .toThrow(/cannot be negative/i)
-  })
-
-  // ⚠️ THESE THREE ARE WHY THE GUARDS THROW RATHER THAN COERCE. Under the Math.trunc draft, NaN
-  // passed both range checks and produced a NaN quote, and 2.5 became 2 here while priceLineQty
-  // rejected 2.5 downstream: two functions disagreeing about the same number.
-  it('C7 NaN and Infinity are refused, not treated as a count', () => {
-    expect(() => conciergeQuote({ uploadedSources: NaN, isFirstPurchase: true }))
-      .toThrow(/whole number/i)
-    expect(() => conciergeQuote({ uploadedSources: Infinity, isFirstPurchase: true }))
-      .toThrow(/whole number/i)
-    expect(() => conciergeQuote({ uploadedSources: 2, connectedSources: NaN, isFirstPurchase: true }))
-      .toThrow(/whole number/i)
-  })
-
-  it('C8 a fractional count is refused rather than truncated', () => {
-    expect(() => conciergeQuote({ uploadedSources: 2.5, isFirstPurchase: true }))
-      .toThrow(/whole number/i)
-  })
-
-  it('C9 an absent connectedSources is zero, not a validation failure', () => {
-    const omitted = conciergeQuote({ uploadedSources: 3, isFirstPurchase: false })
-    const explicit = conciergeQuote({ uploadedSources: 3, connectedSources: 0, isFirstPurchase: false })
-    const undef = conciergeQuote({ uploadedSources: 3, connectedSources: undefined, isFirstPurchase: false })
-    expect(omitted.totalUSD).toBe(270)
-    expect(explicit).toEqual(omitted)
-    expect(undef).toEqual(omitted)
-  })
-
-  it('C10 the self-serve ceiling holds at 60 and refuses 61', () => {
-    expect(CONCIERGE_MAX_SELF_SERVE_SOURCES).toBe(60)
-    const at = conciergeQuote({ uploadedSources: 60, isFirstPurchase: false })
-    expect(at.totalUSD).toBe(5400)          // 60 x 90
-    expect(() => conciergeQuote({ uploadedSources: 61, isFirstPurchase: false }))
-      .toThrow(/contact us for a quote/i)
-  })
-
-  // The ceiling counts the ORDER, not one kind. Uploaded plus connected is what a specialist would
-  // have to set up, so it is the total that decides whether this is still self-serve.
-  it('C11 the ceiling counts uploaded and connected together', () => {
-    expect(() => conciergeQuote({ uploadedSources: 60, connectedSources: 1, isFirstPurchase: false }))
-      .toThrow(/contact us for a quote/i)
+    expect(sourceKindSellable('uploaded')).toBe(true)
+    expect(BILL_REVIEW_HUMAN_READING_SELLABLE).toBe(false)
   })
 })
 
 describe('priceLineQty', () => {
   it('C12 multiplies by quantity at the UNIT price, and keeps priceLine zero-price backstop', () => {
-    const l = priceLineQty('GHG Concierge data source, uploaded (1 year)', 90, 7)
-    expect(l.price_data?.unit_amount).toBe(9000)   // the UNIT, not the total
+    const l = priceLineQty('Bill Review data source (1 year)', 45, 7)
+    expect(l.price_data?.unit_amount).toBe(4500)   // the UNIT, not the total
     expect(l.quantity).toBe(7)
     expect(() => priceLineQty('x', 0, 3)).toThrow(/zero price is not a price/i)
   })
 
   it('C13 quantity 0 throws: the absence of a line is not a line with no quantity', () => {
-    expect(() => priceLineQty('x', 90, 0)).toThrow(/at least 1/i)
-    expect(() => priceLineQty('x', 90, 2.5)).toThrow(/whole quantity/i)
-    expect(() => priceLineQty('x', 90, NaN)).toThrow(/whole quantity/i)
+    expect(() => priceLineQty('x', 45, 0)).toThrow(/at least 1/i)
+    expect(() => priceLineQty('x', 45, 2.5)).toThrow(/whole quantity/i)
+    expect(() => priceLineQty('x', 45, NaN)).toThrow(/whole quantity/i)
   })
 })
 
@@ -253,11 +206,10 @@ describe('priceLineQty', () => {
 describe('ghgTierForEmployees', () => {
   it('E1 every band resolves at both of its edges', () => {
     const edges: [number, string][] = [
-      [1, 'starter'], [19, 'starter'],
-      [20, 'professional'], [99, 'professional'],
-      [100, 'business'], [249, 'business'],
-      [250, 'advisory'], [499, 'advisory'],
-      [500, 'enterprise'], [10_000, 'enterprise'],
+      [1, 'starter'], [49, 'starter'],
+      [50, 'professional'], [249, 'professional'],
+      [250, 'advisory'], [999, 'advisory'],
+      [1000, 'enterprise'], [10_000, 'enterprise'],
     ]
     for (const [n, tier] of edges) {
       expect(ghgTierForEmployees(n), `${n} employees`).toBe(tier)
@@ -267,8 +219,8 @@ describe('ghgTierForEmployees', () => {
   // ⚠️ A GAP OR AN OVERLAP IS A PRICING FAULT, NOT A COSMETIC ONE. A gap throws at checkout for a
   // real company size; an overlap makes the answer depend on iteration order. Walking the range is
   // the only way to prove neither, because reading the table cannot show what falls between rows.
-  it('E2 the bands are contiguous and exclusive from 1 to 600', () => {
-    for (let n = 1; n <= 600; n++) {
+  it('E2 the bands are contiguous and exclusive from 1 to 1,200', () => {
+    for (let n = 1; n <= 1200; n++) {
       const matches = GHG_TIER_KEYS.filter(k => {
         const { min, max } = GHG_TIERS[k].employees
         return n >= min && (max == null || n <= max)
@@ -299,9 +251,17 @@ describe('ghgTierForEmployees', () => {
   })
 
   it('E6 each tier is worded by its employee band', () => {
-    expect(ghgEmployeeBandLabel('starter')).toBe('1 to 19 employees')
-    expect(ghgEmployeeBandLabel('professional')).toBe('20 to 99 employees')
-    expect(ghgEmployeeBandLabel('enterprise')).toBe('500 employees or more')
+    expect(ghgEmployeeBandLabel('starter')).toBe('1 to 49 employees')
+    expect(ghgEmployeeBandLabel('professional')).toBe('50 to 249 employees')
+    expect(ghgEmployeeBandLabel('advisory')).toBe('250 to 999 employees')
+    expect(ghgEmployeeBandLabel('enterprise')).toBe('1,000 employees or more')
+  })
+
+  it('E6b the tiers are the EU company size categories, named and priced from one place (Oct 2026)', () => {
+    expect(GHG_TIER_KEYS).toEqual(['starter', 'professional', 'advisory', 'enterprise'])
+    expect(GHG_TIER_KEYS.map(k => GHG_TIER_LABELS[k])).toEqual(['Small', 'Medium', 'Large', 'Enterprise'])
+    expect(GHG_TIER_KEYS.map(k => GHG_TIERS[k].priceUSD)).toEqual([550, 1750, 4550, null])
+    expect(GHG_SIZE_BASIS_NOTE).toBe('Plans are sized using EU company size categories.')
   })
 })
 
@@ -321,13 +281,13 @@ describe('cartQuote keeps GHG out of the discount but not out of the count', () 
   it('E7 GHG plus one module reaches the 2-module band, and only the other module is discounted', () => {
     const q = cartQuote({ modules: ['ghg', 'cbam'], ghgTier: 'starter' })
     expect(q.totalUSD).toBe(Math.round(cbam * 0.9) + ghg)
-    expect(q.totalUSD).toBe(1824)
+    expect(q.totalUSD).toBe(1899)
   })
 
   it('E8 GHG plus two modules reaches the 3-module band, and GHG is still full price', () => {
     const q = cartQuote({ modules: ['ghg', 'cbam', 'supply-chain'], ghgTier: 'starter' })
     expect(q.totalUSD).toBe(Math.round((cbam + supply) * 0.8) + ghg)
-    expect(q.totalUSD).toBe(3994)
+    expect(q.totalUSD).toBe(4069)
   })
 
   it('E9 a cart without GHG is unchanged by any of this', () => {

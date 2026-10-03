@@ -28,3 +28,14 @@ export const PRICING_DRIVER_SENTENCE =
 /** Published prices, against platform and consultancy quotes. */
 export const PRICING_PUBLISHED_SENTENCE =
   'Reporting rules keep multiplying, and so do the quotes from platforms and consultancies. Our prices are published, so you know the cost before you start.'
+
+/**
+ * Bill Review (the add-on formerly called Concierge), described verbatim wherever a description is shown
+ * (pricing-2026-10). One constant per sentence group, so every surface prints the same words.
+ */
+export const BILL_REVIEW_DESCRIPTION =
+  'Upload your bills and we read the figures for you. You check and approve each one, and our specialists spot-check the readings. Includes Verification Readiness: an organized evidence pack and source-document index, ready to hand to your verifier.'
+
+/** The human-read option, verbatim. */
+export const BILL_REVIEW_HUMAN_DESCRIPTION =
+  'Prefer a person to read your bills? Choose human reading and a ThemisIQ specialist reads each one within 2 business days. Your bills are never sent to AI.'

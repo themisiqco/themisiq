@@ -18,26 +18,19 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAut
 import {
   ALL_MODULE_KEYS,
   TIER_PRICING,
-  ADDONS,
-  addOnRequirementsMet,
   configuratorPrice,
   cartQuote,
   NEW_PRICING_ACTIVE,
   priceLine,
   priceLineQty,
-  conciergeQuote,
-  isFirstConciergePurchase,
-  CONCIERGE_KEY,
-  LEGACY_CONCIERGE_KEYS,
-  UTILITY_CONNECT_ENABLED,
   ghgTierMetaValue,
   isGhgTier,
   isLegacyTier,
   type ModuleKey,
   type Tier,
   type GhgTier,
-  type AddOnKey,
 } from '../../../lib/pricing'
+import { billReviewOrder, type OwnedRow } from '../../../lib/billReviewOrder'
 
 // Stripe needs the Node.js runtime (not edge).
 export const runtime = 'nodejs'
@@ -48,8 +41,10 @@ export const dynamic = 'force-dynamic'
 interface CheckoutBody {
   tier?: Tier
   moduleKeys?: ModuleKey[]
-  addOns?: AddOnKey[]
-  concierge?: { uploadedSources?: unknown; connectedSources?: unknown }
+  // Refused since Oct 2026: the location-band Concierge add-ons are no longer sold.
+  addOns?: unknown[]
+  // Bill Review (internal name: concierge). `reading` 'human' is refused until it can be sold.
+  concierge?: { uploadedSources?: unknown; connectedSources?: unknown; reading?: unknown }
   business?: { name?: string; regNumber?: string }
   purchaser?: { name?: string }
   consent?: { businessCapacity?: boolean; digitalAccess?: boolean; dataAuthority?: boolean; atISO?: string; version?: string }
@@ -72,7 +67,7 @@ export async function POST(req: NextRequest) {
     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
     let ghgTierForMeta: GhgTier | null = null // GHG tier, recorded so the webhook can write entitlements.ghg_tier
     let conciergeMeta: Record<string, string> = {}
-    let ownedRows: { module_key: string }[] = []
+    let ownedRows: OwnedRow[] = []
     const sources: string[] = []
 
     // 2b) Build-your-own (tier + modules)
@@ -124,20 +119,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2c) Add-ons (Verification Readiness + the Concierge tiers). Each is validated generically
-    // against ADDONS via addOnRequirementsMet, which also rejects quote-only tiers (Enterprise).
-    // What does the customer already hold? RLS scopes this to them. Read ONCE: the add-on branch
-    // needs it for prerequisites and the Concierge branch needs it for isFirstPurchase.
+    // 2c) The location-band Concierge add-ons were removed in Oct 2026 (pricing-2026-10). An order that still
+    // names one is refused rather than ignored, so nothing is charged for a product that no longer exists.
+    if (body.addOns && body.addOns.length > 0) {
+      return NextResponse.json({ error: 'That add-on is no longer sold. Bill Review is ordered with its number of data sources.' }, { status: 400 })
+    }
+
+    // 2d) Bill Review (internal name: concierge). lib/billReviewOrder.ts decides what may be sold and prices it
+    // with billReviewQuote, the same function /pricing displays from.
     //
-    // ⚠️ THE READ FAILS LOUDLY. It used to discard its error and treat the result as "owns nothing",
-    // which was harmless while it only fed a prerequisite check. It is not harmless now: reading
-    // nothing makes isFirstConciergePurchase true, and an existing Concierge customer would be
-    // charged the onboarding fee a second time on renewal.
-    let ownedKeys = new Set<string>()
-    if ((body.addOns && body.addOns.length > 0) || body.concierge) {
+    // ⚠️ THE ENTITLEMENT READ FAILS LOUDLY. Reading nothing would make isFirstConciergePurchase true and charge
+    // an existing Bill Review customer onboarding a second time. RLS scopes the read to this customer.
+    if (body.concierge) {
       const { data: owned, error: ownedErr } = await supabase
         .from('entitlements')
-        .select('module_key')
+        .select('module_key, ghg_tier, term_end')
       if (ownedErr) {
         console.error('[checkout] entitlement read failed:', ownedErr.message)
         return NextResponse.json(
@@ -145,98 +141,16 @@ export async function POST(req: NextRequest) {
           { status: 503 },
         )
       }
-      ownedRows = owned ?? []
-      ownedKeys = new Set<string>(ownedRows.map((r) => r.module_key))
-    }
-
-    if (body.addOns && body.addOns.length > 0) {
-      for (const addOnKey of body.addOns) {
-        const addOn = ADDONS[addOnKey]
-        if (!addOn) {
-          return NextResponse.json({ error: 'Unknown add-on.' }, { status: 400 })
-        }
-       // Requirement check (modules + add-on prerequisites) via single authority.
-        // ownedKeys holds BOTH modules and add-ons (webhook writes all to module_key),
-        // so derive each list by filtering against ADDONS.
-        const ownedAndCart = [...ownedKeys, ...modulesInCart]
-        const ownedModuleKeys = ownedAndCart.filter((k) => !(k in ADDONS)) as ModuleKey[]
-        const ownedOrCartAddOns = [
-          ...ownedAndCart.filter((k) => k in ADDONS),
-          ...(body.addOns ?? []),
-        ] as AddOnKey[]
-        const check = addOnRequirementsMet(addOnKey, ownedModuleKeys, ownedOrCartAddOns)
-        if (!check.ok) {
-          return NextResponse.json({ error: check.reason }, { status: 400 })
-        }
-        lineItems.push(priceLine(addOn.label, addOn.price))
-        entitlementsToGrant.add(addOn.key)
-      }
-      sources.push(`addons:${body.addOns.join('+')}`)
-    }
-
-    // 2d) Concierge on the source-based model. The old concierge-* keys above still work until the
-    // configurator moves in Batch 4; this is the path everything new uses.
-    if (body.concierge) {
-      const legacyInCart = (body.addOns ?? []).some((k) => (LEGACY_CONCIERGE_KEYS as readonly string[]).includes(k))
-      if (legacyInCart) {
-        return NextResponse.json(
-          { error: 'Concierge was selected twice, on both the old and the new model. Please start the order again.' },
-          { status: 400 },
-        )
-      }
-
-      // Counts pass through unchanged. conciergeQuote validates them and throws rather than
-      // coercing, so the error names the real fault instead of a rounded number.
-      const uploadedSources = body.concierge.uploadedSources as number
-      const connectedSources = body.concierge.connectedSources as number | undefined
-
-      // ⚠️ THE FLAG IS ENFORCED AT THE SERVER BOUNDARY TOO, not only inside conciergeQuote. The
-      // client cannot be the thing that decides what is sellable.
-      if (!UTILITY_CONNECT_ENABLED && typeof connectedSources === 'number' && connectedSources > 0) {
-        return NextResponse.json(
-          { error: 'Connected utility sources are not available yet. Please order uploaded sources only.' },
-          { status: 400 },
-        )
-      }
-
-      // Concierge requires GHG, the same rule addOnRequirementsMet applies to the old keys.
-      const ghgInCart = modulesInCart.has('ghg')
-      if (!ghgInCart && !ownedKeys.has('ghg')) {
-        return NextResponse.json(
-          { error: 'Concierge requires the GHG module. Add it to your cart or purchase it first.' },
-          { status: 400 },
-        )
-      }
-
-      // ⚠️ NO TIER IS NEEDED HERE ANY MORE, AND THAT IS WHY A WHOLE BRANCH IS GONE. Onboarding was
-      // priced by GHG tier, so this had to work out the customer's band: from the cart when GHG was
-      // in it, and otherwise from their stored location allowance. That second path went inert when
-      // locations became unlimited, and it would have refused every customer adding Concierge on
-      // its own with a 400 about a plan level nobody could determine. The fee is flat now. The
-      // question is not asked, so it cannot be answered wrongly.
-      const isFirstPurchase = isFirstConciergePurchase([...ownedKeys])
-
-      let quote
-      try {
-        quote = conciergeQuote({ uploadedSources, connectedSources, isFirstPurchase })
-      } catch (e) {
-        // conciergeQuote's messages are written for a person and name the actual fault.
-        return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
-      }
-
-      for (const line of quote.lines) {
+      ownedRows = (owned ?? []) as OwnedRow[]
+      const cartTier = modulesInCart.has('ghg') ? ghgTierForMeta : null
+      const order = billReviewOrder(body.concierge, cartTier, ownedRows, new Date())
+      if (!order.ok) return NextResponse.json({ error: order.error }, { status: order.status })
+      for (const line of order.quote.lines) {
         lineItems.push(priceLineQty(line.label, line.unitUSD, line.quantity))
       }
-      entitlementsToGrant.add(CONCIERGE_KEY)
-      conciergeMeta = {
-        concierge_uploaded_sources: String(uploadedSources),
-        concierge_connected_sources: String(connectedSources ?? 0),
-        concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
-        // Recorded, never granted. The onboarding fee buys setup work, not access, so the webhook
-        // must not turn this into an entitlement row or stamp a term on it.
-        concierge_onboarding_usd: String(quote.onboardingUSD),
-      }
-      sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
+      entitlementsToGrant.add(order.grant)
+      conciergeMeta = order.meta
+      sources.push(order.source)
     }
 
     // 3) Must be buying something.
@@ -279,7 +193,7 @@ export async function POST(req: NextRequest) {
     const entitlements = Array.from(entitlementsToGrant).join(',')
     const metadata = {
       user_id: userId,
-      entitlements, // e.g. "ghg,supply-chain,verification"
+      entitlements, // e.g. "ghg,supply-chain,concierge"
       source: sources.join(' | '),
       // The GHG tier. Written whenever GHG is in the cart, and empty otherwise,
       // following the same empty-string convention: Stripe metadata values are strings and the

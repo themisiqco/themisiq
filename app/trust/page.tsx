@@ -23,7 +23,7 @@ const PRINCIPLES = [
     title: 'Where we use AI',
     color: '#7425e3',
     bg: '#EDE9FE',
-    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Concierge add-on, and answering questions in the GHG guide, which sends your question and which step of the wizard you are on. Nothing else in the platform uses it. Framework classification and risk scoring are rules-based, and the rules are published on our methodology page.',
+    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Bill Review add-on, and answering questions in the GHG guide, which sends your question and which step of the wizard you are on. Nothing else in the platform uses it. Framework classification and risk scoring are rules-based, and the rules are published on our methodology page.',
   },
   {
     title: 'Your data is never used to train AI models',
@@ -189,7 +189,7 @@ export default function TrustPage() {
               { label: 'Payment processing', val: 'Stripe: Stripe holds PCI DSS Level 1 certification' },
               { label: 'Email', val: 'Resend: Resend holds SOC 2 Type II certification' },
               { label: 'Frontend', val: 'Vercel: Vercel holds SOC 2 Type II certification' },
-              { label: 'AI provider', val: 'Anthropic: Concierge document reading and the GHG guide only' },
+              { label: 'AI provider', val: 'Anthropic: Bill Review document reading and the GHG guide only' },
             ].map(({ label, val }) => (
               <div key={label} style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>

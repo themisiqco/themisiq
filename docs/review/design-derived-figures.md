@@ -506,6 +506,14 @@ The tests are grouped by task in section 11. They include all of these:
 | T10c: month-only dates (3 Oct 2026) | The main Confirm button is hidden while the month-only date confirmation is open. |
 | T10c: wording (3 Oct 2026) | Written dates ("14 March 2025") wherever a date is shown to customers, including the review line. Field hint "Sum of all 12 monthly bills" becomes "Sum of the bills covering this year". Unit casing kWh, MWh, Mcf, Ccf, MMBtu, GJ, MJ wherever shown. Totals use "t CO2e", not "mt". The Australian source is named "DCCEEW NGA 2025" consistently. |
 | T10c: help entry (3 Oct 2026) | A help/FAQ entry "Why can't I confirm this bill?" with the text supplied by Lisa, on the GHG module page's FAQ, linked from beside a disabled Confirm. This completes the T13 "bills with no figure" items, which are removed from T13. |
+| BR: reading choice (3 Oct 2026) | Per inventory, a Bill Review customer chooses how bills are read: "Read by AI, you confirm" (default) or "Read by a ThemisIQ specialist, you confirm". Chosen at Bill Review setup for the inventory; changeable later in that inventory's settings. (BR1, BR6) |
+| BR: human-reading guarantee (3 Oct 2026) | For a human-read inventory, no document is ever sent to the AI model, enforced server-side in the extract route (refused for human-read inventories), with a test. A switch in either direction applies to future uploads only; bills already uploaded and read keep their reading. The switch screen says so plainly, and when switching from AI to human it states that bills already read were sent to the AI. (BR2, BR6) |
+| BR: price (3 Oct 2026, corrected the same day) | **Superseded:** Bill Review +20%. **Now:** human reading is priced as a fixed onboarding price per GHG tier: Small $1,200, Medium $2,200, Large $4,200, Enterprise quote (AI-read onboarding is Small $900, Medium $1,800, Large $3,500). The per-source fee is $45 a year for both AI-read and human-read. Onboarding includes the first year for 10 / 30 / 80 data sources; each extra source in year 1, and every active source at renewal, is $45 a year. Values from lib/pricing.ts. (BR1, BR11; pricing patch docs/review/patches/pricing-2026-10.patch) |
+| BR: turnaround (3 Oct 2026) | Within 2 business days. Each waiting bill shows "With our team, expected by {date}" (business days, Ontario holidays configurable). The customer receives an email when bills are ready to confirm. Export stays blocked until every bill is read and confirmed. There is never an automatic fallback to AI for a human-read inventory. (BR5, BR7) |
+| BR: specialist queue (3 Oct 2026) | An internal page, role-restricted to named staff (initially Lisa), lists waiting bills oldest first with customer, inventory, site, fuel and expected date. Opening a bill shows the document and a reading form producing the same proposal shape the AI produces (value, unit, period or delivery date, source quote). Every document view and every reading is logged with staff id and time. The same queue offers a sample of AI readings for specialist spot-checks, with the result recorded with who and when. (BR8) |
+| BR: provenance (3 Oct 2026) | Every reading shows, in review, workings, verifier page and PDF, "Read by AI on {date}" or "Read by {specialist name} (ThemisIQ) on {date}", then "Confirmed by {customer} on {date}". Ties into T18. (BR9) |
+| BR: staff access (3 Oct 2026) | Role-based (a staff role table), least privilege, all views logged, designed so a hired data analyst can be added without code changes. (BR3) |
+| BR: privacy and About (3 Oct 2026) | The privacy policy and About page name the AI provider as a subprocessor, state that human-read inventories are never sent to it, and replace "opt out via hello@themisiq.co" with the in-product choice. (BR10) |
 | Launch (2 Oct 2026) | The commercial launch has moved from 1 November 2026 to a date to be set once the GHG module is complete. Order and estimate for the remaining work: section 12. |
 | Sequencing (2 Oct 2026) | The `factor-integrity` branch (FI1 to FI10) is created from main after derived-figures merges. `factor-years` (T3b, T3c, T3d) is created from main after `factor-integrity` merges. |
 | T3b: optional election and allowlist | Optional-election banner confirmed, for a window ending after 1 February 2026: "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it." The EU deadline string "FY2024 (large EU companies)" stays on the source-guard allowlist. |
@@ -2258,6 +2266,366 @@ supplies every year label below. Follows T3b on the same branch.
   - No document with an acted-on reading can disappear without a tombstone.
   - The AI's reading is never lost when a figure is edited.
 
+### Bill Review human reading (BR1 to BR11)
+
+**Context** (3 Oct 2026). The Concierge add-on is being renamed Bill Review. The rename belongs to the pricing
+change, not to these tasks. Today Bill Review prefills each reading with AI extraction
+(app/api/concierge/extract/route.ts) and the customer confirms it. Customers without Bill Review get no AI reading.
+These tasks add a second way of reading: a ThemisIQ specialist.
+
+Rulings: section 10, "BR". Code facts below are at `4d7b7fc`.
+
+**What the code does today, and why it matters for the guarantee:**
+- **The extract route is told nothing about the inventory.** It receives `filePath`, `mediaType` and
+  `locationName` (app/dashboard/ghg/page.tsx:1089).
+- **Nothing ties a stored document to an inventory server-side.** Uploads are stored at
+  `{userId}/{reporting_year}/{location name}/{timestamp}_{file}` (page.tsx:1062).
+- **A document can be uploaded before the inventory is first saved** (`inventoryId` may be null).
+- So "never sent to the AI" cannot be enforced by the route as things stand. BR2 changes the upload path so the
+  route can establish the inventory itself, from the stored path, instead of trusting the browser.
+- **Unused tables built for a reviewer workflow already exist:** `concierge_jobs`, `concierge_job_documents` and
+  `concierge_proposals` (supabase/migrations/20260910_concierge_review_schema.sql:97-240), with a `reviewer`
+  column. No application code writes them (pricing-addons-audit.md, A.4). Whether to reuse them or start clean is
+  open question Q3.
+
+**Dependencies:** T18 (who and when on every action; the confirmation record) and the pricing change that renames
+Concierge to Bill Review. BR9 also needs T11 and T17, which render provenance on the verifier page and the PDF.
+
+#### BR1. Reading choice on the inventory, and the human-reading price (data and constants)
+- **Estimate:** S to M, 1 diff, 1 day.
+- **SQL** (NOT RUN; `supabase/migrations/2026MMDD_bill_review_reading.sql`, parsed offline before Lisa runs it):
+  ```sql
+  -- NOT RUN
+  alter table public.ghg_inventories
+    add column if not exists bill_review_reading text not null default 'ai'
+      check (bill_review_reading in ('ai', 'human')),
+    add column if not exists bill_review_reading_set_by uuid references auth.users(id),
+    add column if not exists bill_review_reading_set_at timestamptz;
+  comment on column public.ghg_inventories.bill_review_reading is
+    'Bill Review: how this inventory''s bills are read. ai = AI reads, customer confirms (default); human = a ThemisIQ specialist reads, customer confirms, and no document is ever sent to the AI. A change applies to later uploads only.';
+  ```
+  - No new table, so no GRANT. The audit trigger on `ghg_inventories` (`audit_ghg_inventories`) records every change
+    of the column, with old and new values.
+  - Pre-flight: `information_schema.column_privileges` shows no column-level grants on `ghg_inventories`.
+- **lib/pricing.ts** (corrected ruling, section 10 "BR: price"): the prices are defined by the pricing patch
+  (docs/review/patches/pricing-2026-10.patch).
+  - `BILL_REVIEW_ONBOARDING_USD` holds the onboarding price per GHG tier and reading: AI-read Small $900, Medium
+    $1,800, Large $3,500; human-read Small $1,200, Medium $2,200, Large $4,200; Enterprise quote.
+  - `BILL_REVIEW_SOURCE_USD = 45` is the per-source fee, the same for both readings.
+  - `billReviewQuote` takes `reading: 'ai' | 'human'`. BR1 adds no price of its own; it relies on these constants.
+  - The human onboarding line carries its own Stripe line name, e.g. "Bill Review onboarding, human reading". No
+    price literal appears anywhere else (CLAUDE.md pricing rule).
+- **Tests:**
+  - the human onboarding price for each tier comes from `BILL_REVIEW_ONBOARDING_USD.human`, and the per-source fee
+    equals the AI-read fee;
+  - no human-reading price literal exists outside lib/pricing.ts (source test);
+  - the column's CHECK rejects any value other than `ai` or `human` (verify SQL, run by Lisa).
+
+#### BR2. The guarantee: a human-read inventory never reaches the AI (server-side)
+- **Estimate:** M, 1 diff, 2 days. **The most important task in the set; it goes first after BR1.**
+- **Files:**
+  - **app/dashboard/ghg/page.tsx:**
+    - With Bill Review held, a document is uploaded only to a saved inventory. The upload saves the inventory
+      first if it has no id.
+    - New uploads are stored at `{userId}/{inventoryId}/{reporting_year}/{location}/{timestamp}_{file}`.
+    - For a human-read inventory the page never calls the extract route. It calls BR4's submit route instead.
+  - **app/api/concierge/extract/route.ts:**
+    - The request carries `inventoryId`.
+    - **The route reads the inventory id from the stored path** (its second segment), and refuses with 403 if it
+      differs from `inventoryId` or the first segment is not the caller.
+    - It loads the inventory through the caller's own client (RLS: own rows only). If `bill_review_reading` is
+      `human`, it refuses with **409 before reading the file or calling the model**: "This inventory's bills are
+      read by a ThemisIQ specialist, so they are not sent to the AI."
+    - A path in the old format (no inventory segment) is refused with 400: "Save the inventory, then upload the bill
+      again." Old-format documents were uploaded, and read, before this change; the route has no re-read flow that
+      would need them.
+    - Every refusal is logged (console, metadata only, as the route's cost log is).
+- **The switch.** The guarantee holds for documents uploaded while the inventory is human-read. A document uploaded
+  while it was AI-read was already sent; BR6 says so plainly. A document uploaded while human-read stays with the
+  team even if the customer later switches to AI (ruling: a switch applies to future uploads only), so the route
+  must also refuse a document that has a BR4 submission record.
+- **Tests:**
+  - With a mocked Supabase and a spy on the model call:
+    - a human-read inventory gets 409, and **the model call is never made and the file is never fetched**;
+    - an AI-read inventory proceeds;
+    - a path naming a different inventory gets 403;
+    - an old-format path gets 400;
+    - a document with a submission record gets 409, even after a switch to AI.
+  - **Source test:** the page's upload handler cannot reach `fetch('/api/concierge/extract'` without the
+    `bill_review_reading !== 'human'` guard.
+  - **Property test:** for every combination of (reading mode at upload, mode now), a document uploaded under
+    `human` is never extracted.
+
+#### BR3. Staff roles and the access log (least privilege, no code change to add a person)
+- **Estimate:** M, 1 diff, 2 days.
+- **SQL** (NOT RUN; `2026MMDD_staff_roles.sql`, plus `2026MMDD_staff_roles_grants.sql`):
+  ```sql
+  -- NOT RUN
+  create table public.staff_roles (
+    user_id    uuid not null references auth.users(id) on delete cascade,
+    role       text not null check (role in ('bill_reader', 'bill_review_lead')),
+    granted_by uuid references auth.users(id),
+    granted_at timestamptz not null default now(),
+    revoked_at timestamptz,
+    primary key (user_id, role)
+  );
+  alter table public.staff_roles enable row level security;   -- no policy: reachable by service_role only
+
+  create table public.staff_access_log (
+    id            uuid primary key default gen_random_uuid(),
+    staff_user_id uuid not null references auth.users(id),
+    action        text not null check (action in ('view_queue', 'view_document', 'save_reading', 'view_ai_reading', 'record_spot_check')),
+    document_ref  text,          -- the stored path or bill_review document id
+    inventory_id  uuid,
+    at            timestamptz not null default now()
+  );
+  alter table public.staff_access_log enable row level security;   -- no policy: service_role only
+
+  -- staff_access_log is append-only, the way audit_log is: a trigger refuses update and delete.
+  ```
+  - **Grants** (memory rule: revoke first, then grant):
+    `revoke all on public.staff_roles, public.staff_access_log from public, anon, authenticated;`
+    `grant select on public.staff_roles to service_role;` `grant select, insert on public.staff_access_log to service_role;`
+  - Parse offline. A verify script in the house format checks the grants, the absence of policies, and that update
+    and delete on the log are refused.
+- **lib/staff/access.ts (new, server-only):** `requireStaffRole(userJwt, role)`. It verifies the session, then
+  checks `staff_roles` with the service-role client (`revoked_at is null`), and returns 403 otherwise.
+  `logStaffAccess(...)` writes one log row. A route cannot serve a document without writing the log row first; if
+  the write fails, the request fails.
+- **Roles, least privilege:**
+  - **`bill_reader`:** the queue, the documents in it, saving readings, and the spot-check sample. Customer
+    identity is limited to company name, inventory label, site and fuel.
+  - **`bill_review_lead`:** the above, plus the log.
+  - Initially Lisa holds both. Adding a hired analyst is an `insert into staff_roles`, with no code change.
+- **Tests:**
+  - every staff route returns 403 without the role and 403 for a revoked role;
+  - every document view writes a log row before the signed URL is issued;
+  - a failed log write fails the view;
+  - signed URLs live at most 5 minutes (⚑ Q6).
+
+#### BR4. The human-reading queue: submission, expected date, readings (data)
+- **Estimate:** M, 1 to 2 diffs, 2 days.
+- **SQL** (NOT RUN). New tables `bill_review_documents` and `bill_review_readings`, or the existing `concierge_*`
+  tables widened (⚑ Q3; this design shows new tables):
+  - `bill_review_documents`: `id, user_id, inventory_id, source_doc_id, file_path, file_name, document_type,
+    location_id, location_name, status ('waiting', 'read', 'unreadable'), submitted_at, expected_by date,
+    read_by uuid, read_at`.
+  - `bill_review_readings`: `id, bill_review_document_id, fuel_type, raw_value, raw_unit, period_start,
+    period_end, delivery_date, source_quote, notes, read_by uuid, read_at`.
+  - **RLS**, with `(select auth.uid())` wrapped as the rule requires: a customer may SELECT their own rows. Inserts
+    and updates come only through service-role routes.
+  - **Grants:** revoke first, then grant SELECT to authenticated and SELECT, INSERT, UPDATE to service_role.
+- **app/api/bill-review/submit/route.ts (new):**
+  - Called by the page for each upload to a human-read inventory.
+  - It checks the caller owns the inventory, that the inventory is human-read, and that the path is inside it (as
+    BR2 does).
+  - It inserts the document row with `expected_by` from BR5, and returns the expected date.
+- **Wizard read-back:** on load, and on a visibility change, the page fetches the inventory's `read` documents and
+  their readings. It merges each reading into the document's `extracted` as a proposal with status `extracted`, so
+  the customer confirms it exactly as an AI reading.
+  - A proposal carries `readBy: { method: 'human', userId, name, at }`, and its value is converted through
+    `convertToCanonical`, as at extraction.
+  - A merge is idempotent (keyed by reading id). It never overwrites a proposal the customer has acted on.
+- **Tests:**
+  - a submission for an AI-read inventory is refused;
+  - a merged reading becomes a proposal of the same shape as an AI one;
+  - a second merge adds nothing;
+  - a confirmed proposal is not overwritten;
+  - the RLS and grant verify script.
+
+#### BR5. Business days and the expected date
+- **Estimate:** S, 1 diff, 0.5 to 1 day.
+- **lib/billReview/businessDays.ts (new, pure):** `expectedBy(submittedAt, days = 2, holidays)`.
+  - It counts business days in America/Toronto. Weekends and listed holidays are skipped.
+  - The submission day is day 0: a bill submitted on Monday is expected by Wednesday. The handling of a submission
+    after a cut-off time is ⚑ Q5.
+- **lib/billReview/holidays.ts (new):** Ontario holidays as a dated list per year, configurable without code logic,
+  with the source cited. ⚑ Q5: which holidays the team observes (Ontario statutory, or also the civic holiday and
+  Easter Monday).
+- **Tests:**
+  - Monday gives Wednesday; Thursday gives Monday; Friday gives Tuesday;
+  - a holiday inside the window pushes the date by one day;
+  - Christmas and Boxing Day together, and a weekend between them;
+  - the year boundary;
+  - the date is computed in Toronto time whatever the server's zone.
+
+#### BR6. Choosing and changing the reading, in the product
+- **Estimate:** M, 1 diff, 2 days.
+- **Where it is chosen:**
+  - At Bill Review setup for an inventory: the first time a Bill Review customer opens an inventory's documents
+    step, before the first upload.
+  - In the inventory's settings afterwards.
+- **Choice, with prices from BR1:**
+  - "Read by AI, you confirm" (default, pre-selected);
+  - "Read by a ThemisIQ specialist, you confirm. Within 2 business days."
+- **Saving** writes `bill_review_reading`, `_set_by` and `_set_at`.
+- **The switch screen** (plain, no em dash):
+  - **AI to specialist:** "From now on, bills you upload to this inventory will be read by a ThemisIQ specialist
+    and will not be sent to the AI. Bills already uploaded keep their reading: {n} bills in this inventory were
+    already read by the AI."
+  - **Specialist to AI:** "From now on, bills you upload to this inventory will be read by the AI, and you will
+    confirm each one. Bills already read by our team keep their reading, and bills still with our team stay with
+    our team."
+  - Both screens show any price difference (⚑ Q1).
+- **Who may choose specialist reading** depends on Q1 (whether the uplift is bought per customer or per
+  inventory). Until it is ruled, the option is shown only to a customer whose entitlement records specialist
+  reading.
+- **Tests:**
+  - the default is AI;
+  - a switch records who and when;
+  - the AI-to-specialist screen states the count of bills already read by the AI;
+  - a switch changes no existing document or reading.
+
+#### BR7. Waiting bills, the email, and the export gate
+- **Estimate:** M, 1 diff, 2 days.
+- **On each waiting document:** "With our team, expected by {date}." The date is in words (T10c).
+  - Past that date it reads "With our team. This is taking longer than expected, and we are on it." (⚑ Q7).
+  - It never falls back to AI.
+- **lib/ghg/engine.ts:** a new export-blocking coverage issue, `awaiting_reading`, for each waiting or unreadable
+  document of a human-read inventory:
+  - "{file} is with our team, expected by {date}. Export is blocked until it is read and you confirm it."
+  - It takes the place of T10's "unread upload" issue for these documents, so the customer is not told that no
+    figure was read and to type one in.
+  - An `unreadable` document says: "Our team could not read a figure from {file}: {note}. Enter the figure from the
+    bill, or reject the bill."
+- **Email** (Resend, the pattern of app/api/survey-invite/route.ts):
+  - Sent when the last waiting document of an inventory is read: "Your bills are ready to confirm." It links to the
+    inventory and names the count.
+  - At most one email per inventory per batch (⚑ Q8). Delivery failures are logged and retried, never silent.
+- **Staff alert:** a document past its expected date appears first in the queue, flagged "overdue".
+- **Tests:**
+  - a waiting document blocks export with the message;
+  - once read and confirmed, it clears;
+  - no code path sends a human-read document to the extract route when overdue (source test, and BR2's property
+    test);
+  - one email per batch, with the right count;
+  - an email failure is logged, not swallowed.
+
+#### BR8. The specialist queue page
+- **Estimate:** L, 2 diffs, 4 to 5 days.
+- **app/staff/bill-review/page.tsx (new), behind `requireStaffRole('bill_reader')`:**
+  - It lists waiting bills **oldest first**, showing: customer (company name), inventory (reporting-year label),
+    site, fuel or document type, uploaded, expected by, and an overdue flag.
+  - Viewing the queue is logged.
+- **Opening a bill:**
+  - The document opens through a short-lived signed URL, issued only after the view is logged.
+  - **The reading form produces the same proposal shape the AI produces:**
+    - fuel;
+    - value and unit (`convertibleUnits`);
+    - either a billing period (start and end) or a delivery date, following T10b's rule;
+    - source quote (required: the exact figure and unit as printed);
+    - notes.
+  - Several readings per document are allowed (a fleet bill with petrol and diesel).
+  - "Can't read" records an outcome and a note, and sets the document to `unreadable`.
+  - Every save is logged.
+- **Spot-checks:**
+  - The same page offers a sample of AI readings (⚑ Q4: sample size and rule, e.g. a fixed number per week drawn at
+    random from AI-read inventories).
+  - The specialist sees the document and the AI's reading, and records "Agrees" or "Disagrees", with a note, who
+    and when, in `bill_review_spot_checks (id, inventory_id, source_doc_id, proposal_index, result, note, by, at)`.
+    The SQL is NOT RUN and has the same grant pattern.
+  - Whether a disagreement is shown to the customer is ⚑ Q4.
+  - Every view is logged.
+- **Tests:**
+  - non-staff are refused;
+  - the queue is sorted oldest first;
+  - a saved reading has the proposal shape and converts as extraction does;
+  - "can't read" sets `unreadable`;
+  - every document view and save has its log row;
+  - a spot-check records who and when.
+
+#### BR9. Provenance on every reading (depends on T18, T11, T17)
+- **Estimate:** M, 1 diff, 2 days.
+- **`ExtractedProposal` gains `readBy: { method: 'ai' | 'human', name?: string, userId?: string, at: string }`:**
+  - the AI path sets `method: 'ai'` and the time at extraction (page.tsx, beside the existing mapping);
+  - BR4 sets `method: 'human'` with the specialist's display name.
+- **It travels on the contribution** into the workings (as T9's `asRead` does) and is shown on every surface with
+  T18's confirmation:
+  - "Read by AI on {date}" or "Read by {specialist name} (ThemisIQ) on {date}";
+  - then "Confirmed by {customer} on {date}".
+- **Surfaces:** the review line, the workings, the verifier page (T11) and the PDF document index (T17).
+- **A reading saved before BR9 has no `readBy`.** It shows "Read by AI (date not recorded)" (⚑ Q9).
+- **The specialist's display name** comes from `staff_roles` or the staff profile. Whether a verifier sees a full
+  name or "a ThemisIQ specialist" is ⚑ Q10.
+- **Tests:**
+  - both provenance lines render on all four surfaces;
+  - a pre-BR9 reading shows the "not recorded" form;
+  - the verifier whitelist test covers `readBy`.
+
+#### BR10. Privacy policy and About page
+- **Estimate:** S, 1 diff, 0.5 day.
+- **app/privacy/page.tsx:131** already names Anthropic as a subprocessor ("Structured prompts; uploaded source
+  documents (Concierge)", "Reading figures off Concierge documents, answering GHG guide questions", USA). The
+  purpose is reworded: "Reading figures off Bill Review documents for inventories read by AI. Documents in an
+  inventory read by a ThemisIQ specialist are never sent to it."
+- **Staff access is disclosed** in the privacy policy:
+  - ThemisIQ staff view uploaded documents to read them, for human-read inventories;
+  - and for quality spot-checks of AI readings (⚑ Q4: whether spot-checks of AI-read customers' documents need
+    their own ruling or consent).
+- **app/about/page.tsx:94-95.**
+  - **Replaced:** "Prefer a person to handle this step? No problem. Just let us know at {email}, and one of our team
+    will do it instead."
+  - **With the in-product choice:** "Prefer a person to read your bills? With Bill Review you can choose, for each
+    inventory, to have a ThemisIQ specialist read them instead, and then nothing from that inventory is sent to the
+    AI."
+- **Observed, not ruled:** About says "We use AI in one place: the GHG Emissions module." The GHG guide
+  (app/api/ghg-bot) also uses the AI, as the privacy row itself says. ⚑ Q11.
+- **Tests:** a source test for each new sentence; the old opt-out sentence is gone; the subprocessor row names the
+  exclusion.
+
+#### BR11. Buying specialist reading (checkout, invoice, webhook)
+- **Estimate:** M, 1 to 2 diffs, 2 days. **Depends on Q1 and on the pricing change that renames Concierge.**
+- **Files:**
+  - the /pricing Bill Review block offers the reading choice, with prices from BR1;
+  - checkout and the admin invoice route send `bill_review_reading` (and the human source count if Q1 says
+    so) in metadata, priced by BR1;
+  - the webhook writes the entitlement's reading field (SQL NOT RUN, shape per Q1);
+  - lib/entitlementMetadata.test.ts adds the key to both writers' contract.
+- **Tests:**
+  - both writers send the key;
+  - the webhook writes it;
+  - a human-read cart prices its onboarding from the human-read column and its sources at $45;
+  - the card threshold counts it (pricing-addons-audit.md, A.7a, already reports that it ignores Concierge).
+
+#### Order, estimate and placement
+- **Order:**
+  1. BR1 and BR2: the guarantee before anything is offered.
+  2. BR3, BR5, BR4.
+  3. BR6 and BR7.
+  4. BR8.
+  5. BR9, once T18, T11 and T17 are in.
+  6. BR10 and BR11, alongside the pricing rename.
+- **Total:** 20 to 22 working days (the items sum to 20 to 21.5).
+- **Placement in section 12:** after item 19 (T17) and before the final run-throughs (item 20). BR2 could move
+  earlier on its own if specialist reading is promised before the rest ships.
+
+#### Open questions (Lisa)
+1. **Q1, how human reading is bought:** the price is now a human-read onboarding fee per GHG tier (section 10, "BR:
+   price"), so the question is narrower. Is the reading choice recorded per customer at purchase (an entitlement
+   field), with any inventory then free to choose either? And what does a switch from AI-read to human-read cost for a
+   customer who paid AI-read onboarding: the difference between the two onboarding prices, nothing until renewal, or
+   something else? BR6 and BR11 wait on this.
+2. **Q2, rounding:** withdrawn. The +20% ruling was replaced by fixed prices per tier (section 10, "BR: price").
+3. **Q3, tables:** reuse the existing, unused `concierge_jobs`, `concierge_job_documents` and `concierge_proposals`
+   tables (widened), or create `bill_review_*` tables and drop the unused ones in the rename?
+4. **Q4, spot-checks:**
+   - Sample size and rule.
+   - Whether a disagreement is shown to the customer.
+   - Whether staff viewing AI-read customers' documents for quality checks needs consent or a privacy statement
+     beyond BR10.
+5. **Q5, holidays and cut-off:** which Ontario holidays; whether a bill submitted after a cut-off time (e.g. 17:00
+   Toronto) counts from the next business day.
+6. **Q6, signed URLs:** their lifetime for staff document views (5 minutes proposed).
+7. **Q7, overdue:** the wording for an overdue bill, and whether the customer is emailed when a date is missed.
+8. **Q8, emails:** one per batch (when the last waiting bill is read), or one per bill, or a daily digest?
+9. **Q9, older readings:** a reading saved before BR9 shows "Read by AI (date not recorded)". Acceptable, or
+   backfill from `uploaded_at`?
+10. **Q10, naming the specialist:** whether verifiers and PDFs show the specialist's full name or "a ThemisIQ
+    specialist".
+11. **Q11, About wording:** the "We use AI in one place" sentence omits the GHG guide. Correct it in BR10?
+12. **Q12, manual entry:** may a customer type a figure for a bill still with the team, instead of waiting? Nothing
+    in the rulings forbids it; it would sit beside the waiting reading as a typed figure, under T10's override rules.
+
 ---
 
 ## 12. Remaining GHG work: recommended order and estimate (2 Oct 2026)
@@ -2293,6 +2661,7 @@ revision round, build and commit.
 | 17 | T18 who and when on every review action; withdraw and delete | main | L, 4 | 5 to 7 | **In scope, core pre-launch** (ruling, section 10). Confirm, edit figure, flag, typed figures and three coverage resolutions record no who; an edited figure loses its reading; removing a document leaves no record. It goes before T11 and T17 because they can only show a trail that is recorded. Could move earlier, to straight after item 3, to protect inventories prepared during testing. |
 | 18 | T11 verifier page: contributions, reasons, estimated dates | main | M, 1 | 2 | **Core pre-launch** (ruling, section 10). Renders workings fields. Done once FI2, FI10, T3c and T18 have added theirs (conversion note, publisher, use class, edition, rule, who and when), so it is built once. |
 | 19 | T17 assurance PDF workings page | main | M, 1 to 2 | 2 to 3 | **Core pre-launch** (ruling, section 10). Same reason as T11. It also removes the PDF's export-time residual recompute. |
+| 19a | BR1 to BR11, Bill Review human reading | main | L, 11 tasks | 20 to 22 | Depends on T18 (provenance), T11 and T17 (BR9) and the pricing rename (BR10, BR11). BR1 and BR2 (the guarantee) go first. ⚑ Whether it is pre-launch is not ruled; the totals below exclude it. |
 | 20 | Country run-throughs (US, CA, UK, EU, AU, NZ) | | | 4 to 5 | Once after `factor-integrity` merges and once after item 19, each with one inventory per country and a verifier link. |
 
 ### 12.2 Recommendations that need a ruling

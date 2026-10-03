@@ -121,13 +121,11 @@ describe('Concierge purchase metadata', () => {
     }
   })
 
-  it('M11 both writers build every Concierge key', () => {
-    for (const rel of [CHECKOUT, INVOICE]) {
-      const src = read(rel)
-      for (const key of CONCIERGE_META_KEYS) {
-        expect(src, `${rel} is missing ${key}`).toContain(key)
-      }
-    }
+  // Oct 2026: both writers spread the metadata lib/billReviewOrder.ts builds, so the keys live there once.
+  it('M11 both writers build every Bill Review (Concierge) key, through the shared order', () => {
+    const order = read('lib/billReviewOrder.ts')
+    for (const key of CONCIERGE_META_KEYS) expect(order, `lib/billReviewOrder.ts is missing ${key}`).toContain(key)
+    for (const rel of [CHECKOUT, INVOICE]) expect(read(rel), rel).toContain('conciergeMeta = order.meta')
   })
 
   it('M12 both writers carry ghg_tier, with the empty-string convention', () => {
@@ -176,32 +174,32 @@ describe('isFirstConciergePurchase', () => {
 // records the band that was actually sold.
 
 describe('Concierge route guards', () => {
-  it('M18 both routes price through conciergeQuote and the pricing constants, never a literal', () => {
+  it('M18 both routes price Bill Review through billReviewOrder and billReviewQuote, never a literal', () => {
+    expect(read('lib/billReviewOrder.ts')).toContain('billReviewQuote(')
     for (const rel of [CHECKOUT, INVOICE]) {
       const src = read(rel)
-      expect(src, `${rel} must call conciergeQuote`).toContain('conciergeQuote(')
-      expect(src, `${rel} must not compute a source price itself`).not.toMatch(/CONCIERGE_SOURCE_USD\s*\./)
+      expect(src, `${rel} must call billReviewOrder`).toContain('billReviewOrder(body.concierge')
+      expect(src, `${rel} must not compute a source price itself`).not.toMatch(/BILL_REVIEW_SOURCE_USD|BILL_REVIEW_ONBOARDING_USD/)
     }
   })
 
-  it('M19 both routes refuse a connected quantity at the server boundary', () => {
-    for (const rel of [CHECKOUT, INVOICE]) {
-      const src = read(rel)
-      expect(src, `${rel} must check the flag itself`).toContain('UTILITY_CONNECT_ENABLED')
-      expect(src, `${rel} must reject connected sources`).toMatch(/not available yet/i)
-    }
+  it('M19 a connected quantity is refused at the server boundary, in the order both routes call', () => {
+    const order = read('lib/billReviewOrder.ts')
+    expect(order).toContain('UTILITY_CONNECT_ENABLED')
+    expect(order).toMatch(/not available yet/i)
+    for (const rel of [CHECKOUT, INVOICE]) expect(read(rel), rel).toContain('billReviewOrder(body.concierge')
   })
 
-  // ⚠️ INVERTED ON 28 Sep 2026, AND THE INVERSION IS THE POINT. This asserted that both routes
-  // validate body.tier inside the Concierge branch, because the onboarding fee was priced by GHG
-  // tier. The fee is flat now, so the branch must not consult a tier AT ALL: reading one would
-  // reintroduce the dependency that forced a stored-allowance derivation and refused every customer
-  // adding Concierge on its own.
-  it('M20 neither route reads a GHG tier inside the Concierge branch', () => {
+  // ⚠️ TIERED AGAIN SINCE OCT 2026 (pricing-2026-10), AND THE SOURCE OF THE TIER IS THE POINT. Bill Review
+  // onboarding is priced by GHG tier. The tier comes from this cart's validated GHG tier, or else from the
+  // ghg_tier recorded on the customer's ACTIVE GHG entitlement, which the webhook writes. It never comes from
+  // a stored location allowance (that derivation is gone) and never from an unvalidated client value.
+  it('M20 both routes take the onboarding tier from the cart or the held GHG plan', () => {
     for (const rel of [CHECKOUT, INVOICE]) {
       const src = read(rel)
-      const branch = src.slice(src.indexOf('body.concierge'))
-      expect(branch, `${rel}: the flat onboarding fee must not depend on a tier`).not.toMatch(/body\.tier/)
+      const branch = src.slice(src.indexOf('if (body.concierge)'))
+      expect(branch, rel).toContain("select('module_key, ghg_tier, term_end')")
+      expect(branch, rel).toMatch(/const cartTier = [^\n]*\? ghgTierForMeta : null/)
       expect(branch, `${rel}: the tier derivation was deleted with the banded fee`).not.toMatch(/ghgTierFromAllowance/)
     }
   })

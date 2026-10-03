@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     }
     if (!conciergeRows || conciergeRows.length === 0) {
       return NextResponse.json(
-        { error: 'Reading figures off a document is part of the concierge add-on. Your upload is still kept as evidence — type the figure into the box above.' },
+        { error: 'Reading figures off a document is part of Bill Review. Your upload is still kept as evidence: type the figure into the box above.' },
         { status: 403 },
       )
     }

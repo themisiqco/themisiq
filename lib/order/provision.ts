@@ -82,7 +82,7 @@ export interface PricedOrder {
   keys: ModuleKey[]         // canonical module keys (pricing-page ids resolved)
   totalUSD: number          // recomputed via cartQuote; 0 when requiresQuote
   entitlements: string      // comma-joined keys — the exact grantFromMetadata format
-  requiresQuote: boolean    // GHG Advisory in cart → custom quote (no self-serve total)
+  requiresQuote: boolean    // GHG Enterprise in cart → custom quote (no self-serve total)
   requiresInvoice: boolean  // total over the card threshold ($10k) → invoice/wire
 }
 

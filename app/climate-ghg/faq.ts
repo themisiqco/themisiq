@@ -1,4 +1,5 @@
-import { UTILITY_CONNECT_ENABLED, CONCIERGE_SOURCE_USD } from '../../lib/pricing'
+import { UTILITY_CONNECT_ENABLED, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, GHG_TIER_LABELS, GHG_TIER_KEYS } from '../../lib/pricing'
+import { BILL_REVIEW_DESCRIPTION, BILL_REVIEW_HUMAN_DESCRIPTION } from '../../lib/pricingCopy'
 import type { Faq } from '../components/modulePage'
 
 /**
@@ -32,36 +33,46 @@ import type { Faq } from '../components/modulePage'
  *   Held because it has not been measured. A guess here becomes an expectation.
  */
 
+// Bill Review (formerly Concierge) prices, worded once from lib/pricing.ts (pricing-2026-10).
+const usd = (n: number | null) => `$${(n as number).toLocaleString('en-US')}`
+// The plans with a self-serve Bill Review price, in band order (Enterprise is quoted).
+const PLANS = GHG_TIER_KEYS.filter(t => BILL_REVIEW_ONBOARDING_USD.ai[t] != null)
+const planList = (f: (t: typeof PLANS[number]) => string) =>
+  `${PLANS.slice(0, -1).map(f).join(', ')} and ${f(PLANS[PLANS.length - 1])}`
+const INCLUDED = `${PLANS.map(t => BILL_REVIEW_INCLUDED_SOURCES[t]).slice(0, -1).join(', ')} or ${BILL_REVIEW_INCLUDED_SOURCES[PLANS[PLANS.length - 1]]} data sources on the ${planList(t => GHG_TIER_LABELS[t])} plans`
+const BILLING =
+  `A one-time onboarding fee for your GHG plan: ${planList(t => `${usd(BILL_REVIEW_ONBOARDING_USD.ai[t])} ${GHG_TIER_LABELS[t]}`)} ` +
+  `(with human reading, ${planList(t => usd(BILL_REVIEW_ONBOARDING_USD.human[t]))}). Onboarding includes the first year for ${INCLUDED}. ` +
+  `Each extra data source in the first year, and every active source at renewal, is $${BILL_REVIEW_SOURCE_USD} a year. The ${GHG_TIER_LABELS.enterprise} plan is quoted.`
+
 /** The target behaviour: what these answers say once utility connection ships. */
 export const FAQ_CONNECTED: readonly Faq[] = [
-  { q: "What's included in Concierge onboarding?",
-    a: 'A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, connect the ones your utilities allow, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG tier.' },
-  { q: 'Do I need Concierge to use the GHG module?',
-    a: 'No. The GHG module is fully self-serve. Concierge is for teams who would rather not enter bills themselves.' },
+  { q: 'What does Bill Review include?', a: `${BILL_REVIEW_DESCRIPTION} ${BILL_REVIEW_HUMAN_DESCRIPTION}` },
+  { q: "What's included in Bill Review onboarding?",
+    a: `A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, connect the ones your utilities allow, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG plan, and it includes the first year for ${INCLUDED}.` },
+  { q: 'Do I need Bill Review to use the GHG module?',
+    a: 'No. The GHG module is fully self-serve. Bill Review is for teams who would rather not enter bills themselves.' },
   { q: 'How does ThemisIQ get my utility data?',
-    a: "Where your utility allows it, we connect to your account and pull usage and billing data directly from the utility, with your permission. Where a direct connection isn't available, you upload your bills and Concierge reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record." },
+    a: "Where your utility allows it, we connect to your account and pull usage and billing data directly from the utility, with your permission. Where a direct connection isn't available, you upload your bills and Bill Review reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record." },
   { q: 'How do I know if my utility can connect directly?',
     a: 'We check each of your utilities during onboarding and tell you which sources will connect and which will be uploaded.' },
   { q: 'What counts as a data source?',
     a: 'One utility account or meter that bills you on a recurring basis, such as an electricity account or a gas meter. A location with electricity and natural gas is usually two data sources.' },
-  { q: 'How is Concierge billed?',
-    a: `A one-time onboarding fee, then an annual fee for each data source: $${CONCIERGE_SOURCE_USD.connected} a year for a source connected directly to your utility, $${CONCIERGE_SOURCE_USD.uploaded} a year for a source you upload.` },
-  { q: 'If my utility adds direct connection later, does my price change?',
-    a: 'Yes. Once a source is connected, it moves to the connected rate at your next renewal.' },
+  { q: 'How is Bill Review billed?', a: BILLING },
 ]
 
 /** What renders while UTILITY_CONNECT_ENABLED is false. Uploads now, connections later. */
 export const FAQ_UPLOAD_ONLY: readonly Faq[] = [
-  { q: "What's included in Concierge onboarding?",
-    a: 'A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG tier.' },
-  { q: 'Do I need Concierge to use the GHG module?',
-    a: 'No. The GHG module is fully self-serve. Concierge is for teams who would rather not enter bills themselves.' },
+  { q: 'What does Bill Review include?', a: `${BILL_REVIEW_DESCRIPTION} ${BILL_REVIEW_HUMAN_DESCRIPTION}` },
+  { q: "What's included in Bill Review onboarding?",
+    a: `A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG plan, and it includes the first year for ${INCLUDED}.` },
+  { q: 'Do I need Bill Review to use the GHG module?',
+    a: 'No. The GHG module is fully self-serve. Bill Review is for teams who would rather not enter bills themselves.' },
   { q: 'How does ThemisIQ get my utility data?',
-    a: 'You upload your bills and Concierge reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record. Direct connections to utilities are coming soon.' },
+    a: 'You upload your bills and Bill Review reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record. Direct connections to utilities are coming soon.' },
   { q: 'What counts as a data source?',
     a: 'One utility account or meter that bills you on a recurring basis, such as an electricity account or a gas meter. A location with electricity and natural gas is usually two data sources.' },
-  { q: 'How is Concierge billed?',
-    a: `A one-time onboarding fee, then $${CONCIERGE_SOURCE_USD.uploaded} a year for each data source you upload. Sources connected directly to your utility will be $${CONCIERGE_SOURCE_USD.connected} a year once direct connections launch.` },
+  { q: 'How is Bill Review billed?', a: BILLING },
 ]
 
 /** The set the page renders. One flag decides, in one place. */

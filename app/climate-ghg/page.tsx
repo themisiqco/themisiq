@@ -3,7 +3,7 @@ import { scope3ScopeClaim, scope3MethodFamilies } from '../../lib/scope3/methodS
 import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
-import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel } from '@/lib/pricing'
+import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '@/lib/pricing'
 import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
 import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
@@ -158,7 +158,7 @@ export default function Page() {
               { label: 'First SB 253 report', big: sbShortDate,
                 note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}.` },
               { label: 'Price', big: `From $${ghgFrom}/yr`,
-                note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; larger organisations are in the picker.` },
+                note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; see all plans for larger organizations.` },
             ].map(({ label, big, fw, note }) => (
               <tr key={label}>
                 <th style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)', padding: '16px 20px 16px 0', verticalAlign: 'top', width: 210, borderBottom: '1px solid var(--color-line)' }}>{label}</th>
@@ -214,11 +214,13 @@ export default function Page() {
         <p style={moduleEyebrow}>Pricing</p>
         <h2 style={sectionTitle}>Priced by company size, not by number of sites.</h2>
         <p style={{ ...bodyCopy, marginTop: '1rem' }}>
-          GHG is the one tiered module, priced by how many people you employ. Every plan covers unlimited
-          locations. Add modules and the multi-module discount applies automatically: two modules −10%,
-          three or more −20%.
+          GHG is the one tiered module, priced by how many people you employ. {GHG_SIZE_BASIS_NOTE} Every plan
+          covers unlimited locations. Add modules and the multi-module discount applies automatically: two
+          modules −10%, three or more −20%.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
+        {/* Four tiers in one row on wide screens (four 190px columns and gaps fit from about 840px), wrapping
+            to two and then one on narrow ones. */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
           {/* ⚠️ TIERS AND BANDS ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. A null priceUSD means
               "contact us", not zero and not missing; ghgEmployeeBandLabel words each band. */}
           {GHG_TIER_KEYS.map(t => (

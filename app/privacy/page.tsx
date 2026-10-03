@@ -128,7 +128,7 @@ export default function PrivacyPage() {
                   ['Vercel', 'Application traffic', 'Hosting and CDN', 'Global'],
                   ['Stripe', 'Billing data', 'Payment processing', 'USA'],
                   ['Resend', 'Name, email', 'Transactional email', 'USA'],
-                  ['Anthropic', 'Structured prompts; uploaded source documents (Concierge)', 'Reading figures off Concierge documents, answering GHG guide questions', 'USA'],
+                  ['Anthropic', 'Structured prompts; uploaded source documents (Bill Review)', 'Reading figures off Bill Review documents, answering GHG guide questions', 'USA'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
             </table>

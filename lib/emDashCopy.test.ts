@@ -327,7 +327,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   //   · TWO ARE MODEL PROMPTS, and CLAUDE.md treats one as a safety property: the concierge's prompt is
   //     what makes the extractor abstain rather than guess a consumption figure. A prompt is input to a
   //     model, not copy read by a person, and editing its punctuation is editing a model's instructions.
-  'app/api/concierge/extract/route.ts': 11,
+  'app/api/concierge/extract/route.ts': 10,
   'app/api/ghg-bot/route.ts': 18,
   //   · THREE ARE console.warn SERVER LOGS in the materiality routes: a reporting-period conflict and a
   //     partial topic-label resolve. They reach a log, never a screen.

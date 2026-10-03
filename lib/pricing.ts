@@ -90,11 +90,15 @@ export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
 }
 
 // ── Tiers + founding offer ───────────────────────────────────────────────────
-// ⚠️ FIVE TIERS SINCE 28 Sep 2026, AND THE ORDER IS THE BAND ORDER. 'business' and 'enterprise'
-// are new. 'advisory' CHANGED MEANING: it was the quote-only tier and is now the 250 to 499 band at
-// a published price, and 'enterprise' is the quote path. The database constraint permitting these
-// five is in supabase/migrations/20260928_ghg_employee_bands.sql, and M23 ties the two together.
-export type Tier = 'starter' | 'professional' | 'business' | 'advisory' | 'enterprise'
+// ⚠️ THE ORDER IS THE BAND ORDER. 'advisory' is a published-price band (Large since Oct 2026) and 'enterprise' is
+// the quote path. The database constraint permitting these keys (plus the retired 'business') is in
+// supabase/migrations/20260928_ghg_employee_bands.sql, and M23 requires every key here to be permitted there.
+// Oct 2026 (pricing-2026-10): four tiers, Small / Medium / Large / Enterprise. The internal keys stay
+// (starter, professional, advisory, enterprise) because they are stored in entitlements.ghg_tier, carried in
+// Stripe metadata and in ?tier= links already sent; only the labels, bands and prices changed. 'business' was
+// the fifth key and is no longer sold. The database CHECK still permits it, which is harmless: a CHECK that
+// allows more than the code writes refuses nothing the code sends. Narrowing it is a separate migration.
+export type Tier = 'starter' | 'professional' | 'advisory' | 'enterprise'
 
 // THE SWITCH. While true, customers pay the `early` price below. Flip to false
 // (one line) to move the whole site to full pricing — nothing else needs editing.
@@ -161,26 +165,30 @@ export type GhgTier = Tier
 // the database gate (enforce_ghg_location_allowance) keeps only the entitlement check
 // (docs/review/patches/FI0-entitlement-gate-only.sql). The column is dropped later, separately, once
 // no deployed code writes it.
+//
+// OCT 2026: THE BANDS ARE THE EU COMPANY SIZE CATEGORIES (Small 1-49, Medium 50-249, Large 250-999,
+// Enterprise 1,000+). GHG_SIZE_BASIS_NOTE says so wherever the bands are shown.
 export const GHG_TIERS: Record<GhgTier, {
   priceUSD: number | null
   employees: { min: number; max: number | null }
 }> = {
-  starter:      { priceUSD:  475, employees: { min:   1, max:  19 } },
-  professional: { priceUSD: 1425, employees: { min:  20, max:  99 } },
-  business:     { priceUSD: 2850, employees: { min: 100, max: 249 } },
-  advisory:     { priceUSD: 4550, employees: { min: 250, max: 499 } },
-  enterprise:   { priceUSD: null, employees: { min: 500, max: null } },
+  starter:      { priceUSD:  550, employees: { min:    1, max:  49 } },
+  professional: { priceUSD: 1750, employees: { min:   50, max: 249 } },
+  advisory:     { priceUSD: 4550, employees: { min:  250, max: 999 } },
+  enterprise:   { priceUSD: null, employees: { min: 1000, max: null } },
 }
 
-/** FI0: a tier's employee band in words, for copy: "1 to 19 employees", "500 employees or more". */
+/** The line shown wherever the employee bands are shown (pricing-2026-10). */
+export const GHG_SIZE_BASIS_NOTE = 'Plans are sized using EU company size categories.'
+
+/** FI0: a tier's employee band in words, for copy: "1 to 49 employees", "1,000 employees or more". */
 export function ghgEmployeeBandLabel(tier: GhgTier): string {
   const { min, max } = GHG_TIERS[tier].employees
   return max == null ? `${min.toLocaleString('en-US')} employees or more` : `${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')} employees`
 }
 
 /**
- * The band an employee count falls in. The single authority, the way conciergeTierForLocations was
- * for the retired location bands.
+ * The band an employee count falls in. The single authority for employee bands.
  *
  * ⚠️ THROWS ON A COUNT IT CANNOT BAND rather than defaulting to the entry tier. A count below 1
  * is not a small company, it is a bad input, and banding it as Essentials would sell a plan on a
@@ -199,14 +207,13 @@ export function ghgTierForEmployees(employees: number): GhgTier {
   throw new Error(`ghgTierForEmployees: ${employees} falls in no band. The bands are not contiguous.`)
 }
 
-// The customer-facing tier names. `starter` has been labelled "Essentials" on every surface since
-// the rescope, recorded until now only in a comment above. It is here because the Concierge
-// onboarding line carries the tier name onto a Stripe invoice, where a key name would be wrong.
+// The customer-facing tier names (pricing-2026-10: EU company size categories). The keys are internal and do not
+// match the labels; nothing customer-facing may print a key. The Bill Review onboarding line carries the label
+// onto a Stripe invoice, where a key name would be wrong.
 export const GHG_TIER_LABELS: Record<GhgTier, string> = {
-  starter:      'Essentials',
-  professional: 'Professional',
-  business:     'Business',
-  advisory:     'Advisory',
+  starter:      'Small',
+  professional: 'Medium',
+  advisory:     'Large',
   enterprise:   'Enterprise',
 }
 
@@ -338,184 +345,133 @@ export function cartQuote(sel: CartSelection): CartQuote {
   return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
 }
 
-// ── Add-ons ──────────────────────────────────────────────────────────────────
-// Add-ons are extras that attach to a module — they are NOT modules themselves.
-// Concierge is the only add-on: it requires the `ghg` module, is priced on actual
-// location count (Basic ≤5 / Standard 6–15 / Enterprise 16+ custom quote), and does
-// NOT count toward the 2-/3-module volume discount.
+// ── Bill Review (the add-on formerly called Concierge) ─────────────────────────────────────────
+// Bill Review requires the `ghg` module and does NOT count toward the multi-module volume discount.
+// Renamed from Concierge in Oct 2026 (pricing-2026-10) in customer-facing text. The internal names stay:
+// entitlements.module_key 'concierge' (CONCIERGE_KEY), the `concierge` request body field, the concierge_*
+// Stripe metadata keys and /api/concierge/extract. Verification Readiness is included in Bill Review and is
+// not sold separately (it was retired as an add-on on 10 Aug 2026).
 //
-// RETIRED 10 Aug 2026 — Verification Readiness ($1,499/yr, key `verification`). Its entitlement
-// was written by the webhook and never read by anything, and half its claims duplicated what GHG
-// Essentials already includes. It was also the ONLY user of `requiresAddOnAnyOf`, which went with
-// it. The six claims that were genuinely its own are recorded in
-// docs/ghg-verifier-grade-roadmap.md — read that before reviving any of this.
-export type AddOnKey = 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'
+// REMOVED Oct 2026: the location-band Concierge add-ons (`ADDONS`, `AddOnKey`, `conciergeTierForLocations`,
+// `addOnRequirementsMet`), the flat onboarding fee and the uploaded and connected per-source rates of the
+// 28 Sep 2026 model. Both purchase routes refuse the old `addOns` body.
 
-export const ADDONS: Record<
-  AddOnKey,
-{ key: AddOnKey; label: string; short: string; price: number; requires: ModuleKey[]; isCustomQuote?: boolean }
-> = {
-  'concierge-basic': {
-    key: 'concierge-basic',
-    label: 'Concierge · Basic (up to 5 locations)',
-    // ⚠️ `short` EXISTS SO NOTHING PARSES `label` ON ITS PUNCTUATION. app/pricing/page.tsx read
-    // `label.replace('Concierge — ', '')` to get this, which made the em dash load-bearing: the
-    // em-dash sweep would have silently started printing the full label in a cell sized for the tier.
-    // Same fix as DEAL_TYPES.short in lib/deals/reportModel.ts, and for the same reason.
-    // ⚠️ THE LABEL IS PAYMENT-FACING AND WAS CHANGED ANYWAY, ON EVIDENCE. It reaches Stripe through
-    // priceLine -> price_data.product_data.name (app/api/checkout/route.ts:133) and invoice lines through
-    // app/api/admin/create-invoice/route.ts:160, so it appears on a customer's checkout page and invoice.
-    // Checked 27 Sep 2026 before touching it: NOTHING matches it by text. The Stripe webhook decides what
-    // was bought from `metadata` (user_id plus comma-separated entitlement keys), never from a line-item
-    // name; there is no price or product lookup by name, no lookup_key, and no reconciliation comparing
-    // description text. So the label is a DISPLAY string on Stripe's side, and the change is cosmetic
-    // there. If a future flow ever matches on it, this is the note that says it used to be safe.
-    short: 'Basic (up to 5 locations)',
-    price: 799,
-    requires: ['ghg'],
-  },
-  'concierge-standard': {
-    key: 'concierge-standard',
-    label: 'Concierge · Standard (6–15 locations)',
-    short: 'Standard (6–15 locations)',
-    price: 1499,
-    requires: ['ghg'],
-  },
-  'concierge-enterprise': {
-    key: 'concierge-enterprise',
-    label: 'Concierge · Enterprise (16+ locations)',
-    short: 'Enterprise (16+ locations)',
-    // price 0 is a PLACEHOLDER, not a sellable price. isCustomQuote is the signal — never the 0.
-    // (Inferring "custom quote" from price===0 is the absence-vs-zero confusion: 0 is a claim
-    // (it's free), a flag is the absence of a self-serve price.) Enforced in addOnRequirementsMet.
-    price: 0,
-    requires: ['ghg'],
-    isCustomQuote: true,
-  },
-}
-// Resolve the Concierge tier from a location count. Single source of truth for the
-// location→tier bands (Basic ≤5, Standard 6–15, Enterprise 16+). Enterprise is a
-// custom quote (price 0 placeholder) — callers should route 16+ to a contact path.
-export function conciergeTierForLocations(locations: number): {
-  key: Extract<AddOnKey, 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'>
-  isCustomQuote: boolean
-} {
-  if (locations <= 5) return { key: 'concierge-basic', isCustomQuote: false }
-  if (locations <= 15) return { key: 'concierge-standard', isCustomQuote: false }
-  return { key: 'concierge-enterprise', isCustomQuote: true }
-}
-// Single authority on whether an add-on is allowed in a given cart/account.
-// `requires` lists prerequisite modules (ALL must be present).
-// Returns ok=false with a human-readable reason the routes surface verbatim.
-//
-// The `requiresAddOnAnyOf` branch was removed with Verification Readiness on 10 Aug 2026 — that
-// add-on was its only user, so the mechanism had no remaining caller. `addOnsOwnedOrInCart` is kept
-// in the signature: both routes pass it, and an add-on-depends-on-add-on rule is plausible again.
-export function addOnRequirementsMet(
-  addOn: AddOnKey,
-  modulesOwnedOrInCart: ModuleKey[],
-  addOnsOwnedOrInCart: AddOnKey[] = [],
-): { ok: boolean; reason?: string } {
-  const def = ADDONS[addOn]
-  // Quote-only add-ons (e.g. Concierge Enterprise) have NO self-serve price and must never be
-  // purchasable through checkout or invoice — the $0 placeholder is not a price. Reject FIRST,
-  // before prerequisites: owning GHG is not enough. This is the single authority /api/checkout and
-  // /api/admin/create-invoice both defer to, so one guard closes both against a direct-API mint.
-  if (def.isCustomQuote) {
-    return { ok: false, reason: `${def.label} is quote-only and cannot be purchased through checkout. Contact sales.` }
-  }
-  const missingModule = def.requires.find((m) => !modulesOwnedOrInCart.includes(m))
-  if (missingModule) {
-    return {
-      ok: false,
-      reason: `${def.label} requires ${def.requires.join(', ')}. Add it to your cart or purchase it first.`,
-    }
-  }
-  return { ok: true }
-}
-
-// ── Concierge, Sep 2026 rescope ───────────────────────────────────────────
-// Priced on DATA SOURCES, not on locations. A data source is one utility account or meter billed
-// on a recurring basis: an electricity account, a gas meter. A location with electricity and gas
-// is usually two.
-//
-// ⚠️ THE OLD LOCATION BANDS ABOVE ARE SUPERSEDED AND ARE KEPT ONLY UNTIL THEIR CALLERS MOVE.
-// conciergeTierForLocations, the three concierge-* keys and ADDONS[key].price are read by
-// /api/checkout, /api/admin/create-invoice and app/pricing/page.tsx. They come out in the final
-// cleanup batch, once those three have moved. Nothing new may read them.
-// docs/pricing-and-concierge-spec-v5.md is the current model; v4's Concierge section is superseded.
-
-// ⚠️ UTILITY CONNECTION IS NOT BUILT. While this is false the connected rate is display only: it
-// shows as "Coming soon" and checkout sells uploaded sources only. conciergeQuote REFUSES a
-// connected quantity rather than quietly pricing it. Falling back to the uploaded rate, or to
-// zero, would sell a service that does not exist yet.
+// ⚠️ UTILITY CONNECTION IS NOT BUILT. Connected sources cannot be sold, and no connected price is published.
 export const UTILITY_CONNECT_ENABLED = false
-
-// One-time, charged on a customer's FIRST Concierge purchase only. Not an entitlement and it
-// writes no term: it buys the specialist's setup work, not access.
-//
-// ⚠️ FLAT SINCE 28 Sep 2026, AND THAT REMOVED A WHOLE CLASS OF PROBLEM. It was keyed on the GHG
-// tier, so the fee had to know which band a customer was on, so a customer adding Concierge WITHOUT
-// buying GHG in the same cart had to have their tier derived from their stored location allowance.
-// That derivation went inert the moment locations became unlimited on every plan, and it would have
-// refused exactly those customers. A flat fee does not ask the question, and ghgTierFromAllowance
-// was deleted with it.
-export const CONCIERGE_ONBOARDING_USD = 1395
 
 export type SourceKind = 'uploaded' | 'connected'
 
-// Annual, per source. A one-time charge each year that grants the usual 365-day term, the same
-// shape as every other line in this file. There are no subscriptions in this platform.
-export const CONCIERGE_SOURCE_USD: Record<SourceKind, number> = {
-  uploaded:  90,   // customer uploads bills, Concierge extracts
-  connected: 60,   // pulled directly from the utility
-}
-
-// ⚠️ A SELF-SERVE CEILING, NOT A TIER CAP. 60 is 20 locations at 3 sources each, 20 being the
-// Advisory location ceiling under the old model. GHG_TIERS.advisory.locationAllowance is null
-// (uncapped) today, so nothing else in this file bounds a Concierge order: without this, a typo in
-// a quantity field becomes a five-figure card charge. Above it the order is a conversation, which
-// is the same posture GHG Advisory and Concierge Enterprise already take.
-export const CONCIERGE_MAX_SELF_SERVE_SOURCES = 60
-
-/** Whether a source kind can be SOLD today. Connected is priced but not sellable yet. */
+/** Whether a source kind can be SOLD today. */
 export function sourceKindSellable(kind: SourceKind): boolean {
   return kind === 'uploaded' || UTILITY_CONNECT_ENABLED
 }
 
-export interface ConciergeSelection {
-  uploadedSources: number
-  /** Rejected while UTILITY_CONNECT_ENABLED is false. Omit, or 0, until then. */
-  connectedSources?: number
+/** How a Bill Review inventory's bills are read (docs/review/design-derived-figures.md, BR). */
+export type BillReviewReading = 'ai' | 'human'
+
+/**
+ * One-time onboarding per GHG tier and reading, USD. It includes the first year for the tier's included data
+ * sources (BILL_REVIEW_INCLUDED_SOURCES). null = Enterprise, quoted.
+ */
+export const BILL_REVIEW_ONBOARDING_USD: Record<BillReviewReading, Record<GhgTier, number | null>> = {
+  ai:    { starter:  900, professional: 1800, advisory: 3500, enterprise: null },
+  human: { starter: 1200, professional: 2200, advisory: 4200, enterprise: null },
+}
+
+/** Data sources covered by onboarding for the first year, per GHG tier. */
+export const BILL_REVIEW_INCLUDED_SOURCES: Record<GhgTier, number | null> = {
+  starter: 10, professional: 30, advisory: 80, enterprise: null,
+}
+
+/**
+ * Per data source a year, USD: each source above the included count in year 1, and every active source at
+ * renewal. The same for AI-read and human-read.
+ */
+export const BILL_REVIEW_SOURCE_USD = 45
+
+/**
+ * ⚠️ HUMAN READING CANNOT BE BOUGHT YET. Its prices are published, but nothing records the reading choice on an
+ * entitlement and nothing enforces it (BR1 to BR11 in docs/review/design-derived-figures.md). Both purchase routes
+ * refuse a human-read order while this is false.
+ */
+export const BILL_REVIEW_HUMAN_READING_SELLABLE = false
+
+/**
+ * ⚠️ A SELF-SERVE CEILING ON THE TOTAL SOURCE COUNT, NOT A PLAN CAP. A typo in a quantity field must not become a
+ * large card charge; above it the order is a conversation. Raised from 60 because Large onboarding includes 80.
+ * ⚑ 150 is a placeholder pending Lisa's ruling.
+ */
+export const BILL_REVIEW_MAX_SELF_SERVE_SOURCES = 150
+
+export interface BillReviewSelection {
+  /** The GHG tier, from the cart or the customer's GHG entitlement. Needed only on a first purchase. */
+  tier: GhgTier | null
+  reading: BillReviewReading
+  /** Total data sources the customer wants covered. */
+  sources: number
   /**
-   * True when the customer has never held Concierge. Decided server side, never by the client.
-   * ⚠️ FOR THE ROUTE THAT COMPUTES IT: look at CONCIERGE ROWS ONLY. True means the user has no
-   * entitlements row with module_key 'concierge' and none under any of the old concierge-* keys.
-   * Do NOT widen it to a `source` value such as 'manual-test': that matches manual grants on other
-   * modules, so a pilot customer given a hand-written GHG row would skip their onboarding fee.
-   * Onboarding is once per customer, so a false positive here charges someone twice for setup work.
+   * True when the customer has never held Bill Review (Concierge). Decided server side, never by the client.
+   * Look at Concierge rows only (isFirstConciergePurchase).
    */
   isFirstPurchase: boolean
 }
 
-export interface ConciergeQuote {
+export interface BillReviewQuote {
+  /** Enterprise: no self-serve price. */
+  requiresQuote: boolean
   onboardingUSD: number
   sourcesUSD: number
   totalUSD: number
+  includedSources: number
+  extraSources: number
+  /** The source count the entitlement records (written to concierge_source_allowance). */
+  sourceAllowance: number
   /** Ready for priceLineQty. Onboarding first, so it reads first on the invoice. */
   lines: { label: string; unitUSD: number; quantity: number }[]
 }
 
-// ⚠️ ONE FUNCTION FOR DISPLAY AND FOR CHARGE, which is the rule cartQuote follows for modules.
-// The configurator and /api/checkout both call this, so a displayed Concierge price cannot differ
-// from the charged one. Note that add-ons do NOT flow through cartQuote today: app/pricing/page.tsx
-// sums them separately. This function is what closes that gap for Concierge.
-//
-// ⚠️ EVERY GUARD THROWS. NONE OF THEM COERCES. An earlier draft ran the counts through Math.trunc,
-// which let 2.5 become 2 silently while priceLineQty rejected 2.5 outright, and let NaN through both
-// range checks (NaN < 0 and NaN < 1 are each false) to return a NaN quote that would have rendered
-// as "$NaN" and reached Stripe as a bad amount. A count that is not a whole number is a caller bug,
-// and the loud failure is the cheap one.
+/**
+ * ⚠️ ONE FUNCTION FOR DISPLAY AND FOR CHARGE. /pricing, /api/checkout and /api/admin/create-invoice all call it, so
+ * a displayed Bill Review price cannot differ from the charged one. Every guard throws; none coerces.
+ *
+ * First purchase: the tier's onboarding (which includes the first year for its included sources), plus $45 for
+ * each source above that. Any later purchase: $45 for each source.
+ */
+export function billReviewQuote(sel: BillReviewSelection): BillReviewQuote {
+  const n = sel.sources
+  if (!Number.isInteger(n)) throw new Error('billReviewQuote: a source count must be a whole number.')
+  if (n < 1) throw new Error('billReviewQuote: Bill Review needs at least one data source.')
+  if (n > BILL_REVIEW_MAX_SELF_SERVE_SOURCES) {
+    throw new Error(`billReviewQuote: above ${BILL_REVIEW_MAX_SELF_SERVE_SOURCES} data sources, contact us for a quote.`)
+  }
+  const empty = (requiresQuote: boolean, includedSources = 0): BillReviewQuote =>
+    ({ requiresQuote, onboardingUSD: 0, sourcesUSD: 0, totalUSD: 0, includedSources, extraSources: 0, sourceAllowance: 0, lines: [] })
+  if (sel.tier === 'enterprise') return empty(true)
+  if (!sel.isFirstPurchase) {
+    const sourcesUSD = n * BILL_REVIEW_SOURCE_USD
+    return {
+      requiresQuote: false, onboardingUSD: 0, sourcesUSD, totalUSD: sourcesUSD, includedSources: 0, extraSources: n,
+      sourceAllowance: n,
+      lines: [{ label: 'Bill Review data source (1 year)', unitUSD: BILL_REVIEW_SOURCE_USD, quantity: n }],
+    }
+  }
+  if (sel.tier == null) throw new Error('billReviewQuote: the GHG plan is needed to price Bill Review onboarding.')
+  const onboardingUSD = BILL_REVIEW_ONBOARDING_USD[sel.reading][sel.tier]
+  const included = BILL_REVIEW_INCLUDED_SOURCES[sel.tier]
+  if (onboardingUSD == null || included == null) return empty(true)
+  const extra = Math.max(0, n - included)
+  const sourcesUSD = extra * BILL_REVIEW_SOURCE_USD
+  const lines: BillReviewQuote['lines'] = [{
+    label: `Bill Review onboarding, ${GHG_TIER_LABELS[sel.tier]} plan${sel.reading === 'human' ? ', human reading' : ''} (includes the first year for ${included} data sources)`,
+    unitUSD: onboardingUSD, quantity: 1,
+  }]
+  if (extra > 0) lines.push({ label: 'Bill Review data source, first year', unitUSD: BILL_REVIEW_SOURCE_USD, quantity: extra })
+  return {
+    requiresQuote: false, onboardingUSD, sourcesUSD, totalUSD: onboardingUSD + sourcesUSD,
+    includedSources: included, extraSources: extra, sourceAllowance: Math.max(n, included), lines,
+  }
+}
+
 // ── Concierge entitlement identity ─────────────────────────────────────
 // ⚠️ ONE LIST, BECAUSE FIVE COPIES IS THE DRIFT. Both purchase routes, the webhook,
 // useHasConcierge() and /api/concierge/extract all have to agree on what "holds Concierge" means.
@@ -538,16 +494,16 @@ export function isFirstConciergePurchase(existingModuleKeys: readonly string[]):
 
 /**
  * The tier keys, as a value rather than a type, because a database CHECK constraint cannot read a
- * TypeScript union. entitlements.ghg_tier is constrained to exactly these five in
- * supabase/migrations/20260928_ghg_employee_bands.sql.
+ * TypeScript union. entitlements.ghg_tier is constrained to these keys (and the retired business) in
+ * supabase/migrations/20260928_ghg_employee_bands.sql (which also still permits the retired 'business').
  *
- * ⚠️ A SIXTH TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
+ * ⚠️ A NEW TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
  * every purchase on the new tier fail AFTER payment: the webhook writes the value, Postgres rejects
  * it, the grant throws, and Stripe retries a write that can never succeed. M23 in
  * lib/entitlementMetadata.test.ts reads the constraint and pins this list against it, so the
  * omission fails a test rather than a customer.
  */
-export const GHG_TIER_KEYS = ['starter', 'professional', 'business', 'advisory', 'enterprise'] as const
+export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory', 'enterprise'] as const
 
 /**
  * Is this a GHG tier key? For validating anything that arrives as text: a URL parameter, a request
@@ -589,47 +545,6 @@ export function isGhgTier(value: unknown): value is GhgTier {
  */
 export function ghgTierMetaValue(tier: unknown): GhgTier | '' {
   return isGhgTier(tier) ? tier : ''
-}
-
-export function conciergeQuote(sel: ConciergeSelection): ConciergeQuote {
-  const uploaded = sel.uploadedSources
-  const connected = sel.connectedSources ?? 0
-  // Number.isInteger is false for NaN, Infinity and any fraction, so this one test covers all
-  // three. connectedSources is checked only when supplied: absent means zero, which is valid.
-  if (!Number.isInteger(uploaded) || (sel.connectedSources != null && !Number.isInteger(sel.connectedSources))) {
-    throw new Error('conciergeQuote: a source count must be a whole number.')
-  }
-  if (uploaded < 0 || connected < 0) {
-    throw new Error('conciergeQuote: a source count cannot be negative.')
-  }
-  const total = uploaded + connected
-  if (total < 1) {
-    throw new Error('conciergeQuote: Concierge needs at least one data source.')
-  }
-  if (total > CONCIERGE_MAX_SELF_SERVE_SOURCES) {
-    throw new Error(`conciergeQuote: above ${CONCIERGE_MAX_SELF_SERVE_SOURCES} data sources, contact us for a quote.`)
-  }
-  if (connected > 0 && !UTILITY_CONNECT_ENABLED) {
-    throw new Error(
-      'conciergeQuote: connected sources cannot be sold yet. Utility connection is not built, ' +
-      'and the connected rate is display only until UTILITY_CONNECT_ENABLED is true.',
-    )
-  }
-  const onboardingUSD = sel.isFirstPurchase ? CONCIERGE_ONBOARDING_USD : 0
-  const sourcesUSD =
-    uploaded * CONCIERGE_SOURCE_USD.uploaded + connected * CONCIERGE_SOURCE_USD.connected
-  const lines: ConciergeQuote['lines'] = []
-  if (onboardingUSD > 0) {
-    // No tier in the label: the fee is the same whichever plan the customer is on.
-    lines.push({ label: 'GHG Concierge onboarding', unitUSD: onboardingUSD, quantity: 1 })
-  }
-  if (uploaded > 0) {
-    lines.push({ label: 'GHG Concierge data source, uploaded (1 year)', unitUSD: CONCIERGE_SOURCE_USD.uploaded, quantity: uploaded })
-  }
-  if (connected > 0) {
-    lines.push({ label: 'GHG Concierge data source, connected (1 year)', unitUSD: CONCIERGE_SOURCE_USD.connected, quantity: connected })
-  }
-  return { onboardingUSD, sourcesUSD, totalUSD: onboardingUSD + sourcesUSD, lines }
 }
 
 // ── Stripe helper ────────────────────────────────────────────────────────────

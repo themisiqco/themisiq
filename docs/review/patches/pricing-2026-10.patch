@@ -1,0 +1,2247 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 7983521..f8df453 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -51,7 +51,7 @@ Lisa is a non-expert in terminal/git workflows. When a manual step is genuinely
+ | Unit conversions | `lib/unitConversions.ts` | 3-tier cascade (exact match → documented factor → flag `needs_manual_review`). |
+ | Entitlement reads | `lib/useEntitlement.ts` | e.g. `useEntitlementAccess()`, `useHasConcierge()`, user-scoped. |
+ | Checkout intent | `lib/checkout.ts` | Stores intent in `sessionStorage`, resumes after login. |
+-| Add-on prerequisites | `addOnRequirementsMet` | Single authority enforcing the `ghg → concierge` dependency chain, and the quote-only guard that keeps Concierge Enterprise unsellable through checkout. Both `/api/checkout` and `/api/admin/create-invoice` defer to it. (Was `ghg → concierge → verification` until 10 Aug 2026 — see the retirement note under **Pricing model**.) |
++| Bill Review orders | `billReviewOrder` (`lib/billReviewOrder.ts`) | Single authority for what Bill Review (internal key `concierge`) may be sold and at what price: an active GHG plan, the onboarding tier, the source count, Enterprise as a quote, human reading and connected sources refused until sellable. Both `/api/checkout` and `/api/admin/create-invoice` call it, and it prices through `billReviewQuote`, which /pricing displays from. (Replaced `addOnRequirementsMet` and the location-band add-ons in Oct 2026.) |
+ 
+ ---
+ 
+@@ -232,12 +232,19 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
+   and not receive it. A derived test guards this; adding a module to `MODULES`
+   fails that test until it is mapped.
+ - **GHG is priced by employee band, with unlimited locations on every plan.**
+-  Bands come from `GHG_TIERS` (`ghgEmployeeBandLabel` words them). The only
++  Bands are the EU company size categories (Small 1-49, Medium 50-249, Large
++  250-999, Enterprise 1,000+ quoted), from `GHG_TIERS`; labels from
++  `GHG_TIER_LABELS`, keys unchanged (`starter`, `professional`, `advisory`,
++  `enterprise`). `ghgEmployeeBandLabel` words them. The only
+   database rule on a GHG save is the entitlement gate (an active `ghg` pass);
+   no code reads or writes `entitlements.location_allowance` (FI0).
+-- **Concierge add-on** (requires GHG) is a separate axis priced on actual
+-  location count: Basic ≤5 $799, Standard 6–15 $1,499, Enterprise 16+ custom
+-  quote. It is now the ONLY add-on.
++- **Bill Review add-on** (formerly Concierge; requires an active GHG plan) is
++  the ONLY add-on. Onboarding is priced by GHG tier and reading (AI-read or
++  human-read) and includes the first year for a tier's data sources; each extra
++  source in year 1 and every active source at renewal is a flat per-source fee.
++  Every value is in `lib/pricing.ts` (`BILL_REVIEW_*`, `billReviewQuote`).
++  Human reading is priced but not yet sellable (`BILL_REVIEW_HUMAN_READING_SELLABLE`).
++  Verification Readiness is included in Bill Review, not sold separately.
+ - **Verification Readiness ($1,499/yr) was RETIRED 10 Aug 2026** — `ADDONS.verification`,
+   its `AddOnKey` member, the `requiresAddOnAnyOf` type field and the
+   `addOnRequirementsMet` branch reading it are all removed, along with
+diff --git a/app/api/admin/create-invoice/route.ts b/app/api/admin/create-invoice/route.ts
+index 9937b67..5b86b9b 100644
+--- a/app/api/admin/create-invoice/route.ts
++++ b/app/api/admin/create-invoice/route.ts
+@@ -32,24 +32,17 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
+ import {
+   ALL_MODULE_KEYS,
+   TIER_PRICING,
+-  ADDONS,
+-  addOnRequirementsMet,
+   configuratorPrice,
+   cartQuote,
+   NEW_PRICING_ACTIVE,
+-  conciergeQuote,
+-  isFirstConciergePurchase,
+-  CONCIERGE_KEY,
+-  LEGACY_CONCIERGE_KEYS,
+-  UTILITY_CONNECT_ENABLED,
+   ghgTierMetaValue,
+   isGhgTier,
+   isLegacyTier,
+   type Tier,
+   type GhgTier,
+   type ModuleKey,
+-  type AddOnKey,
+ } from '../../../../lib/pricing'
++import { billReviewOrder, type OwnedRow } from '../../../../lib/billReviewOrder'
+ 
+ export const runtime = 'nodejs'
+ export const dynamic = 'force-dynamic'
+@@ -58,8 +51,8 @@ interface CreateInvoiceBody {
+   customerEmail?: string
+   tier?: Tier
+   moduleKeys?: ModuleKey[]
+-  addOns?: AddOnKey[]
+-  concierge?: { uploadedSources?: unknown; connectedSources?: unknown }
++  addOns?: unknown[]   // refused since Oct 2026
++  concierge?: { uploadedSources?: unknown; connectedSources?: unknown; reading?: unknown }   // Bill Review
+   daysUntilDue?: number
+ }
+ 
+@@ -100,8 +93,8 @@ export async function POST(req: NextRequest) {
+     const lines: { label: string; amount: number }[] = []
+     const entitlements = new Set<string>()
+     const sources: string[] = []
+-    // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
+-    // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
++    // The GHG tier on this invoice, recorded so the webhook can write entitlements.ghg_tier; it also prices
++    // Bill Review onboarding. Mirrors app/api/checkout/route.ts.
+     let ghgTierForMeta: GhgTier | null = null
+     let conciergeMeta: Record<string, string> = {}
+ 
+@@ -151,100 +144,36 @@ export async function POST(req: NextRequest) {
+       }
+     }
+ 
++    // The location-band Concierge add-ons were removed in Oct 2026 (pricing-2026-10).
+     if (body.addOns && body.addOns.length > 0) {
+-      for (const addOnKey of body.addOns) {
+-        const addOn = ADDONS[addOnKey]
+-        if (!addOn) {
+-          return NextResponse.json({ error: `Unknown add-on: ${addOnKey}` }, { status: 400 })
+-        }
+-       // Requirement check (modules + add-on prerequisites) via single authority.
+-        // `entitlements` holds both modules and add-on keys; split via ADDONS lookup.
+-        const entArr = [...entitlements]
+-        const moduleEnts = entArr.filter((k) => !(k in ADDONS)) as ModuleKey[]
+-        const addOnEnts = [
+-          ...entArr.filter((k) => k in ADDONS),
+-          ...(body.addOns ?? []),
+-        ] as AddOnKey[]
+-        const check = addOnRequirementsMet(addOnKey, moduleEnts, addOnEnts)
+-        if (!check.ok) {
+-          return NextResponse.json({ error: check.reason }, { status: 400 })
+-        }
+-        lines.push({ label: addOn.label, amount: addOn.price })
+-        entitlements.add(addOn.key)
+-        sources.push(`addon:${addOnKey}`)
+-      }
++      return NextResponse.json({ error: 'That add-on is no longer sold. Bill Review is invoiced with its number of data sources.' }, { status: 400 })
+     }
+ 
+-    // Concierge on the source-based model. Mirrors section 2d of app/api/checkout/route.ts,
+-    // including the connected-source refusal, the tier validation and the fee derivation.
+-    // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because
+-    // this runs as admin for someone else and there is no RLS scoping to rely on. And there is no
+-    // >$10k block: this route IS the invoice path, so a large Concierge order belongs here.
++    // Bill Review (internal name: concierge), through lib/billReviewOrder.ts exactly as checkout.
++    // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because this runs as
++    // admin for someone else and there is no RLS scoping to rely on. And there is no >$10k block: this route IS
++    // the invoice path, so a large order belongs here.
+     if (body.concierge) {
+-      const legacyInCart = (body.addOns ?? []).some((k) => (LEGACY_CONCIERGE_KEYS as readonly string[]).includes(k))
+-      if (legacyInCart) {
+-        return NextResponse.json(
+-          { error: 'Concierge was selected twice, on both the old and the new model.' },
+-          { status: 400 },
+-        )
+-      }
+-
+-      const uploadedSources = body.concierge.uploadedSources as number
+-      const connectedSources = body.concierge.connectedSources as number | undefined
+-
+-      if (!UTILITY_CONNECT_ENABLED && typeof connectedSources === 'number' && connectedSources > 0) {
+-        return NextResponse.json(
+-          { error: 'Connected utility sources are not available yet. Invoice uploaded sources only.' },
+-          { status: 400 },
+-        )
+-      }
+-
+       const { data: ownedRows, error: ownedErr } = await supabaseAdmin
+         .from('entitlements')
+-        .select('module_key')
++        .select('module_key, ghg_tier, term_end')
+         .eq('user_id', userId)
+       if (ownedErr) {
+         console.error('[admin-invoice] entitlement read failed:', ownedErr.message)
+         return NextResponse.json({ error: 'Could not read the customer entitlements.' }, { status: 503 })
+       }
+-      const ownedKeys = (ownedRows ?? []).map((r) => r.module_key)
+-
+-      const ghgInCart = entitlements.has('ghg')
+-      if (!ghgInCart && !ownedKeys.includes('ghg')) {
+-        return NextResponse.json(
+-          { error: 'Concierge requires the GHG module. Add it to this invoice or grant it first.' },
+-          { status: 400 },
+-        )
+-      }
+-
+-      // ⚠️ NO TIER IS NEEDED HERE ANY MORE. Mirrors the same removal in app/api/checkout/route.ts:
+-      // onboarding was priced by GHG tier, which forced a derivation from the customer's stored
+-      // location allowance whenever GHG was not on the same invoice. That derivation went inert
+-      // when locations became unlimited. The fee is flat, so the question is not asked.
+-      const isFirstPurchase = isFirstConciergePurchase(ownedKeys)
+-
+-      let quote
+-      try {
+-        quote = conciergeQuote({ uploadedSources, connectedSources, isFirstPurchase })
+-      } catch (e) {
+-        return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
+-      }
+-
+-      for (const line of quote.lines) {
+-        // ⚠️ QUANTITY IS FLATTENED INTO THE AMOUNT AND NAMED IN THE LABEL. stripe.invoiceItems.create
+-        // below takes a single `amount`, not a unit price and a count, so the multiplication happens
+-        // here. The label carries the count so the customer can check the arithmetic on the invoice.
++      const cartTier = entitlements.has('ghg') ? ghgTierForMeta : null
++      const order = billReviewOrder(body.concierge, cartTier, (ownedRows ?? []) as OwnedRow[], new Date())
++      if (!order.ok) return NextResponse.json({ error: order.error }, { status: order.status })
++      for (const line of order.quote.lines) {
++        // ⚠️ QUANTITY IS FLATTENED INTO THE AMOUNT AND NAMED IN THE LABEL. stripe.invoiceItems.create takes a
++        // single `amount`, so the multiplication happens here and the label carries the count.
+         const label = line.quantity > 1 ? `${line.label} x ${line.quantity}` : line.label
+         lines.push({ label, amount: line.unitUSD * line.quantity })
+       }
+-      entitlements.add(CONCIERGE_KEY)
+-      conciergeMeta = {
+-        concierge_uploaded_sources: String(uploadedSources),
+-        concierge_connected_sources: String(connectedSources ?? 0),
+-        concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
+-        concierge_onboarding_usd: String(quote.onboardingUSD),
+-      }
+-      sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
++      entitlements.add(order.grant)
++      conciergeMeta = order.meta
++      sources.push(order.source)
+     }
+ 
+     if (lines.length === 0) {
+diff --git a/app/api/checkout/route.ts b/app/api/checkout/route.ts
+index eee0be9..f18a508 100644
+--- a/app/api/checkout/route.ts
++++ b/app/api/checkout/route.ts
+@@ -18,26 +18,19 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAut
+ import {
+   ALL_MODULE_KEYS,
+   TIER_PRICING,
+-  ADDONS,
+-  addOnRequirementsMet,
+   configuratorPrice,
+   cartQuote,
+   NEW_PRICING_ACTIVE,
+   priceLine,
+   priceLineQty,
+-  conciergeQuote,
+-  isFirstConciergePurchase,
+-  CONCIERGE_KEY,
+-  LEGACY_CONCIERGE_KEYS,
+-  UTILITY_CONNECT_ENABLED,
+   ghgTierMetaValue,
+   isGhgTier,
+   isLegacyTier,
+   type ModuleKey,
+   type Tier,
+   type GhgTier,
+-  type AddOnKey,
+ } from '../../../lib/pricing'
++import { billReviewOrder, type OwnedRow } from '../../../lib/billReviewOrder'
+ 
+ // Stripe needs the Node.js runtime (not edge).
+ export const runtime = 'nodejs'
+@@ -48,8 +41,10 @@ export const dynamic = 'force-dynamic'
+ interface CheckoutBody {
+   tier?: Tier
+   moduleKeys?: ModuleKey[]
+-  addOns?: AddOnKey[]
+-  concierge?: { uploadedSources?: unknown; connectedSources?: unknown }
++  // Refused since Oct 2026: the location-band Concierge add-ons are no longer sold.
++  addOns?: unknown[]
++  // Bill Review (internal name: concierge). `reading` 'human' is refused until it can be sold.
++  concierge?: { uploadedSources?: unknown; connectedSources?: unknown; reading?: unknown }
+   business?: { name?: string; regNumber?: string }
+   purchaser?: { name?: string }
+   consent?: { businessCapacity?: boolean; digitalAccess?: boolean; dataAuthority?: boolean; atISO?: string; version?: string }
+@@ -72,7 +67,7 @@ export async function POST(req: NextRequest) {
+     const entitlementsToGrant = new Set<string>() // module keys + add-on keys
+     let ghgTierForMeta: GhgTier | null = null // GHG tier, recorded so the webhook can write entitlements.ghg_tier
+     let conciergeMeta: Record<string, string> = {}
+-    let ownedRows: { module_key: string }[] = []
++    let ownedRows: OwnedRow[] = []
+     const sources: string[] = []
+ 
+     // 2b) Build-your-own (tier + modules)
+@@ -124,20 +119,21 @@ export async function POST(req: NextRequest) {
+       }
+     }
+ 
+-    // 2c) Add-ons (Verification Readiness + the Concierge tiers). Each is validated generically
+-    // against ADDONS via addOnRequirementsMet, which also rejects quote-only tiers (Enterprise).
+-    // What does the customer already hold? RLS scopes this to them. Read ONCE: the add-on branch
+-    // needs it for prerequisites and the Concierge branch needs it for isFirstPurchase.
++    // 2c) The location-band Concierge add-ons were removed in Oct 2026 (pricing-2026-10). An order that still
++    // names one is refused rather than ignored, so nothing is charged for a product that no longer exists.
++    if (body.addOns && body.addOns.length > 0) {
++      return NextResponse.json({ error: 'That add-on is no longer sold. Bill Review is ordered with its number of data sources.' }, { status: 400 })
++    }
++
++    // 2d) Bill Review (internal name: concierge). lib/billReviewOrder.ts decides what may be sold and prices it
++    // with billReviewQuote, the same function /pricing displays from.
+     //
+-    // ⚠️ THE READ FAILS LOUDLY. It used to discard its error and treat the result as "owns nothing",
+-    // which was harmless while it only fed a prerequisite check. It is not harmless now: reading
+-    // nothing makes isFirstConciergePurchase true, and an existing Concierge customer would be
+-    // charged the onboarding fee a second time on renewal.
+-    let ownedKeys = new Set<string>()
+-    if ((body.addOns && body.addOns.length > 0) || body.concierge) {
++    // ⚠️ THE ENTITLEMENT READ FAILS LOUDLY. Reading nothing would make isFirstConciergePurchase true and charge
++    // an existing Bill Review customer onboarding a second time. RLS scopes the read to this customer.
++    if (body.concierge) {
+       const { data: owned, error: ownedErr } = await supabase
+         .from('entitlements')
+-        .select('module_key')
++        .select('module_key, ghg_tier, term_end')
+       if (ownedErr) {
+         console.error('[checkout] entitlement read failed:', ownedErr.message)
+         return NextResponse.json(
+@@ -145,98 +141,16 @@ export async function POST(req: NextRequest) {
+           { status: 503 },
+         )
+       }
+-      ownedRows = owned ?? []
+-      ownedKeys = new Set<string>(ownedRows.map((r) => r.module_key))
+-    }
+-
+-    if (body.addOns && body.addOns.length > 0) {
+-      for (const addOnKey of body.addOns) {
+-        const addOn = ADDONS[addOnKey]
+-        if (!addOn) {
+-          return NextResponse.json({ error: 'Unknown add-on.' }, { status: 400 })
+-        }
+-       // Requirement check (modules + add-on prerequisites) via single authority.
+-        // ownedKeys holds BOTH modules and add-ons (webhook writes all to module_key),
+-        // so derive each list by filtering against ADDONS.
+-        const ownedAndCart = [...ownedKeys, ...modulesInCart]
+-        const ownedModuleKeys = ownedAndCart.filter((k) => !(k in ADDONS)) as ModuleKey[]
+-        const ownedOrCartAddOns = [
+-          ...ownedAndCart.filter((k) => k in ADDONS),
+-          ...(body.addOns ?? []),
+-        ] as AddOnKey[]
+-        const check = addOnRequirementsMet(addOnKey, ownedModuleKeys, ownedOrCartAddOns)
+-        if (!check.ok) {
+-          return NextResponse.json({ error: check.reason }, { status: 400 })
+-        }
+-        lineItems.push(priceLine(addOn.label, addOn.price))
+-        entitlementsToGrant.add(addOn.key)
+-      }
+-      sources.push(`addons:${body.addOns.join('+')}`)
+-    }
+-
+-    // 2d) Concierge on the source-based model. The old concierge-* keys above still work until the
+-    // configurator moves in Batch 4; this is the path everything new uses.
+-    if (body.concierge) {
+-      const legacyInCart = (body.addOns ?? []).some((k) => (LEGACY_CONCIERGE_KEYS as readonly string[]).includes(k))
+-      if (legacyInCart) {
+-        return NextResponse.json(
+-          { error: 'Concierge was selected twice, on both the old and the new model. Please start the order again.' },
+-          { status: 400 },
+-        )
+-      }
+-
+-      // Counts pass through unchanged. conciergeQuote validates them and throws rather than
+-      // coercing, so the error names the real fault instead of a rounded number.
+-      const uploadedSources = body.concierge.uploadedSources as number
+-      const connectedSources = body.concierge.connectedSources as number | undefined
+-
+-      // ⚠️ THE FLAG IS ENFORCED AT THE SERVER BOUNDARY TOO, not only inside conciergeQuote. The
+-      // client cannot be the thing that decides what is sellable.
+-      if (!UTILITY_CONNECT_ENABLED && typeof connectedSources === 'number' && connectedSources > 0) {
+-        return NextResponse.json(
+-          { error: 'Connected utility sources are not available yet. Please order uploaded sources only.' },
+-          { status: 400 },
+-        )
+-      }
+-
+-      // Concierge requires GHG, the same rule addOnRequirementsMet applies to the old keys.
+-      const ghgInCart = modulesInCart.has('ghg')
+-      if (!ghgInCart && !ownedKeys.has('ghg')) {
+-        return NextResponse.json(
+-          { error: 'Concierge requires the GHG module. Add it to your cart or purchase it first.' },
+-          { status: 400 },
+-        )
+-      }
+-
+-      // ⚠️ NO TIER IS NEEDED HERE ANY MORE, AND THAT IS WHY A WHOLE BRANCH IS GONE. Onboarding was
+-      // priced by GHG tier, so this had to work out the customer's band: from the cart when GHG was
+-      // in it, and otherwise from their stored location allowance. That second path went inert when
+-      // locations became unlimited, and it would have refused every customer adding Concierge on
+-      // its own with a 400 about a plan level nobody could determine. The fee is flat now. The
+-      // question is not asked, so it cannot be answered wrongly.
+-      const isFirstPurchase = isFirstConciergePurchase([...ownedKeys])
+-
+-      let quote
+-      try {
+-        quote = conciergeQuote({ uploadedSources, connectedSources, isFirstPurchase })
+-      } catch (e) {
+-        // conciergeQuote's messages are written for a person and name the actual fault.
+-        return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
+-      }
+-
+-      for (const line of quote.lines) {
++      ownedRows = (owned ?? []) as OwnedRow[]
++      const cartTier = modulesInCart.has('ghg') ? ghgTierForMeta : null
++      const order = billReviewOrder(body.concierge, cartTier, ownedRows, new Date())
++      if (!order.ok) return NextResponse.json({ error: order.error }, { status: order.status })
++      for (const line of order.quote.lines) {
+         lineItems.push(priceLineQty(line.label, line.unitUSD, line.quantity))
+       }
+-      entitlementsToGrant.add(CONCIERGE_KEY)
+-      conciergeMeta = {
+-        concierge_uploaded_sources: String(uploadedSources),
+-        concierge_connected_sources: String(connectedSources ?? 0),
+-        concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
+-        // Recorded, never granted. The onboarding fee buys setup work, not access, so the webhook
+-        // must not turn this into an entitlement row or stamp a term on it.
+-        concierge_onboarding_usd: String(quote.onboardingUSD),
+-      }
+-      sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
++      entitlementsToGrant.add(order.grant)
++      conciergeMeta = order.meta
++      sources.push(order.source)
+     }
+ 
+     // 3) Must be buying something.
+@@ -279,7 +193,7 @@ export async function POST(req: NextRequest) {
+     const entitlements = Array.from(entitlementsToGrant).join(',')
+     const metadata = {
+       user_id: userId,
+-      entitlements, // e.g. "ghg,supply-chain,verification"
++      entitlements, // e.g. "ghg,supply-chain,concierge"
+       source: sources.join(' | '),
+       // The GHG tier. Written whenever GHG is in the cart, and empty otherwise,
+       // following the same empty-string convention: Stripe metadata values are strings and the
+diff --git a/app/api/concierge/extract/route.ts b/app/api/concierge/extract/route.ts
+index 320f31a..0f53370 100644
+--- a/app/api/concierge/extract/route.ts
++++ b/app/api/concierge/extract/route.ts
+@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
+     }
+     if (!conciergeRows || conciergeRows.length === 0) {
+       return NextResponse.json(
+-        { error: 'Reading figures off a document is part of the concierge add-on. Your upload is still kept as evidence — type the figure into the box above.' },
++        { error: 'Reading figures off a document is part of Bill Review. Your upload is still kept as evidence: type the figure into the box above.' },
+         { status: 403 },
+       )
+     }
+diff --git a/app/api/ghg-bot/route.ts b/app/api/ghg-bot/route.ts
+index a6b744d..0088ed7 100644
+--- a/app/api/ghg-bot/route.ts
++++ b/app/api/ghg-bot/route.ts
+@@ -125,7 +125,7 @@ interface BotMessage { role: 'user' | 'assistant'; content: string }
+ function buildSystemPrompt(currentStep: number): string {
+   return `You are a friendly, expert GHG inventory guide built into the ThemisIQ platform. The user is on step ${currentStep + 1} of 6: ${WIZARD_STEP_NAMES[currentStep]}. Your job is to help them complete their GHG inventory with confidence, answer questions clearly, and guide them toward completing the assessment if they haven't already.
+ 
+-ABOUT THEMISIQ: ThemisIQ is a compliance platform for GHG inventories. Scope 1 and 2 are entered once in this wizard and exported to each framework the customer selected, without re-entry — Scope 3 is a separate module, with its own inputs, so "once" describes Scope 1 and 2 rather than the whole platform. Exports UNLOCK RATHER THAN RUN AUTOMATICALLY: every location has to be priceable and its streams declared, every coverage question and grid region resolved, the data confirmed, and, in concierge mode, the extracted figures approved. Until then the export buttons stay disabled and the wizard names what is outstanding, so never tell a customer a report will be produced automatically. The assessment at www.themisiq.co/assess helps companies determine which frameworks apply to them.
++ABOUT THEMISIQ: ThemisIQ is a compliance platform for GHG inventories. Scope 1 and 2 are entered once in this wizard and exported to each framework the customer selected, without re-entry — Scope 3 is a separate module, with its own inputs, so "once" describes Scope 1 and 2 rather than the whole platform. Exports UNLOCK RATHER THAN RUN AUTOMATICALLY: every location has to be priceable and its streams declared, every coverage question and grid region resolved, the data confirmed, and, with Bill Review, the figures read from bills approved. Until then the export buttons stay disabled and the wizard names what is outstanding, so never tell a customer a report will be produced automatically. The assessment at www.themisiq.co/assess helps companies determine which frameworks apply to them.
+ 
+ FRAMEWORK GUIDANCE:
+ - SB 253 (CARB): Required for companies with $1B+ global annual revenue AND California nexus (operations, employees, or sales in California). CARB has PROPOSED ${SB253_FIRST_REPORT_DATE} for the first report (Scope 1 and 2). ${SB253_PROCESS_STATUS} Until OAL approves it the date is NOT FINAL, so never state it as a settled deadline. If unsure whether they qualify, direct them to www.themisiq.co/assess.
+@@ -164,7 +164,7 @@ COMMON QUESTIONS AND ANSWERS:
+ - "Do leased vehicles count?" = Yes, if your company pays for the fuel and controls the vehicle operations, include them in Scope 1 mobile combustion.
+ - "What about employee personal vehicles?" = Business travel in a personal vehicle is Scope 3, Category 6, so it belongs in the Scope 3 module rather than this wizard. Note what that category takes today: ${CAT6_TAKES}, so car mileage has no field of its own yet. Commuting in a personal vehicle is Category 7, which does take a commute distance and mode. Fuel your company pays for in a vehicle it controls is Scope 1 mobile combustion, here in this wizard.
+ - "We have rooftop solar — how do I handle it?" = Electricity you generate and consume on-site is not Scope 2 (it's not purchased). Only purchased grid electricity goes in Scope 2.
+-- "What if I don't have 12 months of bills?" = Annualising is normal and ThemisIQ supports it — the point is WHERE the multiplication happens. Upload the bills you have; where they are machine-read, a coverage strip appears under the upload showing how many of the 12 months are evidenced, with an "Acknowledge & estimate" button. That grosses the metered figure up by 12 over the months covered, writes the extrapolation and its basis into the calculation workings ("9 of 12 months from bills; grossed ×1.33"), and records the estimated percentage on the inventory. Doing the arithmetic yourself and typing the grossed-up number into a quantity box is worse, and this is the reason to say so: nothing marks it, so it arrives looking like a metered figure, the workings show no extrapolation, and the estimated share is recorded as nothing rather than as a proportion. If the bills are not machine-read — no concierge tier, or a spreadsheet or CSV upload — there is no coverage strip for them today, so keep your own record of what you multiplied and raise it with your verifier.
++- "What if I don't have 12 months of bills?" = Annualising is normal and ThemisIQ supports it — the point is WHERE the multiplication happens. Upload the bills you have; where they are machine-read, a coverage strip appears under the upload showing how many of the 12 months are evidenced, with an "Acknowledge & estimate" button. That grosses the metered figure up by 12 over the months covered, writes the extrapolation and its basis into the calculation workings ("9 of 12 months from bills; grossed ×1.33"), and records the estimated percentage on the inventory. Doing the arithmetic yourself and typing the grossed-up number into a quantity box is worse, and this is the reason to say so: nothing marks it, so it arrives looking like a metered figure, the workings show no extrapolation, and the estimated share is recorded as nothing rather than as a proportion. If the bills are not machine-read — no Bill Review, or a spreadsheet or CSV upload — there is no coverage strip for them today, so keep your own record of what you multiplied and raise it with your verifier.
+ - "Multiple meters at one location?" = Add them together for that location's total: there is one figure per fuel per location. Upload every bill you added up, and keep your own arithmetic — the stored figure is a sum, and no single document shows it, so a verifier sampling that line needs the whole set of bills to get back to it.
+ - "What's the difference between stationary and mobile diesel?" = Stationary = diesel in generators, boilers, heating equipment that doesn't move. Mobile = diesel in vehicles and mobile equipment.
+ - "Which GWP basis does ThemisIQ use?" = IPCC AR6 (2021), for every framework including SB 253. Factors a publisher has already combined, such as the UK, Australian and New Zealand fuel factors on AR5, are used as published and marked in the workings. The IPCC revises these values between assessments — methane's 100-year GWP is 25 under AR4, 28 under AR5, and 29.8 (fossil) or 27.0 (non-fossil) under AR6 — but for most companies the difference is small.
+@@ -174,7 +174,7 @@ COMMON QUESTIONS AND ANSWERS:
+ - SUFFICIENCY RULE — THIS APPLIES TO EVERYTHING YOU DESCRIBE, NOT ONLY GWP. Say what ThemisIQ does: which GWP set it applies, which emission factors and editions it uses, which boundary or method a figure rests on, what an export contains. Never say that any of it satisfies a regulator, framework, standard, programme, customer or verifier. Do not call a basis, factor, source, boundary, method, figure or export correct, required, accepted, compliant, sufficient, adequate, standard, industry-standard or increasingly used, and do not say it meets a requirement, is what a regulator wants, or will be accepted. Sufficiency is a question for the customer's verifier or professional adviser, and you send it there — even when the customer asks you to confirm it, even when they seem to want reassurance, and even when the answer looks obvious to you. Describing the platform is your job; vouching for it is not.
+ - "What's an intensity ratio?" = Emissions per unit of economic output (e.g. mtCO2e per $million revenue). Allows comparison across companies of different sizes.
+ - "Do I need a third-party verifier?" = SB 253 requires limited assurance from an accredited verifier — that is in the statute, not something ThemisIQ decides. What ThemisIQ produces for you to hand over is the assurance package: the calculation workings, the emission factor citations and editions, your uploaded source documents and the audit trail. Whether it answers a particular verifier's questions is theirs to say, so ask them early what they want to see.
+-- "Can I submit the CSV directly to CARB?" = The CSV is your working document, and ThemisIQ does not file anything for you — CARB will have its own submission portal. The CSV carries your Scope 1 and Scope 2 totals, the organisation and boundary details, the emission factor citations and a per-location breakdown; the calculation workings and audit trail are in the assurance PDF. Read it against the fields the portal asks for, and put anything you are unsure about to your verifier or adviser.
++- "Can I submit the CSV directly to CARB?" = The CSV is your working document, and ThemisIQ does not file anything for you — CARB will have its own submission portal. The CSV carries your Scope 1 and Scope 2 totals, the organization and boundary details, the emission factor citations and a per-location breakdown; the calculation workings and audit trail are in the assurance PDF. Read it against the fields the portal asks for, and put anything you are unsure about to your verifier or adviser.
+ - "What does assurance-ready mean?" = It describes what the package contains, not a verdict on it: emission factors cited with their source and edition, the calculation workings behind every figure, the source documents you uploaded, and an audit trail of every saved change to this inventory, written by a database trigger rather than by the application. Two limits to state if they come up: the trail records each save of the inventory, not each keystroke, and it covers the GHG inventory — the Scope 3 module is not audited. A verifier may want more than the package holds, and only they can say whether it is enough for their opinion.
+ 
+ Always be encouraging, concise, and jargon-free. If someone seems confused about which frameworks they need, always suggest www.themisiq.co/assess. Never make up regulatory deadlines or requirements you're not sure about.
+diff --git a/app/api/order/quote-request/route.ts b/app/api/order/quote-request/route.ts
+index 76cc8c8..480ffe5 100644
+--- a/app/api/order/quote-request/route.ts
++++ b/app/api/order/quote-request/route.ts
+@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
+     const phone   = vPhone ? esc(vPhone) : NOT_PROVIDED
+     const modules = vModules.length ? esc(vModules.join(', ')) : NOT_PROVIDED
+     const tier    = esc(vTier || NOT_PROVIDED)
+-    const total   = typeof order?.totalUSD === 'number' && (order.totalUSD as number) > 0 ? `$${(order.totalUSD as number).toLocaleString()}` : 'Custom / Advisory'
++    const total   = typeof order?.totalUSD === 'number' && (order.totalUSD as number) > 0 ? `$${(order.totalUSD as number).toLocaleString()}` : 'Custom / Enterprise'
+     const ref     = vRef ? esc(vRef) : null
+ 
+     // ── Internal notification (the one we act on) ──────────────────────────────
+diff --git a/app/calculate-emissions/page.tsx b/app/calculate-emissions/page.tsx
+index 84ad8bf..abfc8e3 100644
+--- a/app/calculate-emissions/page.tsx
++++ b/app/calculate-emissions/page.tsx
+@@ -20,7 +20,8 @@
+ import type { Metadata } from "next";
+ import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
+ import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
+-import { GHG_TIERS, CONCIERGE_SOURCE_USD, ghgEmployeeBandLabel } from '../../lib/pricing';
++import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
++import { BILL_REVIEW_DESCRIPTION } from '../../lib/pricingCopy';
+ import Link from "next/link";
+ import Footer from '../components/Footer'
+ 
+@@ -45,7 +46,15 @@ const CONFIG = {
+ // FAQ_LD so the cost answer can interpolate it. Same pattern as
+ // app/climate-ghg/page.tsx:16.
+ const ghgFrom = GHG_TIERS.starter.priceUSD?.toLocaleString('en-US');
+-const ghgPro = GHG_TIERS.professional.priceUSD?.toLocaleString('en-US');
++// Every priced band, in order, from GHG_TIERS: "$550 a year for 1 to 49 employees, ... and $4,550 a year for ...".
++const GHG_PRICED_BANDS = (() => {
++  const parts = GHG_TIER_KEYS.filter(k => GHG_TIERS[k].priceUSD != null)
++    .map(k => `$${(GHG_TIERS[k].priceUSD as number).toLocaleString('en-US')} a year for ${ghgEmployeeBandLabel(k)}`);
++  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
++})();
++// Bill Review (formerly Concierge): the entry onboarding price and what it includes (pricing-2026-10).
++const billReviewFrom = BILL_REVIEW_ONBOARDING_USD.ai.starter?.toLocaleString('en-US');
++const billReviewIncluded = BILL_REVIEW_INCLUDED_SOURCES.starter;
+ 
+ // --- SEO ---------------------------------------------------------
+ export const metadata: Metadata = {
+@@ -110,7 +119,7 @@ const FAQ_LD = {
+       name: "What data do I need to get started?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: "Your energy and fuel records - typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year, entered as annual or monthly totals. If your bills are incomplete, the Concierge add-on can tabulate them for you.",
++        text: "Your energy and fuel records - typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year, entered as annual or monthly totals. If your bills are incomplete, the Bill Review add-on can read them for you.",
+       },
+     },
+     {
+@@ -142,7 +151,7 @@ const FAQ_LD = {
+       name: "What does it cost?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
++        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Bill Review from $${billReviewFrom}, including the first year for ${billReviewIncluded} data sources; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+       },
+     },
+     {
+@@ -174,7 +183,7 @@ const FAQ_LD = {
+       name: "Is my data secure?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. AI is used in exactly two places, and nothing else in the platform uses it. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
++        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. AI is used in exactly two places, and nothing else in the platform uses it. If you use the Bill Review add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
+       },
+     },
+     {
+@@ -529,7 +538,7 @@ export default function CalculateEmissionsPage() {
+                 <div className="vnum">04</div>
+                 <div className="vstep-body">
+                   <div className="vstep-title">Enter your energy &amp; fuel data</div>
+-                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals and enter them in the right fields. Your <strong>metric tons of CO&#8322;e for Scope 1 and Scope 2</strong> calculate in real time as you type. Missing any documents, or would rather have us calculate the totals? Our <a href="#support">Concierge service</a> is here for you, see below.</p>
++                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals and enter them in the right fields. Your <strong>metric tons of CO&#8322;e for Scope 1 and Scope 2</strong> calculate in real time as you type. Missing any documents, or would rather have us calculate the totals? Our <a href="#support">Bill Review service</a> is here for you, see below.</p>
+                   <div className="calcchips">
+                     <span className="chip">Electricity <b>1,200,000 kWh</b></span>
+                     <span className="chip">Natural gas <b>8,500 therms</b></span>
+@@ -572,9 +581,9 @@ export default function CalculateEmissionsPage() {
+                 <div className="tier-when">Start here: the core report, covering Scope 1, 2 and 3.</div>
+               </div>
+               <div className="tier">
+-                <div className="tier-name">Concierge</div>
+-                <div className="tier-price">{`from $${CONCIERGE_SOURCE_USD.uploaded} per data source a year, plus a one-time onboarding fee`}</div>
+-                <p>Missing invoices, or not comfortable tabulating the annual totals? Our Concierge add-on does the heavy lifting: we extract and total the data from your statements for you.</p>
++                <div className="tier-name">Bill Review</div>
++                <div className="tier-price">{`from $${billReviewFrom} onboarding, including the first year for ${billReviewIncluded} data sources`}</div>
++                <p>{BILL_REVIEW_DESCRIPTION}</p>
+                 <div className="tier-when">Best when your bills are scattered or you&rsquo;d rather not key in numbers.</div>
+               </div>
+               <div className="tier">
+@@ -585,7 +594,7 @@ export default function CalculateEmissionsPage() {
+               </div>
+             </div>
+ 
+-            <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
++            <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: {GHG_PRICED_BANDS}; organizations with {ghgEmployeeBandLabel('enterprise')} are quoted. {GHG_SIZE_BASIS_NOTE}</p>
+ 
+             <div className="support-cta">
+               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>Ready to start? See your emissions instantly</Link>
+@@ -638,7 +647,7 @@ export default function CalculateEmissionsPage() {
+               <details className="qa">
+                 <summary>What data do I need to get started?</summary>
+                 <div className="qa-body">
+-                  Your <strong>energy and fuel records</strong>: typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year. You can enter annual or monthly totals. If your bills are incomplete or you&rsquo;d rather not add them up yourself, the <strong>Concierge</strong> add-on handles it for you.
++                  Your <strong>energy and fuel records</strong>: typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year. You can enter annual or monthly totals. If your bills are incomplete or you&rsquo;d rather not add them up yourself, the <strong>Bill Review</strong> add-on handles it for you.
+                 </div>
+               </details>
+ 
+@@ -685,11 +694,11 @@ export default function CalculateEmissionsPage() {
+                   <ul className="price-list">
+                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
+                     <li><span className="pl-name">GHG module: Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
+-                    <li><span className="pl-name">Concierge: we tabulate the data from your bills. One-time onboarding fee applies.</span><span className="pl-price">{`from $${CONCIERGE_SOURCE_USD.uploaded} per data source a year`}</span></li>
++                    <li><span className="pl-name">Bill Review: we read the figures from your bills, and you approve each one. Includes Verification Readiness.</span><span className="pl-price">{`from $${billReviewFrom}, first year for ${billReviewIncluded} sources included`}</span></li>
+                     <li><span className="pl-name">Advisory: dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
+                     <li><span className="pl-name">Scope 3: full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
+                   </ul>
+-                  <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
++                  <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: {GHG_PRICED_BANDS}; organizations with {ghgEmployeeBandLabel('enterprise')} are quoted. {GHG_SIZE_BASIS_NOTE}</p>
+                 </div>
+               </details>
+ 
+@@ -717,7 +726,7 @@ export default function CalculateEmissionsPage() {
+               <details className="qa">
+                 <summary>Is my data secure?</summary>
+                 <div className="qa-body">
+-                  Security is foundational here. Your data belongs to you: we never sell or share it. Everything is encrypted in transit (TLS&nbsp;1.2+) and at rest (AES-256), hosted on infrastructure provided by Supabase on AWS, which holds SOC&nbsp;2 Type&nbsp;II certification, with row-level security that isolates your data from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you&rsquo;re on. Payments run through <strong>Stripe</strong> (PCI&nbsp;DSS Level&nbsp;1), so we never see your card details. You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law&nbsp;25, GDPR and UK&nbsp;GDPR, and CCPA. Full detail is on our <Link href={CONFIG.TRUST_URL}>trust &amp; data page</Link>.
++                  Security is foundational here. Your data belongs to you: we never sell or share it. Everything is encrypted in transit (TLS&nbsp;1.2+) and at rest (AES-256), hosted on infrastructure provided by Supabase on AWS, which holds SOC&nbsp;2 Type&nbsp;II certification, with row-level security that isolates your data from every other customer at the database level. If you use the Bill Review add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you&rsquo;re on. Payments run through <strong>Stripe</strong> (PCI&nbsp;DSS Level&nbsp;1), so we never see your card details. You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law&nbsp;25, GDPR and UK&nbsp;GDPR, and CCPA. Full detail is on our <Link href={CONFIG.TRUST_URL}>trust &amp; data page</Link>.
+                 </div>
+               </details>
+ 
+diff --git a/app/climate-ghg/faq.test.ts b/app/climate-ghg/faq.test.ts
+index b264908..5c1d91a 100644
+--- a/app/climate-ghg/faq.test.ts
++++ b/app/climate-ghg/faq.test.ts
+@@ -1,13 +1,14 @@
+ import { describe, it, expect } from 'vitest'
+ import { FAQ_CONNECTED, FAQ_UPLOAD_ONLY, CONCIERGE_FAQ } from './faq'
+-import { UTILITY_CONNECT_ENABLED, CONCIERGE_SOURCE_USD } from '../../lib/pricing'
++import { UTILITY_CONNECT_ENABLED, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, GHG_TIER_LABELS } from '../../lib/pricing'
++import { BILL_REVIEW_DESCRIPTION, BILL_REVIEW_HUMAN_DESCRIPTION } from '../../lib/pricingCopy'
+ 
+ // Every string a customer reads from either array. `extra` is included because ModuleFaq renders it
+ // on the page, below the answer: it is not a margin note, it is copy.
+ const textOf = (items: readonly { a: string; extra?: string | readonly string[] }[]): string[] =>
+   items.flatMap(i => [i.a, ...(i.extra == null ? [] : typeof i.extra === 'string' ? [i.extra] : [...i.extra])])
+ 
+-describe('Concierge FAQ', () => {
++describe('Bill Review FAQ (formerly Concierge)', () => {
+   // ⚠️ A PLACEHOLDER IN `extra` IS A PLACEHOLDER ON THE LIVE PAGE. The first draft of this set
+   // carried bracketed notes to ourselves in that field, which renders. Two questions are held out
+   // of the arrays entirely instead, in a comment in faq.ts.
+@@ -21,13 +22,11 @@ describe('Concierge FAQ', () => {
+ 
+   // ⚠️ THE LIVE PAGE MUST NOT DESCRIBE A CONNECTION CHECKOUT CANNOT SELL. These are the phrases
+   // FAQ_CONNECTED uses to assert a live connection. None may appear while the flag is false.
+-  // Future forms are deliberately absent from this list: "will be $60 a year once direct
+-  // connections launch" is a promise about pricing, not a claim that connection works today.
++  // No connected price is published since Oct 2026 (pricing-2026-10).
+   const PRESENT_TENSE_CONNECTION = [
+     'connect the ones your utilities allow',
+     'we connect to your account',
+     'pull usage and billing data directly from the utility',
+-    'moves to the connected rate at your next renewal',
+     'which sources will connect and which will be uploaded',
+   ]
+ 
+@@ -52,7 +51,6 @@ describe('Concierge FAQ', () => {
+   it('F4 the upload-only version says connections are coming, rather than staying silent', () => {
+     const all = textOf(FAQ_UPLOAD_ONLY).join(' ').toLowerCase()
+     expect(all).toContain('coming soon')
+-    expect(all).toContain('once direct connections launch')
+   })
+ 
+   it('F5 the flag picks the array, and today it picks the upload-only one', () => {
+@@ -62,13 +60,25 @@ describe('Concierge FAQ', () => {
+ 
+   // ⚠️ THESE ANSWERS STATE WHAT A CUSTOMER IS CHARGED. A number typed into the copy would be a
+   // second source of truth for a price, which is what lib/pricing.ts exists to prevent.
+-  it('F6 both versions take their prices from CONCIERGE_SOURCE_USD', () => {
+-    const connected = textOf(FAQ_CONNECTED).join(' ')
+-    expect(connected).toContain(`$${CONCIERGE_SOURCE_USD.connected} a year`)
+-    expect(connected).toContain(`$${CONCIERGE_SOURCE_USD.uploaded} a year`)
+-    const upload = textOf(FAQ_UPLOAD_ONLY).join(' ')
+-    expect(upload).toContain(`$${CONCIERGE_SOURCE_USD.uploaded} a year`)
+-    expect(upload).toContain(`$${CONCIERGE_SOURCE_USD.connected} a year`)
++  it('F6 both versions take their prices from the Bill Review constants, and name no retired price', () => {
++    for (const items of [FAQ_CONNECTED, FAQ_UPLOAD_ONLY]) {
++      const all = textOf(items).join(' ')
++      expect(all).toContain(`$${BILL_REVIEW_SOURCE_USD} a year`)
++      for (const t of ['starter', 'professional', 'advisory'] as const) {
++        expect(all).toContain(`$${(BILL_REVIEW_ONBOARDING_USD.ai[t] as number).toLocaleString('en-US')} ${GHG_TIER_LABELS[t]}`)
++        expect(all).toContain(`$${(BILL_REVIEW_ONBOARDING_USD.human[t] as number).toLocaleString('en-US')}`)
++        expect(all).toContain(String(BILL_REVIEW_INCLUDED_SOURCES[t]))
++      }
++      for (const stale of [/\$90(?!\d)/, /\$60(?!\d)/, /\$1,395/, /\$799/, /\$1,499/, /Concierge/]) expect(all, String(stale)).not.toMatch(stale)
++    }
++  })
++
++  it('F8 the description is verbatim', () => {
++    for (const items of [FAQ_CONNECTED, FAQ_UPLOAD_ONLY]) {
++      expect(items[0].a).toBe(`${BILL_REVIEW_DESCRIPTION} ${BILL_REVIEW_HUMAN_DESCRIPTION}`)
++    }
++    expect(BILL_REVIEW_DESCRIPTION).toBe('Upload your bills and we read the figures for you. You check and approve each one, and our specialists spot-check the readings. Includes Verification Readiness: an organized evidence pack and source-document index, ready to hand to your verifier.')
++    expect(BILL_REVIEW_HUMAN_DESCRIPTION).toBe('Prefer a person to read your bills? Choose human reading and a ThemisIQ specialist reads each one within 2 business days. Your bills are never sent to AI.')
+   })
+ 
+   it('F7 no em dash in either version', () => {
+diff --git a/app/climate-ghg/faq.ts b/app/climate-ghg/faq.ts
+index 771480e..0d52c12 100644
+--- a/app/climate-ghg/faq.ts
++++ b/app/climate-ghg/faq.ts
+@@ -1,4 +1,5 @@
+-import { UTILITY_CONNECT_ENABLED, CONCIERGE_SOURCE_USD } from '../../lib/pricing'
++import { UTILITY_CONNECT_ENABLED, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, GHG_TIER_LABELS, GHG_TIER_KEYS } from '../../lib/pricing'
++import { BILL_REVIEW_DESCRIPTION, BILL_REVIEW_HUMAN_DESCRIPTION } from '../../lib/pricingCopy'
+ import type { Faq } from '../components/modulePage'
+ 
+ /**
+@@ -32,36 +33,46 @@ import type { Faq } from '../components/modulePage'
+  *   Held because it has not been measured. A guess here becomes an expectation.
+  */
+ 
++// Bill Review (formerly Concierge) prices, worded once from lib/pricing.ts (pricing-2026-10).
++const usd = (n: number | null) => `$${(n as number).toLocaleString('en-US')}`
++// The plans with a self-serve Bill Review price, in band order (Enterprise is quoted).
++const PLANS = GHG_TIER_KEYS.filter(t => BILL_REVIEW_ONBOARDING_USD.ai[t] != null)
++const planList = (f: (t: typeof PLANS[number]) => string) =>
++  `${PLANS.slice(0, -1).map(f).join(', ')} and ${f(PLANS[PLANS.length - 1])}`
++const INCLUDED = `${PLANS.map(t => BILL_REVIEW_INCLUDED_SOURCES[t]).slice(0, -1).join(', ')} or ${BILL_REVIEW_INCLUDED_SOURCES[PLANS[PLANS.length - 1]]} data sources on the ${planList(t => GHG_TIER_LABELS[t])} plans`
++const BILLING =
++  `A one-time onboarding fee for your GHG plan: ${planList(t => `${usd(BILL_REVIEW_ONBOARDING_USD.ai[t])} ${GHG_TIER_LABELS[t]}`)} ` +
++  `(with human reading, ${planList(t => usd(BILL_REVIEW_ONBOARDING_USD.human[t]))}). Onboarding includes the first year for ${INCLUDED}. ` +
++  `Each extra data source in the first year, and every active source at renewal, is $${BILL_REVIEW_SOURCE_USD} a year. The ${GHG_TIER_LABELS.enterprise} plan is quoted.`
++
+ /** The target behaviour: what these answers say once utility connection ships. */
+ export const FAQ_CONNECTED: readonly Faq[] = [
+-  { q: "What's included in Concierge onboarding?",
+-    a: 'A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, connect the ones your utilities allow, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG tier.' },
+-  { q: 'Do I need Concierge to use the GHG module?',
+-    a: 'No. The GHG module is fully self-serve. Concierge is for teams who would rather not enter bills themselves.' },
++  { q: 'What does Bill Review include?', a: `${BILL_REVIEW_DESCRIPTION} ${BILL_REVIEW_HUMAN_DESCRIPTION}` },
++  { q: "What's included in Bill Review onboarding?",
++    a: `A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, connect the ones your utilities allow, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG plan, and it includes the first year for ${INCLUDED}.` },
++  { q: 'Do I need Bill Review to use the GHG module?',
++    a: 'No. The GHG module is fully self-serve. Bill Review is for teams who would rather not enter bills themselves.' },
+   { q: 'How does ThemisIQ get my utility data?',
+-    a: "Where your utility allows it, we connect to your account and pull usage and billing data directly from the utility, with your permission. Where a direct connection isn't available, you upload your bills and Concierge reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record." },
++    a: "Where your utility allows it, we connect to your account and pull usage and billing data directly from the utility, with your permission. Where a direct connection isn't available, you upload your bills and Bill Review reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record." },
+   { q: 'How do I know if my utility can connect directly?',
+     a: 'We check each of your utilities during onboarding and tell you which sources will connect and which will be uploaded.' },
+   { q: 'What counts as a data source?',
+     a: 'One utility account or meter that bills you on a recurring basis, such as an electricity account or a gas meter. A location with electricity and natural gas is usually two data sources.' },
+-  { q: 'How is Concierge billed?',
+-    a: `A one-time onboarding fee, then an annual fee for each data source: $${CONCIERGE_SOURCE_USD.connected} a year for a source connected directly to your utility, $${CONCIERGE_SOURCE_USD.uploaded} a year for a source you upload.` },
+-  { q: 'If my utility adds direct connection later, does my price change?',
+-    a: 'Yes. Once a source is connected, it moves to the connected rate at your next renewal.' },
++  { q: 'How is Bill Review billed?', a: BILLING },
+ ]
+ 
+ /** What renders while UTILITY_CONNECT_ENABLED is false. Uploads now, connections later. */
+ export const FAQ_UPLOAD_ONLY: readonly Faq[] = [
+-  { q: "What's included in Concierge onboarding?",
+-    a: 'A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG tier.' },
+-  { q: 'Do I need Concierge to use the GHG module?',
+-    a: 'No. The GHG module is fully self-serve. Concierge is for teams who would rather not enter bills themselves.' },
++  { q: 'What does Bill Review include?', a: `${BILL_REVIEW_DESCRIPTION} ${BILL_REVIEW_HUMAN_DESCRIPTION}` },
++  { q: "What's included in Bill Review onboarding?",
++    a: `A ThemisIQ specialist works with you to set up your inventory. We identify every data source across your locations, load your historical bills, and check your baseline with you before your first report. Onboarding is a one-time fee based on your GHG plan, and it includes the first year for ${INCLUDED}.` },
++  { q: 'Do I need Bill Review to use the GHG module?',
++    a: 'No. The GHG module is fully self-serve. Bill Review is for teams who would rather not enter bills themselves.' },
+   { q: 'How does ThemisIQ get my utility data?',
+-    a: 'You upload your bills and Concierge reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record. Direct connections to utilities are coming soon.' },
++    a: 'You upload your bills and Bill Review reads them for you. You approve every figure before it goes into your inventory, and each one stays linked to its source record. Direct connections to utilities are coming soon.' },
+   { q: 'What counts as a data source?',
+     a: 'One utility account or meter that bills you on a recurring basis, such as an electricity account or a gas meter. A location with electricity and natural gas is usually two data sources.' },
+-  { q: 'How is Concierge billed?',
+-    a: `A one-time onboarding fee, then $${CONCIERGE_SOURCE_USD.uploaded} a year for each data source you upload. Sources connected directly to your utility will be $${CONCIERGE_SOURCE_USD.connected} a year once direct connections launch.` },
++  { q: 'How is Bill Review billed?', a: BILLING },
+ ]
+ 
+ /** The set the page renders. One flag decides, in one place. */
+diff --git a/app/climate-ghg/page.tsx b/app/climate-ghg/page.tsx
+index a1d3e27..f36f5e1 100644
+--- a/app/climate-ghg/page.tsx
++++ b/app/climate-ghg/page.tsx
+@@ -3,7 +3,7 @@ import { scope3ScopeClaim, scope3MethodFamilies } from '../../lib/scope3/methodS
+ import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
+ import Nav from '../components/Nav'
+ import Footer from '@/app/components/Footer'
+-import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel } from '@/lib/pricing'
++import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '@/lib/pricing'
+ import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
+ import { MODULE_SUBLINE } from '@/lib/modulePages'
+ import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
+@@ -158,7 +158,7 @@ export default function Page() {
+               { label: 'First SB 253 report', big: sbShortDate,
+                 note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}.` },
+               { label: 'Price', big: `From $${ghgFrom}/yr`,
+-                note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; larger organisations are in the picker.` },
++                note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; see all plans for larger organizations.` },
+             ].map(({ label, big, fw, note }) => (
+               <tr key={label}>
+                 <th style={{ textAlign: 'left', fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)', padding: '16px 20px 16px 0', verticalAlign: 'top', width: 210, borderBottom: '1px solid var(--color-line)' }}>{label}</th>
+@@ -214,11 +214,13 @@ export default function Page() {
+         <p style={moduleEyebrow}>Pricing</p>
+         <h2 style={sectionTitle}>Priced by company size, not by number of sites.</h2>
+         <p style={{ ...bodyCopy, marginTop: '1rem' }}>
+-          GHG is the one tiered module, priced by how many people you employ. Every plan covers unlimited
+-          locations. Add modules and the multi-module discount applies automatically: two modules −10%,
+-          three or more −20%.
++          GHG is the one tiered module, priced by how many people you employ. {GHG_SIZE_BASIS_NOTE} Every plan
++          covers unlimited locations. Add modules and the multi-module discount applies automatically: two
++          modules −10%, three or more −20%.
+         </p>
+-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
++        {/* Four tiers in one row on wide screens (four 190px columns and gaps fit from about 840px), wrapping
++            to two and then one on narrow ones. */}
++        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: '1.25rem', marginTop: '2.5rem' }}>
+           {/* ⚠️ TIERS AND BANDS ARE READ FROM GHG_TIERS, INCLUDING THE NULLS. A null priceUSD means
+               "contact us", not zero and not missing; ghgEmployeeBandLabel words each band. */}
+           {GHG_TIER_KEYS.map(t => (
+diff --git a/app/components/HomePricing.tsx b/app/components/HomePricing.tsx
+index 26cfcb7..ddf5ac6 100644
+--- a/app/components/HomePricing.tsx
++++ b/app/components/HomePricing.tsx
+@@ -64,7 +64,8 @@ export default function HomePricing() {
+   }
+ 
+   const getCta = () => {
+-    if (tier === 'advisory') return { headline: 'Ready to meet your compliance team?', buttons: [{ label: 'Talk to a specialist →', href: '/advisory', primary: true }] }
++    // The quote tier (Enterprise) goes to a specialist; Large ('advisory') is a published price (pricing-2026-10).
++    if (quote.requiresQuote) return { headline: 'Ready to meet your compliance team?', buttons: [{ label: 'Talk to a specialist →', href: '/advisory', primary: true }] }
+     if (count >= 4) return { headline: 'Ready to build your compliance platform?', buttons: [{ label: 'Build your platform →', href: '/pricing', primary: true }, { label: 'Talk to a specialist', href: '/advisory', primary: false }] }
+     if (count === 1) {
+       const mod = [...selected][0] as ModuleId
+diff --git a/app/dashboard/ghg/trends/page.tsx b/app/dashboard/ghg/trends/page.tsx
+index c2f08da..e194f88 100644
+--- a/app/dashboard/ghg/trends/page.tsx
++++ b/app/dashboard/ghg/trends/page.tsx
+@@ -521,7 +521,7 @@ export default function TrendsPage() {
+             {!monthlyLoading && monthly && !monthly.error && monthly.buckets.length === 0 && (
+               <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: '#555' }}>
+                 No monthly (utility-bill) data for {selectedYear}. Monthly detail appears
+-                when you upload dated utility bills via the Concierge flow. Manually-entered
++                when you upload dated utility bills with Bill Review. Manually-entered
+                 annual figures show in the yearly chart above.
+               </div>
+             )}
+diff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx
+index 37d3b8e..77b5964 100644
+--- a/app/dashboard/page.tsx
++++ b/app/dashboard/page.tsx
+@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
+ import Nav from '../components/Nav'
+ import { supabase } from '../../lib/supabase'
+ import { useEntitlementAccess } from '../../lib/useEntitlement'
+-import { FLAT_MODULE_PRICES, type ModuleKey } from '../../lib/pricing'
++import { FLAT_MODULE_PRICES, GHG_TIER_LABELS, type ModuleKey } from '../../lib/pricing'
+ import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED } from '../../lib/aiAct'
+ 
+ const GRAD = 'var(--color-brand)'
+@@ -230,10 +230,12 @@ const MODULES: DashboardModule[] = [
+   },
+ ]
+ 
++// Labels from GHG_TIER_LABELS, the one source (pricing-2026-10); colours only are local.
+ const TIER_CONFIG = {
+-  starter:      { label: 'Essentials', color: '#0F6E56', bg: '#E1F5EE' },
+-  professional: { label: 'Professional', color: '#7425e3', bg: '#EDE9FE' },
+-  advisory:     { label: 'Advisory', color: '#0C447C', bg: '#E6F1FB' },
++  starter:      { label: GHG_TIER_LABELS.starter, color: '#0F6E56', bg: '#E1F5EE' },
++  professional: { label: GHG_TIER_LABELS.professional, color: '#7425e3', bg: '#EDE9FE' },
++  advisory:     { label: GHG_TIER_LABELS.advisory, color: '#0C447C', bg: '#E6F1FB' },
++  enterprise:   { label: GHG_TIER_LABELS.enterprise, color: '#555553', bg: '#f8f7f5' },
+ }
+ 
+ const PACK_CONFIG: Record<string, { label: string; modules: string[] }> = {
+diff --git a/app/locationCapRetired.test.ts b/app/locationCapRetired.test.ts
+index e671833..599fe6e 100644
+--- a/app/locationCapRetired.test.ts
++++ b/app/locationCapRetired.test.ts
+@@ -36,7 +36,7 @@ describe('the location cap is retired (FI0)', () => {
+   it('the GHG page heading and the price notes say what the price follows', () => {
+     expect(read('app/climate-ghg/page.tsx')).toContain('Priced by company size, not by number of sites.')
+     const calc = read('app/calculate-emissions/page.tsx')
+-    expect((calc.match(/The GHG module is priced by company size, with unlimited locations on every plan: from \$\{ghgFrom\} a year for \{ghgEmployeeBandLabel\('starter'\)\}/g) ?? []).length).toBe(2)
+-    expect(read('app/pricing/page.tsx')).toContain('Plans are sized by your number of employees. Every plan covers unlimited locations.')
++    expect((calc.match(/The GHG module is priced by company size, with unlimited locations on every plan: \{GHG_PRICED_BANDS\}/g) ?? []).length).toBe(2)
++    expect(read('app/pricing/page.tsx')).toContain('{GHG_SIZE_BASIS_NOTE} Every plan covers unlimited locations.')
+   })
+ })
+diff --git a/app/order/page.tsx b/app/order/page.tsx
+index 7e1b579..80c7f73 100644
+--- a/app/order/page.tsx
++++ b/app/order/page.tsx
+@@ -4,7 +4,7 @@
+ //
+ // STAGE 1b: renders the pre-configured order and the CARD path only (total ≤ $10k), reusing the
+ // EXISTING startCheckout money funnel (which bounces logged-out buyers through signup→resume→Stripe).
+-// The QUOTE path (>$10k or GHG Advisory) shows a placeholder — Stage 2 builds the real quote form.
++// The QUOTE path (>$10k or GHG Enterprise) shows a placeholder — Stage 2 builds the real quote form.
+ //
+ // ⚠️ LIVE MONEY: the card-path startCheckout call is byte-identical to the pricing page's. We NEVER
+ // call startCheckout when the cart requires a quote/invoice (it 400s by design).
+@@ -70,7 +70,7 @@ function Shell({ children }: { children: React.ReactNode }) {
+ function OrderInner() {
+   const searchParams = useSearchParams()
+   const [submitting, setSubmitting] = useState(false)
+-  // Quote-request form (>$10k / Advisory path) — email-only, no payment.
++  // Quote-request form (>$10k / Enterprise path) — email-only, no payment.
+   // `hp` is the honeypot's LOCAL state name; the wire field is HONEYPOT_FIELD, shared with the route
+   // and with /assess so one edit moves all three. See lib/assessmentSubmitGuard.ts.
+   const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' })
+@@ -109,7 +109,7 @@ function OrderInner() {
+   const quote = cartQuote({ modules: keys, ghgTier: tier as GhgTier })
+   const cardEligible = !quote.requiresQuote && !quote.requiresInvoice
+ 
+-  // Line items (list prices). GHG at the tier price; others flat. null = Advisory (quote).
++  // Line items (list prices). GHG at the tier price; others flat. null = Enterprise (quote).
+   const lineItems = keys.map(k => ({
+     key: k,
+     label: MODULE_LABELS[k] ?? k,
+@@ -193,12 +193,12 @@ function OrderInner() {
+             subtitle="ThemisIQ sells to businesses only. Confirm the details below to continue to secure payment."
+           />
+         ) : (
+-          // QUOTE path (>$10k or GHG Advisory) — placeholder this stage. NEVER routes to card checkout.
++          // QUOTE path (>$10k or GHG Enterprise) — placeholder this stage. NEVER routes to card checkout.
+           <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 14, padding: '1.75rem' }}>
+             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
+             <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 16 }}>
+               {quote.requiresQuote
+-                ? 'GHG Advisory (uncapped locations) is tailored to your footprint, so it’s priced individually.'
++                ? `GHG ${GHG_TIER_LABELS.enterprise} (${ghgEmployeeBandLabel('enterprise')}) is tailored to your organization, so it’s priced individually.`
+                 : 'Orders above $10,000 are completed by invoice rather than card.'} Our team will prepare a quote and walk you through next steps.
+             </div>
+ 
+diff --git a/app/pricing/page.tsx b/app/pricing/page.tsx
+index 7239ef8..6e7ba89 100644
+--- a/app/pricing/page.tsx
++++ b/app/pricing/page.tsx
+@@ -7,12 +7,13 @@ import Image from 'next/image'
+ import { startCheckout } from '../../lib/checkout'
+ import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
+ import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/pricingCopy'
++import { BILL_REVIEW_DESCRIPTION, BILL_REVIEW_HUMAN_DESCRIPTION } from '../../lib/pricingCopy'
+ // tierPrice and tierStrikethrough dropped with the old-model blocks — both priced the retired
+ // per-module-per-tier model and had no reader left. `Tier` STAYS — see the note on the tier state
+ // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
+ // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
+ // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
+-import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
++import { LEGACY_PRICING_PAGE_ID, volumeDiscount, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, GHG_SIZE_BASIS_NOTE, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
+ import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
+ import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
+ import { SB253_SHORT } from '../../lib/sb253'
+@@ -249,29 +250,28 @@ function PricingPageInner() {
+   // no reader left once those blocks went. Everything shown or charged now derives from cartQuote
+   // below. `count` survives because the live panel reads it for volumeDiscount().
+   const count = selected.size
+-  // Add-on logic. Concierge is priced per DATA SOURCE since 28 Sep 2026, not by location band.
+-  // Verification Readiness was retired 10 Aug 2026, see docs/ghg-verifier-grade-roadmap.md.
+-  // Concierge requires GHG, which mirrors the server dependency rule.
++  // Add-on logic. Bill Review (formerly Concierge) is priced by GHG tier: onboarding includes the first year for
++  // the tier's data sources, then $45 a source (pricing-2026-10). Verification Readiness is included in Bill
++  // Review. Bill Review requires GHG, which mirrors the server dependency rule.
+   const ghgSelected = selected.has('ghg')
+   const conciergeActive = ghgSelected && conciergeOn
+ 
+   // ⚠️ isFirstPurchase IS TRUE HERE AND THE SERVER DECIDES THE TRUTH. This page serves logged-out
+-  // visitors, and whether a customer has ever held Concierge is a read of their entitlements that
+-  // only /api/checkout can make. Assuming true shows onboarding to everyone, so the preview can be
+-  // HIGHER than the charge for a returning customer and never lower. The line is labelled "charged
+-  // on your first Concierge order" so the wording is true for both readers.
++  // visitors, and whether a customer has ever held Bill Review is a read of their entitlements that
++  // only /api/checkout can make. Assuming true shows onboarding to everyone, so the preview is what a first
++  // order costs; a returning customer is charged per source instead.
+   // The rule this bends is displayed-equals-charged; it bends in the safe direction, and this is
+   // the only place in the file where the two can differ.
+   const conciergeQ = conciergeActive
+     ? (() => {
+-        // conciergeQuote throws on a count it will not price. The input below is clamped to whole
++        // billReviewQuote throws on a count it will not price. The input below is clamped to whole
+         // numbers from 1 to the ceiling, so the throw is unreachable from the UI. The guard is here
+         // because an unhandled throw during render is a blank page, and a price panel that cannot
+         // price itself should say so rather than take the page down with it.
+         try {
+-          return { quote: conciergeQuote({ uploadedSources: conciergeSources, isFirstPurchase: true }), error: null }
++          return { quote: billReviewQuote({ tier: tier as GhgTier, reading: 'ai', sources: conciergeSources, isFirstPurchase: true }), error: null }
+         } catch (e) {
+-          return { quote: null, error: (e as Error).message.replace(/^conciergeQuote: /, '') }
++          return { quote: null, error: (e as Error).message.replace(/^billReviewQuote: /, '') }
+         }
+       })()
+     : { quote: null, error: null }
+@@ -322,7 +322,9 @@ function PricingPageInner() {
+ 
+   // Dynamic CTA logic
+   const getCta = () => {
+-    if (tier === 'advisory') return {
++    // The quote tier (Enterprise) goes to a specialist. This read `tier === 'advisory'`, from when Advisory was
++    // the quote tier; Large ('advisory') is a published price now.
++    if (quote.requiresQuote) return {
+       headline: 'Ready to meet your compliance team?',
+       sub: 'Specialists with deep sector experience. Technology that speaks your language.',
+       buttons: [{ label: 'Talk to a specialist →', href: '/advisory', primary: true }],
+@@ -645,7 +647,7 @@ function PricingPageInner() {
+                       })}
+                       {/* At the point of CHOICE: what the tier is sized by (FI0). */}
+                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
+-                        Plans are sized by your number of employees. Every plan covers unlimited locations.
++                        {GHG_SIZE_BASIS_NOTE} Every plan covers unlimited locations.
+                       </div>
+                     </div>
+                   )}
+@@ -660,47 +662,49 @@ function PricingPageInner() {
+             <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d', marginBottom: 4 }}>Enhance your GHG inventory</div>
+             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 16 }}>Optional add-ons. We do the bill-reading; you confirm the numbers.</div>
+ 
+-            {/* Concierge */}
++            {/* Bill Review (formerly Concierge). Description verbatim (pricing-2026-10). */}
+             <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid var(--color-brand)' : '1px solid #e8e7e4', marginBottom: 12 }}>
+               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                 <div style={{ flex: 1 }}>
+-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge: we read your bills</div>
+-                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced per data source.</div>
++                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Bill Review</div>
++                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>{BILL_REVIEW_DESCRIPTION}</div>
++                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 6 }}>{BILL_REVIEW_HUMAN_DESCRIPTION}</div>
+                 </div>
+                 <button onClick={() => setConciergeOn(v => !v)} style={{ ...(conciergeOn ? btnSecondary : btnPrimary), flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
+               </div>
+               {conciergeOn && (
+                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efed' }}>
+-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+-                    <label style={{ fontSize: 12, color: '#555553' }} htmlFor="concierge-sources">Data sources:</label>
+-                    <input id="concierge-sources" type="number" min={1} max={CONCIERGE_MAX_SELF_SERVE_SOURCES} value={conciergeSources}
+-                      onChange={e => setConciergeSources(Math.min(CONCIERGE_MAX_SELF_SERVE_SOURCES, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
+-                      style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
+-                    <span style={{ fontSize: 11, color: '#555553' }}>One utility account or meter, such as an electricity account or a gas meter.</span>
+-                  </div>
+-
+-                  {/* ⚠️ THE CONNECTED RATE IS PUBLISHED AND NOT SELECTABLE, AND IT IS TEXT RATHER THAN A
+-                      DISABLED CONTROL. A greyed-out input invites a customer to try it and then explains
+-                      why they cannot; a line of copy states the position once. UTILITY_CONNECT_ENABLED
+-                      is the single authority, and conciergeQuote refuses a connected quantity on the
+-                      server whatever this page renders. */}
+-                  <div style={{ marginTop: 10, fontSize: 12, color: '#0d0d0d', lineHeight: 1.8 }}>
+-                    <div>Uploaded source: {`$${CONCIERGE_SOURCE_USD.uploaded}`} each a year</div>
+-                    <div style={{ color: 'var(--color-ink-muted)' }}>
+-                      Connected source: {`$${CONCIERGE_SOURCE_USD.connected}`} each a year. Coming soon.
+-                    </div>
+-                  </div>
++                  {BILL_REVIEW_INCLUDED_SOURCES[tier as GhgTier] == null ? (
++                    <div style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.7 }}>Bill Review for the Enterprise plan is quoted with your plan. Talk to a specialist.</div>
++                  ) : (
++                    <>
++                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
++                        <label style={{ fontSize: 12, color: '#555553' }} htmlFor="concierge-sources">Data sources:</label>
++                        <input id="concierge-sources" type="number" min={1} max={BILL_REVIEW_MAX_SELF_SERVE_SOURCES} value={conciergeSources}
++                          onChange={e => setConciergeSources(Math.min(BILL_REVIEW_MAX_SELF_SERVE_SOURCES, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
++                          style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
++                        <span style={{ fontSize: 11, color: '#555553' }}>One utility account or meter, such as an electricity account or a gas meter.</span>
++                      </div>
++                      <div style={{ marginTop: 10, fontSize: 12, color: '#0d0d0d', lineHeight: 1.8 }}>
++                        <div>{`${GHG_TIER_LABELS[tier as GhgTier]} plan onboarding: $${(BILL_REVIEW_ONBOARDING_USD.ai[tier as GhgTier] as number).toLocaleString()}, including the first year for ${BILL_REVIEW_INCLUDED_SOURCES[tier as GhgTier]} data sources.`}</div>
++                        <div>{`Each extra data source, and every active source at renewal: $${BILL_REVIEW_SOURCE_USD} a year.`}</div>
++                        <div style={{ color: 'var(--color-ink-muted)' }}>{`Human reading onboarding: $${(BILL_REVIEW_ONBOARDING_USD.human[tier as GhgTier] as number).toLocaleString()}. To arrange human reading, talk to a specialist.`}</div>
++                      </div>
++                    </>
++                  )}
+ 
+-                  {conciergeQ.quote && (
++                  {conciergeQ.quote && !conciergeQ.quote.requiresQuote && (
+                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f0efed', fontSize: 12, color: '#0d0d0d', lineHeight: 1.9 }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+-                        <span>{conciergeSources} data source{conciergeSources === 1 ? '' : 's'} a year</span>
+-                        <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.sourcesUSD.toLocaleString()}`}</span>
+-                      </div>
+-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+-                        <span>One-time onboarding, charged on your first Concierge order</span>
++                        <span>One-time onboarding, charged on your first Bill Review order</span>
+                         <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.onboardingUSD.toLocaleString()}`}</span>
+                       </div>
++                      {conciergeQ.quote.extraSources > 0 && (
++                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
++                          <span>{conciergeQ.quote.extraSources} extra data source{conciergeQ.quote.extraSources === 1 ? '' : 's'}, first year</span>
++                          <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.sourcesUSD.toLocaleString()}`}</span>
++                        </div>
++                      )}
+                     </div>
+                   )}
+                   {conciergeQ.error && (
+diff --git a/app/privacy/page.tsx b/app/privacy/page.tsx
+index 47fae08..ff055dc 100644
+--- a/app/privacy/page.tsx
++++ b/app/privacy/page.tsx
+@@ -128,7 +128,7 @@ export default function PrivacyPage() {
+                   ['Vercel', 'Application traffic', 'Hosting and CDN', 'Global'],
+                   ['Stripe', 'Billing data', 'Payment processing', 'USA'],
+                   ['Resend', 'Name, email', 'Transactional email', 'USA'],
+-                  ['Anthropic', 'Structured prompts; uploaded source documents (Concierge)', 'Reading figures off Concierge documents, answering GHG guide questions', 'USA'],
++                  ['Anthropic', 'Structured prompts; uploaded source documents (Bill Review)', 'Reading figures off Bill Review documents, answering GHG guide questions', 'USA'],
+                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
+               </tbody>
+             </table>
+diff --git a/app/security/page.tsx b/app/security/page.tsx
+index 76dd115..0583fad 100644
+--- a/app/security/page.tsx
++++ b/app/security/page.tsx
+@@ -88,7 +88,7 @@ export default function Page() {
+               // via: null, for the reason the badge comment below gives — this card names no
+               // third-party certification, so there is nothing to attribute. It names a data
+               // flow, which is what a reader looking for subprocessors came here to find.
+-              { title: 'AI processing: Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Concierge add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI: framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
++              { title: 'AI processing: Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Bill Review add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI: framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
+               { title: 'Backups: manual snapshots today', via: null, status: 'In progress', body: 'Supabase Free provides no point-in-time recovery. Backups today are manual pg_dump snapshots, held in two locations and verified by SHA-256 checksum. Continuous PITR arrives with the Supabase Pro upgrade, targeted before commercial launch on 1 November 2026. Retention window, cross-region replication and RTO/RPO figures will be stated here once Pro is live and a restore has been tested.' },
+             ].map(({ title, via, status, body }) => (
+               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', position: 'relative' as const, overflow: 'hidden' }}>
+@@ -136,7 +136,7 @@ export default function Page() {
+               ['Encryption in transit', 'All data transmitted to and from ThemisIQ is encrypted using TLS 1.2 or higher. TLS 1.0 and 1.1 are disabled.'],
+               ['Encryption at rest', 'All data at rest is encrypted using AES-256 at the storage layer via AWS-managed encryption keys.'],
+               ['Account isolation', 'Your data is isolated at the database level. Row-Level Security is enabled on every table and scoped to the authenticated user, so one account cannot read another account\u2019s rows. A small number of server-side operations run with elevated database privileges; these are limited to named API routes and are not reachable from the browser.'],
+-              ['Audit trail: GHG, CBAM and concierge', 'Every change to your GHG inventory, CBAM disclosure and concierge bill-extraction data is written to an audit log by a database trigger, not by the application, so the entry is recorded even if the application is bypassed. Seven tables carry the trigger: the GHG inventory and entry tables, two CBAM disclosure tables, and the three concierge job, document and proposal tables. The log is append-only: no update or delete permission on it is granted to any signed-in account. Other modules are not yet covered.'],
++              ['Audit trail: GHG, CBAM and Bill Review', 'Every change to your GHG inventory, CBAM disclosure and Bill Review bill-extraction data is written to an audit log by a database trigger, not by the application, so the entry is recorded even if the application is bypassed. Seven tables carry the trigger: the GHG inventory and entry tables, two CBAM disclosure tables, and the three Bill Review job, document and proposal tables. The log is append-only: no update or delete permission on it is granted to any signed-in account. Other modules are not yet covered.'],
+             ].map(([title, body], i) => (
+               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
+                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
+@@ -149,7 +149,7 @@ export default function Page() {
+             <div style={eyebrow}>Access control</div>
+             <h2 style={sectionTitle}>Who can access your data.</h2>
+             {[
+-              ['Account-level access', 'Your data belongs to the account that created it, and access is per account: signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organisation.'],
++              ['Account-level access', 'Your data belongs to the account that created it, and access is per account: signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organization.'],
+               ['Who operates ThemisIQ', `ThemisIQ is operated by its founder, with one named deputy for continuity. Production access is held by those two accounts and no others. ${ACCESS_NO_STANDING}`],
+               ['Multi-factor authentication', 'Every account with production access (Supabase, Vercel and GitHub) has multi-factor authentication enrolled via authenticator app. We recommend enabling MFA on your own ThemisIQ account as well.'],
+             ].map(([title, body], i) => (
+diff --git a/app/trust/page.tsx b/app/trust/page.tsx
+index 5cdbdfc..5a7db14 100644
+--- a/app/trust/page.tsx
++++ b/app/trust/page.tsx
+@@ -23,7 +23,7 @@ const PRINCIPLES = [
+     title: 'Where we use AI',
+     color: '#7425e3',
+     bg: '#EDE9FE',
+-    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Concierge add-on, and answering questions in the GHG guide, which sends your question and which step of the wizard you are on. Nothing else in the platform uses it. Framework classification and risk scoring are rules-based, and the rules are published on our methodology page.',
++    content: 'ThemisIQ uses AI in exactly two places, both through our AI provider Anthropic: reading the figures off documents you upload to the Bill Review add-on, and answering questions in the GHG guide, which sends your question and which step of the wizard you are on. Nothing else in the platform uses it. Framework classification and risk scoring are rules-based, and the rules are published on our methodology page.',
+   },
+   {
+     title: 'Your data is never used to train AI models',
+@@ -189,7 +189,7 @@ export default function TrustPage() {
+               { label: 'Payment processing', val: 'Stripe: Stripe holds PCI DSS Level 1 certification' },
+               { label: 'Email', val: 'Resend: Resend holds SOC 2 Type II certification' },
+               { label: 'Frontend', val: 'Vercel: Vercel holds SOC 2 Type II certification' },
+-              { label: 'AI provider', val: 'Anthropic: Concierge document reading and the GHG guide only' },
++              { label: 'AI provider', val: 'Anthropic: Bill Review document reading and the GHG guide only' },
+             ].map(({ label, val }) => (
+               <div key={label} style={{ display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>{label}</div>
+diff --git a/lib/aiDisclosure.test.ts b/lib/aiDisclosure.test.ts
+index b4ce664..ece8467 100644
+--- a/lib/aiDisclosure.test.ts
++++ b/lib/aiDisclosure.test.ts
+@@ -78,8 +78,8 @@ const FACTS: Fact[] = [
+   },
+   {
+     id: 2,
+-    name: 'Concierge document reading is named as a use',
+-    accepts: [/Concierge[^']*?(read|figures|bills|documents|tabulat)/i, /(read|figures|bills|documents)[^']*?Concierge/i],
++    name: 'Bill Review document reading is named as a use',
++    accepts: [/Bill Review[^']*?(read|figures|bills|documents|tabulat)/i, /(read|figures|bills|documents)[^']*?Bill Review/i],
+     why: 'this is the use that sends a customer document off our infrastructure, so it is the one that matters most',
+   },
+   {
+diff --git a/lib/checkout.ts b/lib/checkout.ts
+index 303dd7b..f6c6876 100644
+--- a/lib/checkout.ts
++++ b/lib/checkout.ts
+@@ -10,19 +10,16 @@
+ // ─────────────────────────────────────────────────────────────────────────────
+ 
+ import { supabase } from './supabase'
+-import type { Tier, ModuleKey, AddOnKey } from './pricing'
++import type { Tier, ModuleKey } from './pricing'
+ 
+ // What the caller passes. Use any combination:
+ //   { tier: 'starter', moduleKeys: ['ghg', 'climate-risk'] }
+ //   { tier: 'starter', moduleKeys: ['ghg'], concierge: { uploadedSources: 4 } }
+-//   { tier: 'starter', moduleKeys: ['ghg'], addOns: ['concierge-basic'] }   // old model, until Batch 4
+ export interface CheckoutSelection {
+   tier?: Tier
+   moduleKeys?: ModuleKey[]
+-  addOns?: AddOnKey[]
+   /**
+-   * Concierge on the source-based model. Mutually exclusive with an old concierge-* key in
+-   * `addOns`: the server rejects both together rather than charging twice.
++   * Bill Review (internal name: concierge): the number of data sources. The server prices it.
+    * The client sends COUNTS ONLY. It does not send a tier, a price, or isFirstPurchase: all three
+    * are derived server side, because all three decide an amount. connectedSources is refused while
+    * UTILITY_CONNECT_ENABLED is false, whatever is sent.
+@@ -70,7 +67,7 @@ export async function startCheckout(selection: CheckoutSelection): Promise<void>
+     return
+   }
+ 
+-  // 3) Handle errors from the route (e.g. "Verification requires ghg").
++  // 3) Handle errors from the route (e.g. "Bill Review requires an active GHG plan...").
+   if (!res.ok) {
+     const { error } = await res
+       .json()
+diff --git a/lib/deals/ghgPriceBasis.test.ts b/lib/deals/ghgPriceBasis.test.ts
+index f4bf30a..a5c5436 100644
+--- a/lib/deals/ghgPriceBasis.test.ts
++++ b/lib/deals/ghgPriceBasis.test.ts
+@@ -16,36 +16,36 @@ const ghg = (employees: number | null, sites: number) =>
+ 
+ describe('GHG band from headcount', () => {
+   it.each([
+-    [15, 'starter', 'Essentials'],
+-    [20, 'professional', 'Professional'],
+-    [150, 'business', 'Business'],
++    [15, 'starter', 'Small'],
++    [50, 'professional', 'Medium'],
++    [300, 'advisory', 'Large'],
+   ] as const)('%i employees prices the %s band', (employees, tier, label) => {
+     const o = ghg(employees, 2)
+     expect(o.pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS[tier].priceUSD })
+     expect(o.scopeNote).toBe(`Priced on ${employees} employees (${label} band).`)
+   })
+ 
+-  it('600 employees is Enterprise, which is a quote, not a figure', () => {
+-    const o = getObligations(2, REQ, 'Technology', 600)
++  it('1,200 employees is Enterprise, which is a quote, not a figure', () => {
++    const o = getObligations(2, REQ, 'Technology', 1200)
+     expect(o.included[0].pricing).toEqual({ kind: 'quote' })
+     expect(o.themisIqTotal).toBeNull()
+     expect(o.themisIqHasCustom).toBe(true)
+-    expect(o.included[0].scopeNote).toBe('Priced on 600 employees (Enterprise band).')
++    expect(o.included[0].scopeNote).toBe('Priced on 1,200 employees (Enterprise band).')
+   })
+ 
+-  it('headcount wins over sites: 150 employees on 2 sites is Business, not the 2-site Essentials', () => {
+-    expect(ghg(150, 2).pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS.business.priceUSD })
++  it('headcount wins over sites: 150 employees on 2 sites is Medium, not the 2-site Small', () => {
++    expect(ghg(150, 2).pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS.professional.priceUSD })
+   })
+ 
+   it('a headcount with no location count is still priced, and does not prompt for one', () => {
+-    const o = getObligations(0, REQ, 'Technology', 20)
++    const o = getObligations(0, REQ, 'Technology', 50)
+     expect(o.locationUnset).toBe(false)
+     expect(o.themisIqTotal).toBe(GHG_TIERS.professional.priceUSD)
+   })
+ })
+ 
+ describe('GHG band falls back to sites when headcount is blank', () => {
+-  it('blank headcount on 2 sites prices Essentials and says why', () => {
++  it('blank headcount on 2 sites prices Small and says why', () => {
+     const o = ghg(null, 2)
+     expect(o.pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS.starter.priceUSD })
+     expect(o.scopeNote).toBe('Priced on 2 sites; headcount not provided.')
+@@ -74,8 +74,8 @@ describe('GHG band falls back to sites when headcount is blank', () => {
+ describe('the /order tier agrees with the priced band', () => {
+   it.each([
+     [15, 2, 'starter'],
+-    [150, 2, 'business'],
+-    [600, 2, 'enterprise'],     // quote on the report, quote plan on /order
++    [150, 2, 'professional'],
++    [1200, 2, 'enterprise'],    // quote on the report, quote plan on /order
+     [null, 2, 'starter'],
+     [null, 10, 'professional'],
+     [null, 20, 'enterprise'],   // was 'advisory' at $4,550 on the share page while the card said quote
+@@ -92,11 +92,11 @@ describe('the report says which basis priced it', () => {
+     const m = buildDealReportModel(NEAR_THRESHOLD_DEAL, FIXTURE_GENERATED_AT)
+     expect(m.cost.included.rows.some(r => r.label === 'GHG inventory & Scope 3')).toBe(false)
+     const row = m.cost.recommended.rows.find(r => r.label === 'GHG inventory & Scope 3')!
+-    expect(row.scopeNote).toBe(`${GHG_RECOMMENDED_REASON} Priced on 240 employees (Business band).`)
+-    expect(row.themisIq).toContain(GHG_TIERS.business.priceUSD!.toLocaleString())
++    expect(row.scopeNote).toBe(`${GHG_RECOMMENDED_REASON} Priced on 240 employees (Medium band).`)
++    expect(row.themisIq).toContain(GHG_TIERS.professional.priceUSD!.toLocaleString())
+   })
+ 
+   it('the note is the same sentence ghgPriceBasisNote gives, not a second wording', () => {
+-    expect(ghgPriceBasisNote(ghgPriceBasis(240, 8))).toBe('Priced on 240 employees (Business band).')
++    expect(ghgPriceBasisNote(ghgPriceBasis(240, 8))).toBe('Priced on 240 employees (Medium band).')
+   })
+ })
+diff --git a/lib/deals/marketConditions.test.ts b/lib/deals/marketConditions.test.ts
+index a614b0f..ab9a1f6 100644
+--- a/lib/deals/marketConditions.test.ts
++++ b/lib/deals/marketConditions.test.ts
+@@ -98,7 +98,7 @@ describe('cost section wording', () => {
+   it('a GHG row with neither headcount nor locations shows the floor, its note unchanged', () => {
+     const m = buildDealReportModel(NOT_ASSESSED_DEAL, FIXTURE_GENERATED_AT)
+     const ghg = m.cost.recommended.rows.find(r => r.label === 'GHG inventory & Scope 3')!
+-    expect(ghg.themisIq).toBe('From USD 475')
++    expect(ghg.themisIq).toBe('From USD 550')
+     expect(ghg.scopeNote).toContain('Not priced: neither headcount nor location count was provided.')
+   })
+ })
+diff --git a/lib/emDashCopy.test.ts b/lib/emDashCopy.test.ts
+index 48622c9..ec9aa20 100644
+--- a/lib/emDashCopy.test.ts
++++ b/lib/emDashCopy.test.ts
+@@ -327,7 +327,7 @@ const SWEEP_BUDGET: Record<string, number> = {
+   //   · TWO ARE MODEL PROMPTS, and CLAUDE.md treats one as a safety property: the concierge's prompt is
+   //     what makes the extractor abstain rather than guess a consumption figure. A prompt is input to a
+   //     model, not copy read by a person, and editing its punctuation is editing a model's instructions.
+-  'app/api/concierge/extract/route.ts': 11,
++  'app/api/concierge/extract/route.ts': 10,
+   'app/api/ghg-bot/route.ts': 18,
+   //   · THREE ARE console.warn SERVER LOGS in the materiality routes: a reporting-period conflict and a
+   //     partial topic-label resolve. They reach a log, never a screen.
+diff --git a/lib/entitlementMetadata.test.ts b/lib/entitlementMetadata.test.ts
+index 1eb8018..851efc9 100644
+--- a/lib/entitlementMetadata.test.ts
++++ b/lib/entitlementMetadata.test.ts
+@@ -121,13 +121,11 @@ describe('Concierge purchase metadata', () => {
+     }
+   })
+ 
+-  it('M11 both writers build every Concierge key', () => {
+-    for (const rel of [CHECKOUT, INVOICE]) {
+-      const src = read(rel)
+-      for (const key of CONCIERGE_META_KEYS) {
+-        expect(src, `${rel} is missing ${key}`).toContain(key)
+-      }
+-    }
++  // Oct 2026: both writers spread the metadata lib/billReviewOrder.ts builds, so the keys live there once.
++  it('M11 both writers build every Bill Review (Concierge) key, through the shared order', () => {
++    const order = read('lib/billReviewOrder.ts')
++    for (const key of CONCIERGE_META_KEYS) expect(order, `lib/billReviewOrder.ts is missing ${key}`).toContain(key)
++    for (const rel of [CHECKOUT, INVOICE]) expect(read(rel), rel).toContain('conciergeMeta = order.meta')
+   })
+ 
+   it('M12 both writers carry ghg_tier, with the empty-string convention', () => {
+@@ -176,32 +174,32 @@ describe('isFirstConciergePurchase', () => {
+ // records the band that was actually sold.
+ 
+ describe('Concierge route guards', () => {
+-  it('M18 both routes price through conciergeQuote and the pricing constants, never a literal', () => {
++  it('M18 both routes price Bill Review through billReviewOrder and billReviewQuote, never a literal', () => {
++    expect(read('lib/billReviewOrder.ts')).toContain('billReviewQuote(')
+     for (const rel of [CHECKOUT, INVOICE]) {
+       const src = read(rel)
+-      expect(src, `${rel} must call conciergeQuote`).toContain('conciergeQuote(')
+-      expect(src, `${rel} must not compute a source price itself`).not.toMatch(/CONCIERGE_SOURCE_USD\s*\./)
++      expect(src, `${rel} must call billReviewOrder`).toContain('billReviewOrder(body.concierge')
++      expect(src, `${rel} must not compute a source price itself`).not.toMatch(/BILL_REVIEW_SOURCE_USD|BILL_REVIEW_ONBOARDING_USD/)
+     }
+   })
+ 
+-  it('M19 both routes refuse a connected quantity at the server boundary', () => {
+-    for (const rel of [CHECKOUT, INVOICE]) {
+-      const src = read(rel)
+-      expect(src, `${rel} must check the flag itself`).toContain('UTILITY_CONNECT_ENABLED')
+-      expect(src, `${rel} must reject connected sources`).toMatch(/not available yet/i)
+-    }
++  it('M19 a connected quantity is refused at the server boundary, in the order both routes call', () => {
++    const order = read('lib/billReviewOrder.ts')
++    expect(order).toContain('UTILITY_CONNECT_ENABLED')
++    expect(order).toMatch(/not available yet/i)
++    for (const rel of [CHECKOUT, INVOICE]) expect(read(rel), rel).toContain('billReviewOrder(body.concierge')
+   })
+ 
+-  // ⚠️ INVERTED ON 28 Sep 2026, AND THE INVERSION IS THE POINT. This asserted that both routes
+-  // validate body.tier inside the Concierge branch, because the onboarding fee was priced by GHG
+-  // tier. The fee is flat now, so the branch must not consult a tier AT ALL: reading one would
+-  // reintroduce the dependency that forced a stored-allowance derivation and refused every customer
+-  // adding Concierge on its own.
+-  it('M20 neither route reads a GHG tier inside the Concierge branch', () => {
++  // ⚠️ TIERED AGAIN SINCE OCT 2026 (pricing-2026-10), AND THE SOURCE OF THE TIER IS THE POINT. Bill Review
++  // onboarding is priced by GHG tier. The tier comes from this cart's validated GHG tier, or else from the
++  // ghg_tier recorded on the customer's ACTIVE GHG entitlement, which the webhook writes. It never comes from
++  // a stored location allowance (that derivation is gone) and never from an unvalidated client value.
++  it('M20 both routes take the onboarding tier from the cart or the held GHG plan', () => {
+     for (const rel of [CHECKOUT, INVOICE]) {
+       const src = read(rel)
+-      const branch = src.slice(src.indexOf('body.concierge'))
+-      expect(branch, `${rel}: the flat onboarding fee must not depend on a tier`).not.toMatch(/body\.tier/)
++      const branch = src.slice(src.indexOf('if (body.concierge)'))
++      expect(branch, rel).toContain("select('module_key, ghg_tier, term_end')")
++      expect(branch, rel).toMatch(/const cartTier = [^\n]*\? ghgTierForMeta : null/)
+       expect(branch, `${rel}: the tier derivation was deleted with the banded fee`).not.toMatch(/ghgTierFromAllowance/)
+     }
+   })
+diff --git a/lib/order/provision.ts b/lib/order/provision.ts
+index 9c33fdb..5201066 100644
+--- a/lib/order/provision.ts
++++ b/lib/order/provision.ts
+@@ -82,7 +82,7 @@ export interface PricedOrder {
+   keys: ModuleKey[]         // canonical module keys (pricing-page ids resolved)
+   totalUSD: number          // recomputed via cartQuote; 0 when requiresQuote
+   entitlements: string      // comma-joined keys — the exact grantFromMetadata format
+-  requiresQuote: boolean    // GHG Advisory in cart → custom quote (no self-serve total)
++  requiresQuote: boolean    // GHG Enterprise in cart → custom quote (no self-serve total)
+   requiresInvoice: boolean  // total over the card threshold ($10k) → invoice/wire
+ }
+ 
+diff --git a/lib/pricing.test.ts b/lib/pricing.test.ts
+index 0fd7e3a..ac049d0 100644
+--- a/lib/pricing.test.ts
++++ b/lib/pricing.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from 'vitest'
+-import { cartQuote, ADDONS, addOnRequirementsMet, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, conciergeQuote, priceLineQty, CONCIERGE_SOURCE_USD, CONCIERGE_ONBOARDING_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, type ModuleKey, type GhgTier } from './pricing'
++import { cartQuote, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, priceLineQty, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, GHG_TIER_LABELS, GHG_SIZE_BASIS_NOTE, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, BILL_REVIEW_HUMAN_READING_SELLABLE, type ModuleKey, type GhgTier } from './pricing'
+ 
+ // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
+ // the single source of truth shared by the configurator (display) and the server
+@@ -113,139 +113,92 @@ describe('LEGACY_PRICING_PAGE_ID — cart reachability', () => {
+ // POST /api/checkout { addOns:['concierge-enterprise'] } with GHG owned would mint a real
+ // entitlement for free. addOnRequirementsMet (the single authority BOTH routes defer to) and
+ // priceLine (fail-loud backstop) close that hole. These pin it shut.
+-describe('add-on purchasability — quote-only guard', () => {
+-  it('N1 concierge-enterprise is rejected even when GHG is owned (quote-only, not just a prereq gap)', () => {
+-    const r = addOnRequirementsMet('concierge-enterprise', ['ghg'])
+-    expect(r.ok).toBe(false)
+-    expect(r.reason).toMatch(/quote-only/i)
+-    // The point: owning GHG is NOT enough — the enterprise tier is unsellable via checkout.
+-    expect(ADDONS['concierge-enterprise'].isCustomQuote).toBe(true)
+-  })
+-
+-  it('N2 concierge-basic with GHG owned → ok (the guard must not over-block sellable tiers)', () => {
+-    expect(addOnRequirementsMet('concierge-basic', ['ghg']).ok).toBe(true)
+-    expect(ADDONS['concierge-basic'].isCustomQuote).toBeUndefined()
+-  })
+-
+-  it('N3 concierge-basic without GHG → rejected (existing ghg→concierge dependency still holds)', () => {
+-    const r = addOnRequirementsMet('concierge-basic', [])
+-    expect(r.ok).toBe(false)
+-    expect(r.reason).toMatch(/ghg/i)
+-  })
+-
++describe('priceLine backstop', () => {
+   it('N4 priceLine refuses a $0 line item (fail-loud backstop; a zero price is not a price)', () => {
+-    expect(() => priceLine('Concierge — Enterprise (16+ locations)', 0)).toThrow(/zero price is not a price/i)
+-    expect(() => priceLine('anything', -5)).toThrow() // negative also rejected
+-    // sanity: a real price builds a normal line item (cents)
+-    expect(priceLine('Concierge — Basic', 799).price_data?.unit_amount).toBe(79900)
++    expect(() => priceLine('Anything', 0)).toThrow(/zero price is not a price/)
+   })
+ })
+ 
+-// ── Concierge, source-based model ──────────────────────────────────────
+-describe('conciergeQuote', () => {
+-  it('C1 first purchase charges onboarding for the GHG tier, plus every uploaded source', () => {
+-    const q = conciergeQuote({ uploadedSources: 4, isFirstPurchase: true })
+-    expect(q.onboardingUSD).toBe(CONCIERGE_ONBOARDING_USD)
+-    expect(CONCIERGE_ONBOARDING_USD).toBe(1395)
+-    expect(q.sourcesUSD).toBe(360)          // 4 x 90
+-    expect(q.totalUSD).toBe(1395 + 360)
+-    expect(q.lines.map(l => l.quantity)).toEqual([1, 4])
+-  })
++// ── Bill Review (formerly Concierge), Oct 2026 ───────────────────────────────
++describe('billReviewQuote', () => {
++  const PRICED = ['starter', 'professional', 'advisory'] as const
+ 
+-  it('C2 renewal charges sources only: onboarding is once per customer, never on renewal', () => {
+-    const q = conciergeQuote({ uploadedSources: 4, isFirstPurchase: false })
+-    expect(q.onboardingUSD).toBe(0)
+-    expect(q.totalUSD).toBe(360)
+-    expect(q.lines).toHaveLength(1)
++  it('P1 the published prices: onboarding per plan and reading, included sources, $45 a source', () => {
++    expect(BILL_REVIEW_ONBOARDING_USD.ai).toEqual({ starter: 900, professional: 1800, advisory: 3500, enterprise: null })
++    expect(BILL_REVIEW_ONBOARDING_USD.human).toEqual({ starter: 1200, professional: 2200, advisory: 4200, enterprise: null })
++    expect(BILL_REVIEW_INCLUDED_SOURCES).toEqual({ starter: 10, professional: 30, advisory: 80, enterprise: null })
++    expect(BILL_REVIEW_SOURCE_USD).toBe(45)
+   })
+ 
+-  // ⚠️ FLAT, AND THIS ASSERTED THE OPPOSITE UNTIL 28 Sep 2026. The fee was 1250 / 1750 / 2500 by
+-  // GHG tier, which is what forced both purchase routes to work out a customer's band before they
+-  // could price Concierge. conciergeQuote does not take a tier any more, so there is no tier for
+-  // this to vary by: the assertion is that the fee is the same number, once, for everyone.
+-  it('C3 onboarding does not vary by plan, and a tier change cannot re-trigger it', () => {
+-    const first = conciergeQuote({ uploadedSources: 1, isFirstPurchase: true })
+-    expect(first.onboardingUSD).toBe(CONCIERGE_ONBOARDING_USD)
+-    // Moving up a plan is a renewal for Concierge purposes: isFirstPurchase is false, so nothing.
+-    expect(conciergeQuote({ uploadedSources: 1, isFirstPurchase: false }).onboardingUSD).toBe(0)
+-  })
+-
+-  // ⚠️ THE FLAG IS A SALES GATE, NOT A DISPLAY TWEAK. Pricing a connected source while the
+-  // connection does not exist would sell a service we cannot deliver.
+-  it('C4 connected sources are refused while UTILITY_CONNECT_ENABLED is false', () => {
+-    expect(UTILITY_CONNECT_ENABLED).toBe(false)
+-    expect(sourceKindSellable('uploaded')).toBe(true)
+-    expect(sourceKindSellable('connected')).toBe(false)
+-    expect(() => conciergeQuote({ uploadedSources: 2, connectedSources: 1, isFirstPurchase: true }))
+-      .toThrow(/connected sources cannot be sold yet/i)
++  it('P2 a first purchase within the included sources is onboarding alone', () => {
++    for (const tier of PRICED) {
++      const q = billReviewQuote({ tier, reading: 'ai', sources: BILL_REVIEW_INCLUDED_SOURCES[tier] as number, isFirstPurchase: true })
++      expect(q.totalUSD, tier).toBe(BILL_REVIEW_ONBOARDING_USD.ai[tier])
++      expect(q.lines).toHaveLength(1)
++      expect(q.lines[0].label).toBe(`Bill Review onboarding, ${GHG_TIER_LABELS[tier]} plan (includes the first year for ${BILL_REVIEW_INCLUDED_SOURCES[tier]} data sources)`)
++    }
+   })
+ 
+-  it('C5 the connected rate is still published, so the page can show it as coming soon', () => {
+-    expect(CONCIERGE_SOURCE_USD.connected).toBe(60)
+-    expect(CONCIERGE_SOURCE_USD.uploaded).toBe(90)
++  it('P3 each source above the included count is $45 in the first year', () => {
++    const q = billReviewQuote({ tier: 'starter', reading: 'ai', sources: 14, isFirstPurchase: true })
++    expect(q.extraSources).toBe(4)
++    expect(q.totalUSD).toBe(900 + 4 * 45)
++    expect(q.lines[1]).toEqual({ label: 'Bill Review data source, first year', unitUSD: 45, quantity: 4 })
++    expect(q.sourceAllowance).toBe(14)
+   })
+ 
+-  it('C6 zero or negative sources is refused: Concierge with nothing to read is not a purchase', () => {
+-    expect(() => conciergeQuote({ uploadedSources: 0, isFirstPurchase: true }))
+-      .toThrow(/at least one data source/i)
+-    expect(() => conciergeQuote({ uploadedSources: -1, isFirstPurchase: true }))
+-      .toThrow(/cannot be negative/i)
++  it('P4 fewer sources than included still pays onboarding, and the allowance is the included count', () => {
++    const q = billReviewQuote({ tier: 'professional', reading: 'ai', sources: 3, isFirstPurchase: true })
++    expect(q.totalUSD).toBe(1800)
++    expect(q.sourceAllowance).toBe(30)
+   })
+ 
+-  // ⚠️ THESE THREE ARE WHY THE GUARDS THROW RATHER THAN COERCE. Under the Math.trunc draft, NaN
+-  // passed both range checks and produced a NaN quote, and 2.5 became 2 here while priceLineQty
+-  // rejected 2.5 downstream: two functions disagreeing about the same number.
+-  it('C7 NaN and Infinity are refused, not treated as a count', () => {
+-    expect(() => conciergeQuote({ uploadedSources: NaN, isFirstPurchase: true }))
+-      .toThrow(/whole number/i)
+-    expect(() => conciergeQuote({ uploadedSources: Infinity, isFirstPurchase: true }))
+-      .toThrow(/whole number/i)
+-    expect(() => conciergeQuote({ uploadedSources: 2, connectedSources: NaN, isFirstPurchase: true }))
+-      .toThrow(/whole number/i)
++  it('P5 human reading uses the human onboarding column and the same $45 a source', () => {
++    const q = billReviewQuote({ tier: 'advisory', reading: 'human', sources: 82, isFirstPurchase: true })
++    expect(q.onboardingUSD).toBe(4200)
++    expect(q.sourcesUSD).toBe(2 * 45)
++    expect(q.lines[0].label).toContain('human reading')
+   })
+ 
+-  it('C8 a fractional count is refused rather than truncated', () => {
+-    expect(() => conciergeQuote({ uploadedSources: 2.5, isFirstPurchase: true }))
+-      .toThrow(/whole number/i)
++  it('P6 a later purchase or renewal is $45 for every source, with no onboarding and no tier needed', () => {
++    const q = billReviewQuote({ tier: null, reading: 'ai', sources: 12, isFirstPurchase: false })
++    expect(q.totalUSD).toBe(12 * 45)
++    expect(q.onboardingUSD).toBe(0)
++    expect(q.lines).toEqual([{ label: 'Bill Review data source (1 year)', unitUSD: 45, quantity: 12 }])
+   })
+ 
+-  it('C9 an absent connectedSources is zero, not a validation failure', () => {
+-    const omitted = conciergeQuote({ uploadedSources: 3, isFirstPurchase: false })
+-    const explicit = conciergeQuote({ uploadedSources: 3, connectedSources: 0, isFirstPurchase: false })
+-    const undef = conciergeQuote({ uploadedSources: 3, connectedSources: undefined, isFirstPurchase: false })
+-    expect(omitted.totalUSD).toBe(270)
+-    expect(explicit).toEqual(omitted)
+-    expect(undef).toEqual(omitted)
++  it('P7 Enterprise is a quote, not a figure', () => {
++    expect(billReviewQuote({ tier: 'enterprise', reading: 'ai', sources: 5, isFirstPurchase: true }).requiresQuote).toBe(true)
+   })
+ 
+-  it('C10 the self-serve ceiling holds at 60 and refuses 61', () => {
+-    expect(CONCIERGE_MAX_SELF_SERVE_SOURCES).toBe(60)
+-    const at = conciergeQuote({ uploadedSources: 60, isFirstPurchase: false })
+-    expect(at.totalUSD).toBe(5400)          // 60 x 90
+-    expect(() => conciergeQuote({ uploadedSources: 61, isFirstPurchase: false }))
+-      .toThrow(/contact us for a quote/i)
++  it('P8 a first purchase needs the plan, and bad counts throw rather than coerce', () => {
++    expect(() => billReviewQuote({ tier: null, reading: 'ai', sources: 5, isFirstPurchase: true })).toThrow(/GHG plan is needed/)
++    for (const bad of [0, -1, 2.5, NaN, Infinity]) {
++      expect(() => billReviewQuote({ tier: 'starter', reading: 'ai', sources: bad, isFirstPurchase: true }), String(bad)).toThrow()
++    }
++    expect(() => billReviewQuote({ tier: 'starter', reading: 'ai', sources: BILL_REVIEW_MAX_SELF_SERVE_SOURCES + 1, isFirstPurchase: true })).toThrow(/contact us/)
+   })
+ 
+-  // The ceiling counts the ORDER, not one kind. Uploaded plus connected is what a specialist would
+-  // have to set up, so it is the total that decides whether this is still self-serve.
+-  it('C11 the ceiling counts uploaded and connected together', () => {
+-    expect(() => conciergeQuote({ uploadedSources: 60, connectedSources: 1, isFirstPurchase: false }))
+-      .toThrow(/contact us for a quote/i)
++  it('P9 connected sources and human reading cannot be sold yet', () => {
++    expect(UTILITY_CONNECT_ENABLED).toBe(false)
++    expect(sourceKindSellable('connected')).toBe(false)
++    expect(sourceKindSellable('uploaded')).toBe(true)
++    expect(BILL_REVIEW_HUMAN_READING_SELLABLE).toBe(false)
+   })
+ })
+ 
+ describe('priceLineQty', () => {
+   it('C12 multiplies by quantity at the UNIT price, and keeps priceLine zero-price backstop', () => {
+-    const l = priceLineQty('GHG Concierge data source, uploaded (1 year)', 90, 7)
+-    expect(l.price_data?.unit_amount).toBe(9000)   // the UNIT, not the total
++    const l = priceLineQty('Bill Review data source (1 year)', 45, 7)
++    expect(l.price_data?.unit_amount).toBe(4500)   // the UNIT, not the total
+     expect(l.quantity).toBe(7)
+     expect(() => priceLineQty('x', 0, 3)).toThrow(/zero price is not a price/i)
+   })
+ 
+   it('C13 quantity 0 throws: the absence of a line is not a line with no quantity', () => {
+-    expect(() => priceLineQty('x', 90, 0)).toThrow(/at least 1/i)
+-    expect(() => priceLineQty('x', 90, 2.5)).toThrow(/whole quantity/i)
+-    expect(() => priceLineQty('x', 90, NaN)).toThrow(/whole quantity/i)
++    expect(() => priceLineQty('x', 45, 0)).toThrow(/at least 1/i)
++    expect(() => priceLineQty('x', 45, 2.5)).toThrow(/whole quantity/i)
++    expect(() => priceLineQty('x', 45, NaN)).toThrow(/whole quantity/i)
+   })
+ })
+ 
+@@ -253,11 +206,10 @@ describe('priceLineQty', () => {
+ describe('ghgTierForEmployees', () => {
+   it('E1 every band resolves at both of its edges', () => {
+     const edges: [number, string][] = [
+-      [1, 'starter'], [19, 'starter'],
+-      [20, 'professional'], [99, 'professional'],
+-      [100, 'business'], [249, 'business'],
+-      [250, 'advisory'], [499, 'advisory'],
+-      [500, 'enterprise'], [10_000, 'enterprise'],
++      [1, 'starter'], [49, 'starter'],
++      [50, 'professional'], [249, 'professional'],
++      [250, 'advisory'], [999, 'advisory'],
++      [1000, 'enterprise'], [10_000, 'enterprise'],
+     ]
+     for (const [n, tier] of edges) {
+       expect(ghgTierForEmployees(n), `${n} employees`).toBe(tier)
+@@ -267,8 +219,8 @@ describe('ghgTierForEmployees', () => {
+   // ⚠️ A GAP OR AN OVERLAP IS A PRICING FAULT, NOT A COSMETIC ONE. A gap throws at checkout for a
+   // real company size; an overlap makes the answer depend on iteration order. Walking the range is
+   // the only way to prove neither, because reading the table cannot show what falls between rows.
+-  it('E2 the bands are contiguous and exclusive from 1 to 600', () => {
+-    for (let n = 1; n <= 600; n++) {
++  it('E2 the bands are contiguous and exclusive from 1 to 1,200', () => {
++    for (let n = 1; n <= 1200; n++) {
+       const matches = GHG_TIER_KEYS.filter(k => {
+         const { min, max } = GHG_TIERS[k].employees
+         return n >= min && (max == null || n <= max)
+@@ -299,9 +251,17 @@ describe('ghgTierForEmployees', () => {
+   })
+ 
+   it('E6 each tier is worded by its employee band', () => {
+-    expect(ghgEmployeeBandLabel('starter')).toBe('1 to 19 employees')
+-    expect(ghgEmployeeBandLabel('professional')).toBe('20 to 99 employees')
+-    expect(ghgEmployeeBandLabel('enterprise')).toBe('500 employees or more')
++    expect(ghgEmployeeBandLabel('starter')).toBe('1 to 49 employees')
++    expect(ghgEmployeeBandLabel('professional')).toBe('50 to 249 employees')
++    expect(ghgEmployeeBandLabel('advisory')).toBe('250 to 999 employees')
++    expect(ghgEmployeeBandLabel('enterprise')).toBe('1,000 employees or more')
++  })
++
++  it('E6b the tiers are the EU company size categories, named and priced from one place (Oct 2026)', () => {
++    expect(GHG_TIER_KEYS).toEqual(['starter', 'professional', 'advisory', 'enterprise'])
++    expect(GHG_TIER_KEYS.map(k => GHG_TIER_LABELS[k])).toEqual(['Small', 'Medium', 'Large', 'Enterprise'])
++    expect(GHG_TIER_KEYS.map(k => GHG_TIERS[k].priceUSD)).toEqual([550, 1750, 4550, null])
++    expect(GHG_SIZE_BASIS_NOTE).toBe('Plans are sized using EU company size categories.')
+   })
+ })
+ 
+@@ -321,13 +281,13 @@ describe('cartQuote keeps GHG out of the discount but not out of the count', ()
+   it('E7 GHG plus one module reaches the 2-module band, and only the other module is discounted', () => {
+     const q = cartQuote({ modules: ['ghg', 'cbam'], ghgTier: 'starter' })
+     expect(q.totalUSD).toBe(Math.round(cbam * 0.9) + ghg)
+-    expect(q.totalUSD).toBe(1824)
++    expect(q.totalUSD).toBe(1899)
+   })
+ 
+   it('E8 GHG plus two modules reaches the 3-module band, and GHG is still full price', () => {
+     const q = cartQuote({ modules: ['ghg', 'cbam', 'supply-chain'], ghgTier: 'starter' })
+     expect(q.totalUSD).toBe(Math.round((cbam + supply) * 0.8) + ghg)
+-    expect(q.totalUSD).toBe(3994)
++    expect(q.totalUSD).toBe(4069)
+   })
+ 
+   it('E9 a cart without GHG is unchanged by any of this', () => {
+diff --git a/lib/pricing.ts b/lib/pricing.ts
+index 8ec4242..dacd128 100644
+--- a/lib/pricing.ts
++++ b/lib/pricing.ts
+@@ -90,11 +90,15 @@ export const LEGACY_PRICING_PAGE_ID: Record<string, ModuleKey> = {
+ }
+ 
+ // ── Tiers + founding offer ───────────────────────────────────────────────────
+-// ⚠️ FIVE TIERS SINCE 28 Sep 2026, AND THE ORDER IS THE BAND ORDER. 'business' and 'enterprise'
+-// are new. 'advisory' CHANGED MEANING: it was the quote-only tier and is now the 250 to 499 band at
+-// a published price, and 'enterprise' is the quote path. The database constraint permitting these
+-// five is in supabase/migrations/20260928_ghg_employee_bands.sql, and M23 ties the two together.
+-export type Tier = 'starter' | 'professional' | 'business' | 'advisory' | 'enterprise'
++// ⚠️ THE ORDER IS THE BAND ORDER. 'advisory' is a published-price band (Large since Oct 2026) and 'enterprise' is
++// the quote path. The database constraint permitting these keys (plus the retired 'business') is in
++// supabase/migrations/20260928_ghg_employee_bands.sql, and M23 requires every key here to be permitted there.
++// Oct 2026 (pricing-2026-10): four tiers, Small / Medium / Large / Enterprise. The internal keys stay
++// (starter, professional, advisory, enterprise) because they are stored in entitlements.ghg_tier, carried in
++// Stripe metadata and in ?tier= links already sent; only the labels, bands and prices changed. 'business' was
++// the fifth key and is no longer sold. The database CHECK still permits it, which is harmless: a CHECK that
++// allows more than the code writes refuses nothing the code sends. Narrowing it is a separate migration.
++export type Tier = 'starter' | 'professional' | 'advisory' | 'enterprise'
+ 
+ // THE SWITCH. While true, customers pay the `early` price below. Flip to false
+ // (one line) to move the whole site to full pricing — nothing else needs editing.
+@@ -161,26 +165,30 @@ export type GhgTier = Tier
+ // the database gate (enforce_ghg_location_allowance) keeps only the entitlement check
+ // (docs/review/patches/FI0-entitlement-gate-only.sql). The column is dropped later, separately, once
+ // no deployed code writes it.
++//
++// OCT 2026: THE BANDS ARE THE EU COMPANY SIZE CATEGORIES (Small 1-49, Medium 50-249, Large 250-999,
++// Enterprise 1,000+). GHG_SIZE_BASIS_NOTE says so wherever the bands are shown.
+ export const GHG_TIERS: Record<GhgTier, {
+   priceUSD: number | null
+   employees: { min: number; max: number | null }
+ }> = {
+-  starter:      { priceUSD:  475, employees: { min:   1, max:  19 } },
+-  professional: { priceUSD: 1425, employees: { min:  20, max:  99 } },
+-  business:     { priceUSD: 2850, employees: { min: 100, max: 249 } },
+-  advisory:     { priceUSD: 4550, employees: { min: 250, max: 499 } },
+-  enterprise:   { priceUSD: null, employees: { min: 500, max: null } },
++  starter:      { priceUSD:  550, employees: { min:    1, max:  49 } },
++  professional: { priceUSD: 1750, employees: { min:   50, max: 249 } },
++  advisory:     { priceUSD: 4550, employees: { min:  250, max: 999 } },
++  enterprise:   { priceUSD: null, employees: { min: 1000, max: null } },
+ }
+ 
+-/** FI0: a tier's employee band in words, for copy: "1 to 19 employees", "500 employees or more". */
++/** The line shown wherever the employee bands are shown (pricing-2026-10). */
++export const GHG_SIZE_BASIS_NOTE = 'Plans are sized using EU company size categories.'
++
++/** FI0: a tier's employee band in words, for copy: "1 to 49 employees", "1,000 employees or more". */
+ export function ghgEmployeeBandLabel(tier: GhgTier): string {
+   const { min, max } = GHG_TIERS[tier].employees
+   return max == null ? `${min.toLocaleString('en-US')} employees or more` : `${min.toLocaleString('en-US')} to ${max.toLocaleString('en-US')} employees`
+ }
+ 
+ /**
+- * The band an employee count falls in. The single authority, the way conciergeTierForLocations was
+- * for the retired location bands.
++ * The band an employee count falls in. The single authority for employee bands.
+  *
+  * ⚠️ THROWS ON A COUNT IT CANNOT BAND rather than defaulting to the entry tier. A count below 1
+  * is not a small company, it is a bad input, and banding it as Essentials would sell a plan on a
+@@ -199,14 +207,13 @@ export function ghgTierForEmployees(employees: number): GhgTier {
+   throw new Error(`ghgTierForEmployees: ${employees} falls in no band. The bands are not contiguous.`)
+ }
+ 
+-// The customer-facing tier names. `starter` has been labelled "Essentials" on every surface since
+-// the rescope, recorded until now only in a comment above. It is here because the Concierge
+-// onboarding line carries the tier name onto a Stripe invoice, where a key name would be wrong.
++// The customer-facing tier names (pricing-2026-10: EU company size categories). The keys are internal and do not
++// match the labels; nothing customer-facing may print a key. The Bill Review onboarding line carries the label
++// onto a Stripe invoice, where a key name would be wrong.
+ export const GHG_TIER_LABELS: Record<GhgTier, string> = {
+-  starter:      'Essentials',
+-  professional: 'Professional',
+-  business:     'Business',
+-  advisory:     'Advisory',
++  starter:      'Small',
++  professional: 'Medium',
++  advisory:     'Large',
+   enterprise:   'Enterprise',
+ }
+ 
+@@ -338,184 +345,133 @@ export function cartQuote(sel: CartSelection): CartQuote {
+   return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
+ }
+ 
+-// ── Add-ons ──────────────────────────────────────────────────────────────────
+-// Add-ons are extras that attach to a module — they are NOT modules themselves.
+-// Concierge is the only add-on: it requires the `ghg` module, is priced on actual
+-// location count (Basic ≤5 / Standard 6–15 / Enterprise 16+ custom quote), and does
+-// NOT count toward the 2-/3-module volume discount.
++// ── Bill Review (the add-on formerly called Concierge) ─────────────────────────────────────────
++// Bill Review requires the `ghg` module and does NOT count toward the multi-module volume discount.
++// Renamed from Concierge in Oct 2026 (pricing-2026-10) in customer-facing text. The internal names stay:
++// entitlements.module_key 'concierge' (CONCIERGE_KEY), the `concierge` request body field, the concierge_*
++// Stripe metadata keys and /api/concierge/extract. Verification Readiness is included in Bill Review and is
++// not sold separately (it was retired as an add-on on 10 Aug 2026).
+ //
+-// RETIRED 10 Aug 2026 — Verification Readiness ($1,499/yr, key `verification`). Its entitlement
+-// was written by the webhook and never read by anything, and half its claims duplicated what GHG
+-// Essentials already includes. It was also the ONLY user of `requiresAddOnAnyOf`, which went with
+-// it. The six claims that were genuinely its own are recorded in
+-// docs/ghg-verifier-grade-roadmap.md — read that before reviving any of this.
+-export type AddOnKey = 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'
+-
+-export const ADDONS: Record<
+-  AddOnKey,
+-{ key: AddOnKey; label: string; short: string; price: number; requires: ModuleKey[]; isCustomQuote?: boolean }
+-> = {
+-  'concierge-basic': {
+-    key: 'concierge-basic',
+-    label: 'Concierge · Basic (up to 5 locations)',
+-    // ⚠️ `short` EXISTS SO NOTHING PARSES `label` ON ITS PUNCTUATION. app/pricing/page.tsx read
+-    // `label.replace('Concierge — ', '')` to get this, which made the em dash load-bearing: the
+-    // em-dash sweep would have silently started printing the full label in a cell sized for the tier.
+-    // Same fix as DEAL_TYPES.short in lib/deals/reportModel.ts, and for the same reason.
+-    // ⚠️ THE LABEL IS PAYMENT-FACING AND WAS CHANGED ANYWAY, ON EVIDENCE. It reaches Stripe through
+-    // priceLine -> price_data.product_data.name (app/api/checkout/route.ts:133) and invoice lines through
+-    // app/api/admin/create-invoice/route.ts:160, so it appears on a customer's checkout page and invoice.
+-    // Checked 27 Sep 2026 before touching it: NOTHING matches it by text. The Stripe webhook decides what
+-    // was bought from `metadata` (user_id plus comma-separated entitlement keys), never from a line-item
+-    // name; there is no price or product lookup by name, no lookup_key, and no reconciliation comparing
+-    // description text. So the label is a DISPLAY string on Stripe's side, and the change is cosmetic
+-    // there. If a future flow ever matches on it, this is the note that says it used to be safe.
+-    short: 'Basic (up to 5 locations)',
+-    price: 799,
+-    requires: ['ghg'],
+-  },
+-  'concierge-standard': {
+-    key: 'concierge-standard',
+-    label: 'Concierge · Standard (6–15 locations)',
+-    short: 'Standard (6–15 locations)',
+-    price: 1499,
+-    requires: ['ghg'],
+-  },
+-  'concierge-enterprise': {
+-    key: 'concierge-enterprise',
+-    label: 'Concierge · Enterprise (16+ locations)',
+-    short: 'Enterprise (16+ locations)',
+-    // price 0 is a PLACEHOLDER, not a sellable price. isCustomQuote is the signal — never the 0.
+-    // (Inferring "custom quote" from price===0 is the absence-vs-zero confusion: 0 is a claim
+-    // (it's free), a flag is the absence of a self-serve price.) Enforced in addOnRequirementsMet.
+-    price: 0,
+-    requires: ['ghg'],
+-    isCustomQuote: true,
+-  },
+-}
+-// Resolve the Concierge tier from a location count. Single source of truth for the
+-// location→tier bands (Basic ≤5, Standard 6–15, Enterprise 16+). Enterprise is a
+-// custom quote (price 0 placeholder) — callers should route 16+ to a contact path.
+-export function conciergeTierForLocations(locations: number): {
+-  key: Extract<AddOnKey, 'concierge-basic' | 'concierge-standard' | 'concierge-enterprise'>
+-  isCustomQuote: boolean
+-} {
+-  if (locations <= 5) return { key: 'concierge-basic', isCustomQuote: false }
+-  if (locations <= 15) return { key: 'concierge-standard', isCustomQuote: false }
+-  return { key: 'concierge-enterprise', isCustomQuote: true }
+-}
+-// Single authority on whether an add-on is allowed in a given cart/account.
+-// `requires` lists prerequisite modules (ALL must be present).
+-// Returns ok=false with a human-readable reason the routes surface verbatim.
+-//
+-// The `requiresAddOnAnyOf` branch was removed with Verification Readiness on 10 Aug 2026 — that
+-// add-on was its only user, so the mechanism had no remaining caller. `addOnsOwnedOrInCart` is kept
+-// in the signature: both routes pass it, and an add-on-depends-on-add-on rule is plausible again.
+-export function addOnRequirementsMet(
+-  addOn: AddOnKey,
+-  modulesOwnedOrInCart: ModuleKey[],
+-  addOnsOwnedOrInCart: AddOnKey[] = [],
+-): { ok: boolean; reason?: string } {
+-  const def = ADDONS[addOn]
+-  // Quote-only add-ons (e.g. Concierge Enterprise) have NO self-serve price and must never be
+-  // purchasable through checkout or invoice — the $0 placeholder is not a price. Reject FIRST,
+-  // before prerequisites: owning GHG is not enough. This is the single authority /api/checkout and
+-  // /api/admin/create-invoice both defer to, so one guard closes both against a direct-API mint.
+-  if (def.isCustomQuote) {
+-    return { ok: false, reason: `${def.label} is quote-only and cannot be purchased through checkout. Contact sales.` }
+-  }
+-  const missingModule = def.requires.find((m) => !modulesOwnedOrInCart.includes(m))
+-  if (missingModule) {
+-    return {
+-      ok: false,
+-      reason: `${def.label} requires ${def.requires.join(', ')}. Add it to your cart or purchase it first.`,
+-    }
+-  }
+-  return { ok: true }
+-}
++// REMOVED Oct 2026: the location-band Concierge add-ons (`ADDONS`, `AddOnKey`, `conciergeTierForLocations`,
++// `addOnRequirementsMet`), the flat onboarding fee and the uploaded and connected per-source rates of the
++// 28 Sep 2026 model. Both purchase routes refuse the old `addOns` body.
+ 
+-// ── Concierge, Sep 2026 rescope ───────────────────────────────────────────
+-// Priced on DATA SOURCES, not on locations. A data source is one utility account or meter billed
+-// on a recurring basis: an electricity account, a gas meter. A location with electricity and gas
+-// is usually two.
+-//
+-// ⚠️ THE OLD LOCATION BANDS ABOVE ARE SUPERSEDED AND ARE KEPT ONLY UNTIL THEIR CALLERS MOVE.
+-// conciergeTierForLocations, the three concierge-* keys and ADDONS[key].price are read by
+-// /api/checkout, /api/admin/create-invoice and app/pricing/page.tsx. They come out in the final
+-// cleanup batch, once those three have moved. Nothing new may read them.
+-// docs/pricing-and-concierge-spec-v5.md is the current model; v4's Concierge section is superseded.
+-
+-// ⚠️ UTILITY CONNECTION IS NOT BUILT. While this is false the connected rate is display only: it
+-// shows as "Coming soon" and checkout sells uploaded sources only. conciergeQuote REFUSES a
+-// connected quantity rather than quietly pricing it. Falling back to the uploaded rate, or to
+-// zero, would sell a service that does not exist yet.
++// ⚠️ UTILITY CONNECTION IS NOT BUILT. Connected sources cannot be sold, and no connected price is published.
+ export const UTILITY_CONNECT_ENABLED = false
+ 
+-// One-time, charged on a customer's FIRST Concierge purchase only. Not an entitlement and it
+-// writes no term: it buys the specialist's setup work, not access.
+-//
+-// ⚠️ FLAT SINCE 28 Sep 2026, AND THAT REMOVED A WHOLE CLASS OF PROBLEM. It was keyed on the GHG
+-// tier, so the fee had to know which band a customer was on, so a customer adding Concierge WITHOUT
+-// buying GHG in the same cart had to have their tier derived from their stored location allowance.
+-// That derivation went inert the moment locations became unlimited on every plan, and it would have
+-// refused exactly those customers. A flat fee does not ask the question, and ghgTierFromAllowance
+-// was deleted with it.
+-export const CONCIERGE_ONBOARDING_USD = 1395
+-
+ export type SourceKind = 'uploaded' | 'connected'
+ 
+-// Annual, per source. A one-time charge each year that grants the usual 365-day term, the same
+-// shape as every other line in this file. There are no subscriptions in this platform.
+-export const CONCIERGE_SOURCE_USD: Record<SourceKind, number> = {
+-  uploaded:  90,   // customer uploads bills, Concierge extracts
+-  connected: 60,   // pulled directly from the utility
++/** Whether a source kind can be SOLD today. */
++export function sourceKindSellable(kind: SourceKind): boolean {
++  return kind === 'uploaded' || UTILITY_CONNECT_ENABLED
+ }
+ 
+-// ⚠️ A SELF-SERVE CEILING, NOT A TIER CAP. 60 is 20 locations at 3 sources each, 20 being the
+-// Advisory location ceiling under the old model. GHG_TIERS.advisory.locationAllowance is null
+-// (uncapped) today, so nothing else in this file bounds a Concierge order: without this, a typo in
+-// a quantity field becomes a five-figure card charge. Above it the order is a conversation, which
+-// is the same posture GHG Advisory and Concierge Enterprise already take.
+-export const CONCIERGE_MAX_SELF_SERVE_SOURCES = 60
++/** How a Bill Review inventory's bills are read (docs/review/design-derived-figures.md, BR). */
++export type BillReviewReading = 'ai' | 'human'
+ 
+-/** Whether a source kind can be SOLD today. Connected is priced but not sellable yet. */
+-export function sourceKindSellable(kind: SourceKind): boolean {
+-  return kind === 'uploaded' || UTILITY_CONNECT_ENABLED
++/**
++ * One-time onboarding per GHG tier and reading, USD. It includes the first year for the tier's included data
++ * sources (BILL_REVIEW_INCLUDED_SOURCES). null = Enterprise, quoted.
++ */
++export const BILL_REVIEW_ONBOARDING_USD: Record<BillReviewReading, Record<GhgTier, number | null>> = {
++  ai:    { starter:  900, professional: 1800, advisory: 3500, enterprise: null },
++  human: { starter: 1200, professional: 2200, advisory: 4200, enterprise: null },
+ }
+ 
+-export interface ConciergeSelection {
+-  uploadedSources: number
+-  /** Rejected while UTILITY_CONNECT_ENABLED is false. Omit, or 0, until then. */
+-  connectedSources?: number
++/** Data sources covered by onboarding for the first year, per GHG tier. */
++export const BILL_REVIEW_INCLUDED_SOURCES: Record<GhgTier, number | null> = {
++  starter: 10, professional: 30, advisory: 80, enterprise: null,
++}
++
++/**
++ * Per data source a year, USD: each source above the included count in year 1, and every active source at
++ * renewal. The same for AI-read and human-read.
++ */
++export const BILL_REVIEW_SOURCE_USD = 45
++
++/**
++ * ⚠️ HUMAN READING CANNOT BE BOUGHT YET. Its prices are published, but nothing records the reading choice on an
++ * entitlement and nothing enforces it (BR1 to BR11 in docs/review/design-derived-figures.md). Both purchase routes
++ * refuse a human-read order while this is false.
++ */
++export const BILL_REVIEW_HUMAN_READING_SELLABLE = false
++
++/**
++ * ⚠️ A SELF-SERVE CEILING ON THE TOTAL SOURCE COUNT, NOT A PLAN CAP. A typo in a quantity field must not become a
++ * large card charge; above it the order is a conversation. Raised from 60 because Large onboarding includes 80.
++ * ⚑ 150 is a placeholder pending Lisa's ruling.
++ */
++export const BILL_REVIEW_MAX_SELF_SERVE_SOURCES = 150
++
++export interface BillReviewSelection {
++  /** The GHG tier, from the cart or the customer's GHG entitlement. Needed only on a first purchase. */
++  tier: GhgTier | null
++  reading: BillReviewReading
++  /** Total data sources the customer wants covered. */
++  sources: number
+   /**
+-   * True when the customer has never held Concierge. Decided server side, never by the client.
+-   * ⚠️ FOR THE ROUTE THAT COMPUTES IT: look at CONCIERGE ROWS ONLY. True means the user has no
+-   * entitlements row with module_key 'concierge' and none under any of the old concierge-* keys.
+-   * Do NOT widen it to a `source` value such as 'manual-test': that matches manual grants on other
+-   * modules, so a pilot customer given a hand-written GHG row would skip their onboarding fee.
+-   * Onboarding is once per customer, so a false positive here charges someone twice for setup work.
++   * True when the customer has never held Bill Review (Concierge). Decided server side, never by the client.
++   * Look at Concierge rows only (isFirstConciergePurchase).
+    */
+   isFirstPurchase: boolean
+ }
+ 
+-export interface ConciergeQuote {
++export interface BillReviewQuote {
++  /** Enterprise: no self-serve price. */
++  requiresQuote: boolean
+   onboardingUSD: number
+   sourcesUSD: number
+   totalUSD: number
++  includedSources: number
++  extraSources: number
++  /** The source count the entitlement records (written to concierge_source_allowance). */
++  sourceAllowance: number
+   /** Ready for priceLineQty. Onboarding first, so it reads first on the invoice. */
+   lines: { label: string; unitUSD: number; quantity: number }[]
+ }
+ 
+-// ⚠️ ONE FUNCTION FOR DISPLAY AND FOR CHARGE, which is the rule cartQuote follows for modules.
+-// The configurator and /api/checkout both call this, so a displayed Concierge price cannot differ
+-// from the charged one. Note that add-ons do NOT flow through cartQuote today: app/pricing/page.tsx
+-// sums them separately. This function is what closes that gap for Concierge.
+-//
+-// ⚠️ EVERY GUARD THROWS. NONE OF THEM COERCES. An earlier draft ran the counts through Math.trunc,
+-// which let 2.5 become 2 silently while priceLineQty rejected 2.5 outright, and let NaN through both
+-// range checks (NaN < 0 and NaN < 1 are each false) to return a NaN quote that would have rendered
+-// as "$NaN" and reached Stripe as a bad amount. A count that is not a whole number is a caller bug,
+-// and the loud failure is the cheap one.
++/**
++ * ⚠️ ONE FUNCTION FOR DISPLAY AND FOR CHARGE. /pricing, /api/checkout and /api/admin/create-invoice all call it, so
++ * a displayed Bill Review price cannot differ from the charged one. Every guard throws; none coerces.
++ *
++ * First purchase: the tier's onboarding (which includes the first year for its included sources), plus $45 for
++ * each source above that. Any later purchase: $45 for each source.
++ */
++export function billReviewQuote(sel: BillReviewSelection): BillReviewQuote {
++  const n = sel.sources
++  if (!Number.isInteger(n)) throw new Error('billReviewQuote: a source count must be a whole number.')
++  if (n < 1) throw new Error('billReviewQuote: Bill Review needs at least one data source.')
++  if (n > BILL_REVIEW_MAX_SELF_SERVE_SOURCES) {
++    throw new Error(`billReviewQuote: above ${BILL_REVIEW_MAX_SELF_SERVE_SOURCES} data sources, contact us for a quote.`)
++  }
++  const empty = (requiresQuote: boolean, includedSources = 0): BillReviewQuote =>
++    ({ requiresQuote, onboardingUSD: 0, sourcesUSD: 0, totalUSD: 0, includedSources, extraSources: 0, sourceAllowance: 0, lines: [] })
++  if (sel.tier === 'enterprise') return empty(true)
++  if (!sel.isFirstPurchase) {
++    const sourcesUSD = n * BILL_REVIEW_SOURCE_USD
++    return {
++      requiresQuote: false, onboardingUSD: 0, sourcesUSD, totalUSD: sourcesUSD, includedSources: 0, extraSources: n,
++      sourceAllowance: n,
++      lines: [{ label: 'Bill Review data source (1 year)', unitUSD: BILL_REVIEW_SOURCE_USD, quantity: n }],
++    }
++  }
++  if (sel.tier == null) throw new Error('billReviewQuote: the GHG plan is needed to price Bill Review onboarding.')
++  const onboardingUSD = BILL_REVIEW_ONBOARDING_USD[sel.reading][sel.tier]
++  const included = BILL_REVIEW_INCLUDED_SOURCES[sel.tier]
++  if (onboardingUSD == null || included == null) return empty(true)
++  const extra = Math.max(0, n - included)
++  const sourcesUSD = extra * BILL_REVIEW_SOURCE_USD
++  const lines: BillReviewQuote['lines'] = [{
++    label: `Bill Review onboarding, ${GHG_TIER_LABELS[sel.tier]} plan${sel.reading === 'human' ? ', human reading' : ''} (includes the first year for ${included} data sources)`,
++    unitUSD: onboardingUSD, quantity: 1,
++  }]
++  if (extra > 0) lines.push({ label: 'Bill Review data source, first year', unitUSD: BILL_REVIEW_SOURCE_USD, quantity: extra })
++  return {
++    requiresQuote: false, onboardingUSD, sourcesUSD, totalUSD: onboardingUSD + sourcesUSD,
++    includedSources: included, extraSources: extra, sourceAllowance: Math.max(n, included), lines,
++  }
++}
++
+ // ── Concierge entitlement identity ─────────────────────────────────────
+ // ⚠️ ONE LIST, BECAUSE FIVE COPIES IS THE DRIFT. Both purchase routes, the webhook,
+ // useHasConcierge() and /api/concierge/extract all have to agree on what "holds Concierge" means.
+@@ -538,16 +494,16 @@ export function isFirstConciergePurchase(existingModuleKeys: readonly string[]):
+ 
+ /**
+  * The tier keys, as a value rather than a type, because a database CHECK constraint cannot read a
+- * TypeScript union. entitlements.ghg_tier is constrained to exactly these five in
+- * supabase/migrations/20260928_ghg_employee_bands.sql.
++ * TypeScript union. entitlements.ghg_tier is constrained to these keys (and the retired business) in
++ * supabase/migrations/20260928_ghg_employee_bands.sql (which also still permits the retired 'business').
+  *
+- * ⚠️ A SIXTH TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
++ * ⚠️ A NEW TIER IS A TWO PART CHANGE. Adding one here without altering that constraint makes
+  * every purchase on the new tier fail AFTER payment: the webhook writes the value, Postgres rejects
+  * it, the grant throws, and Stripe retries a write that can never succeed. M23 in
+  * lib/entitlementMetadata.test.ts reads the constraint and pins this list against it, so the
+  * omission fails a test rather than a customer.
+  */
+-export const GHG_TIER_KEYS = ['starter', 'professional', 'business', 'advisory', 'enterprise'] as const
++export const GHG_TIER_KEYS = ['starter', 'professional', 'advisory', 'enterprise'] as const
+ 
+ /**
+  * Is this a GHG tier key? For validating anything that arrives as text: a URL parameter, a request
+@@ -591,47 +547,6 @@ export function ghgTierMetaValue(tier: unknown): GhgTier | '' {
+   return isGhgTier(tier) ? tier : ''
+ }
+ 
+-export function conciergeQuote(sel: ConciergeSelection): ConciergeQuote {
+-  const uploaded = sel.uploadedSources
+-  const connected = sel.connectedSources ?? 0
+-  // Number.isInteger is false for NaN, Infinity and any fraction, so this one test covers all
+-  // three. connectedSources is checked only when supplied: absent means zero, which is valid.
+-  if (!Number.isInteger(uploaded) || (sel.connectedSources != null && !Number.isInteger(sel.connectedSources))) {
+-    throw new Error('conciergeQuote: a source count must be a whole number.')
+-  }
+-  if (uploaded < 0 || connected < 0) {
+-    throw new Error('conciergeQuote: a source count cannot be negative.')
+-  }
+-  const total = uploaded + connected
+-  if (total < 1) {
+-    throw new Error('conciergeQuote: Concierge needs at least one data source.')
+-  }
+-  if (total > CONCIERGE_MAX_SELF_SERVE_SOURCES) {
+-    throw new Error(`conciergeQuote: above ${CONCIERGE_MAX_SELF_SERVE_SOURCES} data sources, contact us for a quote.`)
+-  }
+-  if (connected > 0 && !UTILITY_CONNECT_ENABLED) {
+-    throw new Error(
+-      'conciergeQuote: connected sources cannot be sold yet. Utility connection is not built, ' +
+-      'and the connected rate is display only until UTILITY_CONNECT_ENABLED is true.',
+-    )
+-  }
+-  const onboardingUSD = sel.isFirstPurchase ? CONCIERGE_ONBOARDING_USD : 0
+-  const sourcesUSD =
+-    uploaded * CONCIERGE_SOURCE_USD.uploaded + connected * CONCIERGE_SOURCE_USD.connected
+-  const lines: ConciergeQuote['lines'] = []
+-  if (onboardingUSD > 0) {
+-    // No tier in the label: the fee is the same whichever plan the customer is on.
+-    lines.push({ label: 'GHG Concierge onboarding', unitUSD: onboardingUSD, quantity: 1 })
+-  }
+-  if (uploaded > 0) {
+-    lines.push({ label: 'GHG Concierge data source, uploaded (1 year)', unitUSD: CONCIERGE_SOURCE_USD.uploaded, quantity: uploaded })
+-  }
+-  if (connected > 0) {
+-    lines.push({ label: 'GHG Concierge data source, connected (1 year)', unitUSD: CONCIERGE_SOURCE_USD.connected, quantity: connected })
+-  }
+-  return { onboardingUSD, sourcesUSD, totalUSD: onboardingUSD + sourcesUSD, lines }
+-}
+-
+ // ── Stripe helper ────────────────────────────────────────────────────────────
+ // Stripe expects amounts in the smallest currency unit (cents for USD).
+ export function toStripeAmount(dollars: number): number {
+diff --git a/lib/pricingCopy.ts b/lib/pricingCopy.ts
+index 7f6aed3..9b9a14b 100644
+--- a/lib/pricingCopy.ts
++++ b/lib/pricingCopy.ts
+@@ -28,3 +28,14 @@ export const PRICING_DRIVER_SENTENCE =
+ /** Published prices, against platform and consultancy quotes. */
+ export const PRICING_PUBLISHED_SENTENCE =
+   'Reporting rules keep multiplying, and so do the quotes from platforms and consultancies. Our prices are published, so you know the cost before you start.'
++
++/**
++ * Bill Review (the add-on formerly called Concierge), described verbatim wherever a description is shown
++ * (pricing-2026-10). One constant per sentence group, so every surface prints the same words.
++ */
++export const BILL_REVIEW_DESCRIPTION =
++  'Upload your bills and we read the figures for you. You check and approve each one, and our specialists spot-check the readings. Includes Verification Readiness: an organized evidence pack and source-document index, ready to hand to your verifier.'
++
++/** The human-read option, verbatim. */
++export const BILL_REVIEW_HUMAN_DESCRIPTION =
++  'Prefer a person to read your bills? Choose human reading and a ThemisIQ specialist reads each one within 2 business days. Your bills are never sent to AI.'
+--- /dev/null
++++ b/lib/billReviewOrder.ts
+@@ -0,0 +1,92 @@
++// lib/billReviewOrder.ts
++//
++// THE BILL REVIEW PART OF AN ORDER, FOR BOTH PURCHASE ROUTES (pricing-2026-10). Pure: the routes read the
++// customer's entitlements and pass them in; this decides what may be sold, at what price, and what the webhook
++// must be told. /api/checkout and /api/admin/create-invoice both call it, so the two cannot drift apart, and the
++// price is billReviewQuote's, the same function /pricing displays from.
++//
++// Bill Review is the customer-facing name of the add-on formerly called Concierge. Internal names stay:
++// entitlements.module_key 'concierge' (CONCIERGE_KEY), the `concierge` request body field and the concierge_*
++// metadata keys.
++
++import {
++  billReviewQuote, isFirstConciergePurchase, isGhgTier, UTILITY_CONNECT_ENABLED, BILL_REVIEW_HUMAN_READING_SELLABLE,
++  CONCIERGE_KEY, type GhgTier, type BillReviewQuote,
++} from './pricing'
++
++/** An entitlements row as the routes read it: what the customer already holds. */
++export type OwnedRow = { module_key: string; ghg_tier?: string | null; term_end?: string | null }
++
++export type BillReviewRequest = { uploadedSources?: unknown; connectedSources?: unknown; reading?: unknown }
++
++export type BillReviewOrder =
++  | { ok: false; status: number; error: string }
++  | {
++      ok: true
++      quote: BillReviewQuote
++      isFirstPurchase: boolean
++      /** Spread into the Stripe metadata. */
++      meta: Record<string, string>
++      /** Appended to the order's `source` string. */
++      source: string
++      grant: typeof CONCIERGE_KEY
++    }
++
++/**
++ * @param cartTier the GHG tier in this cart, or null when GHG is not being bought now.
++ * @param owned every entitlements row the customer holds (RLS-scoped read by the route).
++ * @param now the time to judge an owned GHG term against.
++ */
++export function billReviewOrder(req: BillReviewRequest, cartTier: GhgTier | null, owned: readonly OwnedRow[], now: Date): BillReviewOrder {
++  const fail = (status: number, error: string): BillReviewOrder => ({ ok: false, status, error })
++
++  if (typeof req.connectedSources === 'number' && req.connectedSources > 0 && !UTILITY_CONNECT_ENABLED) {
++    return fail(400, 'Connected utility sources are not available yet. Please order uploaded sources only.')
++  }
++  const reading = req.reading ?? 'ai'
++  if (reading !== 'ai' && reading !== 'human') return fail(400, 'Unknown Bill Review reading option.')
++  if (reading === 'human' && !BILL_REVIEW_HUMAN_READING_SELLABLE) {
++    return fail(400, 'Human reading cannot be ordered online yet. Please contact us to arrange it.')
++  }
++
++  // Bill Review requires an ACTIVE GHG plan: in this cart, or held with a term that has not ended. The check used
++  // to accept any GHG row, so a customer whose GHG term had ended could still buy Bill Review on its own.
++  const activeGhg = owned.find(r => r.module_key === 'ghg' && r.term_end != null && new Date(r.term_end).getTime() > now.getTime())
++  if (cartTier == null && !activeGhg) {
++    return fail(400, 'Bill Review requires an active GHG plan. Add GHG to your order, or renew it first.')
++  }
++
++  const isFirstPurchase = isFirstConciergePurchase(owned.map(r => r.module_key))
++  // The tier prices onboarding: this cart's, else the plan the customer holds.
++  const heldTier = activeGhg && isGhgTier(activeGhg.ghg_tier) ? activeGhg.ghg_tier : null
++  const tier: GhgTier | null = cartTier ?? heldTier
++  if (isFirstPurchase && tier == null) {
++    return fail(400, 'We could not tell which GHG plan you hold, so Bill Review onboarding cannot be priced. Please contact us.')
++  }
++
++  let quote: BillReviewQuote
++  try {
++    quote = billReviewQuote({ tier, reading, sources: req.uploadedSources as number, isFirstPurchase })
++  } catch (e) {
++    // billReviewQuote's messages are written for a person and name the actual fault.
++    return fail(400, (e as Error).message.replace(/^billReviewQuote: /, ''))
++  }
++  if (quote.requiresQuote) return fail(400, 'Bill Review for the Enterprise plan is quoted. Please contact us.')
++
++  const uploaded = req.uploadedSources as number
++  return {
++    ok: true,
++    quote,
++    isFirstPurchase,
++    grant: CONCIERGE_KEY,
++    meta: {
++      concierge_uploaded_sources: String(uploaded),
++      concierge_connected_sources: '0',
++      concierge_source_allowance: String(quote.sourceAllowance),
++      // Recorded, never granted. Onboarding buys setup work and the first year for the included sources; the
++      // webhook must not turn this into an entitlement row.
++      concierge_onboarding_usd: String(quote.onboardingUSD),
++    },
++    source: `concierge:${uploaded}u${isFirstPurchase ? '+onboarding' : ''}`,
++  }
++}
+--- /dev/null
++++ b/lib/billReviewOrder.test.ts
+@@ -0,0 +1,62 @@
++// lib/billReviewOrder.test.ts
++//
++// The Bill Review part of an order, shared by /api/checkout and /api/admin/create-invoice (pricing-2026-10).
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { billReviewOrder, type OwnedRow } from './billReviewOrder'
++import { stripTsComments } from './testing/stripComments'
++
++const NOW = new Date('2026-10-03T12:00:00Z')
++const activeGhg = (tier: string | null): OwnedRow => ({ module_key: 'ghg', ghg_tier: tier, term_end: '2027-06-01T00:00:00Z' })
++const expiredGhg: OwnedRow = { module_key: 'ghg', ghg_tier: 'starter', term_end: '2026-01-01T00:00:00Z' }
++
++describe('billReviewOrder', () => {
++  it('B1 with GHG in the cart, a first order is priced on the cart tier', () => {
++    const o = billReviewOrder({ uploadedSources: 12 }, 'starter', [], NOW)
++    expect(o.ok).toBe(true)
++    if (!o.ok) return
++    expect(o.quote.totalUSD).toBe(900 + 2 * 45)
++    expect(o.meta).toEqual({ concierge_uploaded_sources: '12', concierge_connected_sources: '0', concierge_source_allowance: '12', concierge_onboarding_usd: '900' })
++    expect(o.grant).toBe('concierge')
++    expect(o.source).toBe('concierge:12u+onboarding')
++  })
++
++  it('B2 added later to an active GHG plan, onboarding is priced on the plan held', () => {
++    const o = billReviewOrder({ uploadedSources: 30 }, null, [activeGhg('professional')], NOW)
++    expect(o.ok && o.quote.onboardingUSD).toBe(1800)
++  })
++
++  it('B3 an expired GHG plan does not qualify', () => {
++    const o = billReviewOrder({ uploadedSources: 5 }, null, [expiredGhg], NOW)
++    expect(o).toEqual({ ok: false, status: 400, error: 'Bill Review requires an active GHG plan. Add GHG to your order, or renew it first.' })
++  })
++
++  it('B4 a held plan with no recorded tier cannot price a first onboarding', () => {
++    const o = billReviewOrder({ uploadedSources: 5 }, null, [activeGhg(null)], NOW)
++    expect(o.ok).toBe(false)
++    if (!o.ok) expect(o.error).toMatch(/could not tell which GHG plan/)
++  })
++
++  it('B5 a returning customer pays $45 a source, whatever the plan', () => {
++    const o = billReviewOrder({ uploadedSources: 8 }, null, [activeGhg(null), { module_key: 'concierge' }], NOW)
++    expect(o.ok && o.quote.totalUSD).toBe(8 * 45)
++    expect(o.ok && o.source).toBe('concierge:8u')
++  })
++
++  it('B6 Enterprise, human reading and connected sources are refused', () => {
++    expect(billReviewOrder({ uploadedSources: 5 }, 'enterprise', [], NOW)).toMatchObject({ ok: false, error: 'Bill Review for the Enterprise plan is quoted. Please contact us.' })
++    expect(billReviewOrder({ uploadedSources: 5, reading: 'human' }, 'starter', [], NOW)).toMatchObject({ ok: false, error: 'Human reading cannot be ordered online yet. Please contact us to arrange it.' })
++    expect(billReviewOrder({ uploadedSources: 5, connectedSources: 1 }, 'starter', [], NOW)).toMatchObject({ ok: false, status: 400 })
++  })
++
++  it('B7 both purchase routes use it, and both refuse the removed add-ons', () => {
++    for (const rel of ['app/api/checkout/route.ts', 'app/api/admin/create-invoice/route.ts']) {
++      const code = stripTsComments(readFileSync(join(process.cwd(), rel), 'utf8'))
++      expect(code, rel).toContain('billReviewOrder(body.concierge')
++      expect(code, rel).toMatch(/That add-on is no longer sold/)
++      expect(code, rel).not.toMatch(/ADDONS|addOnRequirementsMet|conciergeQuote/)
++    }
++  })
++})

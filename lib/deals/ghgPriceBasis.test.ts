@@ -16,36 +16,36 @@ const ghg = (employees: number | null, sites: number) =>
 
 describe('GHG band from headcount', () => {
   it.each([
-    [15, 'starter', 'Essentials'],
-    [20, 'professional', 'Professional'],
-    [150, 'business', 'Business'],
+    [15, 'starter', 'Small'],
+    [50, 'professional', 'Medium'],
+    [300, 'advisory', 'Large'],
   ] as const)('%i employees prices the %s band', (employees, tier, label) => {
     const o = ghg(employees, 2)
     expect(o.pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS[tier].priceUSD })
     expect(o.scopeNote).toBe(`Priced on ${employees} employees (${label} band).`)
   })
 
-  it('600 employees is Enterprise, which is a quote, not a figure', () => {
-    const o = getObligations(2, REQ, 'Technology', 600)
+  it('1,200 employees is Enterprise, which is a quote, not a figure', () => {
+    const o = getObligations(2, REQ, 'Technology', 1200)
     expect(o.included[0].pricing).toEqual({ kind: 'quote' })
     expect(o.themisIqTotal).toBeNull()
     expect(o.themisIqHasCustom).toBe(true)
-    expect(o.included[0].scopeNote).toBe('Priced on 600 employees (Enterprise band).')
+    expect(o.included[0].scopeNote).toBe('Priced on 1,200 employees (Enterprise band).')
   })
 
-  it('headcount wins over sites: 150 employees on 2 sites is Business, not the 2-site Essentials', () => {
-    expect(ghg(150, 2).pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS.business.priceUSD })
+  it('headcount wins over sites: 150 employees on 2 sites is Medium, not the 2-site Small', () => {
+    expect(ghg(150, 2).pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS.professional.priceUSD })
   })
 
   it('a headcount with no location count is still priced, and does not prompt for one', () => {
-    const o = getObligations(0, REQ, 'Technology', 20)
+    const o = getObligations(0, REQ, 'Technology', 50)
     expect(o.locationUnset).toBe(false)
     expect(o.themisIqTotal).toBe(GHG_TIERS.professional.priceUSD)
   })
 })
 
 describe('GHG band falls back to sites when headcount is blank', () => {
-  it('blank headcount on 2 sites prices Essentials and says why', () => {
+  it('blank headcount on 2 sites prices Small and says why', () => {
     const o = ghg(null, 2)
     expect(o.pricing).toEqual({ kind: 'priced', priceUSD: GHG_TIERS.starter.priceUSD })
     expect(o.scopeNote).toBe('Priced on 2 sites; headcount not provided.')
@@ -74,8 +74,8 @@ describe('GHG band falls back to sites when headcount is blank', () => {
 describe('the /order tier agrees with the priced band', () => {
   it.each([
     [15, 2, 'starter'],
-    [150, 2, 'business'],
-    [600, 2, 'enterprise'],     // quote on the report, quote plan on /order
+    [150, 2, 'professional'],
+    [1200, 2, 'enterprise'],    // quote on the report, quote plan on /order
     [null, 2, 'starter'],
     [null, 10, 'professional'],
     [null, 20, 'enterprise'],   // was 'advisory' at $4,550 on the share page while the card said quote
@@ -92,11 +92,11 @@ describe('the report says which basis priced it', () => {
     const m = buildDealReportModel(NEAR_THRESHOLD_DEAL, FIXTURE_GENERATED_AT)
     expect(m.cost.included.rows.some(r => r.label === 'GHG inventory & Scope 3')).toBe(false)
     const row = m.cost.recommended.rows.find(r => r.label === 'GHG inventory & Scope 3')!
-    expect(row.scopeNote).toBe(`${GHG_RECOMMENDED_REASON} Priced on 240 employees (Business band).`)
-    expect(row.themisIq).toContain(GHG_TIERS.business.priceUSD!.toLocaleString())
+    expect(row.scopeNote).toBe(`${GHG_RECOMMENDED_REASON} Priced on 240 employees (Medium band).`)
+    expect(row.themisIq).toContain(GHG_TIERS.professional.priceUSD!.toLocaleString())
   })
 
   it('the note is the same sentence ghgPriceBasisNote gives, not a second wording', () => {
-    expect(ghgPriceBasisNote(ghgPriceBasis(240, 8))).toBe('Priced on 240 employees (Business band).')
+    expect(ghgPriceBasisNote(ghgPriceBasis(240, 8))).toBe('Priced on 240 employees (Medium band).')
   })
 })

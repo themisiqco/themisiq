@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
 import { supabase } from '../../lib/supabase'
 import { useEntitlementAccess } from '../../lib/useEntitlement'
-import { FLAT_MODULE_PRICES, type ModuleKey } from '../../lib/pricing'
+import { FLAT_MODULE_PRICES, GHG_TIER_LABELS, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED } from '../../lib/aiAct'
 
 const GRAD = 'var(--color-brand)'
@@ -230,10 +230,12 @@ const MODULES: DashboardModule[] = [
   },
 ]
 
+// Labels from GHG_TIER_LABELS, the one source (pricing-2026-10); colours only are local.
 const TIER_CONFIG = {
-  starter:      { label: 'Essentials', color: '#0F6E56', bg: '#E1F5EE' },
-  professional: { label: 'Professional', color: '#7425e3', bg: '#EDE9FE' },
-  advisory:     { label: 'Advisory', color: '#0C447C', bg: '#E6F1FB' },
+  starter:      { label: GHG_TIER_LABELS.starter, color: '#0F6E56', bg: '#E1F5EE' },
+  professional: { label: GHG_TIER_LABELS.professional, color: '#7425e3', bg: '#EDE9FE' },
+  advisory:     { label: GHG_TIER_LABELS.advisory, color: '#0C447C', bg: '#E6F1FB' },
+  enterprise:   { label: GHG_TIER_LABELS.enterprise, color: '#555553', bg: '#f8f7f5' },
 }
 
 const PACK_CONFIG: Record<string, { label: string; modules: string[] }> = {

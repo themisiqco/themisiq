@@ -521,7 +521,7 @@ export default function TrendsPage() {
             {!monthlyLoading && monthly && !monthly.error && monthly.buckets.length === 0 && (
               <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: '#555' }}>
                 No monthly (utility-bill) data for {selectedYear}. Monthly detail appears
-                when you upload dated utility bills via the Concierge flow. Manually-entered
+                when you upload dated utility bills with Bill Review. Manually-entered
                 annual figures show in the yearly chart above.
               </div>
             )}

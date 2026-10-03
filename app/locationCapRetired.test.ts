@@ -36,7 +36,7 @@ describe('the location cap is retired (FI0)', () => {
   it('the GHG page heading and the price notes say what the price follows', () => {
     expect(read('app/climate-ghg/page.tsx')).toContain('Priced by company size, not by number of sites.')
     const calc = read('app/calculate-emissions/page.tsx')
-    expect((calc.match(/The GHG module is priced by company size, with unlimited locations on every plan: from \$\{ghgFrom\} a year for \{ghgEmployeeBandLabel\('starter'\)\}/g) ?? []).length).toBe(2)
-    expect(read('app/pricing/page.tsx')).toContain('Plans are sized by your number of employees. Every plan covers unlimited locations.')
+    expect((calc.match(/The GHG module is priced by company size, with unlimited locations on every plan: \{GHG_PRICED_BANDS\}/g) ?? []).length).toBe(2)
+    expect(read('app/pricing/page.tsx')).toContain('{GHG_SIZE_BASIS_NOTE} Every plan covers unlimited locations.')
   })
 })

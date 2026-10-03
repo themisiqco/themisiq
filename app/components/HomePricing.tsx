@@ -64,7 +64,8 @@ export default function HomePricing() {
   }
 
   const getCta = () => {
-    if (tier === 'advisory') return { headline: 'Ready to meet your compliance team?', buttons: [{ label: 'Talk to a specialist →', href: '/advisory', primary: true }] }
+    // The quote tier (Enterprise) goes to a specialist; Large ('advisory') is a published price (pricing-2026-10).
+    if (quote.requiresQuote) return { headline: 'Ready to meet your compliance team?', buttons: [{ label: 'Talk to a specialist →', href: '/advisory', primary: true }] }
     if (count >= 4) return { headline: 'Ready to build your compliance platform?', buttons: [{ label: 'Build your platform →', href: '/pricing', primary: true }, { label: 'Talk to a specialist', href: '/advisory', primary: false }] }
     if (count === 1) {
       const mod = [...selected][0] as ModuleId

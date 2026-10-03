@@ -7,12 +7,13 @@ import Image from 'next/image'
 import { startCheckout } from '../../lib/checkout'
 import ConsentForm, { type ConsentPayload } from '../components/ConsentForm'
 import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '../../lib/pricingCopy'
+import { BILL_REVIEW_DESCRIPTION, BILL_REVIEW_HUMAN_DESCRIPTION } from '../../lib/pricingCopy'
 // tierPrice and tierStrikethrough dropped with the old-model blocks — both priced the retired
 // per-module-per-tier model and had no reader left. `Tier` STAYS — see the note on the tier state
 // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
 // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
 // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
-import { LEGACY_PRICING_PAGE_ID, volumeDiscount, conciergeQuote, CONCIERGE_SOURCE_USD, CONCIERGE_MAX_SELF_SERVE_SOURCES, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
+import { LEGACY_PRICING_PAGE_ID, volumeDiscount, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, GHG_SIZE_BASIS_NOTE, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
 import { SB253_SHORT } from '../../lib/sb253'
@@ -249,29 +250,28 @@ function PricingPageInner() {
   // no reader left once those blocks went. Everything shown or charged now derives from cartQuote
   // below. `count` survives because the live panel reads it for volumeDiscount().
   const count = selected.size
-  // Add-on logic. Concierge is priced per DATA SOURCE since 28 Sep 2026, not by location band.
-  // Verification Readiness was retired 10 Aug 2026, see docs/ghg-verifier-grade-roadmap.md.
-  // Concierge requires GHG, which mirrors the server dependency rule.
+  // Add-on logic. Bill Review (formerly Concierge) is priced by GHG tier: onboarding includes the first year for
+  // the tier's data sources, then $45 a source (pricing-2026-10). Verification Readiness is included in Bill
+  // Review. Bill Review requires GHG, which mirrors the server dependency rule.
   const ghgSelected = selected.has('ghg')
   const conciergeActive = ghgSelected && conciergeOn
 
   // ⚠️ isFirstPurchase IS TRUE HERE AND THE SERVER DECIDES THE TRUTH. This page serves logged-out
-  // visitors, and whether a customer has ever held Concierge is a read of their entitlements that
-  // only /api/checkout can make. Assuming true shows onboarding to everyone, so the preview can be
-  // HIGHER than the charge for a returning customer and never lower. The line is labelled "charged
-  // on your first Concierge order" so the wording is true for both readers.
+  // visitors, and whether a customer has ever held Bill Review is a read of their entitlements that
+  // only /api/checkout can make. Assuming true shows onboarding to everyone, so the preview is what a first
+  // order costs; a returning customer is charged per source instead.
   // The rule this bends is displayed-equals-charged; it bends in the safe direction, and this is
   // the only place in the file where the two can differ.
   const conciergeQ = conciergeActive
     ? (() => {
-        // conciergeQuote throws on a count it will not price. The input below is clamped to whole
+        // billReviewQuote throws on a count it will not price. The input below is clamped to whole
         // numbers from 1 to the ceiling, so the throw is unreachable from the UI. The guard is here
         // because an unhandled throw during render is a blank page, and a price panel that cannot
         // price itself should say so rather than take the page down with it.
         try {
-          return { quote: conciergeQuote({ uploadedSources: conciergeSources, isFirstPurchase: true }), error: null }
+          return { quote: billReviewQuote({ tier: tier as GhgTier, reading: 'ai', sources: conciergeSources, isFirstPurchase: true }), error: null }
         } catch (e) {
-          return { quote: null, error: (e as Error).message.replace(/^conciergeQuote: /, '') }
+          return { quote: null, error: (e as Error).message.replace(/^billReviewQuote: /, '') }
         }
       })()
     : { quote: null, error: null }
@@ -322,7 +322,9 @@ function PricingPageInner() {
 
   // Dynamic CTA logic
   const getCta = () => {
-    if (tier === 'advisory') return {
+    // The quote tier (Enterprise) goes to a specialist. This read `tier === 'advisory'`, from when Advisory was
+    // the quote tier; Large ('advisory') is a published price now.
+    if (quote.requiresQuote) return {
       headline: 'Ready to meet your compliance team?',
       sub: 'Specialists with deep sector experience. Technology that speaks your language.',
       buttons: [{ label: 'Talk to a specialist →', href: '/advisory', primary: true }],
@@ -645,7 +647,7 @@ function PricingPageInner() {
                       })}
                       {/* At the point of CHOICE: what the tier is sized by (FI0). */}
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 10, flexBasis: '100%' }}>
-                        Plans are sized by your number of employees. Every plan covers unlimited locations.
+                        {GHG_SIZE_BASIS_NOTE} Every plan covers unlimited locations.
                       </div>
                     </div>
                   )}
@@ -660,47 +662,49 @@ function PricingPageInner() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#0d0d0d', marginBottom: 4 }}>Enhance your GHG inventory</div>
             <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 16 }}>Optional add-ons. We do the bill-reading; you confirm the numbers.</div>
 
-            {/* Concierge */}
+            {/* Bill Review (formerly Concierge). Description verbatim (pricing-2026-10). */}
             <div style={{ padding: 14, background: '#fff', borderRadius: 10, border: conciergeOn ? '2px solid var(--color-brand)' : '1px solid #e8e7e4', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Concierge: we read your bills</div>
-                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>Upload utility bills; ThemisIQ extracts the figures with source quotes for you to confirm. Priced per data source.</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>Bill Review</div>
+                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 2 }}>{BILL_REVIEW_DESCRIPTION}</div>
+                  <div style={{ fontSize: 11, color: '#555553', lineHeight: 1.6, marginTop: 6 }}>{BILL_REVIEW_HUMAN_DESCRIPTION}</div>
                 </div>
                 <button onClick={() => setConciergeOn(v => !v)} style={{ ...(conciergeOn ? btnSecondary : btnPrimary), flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '6px 14px' }}>{conciergeOn ? 'Added ✓' : 'Add'}</button>
               </div>
               {conciergeOn && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efed' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <label style={{ fontSize: 12, color: '#555553' }} htmlFor="concierge-sources">Data sources:</label>
-                    <input id="concierge-sources" type="number" min={1} max={CONCIERGE_MAX_SELF_SERVE_SOURCES} value={conciergeSources}
-                      onChange={e => setConciergeSources(Math.min(CONCIERGE_MAX_SELF_SERVE_SOURCES, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
-                      style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
-                    <span style={{ fontSize: 11, color: '#555553' }}>One utility account or meter, such as an electricity account or a gas meter.</span>
-                  </div>
+                  {BILL_REVIEW_INCLUDED_SOURCES[tier as GhgTier] == null ? (
+                    <div style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.7 }}>Bill Review for the Enterprise plan is quoted with your plan. Talk to a specialist.</div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: 12, color: '#555553' }} htmlFor="concierge-sources">Data sources:</label>
+                        <input id="concierge-sources" type="number" min={1} max={BILL_REVIEW_MAX_SELF_SERVE_SOURCES} value={conciergeSources}
+                          onChange={e => setConciergeSources(Math.min(BILL_REVIEW_MAX_SELF_SERVE_SOURCES, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
+                          style={{ width: 70, fontSize: 13, padding: '6px 8px', border: '1px solid #e8e7e4', borderRadius: 6 }} />
+                        <span style={{ fontSize: 11, color: '#555553' }}>One utility account or meter, such as an electricity account or a gas meter.</span>
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 12, color: '#0d0d0d', lineHeight: 1.8 }}>
+                        <div>{`${GHG_TIER_LABELS[tier as GhgTier]} plan onboarding: $${(BILL_REVIEW_ONBOARDING_USD.ai[tier as GhgTier] as number).toLocaleString()}, including the first year for ${BILL_REVIEW_INCLUDED_SOURCES[tier as GhgTier]} data sources.`}</div>
+                        <div>{`Each extra data source, and every active source at renewal: $${BILL_REVIEW_SOURCE_USD} a year.`}</div>
+                        <div style={{ color: 'var(--color-ink-muted)' }}>{`Human reading onboarding: $${(BILL_REVIEW_ONBOARDING_USD.human[tier as GhgTier] as number).toLocaleString()}. To arrange human reading, talk to a specialist.`}</div>
+                      </div>
+                    </>
+                  )}
 
-                  {/* ⚠️ THE CONNECTED RATE IS PUBLISHED AND NOT SELECTABLE, AND IT IS TEXT RATHER THAN A
-                      DISABLED CONTROL. A greyed-out input invites a customer to try it and then explains
-                      why they cannot; a line of copy states the position once. UTILITY_CONNECT_ENABLED
-                      is the single authority, and conciergeQuote refuses a connected quantity on the
-                      server whatever this page renders. */}
-                  <div style={{ marginTop: 10, fontSize: 12, color: '#0d0d0d', lineHeight: 1.8 }}>
-                    <div>Uploaded source: {`$${CONCIERGE_SOURCE_USD.uploaded}`} each a year</div>
-                    <div style={{ color: 'var(--color-ink-muted)' }}>
-                      Connected source: {`$${CONCIERGE_SOURCE_USD.connected}`} each a year. Coming soon.
-                    </div>
-                  </div>
-
-                  {conciergeQ.quote && (
+                  {conciergeQ.quote && !conciergeQ.quote.requiresQuote && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f0efed', fontSize: 12, color: '#0d0d0d', lineHeight: 1.9 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span>{conciergeSources} data source{conciergeSources === 1 ? '' : 's'} a year</span>
-                        <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.sourcesUSD.toLocaleString()}`}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span>One-time onboarding, charged on your first Concierge order</span>
+                        <span>One-time onboarding, charged on your first Bill Review order</span>
                         <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.onboardingUSD.toLocaleString()}`}</span>
                       </div>
+                      {conciergeQ.quote.extraSources > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                          <span>{conciergeQ.quote.extraSources} extra data source{conciergeQ.quote.extraSources === 1 ? '' : 's'}, first year</span>
+                          <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{`$${conciergeQ.quote.sourcesUSD.toLocaleString()}`}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                   {conciergeQ.error && (

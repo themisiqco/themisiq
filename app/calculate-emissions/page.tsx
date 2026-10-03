@@ -20,7 +20,8 @@
 import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
-import { GHG_TIERS, CONCIERGE_SOURCE_USD, ghgEmployeeBandLabel } from '../../lib/pricing';
+import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
+import { BILL_REVIEW_DESCRIPTION } from '../../lib/pricingCopy';
 import Link from "next/link";
 import Footer from '../components/Footer'
 
@@ -45,7 +46,15 @@ const CONFIG = {
 // FAQ_LD so the cost answer can interpolate it. Same pattern as
 // app/climate-ghg/page.tsx:16.
 const ghgFrom = GHG_TIERS.starter.priceUSD?.toLocaleString('en-US');
-const ghgPro = GHG_TIERS.professional.priceUSD?.toLocaleString('en-US');
+// Every priced band, in order, from GHG_TIERS: "$550 a year for 1 to 49 employees, ... and $4,550 a year for ...".
+const GHG_PRICED_BANDS = (() => {
+  const parts = GHG_TIER_KEYS.filter(k => GHG_TIERS[k].priceUSD != null)
+    .map(k => `$${(GHG_TIERS[k].priceUSD as number).toLocaleString('en-US')} a year for ${ghgEmployeeBandLabel(k)}`);
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+})();
+// Bill Review (formerly Concierge): the entry onboarding price and what it includes (pricing-2026-10).
+const billReviewFrom = BILL_REVIEW_ONBOARDING_USD.ai.starter?.toLocaleString('en-US');
+const billReviewIncluded = BILL_REVIEW_INCLUDED_SOURCES.starter;
 
 // --- SEO ---------------------------------------------------------
 export const metadata: Metadata = {
@@ -110,7 +119,7 @@ const FAQ_LD = {
       name: "What data do I need to get started?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Your energy and fuel records - typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year, entered as annual or monthly totals. If your bills are incomplete, the Concierge add-on can tabulate them for you.",
+        text: "Your energy and fuel records - typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year, entered as annual or monthly totals. If your bills are incomplete, the Bill Review add-on can read them for you.",
       },
     },
     {
@@ -142,7 +151,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Concierge from $799; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Bill Review from $${billReviewFrom}, including the first year for ${billReviewIncluded} data sources; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
       },
     },
     {
@@ -174,7 +183,7 @@ const FAQ_LD = {
       name: "Is my data secure?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. AI is used in exactly two places, and nothing else in the platform uses it. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
+        text: "Your data belongs to you and is never sold or shared. It is encrypted in transit (TLS 1.2+) and at rest (AES-256) on infrastructure provided by Supabase on AWS, which holds SOC 2 Type II certification, with row-level security isolating it from every other customer at the database level. AI is used in exactly two places, and nothing else in the platform uses it. If you use the Bill Review add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you're on. Payments run through Stripe (PCI DSS Level 1). You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law 25, GDPR and UK GDPR, and CCPA.",
       },
     },
     {
@@ -529,7 +538,7 @@ export default function CalculateEmissionsPage() {
                 <div className="vnum">04</div>
                 <div className="vstep-body">
                   <div className="vstep-title">Enter your energy &amp; fuel data</div>
-                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals and enter them in the right fields. Your <strong>metric tons of CO&#8322;e for Scope 1 and Scope 2</strong> calculate in real time as you type. Missing any documents, or would rather have us calculate the totals? Our <a href="#support">Concierge service</a> is here for you, see below.</p>
+                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals and enter them in the right fields. Your <strong>metric tons of CO&#8322;e for Scope 1 and Scope 2</strong> calculate in real time as you type. Missing any documents, or would rather have us calculate the totals? Our <a href="#support">Bill Review service</a> is here for you, see below.</p>
                   <div className="calcchips">
                     <span className="chip">Electricity <b>1,200,000 kWh</b></span>
                     <span className="chip">Natural gas <b>8,500 therms</b></span>
@@ -572,9 +581,9 @@ export default function CalculateEmissionsPage() {
                 <div className="tier-when">Start here: the core report, covering Scope 1, 2 and 3.</div>
               </div>
               <div className="tier">
-                <div className="tier-name">Concierge</div>
-                <div className="tier-price">{`from $${CONCIERGE_SOURCE_USD.uploaded} per data source a year, plus a one-time onboarding fee`}</div>
-                <p>Missing invoices, or not comfortable tabulating the annual totals? Our Concierge add-on does the heavy lifting: we extract and total the data from your statements for you.</p>
+                <div className="tier-name">Bill Review</div>
+                <div className="tier-price">{`from $${billReviewFrom} onboarding, including the first year for ${billReviewIncluded} data sources`}</div>
+                <p>{BILL_REVIEW_DESCRIPTION}</p>
                 <div className="tier-when">Best when your bills are scattered or you&rsquo;d rather not key in numbers.</div>
               </div>
               <div className="tier">
@@ -585,7 +594,7 @@ export default function CalculateEmissionsPage() {
               </div>
             </div>
 
-            <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
+            <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: {GHG_PRICED_BANDS}; organizations with {ghgEmployeeBandLabel('enterprise')} are quoted. {GHG_SIZE_BASIS_NOTE}</p>
 
             <div className="support-cta">
               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>Ready to start? See your emissions instantly</Link>
@@ -638,7 +647,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>What data do I need to get started?</summary>
                 <div className="qa-body">
-                  Your <strong>energy and fuel records</strong>: typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year. You can enter annual or monthly totals. If your bills are incomplete or you&rsquo;d rather not add them up yourself, the <strong>Concierge</strong> add-on handles it for you.
+                  Your <strong>energy and fuel records</strong>: typically electricity bills and any natural gas, heating-fuel, or vehicle-fuel statements for your reporting year. You can enter annual or monthly totals. If your bills are incomplete or you&rsquo;d rather not add them up yourself, the <strong>Bill Review</strong> add-on handles it for you.
                 </div>
               </details>
 
@@ -685,11 +694,11 @@ export default function CalculateEmissionsPage() {
                   <ul className="price-list">
                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
                     <li><span className="pl-name">GHG module: Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
-                    <li><span className="pl-name">Concierge: we tabulate the data from your bills. One-time onboarding fee applies.</span><span className="pl-price">{`from $${CONCIERGE_SOURCE_USD.uploaded} per data source a year`}</span></li>
+                    <li><span className="pl-name">Bill Review: we read the figures from your bills, and you approve each one. Includes Verification Readiness.</span><span className="pl-price">{`from $${billReviewFrom}, first year for ${billReviewIncluded} sources included`}</span></li>
                     <li><span className="pl-name">Advisory: dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
                     <li><span className="pl-name">Scope 3: full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>
                   </ul>
-                  <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: from ${ghgFrom} a year for {ghgEmployeeBandLabel('starter')}, ${ghgPro} for {ghgEmployeeBandLabel('professional')}. Larger organisations are on higher tiers, and {ghgEmployeeBandLabel('enterprise')} are quoted.</p>
+                  <p className="usd-note">* All prices in USD. The GHG module is priced by company size, with unlimited locations on every plan: {GHG_PRICED_BANDS}; organizations with {ghgEmployeeBandLabel('enterprise')} are quoted. {GHG_SIZE_BASIS_NOTE}</p>
                 </div>
               </details>
 
@@ -717,7 +726,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>Is my data secure?</summary>
                 <div className="qa-body">
-                  Security is foundational here. Your data belongs to you: we never sell or share it. Everything is encrypted in transit (TLS&nbsp;1.2+) and at rest (AES-256), hosted on infrastructure provided by Supabase on AWS, which holds SOC&nbsp;2 Type&nbsp;II certification, with row-level security that isolates your data from every other customer at the database level. If you use the Concierge add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you&rsquo;re on. Payments run through <strong>Stripe</strong> (PCI&nbsp;DSS Level&nbsp;1), so we never see your card details. You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law&nbsp;25, GDPR and UK&nbsp;GDPR, and CCPA. Full detail is on our <Link href={CONFIG.TRUST_URL}>trust &amp; data page</Link>.
+                  Security is foundational here. Your data belongs to you: we never sell or share it. Everything is encrypted in transit (TLS&nbsp;1.2+) and at rest (AES-256), hosted on infrastructure provided by Supabase on AWS, which holds SOC&nbsp;2 Type&nbsp;II certification, with row-level security that isolates your data from every other customer at the database level. If you use the Bill Review add-on, the bills you upload are sent to our AI provider, Anthropic, to read the figures off them; the GHG guide sends only the questions you type into it and which step you&rsquo;re on. Payments run through <strong>Stripe</strong> (PCI&nbsp;DSS Level&nbsp;1), so we never see your card details. You can export your reports at any time and ask us to delete your data, and we comply with PIPEDA, Quebec Law&nbsp;25, GDPR and UK&nbsp;GDPR, and CCPA. Full detail is on our <Link href={CONFIG.TRUST_URL}>trust &amp; data page</Link>.
                 </div>
               </details>
 

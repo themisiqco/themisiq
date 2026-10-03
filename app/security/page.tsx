@@ -88,7 +88,7 @@ export default function Page() {
               // via: null, for the reason the badge comment below gives — this card names no
               // third-party certification, so there is nothing to attribute. It names a data
               // flow, which is what a reader looking for subprocessors came here to find.
-              { title: 'AI processing: Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Concierge add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI: framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
+              { title: 'AI processing: Anthropic', via: null, status: null, body: 'Two features send data to Anthropic. The Bill Review add-on sends the source documents you upload, so the figures can be read off them; the GHG guide sends the questions you type and which step you are on. Nothing else in the platform uses AI: framework classification and risk scoring are rules-based. Customer data is never used to train or improve any model.' },
               { title: 'Backups: manual snapshots today', via: null, status: 'In progress', body: 'Supabase Free provides no point-in-time recovery. Backups today are manual pg_dump snapshots, held in two locations and verified by SHA-256 checksum. Continuous PITR arrives with the Supabase Pro upgrade, targeted before commercial launch on 1 November 2026. Retention window, cross-region replication and RTO/RPO figures will be stated here once Pro is live and a restore has been tested.' },
             ].map(({ title, via, status, body }) => (
               <div key={title} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1.5rem', position: 'relative' as const, overflow: 'hidden' }}>
@@ -136,7 +136,7 @@ export default function Page() {
               ['Encryption in transit', 'All data transmitted to and from ThemisIQ is encrypted using TLS 1.2 or higher. TLS 1.0 and 1.1 are disabled.'],
               ['Encryption at rest', 'All data at rest is encrypted using AES-256 at the storage layer via AWS-managed encryption keys.'],
               ['Account isolation', 'Your data is isolated at the database level. Row-Level Security is enabled on every table and scoped to the authenticated user, so one account cannot read another account\u2019s rows. A small number of server-side operations run with elevated database privileges; these are limited to named API routes and are not reachable from the browser.'],
-              ['Audit trail: GHG, CBAM and concierge', 'Every change to your GHG inventory, CBAM disclosure and concierge bill-extraction data is written to an audit log by a database trigger, not by the application, so the entry is recorded even if the application is bypassed. Seven tables carry the trigger: the GHG inventory and entry tables, two CBAM disclosure tables, and the three concierge job, document and proposal tables. The log is append-only: no update or delete permission on it is granted to any signed-in account. Other modules are not yet covered.'],
+              ['Audit trail: GHG, CBAM and Bill Review', 'Every change to your GHG inventory, CBAM disclosure and Bill Review bill-extraction data is written to an audit log by a database trigger, not by the application, so the entry is recorded even if the application is bypassed. Seven tables carry the trigger: the GHG inventory and entry tables, two CBAM disclosure tables, and the three Bill Review job, document and proposal tables. The log is append-only: no update or delete permission on it is granted to any signed-in account. Other modules are not yet covered.'],
             ].map(([title, body], i) => (
               <div key={i} style={{ borderBottom: '0.5px solid #e8e7e4', padding: '14px 0' }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>{title}</div>
@@ -149,7 +149,7 @@ export default function Page() {
             <div style={eyebrow}>Access control</div>
             <h2 style={sectionTitle}>Who can access your data.</h2>
             {[
-              ['Account-level access', 'Your data belongs to the account that created it, and access is per account: signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organisation.'],
+              ['Account-level access', 'Your data belongs to the account that created it, and access is per account: signing in with your own credentials is what reaches your data, and no other account can. ThemisIQ does not offer shared team accounts or per-user permissions within an organization.'],
               ['Who operates ThemisIQ', `ThemisIQ is operated by its founder, with one named deputy for continuity. Production access is held by those two accounts and no others. ${ACCESS_NO_STANDING}`],
               ['Multi-factor authentication', 'Every account with production access (Supabase, Vercel and GitHub) has multi-factor authentication enrolled via authenticator app. We recommend enabling MFA on your own ThemisIQ account as well.'],
             ].map(([title, body], i) => (

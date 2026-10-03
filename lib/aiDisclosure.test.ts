@@ -78,8 +78,8 @@ const FACTS: Fact[] = [
   },
   {
     id: 2,
-    name: 'Concierge document reading is named as a use',
-    accepts: [/Concierge[^']*?(read|figures|bills|documents|tabulat)/i, /(read|figures|bills|documents)[^']*?Concierge/i],
+    name: 'Bill Review document reading is named as a use',
+    accepts: [/Bill Review[^']*?(read|figures|bills|documents|tabulat)/i, /(read|figures|bills|documents)[^']*?Bill Review/i],
     why: 'this is the use that sends a customer document off our infrastructure, so it is the one that matters most',
   },
   {

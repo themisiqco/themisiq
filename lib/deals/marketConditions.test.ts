@@ -98,7 +98,7 @@ describe('cost section wording', () => {
   it('a GHG row with neither headcount nor locations shows the floor, its note unchanged', () => {
     const m = buildDealReportModel(NOT_ASSESSED_DEAL, FIXTURE_GENERATED_AT)
     const ghg = m.cost.recommended.rows.find(r => r.label === 'GHG inventory & Scope 3')!
-    expect(ghg.themisIq).toBe('From USD 475')
+    expect(ghg.themisIq).toBe('From USD 550')
     expect(ghg.scopeNote).toContain('Not priced: neither headcount nor location count was provided.')
   })
 })

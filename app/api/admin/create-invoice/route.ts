@@ -32,24 +32,17 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 import {
   ALL_MODULE_KEYS,
   TIER_PRICING,
-  ADDONS,
-  addOnRequirementsMet,
   configuratorPrice,
   cartQuote,
   NEW_PRICING_ACTIVE,
-  conciergeQuote,
-  isFirstConciergePurchase,
-  CONCIERGE_KEY,
-  LEGACY_CONCIERGE_KEYS,
-  UTILITY_CONNECT_ENABLED,
   ghgTierMetaValue,
   isGhgTier,
   isLegacyTier,
   type Tier,
   type GhgTier,
   type ModuleKey,
-  type AddOnKey,
 } from '../../../../lib/pricing'
+import { billReviewOrder, type OwnedRow } from '../../../../lib/billReviewOrder'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -58,8 +51,8 @@ interface CreateInvoiceBody {
   customerEmail?: string
   tier?: Tier
   moduleKeys?: ModuleKey[]
-  addOns?: AddOnKey[]
-  concierge?: { uploadedSources?: unknown; connectedSources?: unknown }
+  addOns?: unknown[]   // refused since Oct 2026
+  concierge?: { uploadedSources?: unknown; connectedSources?: unknown; reading?: unknown }   // Bill Review
   daysUntilDue?: number
 }
 
@@ -100,8 +93,8 @@ export async function POST(req: NextRequest) {
     const lines: { label: string; amount: number }[] = []
     const entitlements = new Set<string>()
     const sources: string[] = []
-    // GHG location ceiling for the ghg entitlement row. Mirrors app/api/checkout/route.ts:67 —
-    // null means the metadata key is written EMPTY, which the webhook reads as uncapped.
+    // The GHG tier on this invoice, recorded so the webhook can write entitlements.ghg_tier; it also prices
+    // Bill Review onboarding. Mirrors app/api/checkout/route.ts.
     let ghgTierForMeta: GhgTier | null = null
     let conciergeMeta: Record<string, string> = {}
 
@@ -151,100 +144,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // The location-band Concierge add-ons were removed in Oct 2026 (pricing-2026-10).
     if (body.addOns && body.addOns.length > 0) {
-      for (const addOnKey of body.addOns) {
-        const addOn = ADDONS[addOnKey]
-        if (!addOn) {
-          return NextResponse.json({ error: `Unknown add-on: ${addOnKey}` }, { status: 400 })
-        }
-       // Requirement check (modules + add-on prerequisites) via single authority.
-        // `entitlements` holds both modules and add-on keys; split via ADDONS lookup.
-        const entArr = [...entitlements]
-        const moduleEnts = entArr.filter((k) => !(k in ADDONS)) as ModuleKey[]
-        const addOnEnts = [
-          ...entArr.filter((k) => k in ADDONS),
-          ...(body.addOns ?? []),
-        ] as AddOnKey[]
-        const check = addOnRequirementsMet(addOnKey, moduleEnts, addOnEnts)
-        if (!check.ok) {
-          return NextResponse.json({ error: check.reason }, { status: 400 })
-        }
-        lines.push({ label: addOn.label, amount: addOn.price })
-        entitlements.add(addOn.key)
-        sources.push(`addon:${addOnKey}`)
-      }
+      return NextResponse.json({ error: 'That add-on is no longer sold. Bill Review is invoiced with its number of data sources.' }, { status: 400 })
     }
 
-    // Concierge on the source-based model. Mirrors section 2d of app/api/checkout/route.ts,
-    // including the connected-source refusal, the tier validation and the fee derivation.
-    // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because
-    // this runs as admin for someone else and there is no RLS scoping to rely on. And there is no
-    // >$10k block: this route IS the invoice path, so a large Concierge order belongs here.
+    // Bill Review (internal name: concierge), through lib/billReviewOrder.ts exactly as checkout.
+    // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because this runs as
+    // admin for someone else and there is no RLS scoping to rely on. And there is no >$10k block: this route IS
+    // the invoice path, so a large order belongs here.
     if (body.concierge) {
-      const legacyInCart = (body.addOns ?? []).some((k) => (LEGACY_CONCIERGE_KEYS as readonly string[]).includes(k))
-      if (legacyInCart) {
-        return NextResponse.json(
-          { error: 'Concierge was selected twice, on both the old and the new model.' },
-          { status: 400 },
-        )
-      }
-
-      const uploadedSources = body.concierge.uploadedSources as number
-      const connectedSources = body.concierge.connectedSources as number | undefined
-
-      if (!UTILITY_CONNECT_ENABLED && typeof connectedSources === 'number' && connectedSources > 0) {
-        return NextResponse.json(
-          { error: 'Connected utility sources are not available yet. Invoice uploaded sources only.' },
-          { status: 400 },
-        )
-      }
-
       const { data: ownedRows, error: ownedErr } = await supabaseAdmin
         .from('entitlements')
-        .select('module_key')
+        .select('module_key, ghg_tier, term_end')
         .eq('user_id', userId)
       if (ownedErr) {
         console.error('[admin-invoice] entitlement read failed:', ownedErr.message)
         return NextResponse.json({ error: 'Could not read the customer entitlements.' }, { status: 503 })
       }
-      const ownedKeys = (ownedRows ?? []).map((r) => r.module_key)
-
-      const ghgInCart = entitlements.has('ghg')
-      if (!ghgInCart && !ownedKeys.includes('ghg')) {
-        return NextResponse.json(
-          { error: 'Concierge requires the GHG module. Add it to this invoice or grant it first.' },
-          { status: 400 },
-        )
-      }
-
-      // ⚠️ NO TIER IS NEEDED HERE ANY MORE. Mirrors the same removal in app/api/checkout/route.ts:
-      // onboarding was priced by GHG tier, which forced a derivation from the customer's stored
-      // location allowance whenever GHG was not on the same invoice. That derivation went inert
-      // when locations became unlimited. The fee is flat, so the question is not asked.
-      const isFirstPurchase = isFirstConciergePurchase(ownedKeys)
-
-      let quote
-      try {
-        quote = conciergeQuote({ uploadedSources, connectedSources, isFirstPurchase })
-      } catch (e) {
-        return NextResponse.json({ error: (e as Error).message.replace(/^conciergeQuote: /, '') }, { status: 400 })
-      }
-
-      for (const line of quote.lines) {
-        // ⚠️ QUANTITY IS FLATTENED INTO THE AMOUNT AND NAMED IN THE LABEL. stripe.invoiceItems.create
-        // below takes a single `amount`, not a unit price and a count, so the multiplication happens
-        // here. The label carries the count so the customer can check the arithmetic on the invoice.
+      const cartTier = entitlements.has('ghg') ? ghgTierForMeta : null
+      const order = billReviewOrder(body.concierge, cartTier, (ownedRows ?? []) as OwnedRow[], new Date())
+      if (!order.ok) return NextResponse.json({ error: order.error }, { status: order.status })
+      for (const line of order.quote.lines) {
+        // ⚠️ QUANTITY IS FLATTENED INTO THE AMOUNT AND NAMED IN THE LABEL. stripe.invoiceItems.create takes a
+        // single `amount`, so the multiplication happens here and the label carries the count.
         const label = line.quantity > 1 ? `${line.label} x ${line.quantity}` : line.label
         lines.push({ label, amount: line.unitUSD * line.quantity })
       }
-      entitlements.add(CONCIERGE_KEY)
-      conciergeMeta = {
-        concierge_uploaded_sources: String(uploadedSources),
-        concierge_connected_sources: String(connectedSources ?? 0),
-        concierge_source_allowance: String(uploadedSources + (connectedSources ?? 0)),
-        concierge_onboarding_usd: String(quote.onboardingUSD),
-      }
-      sources.push(`concierge:${uploadedSources}u+${connectedSources ?? 0}c${isFirstPurchase ? '+onboarding' : ''}`)
+      entitlements.add(order.grant)
+      conciergeMeta = order.meta
+      sources.push(order.source)
     }
 
     if (lines.length === 0) {
