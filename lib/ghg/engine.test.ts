@@ -33,6 +33,7 @@ import {
   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
   documentsBacking, deriveStoredLocations, factorDerivationsFor,
   canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
+  valueProblem, NO_VALUE_MESSAGE, proposalNeedsAttention,
 } from './engine';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE } from './coverageActions';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
@@ -102,7 +103,7 @@ describe('GROUP A — straddle', () => {
     for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
       const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes(choice)]);
       expect(rows.filter(r => r.gwp_basis === 'coverage_resolution'), choice).toEqual([]);
-      expect(ngRow(rows)?.proration_note, choice).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
+      expect(ngRow(rows)?.proration_note, choice).toBe('20 December 2024 to 19 January 2025: 12 of 31 days in reporting year 2024, ×0.387');
     }
   });
 
@@ -3470,7 +3471,7 @@ describe('T1 billContributions', () => {
     const unparseable = INVALID_PERIOD_MESSAGE.unparseable('bill_jan.pdf', 'Jan 2025', '2025-01-31');
     const reversed = INVALID_PERIOD_MESSAGE.reversed('bill_mar.pdf', '2025-03-10', '2025-03-01');
     expect(unparseable).toBe('The billing period on bill_jan.pdf could not be read as dates ("Jan 2025" to "2025-01-31"). Enter the dates as they appear on the bill.');
-    expect(reversed).toBe('The billing period on bill_mar.pdf ends before it starts (2025-03-10 to 2025-03-01). Check the dates and correct them.');
+    expect(reversed).toBe('The billing period on bill_mar.pdf ends before it starts (10 March 2025 to 1 March 2025). Check the dates and correct them.');
     expect(unparseable).not.toBe(reversed);
     for (const m of [unparseable, reversed]) expect(m).not.toMatch(/\u2014|invalid_period|periodProblem/);
   });
@@ -3597,7 +3598,7 @@ describe('T2 applyResolutions folds billContributions', () => {
     expect(a.value).toBeCloseTo(310 * 19 / 31 + 310 * 17 / 31, 9);
     expect(a.adjustment).toMatchObject({ kind: 'prorate', method: 'Prorated by billing days' });
     expect(a.adjustment?.basis).toBe(
-      '2024-12-20 to 2025-01-19: 19 of 31 days in reporting year 2025, ×0.613; then 2025-12-15 to 2026-01-14: 17 of 31 days in reporting year 2025, ×0.548');
+      '20 December 2024 to 19 January 2025: 19 of 31 days in reporting year 2025, ×0.613; then 15 December 2025 to 14 January 2026: 17 of 31 days in reporting year 2025, ×0.548');
   });
 
   it('the extrapolation gross-up applies AFTER the fold, and the gross-up drives the stamp', () => {
@@ -3606,7 +3607,7 @@ describe('T2 applyResolutions folds billContributions', () => {
     const a = applied(l, [ext], 2025).natural_gas_amount;
     expect(a.value).toBeCloseTo((310 * 19 / 31) * (12 / 6), 9);
     expect(a.adjustment?.kind).toBe('extrapolate');
-    expect(a.adjustment?.basis.startsWith('2024-12-20 to 2025-01-19: 19 of 31 days in reporting year 2025, ×0.613; then ')).toBe(true);
+    expect(a.adjustment?.basis.startsWith('20 December 2024 to 19 January 2025: 19 of 31 days in reporting year 2025, ×0.613; then ')).toBe(true);
     const row = buildWorkings([{ ...l, has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf' }], 'AR6', 2025, [ext]).find(r => r.source === 'Natural gas');
     expect(row?.entry_method).toBe('concierge-extrapolated');
     expect(row?.proration_note).toBeUndefined();
@@ -3630,7 +3631,7 @@ describe('T2 applyResolutions folds billContributions', () => {
   it('the proration note has no em dash and names each bill, its days and its share', () => {
     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, []);
     const note = ngRow(rows)?.proration_note as string;
-    expect(note).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
+    expect(note).toBe('20 December 2024 to 19 January 2025: 12 of 31 days in reporting year 2024, ×0.387');
     expect(note).not.toContain('\u2014');
   });
 
@@ -3683,7 +3684,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
   ] });
   const issues = (l: Location, y: number, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], y, 12, r);
   const value = (l: Location, y: number, r: CoverageResolution[] = []) => applyResolutions(l, r, W(y).start, W(y).end).electricity_kwh?.value;
-  const OVERLAP_MSG = 'bill2.pdf and monthOnly.pdf cover the same days (2026-01-01 to 2026-01-31). Choose Same bill, count it once, or Different meters or accounts.';
+  const OVERLAP_MSG = 'bill2.pdf and monthOnly.pdf cover the same days (1 January 2026 to 31 January 2026). Choose Same bill, count it once, or Different meters or accounts.';
 
   it('Scenario B + Bill 2, FY2026: overlap raised with a message naming both documents and the shared days', () => {
     expect(issues(scenarioB(), 2026).filter(i => i.status === 'overlap')).toEqual([
@@ -3797,7 +3798,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
       expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount, 'a typed figure supersedes used none').toBeUndefined();
       expect(applyResolutions(rejected(0), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'nothing typed: used none is 0').toBe(0);
       const row = buildWorkings([rejected()], 'AR6', 2025, [usedNone]).find(w => w.gwp_basis === 'coverage_resolution');
-      expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example at 2026-03-01T10:00:00Z');
+      expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example on 1 March 2026');
       expect(row?.resolved_at).toBe('2026-03-01T10:00:00Z');
     });
 
@@ -3942,11 +3943,11 @@ describe('T3a reportingYearLabel', () => {
 
   it('the proration note uses it: December and March year ends, with no em dash', () => {
     const dec = ngRow(buildWorkings([straddleGasLoc()], 'AR6', 2024, []))?.proration_note as string;
-    expect(dec).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
+    expect(dec).toBe('20 December 2024 to 19 January 2025: 12 of 31 days in reporting year 2024, ×0.387');
     const mar = loc({ has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
       source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2025-03-20', periodEnd: '2025-04-19' })])] });
     const note = ngRow(buildWorkings([mar], 'AR6', 2025, [], 3))?.proration_note as string;
-    expect(note).toBe('2025-03-20 to 2025-04-19: 12 of 31 days in the year ending 31 March 2025, ×0.387');
+    expect(note).toBe('20 March 2025 to 19 April 2025: 12 of 31 days in the year ending 31 March 2025, ×0.387');
     for (const n of [dec, note]) expect(n).not.toContain('\u2014');
   });
 
@@ -4709,7 +4710,7 @@ describe('T10b delivery-based fuels', () => {
     expect(got.some(i => i.status === 'gap')).toBe(false);
     expect(got.filter(i => i.status === 'deliveries_unconfirmed')).toEqual([{ locId: 'L1', fuelType: 'propane', status: 'deliveries_unconfirmed',
       documentType: 'fuel_propane', docIds: ['lpg1', 'lpg2', 'lpg3', 'lpg4', 'lpg5', 'lpg6'],
-      message: 'Confirm that the 6 propane deliveries listed for Melbourne are all the propane deliveries between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
+      message: 'Confirm these are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
   });
 
   it('the confirmation names fuel, site and window, records who and when, clears the issue and reaches the workings', () => {
@@ -4720,7 +4721,7 @@ describe('T10b delivery-based fuels', () => {
     expect(validateResolution(r, l)).toBeNull();
     expect(issues(l, [r])).toEqual([]);
     const row = buildWorkings([l], 'AR6', 2025, [r], 9).find(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'deliveries_complete');
-    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com at 2025-10-02T09:00:00Z');
+    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com on 2 October 2025');
     expect(row?.ef_source).toBe(r.note);
   });
 
@@ -4826,5 +4827,31 @@ describe('T10b delivery-based fuels', () => {
   it('sameDocSet ignores order', () => {
     expect(sameDocSet(['a', 'b'], ['b', 'a'])).toBe(true);
     expect(sameDocSet(['a', 'b'], ['a'])).toBe(false);
+  });
+});
+
+describe('T10c run-through wording', () => {
+  it('a bill with no figure: the default message, or the quote and fuel when the unit is one we cannot use', () => {
+    expect(NO_VALUE_MESSAGE).toBe("We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included.");
+    expect(valueProblem({ value: null })).toBe(NO_VALUE_MESSAGE);
+    expect(valueProblem({ value: null, sourceQuote: '6,944 ft3', fuelType: 'natural_gas', rawValue: 6944, rawUnit: 'ft3' }))
+      .toBe('We read "6,944 ft3" from this bill, but we can\'t use that unit for natural gas yet. Choose the unit from the list, or enter the figure yourself.');
+    expect(valueProblem({ value: null, sourceQuote: '6,944 MJ', fuelType: 'natural_gas', rawValue: 6944, rawUnit: 'mj' }), 'a unit we can convert')
+      .toBe(NO_VALUE_MESSAGE);
+    expect(valueProblem({ value: null, sourceQuote: '', fuelType: 'natural_gas', rawValue: 6944, rawUnit: 'ft3' }), 'no quote').toBe(NO_VALUE_MESSAGE);
+    expect(valueProblem({ value: 12 })).toBeNull();
+  });
+
+  it('only a bill confirmed with no figure needs attention', () => {
+    expect(proposalNeedsAttention({ status: 'confirmed', value: null })).toBe(true);
+    expect(proposalNeedsAttention({ status: 'confirmed', value: 5 })).toBe(false);
+    expect(proposalNeedsAttention({ status: 'extracted', value: null })).toBe(false);
+  });
+
+  it('the Australian source is named "DCCEEW NGA 2025" on every citation', () => {
+    for (const k of ['combustion_au', 'electricity_au', 'residual_au'] as const) {
+      expect(EF_SOURCES[k].startsWith('DCCEEW NGA 2025'), k).toBe(true);
+    }
+    expect(Object.values(EF_SOURCES).join(' ')).not.toMatch(/NGA Factors|National Greenhouse Accounts/);
   });
 });

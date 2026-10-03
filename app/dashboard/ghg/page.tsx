@@ -13,6 +13,9 @@ import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draf
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
+import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
+import { unitLabel } from '../../../lib/ghg/unitLabels'
+import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
 import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
 import { FigureInput } from './_components/FigureInput'
@@ -36,7 +39,7 @@ import {
   detectGridRegion, gridRegionForCountry, pickEF,
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf,
+  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
@@ -522,9 +525,29 @@ function exclusionBannerHeading(u: UnpriceableLocation): string {
     : "We can't work out this location's emissions yet"
 }
 function exclusionBannerTrailer(u: UnpriceableLocation, hasFigures: boolean): string {
-  return u.kind === 'country'
-    ? refusalBannerTrailer(u.refusal, hasFigures)
-    : "Until then this location is left out of your totals: it isn't counted as zero, and nothing else you've entered here is lost."
+  // T10c: the factor-gap sentence (unpriceablePanelMessage) already says the location is left out and nothing is
+  // lost, so it carries no trailer of its own.
+  if (u.kind === 'country') return refusalBannerTrailer(u.refusal, hasFigures)
+  return factorGapHasCountry(u) ? '' : "Until then this location is left out of your totals: it isn't counted as zero, and nothing else you've entered here is lost."
+}
+/** T10c: a factor gap on a location whose country is set, which gets the self-contained panel sentence. */
+function factorGapHasCountry(u: UnpriceableLocation): boolean {
+  return u.kind !== 'country' && !!(COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country))
+}
+
+/**
+ * T10c: the factor-gap sentence ON SCREEN. It must not imply the customer made a mistake: the gap is ours (a
+ * fuel billed in a unit we hold no factor for in that country), which FI1 and FI2 close. A location with no
+ * country set keeps its own sentence, because choosing the country is the customer's to do. The CSV keeps
+ * unpriceableMessage below.
+ */
+function unpriceablePanelMessage(u: UnpriceableLocation, hasFigures: boolean): string {
+  if (u.kind === 'country') return countryRefusalText(u.refusal, 'review', hasFigures)
+  const country = COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country)
+  if (!country) return unpriceableMessage(u, hasFigures)
+  const unit = UNIT_WORDS[u.unit] ?? u.unit
+  const fuel = FUEL_WORDS[u.fuel] ?? u.fuel.replace(/_/g, ' ')
+  return `We can't calculate ${fuel} billed in ${unit} for ${country} yet, so this location isn't included in your totals. Your other locations are unaffected, and nothing you've entered is lost.`
 }
 
 function unpriceableMessage(u: UnpriceableLocation, hasFigures: boolean): string {
@@ -598,7 +621,11 @@ const searchParams = useSearchParams()
   const [activeLocationRaw, setActiveLocation] = useState(0)
   const activeLocation = Math.min(activeLocationRaw, Math.max(0, inventory.locations.length - 1))
   const [saved, setSaved] = useState(false)
-  const [dirty, setDirty] = useState(false)
+  // T10c: UNSAVED WORK IS DERIVED, NOT FLAGGED. `baseline` is the fingerprint of the inventory as last loaded
+  // or saved (lib/ghg/unsavedChanges.ts); the page is dirty whenever the inventory differs from it, so every
+  // upload, confirmation, rejection, edit and resolution counts without each one having to say so. undefined:
+  // not yet established (first render); null: a restored draft, which matches nothing saved.
+  const [baseline, setBaseline] = useState<string | null | undefined>(undefined)
   const [isSaving, setIsSaving] = useState(false)
   // ⚠️ WHAT THE LAST SAVE REPORTED, FOR A CALLER THAT NEEDS TO KNOW. handleSave alerts and returns
   // on failure; it does not report back, and threading a return value through its five failure
@@ -693,7 +720,9 @@ const searchParams = useSearchParams()
       // Cleared on RESTORE, not on save: see the note in lib/ghg/draft.ts. Leaving it would restore
       // stale figures over a later edit on the next reload.
       clearGhgDraft()
-      setDirty(true)   // it is unsaved work: the Save button must not read as already saved
+      // it is unsaved work: the Save button must not read as already saved
+      skipSavedReset.current = false
+      setBaseline(null)
       setMode('wizard')
       return
     }
@@ -736,7 +765,7 @@ const searchParams = useSearchParams()
     // where no ?id is present, so there's no stale ?id to clear — switching mode in state is enough.
     setInventoryId(null)
     setSaved(false)
-    setDirty(false) // fresh inventory is pristine until the user types
+    skipSavedReset.current = true // fresh inventory is pristine until the user types: it becomes the baseline
     setStep(0)
     // A capture belongs to the inventory it was answered against. Carried into a new one it would
     // be written to that inventory's column as if the customer had answered a question about it.
@@ -839,10 +868,11 @@ const searchParams = useSearchParams()
   }, [inventoryId])
 
   useEffect(() => {
-    if (skipSavedReset.current) { skipSavedReset.current = false; return }
+    // A loaded or fresh inventory becomes the baseline; any later change makes the page dirty (T10c).
+    if (skipSavedReset.current) { skipSavedReset.current = false; setBaseline(inventoryFingerprint(inventory)); return }
     setSaved(false)
-    setDirty(true)
   }, [inventory])
+  const dirty = baseline !== undefined && hasUnsavedChanges(baseline, inventory)
   useEffect(() => {
     if (mode !== 'wizard' || !dirty) return
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
@@ -941,7 +971,6 @@ const searchParams = useSearchParams()
           setComparabilityNote('')
         }
         setSaved(true)
-        setDirty(false)
       }
     })
     // router is in the deps because a dead ?id= is cleared from the URL above; it is stable across renders.
@@ -1552,6 +1581,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   const handleSave = async () => {
     if (isSaving) return
+    // T10c: what this save writes. Recorded as the baseline on success, so an edit made while the save is
+    // in flight still reads as unsaved.
+    const savingFingerprint = inventoryFingerprint(inventory)
     lastSaveError.current = null
     setIsSaving(true)
     try {
@@ -1743,7 +1775,7 @@ workings: saved.workings,
       console.error('Monthly emissions write failed (annual save committed, unaffected):', e)
     }
     setSaved(true)
-    setDirty(false)
+    setBaseline(savingFingerprint)
     } finally { setIsSaving(false) }
   }
 
@@ -2134,8 +2166,10 @@ workings: saved.workings,
         {unpriceableById.get(loc.id) && (
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ {exclusionBannerHeading(unpriceableById.get(loc.id)!)}</div>
-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceableMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceablePanelMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
+            {exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc)) && (
+              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
+            )}
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
@@ -2149,7 +2183,7 @@ workings: saved.workings,
                       <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total natural gas: ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
+                  <Field label={`Total natural gas: ${inventory.reporting_year} (${unitLabel(loc.natural_gas_unit)})`} hint="Sum of the bills covering this year">
                     <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
@@ -2169,7 +2203,7 @@ workings: saved.workings,
                       <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
+                  <Field label={`Total propane purchased: ${inventory.reporting_year} (${unitLabel(loc.propane_unit)})`}>
                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
@@ -2287,7 +2321,7 @@ workings: saved.workings,
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Purchased electricity</div>
               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
-                <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
+                <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of the bills covering this year">
                   <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
                 </Field>
                 {validateElectricity(loc.electricity_kwh) && (
@@ -2473,7 +2507,7 @@ workings: saved.workings,
               {blockedHere ? (
                 <div style={{ padding: '2px 0 6px' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>⚠ {blockedHere.kind === 'country' ? refusalResultsHeading(blockedHere.refusal) : 'No results for this location yet'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceablePanelMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
                     Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
                   </div>
@@ -2509,10 +2543,10 @@ workings: saved.workings,
             </div>
             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)' }}>{totals_ar6.s1_total.toFixed(2)} mt Scope 1</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)' }}>{totals_ar6.s1_total.toFixed(2)} t CO₂e Scope 1</div>
               {gridReady
-                ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
-                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)' }}>— mt Scope 2</div><div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
+                ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} t CO₂e Scope 2</div>
+                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)' }}>— t CO₂e Scope 2</div><div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
               {/* Directly under the figure, not in a banner elsewhere on the page: a total that
                   leaves a location out has to say so where it is read, or the omission is silent
                   to anyone who does not scroll. */}
@@ -2563,7 +2597,7 @@ workings: saved.workings,
               <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require biogenic CO₂ emissions to be reported separately from fossil fuel emissions. Biogenic CO₂ comes from burning biomass, wood waste, or agricultural residues.</p>
               {inventory.locations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
-                  <Field label={`${loc.name}: Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
+                  <Field label={`${loc.name}: Biogenic CO₂ (t CO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
                     <input id={`figure-${loc.id}-biogenic_co2_mt`} type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
                   {/* Biogenic was the only figure in the wizard with no evidence path — every other
@@ -2639,40 +2673,40 @@ workings: saved.workings,
                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name}: GWP {fw.gwp}</div>
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 1</div>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                     </div>
                     <div style={{ marginBottom: 6 }}>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 2 (location)</div>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                     </div>
                     {(fw.id === 'esrs' || fw.id === 'gri') && (
                       <div style={{ marginBottom: 6 }}>
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 2 (market)</div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                       </div>
                     )}
                     {(fw.id === 'esrs' || fw.id === 'gri') && (
                       <div style={{ marginBottom: 6 }}>
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Biogenic CO₂ (reported separately)</div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                       </div>
                     )}
                     {totals.s3_td > 0 && (
                       <div style={{ marginBottom: 6 }}>
                         {/* Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Never folded into S1/S2. */}
                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 3 (Cat 3, electricity T&amp;D)</div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                       </div>
                     )}
                     {fw.id === 'cdp' && (
                       <>
                         <div style={{ marginBottom: 6 }}>
                           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                         </div>
                         <div style={{ marginBottom: 6 }}>
                           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                         </div>
                       </>
                     )}
@@ -2685,7 +2719,7 @@ workings: saved.workings,
                         as two identical lines one under the other. An intensity needs its own note
                         only where it appears WITHOUT the totals, which is the CSV RESULTS block and
                         the assurance package's summary table; both carry one. */}
-                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>S1 intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
+                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>S1 intensity: {(totals.s1_total / rev).toFixed(4)} t CO₂e per $M</div>}
                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
                     {/* Every figure in this card — both scopes, biogenic, the intensities — is built
                         from the same excluded set, so the note belongs to the card, not to one line. */}
@@ -2720,8 +2754,8 @@ workings: saved.workings,
                       {/* No numbers for a blocked location — not even a dash beside "S1:", which
                           still reads as a measured scope. The reason takes the figures' place. */}
                       {blocked
-                        ? <div style={{ fontSize: 12, color: 'var(--color-state-warn)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {blocked.kind === 'country' ? '' : 'Not included in any total. '}{unpriceableMessage(blocked, locationHasEnteredFigures(loc))}</div>
-                        : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
+                        ? <div style={{ fontSize: 12, color: 'var(--color-state-warn)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {blocked.kind !== 'country' && !factorGapHasCountry(blocked) ? 'Not included in any total. ' : ''}{unpriceablePanelMessage(blocked, locationHasEnteredFigures(loc))}</div>
+                        : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} t CO₂e · S2: {c!.s2_location.toFixed(2)} t CO₂e · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} t CO₂e</div>}
                     </div>
                     <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
                   </div>
@@ -3166,7 +3200,7 @@ workings: saved.workings,
       ['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(CSV_DP)],
       ['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(CSV_DP)],
       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (tCO₂e)', totals.s2_market.toFixed(CSV_DP)]] : []),
-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂): reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
+      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (t CO₂): reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
       // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
       ...(totals.s3_td > 0 ? [['Scope 3 Cat 3: electricity T&D (tCO₂e)', totals.s3_td.toFixed(CSV_DP)]] : []),
       ...(fw.id === 'cdp' ? [
@@ -3406,7 +3440,7 @@ workings: saved.workings,
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
-        {(step === 4 || step === 5) && dirty && (
+        {showUnsavedNudge({ mode, dirty }) && (
           /* ⚠️ IT DOES NOT TELL A 'none' VISITOR TO SAVE. Since 'none' stopped walling, this banner is
              reachable by someone whose Save cannot succeed: the trigger refuses the write, so "save your
              draft before exporting" names a step they cannot take. That arm says what is actually needed
@@ -3471,6 +3505,8 @@ workings: saved.workings,
 //
 // Record<ConciergeStatus, string> is EXHAUSTIVE BY TYPE: a member added to the union fails the
 // build here rather than rendering `undefined` in a pill.
+// T10c: shown in place of "Confirmed" for a bill confirmed with no figure (proposalNeedsAttention).
+const NEEDS_ATTENTION_BADGE = 'Needs attention'
 const PROPOSAL_BADGE: Record<ConciergeStatus, string> = {
   confirmed:           'Confirmed',
   extracted:           'To confirm',
@@ -3577,14 +3613,15 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                 <div key={pi} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>ThemisIQ read</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${unitLabel(p.unit, '')}` : '—'}</span>
                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
                     {/* T10b: a delivery shows its delivery date, not a one-day period. */}
                     {deliveryDateOf(docType, p) !== null
-                      ? <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· delivered {deliveryDateOf(docType, p)}</span>
-                      : (p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: PROPOSAL_BADGE_COLOUR[p.status].bg, color: PROPOSAL_BADGE_COLOUR[p.status].color }}>
-                      {PROPOSAL_BADGE[p.status]}
+                      ? <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· delivered {isoDateInWords(deliveryDateOf(docType, p))}</span>
+                      : (p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ? isoDateInWords(p.periodStart) : '?'} to {p.periodEnd ? isoDateInWords(p.periodEnd) : '?'}</span>}
+                    {/* T10c: a bill confirmed with no figure reads "Needs attention", never the green "Confirmed". */}
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: PROPOSAL_BADGE_COLOUR[proposalNeedsAttention(p) ? 'needs_manual_review' : p.status].bg, color: PROPOSAL_BADGE_COLOUR[proposalNeedsAttention(p) ? 'needs_manual_review' : p.status].color }}>
+                      {proposalNeedsAttention(p) ? NEEDS_ATTENTION_BADGE : PROPOSAL_BADGE[p.status]}
                     </span>
                   </div>
                   {p.sourceQuote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
@@ -3604,8 +3641,9 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       {p.status === 'confirmed' ? (
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
-                      ) : (
+                        proposalNeedsAttention(p) ? null : <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
+                      ) : periodEditing?.key === `${doc.id}:${pi}` && periodEditing.confirm ? null : (
+                        // T10c: hidden while the month-only date confirmation is open; that step has its own button.
                         // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.
                         <button disabled={valueProblem(p) !== null} onClick={() => valueProblem(p) ? undefined : acceptanceProblem(p)
                           ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
@@ -3621,7 +3659,11 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                     </div>
                   )}
                   {p.status !== 'rejected' && valueProblem(p) && (
-                    <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>{valueProblem(p)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>
+                      {valueProblem(p)}{' '}
+                      {/* T10c: the help entry, in a new tab so the wizard and its unsaved work stay open. */}
+                      <a href={`/climate-ghg#${CONFIRM_HELP_ID}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Why can&apos;t I confirm this bill?</a>
+                    </div>
                   )}
                   {/* T9: dates and unit, answered on the proposal itself; and where they came from. */}
                   {periodEditing?.key === `${doc.id}:${pi}` && (

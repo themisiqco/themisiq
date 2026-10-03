@@ -266,8 +266,10 @@ describe('the GHG page surfaces', () => {
     expect(notes, 'exactly one exclusion note between the intensity and the end of the card').toBe(1)
   })
 
-  it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch', () => {
-    expect(PAGE).toContain("{blocked.kind === 'country' ? '' : 'Not included in any total. '}")
+  it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch on a location with no country', () => {
+    // T10c: a factor gap on a location whose country is set has its own sentence, which says it is not in the
+    // totals, so only the no-country case keeps the prefix.
+    expect(PAGE).toContain("{blocked.kind !== 'country' && !factorGapHasCountry(blocked) ? 'Not included in any total. ' : ''}")
   })
 
   it('no surface carries a hard-coded publisher catalogue any more', () => {

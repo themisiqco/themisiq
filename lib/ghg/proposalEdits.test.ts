@@ -243,6 +243,6 @@ describe('T10a: a proposal with no figure can never be confirmed', () => {
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
     expect(page).toContain('<button disabled={valueProblem(p) !== null}')
     expect(page).toContain("{p.status !== 'rejected' && valueProblem(p) && (")
-    expect(NO_VALUE_MESSAGE).toBe('No figure could be read from this bill. Edit the unit or the figure, or reject the bill.')
+    expect(NO_VALUE_MESSAGE).toBe("We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included.")
   })
 })

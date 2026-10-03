@@ -18,7 +18,8 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
-import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ } from '../unitConversions'
+import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, convertToCanonical, type FuelType } from '../unitConversions'
+import { dateInWords, isoDateInWords } from './dateWords'
 // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
 // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
 import { NOT_PROVIDED } from '../notProvided'
@@ -797,7 +798,7 @@ const EF_SOURCES = {
   //   ⚠️ TWO TESTS CONSTRAIN THIS STRING. F16 requires every token of COMBUSTION_EDITION.EU
   // ('IPCC 2006') to appear in it; F17 requires a four-digit year in parentheses. Keep '(2006)'.
   combustion_eu: 'EU MRR Reg. (EU) 2018/2066, Annex VI Table 1 — IPCC (2006) Vol.2 defaults; published mass-basis, per-volume derived',
-  combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
+  combustion_au: 'DCCEEW NGA 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
   // ── STEAM / DISTRICT HEAT — NAMED TO THE TABLE, UNLIKE combustion ─────────────────────────────
   // These cite the exact table, which combustion above does NOT ('US EPA (2024) Emission Factors for
@@ -828,11 +829,11 @@ const EF_SOURCES = {
   // if GRID_EF.UK ever collapses back to a single edition.
   electricity_uk: defraCitation(),
   electricity_eu: 'EEA (2023) Greenhouse gas emission intensity of electricity generation',
-  electricity_au: 'DCCEEW NGA Factors 2025',
+  electricity_au: 'DCCEEW NGA 2025',
   electricity_nz: 'NZ MfE Measuring Emissions 2026 v2',
   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
-  residual_au: 'DCCEEW National Greenhouse Accounts Factors 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
+  residual_au: 'DCCEEW NGA 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
   // ⚠️ NOTHING IS SELECTABLE. gwp_ar4 and gwp_ar5 said "selectable alternate" from f83326a (20 Jun 2026)
   // until 17 Sep 2026; git history holds no selector, parameter or saved preference by which any inventory
   // could choose either, then or since. The basis comes from FRAMEWORKS[].gwp, which is AR6 for all six.
@@ -1753,10 +1754,8 @@ export function reportingYearLabel(win: { start: Date; end: Date }): { label: st
   return { label: ending, inText: ending }
 }
 
-/** A calendar date in words, "1 October 2024": the date itself, in local time. */
-export function dateInWords(d: Date): string {
-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
-}
+// T10c: dates in words come from lib/ghg/dateWords.ts, the one place they are built; re-exported for callers.
+export { dateInWords, isoDateInWords }
 
 /**
  * T10b: the words of the completeness confirmation, naming the fuel, the site and the window (ruling):
@@ -3066,8 +3065,8 @@ function resolutionMethod(r: CoverageResolution): string {
   return r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
     : r.kind === 'same_bill' ? 'Same bill, counted once'
     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
-    : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
-    : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
+    : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
+    : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
     : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
     : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
     : r.kind
@@ -3232,8 +3231,9 @@ export const COVERAGE_MESSAGE = {
     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
   // T10b: a delivery-based fuel is checked for completeness, not monthly coverage. Until the customer confirms
   // the deliveries listed are all of them, export waits.
-  deliveries_unconfirmed: (n: number, fuel: string, site: string, from: string, to: string) =>
-    `Confirm that the ${n} ${fuel} deliver${n === 1 ? 'y' : 'ies'} listed for ${site} ${n === 1 ? 'is' : 'are'} all the ${fuel} deliveries between ${from} and ${to}. Export is blocked until you confirm.`,
+  // T10c: no count; the list beside it shows the deliveries.
+  deliveries_unconfirmed: (fuel: string, site: string, from: string, to: string) =>
+    `Confirm these are all the ${fuel} deliveries for ${site} between ${from} and ${to}. Export is blocked until you confirm.`,
   deliveries_changed: (fuel: string, site: string, email: string, date: string) =>
     `The ${fuel} deliveries for ${site} have changed since ${email} confirmed them on ${date}. Check the list and confirm again. Export is blocked until you do.`,
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
@@ -3363,15 +3363,37 @@ export function acceptanceProblem(p: Pick<ExtractedProposal, 'periodOrigin' | 'p
   return periodOriginOf(p) === 'billing_month' ? BILLING_MONTH_CONFIRM_MESSAGE : null
 }
 
-/** T10a: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
-export const NO_VALUE_MESSAGE = 'No figure could be read from this bill. Edit the unit or the figure, or reject the bill.'
+/** T10a, worded by T10c: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
+export const NO_VALUE_MESSAGE =
+  "We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included."
+/** T10c: the same, when a figure and unit were read but the unit is one the conversion cannot use. */
+export const NO_VALUE_UNIT_MESSAGE = (quote: string, fuel: string): string =>
+  `We read "${quote}" from this bill, but we can't use that unit for ${fuel} yet. Choose the unit from the list, or enter the figure yourself.`
 
 /**
  * T10a: a proposal with no figure (value null: an unreadable number, or a unit with no conversion) can never be
  * confirmed. Confirming it counted nothing and raised nothing, so the figure fell to zero in silence.
+ * T10c: when the reading has a quote and a unit the conversion does not recognise (the same test that left the
+ * figure empty at extraction), the message names the quote and the fuel.
  */
-export function valueProblem(p: Pick<ExtractedProposal, 'value'>): string | null {
-  return p.value == null ? NO_VALUE_MESSAGE : null
+export function valueProblem(
+  p: Pick<ExtractedProposal, 'value'> & Partial<Pick<ExtractedProposal, 'sourceQuote' | 'fuelType' | 'rawValue' | 'rawUnit'>>,
+): string | null {
+  if (p.value != null) return null
+  const quote = (p.sourceQuote ?? '').trim()
+  if (quote && p.rawUnit && p.fuelType && convertToCanonical(p.fuelType as FuelType, p.rawValue ?? null, p.rawUnit).tier === 3) {
+    return NO_VALUE_UNIT_MESSAGE(quote, FUEL_NAME[p.fuelType] ?? p.fuelType.replace(/_/g, ' '))
+  }
+  return NO_VALUE_MESSAGE
+}
+
+/**
+ * T10c: a bill confirmed with no figure (possible only for one confirmed before T10a) is shown as "Needs
+ * attention", never with the green "Confirmed" badge. Display only: the stored status and the export-blocking
+ * no_value issue are unchanged.
+ */
+export function proposalNeedsAttention(p: Pick<ExtractedProposal, 'status' | 'value'>): boolean {
+  return p.status === 'confirmed' && p.value == null
 }
 
 export type InvalidPeriodKind = 'unparseable' | 'reversed'
@@ -3380,8 +3402,9 @@ export type InvalidPeriodKind = 'unparseable' | 'reversed'
 export const INVALID_PERIOD_MESSAGE: Record<InvalidPeriodKind, (fileName: string, start: string, end: string) => string> = {
   unparseable: (fileName, start, end) =>
     `The billing period on ${fileName} could not be read as dates ("${start}" to "${end}"). Enter the dates as they appear on the bill.`,
+  // T10c: real dates are shown in words; the unparseable message above keeps the stored text, as evidence.
   reversed: (fileName, start, end) =>
-    `The billing period on ${fileName} ends before it starts (${start} to ${end}). Check the dates and correct them.`,
+    `The billing period on ${fileName} ends before it starts (${isoDateInWords(start)} to ${isoDateInWords(end)}). Check the dates and correct them.`,
 }
 
 // A stored period date that is a real calendar date in yyyy-mm-dd form. parseLocalDate reads the first ten
@@ -3617,7 +3640,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
       // basis states the REAL arithmetic, in application order (per-bill proration, THEN extrapolate).
       const meterTag = (m: string | null) => (m == null ? '' : `${m}: `)
       const parts: string[] = prorated.map(c =>
-        `${meterTag(c.meterLabel)}${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in ${yearText}, ×${(c.share ?? 0).toFixed(3)}`)
+        `${meterTag(c.meterLabel)}${isoDateInWords(c.periodStart)} to ${isoDateInWords(lastCoveredDay(c.periodEndExclusive as string))}: ${c.inWindowDays} of ${c.totalDays} days in ${yearText}, ×${(c.share ?? 0).toFixed(3)}`)
       for (const e of extrs) parts.push(`${meterTag(e.meter)}${resolutionBasis(e.r)}`)
       // primary drives kind + method: extrapolate (the gross-up) if present, else proration.
       const kind: NonNullable<AppliedField['adjustment']>['kind'] = extrs.length > 0 ? 'extrapolate' : 'prorate'
@@ -4217,8 +4240,6 @@ export function findUnresolvedCoverage(
   allResolutions: CoverageResolution[]
 ): CoverageIssue[] {
   const coverageWin = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
-  const isoDay = (d: Date): string =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return locations.flatMap(loc => {
     const resolutions = acceptedResolutions(loc, allResolutions)
     const site = loc.name || 'Location'
@@ -4326,7 +4347,7 @@ export function findUnresolvedCoverage(
       out.push({ locId: loc.id, fuelType: g.fuelType, status: 'deliveries_unconfirmed', documentType: g.documentType, docIds,
         message: conf
           ? COVERAGE_MESSAGE.deliveries_changed(fuel, site, conf.by?.email ?? 'someone', dateInWords(new Date(conf.acknowledgedAt)))
-          : COVERAGE_MESSAGE.deliveries_unconfirmed(g.n, fuel, site, dateInWords(coverageWin.start), dateInWords(coverageWin.end)) })
+          : COVERAGE_MESSAGE.deliveries_unconfirmed(fuel, site, dateInWords(coverageWin.start), dateInWords(coverageWin.end)) })
     }
 
     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
@@ -4356,7 +4377,7 @@ export function findUnresolvedCoverage(
         const toExcl = endA < endB ? endA : endB
         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
         out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,
-          message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), isoDay(from), isoDay(to)) })
+          message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), dateInWords(from), dateInWords(to)) })
       }
     }
     return out

@@ -130,7 +130,8 @@ export function ModuleArrivals({ items }: { items: readonly { title: string; bod
  * `kind` when CBAM had a page where Climate Risk had documents. A single string still renders as one
  * block, so nothing else changes.
  */
-export type Faq = { q: string; a: string; extra?: string | readonly string[] }
+// `id` (T10c): an anchor, so a product screen can link straight to one answer.
+export type Faq = { q: string; a: string; extra?: string | readonly string[]; id?: string }
 
 export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
   items: readonly Faq[]
@@ -141,7 +142,7 @@ export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
       <h2 style={sectionTitle}>{heading}</h2>
       <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-line-strong)' }}>
         {items.map(q => (
-          <div key={q.q} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)' }}>
+          <div key={q.q} id={q.id} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)', scrollMarginTop: '5rem' }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-ink)', marginBottom: '0.5rem' }}>{q.q}</div>
             <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, maxWidth: '68ch' }}>{q.a}</div>
             {q.extra && (

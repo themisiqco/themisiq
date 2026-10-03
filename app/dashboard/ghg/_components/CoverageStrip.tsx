@@ -19,13 +19,14 @@
 import { useState } from 'react'
 import {
   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
-  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords,
+  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords, proposalNeedsAttention,
   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
 } from '../../../../lib/ghg/engine'
 import {
   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
   deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
 } from '../../../../lib/ghg/coverageActions'
+import { unitLabel } from '../../../../lib/ghg/unitLabels'
 
 export type CurrentUser = { userId: string; email: string }
 
@@ -52,6 +53,27 @@ const warnButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderR
 const plainButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' } as const
 const prompt = { fontWeight: 400, color: '#7c5a16' } as const
 const row = { marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } as const
+
+// The proposal Confirm button's style (page.tsx), so the deliveries confirmation reads as the same action.
+const confirmButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' } as const
+
+/**
+ * T10c: the deliveries confirmation. The statement is a checkbox the customer ticks, and "Confirm deliveries"
+ * records it, enabled only once ticked. Its own component so each fuel keeps its own tick.
+ */
+function DeliveriesConfirm({ statement, enabled, onConfirm }: { statement: string; enabled: boolean; onConfirm: () => void }) {
+  const [ticked, setTicked] = useState(false)
+  const ready = enabled && ticked
+  return (
+    <div style={{ ...row, alignItems: 'flex-start' }}>
+      <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontWeight: 400, color: '#0d0d0d', cursor: enabled ? 'pointer' : 'default', flex: '1 1 260px' }}>
+        <input type="checkbox" checked={ticked} disabled={!enabled} onChange={e => setTicked(e.target.checked)} style={{ marginTop: 1 }} />
+        <span>{statement}</span>
+      </label>
+      <button disabled={!ready} onClick={() => ready && onConfirm()} style={{ ...confirmButton, opacity: ready ? 1 : 0.5, cursor: ready ? 'pointer' : 'not-allowed' }}>Confirm deliveries</button>
+    </div>
+  )
+}
 
 /** The meter-name input for one overlap. Its own component so each overlap keeps its own text. */
 function DifferentMeters({ fileB, onSave }: { fileB: string; onSave: (label: string) => void }) {
@@ -94,6 +116,10 @@ export function CoverageStrip(p: CoverageStripProps) {
     .sort((a, b) => (a.deliveryDate as string).localeCompare(b.deliveryDate as string))
   const deliveryFuels = [...new Set(deliveries.map(c => c.fuelType))]
   const site = location.name || 'Location'
+  // T10c: a fuel on this upload with bills still needing attention (to confirm, needs review, or confirmed
+  // with no figure), so the estimate control can say to fix them first.
+  const unsettled = (fuel: string) => docs.some(d => (d.extracted ?? []).some(x => x.fuelType === fuel
+    && (x.status === 'extracted' || x.status === 'needs_manual_review' || proposalNeedsAttention(x))))
   // Estimates on this upload that the engine refuses: shown with the reason, so a click never vanishes.
   const refused = p.resolutions
     .filter(r => r.locId === location.id && r.kind === 'extrapolate' && (r.documentType ?? docType) === docType)
@@ -158,6 +184,7 @@ export function CoverageStrip(p: CoverageStripProps) {
                   locId: location.id, fuelType: g.fuelType, documentType: docType, meterLabel: g.meterLabel,
                   monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, at: now(),
                 }))}>Estimate the missing months</button>
+                {unsettled(g.fuelType) && <span style={prompt}>Fix any bills marked above before estimating.</span>}
               </div>
             )}
             {gap && cov.monthsCovered < 1 && (
@@ -200,17 +227,15 @@ export function CoverageStrip(p: CoverageStripProps) {
             </div>
             {list.map(c => (
               <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 2, fontWeight: 400, color: '#555553' }}>
-                {fileOf(c.docId)}: {c.value.toLocaleString()} {c.unit ?? ''}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
+                {fileOf(c.docId)}: {c.value.toLocaleString()} {unitLabel(c.unit, '')}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
               </div>
             ))}
             {issue && (
-              <div style={row}>
-                <button style={{ ...warnButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
-                  onClick={() => p.currentUser && p.onAdd(deliveriesCompleteResolution({
-                    locId: location.id, fuelType: fuel, documentType: docType, docIds: issue.docIds ?? [], statement,
-                    by: p.currentUser, at: now(),
-                  }))}>{statement}</button>
-              </div>
+              <DeliveriesConfirm statement={statement} enabled={!!p.currentUser}
+                onConfirm={() => p.currentUser && p.onAdd(deliveriesCompleteResolution({
+                  locId: location.id, fuelType: fuel, documentType: docType, docIds: issue.docIds ?? [], statement,
+                  by: p.currentUser, at: now(),
+                }))} />
             )}
           </div>
         )

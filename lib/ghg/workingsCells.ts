@@ -1,4 +1,6 @@
 import { NOT_PROVIDED } from '../notProvided'
+import { unitLabel } from './unitLabels'
+import { isoDateInWords } from './dateWords'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONE RENDERER FOR THE WORKINGS TABLE'S ACTIVITY CELL, READ BY BOTH SURFACES.
@@ -113,7 +115,8 @@ export function workingsActivityCell(r: WorkingsActivityCellRow): string {
   if (!r.activity_unit || r.activity_unit === NOT_PROVIDED) {
     return r.result_tco2e == null ? NOT_PROVIDED : data.toLocaleString()
   }
-  return `${data.toLocaleString()} ${r.activity_unit}`
+  // T10c: the unit as the customer reads it (kWh, Mcf, MMBtu), from the one shared map.
+  return `${data.toLocaleString()} ${unitLabel(r.activity_unit)}`
 }
 
 export interface WorkingsFactorCellRow {
@@ -189,7 +192,7 @@ export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: st
  * note does, so the two never describe a bill differently:
  *   - prorated:                "12 of 31 days, ×0.387"
  *   - counted, wholly in year: "31 of 31 days"
- *   - a delivery inside the year (T10b): "Delivered 2025-03-14, counted in full"
+ *   - a delivery inside the year (T10b): "Delivered 14 March 2025, counted in full"
  *   - undated or invalid period (no days to count): NOT_APPLICABLE
  *   - any other bill not counted: "Not counted"; the reason, not this cell, says why.
  * Structural type rather than the engine's BillContribution, because the engine imports this file.
@@ -204,7 +207,7 @@ export type ShareCellContribution = {
 export const NOT_COUNTED = 'Not counted'
 export function contributionShareCell(c: ShareCellContribution): string {
   if (c.reason === 'undated' || c.reason === 'invalid_period') return NOT_APPLICABLE
-  if (c.reason === 'delivered') return `Delivered ${c.deliveryDate ?? ''}, counted in full`
+  if (c.reason === 'delivered') return `Delivered ${isoDateInWords(c.deliveryDate)}, counted in full`
   if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
   const days = `${c.inWindowDays} of ${c.totalDays} days`
   return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days

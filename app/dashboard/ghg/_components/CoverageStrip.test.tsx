@@ -32,7 +32,7 @@ const month = (k: number) => {
 describe('coverage strip', () => {
   it('an overlap shows the engine message and both resolutions', () => {
     const t = text(draw(site([gdoc('a'), gdoc('b')])))
-    expect(t).toContain('a.pdf and b.pdf cover the same days (2025-01-01 to 2025-01-31). Choose Same bill, count it once, or Different meters or accounts.')
+    expect(t).toContain('a.pdf and b.pdf cover the same days (1 January 2025 to 31 January 2025). Choose Same bill, count it once, or Different meters or accounts.')
     expect(t).toContain('If these are the same bill, count it once:')
     expect(t).toContain('Count a.pdf')
     expect(t).toContain('Count b.pdf')
@@ -156,13 +156,16 @@ describe('coverage strip: deliveries and the 0-months guard (T10b)', () => {
   it('deliveries are listed by date with no month count and no estimate, and the confirmation names fuel, site and window', () => {
     const l = melbourne([lpg('lpg2', '2025-06-23'), lpg('lpg1', '2025-03-14')])
     const t = text(drawLpg(l))
-    expect(t).toContain('Confirm that the 2 propane deliveries listed for Melbourne are all the propane deliveries between 1 January 2025 and 31 December 2025. Export is blocked until you confirm.')
+    expect(t).toContain('Confirm these are all the propane deliveries for Melbourne between 1 January 2025 and 31 December 2025. Export is blocked until you confirm.')
     expect(t).toContain('Deliveries are counted in full in the year they were delivered, not spread over months.')
     expect(t.indexOf('lpg1.pdf: 180 litres, delivered 14 March 2025.')).toBeLessThan(t.indexOf('lpg2.pdf: 180 litres, delivered 23 June 2025.'))
     expect(t).toContain(STATEMENT)
     expect(t).not.toContain('months covered')
     expect(t).not.toContain('Estimate the missing months')
-    expect(drawLpg(l, { currentUser: null })).toMatch(/<button[^>]*disabled=""[^>]*>These are all the propane deliveries/)
+    // T10c: the statement is a checkbox label, and "Confirm deliveries" stays disabled until it is ticked.
+    expect(drawLpg(l)).toMatch(/<input type="checkbox"[^>]*>/)
+    expect(drawLpg(l)).toMatch(/<button disabled=""[^>]*>Confirm deliveries<\/button>/)
+    expect(drawLpg(l, { currentUser: null })).toMatch(/<input type="checkbox"[^>]*disabled=""/)
   })
 
   it('once confirmed, the strip shows who confirmed and when', () => {
@@ -189,5 +192,19 @@ describe('coverage strip: deliveries and the 0-months guard (T10b)', () => {
     expect(t).toContain('An estimate was recorded but cannot be used: An estimate needs the number of months covered by bills.')
     expect(t).toContain('Remove it')
     expect(text(draw(l, { resolutions: [zero] }))).not.toContain('Remove it')
+  })
+})
+
+describe('coverage strip: fix bills before estimating (T10c)', () => {
+  const months = (n: number, o: Partial<ExtractedProposal> = {}) => Array.from({ length: n }, (_, k) => gdoc(`m${k}`, { ...month(k + 1), ...o }))
+  it('says to fix bills marked above when the field has bills still needing attention', () => {
+    const t = text(draw(site([...months(6), gdoc('pending', { ...month(8), status: 'extracted' })])))
+    expect(t).toContain('Estimate the missing months')
+    expect(t).toContain('Fix any bills marked above before estimating.')
+  })
+  it('says nothing more when every bill is settled', () => {
+    const t = text(draw(site(months(6))))
+    expect(t).toContain('Estimate the missing months')
+    expect(t).not.toContain('Fix any bills marked above before estimating.')
   })
 })

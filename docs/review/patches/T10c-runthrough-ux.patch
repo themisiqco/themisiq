@@ -1,0 +1,1218 @@
+diff --git a/app/climate-ghg/faq.ts b/app/climate-ghg/faq.ts
+index f26a0a9..771480e 100644
+--- a/app/climate-ghg/faq.ts
++++ b/app/climate-ghg/faq.ts
+@@ -66,3 +66,13 @@ export const FAQ_UPLOAD_ONLY: readonly Faq[] = [
+ 
+ /** The set the page renders. One flag decides, in one place. */
+ export const CONCIERGE_FAQ: readonly Faq[] = UTILITY_CONNECT_ENABLED ? FAQ_CONNECTED : FAQ_UPLOAD_ONLY
++
++/**
++ * T10c: the help entry the bill review links to from beside a disabled Confirm ("Why can't I confirm this
++ * bill?"). The anchor is shared with the link (app/dashboard/ghg/page.tsx) so the two cannot drift apart.
++ */
++export const CONFIRM_HELP_ID = 'why-cant-i-confirm-this-bill'
++export const BILL_REVIEW_FAQ: readonly Faq[] = [
++  { id: CONFIRM_HELP_ID, q: "Why can't I confirm this bill?",
++    a: "Before a bill counts towards your emissions, we need two things from it: the amount you used, and the unit it's measured in. Sometimes we can't get both. The bill might use a unit we don't recognise, the figure might be unclear or hard to read, or the bill might show a charge but no usage. When that happens, we hold the bill back rather than guess, because a wrong number in your report is worse than a missing one. To fix it, open the bill and check what's printed. If the unit is wrong, choose the right one and we'll convert it. If the figure is missing, type it in from the bill. If the bill shouldn't be part of this inventory, reject it. Your report can't be exported while a bill is waiting, so nothing incomplete goes to your customer, lender or verifier." },
++]
+diff --git a/app/climate-ghg/page.tsx b/app/climate-ghg/page.tsx
+index 0ff8896..e7cf416 100644
+--- a/app/climate-ghg/page.tsx
++++ b/app/climate-ghg/page.tsx
+@@ -4,7 +4,7 @@ import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
+ import Nav from '../components/Nav'
+ import Footer from '@/app/components/Footer'
+ import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS } from '@/lib/pricing'
+-import { CONCIERGE_FAQ } from './faq'
++import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
+ import { MODULE_SUBLINE } from '@/lib/modulePages'
+ import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
+ import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+@@ -246,7 +246,7 @@ export default function Page() {
+         {/* The Concierge questions live in ./faq.ts because they come in two versions and a flag
+             picks between them. Keeping them there also lets faq.test.ts import the arrays and
+             assert on them for real, rather than matching this file as text. */}
+-        <ModuleFaq items={[...FAQ, ...CONCIERGE_FAQ]} />
++        <ModuleFaq items={[...FAQ, ...BILL_REVIEW_FAQ, ...CONCIERGE_FAQ]} />
+       </ModuleSection>
+ 
+       {/* ── 10. CLOSING BAND ── */}
+diff --git a/app/components/modulePage.tsx b/app/components/modulePage.tsx
+index 0be5d6e..9fe3d6f 100644
+--- a/app/components/modulePage.tsx
++++ b/app/components/modulePage.tsx
+@@ -130,7 +130,8 @@ export function ModuleArrivals({ items }: { items: readonly { title: string; bod
+  * `kind` when CBAM had a page where Climate Risk had documents. A single string still renders as one
+  * block, so nothing else changes.
+  */
+-export type Faq = { q: string; a: string; extra?: string | readonly string[] }
++// `id` (T10c): an anchor, so a product screen can link straight to one answer.
++export type Faq = { q: string; a: string; extra?: string | readonly string[]; id?: string }
+ 
+ export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
+   items: readonly Faq[]
+@@ -141,7 +142,7 @@ export function ModuleFaq({ items, heading = 'Questions people ask first' }: {
+       <h2 style={sectionTitle}>{heading}</h2>
+       <div style={{ marginTop: '2rem', borderTop: '1px solid var(--color-line-strong)' }}>
+         {items.map(q => (
+-          <div key={q.q} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)' }}>
++          <div key={q.q} id={q.id} style={{ padding: '1.4rem 0', borderBottom: '1px solid var(--color-line)', scrollMarginTop: '5rem' }}>
+             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-ink)', marginBottom: '0.5rem' }}>{q.q}</div>
+             <div style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.75, maxWidth: '68ch' }}>{q.a}</div>
+             {q.extra && (
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.test.tsx b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+index 7d2c722..9ef7d58 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.test.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.test.tsx
+@@ -32,7 +32,7 @@ const month = (k: number) => {
+ describe('coverage strip', () => {
+   it('an overlap shows the engine message and both resolutions', () => {
+     const t = text(draw(site([gdoc('a'), gdoc('b')])))
+-    expect(t).toContain('a.pdf and b.pdf cover the same days (2025-01-01 to 2025-01-31). Choose Same bill, count it once, or Different meters or accounts.')
++    expect(t).toContain('a.pdf and b.pdf cover the same days (1 January 2025 to 31 January 2025). Choose Same bill, count it once, or Different meters or accounts.')
+     expect(t).toContain('If these are the same bill, count it once:')
+     expect(t).toContain('Count a.pdf')
+     expect(t).toContain('Count b.pdf')
+@@ -156,13 +156,16 @@ describe('coverage strip: deliveries and the 0-months guard (T10b)', () => {
+   it('deliveries are listed by date with no month count and no estimate, and the confirmation names fuel, site and window', () => {
+     const l = melbourne([lpg('lpg2', '2025-06-23'), lpg('lpg1', '2025-03-14')])
+     const t = text(drawLpg(l))
+-    expect(t).toContain('Confirm that the 2 propane deliveries listed for Melbourne are all the propane deliveries between 1 January 2025 and 31 December 2025. Export is blocked until you confirm.')
++    expect(t).toContain('Confirm these are all the propane deliveries for Melbourne between 1 January 2025 and 31 December 2025. Export is blocked until you confirm.')
+     expect(t).toContain('Deliveries are counted in full in the year they were delivered, not spread over months.')
+     expect(t.indexOf('lpg1.pdf: 180 litres, delivered 14 March 2025.')).toBeLessThan(t.indexOf('lpg2.pdf: 180 litres, delivered 23 June 2025.'))
+     expect(t).toContain(STATEMENT)
+     expect(t).not.toContain('months covered')
+     expect(t).not.toContain('Estimate the missing months')
+-    expect(drawLpg(l, { currentUser: null })).toMatch(/<button[^>]*disabled=""[^>]*>These are all the propane deliveries/)
++    // T10c: the statement is a checkbox label, and "Confirm deliveries" stays disabled until it is ticked.
++    expect(drawLpg(l)).toMatch(/<input type="checkbox"[^>]*>/)
++    expect(drawLpg(l)).toMatch(/<button disabled=""[^>]*>Confirm deliveries<\/button>/)
++    expect(drawLpg(l, { currentUser: null })).toMatch(/<input type="checkbox"[^>]*disabled=""/)
+   })
+ 
+   it('once confirmed, the strip shows who confirmed and when', () => {
+@@ -191,3 +194,17 @@ describe('coverage strip: deliveries and the 0-months guard (T10b)', () => {
+     expect(text(draw(l, { resolutions: [zero] }))).not.toContain('Remove it')
+   })
+ })
++
++describe('coverage strip: fix bills before estimating (T10c)', () => {
++  const months = (n: number, o: Partial<ExtractedProposal> = {}) => Array.from({ length: n }, (_, k) => gdoc(`m${k}`, { ...month(k + 1), ...o }))
++  it('says to fix bills marked above when the field has bills still needing attention', () => {
++    const t = text(draw(site([...months(6), gdoc('pending', { ...month(8), status: 'extracted' })])))
++    expect(t).toContain('Estimate the missing months')
++    expect(t).toContain('Fix any bills marked above before estimating.')
++  })
++  it('says nothing more when every bill is settled', () => {
++    const t = text(draw(site(months(6))))
++    expect(t).toContain('Estimate the missing months')
++    expect(t).not.toContain('Fix any bills marked above before estimating.')
++  })
++})
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.tsx b/app/dashboard/ghg/_components/CoverageStrip.tsx
+index a7609ee..be9583f 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.tsx
+@@ -19,13 +19,14 @@
+ import { useState } from 'react'
+ import {
+   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
+-  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords,
++  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords, proposalNeedsAttention,
+   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
+ } from '../../../../lib/ghg/engine'
+ import {
+   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
+   deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
+ } from '../../../../lib/ghg/coverageActions'
++import { unitLabel } from '../../../../lib/ghg/unitLabels'
+ 
+ export type CurrentUser = { userId: string; email: string }
+ 
+@@ -53,6 +54,27 @@ const plainButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', border
+ const prompt = { fontWeight: 400, color: '#7c5a16' } as const
+ const row = { marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } as const
+ 
++// The proposal Confirm button's style (page.tsx), so the deliveries confirmation reads as the same action.
++const confirmButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' } as const
++
++/**
++ * T10c: the deliveries confirmation. The statement is a checkbox the customer ticks, and "Confirm deliveries"
++ * records it, enabled only once ticked. Its own component so each fuel keeps its own tick.
++ */
++function DeliveriesConfirm({ statement, enabled, onConfirm }: { statement: string; enabled: boolean; onConfirm: () => void }) {
++  const [ticked, setTicked] = useState(false)
++  const ready = enabled && ticked
++  return (
++    <div style={{ ...row, alignItems: 'flex-start' }}>
++      <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontWeight: 400, color: '#0d0d0d', cursor: enabled ? 'pointer' : 'default', flex: '1 1 260px' }}>
++        <input type="checkbox" checked={ticked} disabled={!enabled} onChange={e => setTicked(e.target.checked)} style={{ marginTop: 1 }} />
++        <span>{statement}</span>
++      </label>
++      <button disabled={!ready} onClick={() => ready && onConfirm()} style={{ ...confirmButton, opacity: ready ? 1 : 0.5, cursor: ready ? 'pointer' : 'not-allowed' }}>Confirm deliveries</button>
++    </div>
++  )
++}
++
+ /** The meter-name input for one overlap. Its own component so each overlap keeps its own text. */
+ function DifferentMeters({ fileB, onSave }: { fileB: string; onSave: (label: string) => void }) {
+   const [label, setLabel] = useState('')
+@@ -94,6 +116,10 @@ export function CoverageStrip(p: CoverageStripProps) {
+     .sort((a, b) => (a.deliveryDate as string).localeCompare(b.deliveryDate as string))
+   const deliveryFuels = [...new Set(deliveries.map(c => c.fuelType))]
+   const site = location.name || 'Location'
++  // T10c: a fuel on this upload with bills still needing attention (to confirm, needs review, or confirmed
++  // with no figure), so the estimate control can say to fix them first.
++  const unsettled = (fuel: string) => docs.some(d => (d.extracted ?? []).some(x => x.fuelType === fuel
++    && (x.status === 'extracted' || x.status === 'needs_manual_review' || proposalNeedsAttention(x))))
+   // Estimates on this upload that the engine refuses: shown with the reason, so a click never vanishes.
+   const refused = p.resolutions
+     .filter(r => r.locId === location.id && r.kind === 'extrapolate' && (r.documentType ?? docType) === docType)
+@@ -158,6 +184,7 @@ export function CoverageStrip(p: CoverageStripProps) {
+                   locId: location.id, fuelType: g.fuelType, documentType: docType, meterLabel: g.meterLabel,
+                   monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, at: now(),
+                 }))}>Estimate the missing months</button>
++                {unsettled(g.fuelType) && <span style={prompt}>Fix any bills marked above before estimating.</span>}
+               </div>
+             )}
+             {gap && cov.monthsCovered < 1 && (
+@@ -200,17 +227,15 @@ export function CoverageStrip(p: CoverageStripProps) {
+             </div>
+             {list.map(c => (
+               <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 2, fontWeight: 400, color: '#555553' }}>
+-                {fileOf(c.docId)}: {c.value.toLocaleString()} {c.unit ?? ''}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
++                {fileOf(c.docId)}: {c.value.toLocaleString()} {unitLabel(c.unit, '')}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
+               </div>
+             ))}
+             {issue && (
+-              <div style={row}>
+-                <button style={{ ...warnButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser}
+-                  onClick={() => p.currentUser && p.onAdd(deliveriesCompleteResolution({
+-                    locId: location.id, fuelType: fuel, documentType: docType, docIds: issue.docIds ?? [], statement,
+-                    by: p.currentUser, at: now(),
+-                  }))}>{statement}</button>
+-              </div>
++              <DeliveriesConfirm statement={statement} enabled={!!p.currentUser}
++                onConfirm={() => p.currentUser && p.onAdd(deliveriesCompleteResolution({
++                  locId: location.id, fuelType: fuel, documentType: docType, docIds: issue.docIds ?? [], statement,
++                  by: p.currentUser, at: now(),
++                }))} />
+             )}
+           </div>
+         )
+diff --git a/app/dashboard/ghg/_components/ProposalEdits.test.tsx b/app/dashboard/ghg/_components/ProposalEdits.test.tsx
+index 36a5721..2becaa8 100644
+--- a/app/dashboard/ghg/_components/ProposalEdits.test.tsx
++++ b/app/dashboard/ghg/_components/ProposalEdits.test.tsx
+@@ -62,7 +62,7 @@ describe('notes under a proposal', () => {
+     })
+     const t = text(renderToStaticMarkup(<ProposalNotes p={p} />))
+     expect(t).toContain('Changed by jo@acme.example on 2 October 2026: unit.')
+-    expect(t).toContain('Read from the bill: 2025-01-01 to 2025-01-31, therms.')
++    expect(t).toContain('Read from the bill: 1 January 2025 to 31 January 2025, therms.')
+   })
+   it('dates confirmed unchanged', () => {
+     const p = prop({ periodOrigin: 'customer_confirmed', periodConfirmedAt: '2026-10-02T12:00:00.000Z', periodConfirmedBy: BY })
+diff --git a/app/dashboard/ghg/_components/ProposalEdits.tsx b/app/dashboard/ghg/_components/ProposalEdits.tsx
+index decd94c..6ea4672 100644
+--- a/app/dashboard/ghg/_components/ProposalEdits.tsx
++++ b/app/dashboard/ghg/_components/ProposalEdits.tsx
+@@ -12,13 +12,11 @@ import { periodOriginOf, type ExtractedProposal } from '../../../../lib/ghg/engi
+ import { editPeriod, editUnit, type Editor } from '../../../../lib/ghg/proposalEdits'
+ import { convertibleUnits, normalizeUnit, type FuelType } from '../../../../lib/unitConversions'
+ import { plainDate } from '../../../../lib/ghg/coverageActions'
++import { unitLabel } from '../../../../lib/ghg/unitLabels'
++import { isoDateInWords } from '../../../../lib/ghg/dateWords'
+ 
+-/** How each unit is written for the customer. A unit not listed is shown as stored. */
+-export const UNIT_LABEL: Record<string, string> = {
+-  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', mj: 'MJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
+-  gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
+-}
+-const unitLabel = (u: string | null) => (u ? UNIT_LABEL[u] ?? u : 'no unit')
++// How each unit is written for the customer: one map, shared with every other surface (T10c).
++export { UNIT_LABEL } from '../../../../lib/ghg/unitLabels'
+ 
+ const smallButton = { fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' } as const
+ const primaryButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' } as const
+@@ -98,7 +96,7 @@ export function ProposalNotes({ p }: { p: ExtractedProposal }) {
+   }
+   if (p.asRead && (p.corrections ?? []).length > 0) {
+     const r = p.asRead
+-    lines.push(`Read from the bill: ${r.periodStart ?? 'no start date'} to ${r.periodEnd ?? 'no end date'}, ${unitLabel(r.unit)}.`)
++    lines.push(`Read from the bill: ${r.periodStart ? isoDateInWords(r.periodStart) : 'no start date'} to ${r.periodEnd ? isoDateInWords(r.periodEnd) : 'no end date'}, ${unitLabel(r.unit)}.`)
+   }
+   if (p.periodOrigin === 'customer_confirmed' && p.periodConfirmedBy && p.periodConfirmedAt && !(p.corrections ?? []).some(c => c.fields.includes('period'))) {
+     lines.push(`Dates confirmed by ${p.periodConfirmedBy.email} on ${plainDate(p.periodConfirmedAt)}.`)
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 8666111..d407c7d 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -13,6 +13,9 @@ import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draf
+ import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
+ import { figuresForSave } from '../../../lib/ghg/savePayload'
+ import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
++import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
++import { unitLabel } from '../../../lib/ghg/unitLabels'
++import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
+ import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
+ import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
+ import { FigureInput } from './_components/FigureInput'
+@@ -36,7 +39,7 @@ import {
+   detectGridRegion, gridRegionForCountry, pickEF,
+   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
+   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
+-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf,
++  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
+   streamState, DECLARABLE_STREAMS,
+   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
+   findSteamFactorGaps, steamFactorFor,
+@@ -522,9 +525,29 @@ function exclusionBannerHeading(u: UnpriceableLocation): string {
+     : "We can't work out this location's emissions yet"
+ }
+ function exclusionBannerTrailer(u: UnpriceableLocation, hasFigures: boolean): string {
+-  return u.kind === 'country'
+-    ? refusalBannerTrailer(u.refusal, hasFigures)
+-    : "Until then this location is left out of your totals: it isn't counted as zero, and nothing else you've entered here is lost."
++  // T10c: the factor-gap sentence (unpriceablePanelMessage) already says the location is left out and nothing is
++  // lost, so it carries no trailer of its own.
++  if (u.kind === 'country') return refusalBannerTrailer(u.refusal, hasFigures)
++  return factorGapHasCountry(u) ? '' : "Until then this location is left out of your totals: it isn't counted as zero, and nothing else you've entered here is lost."
++}
++/** T10c: a factor gap on a location whose country is set, which gets the self-contained panel sentence. */
++function factorGapHasCountry(u: UnpriceableLocation): boolean {
++  return u.kind !== 'country' && !!(COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country))
++}
++
++/**
++ * T10c: the factor-gap sentence ON SCREEN. It must not imply the customer made a mistake: the gap is ours (a
++ * fuel billed in a unit we hold no factor for in that country), which FI1 and FI2 close. A location with no
++ * country set keeps its own sentence, because choosing the country is the customer's to do. The CSV keeps
++ * unpriceableMessage below.
++ */
++function unpriceablePanelMessage(u: UnpriceableLocation, hasFigures: boolean): string {
++  if (u.kind === 'country') return countryRefusalText(u.refusal, 'review', hasFigures)
++  const country = COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country)
++  if (!country) return unpriceableMessage(u, hasFigures)
++  const unit = UNIT_WORDS[u.unit] ?? u.unit
++  const fuel = FUEL_WORDS[u.fuel] ?? u.fuel.replace(/_/g, ' ')
++  return `We can't calculate ${fuel} billed in ${unit} for ${country} yet, so this location isn't included in your totals. Your other locations are unaffected, and nothing you've entered is lost.`
+ }
+ 
+ function unpriceableMessage(u: UnpriceableLocation, hasFigures: boolean): string {
+@@ -598,7 +621,11 @@ const searchParams = useSearchParams()
+   const [activeLocationRaw, setActiveLocation] = useState(0)
+   const activeLocation = Math.min(activeLocationRaw, Math.max(0, inventory.locations.length - 1))
+   const [saved, setSaved] = useState(false)
+-  const [dirty, setDirty] = useState(false)
++  // T10c: UNSAVED WORK IS DERIVED, NOT FLAGGED. `baseline` is the fingerprint of the inventory as last loaded
++  // or saved (lib/ghg/unsavedChanges.ts); the page is dirty whenever the inventory differs from it, so every
++  // upload, confirmation, rejection, edit and resolution counts without each one having to say so. undefined:
++  // not yet established (first render); null: a restored draft, which matches nothing saved.
++  const [baseline, setBaseline] = useState<string | null | undefined>(undefined)
+   const [isSaving, setIsSaving] = useState(false)
+   // ⚠️ WHAT THE LAST SAVE REPORTED, FOR A CALLER THAT NEEDS TO KNOW. handleSave alerts and returns
+   // on failure; it does not report back, and threading a return value through its five failure
+@@ -693,7 +720,9 @@ const searchParams = useSearchParams()
+       // Cleared on RESTORE, not on save: see the note in lib/ghg/draft.ts. Leaving it would restore
+       // stale figures over a later edit on the next reload.
+       clearGhgDraft()
+-      setDirty(true)   // it is unsaved work: the Save button must not read as already saved
++      // it is unsaved work: the Save button must not read as already saved
++      skipSavedReset.current = false
++      setBaseline(null)
+       setMode('wizard')
+       return
+     }
+@@ -736,7 +765,7 @@ const searchParams = useSearchParams()
+     // where no ?id is present, so there's no stale ?id to clear — switching mode in state is enough.
+     setInventoryId(null)
+     setSaved(false)
+-    setDirty(false) // fresh inventory is pristine until the user types
++    skipSavedReset.current = true // fresh inventory is pristine until the user types: it becomes the baseline
+     setStep(0)
+     // A capture belongs to the inventory it was answered against. Carried into a new one it would
+     // be written to that inventory's column as if the customer had answered a question about it.
+@@ -839,10 +868,11 @@ const searchParams = useSearchParams()
+   }, [inventoryId])
+ 
+   useEffect(() => {
+-    if (skipSavedReset.current) { skipSavedReset.current = false; return }
++    // A loaded or fresh inventory becomes the baseline; any later change makes the page dirty (T10c).
++    if (skipSavedReset.current) { skipSavedReset.current = false; setBaseline(inventoryFingerprint(inventory)); return }
+     setSaved(false)
+-    setDirty(true)
+   }, [inventory])
++  const dirty = baseline !== undefined && hasUnsavedChanges(baseline, inventory)
+   useEffect(() => {
+     if (mode !== 'wizard' || !dirty) return
+     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+@@ -941,7 +971,6 @@ const searchParams = useSearchParams()
+           setComparabilityNote('')
+         }
+         setSaved(true)
+-        setDirty(false)
+       }
+     })
+     // router is in the deps because a dead ?id= is cleared from the URL above; it is stable across renders.
+@@ -1552,6 +1581,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+ 
+   const handleSave = async () => {
+     if (isSaving) return
++    // T10c: what this save writes. Recorded as the baseline on success, so an edit made while the save is
++    // in flight still reads as unsaved.
++    const savingFingerprint = inventoryFingerprint(inventory)
+     lastSaveError.current = null
+     setIsSaving(true)
+     try {
+@@ -1743,7 +1775,7 @@ workings: saved.workings,
+       console.error('Monthly emissions write failed (annual save committed, unaffected):', e)
+     }
+     setSaved(true)
+-    setDirty(false)
++    setBaseline(savingFingerprint)
+     } finally { setIsSaving(false) }
+   }
+ 
+@@ -2134,8 +2166,10 @@ workings: saved.workings,
+         {unpriceableById.get(loc.id) && (
+           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
+             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ {exclusionBannerHeading(unpriceableById.get(loc.id)!)}</div>
+-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceableMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
+-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
++            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceablePanelMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
++            {exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc)) && (
++              <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
++            )}
+           </div>
+         )}
+         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
+@@ -2149,7 +2183,7 @@ workings: saved.workings,
+                       <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+-                  <Field label={`Total natural gas: ${inventory.reporting_year} (${loc.natural_gas_unit})`} hint="Sum of all 12 monthly bills for this location">
++                  <Field label={`Total natural gas: ${inventory.reporting_year} (${unitLabel(loc.natural_gas_unit)})`} hint="Sum of the bills covering this year">
+                     <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
+                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
+                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
+@@ -2169,7 +2203,7 @@ workings: saved.workings,
+                       <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+-                  <Field label={`Total propane purchased: ${inventory.reporting_year} (${loc.propane_unit})`}>
++                  <Field label={`Total propane purchased: ${inventory.reporting_year} (${unitLabel(loc.propane_unit)})`}>
+                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
+                   </Field>
+                   {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+@@ -2287,7 +2321,7 @@ workings: saved.workings,
+               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Purchased electricity</div>
+               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
+               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
+-                <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of all 12 monthly bills for this location">
++                <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of the bills covering this year">
+                   <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
+                 </Field>
+                 {validateElectricity(loc.electricity_kwh) && (
+@@ -2473,7 +2507,7 @@ workings: saved.workings,
+               {blockedHere ? (
+                 <div style={{ padding: '2px 0 6px' }}>
+                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>⚠ {blockedHere.kind === 'country' ? refusalResultsHeading(blockedHere.refusal) : 'No results for this location yet'}</div>
+-                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceableMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
++                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceablePanelMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
+                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+                     Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
+                   </div>
+@@ -2509,10 +2543,10 @@ workings: saved.workings,
+             </div>
+             <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 12, padding: '1rem' }}>
+               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>All locations</div>
+-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)' }}>{totals_ar6.s1_total.toFixed(2)} mt Scope 1</div>
++              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-brand)' }}>{totals_ar6.s1_total.toFixed(2)} t CO₂e Scope 1</div>
+               {gridReady
+-                ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} mt Scope 2</div>
+-                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)' }}>— mt Scope 2</div><div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
++                ? <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginTop: 4 }}>{totals_ar6.s2_location.toFixed(2)} t CO₂e Scope 2</div>
++                : <div style={{ marginTop: 4 }}><div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-ink-muted)' }}>— t CO₂e Scope 2</div><div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 1 }}>Resolve grid regions to preview Scope 2</div></div>}
+               {/* Directly under the figure, not in a banner elsewhere on the page: a total that
+                   leaves a location out has to say so where it is read, or the omission is silent
+                   to anyone who does not scroll. */}
+@@ -2563,7 +2597,7 @@ workings: saved.workings,
+               <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>ESRS E1 and GRI 305 require biogenic CO₂ emissions to be reported separately from fossil fuel emissions. Biogenic CO₂ comes from burning biomass, wood waste, or agricultural residues.</p>
+               {inventory.locations.map((loc, i) => (
+                 <div key={loc.id} style={{ marginBottom: 14 }}>
+-                  <Field label={`${loc.name}: Biogenic CO₂ (mtCO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
++                  <Field label={`${loc.name}: Biogenic CO₂ (t CO₂)`} hint="From burning biomass, wood waste, or agricultural residues: 0 if none">
+                     <input id={`figure-${loc.id}-biogenic_co2_mt`} type="number" value={loc.biogenic_co2_mt || ''} onChange={e => updateLocation(i, 'biogenic_co2_mt', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                   </Field>
+                   {/* Biogenic was the only figure in the wizard with no evidence path — every other
+@@ -2639,40 +2673,40 @@ workings: saved.workings,
+                     <div style={{ fontSize: 10, fontWeight: 700, color: fw.color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>{fw.name}: GWP {fw.gwp}</div>
+                     <div style={{ marginBottom: 6 }}>
+                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 1</div>
+-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s1_total.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                     </div>
+                     <div style={{ marginBottom: 6 }}>
+                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 2 (location)</div>
+-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_location.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                     </div>
+                     {(fw.id === 'esrs' || fw.id === 'gri') && (
+                       <div style={{ marginBottom: 6 }}>
+                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 2 (market)</div>
+-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s2_market.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                       </div>
+                     )}
+                     {(fw.id === 'esrs' || fw.id === 'gri') && (
+                       <div style={{ marginBottom: 6 }}>
+                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Biogenic CO₂ (reported separately)</div>
+-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.biogenic.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                       </div>
+                     )}
+                     {totals.s3_td > 0 && (
+                       <div style={{ marginBottom: 6 }}>
+                         {/* Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Never folded into S1/S2. */}
+                         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Scope 3 (Cat 3, electricity T&amp;D)</div>
+-                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{totals.s3_td.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                       </div>
+                     )}
+                     {fw.id === 'cdp' && (
+                       <>
+                         <div style={{ marginBottom: 6 }}>
+                           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
+-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                         </div>
+                         <div style={{ marginBottom: 6 }}>
+                           <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
+-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>mt</span></div>
++                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
+                         </div>
+                       </>
+                     )}
+@@ -2685,7 +2719,7 @@ workings: saved.workings,
+                         as two identical lines one under the other. An intensity needs its own note
+                         only where it appears WITHOUT the totals, which is the CSV RESULTS block and
+                         the assurance package's summary table; both carry one. */}
+-                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>S1 intensity: {(totals.s1_total / rev).toFixed(4)} mt/$M</div>}
++                    {rev > 0 && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>S1 intensity: {(totals.s1_total / rev).toFixed(4)} t CO₂e per $M</div>}
+                     {emp > 0 && fw.id === 'ecovadis' && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Per employee: {(totals.s1_total / emp * 1000).toFixed(2)} kgCO₂e</div>}
+                     {/* Every figure in this card — both scopes, biogenic, the intensities — is built
+                         from the same excluded set, so the note belongs to the card, not to one line. */}
+@@ -2720,8 +2754,8 @@ workings: saved.workings,
+                       {/* No numbers for a blocked location — not even a dash beside "S1:", which
+                           still reads as a measured scope. The reason takes the figures' place. */}
+                       {blocked
+-                        ? <div style={{ fontSize: 12, color: 'var(--color-state-warn)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {blocked.kind === 'country' ? '' : 'Not included in any total. '}{unpriceableMessage(blocked, locationHasEnteredFigures(loc))}</div>
+-                        : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} mt · S2: {c!.s2_location.toFixed(2)} mt · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} mt</div>}
++                        ? <div style={{ fontSize: 12, color: 'var(--color-state-warn)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {blocked.kind !== 'country' && !factorGapHasCountry(blocked) ? 'Not included in any total. ' : ''}{unpriceablePanelMessage(blocked, locationHasEnteredFigures(loc))}</div>
++                        : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} t CO₂e · S2: {c!.s2_location.toFixed(2)} t CO₂e · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} t CO₂e</div>}
+                     </div>
+                     <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
+                   </div>
+@@ -3166,7 +3200,7 @@ workings: saved.workings,
+       ['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(CSV_DP)],
+       ['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(CSV_DP)],
+       ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Scope 2 market-based (tCO₂e)', totals.s2_market.toFixed(CSV_DP)]] : []),
+-      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (mtCO₂): reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
++      ...(fw.id === 'esrs' || fw.id === 'gri' ? [['Biogenic CO₂ (t CO₂): reported separately', totals.biogenic.toFixed(CSV_DP)]] : []),
+       // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
+       ...(totals.s3_td > 0 ? [['Scope 3 Cat 3: electricity T&D (tCO₂e)', totals.s3_td.toFixed(CSV_DP)]] : []),
+       ...(fw.id === 'cdp' ? [
+@@ -3406,7 +3440,7 @@ workings: saved.workings,
+         {step === 1 && renderStep1()}
+         {step === 2 && renderStep2()}
+         {step === 3 && renderStep3()}
+-        {(step === 4 || step === 5) && dirty && (
++        {showUnsavedNudge({ mode, dirty }) && (
+           /* ⚠️ IT DOES NOT TELL A 'none' VISITOR TO SAVE. Since 'none' stopped walling, this banner is
+              reachable by someone whose Save cannot succeed: the trigger refuses the write, so "save your
+              draft before exporting" names a step they cannot take. That arm says what is actually needed
+@@ -3471,6 +3505,8 @@ workings: saved.workings,
+ //
+ // Record<ConciergeStatus, string> is EXHAUSTIVE BY TYPE: a member added to the union fails the
+ // build here rather than rendering `undefined` in a pill.
++// T10c: shown in place of "Confirmed" for a bill confirmed with no figure (proposalNeedsAttention).
++const NEEDS_ATTENTION_BADGE = 'Needs attention'
+ const PROPOSAL_BADGE: Record<ConciergeStatus, string> = {
+   confirmed:           'Confirmed',
+   extracted:           'To confirm',
+@@ -3577,14 +3613,15 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                 <div key={pi} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                     <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>ThemisIQ read</span>
+-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${p.unit ?? ''}` : '—'}</span>
++                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${unitLabel(p.unit, '')}` : '—'}</span>
+                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
+                     {/* T10b: a delivery shows its delivery date, not a one-day period. */}
+                     {deliveryDateOf(docType, p) !== null
+-                      ? <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· delivered {deliveryDateOf(docType, p)}</span>
+-                      : (p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ?? '?'} → {p.periodEnd ?? '?'}</span>}
+-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: PROPOSAL_BADGE_COLOUR[p.status].bg, color: PROPOSAL_BADGE_COLOUR[p.status].color }}>
+-                      {PROPOSAL_BADGE[p.status]}
++                      ? <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· delivered {isoDateInWords(deliveryDateOf(docType, p))}</span>
++                      : (p.periodStart || p.periodEnd) && <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>· {p.periodStart ? isoDateInWords(p.periodStart) : '?'} to {p.periodEnd ? isoDateInWords(p.periodEnd) : '?'}</span>}
++                    {/* T10c: a bill confirmed with no figure reads "Needs attention", never the green "Confirmed". */}
++                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: PROPOSAL_BADGE_COLOUR[proposalNeedsAttention(p) ? 'needs_manual_review' : p.status].bg, color: PROPOSAL_BADGE_COLOUR[proposalNeedsAttention(p) ? 'needs_manual_review' : p.status].color }}>
++                      {proposalNeedsAttention(p) ? NEEDS_ATTENTION_BADGE : PROPOSAL_BADGE[p.status]}
+                     </span>
+                   </div>
+                   {p.sourceQuote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
+@@ -3604,8 +3641,9 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                   ) : (
+                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                       {p.status === 'confirmed' ? (
+-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
+-                      ) : (
++                        proposalNeedsAttention(p) ? null : <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
++                      ) : periodEditing?.key === `${doc.id}:${pi}` && periodEditing.confirm ? null : (
++                        // T10c: hidden while the month-only date confirmation is open; that step has its own button.
+                         // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.
+                         <button disabled={valueProblem(p) !== null} onClick={() => valueProblem(p) ? undefined : acceptanceProblem(p)
+                           ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
+@@ -3621,7 +3659,11 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                     </div>
+                   )}
+                   {p.status !== 'rejected' && valueProblem(p) && (
+-                    <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>{valueProblem(p)}</div>
++                    <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>
++                      {valueProblem(p)}{' '}
++                      {/* T10c: the help entry, in a new tab so the wizard and its unsaved work stay open. */}
++                      <a href={`/climate-ghg#${CONFIRM_HELP_ID}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Why can&apos;t I confirm this bill?</a>
++                    </div>
+                   )}
+                   {/* T9: dates and unit, answered on the proposal itself; and where they came from. */}
+                   {periodEditing?.key === `${doc.id}:${pi}` && (
+diff --git a/lib/ghg/countryRefusalSurfaces.test.ts b/lib/ghg/countryRefusalSurfaces.test.ts
+index 2bc0953..2a63de5 100644
+--- a/lib/ghg/countryRefusalSurfaces.test.ts
++++ b/lib/ghg/countryRefusalSurfaces.test.ts
+@@ -266,8 +266,10 @@ describe('the GHG page surfaces', () => {
+     expect(notes, 'exactly one exclusion note between the intensity and the end of the card').toBe(1)
+   })
+ 
+-  it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch', () => {
+-    expect(PAGE).toContain("{blocked.kind === 'country' ? '' : 'Not included in any total. '}")
++  it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch on a location with no country', () => {
++    // T10c: a factor gap on a location whose country is set has its own sentence, which says it is not in the
++    // totals, so only the no-country case keeps the prefix.
++    expect(PAGE).toContain("{blocked.kind !== 'country' && !factorGapHasCountry(blocked) ? 'Not included in any total. ' : ''}")
+   })
+ 
+   it('no surface carries a hard-coded publisher catalogue any more', () => {
+diff --git a/lib/ghg/engine.test.ts b/lib/ghg/engine.test.ts
+index 27a8082..d554c09 100644
+--- a/lib/ghg/engine.test.ts
++++ b/lib/ghg/engine.test.ts
+@@ -33,6 +33,7 @@ import {
+   validateResolution, COVERAGE_MESSAGE, emissionsByLocationField,
+   documentsBacking, deriveStoredLocations, factorDerivationsFor,
+   canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
++  valueProblem, NO_VALUE_MESSAGE, proposalNeedsAttention,
+ } from './engine';
+ import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE } from './coverageActions';
+ import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
+@@ -102,7 +103,7 @@ describe('GROUP A — straddle', () => {
+     for (const choice of ['prorate', 'this_year', 'next_year'] as const) {
+       const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, [straddleRes(choice)]);
+       expect(rows.filter(r => r.gwp_basis === 'coverage_resolution'), choice).toEqual([]);
+-      expect(ngRow(rows)?.proration_note, choice).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
++      expect(ngRow(rows)?.proration_note, choice).toBe('20 December 2024 to 19 January 2025: 12 of 31 days in reporting year 2024, ×0.387');
+     }
+   });
+ 
+@@ -3470,7 +3471,7 @@ describe('T1 billContributions', () => {
+     const unparseable = INVALID_PERIOD_MESSAGE.unparseable('bill_jan.pdf', 'Jan 2025', '2025-01-31');
+     const reversed = INVALID_PERIOD_MESSAGE.reversed('bill_mar.pdf', '2025-03-10', '2025-03-01');
+     expect(unparseable).toBe('The billing period on bill_jan.pdf could not be read as dates ("Jan 2025" to "2025-01-31"). Enter the dates as they appear on the bill.');
+-    expect(reversed).toBe('The billing period on bill_mar.pdf ends before it starts (2025-03-10 to 2025-03-01). Check the dates and correct them.');
++    expect(reversed).toBe('The billing period on bill_mar.pdf ends before it starts (10 March 2025 to 1 March 2025). Check the dates and correct them.');
+     expect(unparseable).not.toBe(reversed);
+     for (const m of [unparseable, reversed]) expect(m).not.toMatch(/\u2014|invalid_period|periodProblem/);
+   });
+@@ -3597,7 +3598,7 @@ describe('T2 applyResolutions folds billContributions', () => {
+     expect(a.value).toBeCloseTo(310 * 19 / 31 + 310 * 17 / 31, 9);
+     expect(a.adjustment).toMatchObject({ kind: 'prorate', method: 'Prorated by billing days' });
+     expect(a.adjustment?.basis).toBe(
+-      '2024-12-20 to 2025-01-19: 19 of 31 days in reporting year 2025, ×0.613; then 2025-12-15 to 2026-01-14: 17 of 31 days in reporting year 2025, ×0.548');
++      '20 December 2024 to 19 January 2025: 19 of 31 days in reporting year 2025, ×0.613; then 15 December 2025 to 14 January 2026: 17 of 31 days in reporting year 2025, ×0.548');
+   });
+ 
+   it('the extrapolation gross-up applies AFTER the fold, and the gross-up drives the stamp', () => {
+@@ -3606,7 +3607,7 @@ describe('T2 applyResolutions folds billContributions', () => {
+     const a = applied(l, [ext], 2025).natural_gas_amount;
+     expect(a.value).toBeCloseTo((310 * 19 / 31) * (12 / 6), 9);
+     expect(a.adjustment?.kind).toBe('extrapolate');
+-    expect(a.adjustment?.basis.startsWith('2024-12-20 to 2025-01-19: 19 of 31 days in reporting year 2025, ×0.613; then ')).toBe(true);
++    expect(a.adjustment?.basis.startsWith('20 December 2024 to 19 January 2025: 19 of 31 days in reporting year 2025, ×0.613; then ')).toBe(true);
+     const row = buildWorkings([{ ...l, has_natural_gas: true, natural_gas_amount: 1, natural_gas_unit: 'mcf' }], 'AR6', 2025, [ext]).find(r => r.source === 'Natural gas');
+     expect(row?.entry_method).toBe('concierge-extrapolated');
+     expect(row?.proration_note).toBeUndefined();
+@@ -3630,7 +3631,7 @@ describe('T2 applyResolutions folds billContributions', () => {
+   it('the proration note has no em dash and names each bill, its days and its share', () => {
+     const rows = buildWorkings([straddleGasLoc()], 'AR6', 2024, []);
+     const note = ngRow(rows)?.proration_note as string;
+-    expect(note).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
++    expect(note).toBe('20 December 2024 to 19 January 2025: 12 of 31 days in reporting year 2024, ×0.387');
+     expect(note).not.toContain('\u2014');
+   });
+ 
+@@ -3683,7 +3684,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+   ] });
+   const issues = (l: Location, y: number, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], y, 12, r);
+   const value = (l: Location, y: number, r: CoverageResolution[] = []) => applyResolutions(l, r, W(y).start, W(y).end).electricity_kwh?.value;
+-  const OVERLAP_MSG = 'bill2.pdf and monthOnly.pdf cover the same days (2026-01-01 to 2026-01-31). Choose Same bill, count it once, or Different meters or accounts.';
++  const OVERLAP_MSG = 'bill2.pdf and monthOnly.pdf cover the same days (1 January 2026 to 31 January 2026). Choose Same bill, count it once, or Different meters or accounts.';
+ 
+   it('Scenario B + Bill 2, FY2026: overlap raised with a message naming both documents and the shared days', () => {
+     expect(issues(scenarioB(), 2026).filter(i => i.status === 'overlap')).toEqual([
+@@ -3797,7 +3798,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
+       expect(applyResolutions(rejected(50), [usedNone], W(2025).start, W(2025).end).natural_gas_amount, 'a typed figure supersedes used none').toBeUndefined();
+       expect(applyResolutions(rejected(0), [usedNone], W(2025).start, W(2025).end).natural_gas_amount.value, 'nothing typed: used none is 0').toBe(0);
+       const row = buildWorkings([rejected()], 'AR6', 2025, [usedNone]).find(w => w.gwp_basis === 'coverage_resolution');
+-      expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example at 2026-03-01T10:00:00Z');
++      expect(row?.emission_factor).toBe('Site used none, confirmed by jo@acme.example on 1 March 2026');
+       expect(row?.resolved_at).toBe('2026-03-01T10:00:00Z');
+     });
+ 
+@@ -3942,11 +3943,11 @@ describe('T3a reportingYearLabel', () => {
+ 
+   it('the proration note uses it: December and March year ends, with no em dash', () => {
+     const dec = ngRow(buildWorkings([straddleGasLoc()], 'AR6', 2024, []))?.proration_note as string;
+-    expect(dec).toBe('2024-12-20 to 2025-01-19: 12 of 31 days in reporting year 2024, ×0.387');
++    expect(dec).toBe('20 December 2024 to 19 January 2025: 12 of 31 days in reporting year 2024, ×0.387');
+     const mar = loc({ has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
+       source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2025-03-20', periodEnd: '2025-04-19' })])] });
+     const note = ngRow(buildWorkings([mar], 'AR6', 2025, [], 3))?.proration_note as string;
+-    expect(note).toBe('2025-03-20 to 2025-04-19: 12 of 31 days in the year ending 31 March 2025, ×0.387');
++    expect(note).toBe('20 March 2025 to 19 April 2025: 12 of 31 days in the year ending 31 March 2025, ×0.387');
+     for (const n of [dec, note]) expect(n).not.toContain('\u2014');
+   });
+ 
+@@ -4709,7 +4710,7 @@ describe('T10b delivery-based fuels', () => {
+     expect(got.some(i => i.status === 'gap')).toBe(false);
+     expect(got.filter(i => i.status === 'deliveries_unconfirmed')).toEqual([{ locId: 'L1', fuelType: 'propane', status: 'deliveries_unconfirmed',
+       documentType: 'fuel_propane', docIds: ['lpg1', 'lpg2', 'lpg3', 'lpg4', 'lpg5', 'lpg6'],
+-      message: 'Confirm that the 6 propane deliveries listed for Melbourne are all the propane deliveries between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
++      message: 'Confirm these are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
+   });
+ 
+   it('the confirmation names fuel, site and window, records who and when, clears the issue and reaches the workings', () => {
+@@ -4720,7 +4721,7 @@ describe('T10b delivery-based fuels', () => {
+     expect(validateResolution(r, l)).toBeNull();
+     expect(issues(l, [r])).toEqual([]);
+     const row = buildWorkings([l], 'AR6', 2025, [r], 9).find(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'deliveries_complete');
+-    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com at 2025-10-02T09:00:00Z');
++    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com on 2 October 2025');
+     expect(row?.ef_source).toBe(r.note);
+   });
+ 
+@@ -4828,3 +4829,29 @@ describe('T10b delivery-based fuels', () => {
+     expect(sameDocSet(['a', 'b'], ['a'])).toBe(false);
+   });
+ });
++
++describe('T10c run-through wording', () => {
++  it('a bill with no figure: the default message, or the quote and fuel when the unit is one we cannot use', () => {
++    expect(NO_VALUE_MESSAGE).toBe("We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included.");
++    expect(valueProblem({ value: null })).toBe(NO_VALUE_MESSAGE);
++    expect(valueProblem({ value: null, sourceQuote: '6,944 ft3', fuelType: 'natural_gas', rawValue: 6944, rawUnit: 'ft3' }))
++      .toBe('We read "6,944 ft3" from this bill, but we can\'t use that unit for natural gas yet. Choose the unit from the list, or enter the figure yourself.');
++    expect(valueProblem({ value: null, sourceQuote: '6,944 MJ', fuelType: 'natural_gas', rawValue: 6944, rawUnit: 'mj' }), 'a unit we can convert')
++      .toBe(NO_VALUE_MESSAGE);
++    expect(valueProblem({ value: null, sourceQuote: '', fuelType: 'natural_gas', rawValue: 6944, rawUnit: 'ft3' }), 'no quote').toBe(NO_VALUE_MESSAGE);
++    expect(valueProblem({ value: 12 })).toBeNull();
++  });
++
++  it('only a bill confirmed with no figure needs attention', () => {
++    expect(proposalNeedsAttention({ status: 'confirmed', value: null })).toBe(true);
++    expect(proposalNeedsAttention({ status: 'confirmed', value: 5 })).toBe(false);
++    expect(proposalNeedsAttention({ status: 'extracted', value: null })).toBe(false);
++  });
++
++  it('the Australian source is named "DCCEEW NGA 2025" on every citation', () => {
++    for (const k of ['combustion_au', 'electricity_au', 'residual_au'] as const) {
++      expect(EF_SOURCES[k].startsWith('DCCEEW NGA 2025'), k).toBe(true);
++    }
++    expect(Object.values(EF_SOURCES).join(' ')).not.toMatch(/NGA Factors|National Greenhouse Accounts/);
++  });
++});
+diff --git a/lib/ghg/engine.ts b/lib/ghg/engine.ts
+index 72561d5..6bc1089 100644
+--- a/lib/ghg/engine.ts
++++ b/lib/ghg/engine.ts
+@@ -18,7 +18,8 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
+ 
+ // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
+ // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
+-import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ } from '../unitConversions'
++import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, convertToCanonical, type FuelType } from '../unitConversions'
++import { dateInWords, isoDateInWords } from './dateWords'
+ // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
+ // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
+ import { NOT_PROVIDED } from '../notProvided'
+@@ -797,7 +798,7 @@ const EF_SOURCES = {
+   //   ⚠️ TWO TESTS CONSTRAIN THIS STRING. F16 requires every token of COMBUSTION_EDITION.EU
+   // ('IPCC 2006') to appear in it; F17 requires a four-digit year in parentheses. Keep '(2006)'.
+   combustion_eu: 'EU MRR Reg. (EU) 2018/2066, Annex VI Table 1 — IPCC (2006) Vol.2 defaults; published mass-basis, per-volume derived',
+-  combustion_au: 'DCCEEW NGA Factors 2025 (AR5)',
++  combustion_au: 'DCCEEW NGA 2025 (AR5)',
+   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
+   // ── STEAM / DISTRICT HEAT — NAMED TO THE TABLE, UNLIKE combustion ─────────────────────────────
+   // These cite the exact table, which combustion above does NOT ('US EPA (2024) Emission Factors for
+@@ -828,11 +829,11 @@ const EF_SOURCES = {
+   // if GRID_EF.UK ever collapses back to a single edition.
+   electricity_uk: defraCitation(),
+   electricity_eu: 'EEA (2023) Greenhouse gas emission intensity of electricity generation',
+-  electricity_au: 'DCCEEW NGA Factors 2025',
++  electricity_au: 'DCCEEW NGA 2025',
+   electricity_nz: 'NZ MfE Measuring Emissions 2026 v2',
+   residual_us: 'Green-e Residual Mix 2025 (2023 data, publ. 2026-01-29, CRS) — residual CO₂; eGRID2023 Rev2 (publ. 2025-06-12) CH₄/N₂O. Green-e factors out Green-e-certified voluntary sales (the only published US residual source per CRS).',
+   residual_eu: 'AIB European Residual Mixes 2024 (publ. 2025-05-30, Grexel/AIB; Ecoinvent CO₂ inputs) — combined CO₂e, gCO₂/kWh.',
+-  residual_au: 'DCCEEW National Greenhouse Accounts Factors 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
++  residual_au: 'DCCEEW NGA 2025, Table 2 — national Residual Mix Factor, 0.81 kg CO₂-e/kWh Scope 2. Calculated on a FINANCIAL-YEAR basis (years ending June) with a lag adjustment using a 3-year average, because Large-scale Generation Certificates are created on a CALENDAR-year basis up to 12 months after the generation they represent. National aggregate only — see RESIDUAL_AU.',
+   // ⚠️ NOTHING IS SELECTABLE. gwp_ar4 and gwp_ar5 said "selectable alternate" from f83326a (20 Jun 2026)
+   // until 17 Sep 2026; git history holds no selector, parameter or saved preference by which any inventory
+   // could choose either, then or since. The basis comes from FRAMEWORKS[].gwp, which is AR6 for all six.
+@@ -1753,10 +1754,8 @@ export function reportingYearLabel(win: { start: Date; end: Date }): { label: st
+   return { label: ending, inText: ending }
+ }
+ 
+-/** A calendar date in words, "1 October 2024": the date itself, in local time. */
+-export function dateInWords(d: Date): string {
+-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`
+-}
++// T10c: dates in words come from lib/ghg/dateWords.ts, the one place they are built; re-exported for callers.
++export { dateInWords, isoDateInWords }
+ 
+ /**
+  * T10b: the words of the completeness confirmation, naming the fuel, the site and the window (ruling):
+@@ -3066,8 +3065,8 @@ function resolutionMethod(r: CoverageResolution): string {
+   return r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
+     : r.kind === 'same_bill' ? 'Same bill, counted once'
+     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
+-    : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
+-    : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} at ${r.acknowledgedAt}`
++    : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
++    : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
+     : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
+     : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
+     : r.kind
+@@ -3232,8 +3231,9 @@ export const COVERAGE_MESSAGE = {
+     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
+   // T10b: a delivery-based fuel is checked for completeness, not monthly coverage. Until the customer confirms
+   // the deliveries listed are all of them, export waits.
+-  deliveries_unconfirmed: (n: number, fuel: string, site: string, from: string, to: string) =>
+-    `Confirm that the ${n} ${fuel} deliver${n === 1 ? 'y' : 'ies'} listed for ${site} ${n === 1 ? 'is' : 'are'} all the ${fuel} deliveries between ${from} and ${to}. Export is blocked until you confirm.`,
++  // T10c: no count; the list beside it shows the deliveries.
++  deliveries_unconfirmed: (fuel: string, site: string, from: string, to: string) =>
++    `Confirm these are all the ${fuel} deliveries for ${site} between ${from} and ${to}. Export is blocked until you confirm.`,
+   deliveries_changed: (fuel: string, site: string, email: string, date: string) =>
+     `The ${fuel} deliveries for ${site} have changed since ${email} confirmed them on ${date}. Check the list and confirm again. Export is blocked until you do.`,
+   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
+@@ -3363,15 +3363,37 @@ export function acceptanceProblem(p: Pick<ExtractedProposal, 'periodOrigin' | 'p
+   return periodOriginOf(p) === 'billing_month' ? BILLING_MONTH_CONFIRM_MESSAGE : null
+ }
+ 
+-/** T10a: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
+-export const NO_VALUE_MESSAGE = 'No figure could be read from this bill. Edit the unit or the figure, or reject the bill.'
++/** T10a, worded by T10c: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
++export const NO_VALUE_MESSAGE =
++  "We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included."
++/** T10c: the same, when a figure and unit were read but the unit is one the conversion cannot use. */
++export const NO_VALUE_UNIT_MESSAGE = (quote: string, fuel: string): string =>
++  `We read "${quote}" from this bill, but we can't use that unit for ${fuel} yet. Choose the unit from the list, or enter the figure yourself.`
+ 
+ /**
+  * T10a: a proposal with no figure (value null: an unreadable number, or a unit with no conversion) can never be
+  * confirmed. Confirming it counted nothing and raised nothing, so the figure fell to zero in silence.
++ * T10c: when the reading has a quote and a unit the conversion does not recognise (the same test that left the
++ * figure empty at extraction), the message names the quote and the fuel.
++ */
++export function valueProblem(
++  p: Pick<ExtractedProposal, 'value'> & Partial<Pick<ExtractedProposal, 'sourceQuote' | 'fuelType' | 'rawValue' | 'rawUnit'>>,
++): string | null {
++  if (p.value != null) return null
++  const quote = (p.sourceQuote ?? '').trim()
++  if (quote && p.rawUnit && p.fuelType && convertToCanonical(p.fuelType as FuelType, p.rawValue ?? null, p.rawUnit).tier === 3) {
++    return NO_VALUE_UNIT_MESSAGE(quote, FUEL_NAME[p.fuelType] ?? p.fuelType.replace(/_/g, ' '))
++  }
++  return NO_VALUE_MESSAGE
++}
++
++/**
++ * T10c: a bill confirmed with no figure (possible only for one confirmed before T10a) is shown as "Needs
++ * attention", never with the green "Confirmed" badge. Display only: the stored status and the export-blocking
++ * no_value issue are unchanged.
+  */
+-export function valueProblem(p: Pick<ExtractedProposal, 'value'>): string | null {
+-  return p.value == null ? NO_VALUE_MESSAGE : null
++export function proposalNeedsAttention(p: Pick<ExtractedProposal, 'status' | 'value'>): boolean {
++  return p.status === 'confirmed' && p.value == null
+ }
+ 
+ export type InvalidPeriodKind = 'unparseable' | 'reversed'
+@@ -3380,8 +3402,9 @@ export type InvalidPeriodKind = 'unparseable' | 'reversed'
+ export const INVALID_PERIOD_MESSAGE: Record<InvalidPeriodKind, (fileName: string, start: string, end: string) => string> = {
+   unparseable: (fileName, start, end) =>
+     `The billing period on ${fileName} could not be read as dates ("${start}" to "${end}"). Enter the dates as they appear on the bill.`,
++  // T10c: real dates are shown in words; the unparseable message above keeps the stored text, as evidence.
+   reversed: (fileName, start, end) =>
+-    `The billing period on ${fileName} ends before it starts (${start} to ${end}). Check the dates and correct them.`,
++    `The billing period on ${fileName} ends before it starts (${isoDateInWords(start)} to ${isoDateInWords(end)}). Check the dates and correct them.`,
+ }
+ 
+ // A stored period date that is a real calendar date in yyyy-mm-dd form. parseLocalDate reads the first ten
+@@ -3617,7 +3640,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
+       // basis states the REAL arithmetic, in application order (per-bill proration, THEN extrapolate).
+       const meterTag = (m: string | null) => (m == null ? '' : `${m}: `)
+       const parts: string[] = prorated.map(c =>
+-        `${meterTag(c.meterLabel)}${c.periodStart} to ${lastCoveredDay(c.periodEndExclusive as string)}: ${c.inWindowDays} of ${c.totalDays} days in ${yearText}, ×${(c.share ?? 0).toFixed(3)}`)
++        `${meterTag(c.meterLabel)}${isoDateInWords(c.periodStart)} to ${isoDateInWords(lastCoveredDay(c.periodEndExclusive as string))}: ${c.inWindowDays} of ${c.totalDays} days in ${yearText}, ×${(c.share ?? 0).toFixed(3)}`)
+       for (const e of extrs) parts.push(`${meterTag(e.meter)}${resolutionBasis(e.r)}`)
+       // primary drives kind + method: extrapolate (the gross-up) if present, else proration.
+       const kind: NonNullable<AppliedField['adjustment']>['kind'] = extrs.length > 0 ? 'extrapolate' : 'prorate'
+@@ -4217,8 +4240,6 @@ export function findUnresolvedCoverage(
+   allResolutions: CoverageResolution[]
+ ): CoverageIssue[] {
+   const coverageWin = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+-  const isoDay = (d: Date): string =>
+-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+   return locations.flatMap(loc => {
+     const resolutions = acceptedResolutions(loc, allResolutions)
+     const site = loc.name || 'Location'
+@@ -4326,7 +4347,7 @@ export function findUnresolvedCoverage(
+       out.push({ locId: loc.id, fuelType: g.fuelType, status: 'deliveries_unconfirmed', documentType: g.documentType, docIds,
+         message: conf
+           ? COVERAGE_MESSAGE.deliveries_changed(fuel, site, conf.by?.email ?? 'someone', dateInWords(new Date(conf.acknowledgedAt)))
+-          : COVERAGE_MESSAGE.deliveries_unconfirmed(g.n, fuel, site, dateInWords(coverageWin.start), dateInWords(coverageWin.end)) })
++          : COVERAGE_MESSAGE.deliveries_unconfirmed(fuel, site, dateInWords(coverageWin.start), dateInWords(coverageWin.end)) })
+     }
+ 
+     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
+@@ -4356,7 +4377,7 @@ export function findUnresolvedCoverage(
+         const toExcl = endA < endB ? endA : endB
+         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
+         out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,
+-          message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), isoDay(from), isoDay(to)) })
++          message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), dateInWords(from), dateInWords(to)) })
+       }
+     }
+     return out
+diff --git a/lib/ghg/factorEditions.test.ts b/lib/ghg/factorEditions.test.ts
+index 06d6e48..09c4dd0 100644
+--- a/lib/ghg/factorEditions.test.ts
++++ b/lib/ghg/factorEditions.test.ts
+@@ -333,7 +333,7 @@ describe('the declared edition labels cannot drift from their citations', () =>
+     // Documented in factorEditions.ts as the reason the label is declared. Asserted because a future
+     // reader will be tempted by it, and the counter-example is one citation away.
+     expect(EF_SOURCES.combustion_au, 'the parenthesised token is a GWP set, not a year')
+-      .toBe('DCCEEW NGA Factors 2025 (AR5)')
++      .toBe('DCCEEW NGA 2025 (AR5)')
+     expect(/\((\d{4})\)/.exec(EF_SOURCES.combustion_au), 'year-in-parens finds no year here').toBeNull()
+     // And it DOES match the other five, which is exactly what makes it look safe.
+     for (const c of [EF_SOURCES.combustion, EF_SOURCES.combustion_ca, EF_SOURCES.combustion_uk,
+diff --git a/lib/ghg/proposalEdits.test.ts b/lib/ghg/proposalEdits.test.ts
+index 9728bc9..3654c50 100644
+--- a/lib/ghg/proposalEdits.test.ts
++++ b/lib/ghg/proposalEdits.test.ts
+@@ -243,6 +243,6 @@ describe('T10a: a proposal with no figure can never be confirmed', () => {
+     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+     expect(page).toContain('<button disabled={valueProblem(p) !== null}')
+     expect(page).toContain("{p.status !== 'rejected' && valueProblem(p) && (")
+-    expect(NO_VALUE_MESSAGE).toBe('No figure could be read from this bill. Edit the unit or the figure, or reject the bill.')
++    expect(NO_VALUE_MESSAGE).toBe("We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included.")
+   })
+ })
+diff --git a/lib/ghg/workingsCells.test.ts b/lib/ghg/workingsCells.test.ts
+index 83b798d..e8c039d 100644
+--- a/lib/ghg/workingsCells.test.ts
++++ b/lib/ghg/workingsCells.test.ts
+@@ -75,7 +75,7 @@ describe('workings cell rendering', () => {
+       .toBe('12,345.6 kWh')
+     // A row that reports a quantity nothing could price keeps both.
+     expect(workingsActivityCell({ activity_data: 1000, activity_unit: 'gj', result_tco2e: null }))
+-      .toBe('1,000 gj')
++      .toBe('1,000 GJ')
+     // A coverage-resolution row has no quantity to report, which is not the same absence as a missing
+     // one: it records a decision, so the column does not apply to it.
+     expect(workingsActivityCell({ activity_data: null, activity_unit: 'gap', result_tco2e: null }))
+@@ -226,6 +226,6 @@ describe('workings cell rendering', () => {
+ describe('the share cell for a delivery (T10b)', () => {
+   it('reads as delivered and counted in full', () => {
+     expect(contributionShareCell({ reason: 'delivered', inWindowDays: null, totalDays: null, share: 1, deliveryDate: '2025-03-14' }))
+-      .toBe('Delivered 2025-03-14, counted in full')
++      .toBe('Delivered 14 March 2025, counted in full')
+   })
+ })
+diff --git a/lib/ghg/workingsCells.ts b/lib/ghg/workingsCells.ts
+index 54e276d..2f0d11a 100644
+--- a/lib/ghg/workingsCells.ts
++++ b/lib/ghg/workingsCells.ts
+@@ -1,4 +1,6 @@
+ import { NOT_PROVIDED } from '../notProvided'
++import { unitLabel } from './unitLabels'
++import { isoDateInWords } from './dateWords'
+ 
+ // ─────────────────────────────────────────────────────────────────────────────
+ // ONE RENDERER FOR THE WORKINGS TABLE'S ACTIVITY CELL, READ BY BOTH SURFACES.
+@@ -113,7 +115,8 @@ export function workingsActivityCell(r: WorkingsActivityCellRow): string {
+   if (!r.activity_unit || r.activity_unit === NOT_PROVIDED) {
+     return r.result_tco2e == null ? NOT_PROVIDED : data.toLocaleString()
+   }
+-  return `${data.toLocaleString()} ${r.activity_unit}`
++  // T10c: the unit as the customer reads it (kWh, Mcf, MMBtu), from the one shared map.
++  return `${data.toLocaleString()} ${unitLabel(r.activity_unit)}`
+ }
+ 
+ export interface WorkingsFactorCellRow {
+@@ -189,7 +192,7 @@ export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: st
+  * note does, so the two never describe a bill differently:
+  *   - prorated:                "12 of 31 days, ×0.387"
+  *   - counted, wholly in year: "31 of 31 days"
+- *   - a delivery inside the year (T10b): "Delivered 2025-03-14, counted in full"
++ *   - a delivery inside the year (T10b): "Delivered 14 March 2025, counted in full"
+  *   - undated or invalid period (no days to count): NOT_APPLICABLE
+  *   - any other bill not counted: "Not counted"; the reason, not this cell, says why.
+  * Structural type rather than the engine's BillContribution, because the engine imports this file.
+@@ -204,7 +207,7 @@ export type ShareCellContribution = {
+ export const NOT_COUNTED = 'Not counted'
+ export function contributionShareCell(c: ShareCellContribution): string {
+   if (c.reason === 'undated' || c.reason === 'invalid_period') return NOT_APPLICABLE
+-  if (c.reason === 'delivered') return `Delivered ${c.deliveryDate ?? ''}, counted in full`
++  if (c.reason === 'delivered') return `Delivered ${isoDateInWords(c.deliveryDate)}, counted in full`
+   if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
+   const days = `${c.inWindowDays} of ${c.totalDays} days`
+   return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days
+diff --git a/lib/unitConversions.ts b/lib/unitConversions.ts
+index 65bcefd..4d96f83 100644
+--- a/lib/unitConversions.ts
++++ b/lib/unitConversions.ts
+@@ -114,7 +114,7 @@ const TIER2: Record<string, Tier2Fn> = {
+   // Natural gas — exotic units → an existing selector unit
+   'natural_gas:ccf': (v) => {
+     const value = round(v * 0.1); // 1 ccf = 100 ft³, 1 mcf = 1000 ft³
+-    return { value, unit: 'mcf', conversionNote: `${fmt(v)} ccf ÷ 10 = ${fmt(value)} mcf (100 ft³ → 1,000 ft³)` };
++    return { value, unit: 'mcf', conversionNote: `${fmt(v)} Ccf ÷ 10 = ${fmt(value)} Mcf (100 ft³ → 1,000 ft³)` };
+   },
+   'natural_gas:gj': (v) => {
+     const value = round(v / GJ_PER_MMBTU);
+--- /dev/null
++++ b/lib/ghg/unsavedChanges.ts
+@@ -0,0 +1,27 @@
++// lib/ghg/unsavedChanges.ts
++//
++// WHETHER THE GHG WIZARD HOLDS WORK THAT IS NOT SAVED (T10c). Pure: no React, no storage.
++//
++// The page keeps a BASELINE: the fingerprint of the inventory as it was last loaded or saved. The page is
++// dirty whenever the inventory differs from it. Every customer action that matters (an upload, a reading
++// confirmed or rejected, a date or unit edit, a coverage resolution, a typed figure) changes the inventory,
++// so it changes the fingerprint, and the warning before leaving and the Save draft nudge follow without each
++// action having to remember to say so. A save records the fingerprint of what it SAVED, so an edit made while
++// the save was in flight still reads as unsaved.
++//
++// A null baseline means "nothing saved yet that this matches", for a draft restored from the browser.
++
++/** The fingerprint of an inventory: its full serialised state. */
++export function inventoryFingerprint(inventory: unknown): string {
++  return JSON.stringify(inventory)
++}
++
++/** True when the inventory holds changes since the baseline was taken. */
++export function hasUnsavedChanges(baseline: string | null, inventory: unknown): boolean {
++  return baseline === null || inventoryFingerprint(inventory) !== baseline
++}
++
++/** The nudge with Save draft (T10c ruling): on every step of the wizard whenever the page is dirty. */
++export function showUnsavedNudge(a: { mode: string; dirty: boolean }): boolean {
++  return a.mode === 'wizard' && a.dirty
++}
+--- /dev/null
++++ b/lib/ghg/dateWords.ts
+@@ -0,0 +1,24 @@
++// lib/ghg/dateWords.ts
++//
++// DATES AS A CUSTOMER READS THEM (T10c ruling): "14 March 2025", never "2025-03-14", wherever a date is
++// shown. Pure, with no imports, so the engine, the workings cells and the components can all use it without
++// an import cycle. A stored value that is not a real yyyy-mm-dd date is returned as stored: it is evidence of
++// what was read, and rewording it would hide that it could not be read.
++
++const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
++
++/** A calendar date in words, "1 October 2024", in local time. */
++export function dateInWords(d: Date): string {
++  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
++}
++
++/** A stored yyyy-mm-dd date in words; anything else is returned unchanged. */
++export function isoDateInWords(s: string | null | undefined): string {
++  if (!s) return ''
++  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
++  if (!m) return s
++  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
++  const dt = new Date(y, mo - 1, d)
++  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return s
++  return dateInWords(dt)
++}
+--- /dev/null
++++ b/lib/ghg/unitLabels.ts
+@@ -0,0 +1,16 @@
++// lib/ghg/unitLabels.ts
++//
++// HOW EACH UNIT IS WRITTEN FOR THE CUSTOMER (T10c ruling): kWh, MWh, Mcf, Ccf, MMBtu, GJ, MJ, wherever a unit
++// is shown. Units are STORED lower-case (the conversion layer's canonical keys, lib/unitConversions.ts); this
++// is the one place that decides how they read. A unit not listed is shown as stored. Pure, with no imports.
++
++export const UNIT_LABEL: Record<string, string> = {
++  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', mj: 'MJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
++  gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
++}
++
++/** A stored unit as the customer reads it. */
++export function unitLabel(u: string | null | undefined, missing = 'no unit'): string {
++  if (!u) return missing
++  return UNIT_LABEL[u] ?? UNIT_LABEL[u.toLowerCase()] ?? u
++}
+--- /dev/null
++++ b/lib/ghg/unsavedChanges.test.ts
+@@ -0,0 +1,70 @@
++// lib/ghg/unsavedChanges.test.ts
++//
++// T10c: unsaved work. The page is dirty whenever the inventory differs from what was last loaded or saved,
++// so an upload, a confirmation, a rejection, an edit or a resolution all count; saving clears it.
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from './unsavedChanges'
++import { emptyLocation, type ExtractedProposal, type SourceDoc } from './engine'
++import { upsertResolution, usedNoneResolution } from './coverageActions'
++
++const reading: ExtractedProposal = { fuelType: 'natural_gas', rawValue: 100, rawUnit: 'mcf', value: 100, unit: 'mcf',
++  periodStart: '2025-01-01', periodEnd: '2025-01-31', confidence: 'high', sourceQuote: '100 mcf', notes: null, status: 'extracted' }
++const upload: SourceDoc = { id: 'd1', file_name: 'jan.pdf', document_type: 'utility_bill_gas', uploaded_at: '2025-06-01', file_path: '/d1.pdf', extracted: [reading] }
++const saved = { reporting_year: 2025, coverage_resolutions: [], locations: [{ ...emptyLocation('L1', 'Site A'), source_docs: [] as SourceDoc[] }] }
++
++describe('unsaved changes (T10c)', () => {
++  const baseline = inventoryFingerprint(saved)
++
++  it('a loaded or just-saved inventory is not dirty', () => {
++    expect(hasUnsavedChanges(baseline, saved)).toBe(false)
++    expect(hasUnsavedChanges(baseline, JSON.parse(JSON.stringify(saved))), 'an equal copy').toBe(false)
++  })
++
++  it('uploading a bill marks the page dirty', () => {
++    const uploaded = { ...saved, locations: [{ ...saved.locations[0], source_docs: [upload] }] }
++    expect(hasUnsavedChanges(baseline, uploaded)).toBe(true)
++  })
++
++  it('confirming a bill marks the page dirty, and saving clears it', () => {
++    const before = { ...saved, locations: [{ ...saved.locations[0], source_docs: [upload] }] }
++    const afterSave = inventoryFingerprint(before)
++    const confirmed = { ...before, locations: [{ ...before.locations[0], source_docs: [{ ...upload, extracted: [{ ...reading, status: 'confirmed' as const }] }] }] }
++    expect(hasUnsavedChanges(afterSave, confirmed)).toBe(true)
++    expect(hasUnsavedChanges(inventoryFingerprint(confirmed), confirmed), 'saved').toBe(false)
++  })
++
++  it('rejecting, editing and adding a resolution each mark the page dirty', () => {
++    const rejected = { ...saved, locations: [{ ...saved.locations[0], source_docs: [{ ...upload, extracted: [{ ...reading, status: 'rejected' as const }] }] }] }
++    const base = inventoryFingerprint({ ...saved, locations: [{ ...saved.locations[0], source_docs: [upload] }] })
++    expect(hasUnsavedChanges(base, rejected)).toBe(true)
++    const edited = { ...saved, locations: [{ ...saved.locations[0], natural_gas_amount: 42 }] }
++    expect(hasUnsavedChanges(baseline, edited)).toBe(true)
++    const r = usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas',
++      by: { userId: 'u', email: 'e@x.example' }, at: '2026-10-02T09:00:00.000Z' })
++    expect(hasUnsavedChanges(baseline, { ...saved, coverage_resolutions: upsertResolution([], r) })).toBe(true)
++  })
++
++  it('a restored draft matches nothing saved, so it is dirty', () => {
++    expect(hasUnsavedChanges(null, saved)).toBe(true)
++  })
++
++  it('the nudge with Save draft shows on every step of the wizard when dirty, and not when clean', () => {
++    expect(showUnsavedNudge({ mode: 'wizard', dirty: true })).toBe(true)
++    expect(showUnsavedNudge({ mode: 'wizard', dirty: false })).toBe(false)
++    expect(showUnsavedNudge({ mode: 'list', dirty: true })).toBe(false)
++  })
++
++  it('the page derives dirty from the baseline, warns before leaving when dirty, and gates the nudge on no step', () => {
++    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
++    expect(page).toContain('const dirty = baseline !== undefined && hasUnsavedChanges(baseline, inventory)')
++    expect(page).toContain("if (mode !== 'wizard' || !dirty) return")
++    expect(page).toContain("window.addEventListener('beforeunload', handler)")
++    expect(page).toContain('{showUnsavedNudge({ mode, dirty }) && (')
++    expect(page).not.toContain('(step === 4 || step === 5) && dirty')
++    expect(page).toContain('setBaseline(savingFingerprint)')
++    expect(page).not.toMatch(/setDirty\(/)
++  })
++})
+--- /dev/null
++++ b/app/dashboard/ghg/runthroughUx.test.ts
+@@ -0,0 +1,61 @@
++// app/dashboard/ghg/runthroughUx.test.ts
++//
++// T10c: the run-through UX fixes that live in the page component, pinned at source because the page's
++// closures are not exported (the same approach as the other page source tests).
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { BILL_REVIEW_FAQ, CONFIRM_HELP_ID } from '../../climate-ghg/faq'
++import { stripTsComments } from '../../../lib/testing/stripComments'
++
++const PAGE = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
++const CODE = stripTsComments(PAGE)
++
++describe('the GHG wizard after the run-through (T10c)', () => {
++  it('a bill confirmed with no figure shows "Needs attention", not the green Confirmed', () => {
++    expect(PAGE).toContain("const NEEDS_ATTENTION_BADGE = 'Needs attention'")
++    expect(PAGE).toContain('{proposalNeedsAttention(p) ? NEEDS_ATTENTION_BADGE : PROPOSAL_BADGE[p.status]}')
++    expect(PAGE).toContain("proposalNeedsAttention(p) ? null : <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>")
++  })
++
++  it('the main Confirm is hidden while the month-only date confirmation is open', () => {
++    expect(PAGE).toContain(') : periodEditing?.key === `${doc.id}:${pi}` && periodEditing.confirm ? null : (')
++  })
++
++  it('the message under a disabled Confirm links to the help entry, in a new tab', () => {
++    expect(PAGE).toContain('href={`/climate-ghg#${CONFIRM_HELP_ID}`} target="_blank" rel="noopener noreferrer"')
++    expect(PAGE).toContain("Why can&apos;t I confirm this bill?</a>")
++  })
++
++  it('the help entry is on the GHG module page, with its anchor and the ruled text', () => {
++    expect(BILL_REVIEW_FAQ).toHaveLength(1)
++    expect(BILL_REVIEW_FAQ[0].id).toBe(CONFIRM_HELP_ID)
++    expect(BILL_REVIEW_FAQ[0].q).toBe("Why can't I confirm this bill?")
++    expect(BILL_REVIEW_FAQ[0].a.startsWith("Before a bill counts towards your emissions, we need two things from it")).toBe(true)
++    expect(BILL_REVIEW_FAQ[0].a.endsWith('so nothing incomplete goes to your customer, lender or verifier.')).toBe(true)
++    expect(BILL_REVIEW_FAQ[0].a).not.toContain('—')
++    const ghgPage = readFileSync(join(process.cwd(), 'app/climate-ghg/page.tsx'), 'utf8')
++    expect(ghgPage).toContain('<ModuleFaq items={[...FAQ, ...BILL_REVIEW_FAQ, ...CONCIERGE_FAQ]} />')
++    const faqComponent = readFileSync(join(process.cwd(), 'app/components/modulePage.tsx'), 'utf8')
++    expect(faqComponent).toContain('<div key={q.q} id={q.id}')
++  })
++
++  it('an unsupported unit for a country does not read as the customer\'s mistake', () => {
++    expect(PAGE).toContain("`We can't calculate ${fuel} billed in ${unit} for ${country} yet, so this location isn't included in your totals. Your other locations are unaffected, and nothing you've entered is lost.`")
++    // The older sentence stays for the CSV export, and for a location with no country set; no on-screen surface uses it.
++    expect((CODE.match(/unpriceableMessage\(/g) ?? []).length, 'its definition, the no-country fallback and the CSV').toBe(3)
++    expect((CODE.match(/unpriceablePanelMessage\(/g) ?? []).length, 'the definition and the three on-screen surfaces').toBe(4)
++  })
++
++  it('wording: dates in words on the review line, the electricity and gas hint, and totals in t CO2e', () => {
++    expect(PAGE).toContain("{p.periodStart ? isoDateInWords(p.periodStart) : '?'} to {p.periodEnd ? isoDateInWords(p.periodEnd) : '?'}")
++    expect(PAGE).toContain('· delivered {isoDateInWords(deliveryDateOf(docType, p))}')
++    expect(PAGE).not.toContain('Sum of all 12 monthly bills')
++    expect((PAGE.match(/hint="Sum of the bills covering this year"/g) ?? []).length).toBe(2)
++    expect(CODE).not.toMatch(/\bmt\b(?! Scope)/)
++    expect(CODE).not.toMatch(/ mt Scope|>mt<|mtCO|mt\/\$M/)
++    expect(PAGE).toContain('t CO₂e Scope 1')
++    expect(PAGE).toContain('${unitLabel(loc.natural_gas_unit)}')
++  })
++})

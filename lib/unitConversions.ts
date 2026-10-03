@@ -114,7 +114,7 @@ const TIER2: Record<string, Tier2Fn> = {
   // Natural gas — exotic units → an existing selector unit
   'natural_gas:ccf': (v) => {
     const value = round(v * 0.1); // 1 ccf = 100 ft³, 1 mcf = 1000 ft³
-    return { value, unit: 'mcf', conversionNote: `${fmt(v)} ccf ÷ 10 = ${fmt(value)} mcf (100 ft³ → 1,000 ft³)` };
+    return { value, unit: 'mcf', conversionNote: `${fmt(v)} Ccf ÷ 10 = ${fmt(value)} Mcf (100 ft³ → 1,000 ft³)` };
   },
   'natural_gas:gj': (v) => {
     const value = round(v / GJ_PER_MMBTU);

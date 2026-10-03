@@ -12,13 +12,11 @@ import { periodOriginOf, type ExtractedProposal } from '../../../../lib/ghg/engi
 import { editPeriod, editUnit, type Editor } from '../../../../lib/ghg/proposalEdits'
 import { convertibleUnits, normalizeUnit, type FuelType } from '../../../../lib/unitConversions'
 import { plainDate } from '../../../../lib/ghg/coverageActions'
+import { unitLabel } from '../../../../lib/ghg/unitLabels'
+import { isoDateInWords } from '../../../../lib/ghg/dateWords'
 
-/** How each unit is written for the customer. A unit not listed is shown as stored. */
-export const UNIT_LABEL: Record<string, string> = {
-  kwh: 'kWh', mwh: 'MWh', gj: 'GJ', mj: 'MJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
-  gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
-}
-const unitLabel = (u: string | null) => (u ? UNIT_LABEL[u] ?? u : 'no unit')
+// How each unit is written for the customer: one map, shared with every other surface (T10c).
+export { UNIT_LABEL } from '../../../../lib/ghg/unitLabels'
 
 const smallButton = { fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' } as const
 const primaryButton = { fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' } as const
@@ -98,7 +96,7 @@ export function ProposalNotes({ p }: { p: ExtractedProposal }) {
   }
   if (p.asRead && (p.corrections ?? []).length > 0) {
     const r = p.asRead
-    lines.push(`Read from the bill: ${r.periodStart ?? 'no start date'} to ${r.periodEnd ?? 'no end date'}, ${unitLabel(r.unit)}.`)
+    lines.push(`Read from the bill: ${r.periodStart ? isoDateInWords(r.periodStart) : 'no start date'} to ${r.periodEnd ? isoDateInWords(r.periodEnd) : 'no end date'}, ${unitLabel(r.unit)}.`)
   }
   if (p.periodOrigin === 'customer_confirmed' && p.periodConfirmedBy && p.periodConfirmedAt && !(p.corrections ?? []).some(c => c.fields.includes('period'))) {
     lines.push(`Dates confirmed by ${p.periodConfirmedBy.email} on ${plainDate(p.periodConfirmedAt)}.`)

@@ -62,7 +62,7 @@ describe('notes under a proposal', () => {
     })
     const t = text(renderToStaticMarkup(<ProposalNotes p={p} />))
     expect(t).toContain('Changed by jo@acme.example on 2 October 2026: unit.')
-    expect(t).toContain('Read from the bill: 2025-01-01 to 2025-01-31, therms.')
+    expect(t).toContain('Read from the bill: 1 January 2025 to 31 January 2025, therms.')
   })
   it('dates confirmed unchanged', () => {
     const p = prop({ periodOrigin: 'customer_confirmed', periodConfirmedAt: '2026-10-02T12:00:00.000Z', periodConfirmedBy: BY })

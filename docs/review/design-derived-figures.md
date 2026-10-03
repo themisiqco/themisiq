@@ -498,6 +498,14 @@ The tests are grouped by task in section 11. They include all of these:
 | T10b: one-day periods (2 Oct 2026, ruled) | The CLAUDE.md `exclusiveEnd` wording ("a one-day period (start = end) covers that day, whatever the date; canonicalPeriod is the one place that says so") is included in the T10b patch. |
 | T10b: confirmation text (2 Oct 2026, ruled) | The confirmation names the fuel, the site and the window, for example: "These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025." |
 | T10b: sequencing (2 Oct 2026) | T10b blocks the derived-figures merge. It joins the merge set after T10 (and the committed T10a). |
+| T10c: unsaved work (3 Oct 2026) | The browser warns before leaving or reloading the GHG wizard while there are unsaved changes, including uploads, confirmations, rejections, edits and resolutions. The unsaved-changes nudge with Save draft shows on every step whenever the page is dirty, not only steps 4 and 5. Implemented by deriving "dirty" from the inventory as last loaded or saved (lib/ghg/unsavedChanges.ts), so every change counts and a save clears it. |
+| T10c: deliveries confirmation (3 Oct 2026) | The sentence-styled button is replaced by a checkbox whose label is the statement ("These are all the {fuel} deliveries for {site} between {start} and {end}."), plus a primary "Confirm deliveries" button in the standard Confirm style, enabled only when ticked. Warning text, with no count: "Confirm these are all the {fuel} deliveries for {site} between {start} and {end}. Export is blocked until you confirm." |
+| T10c: bills with no figure (3 Oct 2026) | A confirmed bill with no figure shows "Needs attention" instead of the green "Confirmed" badge. The message under a disabled Confirm is "We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included."; where the reading has a quote and an unrecognised unit, "We read "{quote}" from this bill, but we can't use that unit for {fuel} yet. Choose the unit from the list, or enter the figure yourself." |
+| T10c: fix before estimating (3 Oct 2026) | Beside "Estimate the missing months", "Fix any bills marked above before estimating." when the field has bills needing attention (to confirm, needs review, or confirmed with no figure). |
+| T10c: unsupported unit or country (3 Oct 2026) | The location panel must not imply customer error. "This location is set to {country}, but its {fuel} figure is in {unit}. Check the country on this location, or the unit on the bill." becomes "We can't calculate {fuel} billed in {unit} for {country} yet, so this location isn't included in your totals. Your other locations are unaffected, and nothing you've entered is lost." FI1 and FI2 remove the underlying gap. |
+| T10c: month-only dates (3 Oct 2026) | The main Confirm button is hidden while the month-only date confirmation is open. |
+| T10c: wording (3 Oct 2026) | Written dates ("14 March 2025") wherever a date is shown to customers, including the review line. Field hint "Sum of all 12 monthly bills" becomes "Sum of the bills covering this year". Unit casing kWh, MWh, Mcf, Ccf, MMBtu, GJ, MJ wherever shown. Totals use "t CO2e", not "mt". The Australian source is named "DCCEEW NGA 2025" consistently. |
+| T10c: help entry (3 Oct 2026) | A help/FAQ entry "Why can't I confirm this bill?" with the text supplied by Lisa, on the GHG module page's FAQ, linked from beside a disabled Confirm. This completes the T13 "bills with no figure" items, which are removed from T13. |
 | Launch (2 Oct 2026) | The commercial launch has moved from 1 November 2026 to a date to be set once the GHG module is complete. Order and estimate for the remaining work: section 12. |
 | Sequencing (2 Oct 2026) | The `factor-integrity` branch (FI1 to FI10) is created from main after derived-figures merges. `factor-years` (T3b, T3c, T3d) is created from main after `factor-integrity` merges. |
 | T3b: optional election and allowlist | Optional-election banner confirmed, for a window ending after 1 February 2026: "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it." The EU deadline string "FY2024 (large EU companies)" stays on the source-guard allowlist. |
@@ -512,7 +520,7 @@ core derived-figures work. T14 to T16 come after it, as ruled. T11, T17 and T18 
 (ruling of 2 Oct 2026).
 
 **Merge set (ruling, section 10).** derived-figures merges to main after, in order: T3a, T4, T5, T6, T7, T8, T9,
-T12, T10, T10a, T10b. T11 and T13 follow on main. FI1 to FI10 are on the `factor-integrity` branch, created from main after
+T12, T10, T10a, T10b, T10c. T11 and T13 follow on main. FI1 to FI10 are on the `factor-integrity` branch, created from main after
 that merge; T3b, T3c and T3d are on the `factor-years` branch, created from main after `factor-integrity` merges
 (sequencing ruling of 2 Oct 2026). The tasks below are listed in that order. T3a has no entry of its own: it is the patch
 docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the proration note).
@@ -866,6 +874,26 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
   complete. No delivery is prorated or estimated, and no estimate can be recorded from zero covered months
   without the customer being told why.
 
+### T10c. Run-through UX fixes (derived-figures, before merge)
+- **Rulings:** section 10, "T10c". Patch: docs/review/patches/T10c-runthrough-ux.patch.
+- **Files:**
+  - lib/ghg/unsavedChanges.ts (new);
+  - lib/ghg/dateWords.ts (new, the one place dates are put in words);
+  - lib/ghg/unitLabels.ts (new, the unit-casing map moved from ProposalEdits.tsx);
+  - lib/ghg/engine.ts (`valueProblem`, `proposalNeedsAttention`, the deliveries message, dates in words in the
+    proration note, overlap and reversed-period messages and resolution rows, AU citations);
+  - lib/ghg/workingsCells.ts;
+  - lib/unitConversions.ts (Ccf and Mcf in the conversion note);
+  - app/dashboard/ghg/page.tsx;
+  - app/dashboard/ghg/_components/CoverageStrip.tsx and ProposalEdits.tsx;
+  - app/climate-ghg/faq.ts and page.tsx;
+  - app/components/modulePage.tsx (FAQ anchors);
+  - tests.
+- **Not changed, deliberately:**
+  - the CSV export's exclusion sentence (`unpriceableMessage`), which is verifier-facing, not the location panel;
+  - stored values (activity units and dates in saved workings are unchanged); only their display changes.
+- **Done:** every ruling in section 10 "T10c" is on screen, with tests.
+
 ### T11. Verifier page: contributions, reasons, estimated dates
 - **Classification:** core pre-launch work (ruling of 2 Oct 2026, section 10). It supplies the data trail a
   verifier follows from each figure back to its documents (ISO 14064-3 cl. 6.1.3.2), and the documented
@@ -901,51 +929,7 @@ docs/review/patches/T3a-reporting-year-label.patch (`reportingYearLabel` and the
   - It goes through `guardConfirm` per bill, so a month-only bill or one with no figure is never accepted by
     the batch.
   - Reason: the customer's approval of each AI reading is the control a verifier will test.
-- **Bills with no figure: status, message and help (added 2 Oct 2026).**
-  - **"Needs attention", not "Confirmed".**
-    - **Today:** a bill confirmed before T10a but with no figure (value null) shows the green "Confirmed" badge
-      (`PROPOSAL_BADGE` / `PROPOSAL_BADGE_COLOUR`, app/dashboard/ghg/page.tsx:3465-3488, rendered at 3575) and
-      "✓ Confirmed" (3595). Meanwhile it raises the T10a export-blocking issue.
-    - **Change:** such a bill shows the status "Needs attention" in the amber `needs_manual_review` colours, and
-      no "✓ Confirmed".
-    - Both badge and line read one helper, `proposalDisplayStatus(p)` (status `confirmed` and `valueProblem(p)`
-      not null gives `needs_attention`), so the two cannot disagree.
-    - The stored status is unchanged: this is display only. The export-blocking issue is unchanged.
-  - **The message under a disabled Confirm.** `NO_VALUE_MESSAGE` (lib/ghg/engine.ts:3282, returned by
-    `valueProblem` at 3288, shown at page.tsx:3611-3612) becomes one of two messages:
-    - **Default:** "We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself,
-      or reject the bill if it shouldn't be included."
-    - **When the reading has a quote and an unrecognised unit:** "We read "{quote}" from this bill, but we can't
-      use that unit for {fuel} yet. Choose the unit from the list, or enter the figure yourself."
-      - "Has a quote": `sourceQuote` is non-empty.
-      - "Unrecognised unit": `convertToCanonical(fuelType, rawValue, rawUnit)` returns tier 3 (lib/unitConversions.ts),
-        the same test that left the figure empty at extraction.
-      - `{fuel}` is the plain fuel name the review already shows ("natural gas"), not the key.
-      - `{quote}` is the source quote verbatim.
-    - `valueProblem` takes the fields it needs (`value`, `sourceQuote`, `fuelType`, `rawValue`, `rawUnit`), so
-      every caller gets the same sentence: the disabled Confirm (3598), the message (3611-3612), and
-      `guardConfirm` / `undoRejection` (lib/ghg/proposalEdits.ts:83, 98), which read only whether it is null.
-    - **Wording check:** "Choose the unit from the list" refers to the "Edit unit" control, which offers
-      `convertibleUnits(fuelType)` (ProposalEdits.tsx:64). "Enter the figure yourself" refers to "Edit figure".
-      ⚑ If the button labels change, the messages change with them.
-    - **Typography:** the customer's text uses straight quotes around {quote}, as written in the ruling.
-      ⚑ Confirm, if the site uses curly quotes elsewhere.
-  - **Help / FAQ entry "Why can't I confirm this bill?"**
-    - The text is to be supplied by Lisa. It is not drafted here.
-    - ⚑ The surface is not yet named. Candidates: the GHG FAQ on app/climate-ghg/page.tsx, or a help link beside
-      the disabled Confirm's message, pointing to that entry. Linking from the message is what makes it
-      findable at the moment it is needed.
-    - If it goes into a page that emits FAQ structured data (as app/calculate-emissions/page.tsx:145 does), it
-      goes in both the visible list and the JSON-LD, from one constant.
-  - **Tests:**
-    - a confirmed proposal with value null renders "Needs attention" in amber, not "Confirmed" and not
-      "✓ Confirmed";
-    - a confirmed proposal with a value still renders "Confirmed";
-    - `valueProblem` returns the default sentence for a null value with no quote, and the quote sentence (with
-      the quote and the plain fuel name) for a null value with a quote and a tier-3 unit;
-    - a null value with a quote but a recognised unit gets the default sentence;
-    - both sentences carry no em dash;
-    - the FAQ entry renders under its heading and, if the page has JSON-LD, appears there with the same text.
+- **Bills with no figure** (status, message and help entry): done in T10c.
 - **Tests:** full suite; engine count not lower than before T1.
 - **Done:** F-09, F-10 and F-11 are closed by tests that would fail on the old code.
 

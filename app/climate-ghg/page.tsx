@@ -4,7 +4,7 @@ import { AUDIT_TRAIL_NOTE } from '../../lib/auditTrailNotice'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS } from '@/lib/pricing'
-import { CONCIERGE_FAQ } from './faq'
+import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
 import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
@@ -246,7 +246,7 @@ export default function Page() {
         {/* The Concierge questions live in ./faq.ts because they come in two versions and a flag
             picks between them. Keeping them there also lets faq.test.ts import the arrays and
             assert on them for real, rather than matching this file as text. */}
-        <ModuleFaq items={[...FAQ, ...CONCIERGE_FAQ]} />
+        <ModuleFaq items={[...FAQ, ...BILL_REVIEW_FAQ, ...CONCIERGE_FAQ]} />
       </ModuleSection>
 
       {/* ── 10. CLOSING BAND ── */}

@@ -333,7 +333,7 @@ describe('the declared edition labels cannot drift from their citations', () => 
     // Documented in factorEditions.ts as the reason the label is declared. Asserted because a future
     // reader will be tempted by it, and the counter-example is one citation away.
     expect(EF_SOURCES.combustion_au, 'the parenthesised token is a GWP set, not a year')
-      .toBe('DCCEEW NGA Factors 2025 (AR5)')
+      .toBe('DCCEEW NGA 2025 (AR5)')
     expect(/\((\d{4})\)/.exec(EF_SOURCES.combustion_au), 'year-in-parens finds no year here').toBeNull()
     // And it DOES match the other five, which is exactly what makes it look safe.
     for (const c of [EF_SOURCES.combustion, EF_SOURCES.combustion_ca, EF_SOURCES.combustion_uk,

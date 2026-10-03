@@ -75,7 +75,7 @@ describe('workings cell rendering', () => {
       .toBe('12,345.6 kWh')
     // A row that reports a quantity nothing could price keeps both.
     expect(workingsActivityCell({ activity_data: 1000, activity_unit: 'gj', result_tco2e: null }))
-      .toBe('1,000 gj')
+      .toBe('1,000 GJ')
     // A coverage-resolution row has no quantity to report, which is not the same absence as a missing
     // one: it records a decision, so the column does not apply to it.
     expect(workingsActivityCell({ activity_data: null, activity_unit: 'gap', result_tco2e: null }))
@@ -226,6 +226,6 @@ describe('workings cell rendering', () => {
 describe('the share cell for a delivery (T10b)', () => {
   it('reads as delivered and counted in full', () => {
     expect(contributionShareCell({ reason: 'delivered', inWindowDays: null, totalDays: null, share: 1, deliveryDate: '2025-03-14' }))
-      .toBe('Delivered 2025-03-14, counted in full')
+      .toBe('Delivered 14 March 2025, counted in full')
   })
 })

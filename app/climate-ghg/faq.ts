@@ -66,3 +66,13 @@ export const FAQ_UPLOAD_ONLY: readonly Faq[] = [
 
 /** The set the page renders. One flag decides, in one place. */
 export const CONCIERGE_FAQ: readonly Faq[] = UTILITY_CONNECT_ENABLED ? FAQ_CONNECTED : FAQ_UPLOAD_ONLY
+
+/**
+ * T10c: the help entry the bill review links to from beside a disabled Confirm ("Why can't I confirm this
+ * bill?"). The anchor is shared with the link (app/dashboard/ghg/page.tsx) so the two cannot drift apart.
+ */
+export const CONFIRM_HELP_ID = 'why-cant-i-confirm-this-bill'
+export const BILL_REVIEW_FAQ: readonly Faq[] = [
+  { id: CONFIRM_HELP_ID, q: "Why can't I confirm this bill?",
+    a: "Before a bill counts towards your emissions, we need two things from it: the amount you used, and the unit it's measured in. Sometimes we can't get both. The bill might use a unit we don't recognise, the figure might be unclear or hard to read, or the bill might show a charge but no usage. When that happens, we hold the bill back rather than guess, because a wrong number in your report is worse than a missing one. To fix it, open the bill and check what's printed. If the unit is wrong, choose the right one and we'll convert it. If the figure is missing, type it in from the bill. If the bill shouldn't be part of this inventory, reject it. Your report can't be exported while a bill is waiting, so nothing incomplete goes to your customer, lender or verifier." },
+]
