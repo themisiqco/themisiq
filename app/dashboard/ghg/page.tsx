@@ -14,7 +14,7 @@ import type { PriorYearState, InventorySummary, ComparabilityCapture, Comparabil
 import { figuresForSave } from '../../../lib/ghg/savePayload'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
 import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
-import { unitLabel } from '../../../lib/ghg/unitLabels'
+import { unitLabel, unitOptionsShowing } from '../../../lib/ghg/unitLabels'
 import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
 import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
@@ -56,7 +56,7 @@ import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDis
 import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
 import ThemisIQLogo from '../../components/ThemisIQLogo'
 import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
-  workingsFactorSourceCell, RESULT_DP, INTENSITY_DP, CSV_DP, CSV_INTENSITY_DP,
+  workingsFactorSourceCell, RESULT_DP, INTENSITY_DP, CSV_DP, CSV_INTENSITY_DP, formatActivity,
   NOT_QUANTIFIED } from '../../../lib/ghg/workingsCells'
 import SourceAttributions from '../../components/SourceAttributions'
 import type {
@@ -2179,7 +2179,7 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {ngUnitOptions(loc.country).map(([val, label]) => (
+                    {unitOptionsShowing(ngUnitOptions(loc.country), loc.natural_gas_unit, documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')).map(([val, label]) => (
                       <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -2199,7 +2199,7 @@ workings: saved.workings,
               {loc.has_propane && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {propaneUnitOptions(loc.country).map(([val, label]) => (
+                    {unitOptionsShowing(propaneUnitOptions(loc.country), loc.propane_unit, documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')).map(([val, label]) => (
                       <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -2214,7 +2214,7 @@ workings: saved.workings,
               {loc.has_diesel_stationary && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                    {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_stationary_unit, documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')).map(([val, label]) => (
                       <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
                     ))}
                   </div>
@@ -2277,7 +2277,7 @@ workings: saved.workings,
                     <div style={{ display: 'flex', gap: 8 }}>
                       <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'gasoline_amount', r)} onUseBills={() => switchToBills(activeLocation, 'gasoline_amount')} style={{ ...inputStyle, flex: 1 }} />
                       <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
-                        {liquidUnitOptions(loc.country).map(([val, label]) => (
+                        {unitOptionsShowing(liquidUnitOptions(loc.country), loc.gasoline_unit, documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')).map(([val, label]) => (
                           <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
@@ -2287,7 +2287,7 @@ workings: saved.workings,
                     <div style={{ display: 'flex', gap: 8 }}>
                       <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_mobile_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_mobile_amount')} style={{ ...inputStyle, flex: 1 }} />
                       <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
-                        {liquidUnitOptions(loc.country).map(([val, label]) => (
+                        {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_mobile_unit, documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')).map(([val, label]) => (
                           <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
@@ -2508,9 +2508,12 @@ workings: saved.workings,
                 <div style={{ padding: '2px 0 6px' }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>⚠ {blockedHere.kind === 'country' ? refusalResultsHeading(blockedHere.refusal) : 'No results for this location yet'}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceablePanelMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
-                    Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
-                  </div>
+                  {/* T10d: the factor-gap sentence on a location with a country already says this; say it once. */}
+                  {!factorGapHasCountry(blockedHere) && (
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+                      Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
+                    </div>
+                  )}
                 </div>
               ) : [
                 { label: 'Heating & fuel', val: calc!.s1_stationary, color: 'var(--color-module-deals-ink)' },
@@ -3613,7 +3616,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
                 <div key={pi} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>ThemisIQ read</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${unitLabel(p.unit, '')}` : '—'}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${formatActivity(p.value)} ${unitLabel(p.unit, '')}` : '—'}</span>
                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
                     {/* T10b: a delivery shows its delivery date, not a one-day period. */}
                     {deliveryDateOf(docType, p) !== null

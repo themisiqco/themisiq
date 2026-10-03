@@ -47,3 +47,21 @@ describe('FigureInput', () => {
     expect(h).not.toContain('—')
   })
 })
+
+describe('FigureInput: figures from documents are shown rounded (T10d)', () => {
+  const valueOf = (v: number) => /value="([^"]*)"/.exec(draw(withDoc({ natural_gas_amount: v })))?.[1] ?? ''
+  it('the run-through figures read rounded, with thousands separators', () => {
+    expect(valueOf(1062.8581140000001)).toBe('1,062.858')
+    expect(valueOf(6378.098360655738)).toBe('6,378.098')
+    expect(valueOf(1200)).toBe('1,200')
+  })
+  it('no figure field renders more than three decimal places', () => {
+    for (const v of [0.1 + 0.2, 1 / 3, 123456.78901234, 2 / 7 * 1e6, 0.0004999, 99.9995]) {
+      const decimals = (valueOf(v).split('.')[1] ?? '').length
+      expect(decimals, `${v} rendered as ${valueOf(v)}`).toBeLessThanOrEqual(3)
+    }
+  })
+  it('a typed figure stays an editable number, unrounded', () => {
+    expect(draw({ ...emptyLocation('L1', 'Site A'), natural_gas_amount: 40.12345 })).toMatch(/type="number"[^>]*value="40.12345"/)
+  })
+})

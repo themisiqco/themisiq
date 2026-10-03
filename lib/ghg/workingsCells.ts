@@ -57,6 +57,16 @@ export const NOT_QUANTIFIED = 'Not quantified'
  * is the operator's table adopting the verifier's precision rather than a new choice.
  */
 export const RESULT_DP = 3
+/**
+ * T10d: ACTIVITY QUANTITIES ON SCREEN (kWh, m³, litres, the figures on step 2, the review line and the workings
+ * activity cell): at most ACTIVITY_DP decimal places, with thousands separators, in the reader's locale. This is
+ * what `toLocaleString()` already did on the review line and the workings activity cell; it is named here so
+ * every surface follows one rule. Display only: stored and calculated values are never rounded.
+ */
+export const ACTIVITY_DP = 3
+export function formatActivity(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: ACTIVITY_DP })
+}
 
 /**
  * Decimals for an intensity figure ON SCREEN: tCO₂e per $M of revenue, which for a small company can
@@ -113,10 +123,10 @@ export function workingsActivityCell(r: WorkingsActivityCellRow): string {
   if (data === null) return NOT_APPLICABLE
   // No unit, or the words that say the unit is absent: there is no quantity to qualify.
   if (!r.activity_unit || r.activity_unit === NOT_PROVIDED) {
-    return r.result_tco2e == null ? NOT_PROVIDED : data.toLocaleString()
+    return r.result_tco2e == null ? NOT_PROVIDED : formatActivity(data)
   }
   // T10c: the unit as the customer reads it (kWh, Mcf, MMBtu), from the one shared map.
-  return `${data.toLocaleString()} ${unitLabel(r.activity_unit)}`
+  return `${formatActivity(data)} ${unitLabel(r.activity_unit)}`
 }
 
 export interface WorkingsFactorCellRow {

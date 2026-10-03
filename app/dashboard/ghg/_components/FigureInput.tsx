@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import { documentsBacking, activeOverride, type Location } from '../../../../lib/ghg/engine'
 import { plainDate } from '../../../../lib/ghg/coverageActions'
+import { formatActivity } from '../../../../lib/ghg/workingsCells'
 
 export type FigureInputProps = {
   loc: Location                       // the DERIVED location (its figure is what the totals use)
@@ -52,7 +53,8 @@ export function FigureInput({ loc, field, onChange, style, by, onOverride, onUse
   }
   return (
     <div style={flex != null ? { flex } : undefined}>
-      <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
+      {/* T10d: read-only, so shown as text: rounded to ACTIVITY_DP with thousands separators. The figure itself is unchanged. */}
+      <input type="text" value={formatActivity(Number(value) || 0)} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
       <div style={note}>
         From {docs}
         {!asking && <button disabled={!by} onClick={() => setAsking(true)} style={{ ...link, opacity: by ? 1 : 0.5 }}>Enter this figure manually instead</button>}

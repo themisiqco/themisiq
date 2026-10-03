@@ -9,6 +9,17 @@ export const UNIT_LABEL: Record<string, string> = {
   gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
 }
 
+/**
+ * T10d: the unit choices for a figure, so the selector agrees with its label. A figure worked out from documents
+ * carries the documents' unit, which may be one the country's list does not offer (Paris gas billed in kWh,
+ * where the list offers m³ only). The selector is locked then, and shows that unit as its choice rather than
+ * an unselected option that reads as the unit in use.
+ */
+export function unitOptionsShowing(options: Array<[string, string]>, unit: string | null | undefined, fromDocuments: boolean): Array<[string, string]> {
+  if (!fromDocuments || !unit || options.some(([v]) => v === unit)) return options
+  return [...options, [unit, unitLabel(unit)]]
+}
+
 /** A stored unit as the customer reads it. */
 export function unitLabel(u: string | null | undefined, missing = 'no unit'): string {
   if (!u) return missing

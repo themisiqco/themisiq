@@ -1,0 +1,253 @@
+diff --git a/app/dashboard/ghg/_components/CoverageStrip.tsx b/app/dashboard/ghg/_components/CoverageStrip.tsx
+index be9583f..27a3703 100644
+--- a/app/dashboard/ghg/_components/CoverageStrip.tsx
++++ b/app/dashboard/ghg/_components/CoverageStrip.tsx
+@@ -27,6 +27,7 @@ import {
+   deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
+ } from '../../../../lib/ghg/coverageActions'
+ import { unitLabel } from '../../../../lib/ghg/unitLabels'
++import { formatActivity } from '../../../../lib/ghg/workingsCells'
+ 
+ export type CurrentUser = { userId: string; email: string }
+ 
+@@ -227,7 +228,7 @@ export function CoverageStrip(p: CoverageStripProps) {
+             </div>
+             {list.map(c => (
+               <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 2, fontWeight: 400, color: '#555553' }}>
+-                {fileOf(c.docId)}: {c.value.toLocaleString()} {unitLabel(c.unit, '')}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
++                {fileOf(c.docId)}: {formatActivity(c.value)} {unitLabel(c.unit, '')}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
+               </div>
+             ))}
+             {issue && (
+diff --git a/app/dashboard/ghg/_components/FigureInput.test.tsx b/app/dashboard/ghg/_components/FigureInput.test.tsx
+index 7d2c5cf..195f702 100644
+--- a/app/dashboard/ghg/_components/FigureInput.test.tsx
++++ b/app/dashboard/ghg/_components/FigureInput.test.tsx
+@@ -47,3 +47,21 @@ describe('FigureInput', () => {
+     expect(h).not.toContain('—')
+   })
+ })
++
++describe('FigureInput: figures from documents are shown rounded (T10d)', () => {
++  const valueOf = (v: number) => /value="([^"]*)"/.exec(draw(withDoc({ natural_gas_amount: v })))?.[1] ?? ''
++  it('the run-through figures read rounded, with thousands separators', () => {
++    expect(valueOf(1062.8581140000001)).toBe('1,062.858')
++    expect(valueOf(6378.098360655738)).toBe('6,378.098')
++    expect(valueOf(1200)).toBe('1,200')
++  })
++  it('no figure field renders more than three decimal places', () => {
++    for (const v of [0.1 + 0.2, 1 / 3, 123456.78901234, 2 / 7 * 1e6, 0.0004999, 99.9995]) {
++      const decimals = (valueOf(v).split('.')[1] ?? '').length
++      expect(decimals, `${v} rendered as ${valueOf(v)}`).toBeLessThanOrEqual(3)
++    }
++  })
++  it('a typed figure stays an editable number, unrounded', () => {
++    expect(draw({ ...emptyLocation('L1', 'Site A'), natural_gas_amount: 40.12345 })).toMatch(/type="number"[^>]*value="40.12345"/)
++  })
++})
+diff --git a/app/dashboard/ghg/_components/FigureInput.tsx b/app/dashboard/ghg/_components/FigureInput.tsx
+index 03737d6..e61b025 100644
+--- a/app/dashboard/ghg/_components/FigureInput.tsx
++++ b/app/dashboard/ghg/_components/FigureInput.tsx
+@@ -12,6 +12,7 @@
+ import { useState } from 'react'
+ import { documentsBacking, activeOverride, type Location } from '../../../../lib/ghg/engine'
+ import { plainDate } from '../../../../lib/ghg/coverageActions'
++import { formatActivity } from '../../../../lib/ghg/workingsCells'
+ 
+ export type FigureInputProps = {
+   loc: Location                       // the DERIVED location (its figure is what the totals use)
+@@ -52,7 +53,8 @@ export function FigureInput({ loc, field, onChange, style, by, onOverride, onUse
+   }
+   return (
+     <div style={flex != null ? { flex } : undefined}>
+-      <input type="number" value={value} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
++      {/* T10d: read-only, so shown as text: rounded to ACTIVITY_DP with thousands separators. The figure itself is unchanged. */}
++      <input type="text" value={formatActivity(Number(value) || 0)} readOnly aria-readonly="true" style={{ ...inputOwn, background: '#f8f7f5', color: 'var(--color-ink-2)' }} />
+       <div style={note}>
+         From {docs}
+         {!asking && <button disabled={!by} onClick={() => setAsking(true)} style={{ ...link, opacity: by ? 1 : 0.5 }}>Enter this figure manually instead</button>}
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index d407c7d..2f9de15 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -14,7 +14,7 @@ import type { PriorYearState, InventorySummary, ComparabilityCapture, Comparabil
+ import { figuresForSave } from '../../../lib/ghg/savePayload'
+ import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
+ import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
+-import { unitLabel } from '../../../lib/ghg/unitLabels'
++import { unitLabel, unitOptionsShowing } from '../../../lib/ghg/unitLabels'
+ import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
+ import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
+ import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
+@@ -56,7 +56,7 @@ import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDis
+ import { sectionHeadFixed as auditSectionHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
+ import ThemisIQLogo from '../../components/ThemisIQLogo'
+ import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
+-  workingsFactorSourceCell, RESULT_DP, INTENSITY_DP, CSV_DP, CSV_INTENSITY_DP,
++  workingsFactorSourceCell, RESULT_DP, INTENSITY_DP, CSV_DP, CSV_INTENSITY_DP, formatActivity,
+   NOT_QUANTIFIED } from '../../../lib/ghg/workingsCells'
+ import SourceAttributions from '../../components/SourceAttributions'
+ import type {
+@@ -2179,7 +2179,7 @@ workings: saved.workings,
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+-                    {ngUnitOptions(loc.country).map(([val, label]) => (
++                    {unitOptionsShowing(ngUnitOptions(loc.country), loc.natural_gas_unit, documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')).map(([val, label]) => (
+                       <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+@@ -2199,7 +2199,7 @@ workings: saved.workings,
+               {loc.has_propane && (
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+-                    {propaneUnitOptions(loc.country).map(([val, label]) => (
++                    {unitOptionsShowing(propaneUnitOptions(loc.country), loc.propane_unit, documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')).map(([val, label]) => (
+                       <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+@@ -2214,7 +2214,7 @@ workings: saved.workings,
+               {loc.has_diesel_stationary && (
+                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
+                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
++                    {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_stationary_unit, documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')).map(([val, label]) => (
+                       <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
+                     ))}
+                   </div>
+@@ -2277,7 +2277,7 @@ workings: saved.workings,
+                     <div style={{ display: 'flex', gap: 8 }}>
+                       <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'gasoline_amount', r)} onUseBills={() => switchToBills(activeLocation, 'gasoline_amount')} style={{ ...inputStyle, flex: 1 }} />
+                       <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+-                        {liquidUnitOptions(loc.country).map(([val, label]) => (
++                        {unitOptionsShowing(liquidUnitOptions(loc.country), loc.gasoline_unit, documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')).map(([val, label]) => (
+                           <option key={val} value={val}>{label}</option>
+                         ))}
+                       </select>
+@@ -2287,7 +2287,7 @@ workings: saved.workings,
+                     <div style={{ display: 'flex', gap: 8 }}>
+                       <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_mobile_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_mobile_amount')} style={{ ...inputStyle, flex: 1 }} />
+                       <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+-                        {liquidUnitOptions(loc.country).map(([val, label]) => (
++                        {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_mobile_unit, documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')).map(([val, label]) => (
+                           <option key={val} value={val}>{label}</option>
+                         ))}
+                       </select>
+@@ -2508,9 +2508,12 @@ workings: saved.workings,
+                 <div style={{ padding: '2px 0 6px' }}>
+                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>⚠ {blockedHere.kind === 'country' ? refusalResultsHeading(blockedHere.refusal) : 'No results for this location yet'}</div>
+                   <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceablePanelMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
+-                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+-                    Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
+-                  </div>
++                  {/* T10d: the factor-gap sentence on a location with a country already says this; say it once. */}
++                  {!factorGapHasCountry(blockedHere) && (
++                    <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
++                      Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
++                    </div>
++                  )}
+                 </div>
+               ) : [
+                 { label: 'Heating & fuel', val: calc!.s1_stationary, color: 'var(--color-module-deals-ink)' },
+@@ -3613,7 +3616,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
+                 <div key={pi} style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 6, padding: '6px 10px' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                     <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-brand)' }}>ThemisIQ read</span>
+-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${p.value.toLocaleString()} ${unitLabel(p.unit, '')}` : '—'}</span>
++                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d' }}>{p.value != null ? `${formatActivity(p.value)} ${unitLabel(p.unit, '')}` : '—'}</span>
+                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.fuelType.replace('_', ' ')}</span>
+                     {/* T10b: a delivery shows its delivery date, not a one-day period. */}
+                     {deliveryDateOf(docType, p) !== null
+diff --git a/lib/ghg/unitLabels.ts b/lib/ghg/unitLabels.ts
+index 65e1379..4448ba9 100644
+--- a/lib/ghg/unitLabels.ts
++++ b/lib/ghg/unitLabels.ts
+@@ -9,6 +9,17 @@ export const UNIT_LABEL: Record<string, string> = {
+   gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
+ }
+ 
++/**
++ * T10d: the unit choices for a figure, so the selector agrees with its label. A figure worked out from documents
++ * carries the documents' unit, which may be one the country's list does not offer (Paris gas billed in kWh,
++ * where the list offers m³ only). The selector is locked then, and shows that unit as its choice rather than
++ * an unselected option that reads as the unit in use.
++ */
++export function unitOptionsShowing(options: Array<[string, string]>, unit: string | null | undefined, fromDocuments: boolean): Array<[string, string]> {
++  if (!fromDocuments || !unit || options.some(([v]) => v === unit)) return options
++  return [...options, [unit, unitLabel(unit)]]
++}
++
+ /** A stored unit as the customer reads it. */
+ export function unitLabel(u: string | null | undefined, missing = 'no unit'): string {
+   if (!u) return missing
+diff --git a/lib/ghg/workingsCells.ts b/lib/ghg/workingsCells.ts
+index 2f0d11a..a5d6d0a 100644
+--- a/lib/ghg/workingsCells.ts
++++ b/lib/ghg/workingsCells.ts
+@@ -57,6 +57,16 @@ export const NOT_QUANTIFIED = 'Not quantified'
+  * is the operator's table adopting the verifier's precision rather than a new choice.
+  */
+ export const RESULT_DP = 3
++/**
++ * T10d: ACTIVITY QUANTITIES ON SCREEN (kWh, m³, litres, the figures on step 2, the review line and the workings
++ * activity cell): at most ACTIVITY_DP decimal places, with thousands separators, in the reader's locale. This is
++ * what `toLocaleString()` already did on the review line and the workings activity cell; it is named here so
++ * every surface follows one rule. Display only: stored and calculated values are never rounded.
++ */
++export const ACTIVITY_DP = 3
++export function formatActivity(n: number): string {
++  return n.toLocaleString(undefined, { maximumFractionDigits: ACTIVITY_DP })
++}
+ 
+ /**
+  * Decimals for an intensity figure ON SCREEN: tCO₂e per $M of revenue, which for a small company can
+@@ -113,10 +123,10 @@ export function workingsActivityCell(r: WorkingsActivityCellRow): string {
+   if (data === null) return NOT_APPLICABLE
+   // No unit, or the words that say the unit is absent: there is no quantity to qualify.
+   if (!r.activity_unit || r.activity_unit === NOT_PROVIDED) {
+-    return r.result_tco2e == null ? NOT_PROVIDED : data.toLocaleString()
++    return r.result_tco2e == null ? NOT_PROVIDED : formatActivity(data)
+   }
+   // T10c: the unit as the customer reads it (kWh, Mcf, MMBtu), from the one shared map.
+-  return `${data.toLocaleString()} ${unitLabel(r.activity_unit)}`
++  return `${formatActivity(data)} ${unitLabel(r.activity_unit)}`
+ }
+ 
+ export interface WorkingsFactorCellRow {
+--- /dev/null
++++ b/lib/ghg/displayPolish.test.ts
+@@ -0,0 +1,33 @@
++// lib/ghg/displayPolish.test.ts
++//
++// T10d: one rounding rule for activity quantities on screen; one statement of "nothing is lost"; and a unit
++// selector that agrees with the label when the figure comes from documents.
++
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++import { formatActivity, ACTIVITY_DP, workingsActivityCell } from './workingsCells'
++import { unitOptionsShowing } from './unitLabels'
++
++const PAGE = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
++
++describe('display polish (T10d)', () => {
++  it('activity quantities: at most three decimals, with thousands separators, the same on every surface', () => {
++    expect(ACTIVITY_DP).toBe(3)
++    expect(formatActivity(1062.8581140000001)).toBe('1,062.858')
++    expect(workingsActivityCell({ activity_data: 6378.098360655738, activity_unit: 'kwh', result_tco2e: 1 })).toBe('6,378.098 kWh')
++    expect(PAGE).toContain('{p.value != null ? `${formatActivity(p.value)} ${unitLabel(p.unit, \'\')}` : \'—\'}')
++  })
++
++  it('the documents\' unit is shown as the locked selector\'s choice when the country list lacks it', () => {
++    const fr: Array<[string, string]> = [['m3', 'm³']]
++    expect(unitOptionsShowing(fr, 'kwh', true)).toEqual([['m3', 'm³'], ['kwh', 'kWh']])
++    expect(unitOptionsShowing(fr, 'kwh', false), 'a typed figure: the list as it is').toEqual(fr)
++    expect(unitOptionsShowing(fr, 'm3', true), 'already offered').toEqual(fr)
++    expect((PAGE.match(/unitOptionsShowing\(/g) ?? []).length, 'gas, propane, stationary diesel, petrol, fleet diesel').toBe(5)
++  })
++
++  it('the live results panel says "nothing is lost" once', () => {
++    expect(PAGE).toContain('{!factorGapHasCountry(blockedHere) && (')
++  })
++})

@@ -27,6 +27,7 @@ import {
   deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
 } from '../../../../lib/ghg/coverageActions'
 import { unitLabel } from '../../../../lib/ghg/unitLabels'
+import { formatActivity } from '../../../../lib/ghg/workingsCells'
 
 export type CurrentUser = { userId: string; email: string }
 
@@ -227,7 +228,7 @@ export function CoverageStrip(p: CoverageStripProps) {
             </div>
             {list.map(c => (
               <div key={`${c.docId}:${c.proposalIndex}`} style={{ marginTop: 2, fontWeight: 400, color: '#555553' }}>
-                {fileOf(c.docId)}: {c.value.toLocaleString()} {unitLabel(c.unit, '')}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
+                {fileOf(c.docId)}: {formatActivity(c.value)} {unitLabel(c.unit, '')}, delivered {dateInWords(parseLocalDate(c.deliveryDate as string))}{c.counted ? '' : `, outside ${yearText} and not counted`}.
               </div>
             ))}
             {issue && (
