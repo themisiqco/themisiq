@@ -63,6 +63,12 @@ const FORBIDDEN = [
   // list for one run, caught two regimes it knew nothing about, and a guard that cries wolf gets
   // deleted. Narrow enough to be kept is the requirement, not broad enough to feel thorough.
   '2027 (California)',
+  // ⚠️ THE &nbsp; SPELLINGS, ADDED 4 Oct 2026 (calc-copy-2). /calculate-emissions wrote the date as
+  // `Nov&nbsp;10,&nbsp;2026` in two places, "due" and settled, and the plain-space patterns above never
+  // matched it. JSX copy uses &nbsp; to keep a date on one line, so this is where it recurs.
+  'Nov&nbsp;10,&nbsp;2026', 'November&nbsp;10,&nbsp;2026', '10&nbsp;November&nbsp;2026', '10&nbsp;Nov&nbsp;2026',
+  // And the Scope 3 year written as a settled deadline (app/dashboard/supply-chain/page.tsx until calc-copy-2).
+  'Scope 3 deadline 2027',
 ]
 
 const EXCLUDED_FILES = new Set([
@@ -164,6 +170,8 @@ describe('SB 253 dates live in exactly one place', () => {
       ['split val, day',    "  { val: '10 Nov', unit: '2026' }"],
       ['prose month-first', "  <p>the November 10 deadline</p>"],
       ['prose day-first',   "  <p>the 10 November deadline</p>"],
+      ['JSX &nbsp; date',   "  <p>Scope 1 and Scope 2 due Nov&nbsp;10,&nbsp;2026</p>"],
+      ['settled Scope 3',   "  <span>SB 253 Scope 3 deadline 2027.</span>"],
     ]
     for (const [label, line] of plants) {
       expect(scanLines(line), `${label} planted in code was NOT caught`).not.toEqual([])

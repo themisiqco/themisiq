@@ -1825,7 +1825,7 @@ workings: saved.workings,
       <h2 style={sectionHead}>Company & inventory setup</h2>
       <p style={sectionSub}>This information appears across all your selected reports. Enter it once here.</p>
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20, maxWidth: 560 }}>
-        <Field label="Company legal name" hint="Appears on all report submissions">
+        <Field label="Company legal name" hint="Appears on every report and download.">
           {companyLocked ? (
             <>
               <input value={inventory.company_name} readOnly style={{ ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' }} />

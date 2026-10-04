@@ -19,7 +19,7 @@
 
 import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
-import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
+import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM, SB253_POSTURE } from '../../lib/sb253';
 import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
 import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../lib/pricingCopy';
 import { calcInventory, emptyLocation, type Location } from '../../lib/ghg/engine';
@@ -70,12 +70,12 @@ const EXAMPLE_T = (() => {
 export const metadata: Metadata = {
   title: "Calculate Your GHG Emissions | SB 253, CSRD, IFRS S2 | ThemisIQ",
   description:
-    `Asked for your carbon footprint? ThemisIQ calculates Scope 1 and Scope 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $${ghgFrom} USD.`,
+    `Asked for your carbon footprint? ThemisIQ calculates Scope 1 and Scope 2 emissions in real time on the GHG Protocol and produces a report you can use to prepare for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $${ghgFrom} USD.`,
   alternates: { canonical: "/calculate-emissions" },
   openGraph: {
     title: "Calculate Your GHG Emissions in Real Time | ThemisIQ",
     description:
-      `See your Scope 1 and Scope 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $${ghgFrom} USD.`,
+      `See your Scope 1 and Scope 2 emissions instantly, free. Download a report you can use to prepare for SB 253, CSRD, IFRS S2 and more. From $${ghgFrom} USD.`,
     url: "/calculate-emissions",
     type: "website",
   },
@@ -430,7 +430,7 @@ export default function CalculateEmissionsPage() {
   // settled statutory deadline. The date is a CARB PROPOSAL that has moved twice — see lib/sb253.ts.
   const chipText = SB253_SHORT;
   const ctaText =
-    "See your Scope 1 and Scope 2 emissions in minutes, and download a report you can submit or share today.";
+    "See your Scope 1 and Scope 2 emissions in minutes, and download a report to share with your customer, lender or verifier.";
 
   return (
     <>
@@ -488,7 +488,7 @@ export default function CalculateEmissionsPage() {
               <div className="trigger-card">
                 <div className="tag">Government regulation</div>
                 <h3>Regulators now require it</h3>
-                <p>In the US, California&rsquo;s SB 253 is law today (Scope 1 and Scope 2 due Nov&nbsp;10,&nbsp;2026), with New&nbsp;York, Illinois, New&nbsp;Jersey, and Washington advancing similar bills. Internationally, the EU&rsquo;s CSRD requires it through the ESRS standards, and IFRS&nbsp;S2 is being adopted by regulators in markets worldwide.</p>
+                <p>In the US, California&rsquo;s SB 253 is law today (Scope 1 and Scope 2, {SB253_POSTURE}), with New&nbsp;York, Illinois, New&nbsp;Jersey, and Washington advancing similar bills. Internationally, the EU&rsquo;s CSRD requires it through the ESRS standards, and IFRS&nbsp;S2 is being adopted by regulators in markets worldwide.</p>
               </div>
               <div className="trigger-card">
                 <div className="tag">Investor</div>
@@ -588,7 +588,7 @@ export default function CalculateEmissionsPage() {
               <div className="tier">
                 <div className="tier-name">GHG Module</div>
                 <div className="tier-price">from ${ghgFrom}*</div>
-                <p>The core, self-serve product. Calculate your Scope 1, Scope 2 and Scope 3 emissions and download a report ready for SB 253 (or any global GHG framework), built on the GHG Protocol and methodology that holds up to a verifier.</p>
+                <p>The core, self-serve product. Calculate your Scope 1, Scope 2 and Scope 3 emissions and download a report you can use to prepare for SB 253 (or any global GHG framework), built on the GHG Protocol and methodology that holds up to a verifier.</p>
                 <div className="tier-when">Start here: the core report, covering Scope 1, Scope 2 and Scope 3.</div>
               </div>
               <div className="tier">
@@ -646,7 +646,7 @@ export default function CalculateEmissionsPage() {
                   </ul>
                   <p className="qa-subhead">Which scopes apply to you?</p>
                   <p><strong>Scope 1 and Scope 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, proposed for {SB253_FIRST_REPORT_DATE} and not yet final.</p>
-                  <p><strong>Scope 3 required:</strong> SB 253 adds Scope 3 from 2027 (covering fiscal-year 2026 data), with CARB still finalizing the details. The EU&rsquo;s CSRD (ESRS&nbsp;E1) requires your material Scope 3 categories, and IFRS&nbsp;S2 requires Scope 3 as well, with first-year transition relief in many adopting jurisdictions.</p>
+                  <p><strong>Scope 3 required:</strong> SB 253 adds Scope 3 from {SB253_SCOPE3_FROM} (covering the previous fiscal year&rsquo;s data), with CARB still finalizing the details. The EU&rsquo;s CSRD (ESRS&nbsp;E1) requires your material Scope 3 categories, and IFRS&nbsp;S2 requires Scope 3 as well, with first-year transition relief in many adopting jurisdictions.</p>
                   {/* ⚠️ "COVERS THE FULL STANDARD ACROSS ALL 15 CATEGORIES" WAS A CONFORMANCE CLAIM, and the
                       strongest of its kind on the site. Nine of the fifteen have a calculation method; the
                       other six take a figure the company holds. The scope claim is derived so the sentence
@@ -682,7 +682,7 @@ export default function CalculateEmissionsPage() {
                   Build your inventory once, and ThemisIQ produces the report for whichever framework you&rsquo;re asked for, with full coverage for SB&nbsp;253, CDP, ESRS&nbsp;E1 (under the EU&rsquo;s CSRD), IFRS&nbsp;S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI&nbsp;305, plus SBTi for inventory and near-term & net-zero target setting. What each one asks for differs:
                   <p className="qa-subhead">Frameworks that start with Scope 1 and Scope 2</p>
                   <ul className="scope-list">
-                    <li><strong>SB 253</strong>: Scope 1 and Scope 2 for the first reports (due Nov&nbsp;10,&nbsp;2026); Scope 3 phases in from 2027.</li>
+                    <li><strong>SB 253</strong>: Scope 1 and Scope 2 for the first reports, proposed for {SB253_FIRST_REPORT_DATE} and not yet final; Scope 3 is expected from {SB253_SCOPE3_FROM}.</li>
                     <li><strong>GHG Protocol Corporate Standard</strong>: Scope 1 and Scope 2 required; Scope 3 is reported under the separate Corporate Value Chain (Scope 3) Standard.</li>
                   </ul>
                   <p className="qa-subhead">Frameworks that require Scope 1, Scope 2 and Scope 3</p>

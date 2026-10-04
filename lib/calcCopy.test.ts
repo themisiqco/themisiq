@@ -30,6 +30,17 @@ describe('/calculate-emissions copy', () => {
     expect(PAGE).toContain('one site on the US average grid')
   })
 
+  it('CC5: no ThemisIQ report is called submittable, and the SB 253 date reads as proposed', () => {
+    expect(PAGE).not.toMatch(/submit/i)
+    // "Ready for SB 253" read as a filing-ready claim; the SB 253 CSV is ThemisIQ's own layout, not a CARB form.
+    expect(PAGE).not.toMatch(/ready for SB 253/)
+    expect(PAGE.match(/a report you can use to prepare for SB 253/g) ?? []).toHaveLength(3)
+    expect(readFileSync(join(__dirname, '..', 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain('hint="Appears on every report and download."')
+    expect(PAGE).toContain('download a report to share with your customer, lender or verifier.')
+    expect(PAGE).toContain('Scope 1 and Scope 2, {SB253_POSTURE}')
+    expect(PAGE).toContain('proposed for {SB253_FIRST_REPORT_DATE} and not yet final; Scope 3 is expected from {SB253_SCOPE3_FROM}')
+  })
+
   it('CC4: free use says the results are emailed, in the form the ruling gave', () => {
     expect(GHG_FREE_USE_SENTENCE).toBe('Scope 1 and Scope 2 can be calculated free, in your browser, without an account, with your results emailed to you directly.')
     expect(PAGE).toContain('your results will be emailed to you directly. Nothing is saved in ThemisIQ until you have a GHG plan.')

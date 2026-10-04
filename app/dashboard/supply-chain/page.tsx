@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import { csvBlob } from '../../../lib/csv'
 import { CSV_DP } from '../../../lib/ghg/workingsCells'
 import { useEntitlementAccess } from '../../../lib/useEntitlement'
+import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
 import { DRAFT_KEYS, readDraft, useDraftAutosave, clearDraft } from '../../../lib/drafts'
 import { CS3D_APPLIES_FROM } from '../../../lib/cs3d'
 import { INDUSTRY_CODES, INDUSTRY_OPTION_GROUPS, industryName } from '../../../lib/emissionFactors/industryOptions'
@@ -940,7 +941,7 @@ function SupplyChainDashboardInner() {
           docs/colourway-2026.md lists all of them. */}
       <div style={{ background: 'var(--color-module-supply)', padding: '8px 2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-ink)', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ink)' }}>EU CS3D applies from {CS3D_APPLIES_FROM} · ESRS S2 active now · SB 253 Scope 3 deadline 2027. Map your supply chain today.</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-ink)' }}>EU CS3D applies from {CS3D_APPLIES_FROM} · ESRS S2 active now · SB 253 Scope 3 expected from {SB253_SCOPE3_FROM}. Map your supply chain today.</span>
       </div>
       <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '1.5rem 2.5rem' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
