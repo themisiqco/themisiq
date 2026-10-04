@@ -1,10 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import FreeCalcCta from '../app/components/FreeCalcCta'
-import { FREE_CALC_HREF, FREE_CALC_LABEL, FREE_CALC_SHORT_LABEL, FREE_CALC_SUBLINE, GHG_FREE_USE_SENTENCE } from './pricingCopy'
+// Nav imports the browser Supabase client at module load; the header markup needs none of it.
+vi.mock('./supabase', () => ({ supabase: { auth: { getSession: () => new Promise(() => {}), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } } }))
+import Nav from '../app/components/Nav'
+import { FREE_CALC_HREF, FREE_CALC_LABEL, FREE_CALC_SHORT_LABEL, FREE_CALC_SUBLINE, FREE_CALC_HEADER_LABEL, FREE_CALC_HEADER_TAG, GHG_FREE_USE_SENTENCE } from './pricingCopy'
 
 // THE FREE CALCULATOR ON EVERY GHG SURFACE (free-calc-cta, Oct 2026). Until then the home page and /climate-ghg
 // had no link into it at all. Each surface listed here renders the shared CTA (or, for /calculate-emissions and
@@ -61,11 +64,42 @@ describe('free calculator CTA', () => {
       const src = read(file)
       for (const n of needles) expect(src, `${file}: ${n}`).toContain(n)
     }
-    // The header: desktop bar and mobile menu both.
+    // The header's mobile menu (rendered only when opened, so read from source): same label, tag and name.
     const nav = read('app/components/Nav.tsx')
-    expect(nav.match(/FREE_CALC_HREF/g)?.length ?? 0).toBeGreaterThanOrEqual(3) // import + desktop + mobile
-    expect(nav).toContain('{FREE_CALC_SHORT_LABEL}</a>')
-    expect(nav).toContain('label: FREE_CALC_SHORT_LABEL, sub: FREE_CALC_SUBLINE')
+    expect(nav).toContain('{ href: FREE_CALC_HREF, label: FREE_CALC_HEADER_LABEL, sub: FREE_CALC_SUBLINE, tag: true }')
+    expect(nav).toContain('aria-label={tag ? FREE_CALC_SHORT_LABEL : undefined}')
+    expect(nav).toContain('{label}{tag && <FreeTag />}')
+  })
+
+  it('FCC8: the desktop header link reads "Emissions calculator" with a "Free" tag, and is named "Free emissions calculator"', () => {
+    const out = renderToStaticMarkup(createElement(Nav))
+    const link = out.match(/<a[^>]*data-free-calc-header[^>]*>[\s\S]*?<\/a>/)?.[0] ?? ''
+    expect(link).toContain(`href="${FREE_CALC_HREF.replace('&', '&amp;')}"`)
+    expect(link).toContain(`aria-label="${FREE_CALC_SHORT_LABEL}"`)
+    expect(FREE_CALC_SHORT_LABEL).toBe('Free emissions calculator')
+    expect(link).toContain(FREE_CALC_HEADER_LABEL)
+    expect(FREE_CALC_HEADER_LABEL).toBe('Emissions calculator')
+    // The tag is there to see, and hidden from assistive technology so the name is not read twice.
+    expect(link).toMatch(new RegExp(`<span aria-hidden="true" data-free-tag="true"[^>]*>${FREE_CALC_HEADER_TAG}</span>`))
+    // The header's other two calls to action are unchanged.
+    expect(out).toContain('>Free assessment</a>')
+    expect(out).toContain('>Build your platform →</a>')
+  })
+
+  it('FCC9: the home hero is the calculator and "See how it works"; no assessment button in either hero', () => {
+    const home = read('app/page.tsx')
+    const hero = home.slice(home.indexOf('<h1'), home.indexOf('── THE REQUEST ──'))
+    expect(hero).toContain('<FreeCalcCta variant="onDark" />')
+    expect(hero).toContain(`<a href="/methodology" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>See how it works</a>`)
+    expect(hero).not.toContain('/assess')
+    expect(hero).not.toContain('The assessment is free')
+    const ghg = read('app/climate-ghg/page.tsx')
+    const ghgHero = ghg.slice(ghg.indexOf('<FreeCalcCta />'), ghg.indexOf('</section>', ghg.indexOf('<FreeCalcCta />')))
+    expect(ghgHero).toContain('From ${ghgFrom}/yr')
+    expect(ghgHero).not.toContain('/assess')
+    // The assessment is still on both pages, below the hero.
+    expect(home.match(/href="\/assess"/g)?.length ?? 0).toBeGreaterThan(0)
+    expect(ghg).toContain("primary={{ href: '/assess', label: 'Start the free assessment' }}")
   })
 
   it('FCC5: no listed surface types the calculator URL a second time', () => {

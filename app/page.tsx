@@ -72,19 +72,13 @@ export default function Home() {
               Customers, lenders and regulators are each asking for something different, and the rules change by country and by year. ThemisIQ works out which of them apply to you, tells you what to submit and when, and builds the reports from your own data.
             </p>
             {/* THE FREE CALCULATOR LEADS (free-calc-cta, Oct 2026). Until then nothing on this page opened it:
-                the hero offered the assessment and the methodology only. It takes the filled button; the
-                assessment moves to the outline, and "See how it works" to a text link under both. */}
+                the hero offered the assessment and the methodology only. It takes the filled button, with
+                "See how it works" as the outline beside it. The assessment is not in the hero any more
+                (free-calc-cta-2): it stays in the header and further down this page. */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               <FreeCalcCta variant="onDark" />
-              <a href="/assess" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>Start the free assessment</a>
+              <a href="/methodology" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>See how it works</a>
             </div>
-            {/* --color-on-dark-muted, not opacity: the token file's DISABLED AND INACTIVE STATE block
-                is explicit that opacity composites the text with whatever is behind it, which over a
-                photograph is a different colour in every pixel and unmeasurable. */}
-            <p style={{ fontSize: 13, color: 'var(--color-on-dark-muted)', marginTop: '1rem' }}>
-              The assessment is free and takes about five minutes.{' '}
-              <a href="/methodology" style={{ color: 'var(--color-on-dark)', fontWeight: 600, textDecoration: 'underline' }}>See how it works</a>
-            </p>
           </div>
         </div>
       </section>

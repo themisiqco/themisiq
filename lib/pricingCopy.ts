@@ -70,3 +70,11 @@ export const FREE_CALC_LABEL = 'Calculate your Scope 1 and Scope 2 emissions fre
 export const FREE_CALC_SHORT_LABEL = 'Free emissions calculator'
 
 export const FREE_CALC_SUBLINE = 'In your browser, no account needed.'
+
+/**
+ * The site header's form (free-calc-cta-2, Oct 2026): "Emissions calculator" with a small "Free" tag after it.
+ * The tag is visual only; the link's accessible name is FREE_CALC_SHORT_LABEL, so a screen reader says "Free
+ * emissions calculator" rather than "Emissions calculator Free". Every other surface keeps FREE_CALC_SHORT_LABEL.
+ */
+export const FREE_CALC_HEADER_LABEL = 'Emissions calculator'
+export const FREE_CALC_HEADER_TAG = 'Free'

@@ -91,10 +91,10 @@ export default function Page() {
             method, the factor edition and the source document kept behind every figure.
           </p>
           {/* THE FREE CALCULATOR LEADS (free-calc-cta, Oct 2026): until then the GHG module page had no link into
-              the calculator at all. The assessment moves to the outline beside the price. */}
+              the calculator at all. The price is the outline beside it; the assessment left this hero in
+              free-calc-cta-2 and stays in the header and the closing band. */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             <FreeCalcCta />
-            <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>Start the free assessment</a>
             {/* ⚠️ "From", AND THE ANCHOR. GHG is the only tiered module, sized by employees (FI0), and the top
                 band has priceUSD null. A single price would mislead a larger company, so this names the
                 floor and links to the picker. */}

@@ -3,7 +3,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import ThemisIQLogo from './ThemisIQLogo'
-import { FREE_CALC_HREF, FREE_CALC_SHORT_LABEL, FREE_CALC_SUBLINE } from '../../lib/pricingCopy'
+import { FREE_CALC_HREF, FREE_CALC_SHORT_LABEL, FREE_CALC_SUBLINE, FREE_CALC_HEADER_LABEL, FREE_CALC_HEADER_TAG } from '../../lib/pricingCopy'
+
+// The "Free" pill after "Emissions calculator" (free-calc-cta-2, Oct 2026). Brand on the brand wash with a
+// hairline, smaller and lighter than either filled button in the bar, so it reads as a label on the link and not
+// as a third call to action. aria-hidden: the link carries the full name, "Free emissions calculator", in its
+// aria-label, so a screen reader does not hear "Emissions calculator Free".
+function FreeTag() {
+  return (
+    <span aria-hidden="true" data-free-tag style={{
+      fontSize: 10, fontWeight: 600, lineHeight: 1, letterSpacing: '0.04em', padding: '3px 7px', borderRadius: 99,
+      color: 'var(--color-brand)', background: 'var(--color-brand-wash)',
+      border: '0.5px solid color-mix(in srgb, var(--color-brand) 35%, transparent)', whiteSpace: 'nowrap',
+    }}>{FREE_CALC_HEADER_TAG}</span>
+  )
+}
 
 // Single source of truth for the header's module links — consumed by BOTH the
 // desktop Platform ▾ dropdown (full `label` + `sub`) and the mobile overlay
@@ -104,9 +118,11 @@ export default function Nav() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }} className="desktop-nav">
             {/* THE FREE CALCULATOR, FIRST IN THE BAR (free-calc-cta, Oct 2026). A text link in brand, not a
-                fourth button: the right group already carries two filled ones. Short label, because the bar
-                is full at 1101px, the narrowest width it shows at. */}
-            <a href={FREE_CALC_HREF} style={{ ...navLinkStyle, color: 'var(--color-brand)', fontWeight: 600 }}>{FREE_CALC_SHORT_LABEL}</a>
+                fourth button: the right group already carries two filled ones. "Emissions calculator" with a
+                "Free" tag since free-calc-cta-2; the accessible name is the full "Free emissions calculator". */}
+            <a href={FREE_CALC_HREF} aria-label={FREE_CALC_SHORT_LABEL} data-free-calc-header style={{ ...navLinkStyle, color: 'var(--color-brand)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {FREE_CALC_HEADER_LABEL}<FreeTag />
+            </a>
             {/* Platform ▾ dropdown */}
             <div ref={platformRef} style={{ position: 'relative' }}>
               <button
@@ -231,22 +247,27 @@ export default function Nav() {
           display: 'flex', flexDirection: 'column', gap: '0.5rem',
           borderTop: '0.5px solid #e8e7e4', overflowY: 'auto',
         }}>
-          {[
-            // First in the menu, as it is first in the desktop bar.
-            { href: FREE_CALC_HREF, label: FREE_CALC_SHORT_LABEL, sub: FREE_CALC_SUBLINE },
+          {([
+            // First in the menu, as it is first in the desktop bar, with the same label, tag and accessible name.
+            { href: FREE_CALC_HREF, label: FREE_CALC_HEADER_LABEL, sub: FREE_CALC_SUBLINE, tag: true },
             ...MODULES_NAV,
             { href: '/frameworks', label: 'Regulations', sub: 'Every rule we cover, and who it applies to' },
             { href: '/pricing', label: 'Pricing', sub: 'Plans, tiers, and what each includes' },
             { href: '/advisory', label: 'Advisory', sub: 'Expert judgment on your obligation' },
             { href: '/assess', label: 'Free assessment', sub: 'Check which regulations apply to you' },
-          ].map(({ href, label, sub }) => (
-            <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
+          ] as Array<{ href: string; label: string; sub: string; tag?: boolean }>).map(({ href, label, sub, tag }) => (
+            // The tagged item takes its name from aria-label ("Free emissions calculator") and its sub-line as the
+            // description, so the sub-line is still read; every other item is named by its own text, as before.
+            <a key={href} href={href} onClick={() => setMenuOpen(false)}
+              aria-label={tag ? FREE_CALC_SHORT_LABEL : undefined}
+              aria-describedby={tag ? 'nav-free-calc-sub' : undefined}
+              style={{
               display: 'block', padding: '14px 0',
               borderBottom: '0.5px solid #e8e7e4',
               textDecoration: 'none',
             }}>
-              <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>{label}</div>
-              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{sub}</div>
+              <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>{label}{tag && <FreeTag />}</div>
+              <div id={tag ? 'nav-free-calc-sub' : undefined} style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>{sub}</div>
             </a>
           ))}
           {isAuthed && (
