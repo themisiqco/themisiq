@@ -15,6 +15,8 @@ import type { BaselineScope3Coverage } from '../../../lib/ghg/series'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled } from '@/app/components/buttonStyles'
+// The plan gate's messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
+import { saveFailedText } from '../../../lib/planGateError'
 
 // ─── Design tokens (mirroring the climate-risk dashboard) ─────────────────────
 const GRAD = 'var(--color-brand)'
@@ -565,7 +567,7 @@ export default function SbtiDashboard() {
         updated_at: new Date().toISOString(),
         // annual_revenue intentionally NOT written (retired — superseded by net_turnover_eur)
       }, { onConflict: 'company_id' })
-      if (error) { console.error('SBTi profile save failed:', error); alert('Save failed: ' + error.message); return }
+      if (error) { console.error('SBTi profile save failed:', error); alert(saveFailedText(error)); return }
       setSaved(true)
       setDirty(false)
     } finally { setSaving(false) }
@@ -620,7 +622,7 @@ export default function SbtiDashboard() {
         // net-zero is encoded in target_type (no isNetZero column); ambition/status use column defaults.
       }))
       const { error } = await supabase.from('sbti_targets').upsert(rows, { onConflict: 'company_id,scope,target_type' })
-      if (error) { console.error('SBTi targets save failed:', error); alert('Save failed: ' + error.message); return }
+      if (error) { console.error('SBTi targets save failed:', error); alert(saveFailedText(error)); return }
       setSavedTargets(true)
       setDirty(false)
     } finally { setSavingTargets(false) }
@@ -666,7 +668,7 @@ export default function SbtiDashboard() {
         updated_at: now,
       }))
       const { error } = await supabase.from('sbti_targets').upsert(rows, { onConflict: 'company_id,scope,target_type' })
-      if (error) { console.error('SBTi net-zero save failed:', error); alert('Save failed: ' + error.message); return }
+      if (error) { console.error('SBTi net-zero save failed:', error); alert(saveFailedText(error)); return }
       setSavedNetZero(true)
       setDirty(false)
     } finally { setSavingNetZero(false) }

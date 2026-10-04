@@ -12,6 +12,8 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
 import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
 import { wantsNewCalculator, entryView, entryWall, saveGoesToPricing } from '../../../lib/ghg/entry'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
+// The plan gates' messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
+import { saveFailedText } from '../../../lib/planGateError'
 import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
@@ -1764,13 +1766,13 @@ workings: saved.workings,
     let savedId: string | null = inventoryId
     if (inventoryId) {
       const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
-      if (error) { lastSaveError.current = error.message; alert('Save failed: ' + error.message); console.error(error); return }
+      if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
     } else {
       const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
       const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
       if (dup) { lastSaveError.current = 'An inventory for that company and year already exists.'; alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
-      if (error) { lastSaveError.current = error.message; alert('Save failed: ' + error.message); console.error(error); return }
+      if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
       if (data) { savedId = data.id; setInventoryId(data.id) }
       loadCompanies() // refresh dropdown in case resolve-or-create added a new company
     }

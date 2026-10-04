@@ -1,6 +1,8 @@
 -- docs/review/patches/L0-ENF1-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L0-ENF1-source-documents-upload.sql, in the Supabase SQL editor, the whole file. It changes
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa): all 14 checks passed. DO NOT RUN AGAIN as part of
+-- the rollout. It is safe to re-run as a check (it undoes itself), but it is not a step anyone needs to repeat.
+-- Ran AFTER L0-ENF1-source-documents-upload.sql, in the Supabase SQL editor, the whole file. It changes
 -- nothing: every write happens inside one PL/pgSQL block that ends by raising 'enf1_undo', and catching it rolls
 -- the block back to its savepoint, undoing the test uploads, the deletes and the entitlement changes. Results are
 -- carried out of the block in variables, so the rollback does not take them too (same pattern as FI0-verify.sql).

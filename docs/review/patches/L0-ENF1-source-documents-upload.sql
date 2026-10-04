@@ -1,6 +1,9 @@
 -- docs/review/patches/L0-ENF1-source-documents-upload.sql
 --
--- ⚠️ NOT RUN. Drafted 4 Oct 2026 (LEAD1 task L0, ENF1; design in docs/review/design-derived-figures.md section 11
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa): applied, then L0-ENF1-verify.sql run, all checks
+-- passed. DO NOT RUN AGAIN: the pre-flight would refuse (the policies already call has_active_entitlement), and the
+-- live definitions are the ones below.
+-- Drafted 4 Oct 2026 (LEAD1 task L0, ENF1; design in docs/review/design-derived-figures.md section 11
 -- and docs/review/design-lead1.md). To become supabase/migrations/2026MMDD_source_documents_writes_require_ghg.sql.
 --
 -- WHAT IT DOES. Uploading to, and deleting from, the GHG 'source-documents' bucket now need an ACTIVE GHG plan,

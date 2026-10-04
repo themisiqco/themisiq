@@ -118,6 +118,15 @@ export const SCOPE3_SAVE_CODE_SENTENCES: Readonly<Record<string, string>> = {
   '42501':
     `This account is not allowed to write this record. ${SAVE_NOTHING_LOST} Your session may have ended ` +
     `while the page was open: sign in again and save.`,
+  // public.enforce_scope3_entitlement() (LEAD1 L1, M3): Scope 3 writes need an active GHG plan. Two codes, because
+  // an account whose plan has ended needs to hear "renew", and one that never had a plan does not.
+  // ⚠️ WORD FOR WORD THE DATABASE'S OWN MESSAGES (L1-M3-scope3-sbti-entitlement.sql), and deliberately WITHOUT
+  // SAVE_NOTHING_LOST: they already say nothing was saved, so adding the shared clause would tell the customer twice.
+  // lib/lead1L1.test.ts pins both against the SQL.
+  PT402:
+    'Scope 3 is part of the GHG plan. Nothing was saved, and your figures are still on screen. Choose a plan to save them.',
+  PT410:
+    'Your GHG access has expired. Nothing was saved, and your figures are still on screen. Renew to save them.',
 }
 
 /** The constraint name Postgres puts in a violation message, or null. */

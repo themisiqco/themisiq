@@ -72,8 +72,11 @@ describe('the wizard upload control', () => {
 describe('the ENF1 migration (static; the database run is L0-ENF1-verify.sql)', () => {
   const code = sqlCode(MIGRATION)
 
-  it('UR6: NOT RUN header, one transaction', () => {
-    expect(MIGRATION.split('\n')[2]).toContain('⚠️ NOT RUN.')
+  // The header records execution (CLAUDE.md: the migration header is the record): RUN 4 Oct 2026, all checks passed.
+  it('UR6: RUN header with DO NOT RUN AGAIN, one transaction', () => {
+    expect(MIGRATION.split('\n')[2]).toContain('⚠️ RUN 4 Oct 2026')
+    expect(MIGRATION).toContain('DO NOT RUN AGAIN')
+    expect(VERIFY.split('\n')[2]).toContain('⚠️ RUN 4 Oct 2026')
     expect(code.trim().startsWith('begin;')).toBe(true)
     expect(code.trim().endsWith('commit;')).toBe(true)
   })

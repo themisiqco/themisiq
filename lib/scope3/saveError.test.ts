@@ -56,8 +56,13 @@ describe('Scope 3 save errors', () => {
     // of every failure, and a customer must not have to infer it from which sentence they got.
     const all = [...Object.values(SCOPE3_SAVE_SENTENCES), ...Object.values(SCOPE3_SAVE_CODE_SENTENCES),
       saveErrorText({ code: '08006', message: 'connection failure' }), saveErrorText(null)]
+    // The plan gate's two sentences (PT402/PT410, LEAD1 L1) are the database's own wording, ruled on 4 Oct 2026, and
+    // make the same promise in their own words ("Nothing was saved, and your figures are still on screen"), so they
+    // carry it once rather than the shared clause on top. lib/lead1L1.test.ts pins them exactly.
+    const planGate = new Set([SCOPE3_SAVE_CODE_SENTENCES.PT402, SCOPE3_SAVE_CODE_SENTENCES.PT410])
     for (const s of all) {
-      expect(s, s).toContain(SAVE_NOTHING_LOST)
+      if (planGate.has(s)) expect(s, s).toContain('Nothing was saved, and your figures are still on screen.')
+      else expect(s, s).toContain(SAVE_NOTHING_LOST)
       expect(s, 'no em-dash in customer text').not.toContain('—')
       expect(s, 'a value was spliced in without one').not.toMatch(/undefined|\[object/)
       // ⚠️ NO SUPPORT ROUTE IS NAMED, BECAUSE THE PRODUCT HAS NONE. "Please send us this message" told a
