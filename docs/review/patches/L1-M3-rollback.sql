@@ -1,6 +1,7 @@
 -- docs/review/patches/L1-M3-rollback.sql
 --
--- ⚠️ NOT RUN. Rollback for L1-M3-scope3-sbti-entitlement.sql.
+-- ⚠️ NOT RUN, AND NOT TO BE RUN UNLESS L1 IS BEING UNDONE: kept for reference (M1, M3 and M2 were RUN on 4 Oct 2026).
+-- Rollback for L1-M3-scope3-sbti-entitlement.sql.
 --
 -- ⚠️ ROLL BACK M2 FIRST if it has run (L1-M2-rollback.sql). With M2 live and these triggers gone, an account without
 -- a plan can save a free calculation and then write Scope 3 and SBTi against it through the API. The pre-flight

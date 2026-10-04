@@ -1,6 +1,8 @@
 -- docs/review/patches/L1-M2-ghg-entitlement-gate-free-tier.sql
 --
--- ⚠️ NOT RUN. Drafted 4 Oct 2026 (LEAD1 task L1, migration M2; design in docs/review/design-lead1.md section 3).
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), last of the three L1 migrations (M1, M3, M2), then
+-- LEAD1-verify.sql: all 27 checks passed. DO NOT RUN AGAIN: the pre-flight would refuse (the body already reads free_tier).
+-- Drafted 4 Oct 2026 (LEAD1 task L1, migration M2; design in docs/review/design-lead1.md section 3).
 -- To become supabase/migrations/2026MMDD_ghg_entitlement_gate_free_tier.sql.
 --
 -- RUN ORDER (L1): L1-M1-ghg-free-tier.sql (M1), then L1-M3-scope3-sbti-entitlement.sql (M3), then THIS FILE (M2), then

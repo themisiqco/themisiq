@@ -1,6 +1,7 @@
 -- docs/review/patches/L1-M1-rollback.sql
 --
--- ⚠️ NOT RUN. Rollback for L1-M1-ghg-free-tier.sql. Run only to undo M1, and only AFTER M2 has been rolled back
+-- ⚠️ NOT RUN, AND NOT TO BE RUN UNLESS L1 IS BEING UNDONE: kept for reference (M1, M3 and M2 were RUN on 4 Oct 2026).
+-- Rollback for L1-M1-ghg-free-tier.sql. Run only to undo M1, and only AFTER M2 has been rolled back
 -- (L1-M2-rollback.sql): M2's function reads free_tier, so dropping the column under it would break every save.
 --
 -- WHAT IT DOES. Drops the index ghg_inventories_one_free_per_user and the column ghg_inventories.free_tier (which takes

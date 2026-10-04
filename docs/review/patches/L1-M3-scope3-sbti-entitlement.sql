@@ -1,6 +1,8 @@
 -- docs/review/patches/L1-M3-scope3-sbti-entitlement.sql
 --
--- ⚠️ NOT RUN. Drafted 4 Oct 2026 (LEAD1 task L1, migration M3; design in docs/review/design-lead1.md sections 0 and 3).
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), second of the three L1 migrations (M1, M3, M2), then
+-- LEAD1-verify.sql: all 27 checks passed. DO NOT RUN AGAIN: the pre-flight would refuse (the triggers already exist).
+-- Drafted 4 Oct 2026 (LEAD1 task L1, migration M3; design in docs/review/design-lead1.md sections 0 and 3).
 -- To become supabase/migrations/2026MMDD_scope3_sbti_entitlement.sql.
 --
 -- RUN ORDER (L1): L1-M1-ghg-free-tier.sql (M1), then THIS FILE (M3), then L1-M2-ghg-entitlement-gate-free-tier.sql

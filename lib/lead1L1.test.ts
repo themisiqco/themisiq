@@ -67,13 +67,22 @@ describe('plan-gate refusals in the app', () => {
 })
 
 describe('L1 SQL files (static; the database run is LEAD1-verify.sql)', () => {
-  it('L1-4: every file is NOT RUN, one transaction, and states the run order M1, M3, M2, verify', () => {
+  // The headers record execution (CLAUDE.md: the migration header is the record). M1, M3 and M2 and the verify script
+  // were RUN on 4 Oct 2026, all 27 checks passed; the rollbacks were not run and are kept for reference.
+  it('L1-4: RUN headers on the migrations and the verify script, NOT RUN on the rollbacks, one transaction each, run order stated', () => {
+    for (const s of [M1, M2, M3]) {
+      expect(s.split('\n')[2]).toContain('⚠️ RUN 4 Oct 2026')
+      expect(s).toContain('all 27 checks passed. DO NOT RUN AGAIN')
+    }
+    for (const s of [M1R, M2R, M3R]) {
+      expect(s.split('\n')[2]).toContain('⚠️ NOT RUN, AND NOT TO BE RUN UNLESS L1 IS BEING UNDONE: kept for reference')
+    }
     for (const s of [M1, M1R, M2, M2R, M3, M3R]) {
-      expect(s.split('\n')[2]).toContain('⚠️ NOT RUN.')
       expect(code(s).trim().startsWith('begin;')).toBe(true)
       expect(code(s).trim().endsWith('commit;')).toBe(true)
     }
-    expect(VERIFY.split('\n')[2]).toContain('⚠️ NOT RUN.')
+    expect(VERIFY.split('\n')[2]).toContain('⚠️ RUN 4 Oct 2026')
+    expect(VERIFY).toContain('all 27 checks passed. DO NOT RUN')
     expect(M1).toContain('RUN ORDER (L1): this file (M1), then L1-M3-scope3-sbti-entitlement.sql (M3), then')
     expect(M3).toContain('RUN ORDER (L1): L1-M1-ghg-free-tier.sql (M1), then THIS FILE (M3), then L1-M2-ghg-entitlement-gate-free-tier.sql')
     expect(M2).toContain('RUN ORDER (L1): L1-M1-ghg-free-tier.sql (M1), then L1-M3-scope3-sbti-entitlement.sql (M3), then THIS FILE (M2), then')

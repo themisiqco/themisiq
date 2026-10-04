@@ -26,7 +26,7 @@ document. Written 4 Oct 2026; amended the same day with Lisa's decisions and fou
 | Q-L6 | Block disposable email domains only; free webmail is allowed |
 | Q-L7 | Turnstile, through Supabase Auth's CAPTCHA protection (fix 1, section 6) |
 | Q-L8 | Codes only for free accounts; no password |
-| Q-L9 | Sender and reply-to for transactional email: hello@themisiq.co |
+| Q-L9 | App email sent through the Resend API (results, re-email, renewal, marketing): From "ThemisIQ <hello@themisiq.co>", reply-to hello@themisiq.co. Auth email (sign-in codes, sign-up confirmations, password resets) is sent by Supabase through Resend SMTP from "ThemisIQ <noreply@themisiq.co>" (set up 4 Oct 2026, section 10.1) |
 | Q-L10 | Keep the next-step sentence with the price in the results email |
 | FI0 | `docs/review/patches/FI0-entitlement-gate-only.sql` was RUN in Supabase on 2 Oct 2026 (Lisa, 4 Oct). The behavioural verify passed; only the function-name text check failed, as expected. Its header is updated to say so. M2 builds on the live FI0 body |
 | Profiles | No trigger on `auth.users`, and `public.profiles` has 0 rows (Lisa, 4 Oct). M6 adds the trigger and a backfill |
@@ -121,6 +121,9 @@ checkbox.
   calculation in memory is saved there and then. No redirect, no reload, no draft round trip.
 - **It works across devices.** Someone who reads the email on their phone types the code on the laptop.
 - **No password** to choose, store or reset (Q-L8). Paid customers keep password login, unchanged.
+
+**Expiry: 1 hour.** The Email OTP expiry is 3600 s, deliberately (section 10.1): the same Supabase setting governs
+sign-up confirmation links and the purchase email's first sign-in link, so a shorter code life would shorten those too.
 
 **The link** in the same email is the fallback for a visitor who clicks instead of typing. It opens a client page,
 `/auth/confirm?token_hash=…&type=email`, which calls `verifyOtp({ token_hash, type: 'email' })` in the browser and
@@ -356,7 +359,8 @@ can unsubscribe at any time." Account creation does not depend on it.
   - withdrawal takes effect immediately (CASL allows 10 business days);
   - the account page also shows the setting.
 - **Sender identification in every email:** results, sign-in code, re-email, renewal and marketing. "ThemisIQ, 11 Oak
-  Drive, Niagara-on-the-Lake, ON L0S 1J0, Canada. hello@themisiq.co". The Supabase templates carry it too (section 10).
+  Drive, Niagara-on-the-Lake, ON L0S 1J0, Canada. hello@themisiq.co". The Supabase templates carry it too
+  (section 10.3); those auth emails are sent from noreply@themisiq.co and name hello@themisiq.co for questions.
 
 **Privacy policy (`app/privacy/page.tsx`):**
 - "What we collect" (line 74): a free-account row (name, work email, company, one Scope 1 and Scope 2 calculation,
@@ -523,69 +527,123 @@ None open for Lisa in this document. The three items in section 5 are for her la
 
 ---
 
-## 10. Supabase and Cloudflare checklist (Lisa)
+## 10. Supabase, Cloudflare and Vercel checklist (Lisa)
 
-Do these in order. Each step leaves sign-in working. The names are the dashboard's labels at the time of writing; if
-one has moved, the setting is the same. Never paste a key anywhere except the field named.
+### 10.1 Done on 4 Oct 2026 (recorded from Lisa)
 
-1. **Resend: confirm the domain.** In Resend, check that themisiq.co shows as Verified (it already sends the assessment
-   emails). Create an API key named "Supabase SMTP" with sending access only.
-2. **Supabase → Authentication → Emails → SMTP Settings.** Turn on "Enable Custom SMTP":
-   - Sender email: hello@themisiq.co
-   - Sender name: ThemisIQ
-   - Host: smtp.resend.com, Port: 465
-   - Username: resend; Password: the Resend API key from step 1
+| Setting | As set | Note |
+|---|---|---|
+| Supabase custom SMTP | ON, through Resend. Sender "ThemisIQ <noreply@themisiq.co>" | Supabase sends **only auth emails** from noreply@: sign-in codes, sign-up confirmations, password resets |
+| App email | Sent through the Resend API from "ThemisIQ <hello@themisiq.co>", reply-to hello@themisiq.co | The results email, re-email, renewal and marketing (sections 2 and 5) |
+| Email rate limit | 100 an hour | |
+| Email OTP length | 6 | |
+| Email OTP expiry | **3600 s (1 hour), deliberately** | The same setting governs sign-up confirmation links and the purchase email's first sign-in link, so shortening it to 10 minutes would also cut those to 10 minutes. Codes therefore work for 1 hour; every template and screen says 1 hour, never 10 minutes |
+| Redirect URLs | `https://themisiq.co/**` and `https://themisiq-*-lisa-foster-s-projects.vercel.app/**` | Covers /auth/callback, /auth/confirm and /reset-password in production and previews |
+| Turnstile widget | Created, Managed mode, hostnames `themisiq.co` and `www.themisiq.co` only | Previews and local development cannot use it; they use Cloudflare's test key (10.2) |
+| Email templates | **Not yet changed** | After L2 is live (10.3, step 3) |
+| Supabase CAPTCHA protection | **Not yet on** | The last step (10.3, step 5) |
 
-   Save, then send yourself a password reset from the live site's "Forgot password" page to check it arrives from
-   hello@themisiq.co.
-3. **Supabase → Authentication → Rate Limits.** Set "Rate limit for sending emails" to 100 an hour (the custom SMTP
-   allows it). Leave the OTP verification limits as they are.
-4. **Supabase → Authentication → URL Configuration.**
-   - Site URL: https://themisiq.co
-   - Redirect URLs: add `https://themisiq.co/auth/confirm`, `https://themisiq.co/auth/callback**` and
-     `https://themisiq.co/reset-password` (keep any that are there).
-5. **Supabase → Authentication → Providers → Email.** Leave "Enable Email provider" and "Confirm email" on. Set:
-   - Email OTP Length: 6
-   - Email OTP Expiration: 600 seconds
-6. **Supabase → Authentication → Emails → Templates.** Edit two templates.
-   - **"Magic Link"** (sign-in codes for existing accounts): replace the body with the template below.
-   - **"Confirm signup"** (new accounts, by code or by password): use the same body, but make the link
-     `{{ .ConfirmationURL }}` instead of the `/auth/confirm?token_hash=…` link. Password sign-ups need that link, and
-     the L2 callback page completes it in the browser.
+### 10.2 Turnstile keys by environment
 
-   Subject: `Your ThemisIQ code: {{ .Token }}`
+The code chooses the site key (`lib/auth/turnstileKey.ts`, L2):
+- **production** (`NEXT_PUBLIC_VERCEL_ENV` is `production`): `NEXT_PUBLIC_TURNSTILE_SITE_KEY`; with it unset, no widget and nothing changes;
+- **previews and local development:** Cloudflare's published always-pass **test** site key, in the code. It is public
+  (https://developers.cloudflare.com/turnstile/troubleshooting/testing/) and protects nothing, which is the point.
+
+So the real site key is set for **Production only**, and nothing is set for Preview or Development.
+
+⚠️ **After CAPTCHA protection is switched on (step 5), sign-up, password login, code sign-in and password reset stop
+working on previews and locally.** Supabase checks every token against the one real secret, and a test-key token
+fails that check. Production is unaffected. After step 5, test auth flows on production, or decide on a separate
+Supabase project for previews (a larger change, not planned). Everything else on a preview keeps working.
+
+### 10.3 What to do, in order
+
+1. **Vercel env vars, BEFORE deploying L2.** `NEXT_PUBLIC_` values are fixed at build time, so they must be in place
+   when the L2 build runs. Vercel → Project → Settings → Environment Variables:
+
+   | Name | Environments | Which key |
+   |---|---|---|
+   | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | **Production only** | The **site key** of the Turnstile widget created on 4 Oct (Cloudflare → Turnstile → the widget → Site key). Public by design: it is sent to every browser |
+   | `TURNSTILE_SECRET_KEY` | **Production only** | The widget's **secret key**. Not read by L2. L3's `/pending` route verifies tokens with it (L3 picks Cloudflare's test secret for previews, the same way). It can be added now; it must never have the `NEXT_PUBLIC_` prefix |
+
+   Also check that Settings → Environment Variables → "Automatically expose System Environment Variables" is on
+   (Vercel's default). That is what gives the browser `NEXT_PUBLIC_VERCEL_ENV`. Without it, production would use the
+   test key, which still passes while CAPTCHA protection is off, so nothing breaks, but step 5 would then refuse
+   everyone.
+
+2. **Deploy L2** (merge and push). While templates and CAPTCHA are unchanged:
+   - password sign-up, login and reset work exactly as before;
+   - the Turnstile widget shows on sign-up, login and forgot-password, and Supabase ignores its token;
+   - sign-up confirmations and the purchase email's first sign-in link finish in the browser (the fixed /auth/callback).
+   - "Email me a sign-in code" on /login sends Supabase's DEFAULT magic-link email, which has a link but no code,
+     until step 3. Do step 3 straight after the deploy.
+
+3. **Supabase → Authentication → Emails → Templates, straight after the deploy.** These emails come from
+   noreply@themisiq.co.
+
+   **"Magic Link"** (sign-in codes for existing accounts, from /login now and the free-account form in L4):
+
+   Subject: `Your ThemisIQ sign-in code: {{ .Token }}`
 
    ```html
-   <p>Your ThemisIQ code is:</p>
+   <p>Your ThemisIQ sign-in code is:</p>
    <p style="font-size:24px;font-weight:700;letter-spacing:4px">{{ .Token }}</p>
-   <p>Type it in the window where you asked for it. It expires in 10 minutes.</p>
+   <p>Type it on the page where you asked for it. It works for 1 hour.</p>
    <p>Or open this link on any device:
-     <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Confirm and open ThemisIQ</a></p>
+     <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Sign in to ThemisIQ</a></p>
    <p>If you didn't ask for this, you can ignore this email.</p>
    <hr>
    <p style="font-size:12px;color:#555">ThemisIQ, 11 Oak Drive, Niagara-on-the-Lake, ON L0S 1J0, Canada.
-     hello@themisiq.co</p>
+     Questions: hello@themisiq.co</p>
    ```
 
-   Add the same footer line to the "Reset Password" template. These templates take effect at once, but nothing sends
-   the code email until the L2 code is live, so there is no gap.
-7. **Cloudflare → Turnstile → Add widget.**
-   - Name: ThemisIQ. Hostnames: themisiq.co (and the Vercel preview domain if previews are tested; localhost for
-     development). Mode: Managed.
-   - Copy the **site key** into Vercel as `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, and the **secret key** into Vercel as
-     `TURNSTILE_SECRET_KEY` (used by `/pending`). Keep the secret open for step 9.
-8. **Deploy L2.** Lisa merges and pushes the L2 patch. Supabase ignores `captchaToken` while CAPTCHA is off, so
-   sign-up, login and reset keep working with the widget present. Check all three on the live site.
-9. **Supabase → Authentication → Attack Protection → Enable CAPTCHA protection.** Choose Cloudflare Turnstile, paste
-   the secret key from step 7, save.
-10. **Test straight away**, on the live site:
-    - password sign-up (new address);
-    - password login;
-    - forgot password;
-    - a sign-in code typed in the same window;
-    - the code email's link opened on a phone.
+   **"Confirm signup"** (new accounts: password sign-ups today, and code sign-ups from the free-account form in L4):
 
-    Also check that a purchase's first-login email still signs in (it uses the admin API, which CAPTCHA does not
-    affect).
-11. **If anything fails at step 10,** turn off "Enable CAPTCHA protection" (step 9's switch). Sign-in returns to how
-    it was at step 8, immediately, and nothing else needs undoing.
+   Subject: `Confirm your ThemisIQ account`
+
+   ```html
+   <p>Confirm your email to finish creating your ThemisIQ account:</p>
+   <p><a href="{{ .ConfirmationURL }}">Confirm my email</a></p>
+   <p>If you were asked for a code, it is:</p>
+   <p style="font-size:24px;font-weight:700;letter-spacing:4px">{{ .Token }}</p>
+   <p>The link and the code work for 1 hour. If you didn't sign up, you can ignore this email.</p>
+   <hr>
+   <p style="font-size:12px;color:#555">ThemisIQ, 11 Oak Drive, Niagara-on-the-Lake, ON L0S 1J0, Canada.
+     Questions: hello@themisiq.co</p>
+   ```
+
+   ⚠️ **Why "Confirm signup" keeps `{{ .ConfirmationURL }}` instead of a fixed /auth/confirm link.**
+   - That link returns the visitor to the address their sign-up asked for: `/auth/callback?next=…` for a password
+     sign-up, which is how a sign-up started from checkout lands back on the order, and `/auth/confirm` for a code
+     sign-up (L4 sets that).
+   - A fixed `/auth/confirm` link would drop `next`, and every password sign-up would land on the calculator instead
+     of where they were going.
+   - The page it reaches (L2's /auth/callback or /auth/confirm) completes the sign-in in the browser either way.
+
+   **"Reset Password":** keep the body and link, and add the same footer line.
+
+   Then test on production:
+   - a code from /login, typed;
+   - the same email's link opened on a phone;
+   - a password sign-up confirmation;
+   - a password reset.
+
+4. **Re-check the purchase email's first sign-in link** (make a test purchase, or ask a customer who bought since the
+   deploy). It uses the admin API and the fixed /auth/callback, and is not affected by steps 3 or 5.
+
+5. **LAST: Supabase → Authentication → Attack Protection → Enable CAPTCHA protection.** Provider: Cloudflare
+   Turnstile. Secret key: the widget's secret key (the same one as `TURNSTILE_SECRET_KEY`). Save.
+
+   Test straight away, on production:
+   - password sign-up (new address);
+   - password login;
+   - forgot password;
+   - a sign-in code typed on /login;
+   - the code email's link on a phone.
+
+   A refusal reads "The security check didn't complete. Please try again." If that appears for a real visitor whose
+   widget showed, CAPTCHA is not working as intended.
+
+   **Rollback:** turn "Enable CAPTCHA protection" off again. Sign-in returns at once to how it was after step 4, and
+   nothing else needs undoing. Previews regain auth flows at the same moment (10.2).

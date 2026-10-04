@@ -1,6 +1,7 @@
 -- docs/review/patches/L1-M2-rollback.sql
 --
--- ⚠️ NOT RUN. Rollback for L1-M2-ghg-entitlement-gate-free-tier.sql: restores public.enforce_ghg_location_allowance()
+-- ⚠️ NOT RUN, AND NOT TO BE RUN UNLESS L1 IS BEING UNDONE: kept for reference (M1, M3 and M2 were RUN on 4 Oct 2026).
+-- Rollback for L1-M2-ghg-entitlement-gate-free-tier.sql: restores public.enforce_ghg_location_allowance()
 -- to the FI0 body, copied verbatim from docs/review/patches/FI0-entitlement-gate-only.sql (RUN 2 Oct 2026).
 --
 -- EFFECT. Every write without an active GHG plan is refused again, free_tier or not, with FI0's two messages (and no

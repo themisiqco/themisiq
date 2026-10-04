@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import ThemisIQLogo from '../components/ThemisIQLogo'
+import Turnstile from '../components/Turnstile'
+import { authErrorText } from '../../lib/auth/authErrors'
 import { PRICING_DRIVER_SENTENCE } from '../../lib/pricingCopy'
 
 export default function SignupPage() {
@@ -10,6 +12,9 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
  const [success, setSuccess] = useState(false)
+  // Turnstile (LEAD1 L2): see app/login/page.tsx. Without a site key the call goes out exactly as before.
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
   // Where to resume after email confirmation. Same-site relative paths only (no open redirects).
   const rawNext =
     typeof window !== 'undefined'
@@ -28,6 +33,7 @@ export default function SignupPage() {
       password: form.password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`,
+        captchaToken: captcha ?? undefined,
         data: {
           first_name: form.firstName,
           last_name: form.lastName,
@@ -37,8 +43,10 @@ export default function SignupPage() {
       }
     })
 
+    setCaptcha(null)
+    setCaptchaReset(n => n + 1)
     if (error) {
-      setError(error.message)
+      setError(authErrorText(error))
       setLoading(false)
     } else if (data.session) {
       // Email confirmation is off: signUp returned a live session, so the user
@@ -128,6 +136,8 @@ export default function SignupPage() {
                 <label style={labelStyle}>Your role</label>
                 <input value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))} placeholder="e.g. CFO, Head of Sustainability" style={inputStyle} />
               </div>
+
+              <Turnstile onToken={setCaptcha} resetKey={captchaReset} />
 
               <button
                 type="submit"

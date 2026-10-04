@@ -3,12 +3,17 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import ThemisIQLogo from '../components/ThemisIQLogo'
+import Turnstile from '../components/Turnstile'
+import { authErrorText } from '../../lib/auth/authErrors'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sent, setSent] = useState(false)
+  // Turnstile (LEAD1 L2): see app/login/page.tsx. Without a site key the call goes out exactly as before.
+  const [captcha, setCaptcha] = useState<string | null>(null)
+  const [captchaReset, setCaptchaReset] = useState(0)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -16,10 +21,12 @@ export default function ForgotPasswordPage() {
     setError('')
 
     const redirectTo = `${window.location.origin}/reset-password`
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo, captchaToken: captcha ?? undefined })
+    setCaptcha(null)
+    setCaptchaReset(n => n + 1)
 
     if (error) {
-      setError(error.message)
+      setError(authErrorText(error))
       setLoading(false)
     } else {
       // Always show the same confirmation regardless of whether the email exists,
@@ -81,6 +88,8 @@ export default function ForgotPasswordPage() {
                       style={{ width: '100%', fontSize: 14, padding: '10px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box' as const }}
                     />
                   </div>
+
+                  <Turnstile onToken={setCaptcha} resetKey={captchaReset} />
 
                   <button
                     type="submit"

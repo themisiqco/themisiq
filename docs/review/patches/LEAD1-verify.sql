@@ -1,6 +1,8 @@
 -- docs/review/patches/LEAD1-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L1-M1-ghg-free-tier.sql, L1-M3-scope3-sbti-entitlement.sql and
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M1, M3 and M2: all 27 checks passed. DO NOT RUN
+-- AGAIN as part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER L1-M1-ghg-free-tier.sql, L1-M3-scope3-sbti-entitlement.sql and
 -- L1-M2-ghg-entitlement-gate-free-tier.sql, in that order, in the Supabase SQL editor, the whole file. It changes
 -- nothing: every write happens inside one PL/pgSQL block that ends by raising 'lead1_undo', and catching it rolls the
 -- block back to its savepoint, undoing the test company, inventories, Scope 3 and SBTi rows, the entitlement changes
