@@ -105,7 +105,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     name: 'California SB 253: Climate Corporate Data Accountability Act',
     modules: ['ghg'],
     does: {
-      ghg: 'Builds the Scope 1 and 2 inventory and exports it on the CARB template, with every figure traceable to a source document.',
+      ghg: 'Builds the Scope 1 and Scope 2 inventory and gives you a report to prepare your SB 253 filing, with every figure traceable to the documents you upload.',
     },
   },
 

@@ -19,7 +19,7 @@
 
 import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
-import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM, SB253_POSTURE } from '../../lib/sb253';
+import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM, SB253_POSTURE, SB253_PLATFORM_SENTENCE_FIRST_USE } from '../../lib/sb253';
 import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
 import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../lib/pricingCopy';
 import { calcInventory, emptyLocation, type Location } from '../../lib/ghg/engine';
@@ -105,7 +105,7 @@ const FAQ_LD = {
       name: "What is SB 253, and does it apply to me?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `SB 253 (the Climate Corporate Data Accountability Act) requires entities doing business in California with at least $1 billion in annual revenue to disclose Scope 1 and Scope 2 emissions, with the first reports proposed for ${SB253_FIRST_REPORT_DATE} (not yet final) and Scope 3 from ${SB253_SCOPE3_FROM}. If you are under that threshold it may not apply to you directly, but larger customers and investors who are in scope will often ask you for your emissions to complete their own value-chain reporting.`,
+        text: `SB 253 (the Climate Corporate Data Accountability Act) requires entities doing business in California with at least $1 billion in annual revenue to disclose Scope 1 and Scope 2 emissions, with the first reports proposed for ${SB253_FIRST_REPORT_DATE} (not yet final) and Scope 3 from ${SB253_SCOPE3_FROM}. ${SB253_PLATFORM_SENTENCE_FIRST_USE} If you are under that threshold it may not apply to you directly, but larger customers and investors who are in scope will often ask you for your emissions to complete their own value-chain reporting.`,
       },
     },
     {
@@ -624,7 +624,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>What is SB 253, and does it apply to me?</summary>
                 <div className="qa-body">
-                  SB 253 (the Climate Corporate Data Accountability Act) requires entities that do business in California with at least <strong>$1 billion in annual revenue</strong> to disclose their Scope 1 and Scope 2 greenhouse-gas emissions, with the first reports proposed for <strong>{SB253_FIRST_REPORT_DATE}</strong>, {SB253_DATE_STATUS}, not yet final. Scope 3 reporting follows in {SB253_SCOPE3_FROM}. If you&rsquo;re under that threshold, SB 253 may not apply to you directly, but your larger customers and investors who <em>are</em> in scope will often ask you for your emissions so they can complete their own value-chain reporting.
+                  SB 253 (the Climate Corporate Data Accountability Act) requires entities that do business in California with at least <strong>$1 billion in annual revenue</strong> to disclose their Scope 1 and Scope 2 greenhouse-gas emissions, with the first reports proposed for <strong>{SB253_FIRST_REPORT_DATE}</strong>, {SB253_DATE_STATUS}, not yet final. Scope 3 reporting follows in {SB253_SCOPE3_FROM}. {SB253_PLATFORM_SENTENCE_FIRST_USE} If you&rsquo;re under that threshold, SB 253 may not apply to you directly, but your larger customers and investors who <em>are</em> in scope will often ask you for your emissions so they can complete their own value-chain reporting.
                 </div>
               </details>
 

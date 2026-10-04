@@ -60,6 +60,20 @@ export const SB253_PROCESS_STATUS =
 // a chip, a table cell. SB261_CITATION is the sibling and is deliberately the same shape.
 export const SB253_STATUTE = 'California Health & Safety Code §38532 (SB 253)'
 
+// WHAT A THEMISIQ REPORT IS FOR, UNDER SB 253 (calc-copy-3, Oct 2026). CARB has published only a draft,
+// optional Scope 1 and 2 template (October 2025), and ThemisIQ's SB 253 download is its own CSV layout that
+// does not follow it. So no surface may say the export is "on the CARB template", "pre-filled", or accepted
+// or approved by CARB (lib/carbClaims.test.ts). This is the sentence that says what the report does instead.
+export const SB253_PLATFORM_SENTENCE =
+  "Your ThemisIQ report gives you the Scope 1 and Scope 2 figures to enter on CARB's SB 253 reporting platform, built on the GHG Protocol and traceable to your source documents where you've uploaded them."
+
+// The same sentence for a page that has not yet named CARB: the agency is spelled out on first use. Derived
+// from the one above, so the two cannot drift apart.
+export const SB253_PLATFORM_SENTENCE_FIRST_USE = SB253_PLATFORM_SENTENCE.replace(
+  "CARB's SB 253 reporting platform",
+  'the California Air Resources Board (CARB) SB 253 reporting platform',
+)
+
 // The programme page. Verified live 12 August 2026. Note this is the PROGRAMME page, not the
 // rulemaking page — the rulemaking page was stale when checked (last reviewed 29 December 2025)
 // and still showed the Final Package pending at OAL, which the withdrawal had overtaken. The

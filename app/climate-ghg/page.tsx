@@ -6,7 +6,7 @@ import Footer from '@/app/components/Footer'
 import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '@/lib/pricing'
 import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
 import { MODULE_SUBLINE } from '@/lib/modulePages'
-import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM } from '../../lib/sb253'
+import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM, SB253_PLATFORM_SENTENCE_FIRST_USE } from '../../lib/sb253'
 import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
@@ -22,12 +22,12 @@ const KEY = 'ghg' as const
 export const metadata: Metadata = {
   title: 'GHG Inventory Software: Scope 1, 2 and 3 | ThemisIQ',
   description:
-    'Build a full GHG inventory under the GHG Protocol, with an audit trail your verifier can follow. Pre-filled CARB SB 253 export, plus CDP, ESRS E1 and EcoVadis from one inventory.',
+    'Build a full GHG inventory under the GHG Protocol, with an audit trail your verifier can follow. One inventory gives you reports to prepare for SB 253, CDP, ESRS E1 and EcoVadis.',
   alternates: { canonical: '/climate-ghg' },
   openGraph: {
     title: 'GHG Inventory Software: Scope 1, 2 and 3 | ThemisIQ',
     description:
-      'Build a full GHG inventory under the GHG Protocol, with an audit trail your verifier can follow. Pre-filled CARB SB 253 export, plus CDP, ESRS E1 and EcoVadis from one inventory.',
+      'Build a full GHG inventory under the GHG Protocol, with an audit trail your verifier can follow. One inventory gives you reports to prepare for SB 253, CDP, ESRS E1 and EcoVadis.',
     url: '/climate-ghg',
     type: 'website',
   },
@@ -143,8 +143,8 @@ export default function Page() {
               // lib/auditTrailNotice.ts so the homepage's twin cannot drift from it.
               { label: 'Audit trail', big: 'Every saved change logged', note: AUDIT_TRAIL_NOTE },
               // ⚠️ THE STRONGEST SENTENCE ON THE PAGE: one inventory, six destinations, simultaneously.
-              { label: 'Frameworks', fw: 'SB 253 · CDP C6 · ESRS E1 · GHG Protocol · IFRS S2 · EcoVadis · CARB template · SBTi',
-                note: 'One inventory exports to CARB SB 253 template, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305, and IFRS S2 simultaneously.' },
+              { label: 'Frameworks', fw: 'SB 253 · CDP C6 · ESRS E1 · GHG Protocol · IFRS S2 · EcoVadis · SBTi',
+                note: 'One inventory gives you a report for each framework: SB 253, CDP C6 and C7, ESRS E1-6, EcoVadis, GRI 305 and IFRS S2.' },
               // ⚠️ THIS NOTE READ, UNTIL 17 SEP 2026: "IPCC AR6 GWP values throughout. IEA 2024 grid
               // electricity factors. DEFRA 2024 travel and freight factors. Auto-converts to AR4 on CARB
               // export." All four claims were false: no IEA factor exists; no DEFRA travel or freight
@@ -156,7 +156,8 @@ export default function Page() {
               { label: 'Emission factors', big: 'IPCC AR6',
                 note: "Scope 1 and 2 factors matched to each location's country: US EPA and eGRID (US), ECCC (Canada), DEFRA/DESNZ (UK), EU MRR/IPCC defaults and EEA (EU), DCCEEW (Australia) and MfE (New Zealand), with US EPA combustion factors elsewhere. IPCC AR6 GWPs by default; a factor published with its own GWP basis is applied as published. Every factor is cited on its workings row." },
               { label: 'First SB 253 report', big: sbShortDate,
-                note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}.` },
+                // The first visible mention of CARB on this page, so the agency is spelled out (FIRST_USE).
+                note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}. ${SB253_PLATFORM_SENTENCE_FIRST_USE}` },
               { label: 'Price', big: `From $${ghgFrom}/yr`,
                 note: `Entry tier: ${ghgEmployeeBandLabel('starter')}. Every plan covers unlimited locations; see all plans for larger organizations.` },
             ].map(({ label, big, fw, note }) => (
