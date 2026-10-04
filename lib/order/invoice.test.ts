@@ -50,10 +50,11 @@ describe('card-any-amount', () => {
     expect(read('lib/order/invoice.ts')).not.toContain("'card_eligible'")
     expect(read('app/api/order/quote-request/route.ts')).not.toContain('card_eligible')
     for (const f of ['app/pricing/page.tsx', 'app/order/page.tsx']) {
-      const src = read(f)
-      expect(src, f).not.toMatch(/requiresInvoice|\$10k|\$10,000/)
-      expect(src, f).toContain('Request an invoice')
+      expect(read(f), f).not.toMatch(/requiresInvoice|\$10k|\$10,000/)
     }
+    // /pricing says it in one line near the buy button (calc-copy, Oct 2026); /order keeps the fuller form.
+    expect(read('app/pricing/page.tsx')).toContain('Pay by card or <Link href={invoiceHref}')
+    expect(read('app/order/page.tsx')).toContain('Request an invoice')
     // §3 states no threshold; §13's US$10,000 is the liability cap.
     const terms = read('app/terms/page.tsx')
     expect(terms).not.toContain('Orders up to US$10,000')

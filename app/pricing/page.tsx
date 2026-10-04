@@ -803,7 +803,7 @@ function PricingPageInner() {
           </div>
           {!quote.requiresQuote && count > 0 && (
             <div style={{ fontSize: 12, color: 'var(--color-ink-2)', marginTop: 12, textAlign: 'center' }}>
-              Pay by card, or request an invoice. Prefer to pay by invoice? <Link href={invoiceHref} style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Request an invoice</Link>
+              Pay by card or <Link href={invoiceHref} style={{ color: 'var(--color-brand)', fontWeight: 600 }}>invoice</Link>.
             </div>
           )}
         </div>

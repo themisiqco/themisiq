@@ -2851,7 +2851,16 @@ explicit revokes from `anon` and `authenticated` first; every new policy uses `(
   - **Q-REN-6:** the Terms §4 sentence already promises the reminder. Change it to name the opt-in, or leave
     it as is?
 
-#### LEAD1. "Email me my results" for the free Scope 1 and 2 calculator
+#### LEAD1. "Email me my results" for the free Scope 1 and 2 calculator: ⛔ LAUNCH BLOCKER
+- **⛔ Launch blocker (calc-copy, 4 Oct 2026).** The site now says the results are emailed:
+  - `GHG_FREE_USE_SENTENCE` in lib/pricingCopy.ts ("… with your results emailed to you directly"), printed on
+    /calculate-emissions and in the GHG wizard's banner;
+  - the /calculate-emissions footnote ("your results will be emailed to you directly");
+  - step 04 of its five steps ("we'll send your results to you directly").
+
+  That wording must not reach a public launch until "Email me my results" works end to end in production:
+  the form, the server-computed email delivered through Resend, and the lead row. LEAD1 is built immediately
+  after calc-copy and before launch. If launch comes first, revert those three sentences.
 - **Ruling (4 Oct 2026):** "Email me my results" is the lead capture; the other options (a free account that
   saves a draft, or both) are not chosen.
 - **Estimate:** M, 3 diffs, 3 to 4 days.
@@ -3010,7 +3019,7 @@ LEAD1: "… Email yourself the results."
   1. ENF1 and ENF2 (2 days, before launch).
   2. PAY1 (2 to 3 days, before launch: invoice orders need the tier).
   3. REN1 (4 to 5 days; before launch if the Terms §4 and FAQ sentences ship).
-  4. LEAD1 (3 to 4 days).
+  4. LEAD1 (3 to 4 days). ⛔ **Launch blocker** since calc-copy; built immediately after it, before launch.
   5. PROMO1 (1.5 days, after free-claims and with or after LEAD1).
   6. ENF3 post-launch (4 to 6 days).
 - **Total:** 13 to 16 days before ENF3, and 17 to 22 with it.

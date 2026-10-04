@@ -22,6 +22,7 @@ import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSumma
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
 import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
 import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../lib/pricingCopy';
+import { calcInventory, emptyLocation, type Location } from '../../lib/ghg/engine';
 import Link from "next/link";
 import Footer from '../components/Footer'
 
@@ -55,17 +56,26 @@ const GHG_PRICED_BANDS = (() => {
 // Bill Review (formerly Concierge): the entry onboarding price and what it includes (pricing-2026-10).
 const billReviewFrom = BILL_REVIEW_ONBOARDING_USD.ai.starter?.toLocaleString('en-US');
 const billReviewIncluded = BILL_REVIEW_INCLUDED_SOURCES.starter;
+// The "How it works" example, computed by the engine rather than typed in (calc-copy, Oct 2026). The page said
+// 535 tCO2e for these inputs, which no grid the engine holds produces: on the US average grid it is 465.
+const EXAMPLE_KWH = 1_200_000;
+const EXAMPLE_THERMS = 8_500;
+const EXAMPLE_T = (() => {
+  const site: Location = { ...emptyLocation('example', 'Example site'), country: 'US', grid_region: 'US_AVG', electricity_kwh: EXAMPLE_KWH, has_natural_gas: true, natural_gas_amount: EXAMPLE_THERMS, natural_gas_unit: 'therms' } as Location;
+  const t = calcInventory([site], 'AR6');
+  return Math.round(t.s1_total + t.s2_location);
+})();
 
 // --- SEO ---------------------------------------------------------
 export const metadata: Metadata = {
   title: "Calculate Your GHG Emissions | SB 253, CSRD, IFRS S2 | ThemisIQ",
   description:
-    `Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $${ghgFrom} USD.`,
+    `Asked for your carbon footprint? ThemisIQ calculates Scope 1 and Scope 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $${ghgFrom} USD.`,
   alternates: { canonical: "/calculate-emissions" },
   openGraph: {
     title: "Calculate Your GHG Emissions in Real Time | ThemisIQ",
     description:
-      `See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $${ghgFrom} USD.`,
+      `See your Scope 1 and Scope 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $${ghgFrom} USD.`,
     url: "/calculate-emissions",
     type: "website",
   },
@@ -103,15 +113,15 @@ const FAQ_LD = {
       name: "My customer asked for my footprint, but I'm not regulated. Can I still use ThemisIQ?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Yes. You don't need to be subject to SB 253 to produce a credible emissions figure. ThemisIQ gives you a Scope 1 and 2 number on the same GHG Protocol basis your customer's or investor's reporting references, so what you hand back fits straight into their process.",
+        text: "Yes. You don't need to be subject to SB 253 to produce a credible emissions figure. ThemisIQ gives you a Scope 1 and Scope 2 number on the same GHG Protocol basis your customer's or investor's reporting references, so what you hand back fits straight into their process.",
       },
     },
     {
       "@type": "Question",
-      name: "Scope 1, 2 & 3: what they are and which you need",
+      name: "Scope 1, Scope 2 and Scope 3: what they are and which you need",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `Scope 1 is direct emissions from sources you own or control; Scope 2 is indirect emissions from purchased energy; Scope 3 is all other value-chain emissions across 15 categories. SB 253's first reports require only Scope 1 and 2 (proposed for ${SB253_FIRST_REPORT_DATE}, not yet final), with Scope 3 from ${SB253_SCOPE3_FROM}. CSRD (ESRS E1) and IFRS S2 require material Scope 3 as well.`,
+        text: `Scope 1 is direct emissions from sources you own or control; Scope 2 is indirect emissions from purchased energy; Scope 3 is all other value-chain emissions across 15 categories. SB 253's first reports require only Scope 1 and Scope 2 (proposed for ${SB253_FIRST_REPORT_DATE}, not yet final), with Scope 3 from ${SB253_SCOPE3_FROM}. CSRD (ESRS E1) and IFRS S2 require material Scope 3 as well.`,
       },
     },
     {
@@ -143,7 +153,7 @@ const FAQ_LD = {
       name: "One inventory, multiple frameworks - and which scopes each needs",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "From one inventory, ThemisIQ produces reports for SB 253, CDP, ESRS E1 (CSRD), IFRS S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI 305, plus SBTi for inventory and near-term & net-zero target setting. SB 253 and the GHG Protocol Corporate Standard start with Scope 1 and 2; CDP, ESRS E1, IFRS S2, GRI 305, and SBTi involve Scope 3. EcoVadis assesses all three scopes.",
+        text: "From one inventory, ThemisIQ produces reports for SB 253, CDP, ESRS E1 (CSRD), IFRS S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI 305, plus SBTi for inventory and near-term & net-zero target setting. SB 253 and the GHG Protocol Corporate Standard start with Scope 1 and Scope 2; CDP, ESRS E1, IFRS S2, GRI 305, and SBTi involve Scope 3. EcoVadis assesses all three scopes.",
       },
     },
     {
@@ -420,7 +430,7 @@ export default function CalculateEmissionsPage() {
   // settled statutory deadline. The date is a CARB PROPOSAL that has moved twice — see lib/sb253.ts.
   const chipText = SB253_SHORT;
   const ctaText =
-    "See your Scope 1 & 2 emissions in minutes, and download a report you can submit or share today.";
+    "See your Scope 1 and Scope 2 emissions in minutes, and download a report you can submit or share today.";
 
   return (
     <>
@@ -443,15 +453,16 @@ export default function CalculateEmissionsPage() {
             </span>
             <h1>You&rsquo;re being asked for your carbon footprint. Have the number this week.</h1>
             <p className="sub">
-              ThemisIQ turns your utility and fuel bills into a defensible Scope 1 &amp; 2 figure, built on the GHG Protocol,
-              calculated in real time, at a fraction of the cost of traditional carbon accounting platforms and consultants.
+              ThemisIQ turns your utility bills, fuel records and spending into a defensible Scope 1, Scope 2 and Scope 3
+              inventory, built on the GHG Protocol, calculated in real time, at a fraction of the cost of traditional carbon
+              accounting platforms and consultants.
             </p>
             <div className="cta-row">
               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>See your emissions instantly</Link>
               <a className="btn btn-ghost" href={CONFIG.CONTACT_HREF}>Get in touch</a>
             </div>
             <p className="reassure">{GHG_FREE_USE_SENTENCE}* {GHG_PLAN_USE_SENTENCE}</p>
-            <p className="hero-foot">*Your Scope 1 and 2 figures are calculated in your browser, instantly and at no cost, and are not saved. A GHG plan, from ${ghgFrom} USD a year, adds saving and report downloads under any GHG framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
+            <p className="hero-foot">*Your Scope 1 and Scope 2 figures are calculated in your browser, instantly and at no cost, and your results will be emailed to you directly. Nothing is saved in ThemisIQ until you have a GHG plan. A GHG plan, from ${ghgFrom} USD a year, adds saving, Scope 3 and report downloads under any framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2 and more.</p>
           </div>
         </section>
 
@@ -472,12 +483,12 @@ export default function CalculateEmissionsPage() {
               <div className="trigger-card">
                 <div className="tag">Customer</div>
                 <h3>A buyer asked for your numbers</h3>
-                <p>Their procurement or sustainability team needs your Scope 1 &amp; 2 emissions to complete their own reporting. Don&rsquo;t let a spreadsheet hold up the contract.</p>
+                <p>Their procurement or sustainability team needs your Scope 1 and Scope 2 emissions to complete their own reporting. Don&rsquo;t let a spreadsheet hold up the contract.</p>
               </div>
               <div className="trigger-card">
                 <div className="tag">Government regulation</div>
                 <h3>Regulators now require it</h3>
-                <p>In the US, California&rsquo;s SB 253 is law today (Scope 1 &amp; 2 due Nov&nbsp;10,&nbsp;2026), with New&nbsp;York, Illinois, New&nbsp;Jersey, and Washington advancing similar bills. Internationally, the EU&rsquo;s CSRD requires it through the ESRS standards, and IFRS&nbsp;S2 is being adopted by regulators in markets worldwide.</p>
+                <p>In the US, California&rsquo;s SB 253 is law today (Scope 1 and Scope 2 due Nov&nbsp;10,&nbsp;2026), with New&nbsp;York, Illinois, New&nbsp;Jersey, and Washington advancing similar bills. Internationally, the EU&rsquo;s CSRD requires it through the ESRS standards, and IFRS&nbsp;S2 is being adopted by regulators in markets worldwide.</p>
               </div>
               <div className="trigger-card">
                 <div className="tag">Investor</div>
@@ -497,7 +508,7 @@ export default function CalculateEmissionsPage() {
         <section className="section">
           <div className="wrap">
             <div className="eyebrow">How it works</div>
-            <h2>From bills to a submittable report, in five steps.</h2>
+            <h2>From bills to a report, in five steps.</h2>
             <p className="section-sub">Start calculating in seconds. {GHG_FREE_USE_SENTENCE} {GHG_PLAN_USE_SENTENCE}</p>
 
             <div className="vprocess">
@@ -505,7 +516,7 @@ export default function CalculateEmissionsPage() {
                 <div className="vnum">01</div>
                 <div className="vstep-body">
                   <div className="vstep-title">See your emissions instantly</div>
-                  <p className="vstep-desc">Click <strong>&ldquo;See your emissions instantly&rdquo;</strong> to open the calculator. Nothing to install, no sales call to sit through: just start.</p>
+                  <p className="vstep-desc">Click <strong>&ldquo;See your emissions instantly&rdquo;</strong> to open the calculator in your browser. There is nothing to install, and you don&rsquo;t need an account to start.</p>
                 </div>
               </div>
 
@@ -538,22 +549,22 @@ export default function CalculateEmissionsPage() {
                 <div className="vnum">04</div>
                 <div className="vstep-body">
                   <div className="vstep-title">Enter your energy &amp; fuel data</div>
-                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals and enter them in the right fields. Your <strong>metric tons of CO&#8322;e for Scope 1 and Scope 2</strong> calculate in real time as you type. Missing any documents, or would rather have us calculate the totals? Our <a href="#support">Bill Review service</a> is here for you, see below.</p>
+                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals for the year and enter them in the right fields. Your <strong>Scope 1 and Scope 2 emissions, in metric tons of CO&#8322;e,</strong> calculate in real time as you type. Then enter your email address and we&rsquo;ll send your results to you directly. Rather not add up the bills yourself? With <a href="#support">Bill Review</a>, added to a GHG plan, you upload your bills, we read the figures for you, and you approve each one.</p>
                   <div className="calcchips">
                     <span className="chip">Electricity <b>1,200,000 kWh</b></span>
                     <span className="chip">Natural gas <b>8,500 therms</b></span>
                     <span className="arrow">&rarr;</span>
-                    <span className="chip chip-out">Scope 1 + 2 <b>~535 tCO&#8322;e</b></span>
+                    <span className="chip chip-out">Scope 1 + 2 <b>~{EXAMPLE_T.toLocaleString('en-US')} tCO&#8322;e</b></span>
                   </div>
-                  <span className="hint">Illustrative only: your figures depend on your data and location factors</span>
+                  <span className="hint">Illustrative only: one site on the US average grid. Your figures depend on your data and your locations.</span>
                 </div>
               </div>
 
               <div className="vstep">
                 <div className="vnum">05</div>
                 <div className="vstep-body">
-                  <div className="vstep-title">Unlock &amp; download your report</div>
-                  <p className="vstep-desc">Our GHG module is priced from <strong>${ghgFrom} USD</strong> a year: create an account and pay by card, or request an invoice, through <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
+                  <div className="vstep-title">Choose a plan, save and download</div>
+                  <p className="vstep-desc">A GHG plan is priced from <strong>${ghgFrom} USD</strong> a year: create an account and pay by card or <Link href={CONFIG.PRICING_URL}>invoice</Link>. Then save your inventory, add Scope 3, and download a report for each framework you selected, such as <strong>California&rsquo;s SB 253</strong>, plus an assurance package to hand to your verifier, customer or investor.</p>
                   <span className="hint">Scope 3 is included in the GHG module. <Link href={CONFIG.SUPPLY_CHAIN_URL}>Add Supply Chain for primary supplier data on Category 1 &rarr;</Link></span>
                 </div>
               </div>
@@ -577,8 +588,8 @@ export default function CalculateEmissionsPage() {
               <div className="tier">
                 <div className="tier-name">GHG Module</div>
                 <div className="tier-price">from ${ghgFrom}*</div>
-                <p>The core, self-serve product. Calculate your Scope 1, 2 and 3 emissions and download a report ready for SB 253 (or any global GHG framework), built on the GHG Protocol and methodology that holds up to a verifier.</p>
-                <div className="tier-when">Start here: the core report, covering Scope 1, 2 and 3.</div>
+                <p>The core, self-serve product. Calculate your Scope 1, Scope 2 and Scope 3 emissions and download a report ready for SB 253 (or any global GHG framework), built on the GHG Protocol and methodology that holds up to a verifier.</p>
+                <div className="tier-when">Start here: the core report, covering Scope 1, Scope 2 and Scope 3.</div>
               </div>
               <div className="tier">
                 <div className="tier-name">Bill Review</div>
@@ -620,12 +631,12 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>My customer asked for my footprint, but I&rsquo;m not regulated. Can I still use ThemisIQ?</summary>
                 <div className="qa-body">
-                  Yes, that&rsquo;s exactly who this is built for. You don&rsquo;t need to be subject to SB 253 to produce a credible emissions figure. ThemisIQ gives you a Scope 1 &amp; 2 number on the same GHG-Protocol basis your customer&rsquo;s or investor&rsquo;s reporting references, so what you hand back fits straight into their process.
+                  Yes, that&rsquo;s exactly who this is built for. You don&rsquo;t need to be subject to SB 253 to produce a credible emissions figure. ThemisIQ gives you a Scope 1 and Scope 2 number on the same GHG-Protocol basis your customer&rsquo;s or investor&rsquo;s reporting references, so what you hand back fits straight into their process.
                 </div>
               </details>
 
               <details className="qa">
-                <summary>Scope 1, 2 &amp; 3: what they are and which you need</summary>
+                <summary>Scope 1, Scope 2 and Scope 3: what they are and which you need</summary>
                 <div className="qa-body">
                   It depends on who&rsquo;s asking and under which framework. First, the three scopes:
                   <ul className="scope-list">
@@ -634,7 +645,7 @@ export default function CalculateEmissionsPage() {
                     <li><strong>Scope 3</strong>: all other indirect emissions across your value chain, organized into 15 categories: purchased goods and services, business travel, transportation, use of sold products, financed emissions, and more.</li>
                   </ul>
                   <p className="qa-subhead">Which scopes apply to you?</p>
-                  <p><strong>Scope 1 &amp; 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, proposed for {SB253_FIRST_REPORT_DATE} and not yet final.</p>
+                  <p><strong>Scope 1 and Scope 2 only, for now:</strong> California&rsquo;s SB 253 requires just Scope 1 and Scope 2 for its first reports, proposed for {SB253_FIRST_REPORT_DATE} and not yet final.</p>
                   <p><strong>Scope 3 required:</strong> SB 253 adds Scope 3 from 2027 (covering fiscal-year 2026 data), with CARB still finalizing the details. The EU&rsquo;s CSRD (ESRS&nbsp;E1) requires your material Scope 3 categories, and IFRS&nbsp;S2 requires Scope 3 as well, with first-year transition relief in many adopting jurisdictions.</p>
                   {/* ⚠️ "COVERS THE FULL STANDARD ACROSS ALL 15 CATEGORIES" WAS A CONFORMANCE CLAIM, and the
                       strongest of its kind on the site. Nine of the fifteen have a calculation method; the
@@ -669,16 +680,16 @@ export default function CalculateEmissionsPage() {
                 <summary>One inventory, multiple frameworks, and which scopes each needs</summary>
                 <div className="qa-body">
                   Build your inventory once, and ThemisIQ produces the report for whichever framework you&rsquo;re asked for, with full coverage for SB&nbsp;253, CDP, ESRS&nbsp;E1 (under the EU&rsquo;s CSRD), IFRS&nbsp;S2, the GHG Protocol Corporate Standard, EcoVadis, and GRI&nbsp;305, plus SBTi for inventory and near-term & net-zero target setting. What each one asks for differs:
-                  <p className="qa-subhead">Frameworks that start with Scope 1 &amp; 2</p>
+                  <p className="qa-subhead">Frameworks that start with Scope 1 and Scope 2</p>
                   <ul className="scope-list">
-                    <li><strong>SB 253</strong>: Scope 1 &amp; 2 for the first reports (due Nov&nbsp;10,&nbsp;2026); Scope 3 phases in from 2027.</li>
-                    <li><strong>GHG Protocol Corporate Standard</strong>: Scope 1 &amp; 2 required; Scope 3 is reported under the separate Corporate Value Chain (Scope 3) Standard.</li>
+                    <li><strong>SB 253</strong>: Scope 1 and Scope 2 for the first reports (due Nov&nbsp;10,&nbsp;2026); Scope 3 phases in from 2027.</li>
+                    <li><strong>GHG Protocol Corporate Standard</strong>: Scope 1 and Scope 2 required; Scope 3 is reported under the separate Corporate Value Chain (Scope 3) Standard.</li>
                   </ul>
-                  <p className="qa-subhead">Frameworks that require Scope 1, 2 &amp; 3</p>
+                  <p className="qa-subhead">Frameworks that require Scope 1, Scope 2 and Scope 3</p>
                   <ul className="scope-list">
-                    <li><strong>ESRS E1 (CSRD)</strong>: gross Scope 1 and 2, plus your material Scope 3 categories.</li>
-                    <li><strong>IFRS S2</strong>: Scope 1, 2 and 3, with first-year transition relief to defer Scope 3 by a year in many jurisdictions.</li>
-                    <li><strong>CDP</strong>: Scope 1, 2 and 3, with Scope 3 increasingly expected and scored.</li>
+                    <li><strong>ESRS E1 (CSRD)</strong>: gross Scope 1 and Scope 2, plus your material Scope 3 categories.</li>
+                    <li><strong>IFRS S2</strong>: Scope 1, Scope 2 and Scope 3, with first-year transition relief to defer Scope 3 by a year in many jurisdictions.</li>
+                    <li><strong>CDP</strong>: Scope 1, Scope 2 and Scope 3, with Scope 3 increasingly expected and scored.</li>
                     <li><strong>GRI 305</strong>: Scope 1 (305-1), Scope 2 (305-2) and Scope 3 (305-3).</li>
                     <li><strong>SBTi</strong>: a Scope 3 target is required where Scope 3 is a significant share of your total (over 40% under current criteria).</li>
                   </ul>
@@ -692,8 +703,8 @@ export default function CalculateEmissionsPage() {
                 <div className="qa-body">
                   A fraction of what consultants and legacy platforms charge. {GHG_FREE_USE_SENTENCE} {GHG_PLAN_USE_SENTENCE}
                   <ul className="price-list">
-                    <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
-                    <li><span className="pl-name">GHG module: Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
+                    <li><span className="pl-name">Calculate &amp; preview your Scope 1 and Scope 2 emissions</span><span className="pl-price">Free</span></li>
+                    <li><span className="pl-name">GHG module: Scope 1, Scope 2 and Scope 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
                     <li><span className="pl-name">Bill Review: we read the figures from your bills, and you approve each one. Includes Verification Readiness.</span><span className="pl-price">{`from $${billReviewFrom}, first year for ${billReviewIncluded} sources included`}</span></li>
                     <li><span className="pl-name">Advisory: dedicated specialists guide you</span><span className="pl-price">Custom</span></li>
                     <li><span className="pl-name">Scope 3: full value chain, included in the GHG module</span><span className="pl-price"><Link href={CONFIG.CLIMATE_GHG_URL}>See module &rarr;</Link></span></li>

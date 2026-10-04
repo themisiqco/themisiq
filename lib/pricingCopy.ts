@@ -45,8 +45,10 @@ export const BILL_REVIEW_HUMAN_DESCRIPTION =
  * free use prints these two sentences, so the free/paid line is drawn once. It must match the gates in
  * app/dashboard/ghg/page.tsx and its siblings; docs/review/free-claims-audit.md section 1 is the audit.
  */
+// ⚠️ "EMAILED TO YOU DIRECTLY" IS TRUE ONLY ONCE LEAD1 ("Email me my results") SHIPS. It is a launch blocker
+// in docs/review/design-derived-figures.md section 11: this sentence must not reach a public launch before it.
 export const GHG_FREE_USE_SENTENCE =
-  'Scope 1 and 2 can be calculated free, in your browser, without an account.'
+  'Scope 1 and Scope 2 can be calculated free, in your browser, without an account, with your results emailed to you directly.'
 
 export const GHG_PLAN_USE_SENTENCE =
   'Saving, Scope 3, document uploads, the GHG guide, Trends, SBTi targets, verifier sharing and report downloads need a GHG plan.'
