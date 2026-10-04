@@ -11,6 +11,7 @@ import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
 import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
 import { wantsNewCalculator, entryView, entryWall, saveGoesToPricing } from '../../../lib/ghg/entry'
+import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
 import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
@@ -166,6 +167,9 @@ const BOT_ERRORS: Record<string, string> = {
     'The guide is part of the GHG plan. Sign in with an account that has a GHG plan to ask it questions.',
   unauthenticated:
     'Your session has ended. Refresh the page and sign in again, and the guide will pick straight back up.',
+  // ENF2: a ghg row whose term has ended. Same opening as the renew wall and the read-on banner.
+  entitlement_expired:
+    'Your GHG access has expired, so the guide is off until you renew.',
   entitlement_required:
     'The guide is available on paid plans. It answers the boundary and data questions that come up as you build an inventory: what counts as yours, where a figure comes from, what a verifier will look for.',
   entitlement_check_failed:
@@ -1070,6 +1074,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setUploading(false); return }
     setUploadErrors(prev => { const next = { ...prev }; delete next[`${locIdx}:${docType}`]; return next })
+    // ENF1: the slot hides the picker without an active plan, so this is a backstop. The policy would refuse it.
+    if (ghgAccess !== 'active') {
+      setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: UPLOAD_NEEDS_ACTIVE_PLAN }))
+      setUploading(false)
+      return
+    }
     for (const file of Array.from(files)) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${safeName}`
@@ -1079,7 +1089,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // the one case that needs a transient message. Silently doing nothing was indistinguishable
         // from a successful upload that produced no figures.
         console.error('[upload] storage failed', error)
-        setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: `${file.name} didn’t upload: ${error.message}. Please try again.` }))
+        // ENF1: a refusal by the storage policy (no active GHG plan) says so; anything else keeps its old wording.
+        setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: uploadFailureMessage(file.name, error) }))
         continue
       }
       {
@@ -1211,10 +1222,23 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
    */
   const removeDoc = async (locId: string, docId: string, filePath: string, errorKey: string) => {
     setUploadErrors(prev => { const next = { ...prev }; delete next[errorKey]; return next })
-    const { error } = await supabase.storage.from('source-documents').remove([filePath])
+    // L0: deleting evidence needs an active plan (the storage DELETE policy enforces it). The control is hidden
+    // without one; this is the backstop.
+    if (ghgAccess !== 'active') {
+      setUploadErrors(prev => ({ ...prev, [errorKey]: DOCUMENTS_KEPT_INACTIVE }))
+      return
+    }
+    const { data: removed, error } = await supabase.storage.from('source-documents').remove([filePath])
     if (error) {
       console.error('[removeDoc] storage delete failed', error)
       setUploadErrors(prev => ({ ...prev, [errorKey]: `That document couldn’t be deleted: ${error.message}. It is still attached to this location; try Remove again.` }))
+      return
+    }
+    // No error is not the same as deleted: a delete the storage policy refuses can come back empty. The document
+    // stays attached, and the sentence says what was observed.
+    if (!removedAll(1, removed)) {
+      console.error('[removeDoc] storage removed nothing for', filePath)
+      setUploadErrors(prev => ({ ...prev, [errorKey]: 'That document couldn’t be deleted. It is still attached to this location.' }))
       return
     }
     setInventory(inv => ({
@@ -1257,10 +1281,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
     const paths = (loc.source_docs ?? []).map(d => d.file_path).filter(Boolean)
     if (paths.length > 0) {
-      const { error } = await supabase.storage.from('source-documents').remove(paths)
+      // L0: a location's documents are evidence, and deleting them needs an active plan, as for one document.
+      if (ghgAccess !== 'active') {
+        alert(`This location has documents. ${DOCUMENTS_KEPT_INACTIVE}`)
+        return
+      }
+      const { data: removed, error } = await supabase.storage.from('source-documents').remove(paths)
       if (error) {
         console.error('[removeLocation] storage delete failed', error)
         alert(locationDeleteStorageFailed(facts, error.message))
+        return
+      }
+      if (!removedAll(paths.length, removed)) {
+        console.error('[removeLocation] storage removed', removed?.length ?? 0, 'of', paths.length)
+        alert(locationDeleteStorageFailed(facts, `storage removed ${removed?.length ?? 0} of ${paths.length} documents`))
         return
       }
     }
@@ -2178,7 +2212,7 @@ workings: saved.workings,
                       </div>
                     )}
                   </Field>
-                  {isPaid ? <DocUpload label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -2193,7 +2227,7 @@ workings: saved.workings,
                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${unitLabel(loc.propane_unit)})`}>
                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2208,7 +2242,7 @@ workings: saved.workings,
                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2236,7 +2270,7 @@ workings: saved.workings,
                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2252,7 +2286,7 @@ workings: saved.workings,
                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2280,7 +2314,7 @@ workings: saved.workings,
                       </select>
                     </div>
                   </Field>
-                  {isPaid ? <DocUpload label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}
             </QuestionCard>
@@ -2300,7 +2334,7 @@ workings: saved.workings,
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input id={`figure-${loc.id}-refrigerant_purchased_kg`} type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload service records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="service_record" docs={loc.source_docs.filter(d => d.document_type === 'service_record')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:service_record`]} /> : <LockedDocUpload label="Upload service records" />}
                 </div>
               )}
             </div>
@@ -2373,7 +2407,7 @@ workings: saved.workings,
                     <a href={EPA_EGRID_POWER_PROFILER_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0C447C', textDecoration: 'none', display: 'inline-block', marginTop: 6 }}>🔎 Find your subregion with EPA Power Profiler (enter your ZIP) →</a>
                   </div>
                 )}
-                {isPaid ? <DocUpload label="Upload electricity bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
+                {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload electricity bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_electricity" docs={loc.source_docs.filter(d => d.document_type === 'utility_electricity')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_electricity`]} /> : <LockedDocUpload label="Upload electricity bills" />}
               </div>
             </div>
             <QuestionCard question={streamQuestion('purchased_steam')} hint="Purchased steam or hot water from a district energy system: Scope 2" checked={loc.has_purchased_steam} onToggle={v => updateLocation(activeLocation, 'has_purchased_steam', v)}>
@@ -2443,7 +2477,7 @@ workings: saved.workings,
                       )}
                     </>
                   })()}
-                  {isPaid ? <DocUpload label="Upload steam / district heating bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload steam / district heating bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="purchased_steam" docs={loc.source_docs.filter(d => d.document_type === 'purchased_steam')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:purchased_steam`]} /> : <LockedDocUpload label="Upload steam / district heating bills" />}
                 </div>
               )}
             </QuestionCard>
@@ -2576,7 +2610,7 @@ workings: saved.workings,
                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
                     <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(i, 'renewable_electricity_kwh', r)} onUseBills={() => switchToBills(i, 'renewable_electricity_kwh')} style={inputStyle} />
                   </Field>
-                  {isPaid ? <DocUpload label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -2595,7 +2629,7 @@ workings: saved.workings,
                       docs live in the locations_data jsonb with no DB constraint on document_type,
                       and /api/verifier-documents iterates source_docs generically, so this slot
                       reaches the verifier surface on its own. */}
-                  {isPaid ? <DocUpload label={`Upload biomass records: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
+                  {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label={`Upload biomass records: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="biogenic" docs={loc.source_docs.filter(d => d.document_type === 'biogenic')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${i}:biogenic`]} /> : <LockedDocUpload label={`Upload biomass records: ${loc.name}`} />}
                 </div>
               ))}
             </div>
@@ -3545,7 +3579,7 @@ const PROPOSAL_BADGE_COLOUR: Record<ConciergeStatus, { bg: string; color: string
   rejected:            { bg: 'var(--color-sunken)',  color: 'var(--color-ink-muted)' },
 }
 
-function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, onRemoveCoverageResolution, onLabelMeter, onEnterManually, currentUser, location, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onLabelMeter: (locId: string, docId: string, label: string, res: CoverageResolution) => void; onEnterManually: (locId: string, field: string) => void; currentUser: CurrentUser | null; location: Location; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; onRemoveCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
+function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemove, onUpdateProposal, onAddCoverageResolution, onRemoveCoverageResolution, onLabelMeter, onEnterManually, currentUser, location, uploading, reportingYear, fiscalYearEndMonth, locId, coverageResolutions, uploadError }: { label: string; uploadsOff?: string; locIdx: number; docType: string; uploadError?: string; docs: SourceDoc[]; onLabelMeter: (locId: string, docId: string, label: string, res: CoverageResolution) => void; onEnterManually: (locId: string, field: string) => void; currentUser: CurrentUser | null; location: Location; onUpload: (f: FileList, i: number, t: string) => void; onRemove: (locId: string, docId: string, path: string, errorKey: string) => void; onUpdateProposal: (locIdx: number, docId: string, propIdx: number, patch: Partial<ExtractedProposal>) => void; onAddCoverageResolution: (res: CoverageResolution) => void; onRemoveCoverageResolution: (res: CoverageResolution) => void; uploading: boolean; reportingYear: number; fiscalYearEndMonth: number; locId: string; coverageResolutions: CoverageResolution[] }) {
   const ref = useRef<HTMLInputElement>(null)
   const [editing, setEditing] = useState<string | null>(null)   // `${docId}:${propIdx}` being edited
   const [editVal, setEditVal] = useState<string>('')
@@ -3566,9 +3600,22 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
     <div
       onDragOver={e => { e.preventDefault(); setDragActive(true) }}
       onDragLeave={e => { e.preventDefault(); setDragActive(false) }}
-      onDrop={e => { e.preventDefault(); setDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) onUpload(e.dataTransfer.files, locIdx, docType) }}
+      onDrop={e => { e.preventDefault(); setDragActive(false); if (!uploadsOff && e.dataTransfer.files && e.dataTransfer.files.length > 0) onUpload(e.dataTransfer.files, locIdx, docType) }}
       style={{ background: dragActive ? 'var(--color-brand-wash)' : '#f8f7f5', border: dragActive ? '1px solid var(--color-brand)' : '0.5px dashed #e8e7e4', borderRadius: 12, padding: '10px 14px', transition: 'background 0.12s ease, border-color 0.12s ease' }}
     >
+      {/* ⚠️ UPLOADS OFF, DOCUMENTS STILL SHOWN (ENF1, Oct 2026). A plan that has ended keeps every document
+          already uploaded readable here, so this slot is not swapped for LockedDocUpload, which would hide them.
+          Only the picker goes: the storage policy refuses the upload anyway, and offering it would invite a
+          refusal. */}
+      {uploadsOff ? (
+        <div style={{ marginBottom: docs.length > 0 ? 8 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400 }}>📎 {label}</span>
+            <span style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', color: 'var(--color-ink-muted)' }}>🔒 Renew to upload</span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.5 }}>{uploadsOff}</div>
+        </div>
+      ) : (<>
       {/* Click-to-pick region (drop works anywhere on the card above). Same picker as before. */}
       <div onClick={() => !uploading && ref.current?.click()} style={{ cursor: uploading ? 'default' : 'pointer', marginBottom: docs.length > 0 ? 8 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -3589,6 +3636,7 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
         </div>
       </div>
       <input ref={ref} type="file" multiple accept=".pdf,.xlsx,.csv,.jpg,.png" style={{ display: 'none' }} onChange={e => e.target.files && onUpload(e.target.files, locIdx, docType)} />
+      </>)}
       {/* The coverage strip (T8): the engine's issues for this upload, per fuel and meter, with the controls
           that answer them. See ./_components/CoverageStrip.tsx. */}
       <CoverageStrip location={location} docType={docType} reportingYear={reportingYear} fiscalYearEndMonth={fiscalYearEndMonth}
@@ -3599,11 +3647,16 @@ function DocUpload({ label, locIdx, docType, docs, onUpload, onRemove, onUpdateP
           {uploadError}
         </div>
       )}
+      {uploadsOff && docs.length > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.5, marginBottom: 4 }}>{DOCUMENTS_KEPT_INACTIVE}</div>
+      )}
       {docs.map(doc => (
         <div key={doc.id} style={{ padding: '3px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
             <span style={{ color: '#0d0d0d' }}>✓ {doc.file_name}</span>
-            <button onClick={() => onRemove(locId, doc.id, doc.file_path, `${locIdx}:${docType}`)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none' }}>Remove</button>
+            {/* No Remove without an active plan (L0): the storage DELETE policy refuses it, and the evidence behind
+                a read-only inventory stays as it was. The line under the list says so once. */}
+            {!uploadsOff && <button onClick={() => onRemove(locId, doc.id, doc.file_path, `${locIdx}:${docType}`)} style={{ fontSize: 11, color: '#B91C1C', background: 'none', border: 'none' }}>Remove</button>}
           </div>
           {/* Why this document carries no figures. Abstention is NEUTRAL, not amber: the reader
               declining to guess is the system working, and colouring it as a fault would push a

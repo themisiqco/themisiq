@@ -49,6 +49,7 @@ import { SB253_FIRST_REPORT_DATE, SB253_PROCESS_STATUS } from '../../../lib/sb25
 import { assistantScope3Basis, assistantScope3GwpClause } from '../../../lib/scope3/methodSummary'
 import { CAT6_TAKES } from '../../../lib/scope3/businessTravelCopy'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
+import { accessFromRow } from '../../../lib/entitlementAccess'
 import { checkAndRecordRateLimit, ipFromHeaders } from '../../../lib/rateLimit'
 import { WIZARD_STEP_NAMES, isWizardStep } from '../../../lib/ghg/wizardSteps'
 
@@ -202,17 +203,31 @@ export async function POST(req: NextRequest) {
   // ── 2. Entitlement. Mirrors useEntitlementAccess('ghg'): no user_id filter, because RLS scopes the
   // read to this user's own rows. FAILS CLOSED — unlike the rate limiter, which fails open, a fault
   // here must not hand out use of the API key. A paying customer sees a retryable message. ──
+  //
+  // ⚠️ THE TERM IS READ, NOT JUST THE ROW (ENF2, Oct 2026). This selected module_key only and refused only when no
+  // row existed, so a customer whose plan had ended kept the guide, and its model calls, indefinitely. It now
+  // reads term_end and decides with accessFromRow, the same rule as useEntitlementAccess and the database triggers
+  // (term_end strictly after now). An expired row gets its own code so the customer is told their plan ended,
+  // not that they never had one; an unreadable term_end is 'unknown' and fails closed like a failed read.
   const { data: ent, error: entErr } = await supabase
     .from('entitlements')
-    .select('module_key')
+    .select('module_key, term_end')
     .eq('module_key', 'ghg')
     .maybeSingle()
   if (entErr) {
     console.error('[ghg-bot] entitlement read failed (denying):', entErr.message)
     return NextResponse.json({ error: 'entitlement_check_failed' }, { status: 503 })
   }
-  if (!ent) {
+  const access = accessFromRow({ ok: true, row: ent }, new Date())
+  if (access === 'none') {
     return NextResponse.json({ error: 'entitlement_required' }, { status: 403 })
+  }
+  if (access === 'expired') {
+    return NextResponse.json({ error: 'entitlement_expired' }, { status: 403 })
+  }
+  if (access !== 'active') {
+    console.error('[ghg-bot] unreadable term_end on the ghg entitlement (denying)')
+    return NextResponse.json({ error: 'entitlement_check_failed' }, { status: 503 })
   }
 
   // ── 3. Rate limit, now that there is a verified identity to key on. ──
