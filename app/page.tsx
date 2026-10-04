@@ -3,6 +3,7 @@ import Image from 'next/image'
 import HomePricing from './components/HomePricing'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
+import FreeCalcCta from './components/FreeCalcCta'
 import { btnPrimary, btnSecondary, btnOnDark, btnOnDarkOutline } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import { AURORA_SRC, AURORA_CLOSE_POSITION } from '@/app/components/auroraBand'
@@ -70,15 +71,19 @@ export default function Home() {
             <p style={{ fontSize: 15, color: 'var(--color-on-dark)', lineHeight: 1.7, maxWidth: '58ch', marginBottom: '2.25rem' }}>
               Customers, lenders and regulators are each asking for something different, and the rules change by country and by year. ThemisIQ works out which of them apply to you, tells you what to submit and when, and builds the reports from your own data.
             </p>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <a href="/assess" style={{ ...btnOnDark, textDecoration: 'none' }}>Start the free assessment</a>
-              <a href="/methodology" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>See how it works</a>
+            {/* THE FREE CALCULATOR LEADS (free-calc-cta, Oct 2026). Until then nothing on this page opened it:
+                the hero offered the assessment and the methodology only. It takes the filled button; the
+                assessment moves to the outline, and "See how it works" to a text link under both. */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <FreeCalcCta variant="onDark" />
+              <a href="/assess" style={{ ...btnOnDarkOutline, textDecoration: 'none' }}>Start the free assessment</a>
             </div>
             {/* --color-on-dark-muted, not opacity: the token file's DISABLED AND INACTIVE STATE block
                 is explicit that opacity composites the text with whatever is behind it, which over a
                 photograph is a different colour in every pixel and unmeasurable. */}
             <p style={{ fontSize: 13, color: 'var(--color-on-dark-muted)', marginTop: '1rem' }}>
-              Free, takes about five minutes.
+              The assessment is free and takes about five minutes.{' '}
+              <a href="/methodology" style={{ color: 'var(--color-on-dark)', fontWeight: 600, textDecoration: 'underline' }}>See how it works</a>
             </p>
           </div>
         </div>
@@ -181,7 +186,24 @@ export default function Home() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(250px, 100%), 1fr))', gap: '1.25rem' }}>
-          {MODULES_HOME.map(m => (
+          {MODULES_HOME.map(m => m.key === 'ghg' ? (
+            // ⚠️ A <div>, NOT AN <a>, FOR THIS ONE CARD. It carries the free calculator as well as the module
+            // link, and a link cannot contain a link. The other cards stay whole-card links.
+            <div key={m.name}
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: `4px solid var(--color-module-${m.key})`, borderRadius: 6, padding: '1.4rem' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: 'var(--color-ink)', lineHeight: 1.2 }}>{m.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{m.desc}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 'auto', paddingTop: '0.6rem' }}>
+                {m.chips.map(c => (
+                  <span key={c} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: 'var(--color-ground)', border: '0.5px solid var(--color-line)', color: 'var(--color-ink-muted)' }}>{c}</span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem 1rem', paddingTop: '0.3rem' }}>
+                <FreeCalcCta variant="short" />
+                <a href={m.href} style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none' }}>See the module →</a>
+              </div>
+            </div>
+          ) : (
             <a key={m.name} href={m.href}
               style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', background: 'var(--color-paper)', border: '1px solid var(--color-line)', borderTop: `4px solid var(--color-module-${m.key})`, borderRadius: 6, padding: '1.4rem', textDecoration: 'none', transition: 'background 0.15s' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-ground)' }}

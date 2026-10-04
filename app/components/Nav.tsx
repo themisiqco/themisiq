@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import ThemisIQLogo from './ThemisIQLogo'
+import { FREE_CALC_HREF, FREE_CALC_SHORT_LABEL, FREE_CALC_SUBLINE } from '../../lib/pricingCopy'
 
 // Single source of truth for the header's module links — consumed by BOTH the
 // desktop Platform ▾ dropdown (full `label` + `sub`) and the mobile overlay
@@ -102,6 +103,10 @@ export default function Nav() {
           </a>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }} className="desktop-nav">
+            {/* THE FREE CALCULATOR, FIRST IN THE BAR (free-calc-cta, Oct 2026). A text link in brand, not a
+                fourth button: the right group already carries two filled ones. Short label, because the bar
+                is full at 1101px, the narrowest width it shows at. */}
+            <a href={FREE_CALC_HREF} style={{ ...navLinkStyle, color: 'var(--color-brand)', fontWeight: 600 }}>{FREE_CALC_SHORT_LABEL}</a>
             {/* Platform ▾ dropdown */}
             <div ref={platformRef} style={{ position: 'relative' }}>
               <button
@@ -227,6 +232,8 @@ export default function Nav() {
           borderTop: '0.5px solid #e8e7e4', overflowY: 'auto',
         }}>
           {[
+            // First in the menu, as it is first in the desktop bar.
+            { href: FREE_CALC_HREF, label: FREE_CALC_SHORT_LABEL, sub: FREE_CALC_SUBLINE },
             ...MODULES_NAV,
             { href: '/frameworks', label: 'Regulations', sub: 'Every rule we cover, and who it applies to' },
             { href: '/pricing', label: 'Pricing', sub: 'Plans, tiers, and what each includes' },

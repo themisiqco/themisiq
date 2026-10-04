@@ -52,3 +52,21 @@ export const GHG_FREE_USE_SENTENCE =
 
 export const GHG_PLAN_USE_SENTENCE =
   'Saving, Scope 3, document uploads, the GHG guide, Trends, SBTi targets, verifier sharing and report downloads need a GHG plan.'
+
+/**
+ * THE FREE SCOPE 1 AND SCOPE 2 CALCULATOR, AS ONE CALL TO ACTION (free-calc-cta, Oct 2026). Rendered by
+ * app/components/FreeCalcCta.tsx on every GHG surface, and the href is the one /calculate-emissions has always
+ * used (its CONFIG.TRY_URL now reads this). The calculator IS the GHG wizard: a visitor with no plan, signed in
+ * or not, gets the wizard there rather than a sign-in or pricing wall (app/dashboard/ghg/page.tsx entry gate).
+ * The wording must stay inside the free-use line drawn by GHG_FREE_USE_SENTENCE above (lib/freeClaims.test.ts).
+ */
+// ?start=new: a blank calculator for everyone, including customers with saved inventories or an ended plan
+// (lib/ghg/entry.ts). Without it /dashboard/ghg behaves as it always has.
+export const FREE_CALC_HREF = '/dashboard/ghg?start=new'
+
+export const FREE_CALC_LABEL = 'Calculate your Scope 1 and Scope 2 emissions free'
+
+/** For a header, a small card or any slot the full label will not fit. */
+export const FREE_CALC_SHORT_LABEL = 'Free emissions calculator'
+
+export const FREE_CALC_SUBLINE = 'In your browser, no account needed.'

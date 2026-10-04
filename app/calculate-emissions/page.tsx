@@ -21,7 +21,7 @@ import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM, SB253_POSTURE, SB253_PLATFORM_SENTENCE_FIRST_USE } from '../../lib/sb253';
 import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
-import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../lib/pricingCopy';
+import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE, FREE_CALC_HREF } from '../../lib/pricingCopy';
 import { calcInventory, emptyLocation, type Location } from '../../lib/ghg/engine';
 import Link from "next/link";
 import Footer from '../components/Footer'
@@ -29,7 +29,7 @@ import Footer from '../components/Footer'
 // --- CONFIG ------------------------------------------------------
 const CONFIG = {
   // Primary CTA: free, no-account calculator entry.
-  TRY_URL: "/dashboard/ghg",
+  TRY_URL: FREE_CALC_HREF, // the free calculator; one href site-wide (lib/pricingCopy.ts)
   // "Back to" parent product page (the GHG Emissions overview).
   CLIMATE_GHG_URL: "/climate-ghg",
   // "Get in touch" mailto.

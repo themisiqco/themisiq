@@ -1,6 +1,7 @@
 'use client'
 import Nav from '@/app/components/Nav'
 import Footer from '@/app/components/Footer'
+import FreeCalcCta from '@/app/components/FreeCalcCta'
 import { SB253_POSTURE, SB253_PROGRAMME_URL, SB253_STATUTE, SB253_SCOPE3_FROM } from '@/lib/sb253'
 import {
   CS3D_APPLIES_FROM, CS3D_TRANSPOSITION, CS3D_CITATION, CS3D_OMNIBUS_CITATION,
@@ -285,6 +286,12 @@ export default function Frameworks() {
             </div>
           </div>
         ))}
+        {/* ONE link under the table, not one per row (free-calc-cta, Oct 2026): every GHG framework above starts
+            from the same Scope 1 and Scope 2 figures, and the calculator is where those come from. */}
+        <p style={{ fontSize: 14, color: 'var(--color-ink-2)', lineHeight: 1.7, margin: 0 }}>
+          SB 253, the GHG Protocol, ESRS E1, CDP and GRI 305 all start from your Scope 1 and Scope 2 figures.{' '}
+          <FreeCalcCta variant="link" style={{ fontSize: 14 }} />
+        </p>
       </section>
 
       {/* CTA */}

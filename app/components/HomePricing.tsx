@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { volumeDiscount, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, LEGACY_PRICING_PAGE_ID, type Tier, type GhgTier, type ModuleKey } from '@/lib/pricing'
 import { PRICING_DRIVER_SENTENCE, PRICING_PUBLISHED_SENTENCE } from '@/lib/pricingCopy'
+import { FREE_CALC_HREF, FREE_CALC_LABEL } from '@/lib/pricingCopy'
 
 type ModuleId = 'ghg' | 'cbam' | 'risk' | 'impact' | 'supply' | 'people' | 'deals' | 'ai' | 'cyber' | 'forced-labour'
 
@@ -26,7 +27,8 @@ const MODULES: { id: ModuleId; name: string; frameworks: string; href: string }[
 ]
 
 const MODULE_CTA: Record<ModuleId, { headline: string; btn: string; href: string }> = {
-  ghg:    { headline: 'Ready to see your emissions?', btn: 'See your emissions instantly →', href: '/dashboard/ghg' },
+  // The free calculator, in the shared wording and href (free-calc-cta, Oct 2026).
+  ghg:    { headline: 'Ready to see your emissions?', btn: `${FREE_CALC_LABEL} →`, href: FREE_CALC_HREF },
   cbam:   { headline: 'Is your EU customer asking for your actual emissions?', btn: 'Calculate your embedded emissions →', href: '/dashboard/cbam' },
   risk:   { headline: 'Ready to assess your climate risk?', btn: 'Assess your climate risk →', href: '/dashboard/climate-risk' },
   // ⚠️ NOT /dashboard/materiality — that path is a server redirect INTO the climate-risk wizard

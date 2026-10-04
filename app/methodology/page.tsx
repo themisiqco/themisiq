@@ -1,6 +1,7 @@
 'use client'
 
 import Nav from '../components/Nav'
+import FreeCalcCta from '../components/FreeCalcCta'
 import Footer from '../components/Footer'
 import { scope3MethodDescription, provenanceGap } from '../../lib/scope3/categoryMethods'
 import { methodologyHierarchyLines, scope3ScopeClaim } from '../../lib/scope3/methodSummary'
@@ -472,6 +473,8 @@ export default function MethodologyPage() {
                       </div>
                     </div>
                   ))}
+                  {/* The end of the GHG section: the method just described, free to try (free-calc-cta, Oct 2026). */}
+                  {method.module.startsWith('GHG Inventory') && <FreeCalcCta variant="link" />}
                 </div>
               </div>
             </div>

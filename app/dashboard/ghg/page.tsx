@@ -10,6 +10,7 @@ import { csvBlob } from '../../../lib/csv'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
 import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
+import { wantsNewCalculator, entryView, entryWall, saveGoesToPricing } from '../../../lib/ghg/entry'
 import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
@@ -698,7 +699,9 @@ const searchParams = useSearchParams()
   useEffect(() => {
     const loadId = searchParams.get('id')
     const viewParam = searchParams.get('view')
-    if (loadId) { setMode('wizard'); return }
+    // ?start=new (the free calculator link, FREE_CALC_HREF): a blank calculator for everyone, with no draft
+    // restore and no Trends redirect. lib/ghg/entry.ts entryView states the same rule and is what is tested.
+    if (loadId || wantsNewCalculator(searchParams)) { setMode('wizard'); return }
     // ⚠️ THE DRAFT IS READ BEFORE THE SESSION, NOT AFTER, SINCE 'none' STOPPED WALLING. The old ordering
     // was sound while a draft could only exist because handleSave had bounced someone to /login: by the
     // time it mattered there was a session. handleSave now stashes for a SIGNED-OUT visitor and sends
@@ -739,11 +742,12 @@ const searchParams = useSearchParams()
         .from('ghg_inventories')
         .select('id, company_name, reporting_year, updated_at')
         .order('updated_at', { ascending: false })
-      if (data && data.length > 0) {
+      const view = entryView({ hasId: false, startNew: false, hasDraft: false, signedIn: true, savedInventoryCount: data?.length ?? 0, viewParam })
+      if (data && view !== 'wizard') {
         // Trends-first: existing inventories land on trends, UNLESS ?view=list
         // (the explicit "manage inventories" escape hatch — avoids a redirect
         // loop with the trends page's back-to-inventory link).
-        if (viewParam === 'list') {
+        if (view === 'list') {
           setInventoryList(data)
           setMode('list')
         } else {
@@ -1616,8 +1620,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // The stash, the draft lifetime and the redirect are stashDraftAndGoToPricing's, shared with the
     // export overlay's button and the unsaved-changes banner. See its header for the `anon: !session`
     // rule and for the ordering.
-    if (!session || ghgAccess === 'none') {
-      await stashDraftAndGoToPricing(`Saving needs the GHG module. ${draftKeptSentence(!session)}`)
+    // lib/ghg/entry.ts saveGoesToPricing: signed out or no plan, as before, and since free-calc-cta an ended
+    // plan on a NEW inventory (free mode, ?start=new), whose write the trigger refuses after handleSave has
+    // already created a companies row.
+    // `!session ||` is redundant with the helper and is there so TypeScript narrows session below.
+    if (!session || saveGoesToPricing({ signedIn: true, access: ghgAccess, hasInventoryId: !!inventoryId })) {
+      await stashDraftAndGoToPricing(`${ghgAccess === 'expired' ? 'Saving needs an active GHG plan.' : 'Saving needs the GHG module.'} ${draftKeptSentence(!session)}`)
       return
     }
     // Resolve the company_id for this inventory's company_name.
@@ -3341,32 +3349,42 @@ workings: saved.workings,
   // Nested rather than two sibling ifs so the narrowing survives: after the outer test rules out
   // 'active' and 'none' and the inner one rules out 'loading', `ghgAccess` is exactly the two states
   // the wall accepts, and a sixth state added later fails to compile here instead of rendering blank.
-  if (mode === 'wizard' && !inventoryId && ghgAccess !== 'active' && ghgAccess !== 'none') {
-    if (ghgAccess === 'loading') {
-      return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading…</div>
-    }
-    return <GhgEntryWall access={ghgAccess} />
+  //
+  // ?start=new LIFTS THE WALL (free-calc-cta, Oct 2026): the visitor asked for the free calculator, so an ended
+  // plan or an unreadable one gets free mode, and the read-on banner below says what has happened. The rule
+  // lives in lib/ghg/entry.ts entryWall.
+  const wall = entryWall({ mode, hasInventoryId: !!inventoryId, access: ghgAccess, startNew: wantsNewCalculator(searchParams) })
+  if (wall === 'loading') {
+    return <div style={{ background: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-ink-muted)', fontSize: 14 }}>Loading…</div>
   }
+  if (wall) return <GhgEntryWall access={wall} />
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
-      <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      {/* ⚠️ IT WRAPS, IT DOES NOT CLIP (free-calc-cta, Oct 2026). This bar was one fixed 56px row with 2rem side
+          padding, and at phone width the framework chip, "View trends" and Save did not fit: measured at 375px
+          it ran 60px past the screen and at 320px 115px, with the Save button cut off at the edge. Now both
+          groups wrap, the right group keeps to the right on its own line when it has to, and the side padding
+          shrinks with the screen. The bar grows taller on a phone instead of wider. */}
+      <nav style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '8px clamp(1rem, 4vw, 2rem)', minHeight: 56, boxSizing: 'border-box', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 1rem', minWidth: 0 }}>
           <a href="/dashboard" style={{ textDecoration: 'none' }}>
             <ThemisIQLogo size={19} />
           </a>
-          <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ GHG Inventory</span>
-          {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
+          <span style={{ fontSize: 12, color: 'var(--color-ink-muted)', whiteSpace: 'nowrap' }}>/ GHG Inventory</span>
+          {activeFrameworks.length > 0 && <span style={{ fontSize: 11, background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 99, padding: '2px 10px', color: '#555553', maxWidth: '100%' }}>{activeFrameworks.map(f => f.name).join(' · ')}</span>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <a href="/dashboard/ghg/trends" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', marginRight: 16, whiteSpace: 'nowrap' }}>View trends →</a>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px 16px', marginLeft: 'auto' }}>
+          <a href="/dashboard/ghg/trends" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-brand)', textDecoration: 'none', whiteSpace: 'nowrap' }}>View trends →</a>
           <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 14, padding: '10px 24px', borderRadius: 8, background: saved ? '#E1F5EE' : 'var(--color-brand)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : 'var(--color-on-dark)', fontWeight: saved ? 500 : 700 }}>
             {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
           </button>
         </div>
       </nav>
 
-      <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 2rem', display: 'flex', overflowX: 'auto' as const }}>
+      {/* The step strip scrolls inside itself on a phone (overflowX), which is how all seven steps stay reachable
+          without the page scrolling sideways. Its padding shrinks with the screen, as the bar's does. */}
+      <div style={{ background: '#fff', borderBottom: '0.5px solid #e8e7e4', padding: '0 clamp(0.5rem, 3vw, 2rem)', display: 'flex', overflowX: 'auto' as const }}>
         {STEPS.map((s, i) => (
           <button key={s} onClick={() => setStep(i)} style={{ fontSize: 12, padding: '14px 16px', background: 'none', border: 'none', borderBottom: `2px solid ${step === i ? 'var(--color-brand)' : 'transparent'}`, color: step === i ? 'var(--color-brand)' : 'var(--color-ink-muted)', cursor: 'pointer', fontWeight: step === i ? 500 : 400, whiteSpace: 'nowrap' as const }}>
             {i + 1}. {s}
@@ -3397,7 +3415,10 @@ workings: saved.workings,
              computed-value time and the browser dropped it, so these banners have had no border. */
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: noticeIsNeutral ? 'var(--color-accent-neutral-wash)' : '#FEF3E2', border: noticeIsNeutral ? '0.5px solid var(--color-line)' : '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
-              {ghgAccess === 'expired'
+              {ghgAccess === 'expired' && !inventoryId
+                // Free mode for an ended plan (?start=new): there is no inventory to read yet.
+                ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can calculate a new inventory here, and saving it needs you to renew.</>
+                : ghgAccess === 'expired'
                 ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can read this inventory and everything in it. Saving changes is off until you renew.</>
                 : ghgAccess === 'unknown'
                 ? <><strong style={{ fontWeight: 600 }}>We could not check your GHG access.</strong> Reading is unaffected. Saving may not work until this clears.</>
@@ -3405,8 +3426,15 @@ workings: saved.workings,
                 ? <><strong style={{ fontWeight: 600 }}>Saving needs the GHG module.</strong> You can read this inventory, but changes will not be kept.</>
                 : <>{GHG_FREE_USE_SENTENCE} Your results are calculated as you enter your data. {GHG_PLAN_USE_SENTENCE}</>}
             </span>
+            {/* ⚠️ SECONDARY ON THE FREE-USE ARM (free-calc-cta, Oct 2026). This is the free-use box: a visitor
+                reading it is already IN the free calculator, so the calculator is the primary action by being
+                the page, and pricing drops to the outline. There is deliberately no calculator button here: it
+                would link this page to itself, and a reload drops whatever has been typed. The arms that
+                report something wrong keep the filled button. */}
             {ghgAccess !== 'unknown' && (
-              <a href="/pricing?modules=ghg" style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
+              <a href="/pricing?modules=ghg" style={noticeIsNeutral
+                ? { fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none', whiteSpace: 'nowrap' as const }
+                : { fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
             )}
           </div>
         )}
@@ -3433,9 +3461,9 @@ workings: saved.workings,
              Border: see the note on the read-on banner above for why the old `var(--color-state-warn)33`
              rendered no border at all. */
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
-            {ghgAccess === 'none' ? (
+            {ghgAccess === 'none' || (ghgAccess === 'expired' && !inventoryId) ? (
               <>
-                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>Saving needs the GHG module. {draftKeptSentence(signedIn !== true)}</span>
+                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>{ghgAccess === 'expired' ? 'Saving needs an active GHG plan.' : 'Saving needs the GHG module.'} {draftKeptSentence(signedIn !== true)}</span>
                 <button onClick={() => { void stashDraftAndGoToPricing() }} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>See GHG pricing →</button>
               </>
             ) : (
@@ -3466,11 +3494,14 @@ workings: saved.workings,
         </div>
       </div>
 
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: '#fff', borderTop: '0.5px solid #e8e7e4', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)', padding: '14px 2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      {/* ⚠️ 96px KEPT CLEAR ON THE RIGHT FOR THE GUIDE BUTTON (free-calc-cta, Oct 2026). GHGBot's round button is
+          fixed 24px from the bottom-right at z-index 1000, above this bar, and it sat on top of Save draft:
+          at 375px it covered the right third of the button. The bar now ends where the guide button begins. */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: '#fff', borderTop: '0.5px solid #e8e7e4', boxShadow: '0 -2px 12px rgba(0,0,0,0.06)', padding: '14px 96px 14px clamp(1rem, 4vw, 2rem)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: saved ? '#0F6E56' : '#0d0d0d' }}>
           {saved ? '✓ All changes saved' : 'You have unsaved changes'}
         </div>
-        <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 16, fontWeight: saved ? 500 : 700, padding: '14px 40px', borderRadius: 8, background: saved ? '#E1F5EE' : 'var(--color-brand)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : 'var(--color-on-dark)' }}>
+        <button onClick={handleSave} disabled={isSaving} style={{ fontSize: 16, fontWeight: saved ? 500 : 700, padding: '14px clamp(16px, 5vw, 40px)', flexShrink: 0, whiteSpace: 'nowrap' as const, borderRadius: 8, background: saved ? '#E1F5EE' : 'var(--color-brand)', border: saved ? '1px solid #0F6E56' : 'none', cursor: 'pointer', color: saved ? '#0F6E56' : 'var(--color-on-dark)' }}>
           {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
         </button>
       </div>

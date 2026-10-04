@@ -5,9 +5,10 @@ import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
 import { GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '@/lib/pricing'
 import { CONCIERGE_FAQ, BILL_REVIEW_FAQ } from './faq'
+import FreeCalcCta from '../components/FreeCalcCta'
 import { MODULE_SUBLINE } from '@/lib/modulePages'
 import { SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_STATUS_SENTENCE, SB253_SCOPE3_FROM, SB253_PLATFORM_SENTENCE_FIRST_USE } from '../../lib/sb253'
-import { btnPrimary, btnSecondary } from '@/app/components/buttonStyles'
+import { btnSecondary } from '@/app/components/buttonStyles'
 import { sectionTitle } from '@/app/components/headingStyles'
 import {
   ModuleSpine, FrameworkChips, EvidenceSection, ClosingBand, ModuleSection,
@@ -89,8 +90,11 @@ export default function Page() {
             Scope 1, 2 and 3 under the GHG Protocol, built from your own bills and records, with the
             method, the factor edition and the source document kept behind every figure.
           </p>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <a href="/assess" style={{ ...btnPrimary, textDecoration: 'none' }}>Start the free assessment</a>
+          {/* THE FREE CALCULATOR LEADS (free-calc-cta, Oct 2026): until then the GHG module page had no link into
+              the calculator at all. The assessment moves to the outline beside the price. */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <FreeCalcCta />
+            <a href="/assess" style={{ ...btnSecondary, textDecoration: 'none' }}>Start the free assessment</a>
             {/* ⚠️ "From", AND THE ANCHOR. GHG is the only tiered module, sized by employees (FI0), and the top
                 band has priceUSD null. A single price would mislead a larger company, so this names the
                 floor and links to the picker. */}

@@ -1,5 +1,6 @@
 
 import ThemisIQLogo from './ThemisIQLogo'
+import { FREE_CALC_HREF, FREE_CALC_SHORT_LABEL } from '../../lib/pricingCopy'
 // app/components/Footer.tsx
 // Shared site footer for ThemisIQ.
 // Self-contained: import and drop in as <Footer /> on any page.
@@ -20,6 +21,8 @@ export default function Footer() {
           // modules because it has no grid card of its own, and Advisory stays last because it is not a module.
           { heading: 'Products', links: [
             { label: 'Climate · GHG', href: '/climate-ghg' },
+            // Under its module, as the free part of it (free-calc-cta, Oct 2026).
+            { label: FREE_CALC_SHORT_LABEL, href: FREE_CALC_HREF },
             { label: 'Climate · Risk', href: '/climate-risk' },
             { label: 'Supply Chain', href: '/supply-chain' },
             { label: 'CBAM', href: '/cbam' },

@@ -13,6 +13,8 @@ import { BILL_REVIEW_DESCRIPTION, BILL_REVIEW_HUMAN_DESCRIPTION } from '../../li
 // below. NEW_PRICING_ACTIVE STAYS TOO, but only just: every `!NEW_PRICING_ACTIVE` branch is gone, and
 // the four that remain are `NEW_PRICING_ACTIVE && (…)` wrappers around live content — always-true
 // no-ops. They can be unwrapped whenever someone is in here; the flag is not doing work.
+import FreeCalcCta from '../components/FreeCalcCta'
+import { FREE_CALC_HREF, FREE_CALC_SHORT_LABEL } from '../../lib/pricingCopy'
 import { LEGACY_PRICING_PAGE_ID, volumeDiscount, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, GHG_SIZE_BASIS_NOTE, NEW_PRICING_ACTIVE, cartQuote, GHG_TIERS, GHG_TIER_KEYS, GHG_TIER_LABELS, FLAT_MODULE_PRICES, ghgEmployeeBandLabel, type Tier, type GhgTier, type ModuleKey } from '../../lib/pricing'
 import { AI_ACT_HIGH_RISK_STANDALONE } from '../../lib/aiAct'
 import { CS3D_APPLIES_FROM } from '../../lib/cs3d'
@@ -52,7 +54,7 @@ const MODULES: Module[] = [
       headline: 'Ready to see your emissions?',
       sub: 'Your SB 253 Scope 1, 2 & 3 inventory can be complete in days, not months.',
       btn: 'See your emissions instantly →',
-      href: '/dashboard/ghg',
+      href: FREE_CALC_HREF,
     },
   },
   {
@@ -490,8 +492,8 @@ function PricingPageInner() {
           </Link>
           <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>/ Pricing</span>
         </div>
-        <Link href="/dashboard/ghg" style={{ ...primaryBtn, fontSize: 12, padding: '7px 16px' }}>
-          See your emissions instantly →
+        <Link href={FREE_CALC_HREF} style={{ ...primaryBtn, fontSize: 12, padding: '7px 16px' }}>
+          {FREE_CALC_SHORT_LABEL}
         </Link>
       </nav>
 
@@ -628,6 +630,15 @@ function PricingPageInner() {
                       <div style={{ fontSize: 10, color: 'var(--color-ink-muted)' }}>/yr</div>
                     </div>
                   </div>
+                  {/* BESIDE THE GHG PLANS, AND OUTSIDE THE CLICKABLE GRID ABOVE (free-calc-cta, Oct 2026): a click
+                      here must open the calculator, not toggle GHG in the cart. Shown whether or not GHG is
+                      selected, because the reader deciding whether to buy is the one it is for. */}
+                  {isGhg && (
+                    <div style={{ marginTop: 8, paddingLeft: 30 }}>
+                      <span style={{ fontSize: 12, color: '#555553' }}>Not ready to choose a plan? </span>
+                      <FreeCalcCta variant="link" style={{ fontSize: 12 }} />
+                    </div>
+                  )}
                   {/* GHG inline tier picker — only when GHG is selected */}
                   {isGhg && isSelected && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>

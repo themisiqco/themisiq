@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 // RELATIVE, NOT '@/lib/...'. tsconfig resolves the alias and vitest does not, so an aliased import
 // here typechecks clean and then fails app/assess/obligations.test.ts at import time. Every other
 // import in this file is relative for the same reason.
@@ -25,6 +25,7 @@ import {
   ukTurnoverInScope, auRevenueInScope, assessTiming, UK_ASSESS_WHO, UK_ASSESS_CONTENT, AU_ASSESS_WHO, AU_ASSESS_CONTENT,
 } from '../../lib/forcedLabour/assessSummary'
 import ThemisIQLogo from '../components/ThemisIQLogo'
+import FreeCalcCta from '../components/FreeCalcCta'
 // The obligation → module mapping, its link vocabulary and its prices. NONE of this is restated
 // here: the shorthand comes from obligationModulesParam (which inverts LEGACY_PRICING_PAGE_ID, so a
 // module the cart would silently drop is a type error rather than a lost purchase), and the figure
@@ -753,6 +754,12 @@ export default function AssessPage() {
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }))
 
   const obligations = computeObligations(answers)
+  // THE CARD THE FREE CALCULATOR SITS UNDER (free-calc-cta, Oct 2026): SB 253's when it is in the results,
+  // otherwise the first card the GHG module answers, in the order the groups render. Once, not under every
+  // GHG card: several can fire together and the calculator is the same calculator for all of them.
+  const ghgCards = OBLIGATION_GROUPS.flatMap(g => obligations.filter(ob => ob.group === g.key))
+    .filter(ob => ob.obligationId && entryObligation(ob).modules.includes('ghg'))
+  const freeCalcUnder = (ghgCards.find(ob => ob.obligationId === 'sb253') ?? ghgCards[0])?.name ?? null
   const critical = obligations.filter(o => o.urgency === 'critical').length
   const high = obligations.filter(o => o.urgency === 'high').length
 
@@ -862,7 +869,8 @@ export default function AssessPage() {
                   /* Keyed on `name`, not on the index within the group — two groups both start at 0,
                      so an index key would make the first regulatory and first market card share an
                      expand state and open together. Names are unique within a result set. */
-                  <div key={ob.name} style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden', background: '#fff', borderTop: `4px solid ${URGENCY_COLOR[ob.urgency]}` }}>
+                  <Fragment key={ob.name}>
+                  <div style={{ border: '0.5px solid #e8e7e4', borderRadius: 10, overflow: 'hidden', background: '#fff', borderTop: `4px solid ${URGENCY_COLOR[ob.urgency]}` }}>
                     <div onClick={() => toggleExpand(ob.name)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', cursor: 'pointer' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: URGENCY_COLOR[ob.urgency], flexShrink: 0 }} />
@@ -913,6 +921,13 @@ export default function AssessPage() {
                       </div>
                     )}
                   </div>
+                  {/* Outside the card, so it shows whether or not the card is expanded. */}
+                  {ob.name === freeCalcUnder && (
+                    <div style={{ padding: '10px 2px 4px' }}>
+                      <FreeCalcCta />
+                    </div>
+                  )}
+                  </Fragment>
                 ))}
               </div>
             </div>
@@ -923,7 +938,6 @@ export default function AssessPage() {
           <p style={{ fontSize: 13, color: 'var(--color-ink-2)', marginBottom: '1.25rem', fontWeight: 400 }}>An advisor will review your results with you and suggest where to start. No charge for the initial call.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
             <a href="/advisory" style={{ fontSize: 13, fontWeight: 500, padding: '10px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none' }}>Talk to a specialist</a>
-           <a href="/dashboard/ghg" style={{ fontSize: 13, padding: '10px 24px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none' }}>Calculate your emissions →</a>
           </div>
         </div>
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
