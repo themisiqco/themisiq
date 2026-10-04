@@ -21,7 +21,7 @@ import type { Metadata } from "next";
 import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
 import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
-import { BILL_REVIEW_DESCRIPTION } from '../../lib/pricingCopy';
+import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../lib/pricingCopy';
 import Link from "next/link";
 import Footer from '../components/Footer'
 
@@ -60,12 +60,12 @@ const billReviewIncluded = BILL_REVIEW_INCLUDED_SOURCES.starter;
 export const metadata: Metadata = {
   title: "Calculate Your GHG Emissions | SB 253, CSRD, IFRS S2 | ThemisIQ",
   description:
-    "Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $4,900 USD.",
+    `Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $${ghgFrom} USD.`,
   alternates: { canonical: "/calculate-emissions" },
   openGraph: {
     title: "Calculate Your GHG Emissions in Real Time | ThemisIQ",
     description:
-      "See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $4,900 USD.",
+      `See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $${ghgFrom} USD.`,
     url: "/calculate-emissions",
     type: "website",
   },
@@ -151,7 +151,7 @@ const FAQ_LD = {
       name: "What does it cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Bill Review from $${billReviewFrom}, including the first year for ${billReviewIncluded} data sources; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+        text: `${GHG_FREE_USE_SENTENCE} ${GHG_PLAN_USE_SENTENCE} The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Bill Review from $${billReviewFrom}, including the first year for ${billReviewIncluded} data sources; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
       },
     },
     {
@@ -159,15 +159,15 @@ const FAQ_LD = {
       name: "Is this a subscription? Will I be charged again?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "No. ThemisIQ is a one-time purchase - you select and pay for the modules you need, once, and your credit card will not be charged again. Choose more than one module and the multi-module discount is applied automatically at checkout, and every payment is handled securely by Stripe.",
+        text: "No. A plan gives you 12 months of access and does not renew or charge you automatically. We email you 30 days before it ends so you can opt in to another year. Choose more than one module and the multi-module discount is applied automatically at checkout, and every payment is handled securely by Stripe.",
       },
     },
     {
       "@type": "Question",
-      name: "What if the total is more than my company card allows?",
+      name: "Can I pay by invoice?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "At Stripe checkout, choose 'Invoice me' instead of paying by card. We generate an invoice you can forward to your accounting team for payment. Once that payment is received, we email you to confirm your selected modules are unlocked and ready to go.",
+        text: "Yes. Pay by card, or request an invoice, at any amount. Prefer to pay by invoice? Choose your modules on the pricing page and request an invoice there. We send an invoice you can forward to your accounts team, and once it is paid we email you to confirm your modules are unlocked.",
       },
     },
     {
@@ -175,7 +175,7 @@ const FAQ_LD = {
       name: "Can I try it before I pay?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Yes. Calculating your emissions is free with no account required. Payment, securely via Stripe, only happens when you choose to unlock and download the finished report.",
+        text: `Yes. ${GHG_FREE_USE_SENTENCE} Nothing is saved until you have a GHG plan. ${GHG_PLAN_USE_SENTENCE} Payment is handled securely by Stripe.`,
       },
     },
     {
@@ -450,8 +450,8 @@ export default function CalculateEmissionsPage() {
               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>See your emissions instantly</Link>
               <a className="btn btn-ghost" href={CONFIG.CONTACT_HREF}>Get in touch</a>
             </div>
-            <p className="reassure">Explore the calculator free*: you only pay when you&rsquo;re ready to download your report.</p>
-            <p className="hero-foot">*GHG emissions calculated from your totals via our platform, instantly and at no cost. For $4,900 USD, unlock platform access to download your report under any GHG framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
+            <p className="reassure">{GHG_FREE_USE_SENTENCE}* {GHG_PLAN_USE_SENTENCE}</p>
+            <p className="hero-foot">*Your Scope 1 and 2 figures are calculated in your browser, instantly and at no cost, and are not saved. A GHG plan, from ${ghgFrom} USD a year, adds saving and report downloads under any GHG framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
           </div>
         </section>
 
@@ -498,7 +498,7 @@ export default function CalculateEmissionsPage() {
           <div className="wrap">
             <div className="eyebrow">How it works</div>
             <h2>From bills to a submittable report, in five steps.</h2>
-            <p className="section-sub">Start calculating in seconds. No account needed to see your emissions; you only create one when you&rsquo;re ready to download.</p>
+            <p className="section-sub">Start calculating in seconds. {GHG_FREE_USE_SENTENCE} {GHG_PLAN_USE_SENTENCE}</p>
 
             <div className="vprocess">
               <div className="vstep">
@@ -522,7 +522,7 @@ export default function CalculateEmissionsPage() {
                     <span className="fwk">GRI 305</span>
                     <span className="fwk">EcoVadis</span>
                   </div>
-                  <span className="hint">$4,900 USD unlocks platform access: download your report under any framework you need</span>
+                  <span className="hint">A GHG plan, from ${ghgFrom} USD a year, adds report downloads under any framework you need</span>
                 </div>
               </div>
 
@@ -553,7 +553,7 @@ export default function CalculateEmissionsPage() {
                 <div className="vnum">05</div>
                 <div className="vstep-body">
                   <div className="vstep-title">Unlock &amp; download your report</div>
-                  <p className="vstep-desc">Our Scope 1 &amp; Scope 2 GHG module is priced at <strong>$4,900 USD</strong>: simply create an account and pay securely by credit card, or on invoice, via <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
+                  <p className="vstep-desc">Our GHG module is priced from <strong>${ghgFrom} USD</strong> a year: create an account and pay by card, or request an invoice, through <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
                   <span className="hint">Scope 3 is included in the GHG module. <Link href={CONFIG.SUPPLY_CHAIN_URL}>Add Supply Chain for primary supplier data on Category 1 &rarr;</Link></span>
                 </div>
               </div>
@@ -690,7 +690,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>What does it cost?</summary>
                 <div className="qa-body">
-                  A fraction of what consultants and legacy platforms charge. Seeing your emissions is free: you only pay when you&rsquo;re ready to download a report or add support:
+                  A fraction of what consultants and legacy platforms charge. {GHG_FREE_USE_SENTENCE} {GHG_PLAN_USE_SENTENCE}
                   <ul className="price-list">
                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
                     <li><span className="pl-name">GHG module: Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
@@ -705,21 +705,21 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>Is this a subscription? Will I be charged again?</summary>
                 <div className="qa-body">
-                  No, this is not a subscription, and your credit card will not be charged again. ThemisIQ is a one-time purchase: you select and pay for the modules you need, once. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout, with nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
+                  No. A plan gives you 12 months of access and does not renew or charge you automatically. We email you 30 days before it ends so you can opt in to another year. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout, with nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
                 </div>
               </details>
 
               <details className="qa">
-                <summary>What if the total is more than my company card allows?</summary>
+                <summary>Can I pay by invoice?</summary>
                 <div className="qa-body">
-                  No problem. At Stripe checkout, just choose <strong>&ldquo;Invoice me&rdquo;</strong> instead of paying by card. We&rsquo;ll generate an invoice you can forward to your accounting team for payment. Once that payment is received, we&rsquo;ll email you to confirm your selected modules are unlocked and ready to go.
+                  Yes. Pay by card, or request an invoice, at any amount. Prefer to pay by invoice? <Link href={CONFIG.PRICING_URL}>Request an invoice</Link> once you&rsquo;ve chosen your modules. We&rsquo;ll send an invoice you can forward to your accounts team, and once it&rsquo;s paid we&rsquo;ll email you to confirm your modules are unlocked.
                 </div>
               </details>
 
               <details className="qa">
                 <summary>Can I try it before I pay?</summary>
                 <div className="qa-body">
-                  Yes. Calculating your emissions is free: no account required. Payment (securely via <strong>Stripe</strong>) only happens when you choose to unlock and download the finished report.
+                  Yes. {GHG_FREE_USE_SENTENCE} Nothing is saved until you have a GHG plan. {GHG_PLAN_USE_SENTENCE} Payment is handled securely by <strong>Stripe</strong>.
                 </div>
               </details>
 

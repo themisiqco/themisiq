@@ -39,3 +39,14 @@ export const BILL_REVIEW_DESCRIPTION =
 /** The human-read option, verbatim. */
 export const BILL_REVIEW_HUMAN_DESCRIPTION =
   'Prefer a person to read your bills? Choose human reading and a ThemisIQ specialist reads each one within 2 business days. Your bills are never sent to AI.'
+
+/**
+ * What the GHG module does free, and what needs a plan (free-claims, Oct 2026). Every page that describes
+ * free use prints these two sentences, so the free/paid line is drawn once. It must match the gates in
+ * app/dashboard/ghg/page.tsx and its siblings; docs/review/free-claims-audit.md section 1 is the audit.
+ */
+export const GHG_FREE_USE_SENTENCE =
+  'Scope 1 and 2 can be calculated free, in your browser, without an account.'
+
+export const GHG_PLAN_USE_SENTENCE =
+  'Saving, Scope 3, document uploads, the GHG guide, Trends, SBTi targets, verifier sharing and report downloads need a GHG plan.'

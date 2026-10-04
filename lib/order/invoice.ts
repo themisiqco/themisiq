@@ -1,6 +1,7 @@
 // lib/order/invoice.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// SERVER-ONLY. Stage I2: create a Stripe invoice as a DRAFT for the >$10k quote path,
+// SERVER-ONLY. Stage I2: create a Stripe invoice as a DRAFT for an order paid by invoice (any amount since
+// card-any-amount, Oct 2026; it was the >$10k path before),
 // composing the I1 provisioning helpers with the proven admin-invoice pattern.
 //
 // ⚠️ DRAFTS ONLY. auto_advance:false → the invoice stays a draft; nothing finalizes or
@@ -32,7 +33,6 @@ export type DraftInvoiceResult =
   | { ok: true; invoiceId: string; status: 'draft'; amount: number; user_id: string; customerId: string }
   | { ok: false; reason: 'empty'; message: string }          // no valid modules
   | { ok: false; reason: 'requires_quote'; message: string } // Advisory — manual quote, not auto-priced
-  | { ok: false; reason: 'card_eligible'; message: string; amount: number } // ≤$10k — belongs on card path
   | { ok: false; reason: 'error'; message: string }          // validation / Stripe / provisioning failure
 
 // Replicated from the admin route (private there): reuse an existing Stripe customer by email,
@@ -60,10 +60,8 @@ export async function createDraftInvoiceForOrder(input: CreateDraftInvoiceInput)
     if (priced.requiresQuote) {
       return { ok: false, reason: 'requires_quote', message: 'GHG Enterprise is a custom quote: a manual line item is required; not auto-invoiced.' }
     }
-    // This path is for >$10k only. A card-eligible cart should NOT become an invoice.
-    if (!priced.requiresInvoice) {
-      return { ok: false, reason: 'card_eligible', message: 'Order is under the card threshold: use card checkout, not an invoice.', amount: priced.totalUSD }
-    }
+    // No minimum (card-any-amount, Oct 2026). This refused every order of $10,000 or less as card-eligible;
+    // a customer may now ask to pay by invoice at any amount.
 
     // 2) Provision the account (resolve-or-create) → user_id for the webhook grant.
     const userId = await resolveOrCreateUser(email)

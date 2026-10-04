@@ -238,15 +238,10 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
   // file has ever been tested against a buyer. A price set above the module a customer already
   // knows, for work that customer has not yet seen, buys nothing except a reason not to start.
   //
-  // AND BOTH MODULES TOGETHER STAY SELF-SERVE, WHICH 9,900 DID NOT.
-  //   4900 + 4900 = 9800 gross, less the 2-module volume discount (10%) = $8,820 — under
-  //   CARD_THRESHOLD_USD (10000), so requiresInvoice() is false and screen-then-assess checks out
-  //   by card.
-  //   At 9900 the same pair was 14800 gross, 13320 net — over the threshold, so the natural
-  //   two-module path would have routed every customer to request-an-invoice. That is a sales
-  //   decision, and it was not one anybody had made.
-  // (Arithmetic verified against cartQuote, not computed by hand. Recompute rather than trusting
-  // these figures if FLAT_MODULE_PRICES or volumeDiscount moves.)
+  // AND BOTH MODULES TOGETHER STAYED SELF-SERVE, WHICH 9,900 DID NOT, while card payment stopped at
+  // $10,000: 4900 + 4900 less the 2-module discount is $8,820. That threshold was removed in Oct 2026
+  // (card-any-amount): card is allowed at any amount and an invoice can be requested at any amount, so
+  // no price here decides how a customer may pay any more.
   //
   // ⚠️ WHAT THIS PRICE IS NOT. It is not calibrated. The repo records no transaction, no price test
   // and no customer — the only pricing rationale written anywhere is CLAUDE.md's note that the Full
@@ -264,19 +259,16 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
   'forced-labour': 1499,
 }
 
-// Self-serve card is disabled ABOVE this; larger orders route to request-an-invoice
-// (admin-invoice draft: card or manual wire — Canadian account has no Stripe ACH).
-export const CARD_THRESHOLD_USD = 10000
+// ⚠️ NO CARD THRESHOLD (card-any-amount, Oct 2026). Until then CARD_THRESHOLD_USD = 10000 refused card
+// checkout above $10,000 and sent the order to request-an-invoice. Card is now allowed at any amount, and
+// an invoice is an option at any amount: /order?pay=invoice → /api/order/quote-request →
+// lib/order/invoice.ts drafts it (card or manual wire; the Canadian account has no Stripe ACH).
 
 // ⚠️ NOT A PLAN INCLUSION AND NOT A CHECKOUT PATH. Advisory support is not included in any plan
 // and is not sold self-serve: this is the rate quoted on /pricing beside a contact link, with no
 // flow behind it. It lives here because it is a price a customer reads, and no price a customer
 // reads is typed into a page.
 export const ADVISORY_HOURLY_USD = 175
-
-export function requiresInvoice(orderTotalUSD: number): boolean {
-  return orderTotalUSD > CARD_THRESHOLD_USD
-}
 
 // ── Volume discount (matches the pricing page exactly) ───────────────────────
 //   1 module  → 0%
@@ -307,7 +299,6 @@ export function configuratorPrice(tier: LegacyTier, moduleKeys: ModuleKey[]): nu
 //   - GHG Advisory (priceUSD null) has no self-serve price → requiresQuote=true,
 //     totalUSD=0; the caller routes the whole selection to the contact/quote path
 //     (never sum a null).
-//   - totalUSD > CARD_THRESHOLD_USD → requiresInvoice=true (self-serve card off).
 export interface CartSelection {
   modules: ModuleKey[]
   ghgTier?: GhgTier // only consulted when 'ghg' is in modules; defaults to Essentials
@@ -315,17 +306,16 @@ export interface CartSelection {
 export interface CartQuote {
   totalUSD: number          // 0 when requiresQuote (no self-serve total)
   requiresQuote: boolean    // GHG Advisory in cart → contact/quote path
-  requiresInvoice: boolean  // total over the card threshold → invoice/wire
 }
 export function cartQuote(sel: CartSelection): CartQuote {
   const modules = sel.modules
   if (modules.length === 0) {
-    return { totalUSD: 0, requiresQuote: false, requiresInvoice: false }
+    return { totalUSD: 0, requiresQuote: false }
   }
   const ghgTier: GhgTier = sel.ghgTier ?? 'starter'
   // GHG Advisory has no self-serve price → the whole selection goes to quote.
   if (modules.includes('ghg') && GHG_TIERS[ghgTier].priceUSD == null) {
-    return { totalUSD: 0, requiresQuote: true, requiresInvoice: false }
+    return { totalUSD: 0, requiresQuote: true }
   }
   // ⚠️ GHG COUNTS TOWARD THE BAND BUT IS NEVER DISCOUNTED BY IT, and those are two separate
   // rules. The module tally that picks the discount band INCLUDES GHG, so buying GHG plus two
@@ -342,7 +332,7 @@ export function cartQuote(sel: CartSelection): CartQuote {
   const othersSum = others.reduce((n, m) => n + FLAT_MODULE_PRICES[m], 0)
   const ghgSum = modules.includes('ghg') ? (GHG_TIERS[ghgTier].priceUSD as number) : 0
   const totalUSD = Math.round(othersSum * (1 - volumeDiscount(modules.length))) + ghgSum
-  return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
+  return { totalUSD, requiresQuote: false }
 }
 
 // ── Bill Review (the add-on formerly called Concierge) ─────────────────────────────────────────

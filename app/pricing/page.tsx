@@ -282,11 +282,11 @@ function PricingPageInner() {
   // (Was "NEW-MODEL pricing (behind NEW_PRICING_ACTIVE)" — there is no other model left to be
   // behind a flag, and handleBuy, which the old note named, is gone with the old-model CTA arm.)
   const canonicalKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean) as ModuleKey[]
-  // TODO(checkout-consent sub-step): quote.requiresInvoice gates on the MODULE total
-  // only (cartQuote), NOT module + add-ons. Add a grand-total card-threshold guard there.
   const quote = cartQuote({ modules: canonicalKeys, ghgTier: tier as GhgTier })
   const newGrandTotal = quote.totalUSD + addOnsTotal
   const advisoryHref = `/advisory?modules=${Array.from(selected).join(',')}&tier=${tier}`
+  // Pay by invoice, at any amount (card-any-amount, Oct 2026): the /order invoice request for this cart.
+  const invoiceHref = `/order?modules=${Array.from(selected).join(',')}&tier=${tier}&pay=invoice`
   const newModulePrice = (id: ModuleId): number | null => {
     const key = LEGACY_PRICING_PAGE_ID[id]
     return key === 'ghg'
@@ -742,11 +742,6 @@ function PricingPageInner() {
                       {volumeDiscount(count) * 100}% multi-module discount applied
                     </div>
                   )}
-                  {quote.requiresInvoice && (
-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--color-module-cbam-wash)', color: 'var(--color-module-cbam-ink)', border: '1px solid var(--color-module-cbam)' }}>
-                      Over $10k: completed by invoice
-                    </div>
-                  )}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -793,12 +788,10 @@ function PricingPageInner() {
             {/* The old-model arm — `tier !== 'advisory' && <button onClick={handleBuy}>` priced from
                 totalNet — went with the three dead blocks above. It was the last reader of handleBuy
                 and of the net/gross figures, both of which computed the retired per-module-per-tier
-                price. The live path is quote-driven: requiresQuote → specialist, requiresInvoice →
-                invoice, otherwise the consent modal and startCheckout. */}
+                price. The live path is quote-driven: requiresQuote → specialist, otherwise the consent modal
+                and startCheckout, at any amount. Paying by invoice is offered beside it, also at any amount. */}
             {quote.requiresQuote ? (
               <Link href={advisoryHref} style={primaryBtn}>Talk to a specialist →</Link>
-            ) : quote.requiresInvoice ? (
-              <Link href={advisoryHref} style={primaryBtn}>Request an invoice →</Link>
             ) : (
               <button onClick={() => setConsentOpen(true)} style={primaryBtn}>Buy now, ${newGrandTotal.toLocaleString()}/yr →</button>
             )}
@@ -808,6 +801,11 @@ function PricingPageInner() {
               </Link>
             ))}
           </div>
+          {!quote.requiresQuote && count > 0 && (
+            <div style={{ fontSize: 12, color: 'var(--color-ink-2)', marginTop: 12, textAlign: 'center' }}>
+              Pay by card, or request an invoice. Prefer to pay by invoice? <Link href={invoiceHref} style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Request an invoice</Link>
+            </div>
+          )}
         </div>
 
       </div>

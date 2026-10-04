@@ -9,7 +9,8 @@ import { supabase } from '../../../lib/supabase'
 import { csvBlob } from '../../../lib/csv'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
-import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
+import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
+import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
@@ -158,6 +159,10 @@ const BOT_INCOMPLETE_NOTE = `This answer stopped before the end. It ran longer t
 // The entitlement line is a REAL CHANGE in who can use this: the guide answered anyone in the
 // wizard before, backed by the Anthropic key, whether or not they had bought the module.
 const BOT_ERRORS: Record<string, string> = {
+  // No session in this browser at all: most often someone who has never signed in, so nothing has "ended".
+  // The server's 401 (a token it would not accept) keeps `unauthenticated` below.
+  signed_out:
+    'The guide is part of the GHG plan. Sign in with an account that has a GHG plan to ask it questions.',
   unauthenticated:
     'Your session has ended. Refresh the page and sign in again, and the guide will pick straight back up.',
   entitlement_required:
@@ -210,7 +215,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
       // runs before calling /api/concierge/extract.
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS.unauthenticated }])
+        setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS.signed_out }])
         setLoading(false)
         return
       }
@@ -364,7 +369,7 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
 //
 // onUnlock, NOT AN HREF, because the draft has to be stashed before the navigation. See
 // stashDraftAndGoToPricing.
-function PaywallOverlay({ frameworks, onUnlock }: { frameworks: string[]; onUnlock: () => void }) {
+function PaywallOverlay({ frameworks, onUnlock, anon }: { frameworks: string[]; onUnlock: () => void; anon: boolean }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
@@ -377,7 +382,7 @@ function PaywallOverlay({ frameworks, onUnlock }: { frameworks: string[]; onUnlo
         {/* "One click" is gone with it: the path from here is /pricing, the configurator, the consent
             step, Stripe, and then the webhook. The last sentence is the draft promise, said where it can
             be read BEFORE the button rather than in a modal after it. */}
-        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package and saving. Your figures are kept while you choose a plan.</div>
+        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package and saving. {draftKeptSentence(anon)}</div>
         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
           {[
@@ -642,10 +647,14 @@ const searchParams = useSearchParams()
   // Who is signed in, for "Confirm this site used none", which records who confirmed and when (T8). Null
   // until the session is read, or when it has no email; the control is disabled while null.
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  // Whether a session exists, for the draft-retention sentence: a draft written signed out expires after two
+  // hours (lib/drafts.ts). null until read, and read as signed out, which is the shorter promise.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user
       setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
+      setSignedIn(!!session)
     })
   }, [])
   // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
@@ -1608,7 +1617,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // export overlay's button and the unsaved-changes banner. See its header for the `anon: !session`
     // rule and for the ordering.
     if (!session || ghgAccess === 'none') {
-      await stashDraftAndGoToPricing('Saving needs the GHG module. Your figures will be kept while you choose a plan.')
+      await stashDraftAndGoToPricing(`Saving needs the GHG module. ${draftKeptSentence(!session)}`)
       return
     }
     // Resolve the company_id for this inventory's company_name.
@@ -2988,7 +2997,7 @@ workings: saved.workings,
             one sentence that is merely inoffensive to both. */}
         <p style={sectionSub}>One inventory: {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. {isPaid ? 'Download any of them below.' : 'Downloading them needs the GHG module.'}</p>
         <div style={{ position: 'relative' }}>
-          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} onUnlock={() => { void stashDraftAndGoToPricing() }} />}
+          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} anon={signedIn !== true} onUnlock={() => { void stashDraftAndGoToPricing() }} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' as const }}>
               {activeFrameworks.map(fw => (
@@ -3394,7 +3403,7 @@ workings: saved.workings,
                 ? <><strong style={{ fontWeight: 600 }}>We could not check your GHG access.</strong> Reading is unaffected. Saving may not work until this clears.</>
                 : inventoryId
                 ? <><strong style={{ fontWeight: 600 }}>Saving needs the GHG module.</strong> You can read this inventory, but changes will not be kept.</>
-                : <>Your results are calculated as you enter your data. Saving your inventory and downloading reports need the GHG module.</>}
+                : <>{GHG_FREE_USE_SENTENCE} Your results are calculated as you enter your data. {GHG_PLAN_USE_SENTENCE}</>}
             </span>
             {ghgAccess !== 'unknown' && (
               <a href="/pricing?modules=ghg" style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
@@ -3426,7 +3435,7 @@ workings: saved.workings,
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             {ghgAccess === 'none' ? (
               <>
-                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>Saving needs the GHG module. Your figures will be kept while you choose a plan.</span>
+                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>Saving needs the GHG module. {draftKeptSentence(signedIn !== true)}</span>
                 <button onClick={() => { void stashDraftAndGoToPricing() }} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>See GHG pricing →</button>
               </>
             ) : (

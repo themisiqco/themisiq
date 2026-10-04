@@ -256,8 +256,11 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
   and `/verify/[token]` already citing the same ISO 14064-3 / ISAE 3410. The six claims
   that were genuinely its own are in `docs/ghg-verifier-grade-roadmap.md` — read that
   before reviving any of it. Do not re-add the add-on to restore the page.
-- **`CARD_THRESHOLD_USD` = $10,000.** Above that, self-serve card is off and
-  the order routes to request-an-invoice.
+- **No card threshold (card-any-amount, Oct 2026).** Card checkout is allowed at
+  any amount, and paying by invoice is an option at any amount (/order
+  `?pay=invoice` → `/api/order/quote-request` → `lib/order/invoice.ts` drafts it).
+  `CARD_THRESHOLD_USD` and `CartQuote.requiresInvoice` are gone; the $10,000 in
+  Terms §13 is the liability cap, not a payment rule.
 - `allow_promotion_codes: true` is permanent.
 - **Dead rollback path:** the `!NEW_PRICING_ACTIVE` branches in
   `app/pricing/page.tsx` and `app/components/HomePricing.tsx` (six guards,

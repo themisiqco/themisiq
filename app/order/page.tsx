@@ -2,12 +2,14 @@
 
 // Public, param-driven pre-configured checkout — /order?modules=ghg,supply&tier=professional&ref=<token>
 //
-// STAGE 1b: renders the pre-configured order and the CARD path only (total ≤ $10k), reusing the
-// EXISTING startCheckout money funnel (which bounces logged-out buyers through signup→resume→Stripe).
-// The QUOTE path (>$10k or GHG Enterprise) shows a placeholder — Stage 2 builds the real quote form.
+// Renders the pre-configured order with two ways to pay at ANY amount (card-any-amount, Oct 2026; card
+// had a ceiling before): card, through the EXISTING startCheckout money funnel (which bounces
+// logged-out buyers through signup→resume→Stripe), or an invoice request (?pay=invoice, or the link under
+// the card form), which posts to /api/order/quote-request and drafts an invoice. GHG Enterprise has no
+// self-serve price and shows the quote form only.
 //
 // ⚠️ LIVE MONEY: the card-path startCheckout call is byte-identical to the pricing page's. We NEVER
-// call startCheckout when the cart requires a quote/invoice (it 400s by design).
+// call startCheckout when the cart requires a quote (it 400s by design).
 
 import { useState, Suspense } from 'react'
 // RELATIVE, not '@/lib/...': tsconfig resolves the alias and vitest does not.
@@ -70,7 +72,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function OrderInner() {
   const searchParams = useSearchParams()
   const [submitting, setSubmitting] = useState(false)
-  // Quote-request form (>$10k / Enterprise path) — email-only, no payment.
+  // Invoice / quote request form (pay by invoice, or the Enterprise quote) — email-only, no payment.
   // `hp` is the honeypot's LOCAL state name; the wire field is HONEYPOT_FIELD, shared with the route
   // and with /assess so one edit moves all three. See lib/assessmentSubmitGuard.ts.
   const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' })
@@ -83,6 +85,8 @@ function OrderInner() {
   // the tier list instead of being a fourth place to remember.
   const tier: Tier = isGhgTier(rawTier) ? rawTier : 'starter'
   const ref = searchParams.get('ref') // attribution token — preserved, no logic this stage
+  // Pay by invoice instead of card: chosen by link (?pay=invoice from /pricing) or by the button below.
+  const [payByInvoice, setPayByInvoice] = useState(searchParams.get('pay') === 'invoice')
 
   const keys = Array.from(new Set(
     (searchParams.get('modules') ?? '')
@@ -107,7 +111,7 @@ function OrderInner() {
 
   // ── Quote (authoritative price — same fn the checkout API charges from) ────────
   const quote = cartQuote({ modules: keys, ghgTier: tier as GhgTier })
-  const cardEligible = !quote.requiresQuote && !quote.requiresInvoice
+  const cardEligible = !quote.requiresQuote
 
   // Line items (list prices). GHG at the tier price; others flat. null = Enterprise (quote).
   const lineItems = keys.map(k => ({
@@ -184,28 +188,40 @@ function OrderInner() {
         </div>
 
         {/* Path decision */}
-        {cardEligible ? (
-          <ConsentForm
-            onSubmit={pay}
-            submitting={submitting}
-            submitLabel="Continue to secure payment →"
-            title="Confirm your purchase"
-            subtitle="ThemisIQ sells to businesses only. Confirm the details below to continue to secure payment."
-          />
+        {cardEligible && !payByInvoice ? (
+          <>
+            <ConsentForm
+              onSubmit={pay}
+              submitting={submitting}
+              submitLabel="Continue to secure payment →"
+              title="Confirm your purchase"
+              subtitle="ThemisIQ sells to businesses only. Confirm the details below to continue to secure payment."
+            />
+            <div style={{ fontSize: 13, color: '#555553', marginTop: 14, textAlign: 'center' }}>
+              Prefer to pay by invoice?{' '}
+              <button type="button" onClick={() => setPayByInvoice(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-brand)', fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}>Request an invoice</button>
+            </div>
+          </>
         ) : (
-          // QUOTE path (>$10k or GHG Enterprise) — placeholder this stage. NEVER routes to card checkout.
+          // INVOICE or QUOTE path. NEVER routes to card checkout.
           <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 14, padding: '1.75rem' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>{quote.requiresQuote ? 'This configuration needs a custom quote' : 'Request an invoice'}</div>
             <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 16 }}>
               {quote.requiresQuote
-                ? `GHG ${GHG_TIER_LABELS.enterprise} (${ghgEmployeeBandLabel('enterprise')}) is tailored to your organization, so it’s priced individually.`
-                : 'Orders above $10,000 are completed by invoice rather than card.'} Our team will prepare a quote and walk you through next steps.
+                ? `GHG ${GHG_TIER_LABELS.enterprise} (${ghgEmployeeBandLabel('enterprise')}) is tailored to your organization, so it’s priced individually. Our team will prepare a quote and walk you through next steps.`
+                : 'We’ll send you an invoice for this order that you can forward to your accounts team. Your modules are unlocked once it’s paid.'}
+              {cardEligible && (
+                <>
+                  {' '}Prefer to pay by card?{' '}
+                  <button type="button" onClick={() => setPayByInvoice(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-brand)', fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}>Pay by card</button>
+                </>
+              )}
             </div>
 
             {quoteStatus === 'done' ? (
               <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Thanks — we&rsquo;ve received your request.</div>
-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7 }}>Our team will prepare your quote and follow up at <strong>{q.email}</strong>.</div>
+                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7 }}>Our team will prepare your {quote.requiresQuote ? 'quote' : 'invoice'} and follow up at <strong>{q.email}</strong>.</div>
               </div>
             ) : (
               <div>
@@ -235,7 +251,7 @@ function OrderInner() {
                   disabled={!qReady || quoteStatus === 'sending'}
                   style={{ marginTop: 18, fontSize: 14, fontWeight: 600, padding: '12px 26px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: (qReady && quoteStatus !== 'sending') ? 'pointer' : 'not-allowed', opacity: (qReady && quoteStatus !== 'sending') ? 1 : 0.4 }}
                 >
-                  {quoteStatus === 'sending' ? 'Sending…' : 'Request your quote'}
+                  {quoteStatus === 'sending' ? 'Sending…' : quote.requiresQuote ? 'Request your quote' : 'Request an invoice'}
                 </button>
               </div>
             )}
@@ -243,7 +259,7 @@ function OrderInner() {
         )}
 
         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 16, textAlign: 'center' }}>
-          Prices in USD. Payment is processed securely by Stripe. You&rsquo;ll create or sign in to your ThemisIQ account as part of checkout.
+          Prices in USD. Pay by card, or request an invoice. Payment is processed securely by Stripe. You&rsquo;ll create or sign in to your ThemisIQ account as part of checkout.
         </div>
       </div>
     </Shell>

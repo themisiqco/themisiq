@@ -65,7 +65,7 @@ export default function Page() {
           </Section>
 
           <Section id="t3" num="Section 3" title="Fees and payment">
-            <p style={body}>{`Fees are the annual list prices in effect at the time of purchase. Payment is due in advance and access begins once payment has been successfully processed. Orders up to US$10,000 may be paid by card. Orders above US$10,000 are invoiced and payable by card or wire transfer. Fees exclude applicable taxes, duties, VAT, GST, HST, or similar charges, which remain the responsibility of the customer.`}</p>
+            <p style={body}>{`Fees are the annual list prices in effect at the time of purchase. Payment is due in advance and access begins once payment has been successfully processed. Orders of any amount may be paid by card or, on request, by invoice. Invoices are payable by card or wire transfer. Fees exclude applicable taxes, duties, VAT, GST, HST, or similar charges, which remain the responsibility of the customer.`}</p>
           </Section>
 
           <Section id="t4" num="Section 4" title="Term, renewal and cancellation">

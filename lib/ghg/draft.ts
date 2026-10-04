@@ -27,7 +27,7 @@
 // back to the page's own defaults, because the caller merges this PARTIAL over them — never the
 // reverse. Merging the other way would let a missing key blank a field the form had already defaulted.
 
-import { DRAFT_KEYS, readDraft, saveDraft, clearDraft } from '../drafts'
+import { DRAFT_KEYS, readDraft, saveDraft, clearDraft, ANON_TTL_MS } from '../drafts'
 
 /** The fields a restore carries. All optional: the caller merges over its own defaults. */
 export type GhgDraft = {
@@ -121,4 +121,17 @@ export function readGhgDraft(): GhgDraft | null {
  */
 export function clearGhgDraft(): void {
   clearDraft(DRAFT_KEYS.ghg)
+}
+
+/**
+ * What happens to the figures while a visitor goes to choose a plan, said as it actually is (free-claims,
+ * Oct 2026). The draft lives in this browser's storage only; written signed out it expires after
+ * ANON_TTL_MS, written signed in it does not expire here. "Kept while you choose a plan" alone promised
+ * the signed-out visitor more than two hours in the same browser.
+ */
+export function draftKeptSentence(anon: boolean): string {
+  const hours = ANON_TTL_MS / (60 * 60 * 1000)
+  return anon
+    ? `Your figures are kept in this browser for ${hours} hours while you choose a plan.`
+    : 'Your figures are kept in this browser while you choose a plan.'
 }

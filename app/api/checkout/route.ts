@@ -91,9 +91,7 @@ export async function POST(req: NextRequest) {
         if (q.requiresQuote) {
           return NextResponse.json({ error: 'GHG Enterprise is quote-only: please contact us.', requiresQuote: true }, { status: 400 })
         }
-        if (q.requiresInvoice) {
-          return NextResponse.json({ error: 'Orders over $10,000 are completed by invoice. Please request an invoice.', requiresInvoice: true }, { status: 400 })
-        }
+        // No card ceiling (card-any-amount, Oct 2026): this route used to refuse large orders here.
         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
         lineItems.push(priceLine(label, q.totalUSD))
       } else {

@@ -1,0 +1,554 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index f8df453..4ad2cb5 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -256,8 +256,11 @@ Found 5 Aug 2026 while testing the unpriceable-location isolation.
+   and `/verify/[token]` already citing the same ISO 14064-3 / ISAE 3410. The six claims
+   that were genuinely its own are in `docs/ghg-verifier-grade-roadmap.md` — read that
+   before reviving any of it. Do not re-add the add-on to restore the page.
+-- **`CARD_THRESHOLD_USD` = $10,000.** Above that, self-serve card is off and
+-  the order routes to request-an-invoice.
++- **No card threshold (card-any-amount, Oct 2026).** Card checkout is allowed at
++  any amount, and paying by invoice is an option at any amount (/order
++  `?pay=invoice` → `/api/order/quote-request` → `lib/order/invoice.ts` drafts it).
++  `CARD_THRESHOLD_USD` and `CartQuote.requiresInvoice` are gone; the $10,000 in
++  Terms §13 is the liability cap, not a payment rule.
+ - `allow_promotion_codes: true` is permanent.
+ - **Dead rollback path:** the `!NEW_PRICING_ACTIVE` branches in
+   `app/pricing/page.tsx` and `app/components/HomePricing.tsx` (six guards,
+diff --git a/app/api/admin/create-invoice/route.ts b/app/api/admin/create-invoice/route.ts
+index 5b86b9b..669f939 100644
+--- a/app/api/admin/create-invoice/route.ts
++++ b/app/api/admin/create-invoice/route.ts
+@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
+         if (q.requiresQuote) {
+           return NextResponse.json({ error: 'GHG Enterprise is a custom quote: add a manual line item in Stripe instead.' }, { status: 400 })
+         }
+-        // This route IS the invoice path, so requiresInvoice (>$10k) does NOT block here.
++        // Any amount may be invoiced (card-any-amount, Oct 2026), so the total does not block here.
+         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
+         lines.push({ label, amount: q.totalUSD })
+       } else {
+@@ -151,8 +151,8 @@ export async function POST(req: NextRequest) {
+ 
+     // Bill Review (internal name: concierge), through lib/billReviewOrder.ts exactly as checkout.
+     // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because this runs as
+-    // admin for someone else and there is no RLS scoping to rely on. And there is no >$10k block: this route IS
+-    // the invoice path, so a large order belongs here.
++    // admin for someone else and there is no RLS scoping to rely on. And no amount blocks: an invoice may be
++    // requested at any amount, as card may be used at any amount.
+     if (body.concierge) {
+       const { data: ownedRows, error: ownedErr } = await supabaseAdmin
+         .from('entitlements')
+diff --git a/app/api/checkout/route.ts b/app/api/checkout/route.ts
+index f18a508..7cdb3c9 100644
+--- a/app/api/checkout/route.ts
++++ b/app/api/checkout/route.ts
+@@ -91,9 +91,7 @@ export async function POST(req: NextRequest) {
+         if (q.requiresQuote) {
+           return NextResponse.json({ error: 'GHG Enterprise is quote-only: please contact us.', requiresQuote: true }, { status: 400 })
+         }
+-        if (q.requiresInvoice) {
+-          return NextResponse.json({ error: 'Orders over $10,000 are completed by invoice. Please request an invoice.', requiresInvoice: true }, { status: 400 })
+-        }
++        // No card ceiling (card-any-amount, Oct 2026): this route used to refuse large orders here.
+         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
+         lineItems.push(priceLine(label, q.totalUSD))
+       } else {
+diff --git a/app/api/order/quote-request/route.ts b/app/api/order/quote-request/route.ts
+index 480ffe5..bd5fb26 100644
+--- a/app/api/order/quote-request/route.ts
++++ b/app/api/order/quote-request/route.ts
+@@ -7,8 +7,8 @@ import { BRAND, BRAND_WASH, INK_MUTED } from '@/lib/brand'
+ import { NOT_PROVIDED } from '../../../../lib/notProvided'
+ import { subjectText } from '../../../../lib/emailSubject'
+ 
+-// Quote-request capture for /order carts that exceed the card threshold (>$10k) or are
+-// GHG Advisory. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
++// Invoice and quote requests from /order: any order the customer prefers to pay by invoice (any amount,
++// card-any-amount Oct 2026), or GHG Enterprise. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
+ // Resend pattern (same env vars, same fetch helper): notify our monitor address so we can
+ // follow up with an invoice, and send the prospect a brief confirmation.
+ 
+@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
+     // (I2: server-priced, metadata.{user_id,entitlements}, idempotent, auto_advance:false — nothing
+     // sends) and notifies the monitor to review-and-send from Stripe with one click. It is wrapped so
+     // that NO invoice-side fault can turn the prospect's submission into a visible failure, and it
+-    // NEVER finalizes/sends. Advisory & card-eligible are excluded by the helper's own guards.
++    // NEVER finalizes/sends. Enterprise (requires_quote) is excluded by the helper's own guard.
+     try {
+       const inv = await createDraftInvoiceForOrder({ email: vEmail, modules: vModules, tier: tierParam, ref: vRef || undefined })
+       if (inv.ok) {
+@@ -201,9 +201,6 @@ export async function POST(req: NextRequest) {
+           `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Manual quote needed for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.message)}<br>Build a custom quote/invoice in Stripe manually.</p>`,
+           `Manual quote needed for ${vName} (${vEmail}) · ${company} · ${modules}. ${inv.message}`,
+         )
+-      } else if (inv.reason === 'card_eligible') {
+-        // Defensive: a ≤$10k order shouldn't reach the quote form. Do NOT invoice.
+-        console.warn(`[quote-request] card-eligible order reached quote path for ${vEmail}; no invoice created.`)
+       } else {
+         // empty / error — invoice NOT created. Alert the monitor to handle it manually.
+         await sendEmail(
+diff --git a/app/order/page.tsx b/app/order/page.tsx
+index 80c7f73..66b9bc5 100644
+--- a/app/order/page.tsx
++++ b/app/order/page.tsx
+@@ -2,12 +2,14 @@
+ 
+ // Public, param-driven pre-configured checkout — /order?modules=ghg,supply&tier=professional&ref=<token>
+ //
+-// STAGE 1b: renders the pre-configured order and the CARD path only (total ≤ $10k), reusing the
+-// EXISTING startCheckout money funnel (which bounces logged-out buyers through signup→resume→Stripe).
+-// The QUOTE path (>$10k or GHG Enterprise) shows a placeholder — Stage 2 builds the real quote form.
++// Renders the pre-configured order with two ways to pay at ANY amount (card-any-amount, Oct 2026; card
++// had a ceiling before): card, through the EXISTING startCheckout money funnel (which bounces
++// logged-out buyers through signup→resume→Stripe), or an invoice request (?pay=invoice, or the link under
++// the card form), which posts to /api/order/quote-request and drafts an invoice. GHG Enterprise has no
++// self-serve price and shows the quote form only.
+ //
+ // ⚠️ LIVE MONEY: the card-path startCheckout call is byte-identical to the pricing page's. We NEVER
+-// call startCheckout when the cart requires a quote/invoice (it 400s by design).
++// call startCheckout when the cart requires a quote (it 400s by design).
+ 
+ import { useState, Suspense } from 'react'
+ // RELATIVE, not '@/lib/...': tsconfig resolves the alias and vitest does not.
+@@ -70,7 +72,7 @@ function Shell({ children }: { children: React.ReactNode }) {
+ function OrderInner() {
+   const searchParams = useSearchParams()
+   const [submitting, setSubmitting] = useState(false)
+-  // Quote-request form (>$10k / Enterprise path) — email-only, no payment.
++  // Invoice / quote request form (pay by invoice, or the Enterprise quote) — email-only, no payment.
+   // `hp` is the honeypot's LOCAL state name; the wire field is HONEYPOT_FIELD, shared with the route
+   // and with /assess so one edit moves all three. See lib/assessmentSubmitGuard.ts.
+   const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' })
+@@ -83,6 +85,8 @@ function OrderInner() {
+   // the tier list instead of being a fourth place to remember.
+   const tier: Tier = isGhgTier(rawTier) ? rawTier : 'starter'
+   const ref = searchParams.get('ref') // attribution token — preserved, no logic this stage
++  // Pay by invoice instead of card: chosen by link (?pay=invoice from /pricing) or by the button below.
++  const [payByInvoice, setPayByInvoice] = useState(searchParams.get('pay') === 'invoice')
+ 
+   const keys = Array.from(new Set(
+     (searchParams.get('modules') ?? '')
+@@ -107,7 +111,7 @@ function OrderInner() {
+ 
+   // ── Quote (authoritative price — same fn the checkout API charges from) ────────
+   const quote = cartQuote({ modules: keys, ghgTier: tier as GhgTier })
+-  const cardEligible = !quote.requiresQuote && !quote.requiresInvoice
++  const cardEligible = !quote.requiresQuote
+ 
+   // Line items (list prices). GHG at the tier price; others flat. null = Enterprise (quote).
+   const lineItems = keys.map(k => ({
+@@ -184,28 +188,40 @@ function OrderInner() {
+         </div>
+ 
+         {/* Path decision */}
+-        {cardEligible ? (
+-          <ConsentForm
+-            onSubmit={pay}
+-            submitting={submitting}
+-            submitLabel="Continue to secure payment →"
+-            title="Confirm your purchase"
+-            subtitle="ThemisIQ sells to businesses only. Confirm the details below to continue to secure payment."
+-          />
++        {cardEligible && !payByInvoice ? (
++          <>
++            <ConsentForm
++              onSubmit={pay}
++              submitting={submitting}
++              submitLabel="Continue to secure payment →"
++              title="Confirm your purchase"
++              subtitle="ThemisIQ sells to businesses only. Confirm the details below to continue to secure payment."
++            />
++            <div style={{ fontSize: 13, color: '#555553', marginTop: 14, textAlign: 'center' }}>
++              Prefer to pay by invoice?{' '}
++              <button type="button" onClick={() => setPayByInvoice(true)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-brand)', fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}>Request an invoice</button>
++            </div>
++          </>
+         ) : (
+-          // QUOTE path (>$10k or GHG Enterprise) — placeholder this stage. NEVER routes to card checkout.
++          // INVOICE or QUOTE path. NEVER routes to card checkout.
+           <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 20%, transparent)', borderRadius: 14, padding: '1.75rem' }}>
+-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>This configuration needs a custom quote</div>
++            <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 8 }}>{quote.requiresQuote ? 'This configuration needs a custom quote' : 'Request an invoice'}</div>
+             <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: 16 }}>
+               {quote.requiresQuote
+-                ? `GHG ${GHG_TIER_LABELS.enterprise} (${ghgEmployeeBandLabel('enterprise')}) is tailored to your organization, so it’s priced individually.`
+-                : 'Orders above $10,000 are completed by invoice rather than card.'} Our team will prepare a quote and walk you through next steps.
++                ? `GHG ${GHG_TIER_LABELS.enterprise} (${ghgEmployeeBandLabel('enterprise')}) is tailored to your organization, so it’s priced individually. Our team will prepare a quote and walk you through next steps.`
++                : 'We’ll send you an invoice for this order that you can forward to your accounts team. Your modules are unlocked once it’s paid.'}
++              {cardEligible && (
++                <>
++                  {' '}Prefer to pay by card?{' '}
++                  <button type="button" onClick={() => setPayByInvoice(false)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-brand)', fontSize: 13, fontWeight: 600, textDecoration: 'underline' }}>Pay by card</button>
++                </>
++              )}
+             </div>
+ 
+             {quoteStatus === 'done' ? (
+               <div style={{ background: '#E1F5EE', border: '0.5px solid rgba(15,110,86,0.25)', borderRadius: 10, padding: '1.25rem' }}>
+                 <div style={{ fontSize: 14, fontWeight: 600, color: '#0F6E56', marginBottom: 4 }}>Thanks — we&rsquo;ve received your request.</div>
+-                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7 }}>Our team will prepare your quote and follow up at <strong>{q.email}</strong>.</div>
++                <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7 }}>Our team will prepare your {quote.requiresQuote ? 'quote' : 'invoice'} and follow up at <strong>{q.email}</strong>.</div>
+               </div>
+             ) : (
+               <div>
+@@ -235,7 +251,7 @@ function OrderInner() {
+                   disabled={!qReady || quoteStatus === 'sending'}
+                   style={{ marginTop: 18, fontSize: 14, fontWeight: 600, padding: '12px 26px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', border: 'none', cursor: (qReady && quoteStatus !== 'sending') ? 'pointer' : 'not-allowed', opacity: (qReady && quoteStatus !== 'sending') ? 1 : 0.4 }}
+                 >
+-                  {quoteStatus === 'sending' ? 'Sending…' : 'Request your quote'}
++                  {quoteStatus === 'sending' ? 'Sending…' : quote.requiresQuote ? 'Request your quote' : 'Request an invoice'}
+                 </button>
+               </div>
+             )}
+@@ -243,7 +259,7 @@ function OrderInner() {
+         )}
+ 
+         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, marginTop: 16, textAlign: 'center' }}>
+-          Prices in USD. Payment is processed securely by Stripe. You&rsquo;ll create or sign in to your ThemisIQ account as part of checkout.
++          Prices in USD. Pay by card, or request an invoice. Payment is processed securely by Stripe. You&rsquo;ll create or sign in to your ThemisIQ account as part of checkout.
+         </div>
+       </div>
+     </Shell>
+diff --git a/app/pricing/page.tsx b/app/pricing/page.tsx
+index 6e7ba89..b239cbf 100644
+--- a/app/pricing/page.tsx
++++ b/app/pricing/page.tsx
+@@ -282,11 +282,11 @@ function PricingPageInner() {
+   // (Was "NEW-MODEL pricing (behind NEW_PRICING_ACTIVE)" — there is no other model left to be
+   // behind a flag, and handleBuy, which the old note named, is gone with the old-model CTA arm.)
+   const canonicalKeys = Array.from(selected).map((id) => LEGACY_PRICING_PAGE_ID[id]).filter(Boolean) as ModuleKey[]
+-  // TODO(checkout-consent sub-step): quote.requiresInvoice gates on the MODULE total
+-  // only (cartQuote), NOT module + add-ons. Add a grand-total card-threshold guard there.
+   const quote = cartQuote({ modules: canonicalKeys, ghgTier: tier as GhgTier })
+   const newGrandTotal = quote.totalUSD + addOnsTotal
+   const advisoryHref = `/advisory?modules=${Array.from(selected).join(',')}&tier=${tier}`
++  // Pay by invoice, at any amount (card-any-amount, Oct 2026): the /order invoice request for this cart.
++  const invoiceHref = `/order?modules=${Array.from(selected).join(',')}&tier=${tier}&pay=invoice`
+   const newModulePrice = (id: ModuleId): number | null => {
+     const key = LEGACY_PRICING_PAGE_ID[id]
+     return key === 'ghg'
+@@ -742,11 +742,6 @@ function PricingPageInner() {
+                       {volumeDiscount(count) * 100}% multi-module discount applied
+                     </div>
+                   )}
+-                  {quote.requiresInvoice && (
+-                    <div style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'var(--color-module-cbam-wash)', color: 'var(--color-module-cbam-ink)', border: '1px solid var(--color-module-cbam)' }}>
+-                      Over $10k: completed by invoice
+-                    </div>
+-                  )}
+                 </div>
+               </div>
+               <div style={{ textAlign: 'right', flexShrink: 0 }}>
+@@ -793,12 +788,10 @@ function PricingPageInner() {
+             {/* The old-model arm — `tier !== 'advisory' && <button onClick={handleBuy}>` priced from
+                 totalNet — went with the three dead blocks above. It was the last reader of handleBuy
+                 and of the net/gross figures, both of which computed the retired per-module-per-tier
+-                price. The live path is quote-driven: requiresQuote → specialist, requiresInvoice →
+-                invoice, otherwise the consent modal and startCheckout. */}
++                price. The live path is quote-driven: requiresQuote → specialist, otherwise the consent modal
++                and startCheckout, at any amount. Paying by invoice is offered beside it, also at any amount. */}
+             {quote.requiresQuote ? (
+               <Link href={advisoryHref} style={primaryBtn}>Talk to a specialist →</Link>
+-            ) : quote.requiresInvoice ? (
+-              <Link href={advisoryHref} style={primaryBtn}>Request an invoice →</Link>
+             ) : (
+               <button onClick={() => setConsentOpen(true)} style={primaryBtn}>Buy now, ${newGrandTotal.toLocaleString()}/yr →</button>
+             )}
+@@ -808,6 +801,11 @@ function PricingPageInner() {
+               </Link>
+             ))}
+           </div>
++          {!quote.requiresQuote && count > 0 && (
++            <div style={{ fontSize: 12, color: 'var(--color-ink-2)', marginTop: 12, textAlign: 'center' }}>
++              Pay by card, or request an invoice. Prefer to pay by invoice? <Link href={invoiceHref} style={{ color: 'var(--color-brand)', fontWeight: 600 }}>Request an invoice</Link>
++            </div>
++          )}
+         </div>
+ 
+       </div>
+diff --git a/app/terms/page.tsx b/app/terms/page.tsx
+index aec251e..7bf21ec 100644
+--- a/app/terms/page.tsx
++++ b/app/terms/page.tsx
+@@ -65,7 +65,7 @@ export default function Page() {
+           </Section>
+ 
+           <Section id="t3" num="Section 3" title="Fees and payment">
+-            <p style={body}>{`Fees are the annual list prices in effect at the time of purchase. Payment is due in advance and access begins once payment has been successfully processed. Orders up to US$10,000 may be paid by card. Orders above US$10,000 are invoiced and payable by card or wire transfer. Fees exclude applicable taxes, duties, VAT, GST, HST, or similar charges, which remain the responsibility of the customer.`}</p>
++            <p style={body}>{`Fees are the annual list prices in effect at the time of purchase. Payment is due in advance and access begins once payment has been successfully processed. Orders of any amount may be paid by card or, on request, by invoice. Invoices are payable by card or wire transfer. Fees exclude applicable taxes, duties, VAT, GST, HST, or similar charges, which remain the responsibility of the customer.`}</p>
+           </Section>
+ 
+           <Section id="t4" num="Section 4" title="Term, renewal and cancellation">
+diff --git a/lib/order/invoice.ts b/lib/order/invoice.ts
+index ca5c732..521665d 100644
+--- a/lib/order/invoice.ts
++++ b/lib/order/invoice.ts
+@@ -1,6 +1,7 @@
+ // lib/order/invoice.ts
+ // ─────────────────────────────────────────────────────────────────────────────
+-// SERVER-ONLY. Stage I2: create a Stripe invoice as a DRAFT for the >$10k quote path,
++// SERVER-ONLY. Stage I2: create a Stripe invoice as a DRAFT for an order paid by invoice (any amount since
++// card-any-amount, Oct 2026; it was the >$10k path before),
+ // composing the I1 provisioning helpers with the proven admin-invoice pattern.
+ //
+ // ⚠️ DRAFTS ONLY. auto_advance:false → the invoice stays a draft; nothing finalizes or
+@@ -32,7 +33,6 @@ export type DraftInvoiceResult =
+   | { ok: true; invoiceId: string; status: 'draft'; amount: number; user_id: string; customerId: string }
+   | { ok: false; reason: 'empty'; message: string }          // no valid modules
+   | { ok: false; reason: 'requires_quote'; message: string } // Advisory — manual quote, not auto-priced
+-  | { ok: false; reason: 'card_eligible'; message: string; amount: number } // ≤$10k — belongs on card path
+   | { ok: false; reason: 'error'; message: string }          // validation / Stripe / provisioning failure
+ 
+ // Replicated from the admin route (private there): reuse an existing Stripe customer by email,
+@@ -60,10 +60,8 @@ export async function createDraftInvoiceForOrder(input: CreateDraftInvoiceInput)
+     if (priced.requiresQuote) {
+       return { ok: false, reason: 'requires_quote', message: 'GHG Enterprise is a custom quote: a manual line item is required; not auto-invoiced.' }
+     }
+-    // This path is for >$10k only. A card-eligible cart should NOT become an invoice.
+-    if (!priced.requiresInvoice) {
+-      return { ok: false, reason: 'card_eligible', message: 'Order is under the card threshold: use card checkout, not an invoice.', amount: priced.totalUSD }
+-    }
++    // No minimum (card-any-amount, Oct 2026). This refused every order of $10,000 or less as card-eligible;
++    // a customer may now ask to pay by invoice at any amount.
+ 
+     // 2) Provision the account (resolve-or-create) → user_id for the webhook grant.
+     const userId = await resolveOrCreateUser(email)
+diff --git a/lib/order/provision.ts b/lib/order/provision.ts
+index 5201066..a9b6899 100644
+--- a/lib/order/provision.ts
++++ b/lib/order/provision.ts
+@@ -83,7 +83,6 @@ export interface PricedOrder {
+   totalUSD: number          // recomputed via cartQuote; 0 when requiresQuote
+   entitlements: string      // comma-joined keys — the exact grantFromMetadata format
+   requiresQuote: boolean    // GHG Enterprise in cart → custom quote (no self-serve total)
+-  requiresInvoice: boolean  // total over the card threshold ($10k) → invoice/wire
+ }
+ 
+ // Convert pricing-page ids (ghg / supply / risk) → canonical keys, then recompute the
+@@ -106,6 +105,5 @@ export function priceOrder(input: { modules: string[]; tier?: Tier }): PricedOrd
+     // grantFromMetadata does entitlements.split(',').map(trim).filter(Boolean) → this matches.
+     entitlements: keys.join(','),
+     requiresQuote: q.requiresQuote,
+-    requiresInvoice: q.requiresInvoice,
+   }
+ }
+diff --git a/lib/pricing.test.ts b/lib/pricing.test.ts
+index ac049d0..81be99b 100644
+--- a/lib/pricing.test.ts
++++ b/lib/pricing.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from 'vitest'
+-import { cartQuote, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, priceLineQty, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, GHG_TIER_LABELS, GHG_SIZE_BASIS_NOTE, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, BILL_REVIEW_HUMAN_READING_SELLABLE, type ModuleKey, type GhgTier } from './pricing'
++import { cartQuote, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, MODULES, LEGACY_PRICING_PAGE_ID, priceLineQty, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, GHG_TIER_LABELS, GHG_SIZE_BASIS_NOTE, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, BILL_REVIEW_HUMAN_READING_SELLABLE, type ModuleKey, type GhgTier } from './pricing'
+ 
+ // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
+ // the single source of truth shared by the configurator (display) and the server
+@@ -28,31 +28,25 @@ const expectedCart = (modules: ModuleKey[], ghgTier: GhgTier): number => {
+ describe('cartQuote — new pricing model', () => {
+   it('single flat module (People) = $1,499, card OK', () => {
+     expect(cartQuote({ modules: ['people'] })).toEqual({
+-      totalUSD: 1499, requiresQuote: false, requiresInvoice: false,
++      totalUSD: 1499, requiresQuote: false,
+     })
+   })
+ 
+   it('single flat module (CBAM) = $1,499, card OK', () => {
+     expect(cartQuote({ modules: ['cbam'] })).toEqual({
+-      totalUSD: 1499, requiresQuote: false, requiresInvoice: false,
++      totalUSD: 1499, requiresQuote: false,
+     })
+   })
+ 
+   it('two flat modules apply the -10% volume discount: (4900 + 1499) * 0.9 = 5759', () => {
+     const q = cartQuote({ modules: ['climate-risk', 'people'] })
+     expect(q.totalUSD).toBe(5759)
+-    expect(q.requiresInvoice).toBe(false)
+     expect(q.requiresQuote).toBe(false)
+   })
+ 
+-  // ⚠️ THIS ASSERTED $11,900 AND requiresInvoice UNTIL 28 Sep 2026. Professional is $1,425 under
+-  // the employee bands, which is far below CARD_THRESHOLD_USD, so the card path is now the normal
+-  // one for it. The threshold behaviour itself is asserted below on a cart that still exceeds it.
+-  it('GHG Professional alone is the band price and clears on card', () => {
++  it('GHG Professional alone is the band price', () => {
+     const q = cartQuote({ modules: ['ghg'], ghgTier: 'professional' })
+     expect(q.totalUSD).toBe(GHG_TIERS.professional.priceUSD)
+-    expect(q.totalUSD).toBeLessThan(CARD_THRESHOLD_USD)
+-    expect(q.requiresInvoice).toBe(false)
+     expect(q.requiresQuote).toBe(false)
+   })
+ 
+@@ -74,10 +68,12 @@ describe('cartQuote — new pricing model', () => {
+     expect(volumeDiscount(ALL.length)).toBe(volumeDiscount(ALL.filter(k => k !== 'ghg').length + 1))
+   })
+ 
+-  it('a full cart exceeds the card threshold → requiresInvoice (cap no longer holds it under $10k)', () => {
++  // card-any-amount (Oct 2026): a cart over $10,000 used to come back requiresInvoice and was refused at
++  // card checkout. No total decides how a customer pays now, so the quote carries no such flag.
++  it('CA1: a full cart over $10,000 is priced with no invoice flag', () => {
+     const q = cartQuote({ modules: ALL, ghgTier: 'professional' })
+-    expect(q.totalUSD).toBeGreaterThan(CARD_THRESHOLD_USD)
+-    expect(q.requiresInvoice).toBe(true)
++    expect(q.totalUSD).toBeGreaterThan(10_000)
++    expect(q).toEqual({ totalUSD: q.totalUSD, requiresQuote: false })
+   })
+ 
+   // ⚠️ THE QUOTE TIER MOVED ON 28 Sep 2026. Advisory was the quote path and is now the 250 to 499
+diff --git a/lib/pricing.ts b/lib/pricing.ts
+index dacd128..28bdc54 100644
+--- a/lib/pricing.ts
++++ b/lib/pricing.ts
+@@ -238,15 +238,10 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
+   // file has ever been tested against a buyer. A price set above the module a customer already
+   // knows, for work that customer has not yet seen, buys nothing except a reason not to start.
+   //
+-  // AND BOTH MODULES TOGETHER STAY SELF-SERVE, WHICH 9,900 DID NOT.
+-  //   4900 + 4900 = 9800 gross, less the 2-module volume discount (10%) = $8,820 — under
+-  //   CARD_THRESHOLD_USD (10000), so requiresInvoice() is false and screen-then-assess checks out
+-  //   by card.
+-  //   At 9900 the same pair was 14800 gross, 13320 net — over the threshold, so the natural
+-  //   two-module path would have routed every customer to request-an-invoice. That is a sales
+-  //   decision, and it was not one anybody had made.
+-  // (Arithmetic verified against cartQuote, not computed by hand. Recompute rather than trusting
+-  // these figures if FLAT_MODULE_PRICES or volumeDiscount moves.)
++  // AND BOTH MODULES TOGETHER STAYED SELF-SERVE, WHICH 9,900 DID NOT, while card payment stopped at
++  // $10,000: 4900 + 4900 less the 2-module discount is $8,820. That threshold was removed in Oct 2026
++  // (card-any-amount): card is allowed at any amount and an invoice can be requested at any amount, so
++  // no price here decides how a customer may pay any more.
+   //
+   // ⚠️ WHAT THIS PRICE IS NOT. It is not calibrated. The repo records no transaction, no price test
+   // and no customer — the only pricing rationale written anywhere is CLAUDE.md's note that the Full
+@@ -264,9 +259,10 @@ export const FLAT_MODULE_PRICES: Record<Exclude<ModuleKey, 'ghg'>, number> = {
+   'forced-labour': 1499,
+ }
+ 
+-// Self-serve card is disabled ABOVE this; larger orders route to request-an-invoice
+-// (admin-invoice draft: card or manual wire — Canadian account has no Stripe ACH).
+-export const CARD_THRESHOLD_USD = 10000
++// ⚠️ NO CARD THRESHOLD (card-any-amount, Oct 2026). Until then CARD_THRESHOLD_USD = 10000 refused card
++// checkout above $10,000 and sent the order to request-an-invoice. Card is now allowed at any amount, and
++// an invoice is an option at any amount: /order?pay=invoice → /api/order/quote-request →
++// lib/order/invoice.ts drafts it (card or manual wire; the Canadian account has no Stripe ACH).
+ 
+ // ⚠️ NOT A PLAN INCLUSION AND NOT A CHECKOUT PATH. Advisory support is not included in any plan
+ // and is not sold self-serve: this is the rate quoted on /pricing beside a contact link, with no
+@@ -274,10 +270,6 @@ export const CARD_THRESHOLD_USD = 10000
+ // reads is typed into a page.
+ export const ADVISORY_HOURLY_USD = 175
+ 
+-export function requiresInvoice(orderTotalUSD: number): boolean {
+-  return orderTotalUSD > CARD_THRESHOLD_USD
+-}
+-
+ // ── Volume discount (matches the pricing page exactly) ───────────────────────
+ //   1 module  → 0%
+ //   2 modules → 10%
+@@ -307,7 +299,6 @@ export function configuratorPrice(tier: LegacyTier, moduleKeys: ModuleKey[]): nu
+ //   - GHG Advisory (priceUSD null) has no self-serve price → requiresQuote=true,
+ //     totalUSD=0; the caller routes the whole selection to the contact/quote path
+ //     (never sum a null).
+-//   - totalUSD > CARD_THRESHOLD_USD → requiresInvoice=true (self-serve card off).
+ export interface CartSelection {
+   modules: ModuleKey[]
+   ghgTier?: GhgTier // only consulted when 'ghg' is in modules; defaults to Essentials
+@@ -315,17 +306,16 @@ export interface CartSelection {
+ export interface CartQuote {
+   totalUSD: number          // 0 when requiresQuote (no self-serve total)
+   requiresQuote: boolean    // GHG Advisory in cart → contact/quote path
+-  requiresInvoice: boolean  // total over the card threshold → invoice/wire
+ }
+ export function cartQuote(sel: CartSelection): CartQuote {
+   const modules = sel.modules
+   if (modules.length === 0) {
+-    return { totalUSD: 0, requiresQuote: false, requiresInvoice: false }
++    return { totalUSD: 0, requiresQuote: false }
+   }
+   const ghgTier: GhgTier = sel.ghgTier ?? 'starter'
+   // GHG Advisory has no self-serve price → the whole selection goes to quote.
+   if (modules.includes('ghg') && GHG_TIERS[ghgTier].priceUSD == null) {
+-    return { totalUSD: 0, requiresQuote: true, requiresInvoice: false }
++    return { totalUSD: 0, requiresQuote: true }
+   }
+   // ⚠️ GHG COUNTS TOWARD THE BAND BUT IS NEVER DISCOUNTED BY IT, and those are two separate
+   // rules. The module tally that picks the discount band INCLUDES GHG, so buying GHG plus two
+@@ -342,7 +332,7 @@ export function cartQuote(sel: CartSelection): CartQuote {
+   const othersSum = others.reduce((n, m) => n + FLAT_MODULE_PRICES[m], 0)
+   const ghgSum = modules.includes('ghg') ? (GHG_TIERS[ghgTier].priceUSD as number) : 0
+   const totalUSD = Math.round(othersSum * (1 - volumeDiscount(modules.length))) + ghgSum
+-  return { totalUSD, requiresQuote: false, requiresInvoice: requiresInvoice(totalUSD) }
++  return { totalUSD, requiresQuote: false }
+ }
+ 
+ // ── Bill Review (the add-on formerly called Concierge) ─────────────────────────────────────────
+--- /dev/null
++++ b/lib/order/invoice.test.ts
+@@ -0,0 +1,67 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++
++// card-any-amount (Oct 2026): an invoice may be requested at any amount, and card is allowed at any
++// amount. Until then createDraftInvoiceForOrder refused every order of $10,000 or less as 'card_eligible'
++// and checkout refused every order over it.
++
++vi.mock('../supabaseAdmin', () => ({ getSupabaseAdmin: vi.fn() }))
++vi.mock('./provision', async () => {
++  const actual = await vi.importActual<typeof import('./provision')>('./provision')
++  return { ...actual, resolveOrCreateUser: vi.fn(async () => 'user-1') }
++})
++const invoicesCreate = vi.fn(async () => ({ id: 'in_1' }))
++const itemsCreate = vi.fn(async () => ({ id: 'ii_1' }))
++vi.mock('../stripe', () => ({
++  getStripe: () => ({
++    customers: { list: vi.fn(async () => ({ data: [{ id: 'cus_1' }] })), create: vi.fn() },
++    invoices: { create: invoicesCreate },
++    invoiceItems: { create: itemsCreate },
++  }),
++}))
++
++import { createDraftInvoiceForOrder } from './invoice'
++import { GHG_TIERS } from '../pricing'
++
++const ROOT = join(__dirname, '..', '..')
++const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
++
++describe('card-any-amount', () => {
++  beforeEach(() => { invoicesCreate.mockClear(); itemsCreate.mockClear() })
++
++  it('CA2: a small order can be invoiced', async () => {
++    const r = await createDraftInvoiceForOrder({ email: 'a@b.co', modules: ['ghg'], tier: 'starter' })
++    expect(r).toMatchObject({ ok: true, invoiceId: 'in_1', amount: GHG_TIERS.starter.priceUSD })
++    expect(itemsCreate).toHaveBeenCalledWith(
++      expect.objectContaining({ amount: (GHG_TIERS.starter.priceUSD as number) * 100 }),
++      expect.anything(),
++    )
++  })
++
++  it('CA3: GHG Enterprise is still a manual quote, not an invoice', async () => {
++    const r = await createDraftInvoiceForOrder({ email: 'a@b.co', modules: ['ghg'], tier: 'enterprise' })
++    expect(r).toMatchObject({ ok: false, reason: 'requires_quote' })
++    expect(invoicesCreate).not.toHaveBeenCalled()
++  })
++
++  it('CA4: no route or page refuses card by amount, and no customer text states a $10,000 rule', () => {
++    expect(read('app/api/checkout/route.ts')).not.toMatch(/requiresInvoice|10,000/)
++    expect(read('lib/order/invoice.ts')).not.toContain("'card_eligible'")
++    expect(read('app/api/order/quote-request/route.ts')).not.toContain('card_eligible')
++    for (const f of ['app/pricing/page.tsx', 'app/order/page.tsx']) {
++      const src = read(f)
++      expect(src, f).not.toMatch(/requiresInvoice|\$10k|\$10,000/)
++      expect(src, f).toContain('Request an invoice')
++    }
++    // §3 states no threshold; §13's US$10,000 is the liability cap.
++    const terms = read('app/terms/page.tsx')
++    expect(terms).not.toContain('Orders up to US$10,000')
++    expect(terms).toContain('Orders of any amount may be paid by card')
++  })
++
++  it('CA5: /order offers the invoice request beside card, and /pricing links to it', () => {
++    expect(read('app/order/page.tsx')).toContain("searchParams.get('pay') === 'invoice'")
++    expect(read('app/pricing/page.tsx')).toContain('&pay=invoice')
++  })
++})

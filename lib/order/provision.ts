@@ -83,7 +83,6 @@ export interface PricedOrder {
   totalUSD: number          // recomputed via cartQuote; 0 when requiresQuote
   entitlements: string      // comma-joined keys — the exact grantFromMetadata format
   requiresQuote: boolean    // GHG Enterprise in cart → custom quote (no self-serve total)
-  requiresInvoice: boolean  // total over the card threshold ($10k) → invoice/wire
 }
 
 // Convert pricing-page ids (ghg / supply / risk) → canonical keys, then recompute the
@@ -106,6 +105,5 @@ export function priceOrder(input: { modules: string[]; tier?: Tier }): PricedOrd
     // grantFromMetadata does entitlements.split(',').map(trim).filter(Boolean) → this matches.
     entitlements: keys.join(','),
     requiresQuote: q.requiresQuote,
-    requiresInvoice: q.requiresInvoice,
   }
 }

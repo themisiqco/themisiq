@@ -4315,7 +4315,7 @@ export default function Scope3Dashboard() {
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Unlock your full Scope 3 results</div>
                 <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 18 }}>Your complete inventory is ready: the total, the category-by-category breakdown, and the data-quality flags for every line. Unlock the GHG module to view and download it.</div>
                 <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock →</a>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>The calculator stays free. You only pay to unlock results &amp; export.</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>Scope 1 and 2 are free to try. Scope 3 is part of the GHG plan.</div>
               </div>
             </div>
           )}
@@ -4489,7 +4489,7 @@ export default function Scope3Dashboard() {
                     ⚠️ `signedIn === false`, NOT `!signedIn`: null means not yet known and `!null` is true. */}
                 {signedIn === false && (
                   <p style={{ ...sectionSub, color: 'var(--color-ink-2)', marginTop: '0.75rem' }}>
-                    Scope 3 builds on a saved GHG inventory, so it needs a free account.
+                    Scope 3 builds on a saved GHG inventory and is part of the GHG plan.
                   </p>
                 )}
                 <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Create a GHG inventory →</a>

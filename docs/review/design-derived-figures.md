@@ -2626,6 +2626,395 @@ Concierge to Bill Review. BR9 also needs T11 and T17, which render provenance on
 12. **Q12, manual entry:** may a customer type a figure for a bill still with the team, instead of waiting? Nothing
     in the rulings forbids it; it would sit beside the waiting reading as a typed figure, under T10's override rules.
 
+### Launch commercial tasks: enforcement, payment, renewal, leads, promotion (4 Oct 2026)
+
+Design only. Sources: docs/review/free-claims-audit.md (the gates and claims) and the two unapplied patches
+`docs/review/patches/free-claims.patch` (copy) and `docs/review/patches/card-any-amount.patch` (card at any
+amount, invoice at any amount). Every SQL file named here is NOT RUN; each opens with a NOT RUN header and
+Lisa runs it. Per the standing grants rule, any new table or function carries its own GRANT block with
+explicit revokes from `anon` and `authenticated` first; every new policy uses `(select auth.uid())`.
+
+#### ENF1. Uploads to `source-documents` require an active GHG plan (server-side)
+- **Why:** the upload gate is UI-only (audit S1). The bucket's INSERT policy checks only the uid prefix
+  (supabase/migrations/20260804_ghg_source_documents_policies.sql:63-66, rewritten to the wrapped form by
+  20260908_storage_rls_initplan.sql), so any signed-in account can write documents through the storage API.
+- **Estimate:** S, 1 diff, 1 day.
+- **SQL (NOT RUN):** `supabase/migrations/2026MMDD_source_documents_upload_requires_ghg.sql`.
+  - **New function** `public.has_active_entitlement(p_module text) returns boolean`: `language sql stable
+    security definer set search_path = ''`. Body: `select exists (select 1 from public.entitlements e where
+    e.user_id = (select auth.uid()) and e.module_key = p_module and e.term_end > now())`.
+    - It takes no user argument, so a caller can ask only about itself.
+    - Security definer, so the storage policy does not depend on the caller's grants on `entitlements`.
+    - The comparison is the database clock, the same as `enforce_ghg_location_allowance()`.
+  - **Grants:** revoke all on the function from `public`, `anon` and `authenticated`, then grant execute to
+    `authenticated` only.
+  - **Policy:** drop and recreate `"Users can upload own documents"` (insert, to authenticated) with
+    `with check (bucket_id = 'source-documents' and ((select auth.uid()))::text = (storage.foldername(name))[1]
+    and (select public.has_active_entitlement('ghg')))`.
+  - **Not changed:**
+    - SELECT and DELETE stay as they are, because reading is not withdrawn by expiry (the entry-gate rule).
+    - Bill Review uploads use the same bucket and already require an active GHG plan, so nothing else
+      changes.
+  - **Before and after:** count the policies on `storage.objects` for this bucket; they must match (3 and 3).
+- **Files:**
+  - `app/dashboard/ghg/page.tsx`: `handleFileUpload`, at :1063-1070. The storage error for a refused
+    insert is mapped to "Uploading documents needs an active GHG plan." This states what was observed, a
+    refusal by the policy, not a guess.
+  - Expired customers: `isPaid` is true for them (:682), so the upload control renders and is then refused.
+    Narrow the upload slots to `ghgAccess === 'active'` in the same diff, and show the expired arm's
+    existing renew wording in place of "Paid plan".
+- **Tests:**
+  - **Static (vitest):** the migration parses (pglast, offline). The insert policy names
+    `has_active_entitlement('ghg')`, and the select and delete policies are untouched.
+  - **Source test:** the upload slots read `ghgAccess === 'active'`.
+  - **Verify SQL (NOT RUN),** `docs/review/patches/ENF1-verify.sql`, run as three seeded users:
+    - active: the insert succeeds;
+    - expired: refused;
+    - none: refused;
+    - expired: can still select their own object.
+
+#### ENF2. The guide route checks that the plan is active, not just present
+- **Why:** `/api/ghg-bot` reads `select('module_key')` and refuses only when no row exists
+  (app/api/ghg-bot/route.ts:205-215). An expired customer keeps the guide, and the model calls are paid for.
+- **Estimate:** S, 1 diff, half a day.
+- **Files:**
+  - `app/api/ghg-bot/route.ts`: select `module_key, term_end` and refuse with the existing
+    `entitlement_required` when `term_end <= now`. That is the same comparison `useHasConcierge` and the
+    extract route make.
+    - An unreadable `term_end` is `entitlement_check_failed` (503, fail closed), not access.
+  - `app/dashboard/ghg/page.tsx` `BOT_ERRORS`: a new `entitlement_expired` code with "Your GHG plan has
+    ended, so the guide is off until you renew." The route returns it for a present but expired row, so
+    the message says which of the two happened.
+  - **Optional, same diff:** move the comparison into a shared pure helper `isTermActive(row, now)` in
+    `lib/useEntitlement.ts` (beside `accessFromRow`) so the four readers stop restating it.
+- **SQL:** none.
+- **Tests:** route tests with a mocked Supabase client:
+  - no row → 403 `entitlement_required`;
+  - expired row → 403 `entitlement_expired`;
+  - active row → passes to the model call (mocked);
+  - null `term_end` → 503.
+
+#### ENF3. Exports built server-side, for active plans only (post-launch)
+- **Why:** the framework CSVs and the assurance PDF are built in the browser
+  (app/dashboard/ghg/page.tsx:3107-3254). The paywall is a blur with `pointerEvents: none` (audit S2), so
+  anyone who removes it in the browser's developer tools gets the files.
+- **Placement:** post-launch, as ruled, unless Lisa moves it.
+- **Estimate:** L, 2 to 3 diffs, 4 to 6 days. The assurance PDF comes first; the CSVs follow.
+- **Design:**
+  - **Route:** `POST /api/ghg/export` with `{ inventoryId, kind: 'assurance_pdf' | 'framework_csv',
+    frameworkId? }`.
+    - The route authenticates the bearer and requires an active `ghg` row (the ENF2 helper).
+    - It reads the SAVED inventory by id under the user's RLS client and re-derives figures with
+      `figuresForSave` and `buildWorkings`, never trusting client figures.
+    - It runs the same export gate as the page (`dataConfirmed` is recorded with the request, plus
+      coverage, declarations, pricing and steam readiness), shared through a pure `exportReady()` taken
+      out of the page.
+    - It returns the file.
+  - **Consequence:** an export is always of the saved inventory, not unsaved edits. The step 5 copy must
+    say "Downloads use your last saved version." and the button saves first when the page is dirty.
+  - `lib/assurancePdf.ts` must run in Node: jsPDF does, but the font and logo loading (lib/pdf/logo.ts)
+    needs checking under the route runtime.
+  - Once both kinds are served, the client builders are removed.
+- **Files:**
+  - `app/api/ghg/export/route.ts` (new) and `lib/ghg/exportReady.ts` (new, pure);
+  - `app/dashboard/ghg/page.tsx` (`generateAssurance` and `generateExport` call the route);
+  - `lib/assurancePdf.ts`.
+- **SQL:** none (it reads `ghg_inventories`, `audit_log` and residual rows that RLS already scopes).
+- **Tests:**
+  - **Route:**
+    - none or expired → 403;
+    - another user's inventory → 404 from RLS;
+    - an inventory failing `exportReady` → 409 naming the first failing check;
+    - the PDF bytes start with `%PDF`.
+  - **Gate:** `exportReady` agrees with the page's current gate on the existing run-through fixtures.
+
+#### PAY1. Pay by card or by invoice, at any amount
+- **Rulings (4 Oct 2026):** card is allowed at any amount, and paying by invoice is optional at any amount.
+  There is no $10,000 rule anywhere in customer text.
+- **Already in `card-any-amount.patch` (unapplied):**
+  - **Removed:** `CARD_THRESHOLD_USD`, `requiresInvoice()` and `CartQuote.requiresInvoice` (lib/pricing.ts),
+    plus the checkout refusal above $10,000.
+  - **Invoice drafting:** `createDraftInvoiceForOrder` no longer has its `card_eligible` refusal, and the
+    quote route drafts an invoice at any amount.
+  - **/order:** card and "Prefer to pay by invoice? Request an invoice" side by side, with `?pay=invoice`.
+  - **/pricing:** "Pay by card, or request an invoice. Prefer to pay by invoice? Request an invoice" under
+    the button.
+  - **Terms §3:** "Orders of any amount may be paid by card or, on request, by invoice."
+- **What PAY1 still has to build** (after the patch, an invoice request emails Lisa and creates a DRAFT she
+  sends by hand):
+  1. **Send without a person,** or keep the review step. ⚑ Q-PAY-1. The draft is `auto_advance: false` by
+     design (lib/order/invoice.ts:6-7). Finalising and sending automatically makes the request self-serve;
+     keeping the review lets Lisa check the buyer.
+  2. **Entitlement on payment:** `invoice.paid` already calls `grantFromMetadata`
+     (app/api/webhooks/stripe/route.ts:130). The gaps:
+     - invoice metadata carries no `ghg_tier`, so the GHG row is written with no tier, and Bill Review then
+       cannot price onboarding (pricing-2026-10 report, item 5);
+     - Bill Review is not orderable through /order at all.
+     Both are needed: `priceOrder` returns the tier, and the invoice metadata includes `ghg_tier` and the
+     `concierge_*` keys from `billReviewOrder`, exactly as checkout sends them.
+  3. **/pricing with Bill Review in the cart:** the invoice link carries modules and tier only, so a Bill
+     Review selection is dropped silently on the way to /order. Until /order takes a Bill Review source
+     count, the link must either carry it or say beside it "Bill Review is added to your invoice by our
+     team." ⚑ Q-PAY-2.
+  4. **Wire transfer:** the account is Canadian with no Stripe ACH, and `payment_settings` is card only. The
+     wire details come from `INVOICE_WIRE_FOOTER`. Confirm the footer is set in Vercel (Lisa: the variable
+     NAME is `INVOICE_WIRE_FOOTER`; do not paste its value anywhere).
+  5. **Prospect email:** the confirmation still says "prepare a quote" for an invoice request
+     (app/api/order/quote-request/route.ts:146, :157-159). Say "invoice" when the request is not GHG
+     Enterprise.
+  6. **Due date:** 30 days (`days_until_due: 30`). Access starts on payment, per Terms §3.
+- **Estimate:** M, 2 diffs, 2 to 3 days (items 2, 3 and 5; item 1 is a flag flip plus a test once ruled).
+- **SQL:** none.
+- **Tests:**
+  - `priceOrder` and invoice metadata carry `ghg_tier`, and the Bill Review keys when ordered (extend
+    lib/entitlementMetadata.test.ts, so all three writers keep one contract);
+  - `invoice.paid` with that metadata writes `ghg_tier` and `source_allowance`;
+  - the prospect email wording branches on quote or invoice.
+
+#### REN1. Twelve months, no auto-renewal, an email 30 days before the end
+- **Rulings:**
+  - access is 12 months with no automatic renewal or charge;
+  - an email goes out 30 days before `term_end` inviting the customer to opt in to another year for the
+    same module(s), with a renewal checkout (confirmed 4 Oct 2026).
+- **Already promised and not built:**
+  - Terms §4 (app/terms/page.tsx:72): "ThemisIQ will send a renewal reminder 30 days before expiry."
+  - `free-claims.patch` adds "We email you 30 days before it ends so you can opt in to another year" to
+    /calculate-emissions.
+  - Nothing sends it: no cron, no `vercel.json`, no reminder code.
+  - ⚑ **These sentences are false until REN1 ships.** Either ship REN1 before launch, or hold that sentence
+    of the patch back.
+- **Estimate:** M to L, 3 diffs, 4 to 5 days.
+- **Design:**
+  1. **Schedule:** a Vercel Cron (new `vercel.json`, daily at 13:00 UTC) calls `GET /api/cron/renewal-reminders`,
+     authenticated by the `CRON_SECRET` header Vercel sends.
+     - The route selects active entitlement rows whose `term_end` falls in a window it has not yet emailed,
+       grouped per user.
+     - It sends one email per user listing every module ending in that window.
+  2. **Reminder schedule (proposed):** 30 days before, as ruled. ⚑ Q-REN-1: also 7 days before, and on the
+     day it ends?
+  3. **Dedup:** a `renewal_reminders` table, one row per (user, term_end, kind), unique, so a re-run or a
+     retried cron sends nothing twice.
+  4. **Email** (Resend, the existing helper pattern):
+     - Subject: "Your ThemisIQ plan ends on {date}". Body: the modules and tiers, the end date, what happens
+       at the end (item 6), the renewal price from `cartQuote` at TODAY's list prices, and one button,
+       "Renew for another year".
+     - It is transactional (about an existing purchase), so no marketing consent is needed. It still names
+       the sender and gives the postal address, as CASL requires for a commercial electronic message that
+       includes an offer.
+  5. **Renewal checkout:**
+     - The button opens `/order?modules=…&tier=…&renew=1`, pre-filled from the expiring rows, with the same
+       card or invoice choice as any order (PAY1).
+     - The webhook already extends the term. ⚠️ `lib/entitlementTerm.ts` sets `term_end` to the LATER of the
+       prior end and now + 365, so a customer who renews 30 days early LOSES those 30 days. Renewal must
+       extend from the prior end (prior end + 365 when the prior term is still running).
+     - That is a change to `computeEntitlementTerm`, with tests. ⚑ Q-REN-2 confirms that is the intent.
+  6. **At expiry:** what the product does today, from the audit and the entry gate:
+     - the inventories stay readable;
+     - saving is refused by the trigger;
+     - uploads are still offered to expired customers in the UI (ENF1 closes this);
+     - exports are still offered (`isPaid` is true for expired; ENF3, or a narrower client gate, closes
+       this);
+     - verifier sharing is off (active only);
+     - the guide is still on (ENF2 closes this);
+     - Bill Review reading is off.
+     ⚑ Q-REN-3 asks what it SHOULD be.
+- **SQL (NOT RUN):** `2026MMDD_renewal_reminders.sql`:
+  - **Columns:** `id uuid pk default gen_random_uuid()`, `user_id uuid not null references auth.users on
+    delete cascade`, `term_end timestamptz not null`, `kind text not null check (kind in
+    ('t_minus_30','t_minus_7','ended'))`, `sent_at timestamptz not null default now()`, `resend_id text`,
+    `unique (user_id, term_end, kind)`.
+  - **Access:** RLS enabled with no policy (service role only, like `erasure_log`).
+  - **Grants:** revoke all from `public`, `anon` and `authenticated`; grant to `service_role`.
+- **Files:**
+  - `vercel.json` (new) and `app/api/cron/renewal-reminders/route.ts` (new);
+  - `lib/renewal.ts` (new, pure: which rows are due, the email model);
+  - `lib/renewalEmail.ts` (new, HTML and text);
+  - `lib/entitlementTerm.ts`; `app/order/page.tsx` (`renew=1`, and the heading "Renew your plan").
+- **Tests:**
+  - `lib/renewal.ts`:
+    - due-window edges (exactly 30 days, 29, 31, timezone at midnight UTC);
+    - grouping per user;
+    - skipping rows already reminded;
+    - an expired row is never reminded at T-30.
+  - `computeEntitlementTerm`: an early renewal extends from the prior end; a late renewal starts now.
+  - The cron route rejects a missing or wrong `CRON_SECRET`.
+  - The email text names the modules, the date and the price, and carries the sender block.
+- **Questions for Lisa:**
+  - **Q-REN-1:** reminder schedule: 30 days only, or 30 + 7 + on the day?
+  - **Q-REN-2:** an early renewal extends from the current end date (no days lost). Confirm.
+  - **Q-REN-3:** at expiry, should exports be blocked (currently offered), and should uploads be blocked
+    (currently offered)? Reading stays. Proposed: block both, keep reading and the audit trail.
+  - **Q-REN-4:** is the renewal price today's list price or the price they paid? Proposed: today's list
+    price, stated in the email.
+  - **Q-REN-5:** Bill Review at renewal: every active source at $45. Who counts the sources, the customer on
+    /order, or the email pre-filling the count from last year's allowance?
+  - **Q-REN-6:** the Terms §4 sentence already promises the reminder. Change it to name the opt-in, or leave
+    it as is?
+
+#### LEAD1. "Email me my results" for the free Scope 1 and 2 calculator
+- **Ruling (4 Oct 2026):** "Email me my results" is the lead capture; the other options (a free account that
+  saves a draft, or both) are not chosen.
+- **Estimate:** M, 3 diffs, 3 to 4 days.
+- **Placement:**
+  - In the wizard, for visitors with no plan (`ghgAccess === 'none'`, signed in or not): a panel on step 4
+    under the totals, and a button in the step 4-5 banner beside "See GHG pricing".
+  - Not shown to active or expired customers, who can save.
+- **The form:**
+  - **Email:** required, validated as an address.
+  - **Box 1, required to send:** "Email me my Scope 1 and 2 results." Unticked by default.
+  - **Box 2, optional:** "Also send me occasional ThemisIQ updates about emissions reporting. You can
+    unsubscribe at any time." Unticked by default.
+  - **Under the boxes:** "ThemisIQ, a company incorporated in Ontario, Canada, will send this email.
+    [postal address]. We keep your email address, your choices and the summary below to send your results
+    and, if you ticked the second box, our updates. See our Privacy Policy." ⚑ Q-LEAD-1: the postal address
+    to print. CASL requires it, and the repo carries none.
+  - **Button:** "Email my results". It is disabled until the address is valid and box 1 is ticked.
+  - **Hidden:** the honeypot (`HONEYPOT_FIELD`) and a bot-protection token (see below).
+- **Consent design:**
+  - **CASL:** express consent, obtained separately for each purpose (box 1 is the requested results, a
+    transactional reply; box 2 is the commercial electronic messages). It states the purpose, identifies
+    the sender with contact details, and says it can be withdrawn. Nothing is pre-ticked.
+  - **GDPR:** box 2 is freely given, specific, informed and unambiguous (Art. 4(11), 7). Box 1's lawful
+    basis is performing the request (Art. 6(1)(b)), so it is recorded but not needed as consent; the box
+    stays because it makes the request explicit.
+  - **Recorded per box:** whether it was ticked, when, and the exact wording version (`consent_text_version`).
+- **The email** (Resend, the existing `sendEmail` pattern; subject "Your Scope 1 and 2 results from
+  ThemisIQ"):
+  - **Content:**
+    - totals: Scope 1, Scope 2 location-based, Scope 2 market-based where computed;
+    - the main lines: the largest lines from `buildWorkings` (site, fuel, quantity and unit, factor,
+      tCO2e), at most 10, then "and N more lines";
+    - the factor editions used, from `factorEditions` (the same values a save would write);
+    - the reporting year and the number of sites.
+  - **Fixed note:** "These figures were calculated in your browser and have not been saved. No documents
+    were uploaded or kept. To save your inventory, add Scope 3 and download reports, continue with a GHG
+    plan." Then a "See GHG plans" button linking to `/pricing?modules=ghg`.
+  - **Footer:** the sender identification, the postal address, and the reason ("You asked for this email on
+    themisiq.co.").
+  - **Unsubscribe:** a link that withdraws box 2 when it was given, and a `List-Unsubscribe` header. The
+    link is a signed token, `HMAC(lead_id)` with a new server secret; Lisa names the variable, never the
+    value.
+  - **The figures are computed on the server,** not sent as numbers from the client. The client sends the
+    inventory inputs (locations, fuels, units, country, year). The route runs
+    `figuresForSave(inventory, 'AR6')` and `buildWorkings` and refuses inputs that do not parse. So the email
+    states what the engine says, and nobody can mail arbitrary numbers under ThemisIQ's name.
+- **Storage:**
+  - **SQL (NOT RUN):** `2026MMDD_leads.sql` creates `public.leads`:
+    - `id uuid pk default gen_random_uuid()`, `email text not null`, `email_key text not null` (the
+      `recipientKey` normalisation);
+    - `consent_results boolean not null`, `consent_results_at timestamptz`;
+    - `consent_updates boolean not null default false`, `consent_updates_at timestamptz`,
+      `updates_withdrawn_at timestamptz`;
+    - `consent_text_version text not null`;
+    - `country text`, `site_count int not null check (site_count >= 0)`, `scope1_t numeric`,
+      `scope2_location_t numeric`, `scope2_market_t numeric`, `reporting_year int`;
+    - `source_page text not null` (e.g. `/dashboard/ghg`, with the referrer path when it is ours);
+    - `user_id uuid null references auth.users on delete set null` (set when signed in), `created_at
+      timestamptz not null default now()`, `resend_id text`.
+    - **Index:** on `(email_key, created_at)`.
+  - **Access:**
+    - RLS enabled. No policy for `anon` or `authenticated`: the route writes with the service role, and
+      nobody reads leads from the browser.
+    - Grants: revoke all from `public`, `anon` and `authenticated`; grant to `service_role`.
+    - ⚑ Q-LEAD-2: should a signed-in user see their own lead rows? Proposed no, and no policy.
+  - **Retention:** ⚑ Q-LEAD-3. Proposed: delete a lead with no updates consent after 24 months, and keep a
+    consented one until withdrawal plus 24 months (CASL's record-of-consent burden sits with the sender).
+    The privacy policy gains a row for this table.
+- **Abuse controls:**
+  - `lib/rateLimit.ts` buckets `lead-results-ip` and `lead-results-email` (for example 5 per hour per IP and
+    3 per day per address, matching the assessment route);
+  - the shared honeypot;
+  - a bot-protection check.
+  - ⚑ Q-LEAD-4: add Cloudflare Turnstile (free, no tracking cookies), or rely on the honeypot plus rate
+    limits as /assess does today. Proposed: Turnstile on this form only, because it sends email to an
+    address typed by an anonymous visitor, which is a mail-bombing vector the assessment form shares but
+    does not need to.
+- **Files:**
+  - `app/api/ghg/email-results/route.ts` (new); `lib/ghg/resultsEmail.ts` (new, pure: model and HTML/text);
+  - `lib/leads.ts` (new: row shape, consent text version, unsubscribe token);
+  - `app/unsubscribe/page.tsx` and `app/api/unsubscribe/route.ts` (new);
+  - `app/dashboard/ghg/page.tsx` (the panel); `app/privacy/page.tsx` (the leads row and retention).
+- **Tests:**
+  - **Consent:**
+    - the route refuses without `consent_results`;
+    - box 2 defaults false and is stored false when absent;
+    - timestamps are set only for ticked boxes;
+    - the text version is stored.
+  - **Figures:** they come from the server (a client-supplied total is ignored); the email model lists at
+    most 10 lines plus "and N more"; editions match `figuresForSave`.
+  - **Email text:** it contains the not-saved and no-documents sentence, the sender block and the
+    unsubscribe link.
+  - **Abuse:** the honeypot drops silently; the rate limiter's denial is a 429 with a plain message.
+  - **Unsubscribe:** the token round-trips; a tampered token is refused; withdrawal sets
+    `updates_withdrawn_at` and never deletes the record of consent.
+  - **Database:** a static test that the migration revokes from `anon` and `authenticated` and creates no
+    policy.
+- **Questions for Lisa:** Q-LEAD-1 (postal address), Q-LEAD-2, Q-LEAD-3 (retention), Q-LEAD-4
+  (Turnstile), and Q-LEAD-5: who reads leads, and where? Proposed: a monitor email per lead that ticked
+  box 2, and a CSV export from the admin area later.
+
+#### PROMO1. The free Scope 1 and 2 calculator, given premier placement
+Proposals only; no copy changes yet. The shared line, from the free-use ruling: "Calculate your Scope 1 and 2
+emissions free, no account needed. Email yourself the results." ("Email yourself the results" only once
+LEAD1 ships; until then the first sentence stands alone.) The calculator itself is `/dashboard/ghg`.
+
+**What each surface says today:**
+
+| Surface | Today | Calculator link? |
+|---|---|---|
+| Home hero (app/page.tsx:64-82) | "Sustainability reporting that suits your needs and budget." Buttons: "Start the free assessment", "See how it works". "Free, takes about five minutes." (the assessment) | No |
+| Home, later sections (:112, :166, :180, :319) | All four point to /assess or /advisory | No |
+| Home pricing block (app/components/HomePricing.tsx:29) | GHG card CTA: "Ready to see your emissions?" / "See your emissions instantly →" to /dashboard/ghg | Yes, only after choosing GHG in the block |
+| /climate-ghg hero (app/climate-ghg/page.tsx:85-98) | "Start the free assessment" and "From $550/yr" | **No calculator link anywhere on the GHG module page** |
+| /climate-ghg closing (:256-257) | "Start the free assessment", "Talk to us" | No |
+| /calculate-emissions (:450, :563, :600, :764) | "See your emissions instantly" (4 times). Copy per the free-claims patch | Yes. ⚠️ **No page, nav or footer links to /calculate-emissions**; it is reachable only from the sitemap and search |
+| /pricing nav (app/pricing/page.tsx:493) | "See your emissions instantly →" | Yes, small, in the page's own nav |
+| /pricing GHG card CTA (:51-56) | "Ready to see your emissions?" / "Your SB 253 Scope 1, 2 & 3 inventory can be complete in days, not months." / "See your emissions instantly →" | Yes, when GHG is selected |
+| /assess results (app/assess/page.tsx:926) | Closing band: "Talk to a specialist" + "Calculate your emissions →" (secondary, outlined) | Yes, last on the page |
+| /frameworks (app/frameworks/page.tsx:77-100) | SB 253, ESRS E1, CDP and GRI 305 rows link "covers" to /climate-ghg | No |
+| SB 253 page | None exists; SB 253 is a row on /frameworks and a tag on /climate-ghg | — |
+| Nav (app/components/Nav.tsx:12, :152) | "GHG Emissions" to /climate-ghg; the one CTA is "Free assessment" | No |
+| Footer (app/components/Footer.tsx:22) | "Climate · GHG" to /climate-ghg | No |
+
+**Proposals** (for approval). One primary CTA label everywhere: **"Calculate your emissions free"**, linking to
+`/dashboard/ghg`. Under it, where there is room: "Scope 1 and 2, in your browser, no account needed." After
+LEAD1: "… Email yourself the results."
+
+| # | Surface | Placement | Proposed |
+|---|---|---|---|
+| PR1 | Home hero | Above the fold, as a second primary-weight button beside the assessment | Button "Calculate your emissions free". The micro-line under the buttons becomes: "The assessment and the Scope 1 and 2 calculator are both free. No account needed." ⚑ The hero then has two primary actions; alternatively the calculator takes the outlined slot and "See how it works" moves to a text link |
+| PR2 | Home, new band directly under the hero | Above the module grid | Heading "Know your Scope 1 and 2 emissions today." Body: "Enter your energy and fuel use for each site and see your emissions as you type, with every factor shown. Free, in your browser, no account needed." Button "Calculate your emissions free" |
+| PR3 | /climate-ghg hero | Above the fold, primary | Primary button "Calculate your emissions free"; "Start the free assessment" becomes secondary; "From $550/yr" stays as the third. Line under the buttons: "Scope 1 and 2 are free to calculate in your browser. Saving, Scope 3 and reports need a GHG plan." (from `GHG_FREE_USE_SENTENCE` / `GHG_PLAN_USE_SENTENCE`) |
+| PR4 | /climate-ghg closing band | Last band | Primary "Calculate your emissions free", secondary "Talk to us" |
+| PR5 | /calculate-emissions | Hero, already primary | Button label "Calculate your emissions free" in place of "See your emissions instantly" (all four), so one label is used site-wide. Link the page from the footer (PR10) so it is not an orphan |
+| PR6 | /pricing | The page nav button (:493), and a line above the module grid | Nav button "Calculate your emissions free". New line above the configurator: "Not ready to buy? Calculate your Scope 1 and 2 emissions free, no account needed." with the same link |
+| PR7 | /assess results | Move the calculator from the closing band's outlined button to directly under the GHG obligation card, when GHG is among the results | "Your Scope 1 and 2 emissions are the starting point for {frameworks}. Calculate them free now, no account needed." Button "Calculate your emissions free" |
+| PR8 | /frameworks | On the SB 253, ESRS E1, CDP and GRI 305 rows | A second link beside the module link: "Calculate your Scope 1 and 2 free →" |
+| PR9 | Nav | Signed-out right group | Keep "Free assessment" as the filled button, and add a text link before it, "Free calculator", to /dashboard/ghg. In the GHG Emissions menu item's sub-line, add "Free Scope 1 and 2 calculator" |
+| PR10 | Footer | Platform column, under "Climate · GHG" | "Free emissions calculator" to /calculate-emissions (the explainer page, for search, which then links into the wizard) |
+| PR11 | A dedicated SB 253 page | Not proposed now | ⚑ Q-PROMO-1: a /sb-253 explainer page with the calculator as its primary CTA would serve search well, but it is a new page with legal-date content (`lib/sb253`) to maintain. Proposed: later, not in PROMO1 |
+
+- **Estimate:** S to M, 1 to 2 diffs, 1.5 days once the wording is approved.
+- **Files:** app/page.tsx, app/climate-ghg/page.tsx, app/calculate-emissions/page.tsx, app/pricing/page.tsx,
+  app/assess/page.tsx, app/frameworks/page.tsx, app/components/Nav.tsx, app/components/Footer.tsx; a
+  `FREE_CALCULATOR_CTA` label and `FREE_CALCULATOR_LINE` constant in lib/pricingCopy.ts beside the free-use
+  sentences.
+- **Tests:**
+  - a source test that each listed surface links `/dashboard/ghg` with `FREE_CALCULATOR_CTA`;
+  - no surface says "See your emissions instantly";
+  - the footer links /calculate-emissions.
+- **Depends on:** `free-claims.patch` (the shared sentences). "Email yourself the results" waits for LEAD1.
+
+#### Order and estimate
+- **Order:**
+  1. ENF1 and ENF2 (2 days, before launch).
+  2. PAY1 (2 to 3 days, before launch: invoice orders need the tier).
+  3. REN1 (4 to 5 days; before launch if the Terms §4 and FAQ sentences ship).
+  4. LEAD1 (3 to 4 days).
+  5. PROMO1 (1.5 days, after free-claims and with or after LEAD1).
+  6. ENF3 post-launch (4 to 6 days).
+- **Total:** 13 to 16 days before ENF3, and 17 to 22 with it.
+
 ---
 
 ## 12. Remaining GHG work: recommended order and estimate (2 Oct 2026)

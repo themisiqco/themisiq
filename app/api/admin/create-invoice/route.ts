@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         if (q.requiresQuote) {
           return NextResponse.json({ error: 'GHG Enterprise is a custom quote: add a manual line item in Stripe instead.' }, { status: 400 })
         }
-        // This route IS the invoice path, so requiresInvoice (>$10k) does NOT block here.
+        // Any amount may be invoiced (card-any-amount, Oct 2026), so the total does not block here.
         const label = `ThemisIQ: ${moduleKeys.length} module${moduleKeys.length > 1 ? 's' : ''}`
         lines.push({ label, amount: q.totalUSD })
       } else {
@@ -151,8 +151,8 @@ export async function POST(req: NextRequest) {
 
     // Bill Review (internal name: concierge), through lib/billReviewOrder.ts exactly as checkout.
     // ⚠️ TWO DELIBERATE DIFFERENCES FROM THAT ROUTE. The read filters by user_id explicitly, because this runs as
-    // admin for someone else and there is no RLS scoping to rely on. And there is no >$10k block: this route IS
-    // the invoice path, so a large order belongs here.
+    // admin for someone else and there is no RLS scoping to rely on. And no amount blocks: an invoice may be
+    // requested at any amount, as card may be used at any amount.
     if (body.concierge) {
       const { data: ownedRows, error: ownedErr } = await supabaseAdmin
         .from('entitlements')

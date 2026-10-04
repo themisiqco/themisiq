@@ -812,8 +812,7 @@ export default function SbtiDashboard() {
           <h1 style={sectionHead}>Science-based targets, built on your GHG inventory</h1>
           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, marginTop: '0.75rem' }}>
             This module sets and tracks emissions reduction targets under the SBTi Corporate Net-Zero
-            Standard. It works from an inventory you have already built, so it needs a free account
-            before there is anything to show.
+            Standard. It works from a saved GHG inventory and is part of the GHG plan.
           </p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
             <a href={`/login?next=${encodeURIComponent('/dashboard/sbti')}`}

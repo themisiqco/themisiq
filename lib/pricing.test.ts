@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cartQuote, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, CARD_THRESHOLD_USD, MODULES, LEGACY_PRICING_PAGE_ID, priceLineQty, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, GHG_TIER_LABELS, GHG_SIZE_BASIS_NOTE, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, BILL_REVIEW_HUMAN_READING_SELLABLE, type ModuleKey, type GhgTier } from './pricing'
+import { cartQuote, priceLine, FLAT_MODULE_PRICES, GHG_TIERS, volumeDiscount, MODULES, LEGACY_PRICING_PAGE_ID, priceLineQty, UTILITY_CONNECT_ENABLED, sourceKindSellable, ghgTierForEmployees, ghgEmployeeBandLabel, GHG_TIER_KEYS, GHG_TIER_LABELS, GHG_SIZE_BASIS_NOTE, billReviewQuote, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, BILL_REVIEW_SOURCE_USD, BILL_REVIEW_MAX_SELF_SERVE_SOURCES, BILL_REVIEW_HUMAN_READING_SELLABLE, type ModuleKey, type GhgTier } from './pricing'
 
 // Regression guard for the new-model cart math (June 2026 rescope). cartQuote is
 // the single source of truth shared by the configurator (display) and the server
@@ -28,31 +28,25 @@ const expectedCart = (modules: ModuleKey[], ghgTier: GhgTier): number => {
 describe('cartQuote — new pricing model', () => {
   it('single flat module (People) = $1,499, card OK', () => {
     expect(cartQuote({ modules: ['people'] })).toEqual({
-      totalUSD: 1499, requiresQuote: false, requiresInvoice: false,
+      totalUSD: 1499, requiresQuote: false,
     })
   })
 
   it('single flat module (CBAM) = $1,499, card OK', () => {
     expect(cartQuote({ modules: ['cbam'] })).toEqual({
-      totalUSD: 1499, requiresQuote: false, requiresInvoice: false,
+      totalUSD: 1499, requiresQuote: false,
     })
   })
 
   it('two flat modules apply the -10% volume discount: (4900 + 1499) * 0.9 = 5759', () => {
     const q = cartQuote({ modules: ['climate-risk', 'people'] })
     expect(q.totalUSD).toBe(5759)
-    expect(q.requiresInvoice).toBe(false)
     expect(q.requiresQuote).toBe(false)
   })
 
-  // ⚠️ THIS ASSERTED $11,900 AND requiresInvoice UNTIL 28 Sep 2026. Professional is $1,425 under
-  // the employee bands, which is far below CARD_THRESHOLD_USD, so the card path is now the normal
-  // one for it. The threshold behaviour itself is asserted below on a cart that still exceeds it.
-  it('GHG Professional alone is the band price and clears on card', () => {
+  it('GHG Professional alone is the band price', () => {
     const q = cartQuote({ modules: ['ghg'], ghgTier: 'professional' })
     expect(q.totalUSD).toBe(GHG_TIERS.professional.priceUSD)
-    expect(q.totalUSD).toBeLessThan(CARD_THRESHOLD_USD)
-    expect(q.requiresInvoice).toBe(false)
     expect(q.requiresQuote).toBe(false)
   })
 
@@ -74,10 +68,12 @@ describe('cartQuote — new pricing model', () => {
     expect(volumeDiscount(ALL.length)).toBe(volumeDiscount(ALL.filter(k => k !== 'ghg').length + 1))
   })
 
-  it('a full cart exceeds the card threshold → requiresInvoice (cap no longer holds it under $10k)', () => {
+  // card-any-amount (Oct 2026): a cart over $10,000 used to come back requiresInvoice and was refused at
+  // card checkout. No total decides how a customer pays now, so the quote carries no such flag.
+  it('CA1: a full cart over $10,000 is priced with no invoice flag', () => {
     const q = cartQuote({ modules: ALL, ghgTier: 'professional' })
-    expect(q.totalUSD).toBeGreaterThan(CARD_THRESHOLD_USD)
-    expect(q.requiresInvoice).toBe(true)
+    expect(q.totalUSD).toBeGreaterThan(10_000)
+    expect(q).toEqual({ totalUSD: q.totalUSD, requiresQuote: false })
   })
 
   // ⚠️ THE QUOTE TIER MOVED ON 28 Sep 2026. Advisory was the quote path and is now the 250 to 499

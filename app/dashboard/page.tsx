@@ -78,7 +78,9 @@ const MODULES: DashboardModule[] = [
     bg: 'var(--color-module-ghg-wash)',
     frameworks: ['GHG Protocol', 'CSRD', 'CDP', 'SBTi'],
     urgency: null,
-    previewable: true,
+    // false: Scope 3 binds to a saved GHG inventory, and saving needs the plan, so there is nothing to
+    // preview without one (docs/review/free-claims-audit.md). The card reads "Locked", not "Preview free".
+    previewable: false,
   },
   {
     id: 'sbti',
@@ -398,7 +400,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d' }}>Your compliance modules</h2>
             {activeModuleCount === 0 && (
-              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Click any module to preview · unlock to export</div>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Click any module to see what it includes · GHG: Scope 1 and 2 are free to calculate; saving and downloads need a GHG plan</div>
             )}
           </div>
 

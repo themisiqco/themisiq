@@ -1,0 +1,446 @@
+diff --git a/app/calculate-emissions/page.tsx b/app/calculate-emissions/page.tsx
+index abfc8e3..f78127e 100644
+--- a/app/calculate-emissions/page.tsx
++++ b/app/calculate-emissions/page.tsx
+@@ -21,7 +21,7 @@ import type { Metadata } from "next";
+ import { scope3ScopeClaim, scope3ShortClaim } from '../../lib/scope3/methodSummary'
+ import { SB253_SHORT, SB253_FIRST_REPORT_DATE, SB253_DATE_STATUS, SB253_SCOPE3_FROM } from '../../lib/sb253';
+ import { GHG_TIERS, GHG_TIER_KEYS, BILL_REVIEW_ONBOARDING_USD, BILL_REVIEW_INCLUDED_SOURCES, ghgEmployeeBandLabel, GHG_SIZE_BASIS_NOTE } from '../../lib/pricing';
+-import { BILL_REVIEW_DESCRIPTION } from '../../lib/pricingCopy';
++import { BILL_REVIEW_DESCRIPTION, GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../lib/pricingCopy';
+ import Link from "next/link";
+ import Footer from '../components/Footer'
+ 
+@@ -60,12 +60,12 @@ const billReviewIncluded = BILL_REVIEW_INCLUDED_SOURCES.starter;
+ export const metadata: Metadata = {
+   title: "Calculate Your GHG Emissions | SB 253, CSRD, IFRS S2 | ThemisIQ",
+   description:
+-    "Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $4,900 USD.",
++    `Asked for your carbon footprint? ThemisIQ calculates Scope 1 & 2 emissions in real time on the GHG Protocol and produces a report ready for SB 253, CSRD (ESRS E1), IFRS S2 and more. From $${ghgFrom} USD.`,
+   alternates: { canonical: "/calculate-emissions" },
+   openGraph: {
+     title: "Calculate Your GHG Emissions in Real Time | ThemisIQ",
+     description:
+-      "See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $4,900 USD.",
++      `See your Scope 1 & 2 emissions instantly, free. Download a report ready for SB 253, CSRD, IFRS S2 and more. From $${ghgFrom} USD.`,
+     url: "/calculate-emissions",
+     type: "website",
+   },
+@@ -151,7 +151,7 @@ const FAQ_LD = {
+       name: "What does it cost?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: `Calculating and previewing your Scope 1 and 2 emissions is free. The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Bill Review from $${billReviewFrom}, including the first year for ${billReviewIncluded} data sources; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
++        text: `${GHG_FREE_USE_SENTENCE} ${GHG_PLAN_USE_SENTENCE} The GHG module starts at $${ghgFrom} USD and is priced by company size, with unlimited locations; Bill Review from $${billReviewFrom}, including the first year for ${billReviewIncluded} data sources; Advisory is custom; Scope 3 (${scope3ShortClaim()}) is included in the GHG module; the Supply Chain module adds primary supplier data collection for Category 1. All prices in USD.`,
+       },
+     },
+     {
+@@ -159,15 +159,15 @@ const FAQ_LD = {
+       name: "Is this a subscription? Will I be charged again?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: "No. ThemisIQ is a one-time purchase - you select and pay for the modules you need, once, and your credit card will not be charged again. Choose more than one module and the multi-module discount is applied automatically at checkout, and every payment is handled securely by Stripe.",
++        text: "No. A plan gives you 12 months of access and does not renew or charge you automatically. We email you 30 days before it ends so you can opt in to another year. Choose more than one module and the multi-module discount is applied automatically at checkout, and every payment is handled securely by Stripe.",
+       },
+     },
+     {
+       "@type": "Question",
+-      name: "What if the total is more than my company card allows?",
++      name: "Can I pay by invoice?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: "At Stripe checkout, choose 'Invoice me' instead of paying by card. We generate an invoice you can forward to your accounting team for payment. Once that payment is received, we email you to confirm your selected modules are unlocked and ready to go.",
++        text: "Yes. Pay by card, or request an invoice, at any amount. Prefer to pay by invoice? Choose your modules on the pricing page and request an invoice there. We send an invoice you can forward to your accounts team, and once it is paid we email you to confirm your modules are unlocked.",
+       },
+     },
+     {
+@@ -175,7 +175,7 @@ const FAQ_LD = {
+       name: "Can I try it before I pay?",
+       acceptedAnswer: {
+         "@type": "Answer",
+-        text: "Yes. Calculating your emissions is free with no account required. Payment, securely via Stripe, only happens when you choose to unlock and download the finished report.",
++        text: `Yes. ${GHG_FREE_USE_SENTENCE} Nothing is saved until you have a GHG plan. ${GHG_PLAN_USE_SENTENCE} Payment is handled securely by Stripe.`,
+       },
+     },
+     {
+@@ -450,8 +450,8 @@ export default function CalculateEmissionsPage() {
+               <Link className="btn btn-primary" href={CONFIG.TRY_URL}>See your emissions instantly</Link>
+               <a className="btn btn-ghost" href={CONFIG.CONTACT_HREF}>Get in touch</a>
+             </div>
+-            <p className="reassure">Explore the calculator free*: you only pay when you&rsquo;re ready to download your report.</p>
+-            <p className="hero-foot">*GHG emissions calculated from your totals via our platform, instantly and at no cost. For $4,900 USD, unlock platform access to download your report under any GHG framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
++            <p className="reassure">{GHG_FREE_USE_SENTENCE}* {GHG_PLAN_USE_SENTENCE}</p>
++            <p className="hero-foot">*Your Scope 1 and 2 figures are calculated in your browser, instantly and at no cost, and are not saved. A GHG plan, from ${ghgFrom} USD a year, adds saving and report downloads under any GHG framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2, and more.</p>
+           </div>
+         </section>
+ 
+@@ -498,7 +498,7 @@ export default function CalculateEmissionsPage() {
+           <div className="wrap">
+             <div className="eyebrow">How it works</div>
+             <h2>From bills to a submittable report, in five steps.</h2>
+-            <p className="section-sub">Start calculating in seconds. No account needed to see your emissions; you only create one when you&rsquo;re ready to download.</p>
++            <p className="section-sub">Start calculating in seconds. {GHG_FREE_USE_SENTENCE} {GHG_PLAN_USE_SENTENCE}</p>
+ 
+             <div className="vprocess">
+               <div className="vstep">
+@@ -522,7 +522,7 @@ export default function CalculateEmissionsPage() {
+                     <span className="fwk">GRI 305</span>
+                     <span className="fwk">EcoVadis</span>
+                   </div>
+-                  <span className="hint">$4,900 USD unlocks platform access: download your report under any framework you need</span>
++                  <span className="hint">A GHG plan, from ${ghgFrom} USD a year, adds report downloads under any framework you need</span>
+                 </div>
+               </div>
+ 
+@@ -553,7 +553,7 @@ export default function CalculateEmissionsPage() {
+                 <div className="vnum">05</div>
+                 <div className="vstep-body">
+                   <div className="vstep-title">Unlock &amp; download your report</div>
+-                  <p className="vstep-desc">Our Scope 1 &amp; Scope 2 GHG module is priced at <strong>$4,900 USD</strong>: simply create an account and pay securely by credit card, or on invoice, via <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
++                  <p className="vstep-desc">Our GHG module is priced from <strong>${ghgFrom} USD</strong> a year: create an account and pay by card, or request an invoice, through <strong>Stripe</strong>. Then download your selected report, ready to <strong>submit for California&rsquo;s SB 253, or any other global GHG reporting framework</strong>, or hand straight to your customer or investor.</p>
+                   <span className="hint">Scope 3 is included in the GHG module. <Link href={CONFIG.SUPPLY_CHAIN_URL}>Add Supply Chain for primary supplier data on Category 1 &rarr;</Link></span>
+                 </div>
+               </div>
+@@ -690,7 +690,7 @@ export default function CalculateEmissionsPage() {
+               <details className="qa">
+                 <summary>What does it cost?</summary>
+                 <div className="qa-body">
+-                  A fraction of what consultants and legacy platforms charge. Seeing your emissions is free: you only pay when you&rsquo;re ready to download a report or add support:
++                  A fraction of what consultants and legacy platforms charge. {GHG_FREE_USE_SENTENCE} {GHG_PLAN_USE_SENTENCE}
+                   <ul className="price-list">
+                     <li><span className="pl-name">Calculate &amp; preview your Scope 1 &amp; 2 emissions</span><span className="pl-price">Free</span></li>
+                     <li><span className="pl-name">GHG module: Scope 1, 2 and 3 report, any framework</span><span className="pl-price">from ${ghgFrom}*</span></li>
+@@ -705,21 +705,21 @@ export default function CalculateEmissionsPage() {
+               <details className="qa">
+                 <summary>Is this a subscription? Will I be charged again?</summary>
+                 <div className="qa-body">
+-                  No, this is not a subscription, and your credit card will not be charged again. ThemisIQ is a one-time purchase: you select and pay for the modules you need, once. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout, with nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
++                  No. A plan gives you 12 months of access and does not renew or charge you automatically. We email you 30 days before it ends so you can opt in to another year. Buying more than one module? The <Link href={CONFIG.PRICING_URL}>multi-module discount</Link> is applied automatically at checkout, with nothing to ask for. We always show you exactly what you&rsquo;re paying for before you confirm, and every payment is handled securely by <strong>Stripe</strong>.
+                 </div>
+               </details>
+ 
+               <details className="qa">
+-                <summary>What if the total is more than my company card allows?</summary>
++                <summary>Can I pay by invoice?</summary>
+                 <div className="qa-body">
+-                  No problem. At Stripe checkout, just choose <strong>&ldquo;Invoice me&rdquo;</strong> instead of paying by card. We&rsquo;ll generate an invoice you can forward to your accounting team for payment. Once that payment is received, we&rsquo;ll email you to confirm your selected modules are unlocked and ready to go.
++                  Yes. Pay by card, or request an invoice, at any amount. Prefer to pay by invoice? <Link href={CONFIG.PRICING_URL}>Request an invoice</Link> once you&rsquo;ve chosen your modules. We&rsquo;ll send an invoice you can forward to your accounts team, and once it&rsquo;s paid we&rsquo;ll email you to confirm your modules are unlocked.
+                 </div>
+               </details>
+ 
+               <details className="qa">
+                 <summary>Can I try it before I pay?</summary>
+                 <div className="qa-body">
+-                  Yes. Calculating your emissions is free: no account required. Payment (securely via <strong>Stripe</strong>) only happens when you choose to unlock and download the finished report.
++                  Yes. {GHG_FREE_USE_SENTENCE} Nothing is saved until you have a GHG plan. {GHG_PLAN_USE_SENTENCE} Payment is handled securely by <strong>Stripe</strong>.
+                 </div>
+               </details>
+ 
+diff --git a/app/dashboard/ghg/page.tsx b/app/dashboard/ghg/page.tsx
+index 25f936e..6fe93f2 100644
+--- a/app/dashboard/ghg/page.tsx
++++ b/app/dashboard/ghg/page.tsx
+@@ -9,7 +9,8 @@ import { supabase } from '../../../lib/supabase'
+ import { csvBlob } from '../../../lib/csv'
+ import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
+ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
+-import { saveGhgDraft, readGhgDraft, clearGhgDraft } from '../../../lib/ghg/draft'
++import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
++import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
+ import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
+ import { figuresForSave } from '../../../lib/ghg/savePayload'
+ import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
+@@ -158,6 +159,10 @@ const BOT_INCOMPLETE_NOTE = `This answer stopped before the end. It ran longer t
+ // The entitlement line is a REAL CHANGE in who can use this: the guide answered anyone in the
+ // wizard before, backed by the Anthropic key, whether or not they had bought the module.
+ const BOT_ERRORS: Record<string, string> = {
++  // No session in this browser at all: most often someone who has never signed in, so nothing has "ended".
++  // The server's 401 (a token it would not accept) keeps `unauthenticated` below.
++  signed_out:
++    'The guide is part of the GHG plan. Sign in with an account that has a GHG plan to ask it questions.',
+   unauthenticated:
+     'Your session has ended. Refresh the page and sign in again, and the guide will pick straight back up.',
+   entitlement_required:
+@@ -210,7 +215,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
+       // runs before calling /api/concierge/extract.
+       const { data: { session } } = await supabase.auth.getSession()
+       if (!session) {
+-        setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS.unauthenticated }])
++        setMessages(m => [...m, { role: 'assistant', content: BOT_ERRORS.signed_out }])
+         setLoading(false)
+         return
+       }
+@@ -364,7 +369,7 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
+ //
+ // onUnlock, NOT AN HREF, because the draft has to be stashed before the navigation. See
+ // stashDraftAndGoToPricing.
+-function PaywallOverlay({ frameworks, onUnlock }: { frameworks: string[]; onUnlock: () => void }) {
++function PaywallOverlay({ frameworks, onUnlock, anon }: { frameworks: string[]; onUnlock: () => void; anon: boolean }) {
+   return (
+     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+       <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
+@@ -377,7 +382,7 @@ function PaywallOverlay({ frameworks, onUnlock }: { frameworks: string[]; onUnlo
+         {/* "One click" is gone with it: the path from here is /pricing, the configurator, the consent
+             step, Stripe, and then the webhook. The last sentence is the draft promise, said where it can
+             be read BEFORE the button rather than in a modal after it. */}
+-        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package and saving. Your figures are kept while you choose a plan.</div>
++        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package and saving. {draftKeptSentence(anon)}</div>
+         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
+           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
+           {[
+@@ -642,10 +647,14 @@ const searchParams = useSearchParams()
+   // Who is signed in, for "Confirm this site used none", which records who confirmed and when (T8). Null
+   // until the session is read, or when it has no email; the control is disabled while null.
+   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
++  // Whether a session exists, for the draft-retention sentence: a draft written signed out expires after two
++  // hours (lib/drafts.ts). null until read, and read as signed out, which is the shorter promise.
++  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+   useEffect(() => {
+     supabase.auth.getSession().then(({ data: { session } }) => {
+       const u = session?.user
+       setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
++      setSignedIn(!!session)
+     })
+   }, [])
+   // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
+@@ -1608,7 +1617,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
+     // export overlay's button and the unsaved-changes banner. See its header for the `anon: !session`
+     // rule and for the ordering.
+     if (!session || ghgAccess === 'none') {
+-      await stashDraftAndGoToPricing('Saving needs the GHG module. Your figures will be kept while you choose a plan.')
++      await stashDraftAndGoToPricing(`Saving needs the GHG module. ${draftKeptSentence(!session)}`)
+       return
+     }
+     // Resolve the company_id for this inventory's company_name.
+@@ -2988,7 +2997,7 @@ workings: saved.workings,
+             one sentence that is merely inoffensive to both. */}
+         <p style={sectionSub}>One inventory: {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. {isPaid ? 'Download any of them below.' : 'Downloading them needs the GHG module.'}</p>
+         <div style={{ position: 'relative' }}>
+-          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} onUnlock={() => { void stashDraftAndGoToPricing() }} />}
++          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} anon={signedIn !== true} onUnlock={() => { void stashDraftAndGoToPricing() }} />}
+           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
+             <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' as const }}>
+               {activeFrameworks.map(fw => (
+@@ -3394,7 +3403,7 @@ workings: saved.workings,
+                 ? <><strong style={{ fontWeight: 600 }}>We could not check your GHG access.</strong> Reading is unaffected. Saving may not work until this clears.</>
+                 : inventoryId
+                 ? <><strong style={{ fontWeight: 600 }}>Saving needs the GHG module.</strong> You can read this inventory, but changes will not be kept.</>
+-                : <>Your results are calculated as you enter your data. Saving your inventory and downloading reports need the GHG module.</>}
++                : <>{GHG_FREE_USE_SENTENCE} Your results are calculated as you enter your data. {GHG_PLAN_USE_SENTENCE}</>}
+             </span>
+             {ghgAccess !== 'unknown' && (
+               <a href="/pricing?modules=ghg" style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
+@@ -3426,7 +3435,7 @@ workings: saved.workings,
+           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
+             {ghgAccess === 'none' ? (
+               <>
+-                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>Saving needs the GHG module. Your figures will be kept while you choose a plan.</span>
++                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>Saving needs the GHG module. {draftKeptSentence(signedIn !== true)}</span>
+                 <button onClick={() => { void stashDraftAndGoToPricing() }} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>See GHG pricing →</button>
+               </>
+             ) : (
+diff --git a/app/dashboard/page.tsx b/app/dashboard/page.tsx
+index 77b5964..5c7548e 100644
+--- a/app/dashboard/page.tsx
++++ b/app/dashboard/page.tsx
+@@ -78,7 +78,9 @@ const MODULES: DashboardModule[] = [
+     bg: 'var(--color-module-ghg-wash)',
+     frameworks: ['GHG Protocol', 'CSRD', 'CDP', 'SBTi'],
+     urgency: null,
+-    previewable: true,
++    // false: Scope 3 binds to a saved GHG inventory, and saving needs the plan, so there is nothing to
++    // preview without one (docs/review/free-claims-audit.md). The card reads "Locked", not "Preview free".
++    previewable: false,
+   },
+   {
+     id: 'sbti',
+@@ -398,7 +400,7 @@ export default function Dashboard() {
+           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 400, color: '#0d0d0d' }}>Your compliance modules</h2>
+             {activeModuleCount === 0 && (
+-              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Click any module to preview · unlock to export</div>
++              <div style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>Click any module to see what it includes · GHG: Scope 1 and 2 are free to calculate; saving and downloads need a GHG plan</div>
+             )}
+           </div>
+ 
+diff --git a/app/dashboard/sbti/page.tsx b/app/dashboard/sbti/page.tsx
+index 20cbc65..c306ca0 100644
+--- a/app/dashboard/sbti/page.tsx
++++ b/app/dashboard/sbti/page.tsx
+@@ -812,8 +812,7 @@ export default function SbtiDashboard() {
+           <h1 style={sectionHead}>Science-based targets, built on your GHG inventory</h1>
+           <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.75, marginTop: '0.75rem' }}>
+             This module sets and tracks emissions reduction targets under the SBTi Corporate Net-Zero
+-            Standard. It works from an inventory you have already built, so it needs a free account
+-            before there is anything to show.
++            Standard. It works from a saved GHG inventory and is part of the GHG plan.
+           </p>
+           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: '2rem' }}>
+             <a href={`/login?next=${encodeURIComponent('/dashboard/sbti')}`}
+diff --git a/app/dashboard/scope3/page.tsx b/app/dashboard/scope3/page.tsx
+index 85df330..1abfbd5 100644
+--- a/app/dashboard/scope3/page.tsx
++++ b/app/dashboard/scope3/page.tsx
+@@ -4315,7 +4315,7 @@ export default function Scope3Dashboard() {
+                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', fontWeight: 400, marginBottom: 8 }}>Unlock your full Scope 3 results</div>
+                 <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.6, marginBottom: 18 }}>Your complete inventory is ready: the total, the category-by-category breakdown, and the data-quality flags for every line. Unlock the GHG module to view and download it.</div>
+                 <a href="/pricing" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See pricing &amp; unlock →</a>
+-                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>The calculator stays free. You only pay to unlock results &amp; export.</div>
++                <div style={{ fontSize: 11, color: 'var(--color-ink-2)', marginTop: 12 }}>Scope 1 and 2 are free to try. Scope 3 is part of the GHG plan.</div>
+               </div>
+             </div>
+           )}
+@@ -4489,7 +4489,7 @@ export default function Scope3Dashboard() {
+                     ⚠️ `signedIn === false`, NOT `!signedIn`: null means not yet known and `!null` is true. */}
+                 {signedIn === false && (
+                   <p style={{ ...sectionSub, color: 'var(--color-ink-2)', marginTop: '0.75rem' }}>
+-                    Scope 3 builds on a saved GHG inventory, so it needs a free account.
++                    Scope 3 builds on a saved GHG inventory and is part of the GHG plan.
+                   </p>
+                 )}
+                 <a href="/dashboard/ghg" style={{ display: 'inline-block', padding: '11px 24px', borderRadius: 8, background: GRAD, color: 'var(--color-on-dark)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>Create a GHG inventory →</a>
+diff --git a/lib/ghg/draft.ts b/lib/ghg/draft.ts
+index 49c281f..6ddd0c6 100644
+--- a/lib/ghg/draft.ts
++++ b/lib/ghg/draft.ts
+@@ -27,7 +27,7 @@
+ // back to the page's own defaults, because the caller merges this PARTIAL over them — never the
+ // reverse. Merging the other way would let a missing key blank a field the form had already defaulted.
+ 
+-import { DRAFT_KEYS, readDraft, saveDraft, clearDraft } from '../drafts'
++import { DRAFT_KEYS, readDraft, saveDraft, clearDraft, ANON_TTL_MS } from '../drafts'
+ 
+ /** The fields a restore carries. All optional: the caller merges over its own defaults. */
+ export type GhgDraft = {
+@@ -122,3 +122,16 @@ export function readGhgDraft(): GhgDraft | null {
+ export function clearGhgDraft(): void {
+   clearDraft(DRAFT_KEYS.ghg)
+ }
++
++/**
++ * What happens to the figures while a visitor goes to choose a plan, said as it actually is (free-claims,
++ * Oct 2026). The draft lives in this browser's storage only; written signed out it expires after
++ * ANON_TTL_MS, written signed in it does not expire here. "Kept while you choose a plan" alone promised
++ * the signed-out visitor more than two hours in the same browser.
++ */
++export function draftKeptSentence(anon: boolean): string {
++  const hours = ANON_TTL_MS / (60 * 60 * 1000)
++  return anon
++    ? `Your figures are kept in this browser for ${hours} hours while you choose a plan.`
++    : 'Your figures are kept in this browser while you choose a plan.'
++}
+diff --git a/lib/pricingCopy.ts b/lib/pricingCopy.ts
+index 9b9a14b..e12edfa 100644
+--- a/lib/pricingCopy.ts
++++ b/lib/pricingCopy.ts
+@@ -39,3 +39,14 @@ export const BILL_REVIEW_DESCRIPTION =
+ /** The human-read option, verbatim. */
+ export const BILL_REVIEW_HUMAN_DESCRIPTION =
+   'Prefer a person to read your bills? Choose human reading and a ThemisIQ specialist reads each one within 2 business days. Your bills are never sent to AI.'
++
++/**
++ * What the GHG module does free, and what needs a plan (free-claims, Oct 2026). Every page that describes
++ * free use prints these two sentences, so the free/paid line is drawn once. It must match the gates in
++ * app/dashboard/ghg/page.tsx and its siblings; docs/review/free-claims-audit.md section 1 is the audit.
++ */
++export const GHG_FREE_USE_SENTENCE =
++  'Scope 1 and 2 can be calculated free, in your browser, without an account.'
++
++export const GHG_PLAN_USE_SENTENCE =
++  'Saving, Scope 3, document uploads, the GHG guide, Trends, SBTi targets, verifier sharing and report downloads need a GHG plan.'
+--- /dev/null
++++ b/app/calculate-emissions/prices.test.ts
+@@ -0,0 +1,23 @@
++import { describe, it, expect } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++
++// /calculate-emissions carried "$4,900 USD" in five places for months after GHG was repriced, because
++// each was typed into the copy rather than read from lib/pricing.ts. Every price on this page now comes
++// from ghgFrom, billReviewFrom or GHG_PRICED_BANDS. A dollar figure typed into the source is the
++// regression; SB 253's "$1 billion" revenue threshold is the one literal that is not a price.
++const SRC = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
++  .split('\n')
++  .filter(line => !line.trim().startsWith('//'))
++  .join('\n')
++
++describe('/calculate-emissions prices', () => {
++  it('CP1: no hard-coded dollar figure other than the SB 253 revenue threshold', () => {
++    const literals = [...SRC.matchAll(/\$\d[\d,]*/g)].map(m => m[0]).filter(m => m !== '$1')
++    expect(literals).toEqual([])
++  })
++
++  it('CP2: the retired $4,900 GHG price is gone', () => {
++    expect(SRC).not.toContain('4,900')
++  })
++})
+--- /dev/null
++++ b/lib/freeClaims.test.ts
+@@ -0,0 +1,67 @@
++import { describe, it, expect, vi } from 'vitest'
++import { readFileSync } from 'node:fs'
++import { join } from 'node:path'
++// lib/drafts.ts imports the browser Supabase client; the sentence needs none of it.
++vi.mock('./supabase', () => ({ supabase: {} }))
++import { draftKeptSentence } from './ghg/draft'
++import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from './pricingCopy'
++
++// Free-use and payment claims, held against what the product does (docs/review/free-claims-audit.md).
++// Each retired phrase below was on the site and was false: payment is needed for far more than downloads,
++// Scope 3 and SBTi need a plan rather than a free account, there is no "Invoice me" at Stripe checkout, and
++// a plan is 12 months of access rather than a one-time purchase.
++const ROOT = join(__dirname, '..')
++const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
++
++const CALC = 'app/calculate-emissions/page.tsx'
++const GHG = 'app/dashboard/ghg/page.tsx'
++const SCOPE3 = 'app/dashboard/scope3/page.tsx'
++const SBTI = 'app/dashboard/sbti/page.tsx'
++const DASH = 'app/dashboard/page.tsx'
++
++describe('free-use claims', () => {
++  it('FC1: the retired claims are gone', () => {
++    const retired: Array<[string, string]> = [
++      [CALC, 'only pay when'],
++      [CALC, 'Invoice me'],
++      [CALC, 'one-time purchase'],
++      [CALC, 'not be charged again'],
++      [CALC, '10,000'],
++      [SCOPE3, 'needs a free account'],
++      [SCOPE3, 'calculator stays free'],
++      [SBTI, 'needs a free account'],
++      [DASH, 'unlock to export'],
++      [GHG, 'Your figures will be kept while you choose a plan'],
++    ]
++    for (const [file, phrase] of retired) expect(read(file), `${file}: "${phrase}"`).not.toContain(phrase)
++  })
++
++  it('FC2: free use is described with the shared sentences', () => {
++    for (const file of [CALC, GHG]) {
++      const src = read(file)
++      expect(src, file).toContain('GHG_FREE_USE_SENTENCE')
++      expect(src, file).toContain('GHG_PLAN_USE_SENTENCE')
++    }
++    expect(GHG_FREE_USE_SENTENCE).toContain('free')
++    for (const gated of ['Saving', 'Scope 3', 'uploads', 'guide', 'Trends', 'SBTi', 'verifier sharing', 'downloads']) {
++      expect(GHG_PLAN_USE_SENTENCE).toContain(gated)
++    }
++  })
++
++  it('FC3: the draft sentence states the signed-out retention', () => {
++    expect(draftKeptSentence(true)).toBe('Your figures are kept in this browser for 2 hours while you choose a plan.')
++    expect(draftKeptSentence(false)).toBe('Your figures are kept in this browser while you choose a plan.')
++  })
++
++  it('FC4: the Scope 3 card does not offer a free preview', () => {
++    const card = read(DASH).split("id: 'scope3'")[1].split("id: 'sbti'")[0]
++    expect(card).toContain('previewable: false')
++  })
++
++  it('FC5: a visitor with no session is not told their session ended', () => {
++    const src = read(GHG)
++    expect(src).toContain('content: BOT_ERRORS.signed_out')
++    const signedOut = src.split('signed_out:')[1].split('\n')[1]
++    expect(signedOut).not.toContain('session')
++  })
++})

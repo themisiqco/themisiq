@@ -7,8 +7,8 @@ import { BRAND, BRAND_WASH, INK_MUTED } from '@/lib/brand'
 import { NOT_PROVIDED } from '../../../../lib/notProvided'
 import { subjectText } from '../../../../lib/emailSubject'
 
-// Quote-request capture for /order carts that exceed the card threshold (>$10k) or are
-// GHG Advisory. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
+// Invoice and quote requests from /order: any order the customer prefers to pay by invoice (any amount,
+// card-any-amount Oct 2026), or GHG Enterprise. Email-only — NO payment, NO DB table. Clones the /api/assessment/submit
 // Resend pattern (same env vars, same fetch helper): notify our monitor address so we can
 // follow up with an invoice, and send the prospect a brief confirmation.
 
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     // (I2: server-priced, metadata.{user_id,entitlements}, idempotent, auto_advance:false — nothing
     // sends) and notifies the monitor to review-and-send from Stripe with one click. It is wrapped so
     // that NO invoice-side fault can turn the prospect's submission into a visible failure, and it
-    // NEVER finalizes/sends. Advisory & card-eligible are excluded by the helper's own guards.
+    // NEVER finalizes/sends. Enterprise (requires_quote) is excluded by the helper's own guard.
     try {
       const inv = await createDraftInvoiceForOrder({ email: vEmail, modules: vModules, tier: tierParam, ref: vRef || undefined })
       if (inv.ok) {
@@ -201,9 +201,6 @@ export async function POST(req: NextRequest) {
           `<p style="font-family:sans-serif;font-size:13px;color:#0d0d0d;">Manual quote needed for <strong>${name}</strong> (${email}) · ${company} · ${modules}.<br>Reason: ${esc(inv.message)}<br>Build a custom quote/invoice in Stripe manually.</p>`,
           `Manual quote needed for ${vName} (${vEmail}) · ${company} · ${modules}. ${inv.message}`,
         )
-      } else if (inv.reason === 'card_eligible') {
-        // Defensive: a ≤$10k order shouldn't reach the quote form. Do NOT invoice.
-        console.warn(`[quote-request] card-eligible order reached quote path for ${vEmail}; no invoice created.`)
       } else {
         // empty / error — invoice NOT created. Alert the monitor to handle it manually.
         await sendEmail(
