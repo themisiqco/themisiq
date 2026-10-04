@@ -1,6 +1,12 @@
 -- docs/review/patches/FI0-entitlement-gate-only.sql
 --
--- ⚠️ NOT RUN. Drafted 2 Oct 2026 (task FI0, docs/review/design-derived-figures.md section 11). To become
+-- ⚠️ RUN 2 Oct 2026, in the Supabase SQL editor (recorded by Lisa on 4 Oct 2026). FI0-verify.sql was run afterwards:
+-- the behavioural checks passed; only the function-name text check failed, as expected: "body does not read
+-- location_allowance" searches pg_get_functiondef(), which prints the function's own name,
+-- enforce_ghg_location_allowance, so it finds the string even though the body no longer reads the column.
+-- DO NOT RUN IT AGAIN: the live body is now this file's, and LEAD1's M2 (docs/review/design-lead1.md section 4)
+-- builds on it.
+-- Drafted 2 Oct 2026 (task FI0, docs/review/design-derived-figures.md section 11). To become
 -- supabase/migrations/2026MMDD_ghg_entitlement_gate_only.sql.
 --
 -- WHAT IT DOES. Replaces public.enforce_ghg_location_allowance() with its ENTITLEMENT GATE ONLY. The location cap
