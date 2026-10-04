@@ -1,6 +1,8 @@
 -- docs/review/patches/L3-M4-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L3-M4-free-calc-pending.sql, in the Supabase SQL editor, the whole file. It changes nothing:
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M4 and M6: all 13 checks passed. DO NOT RUN AGAIN as
+-- part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER L3-M4-free-calc-pending.sql, in the Supabase SQL editor, the whole file. It changes nothing:
 -- the writes happen inside one PL/pgSQL block that ends by raising 'm4_undo', and catching it rolls the block back.
 -- Results are carried out in variables (the L0/L1 pattern).
 --

@@ -1,6 +1,8 @@
 -- docs/review/patches/L3-M6-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L3-M6-profiles-on-signup.sql, in the Supabase SQL editor, the whole file. It changes nothing:
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M4 and M6: all 15 checks passed. DO NOT RUN AGAIN as
+-- part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER L3-M6-profiles-on-signup.sql, in the Supabase SQL editor, the whole file. It changes nothing:
 -- the test users and everything they cause are created inside one PL/pgSQL block that ends by raising 'm6_undo', and
 -- catching it rolls the block back (the L0/L1 pattern). It inserts into auth.users the way a sign-up does, with the
 -- columns GoTrue sets; if this project's auth.users needs more, the S cases report the error instead of passing.

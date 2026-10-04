@@ -229,8 +229,12 @@ describe('route wiring and SQL shape', () => {
   it('W2: M4 is service-role only; M6 never blocks a sign-up and grants authenticated SELECT only', () => {
     const m4 = read('docs/review/patches/L3-M4-free-calc-pending.sql')
     const m6 = read('docs/review/patches/L3-M6-profiles-on-signup.sql')
-    for (const s of [m4, m6, read('docs/review/patches/L3-M4-rollback.sql'), read('docs/review/patches/L3-M6-rollback.sql'),
-      read('docs/review/patches/L3-M4-verify.sql'), read('docs/review/patches/L3-M6-verify.sql')]) {
+    // The headers record execution (CLAUDE.md): M4, M6 and both verify scripts were RUN on 4 Oct 2026 (13 and 15 checks
+    // passed); the rollbacks were not run.
+    for (const s of [m4, m6]) expect(s.split('\n')[2]).toContain('⚠️ RUN 4 Oct 2026')
+    expect(read('docs/review/patches/L3-M4-verify.sql')).toContain('all 13 checks passed. DO NOT RUN AGAIN')
+    expect(read('docs/review/patches/L3-M6-verify.sql')).toContain('all 15 checks passed. DO NOT RUN AGAIN')
+    for (const s of [read('docs/review/patches/L3-M4-rollback.sql'), read('docs/review/patches/L3-M6-rollback.sql')]) {
       expect(s.split('\n')[2]).toContain('⚠️ NOT RUN.')
     }
     expect(m4).toContain('alter table public.free_calc_pending enable row level security;')

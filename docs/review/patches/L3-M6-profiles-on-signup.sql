@@ -1,6 +1,8 @@
 -- docs/review/patches/L3-M6-profiles-on-signup.sql
 --
--- ⚠️ NOT RUN. Drafted 4 Oct 2026 (LEAD1 task L3, migration M6; design in docs/review/design-lead1.md section 4, "M6").
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M4; L3-M6-verify.sql then passed all 15 checks.
+-- DO NOT RUN AGAIN: the pre-flight would refuse (handle_new_user() and the auth.users trigger already exist).
+-- Drafted 4 Oct 2026 (LEAD1 task L3, migration M6; design in docs/review/design-lead1.md section 4, "M6").
 -- To become supabase/migrations/2026MMDD_profiles_on_signup.sql.
 --
 -- RUN ORDER (L3, after the L3 code is live): L3-M4-free-calc-pending.sql (M4), then THIS FILE (M6), then

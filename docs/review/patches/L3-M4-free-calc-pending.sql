@@ -1,6 +1,8 @@
 -- docs/review/patches/L3-M4-free-calc-pending.sql
 --
--- ⚠️ NOT RUN. Drafted 4 Oct 2026 (LEAD1 task L3, migration M4; design in docs/review/design-lead1.md sections 1.6 and 4).
+-- ⚠️ RUN 4 Oct 2026 in the Supabase SQL editor (recorded by Lisa), first of the L3 files; L3-M4-verify.sql then passed all
+-- 13 checks. DO NOT RUN AGAIN: the pre-flight would refuse (free_calc_pending already exists).
+-- Drafted 4 Oct 2026 (LEAD1 task L3, migration M4; design in docs/review/design-lead1.md sections 1.6 and 4).
 -- To become supabase/migrations/2026MMDD_free_calc_pending.sql.
 --
 -- RUN ORDER (L3, after the L3 code is live): THIS FILE (M4), then L3-M6-profiles-on-signup.sql (M6), then

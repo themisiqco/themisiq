@@ -10,7 +10,10 @@ import { csvBlob } from '../../../lib/csv'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
 import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
-import { wantsNewCalculator, entryView, entryWall, saveGoesToPricing } from '../../../lib/ghg/entry'
+import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry'
+// "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
+import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, KEEP_COPY, readPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
+import KeepResultsModal from './_components/KeepResultsModal'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
 // The plan gates' messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
 import { saveFailedText } from '../../../lib/planGateError'
@@ -376,7 +379,7 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
 //
 // onUnlock, NOT AN HREF, because the draft has to be stashed before the navigation. See
 // stashDraftAndGoToPricing.
-function PaywallOverlay({ frameworks, onUnlock, anon }: { frameworks: string[]; onUnlock: () => void; anon: boolean }) {
+function PaywallOverlay({ frameworks, onUnlock, anon, onKeep }: { frameworks: string[]; onUnlock: () => void; anon: boolean; onKeep?: () => void }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '2.5rem', boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '0.5px solid #e8e7e4', maxWidth: 480, textAlign: 'center' as const }}>
@@ -423,6 +426,14 @@ function PaywallOverlay({ frameworks, onUnlock, anon }: { frameworks: string[]; 
         <button onClick={onUnlock} style={{ width: '100%', fontSize: 14, fontWeight: 600, padding: '14px 28px', borderRadius: 10, border: 'none', cursor: 'pointer', marginBottom: 10, background: 'var(--color-brand)', color: 'var(--color-on-dark)' }}>
           See GHG pricing →
         </button>
+        {/* LEAD1 L4: the secondary way out, under the pricing button. Downloads stay paid; the free account keeps
+            the calculation. ⚠️ L5: once the results email is sent on claim, this becomes design 1.1's
+            "Email me my results instead (free account)". */}
+        {onKeep && (
+          <button type="button" onClick={onKeep} style={{ display: 'block', width: '100%', fontSize: 13, fontWeight: 600, padding: '8px 0', marginBottom: 10, background: 'none', border: 'none', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>
+            {KEEP_COPY.overlayLink}
+          </button>
+        )}
         <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 12 }}>Secure payment through Stripe</div>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const, borderTop: '0.5px solid #e8e7e4', paddingTop: 12 }}>
           {['Your data is encrypted', 'Never sold or shared', 'PIPEDA compliant', 'Not used to train AI'].map(t => (
@@ -657,13 +668,27 @@ const searchParams = useSearchParams()
   // Whether a session exists, for the draft-retention sentence: a draft written signed out expires after two
   // hours (lib/drafts.ts). null until read, and read as signed out, which is the shorter promise.
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  // LEAD1 L4. editingFree: the inventory open by id is this account's free calculation (ghg_inventories.free_tier).
+  // keepModal: the "Keep my results" modal, and where it starts. leaving: set just before the modal navigates, so the
+  // unsaved-changes prompt does not stop a save that has already happened.
+  const [editingFree, setEditingFree] = useState(false)
+  const [hasFreeCalc, setHasFreeCalc] = useState(false)
+  const [keepModal, setKeepModal] = useState<null | { start: 'form' | 'claim' | 'code'; pending: PendingMarker | null }>(null)
+  const leaving = useRef(false)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user
       setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
       setSignedIn(!!session)
+      // Whether this account's one free calculation is used (LEAD1 L4): it decides the "Keep my results" placements
+      // and what Save does for an account with no plan. RLS scopes the read to the owner.
+      if (session) {
+        void supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
+          .then(({ data }) => setHasFreeCalc(!!data && data.length > 0))
+      }
     })
   }, [])
+
   // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
   // storage upload, which produced no document at all, and a failed storage DELETE, where the document
   // is still attached and still listed. Everything that happens to a document that DOES exist and stays
@@ -698,7 +723,14 @@ const searchParams = useSearchParams()
   const isPaid = ghgAccess === 'active' || ghgAccess === 'expired'
   // The one read-on banner arm that is information rather than a warning: no plan, and no inventory to
   // lose. Everything else that banner says reports a state a customer would want flagged.
-  const noticeIsNeutral = ghgAccess === 'none' && !inventoryId
+  // LEAD1 L4: a free account in its own free calculation is information too, whatever the plan says.
+  const noticeIsNeutral = (ghgAccess === 'none' && !inventoryId) || editingFree
+  // Who is looking, for lib/ghg/keepResults.ts: Save routing, the placements and the unsaved-changes banner.
+  const visitor = { signedIn: signedIn === true, access: ghgAccess, hasInventoryId: !!inventoryId, editingFree, hasFreeCalc }
+  const showKeep = keepPromptShown(visitor)
+  const openKeepForm = () => setKeepModal({ start: 'form', pending: null })
+  // ?kept=free|plan: the claim saved this calculation and reopened it here (lib/ghg/keepResults.ts savedHref).
+  const keptMessage = keptLine(searchParams.get('kept'))
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
@@ -735,7 +767,12 @@ const searchParams = useSearchParams()
       }))
       // Cleared on RESTORE, not on save: see the note in lib/ghg/draft.ts. Leaving it would restore
       // stale figures over a later edit on the next reload.
-      clearGhgDraft()
+      // ⚠️ EXCEPT WHILE A "KEEP MY RESULTS" CODE IS PENDING (LEAD1 L4, design 1.6): the draft stays until the claim
+      // succeeds, so another reload before the code is typed still finds the calculation, and the modal reopens at
+      // the code step.
+      const keepPending = readPendingMarker()
+      if (clearDraftOnRestore(keepPending)) clearGhgDraft()
+      else setKeepModal({ start: 'code', pending: keepPending })
       // it is unsaved work: the Save button must not read as already saved
       skipSavedReset.current = false
       setBaseline(null)
@@ -781,6 +818,7 @@ const searchParams = useSearchParams()
     // setMode('wizard') below (the "button does nothing" bug). This button only renders in list mode,
     // where no ?id is present, so there's no stale ?id to clear — switching mode in state is enough.
     setInventoryId(null)
+    setEditingFree(false)
     setSaved(false)
     skipSavedReset.current = true // fresh inventory is pristine until the user types: it becomes the baseline
     setStep(0)
@@ -892,7 +930,7 @@ const searchParams = useSearchParams()
   const dirty = baseline !== undefined && hasUnsavedChanges(baseline, inventory)
   useEffect(() => {
     if (mode !== 'wizard' || !dirty) return
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    const handler = (e: BeforeUnloadEvent) => { if (leaving.current) return; e.preventDefault(); e.returnValue = '' }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty, mode])
@@ -924,6 +962,8 @@ const searchParams = useSearchParams()
       if (data) {
        skipSavedReset.current = true 
         setInventoryId(data.id)
+        // LEAD1 L4: the free calculation saves as itself and shows its own banner.
+        setEditingFree(data.free_tier === true)
         setInventory(inv => ({
           ...inv,
           company_name: data.company_name || '',
@@ -1656,12 +1696,19 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // The stash, the draft lifetime and the redirect are stashDraftAndGoToPricing's, shared with the
     // export overlay's button and the unsaved-changes banner. See its header for the `anon: !session`
     // rule and for the ordering.
-    // lib/ghg/entry.ts saveGoesToPricing: signed out or no plan, as before, and since free-calc-cta an ended
-    // plan on a NEW inventory (free mode, ?start=new), whose write the trigger refuses after handleSave has
-    // already created a companies row.
-    // `!session ||` is redundant with the helper and is there so TypeScript narrows session below.
-    if (!session || saveGoesToPricing({ signedIn: true, access: ghgAccess, hasInventoryId: !!inventoryId })) {
-      await stashDraftAndGoToPricing(`${ghgAccess === 'expired' ? 'Saving needs an active GHG plan.' : 'Saving needs the GHG module.'} ${draftKeptSentence(!session)}`)
+    // ⚠️ LEAD1 L4: SAVE IS lib/ghg/keepResults.ts decideSave, FOUR OUTCOMES (design 1.1). The notes above describe
+    // the pricing redirect it replaced; Save no longer goes to pricing. It replaced saveGoesToPricing, and it still
+    // returns before the companies lookup below for everyone whose write would not be this function's own:
+    //   signed out                                     the "Keep my results" form; nothing is written until the
+    //                                                  email is confirmed, and then by the claim route
+    //   no plan (or expired), new calculation          the claim route saves it as the free calculation, or states
+    //                                                  the one-free choice; it creates the companies row itself
+    //   active plan, or the account's own free row     saved here, as always (the M2 trigger allows a free row)
+    //   expired plan, a saved real inventory           saved here, and the trigger refuses with its renew message
+    // `!session ||` is redundant with decideSave and is there so TypeScript narrows session below.
+    const outcome = decideSave({ signedIn: !!session, access: ghgAccess, hasInventoryId: !!inventoryId, editingFree, hasFreeCalc })
+    if (!session || outcome !== 'save') {
+      setKeepModal({ start: outcome === 'keep_form' ? 'form' : 'claim', pending: null })
       return
     }
     // Resolve the company_id for this inventory's company_name.
@@ -2756,6 +2803,13 @@ workings: saved.workings,
                 )
               })}
             </div>
+            {/* LEAD1 L4, the main "Keep my results" placement (design 1.1): under the totals, where the result is. */}
+            {showKeep && (
+              <div data-keep-results="step4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: 'var(--color-accent-neutral-wash)', border: '0.5px solid var(--color-line)', borderRadius: 10, padding: '14px 16px', marginBottom: '2rem' }}>
+                <span style={{ fontSize: 14, color: '#0d0d0d', lineHeight: 1.6 }}>{KEEP_COPY.line}</span>
+                <button type="button" onClick={openKeepForm} style={{ fontSize: 14, fontWeight: 600, padding: '10px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>{KEEP_COPY.button}</button>
+              </div>
+            )}
             {(() => {
             const wGwp: GwpVersion = (FRAMEWORKS.find(f => f.id === activeExport)?.gwp as GwpVersion) || (activeFrameworks[0]?.gwp as GwpVersion) || 'AR6'
             // ONE derivation. The tested engine builds every workings row (including Phase-3b declaration
@@ -3041,7 +3095,7 @@ workings: saved.workings,
             one sentence that is merely inoffensive to both. */}
         <p style={sectionSub}>One inventory: {activeFrameworks.length} report{activeFrameworks.length > 1 ? 's' : ''}. {isPaid ? 'Download any of them below.' : 'Downloading them needs the GHG module.'}</p>
         <div style={{ position: 'relative' }}>
-          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} anon={signedIn !== true} onUnlock={() => { void stashDraftAndGoToPricing() }} />}
+          {!isPaid && <PaywallOverlay frameworks={activeFrameworks.map(f => f.name)} anon={signedIn !== true} onUnlock={() => { void stashDraftAndGoToPricing() }} onKeep={showKeep ? openKeepForm : undefined} />}
           <div style={{ filter: isPaid ? 'none' : 'blur(4px)', pointerEvents: isPaid ? 'auto' : 'none' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' as const }}>
               {activeFrameworks.map(fw => (
@@ -3451,9 +3505,15 @@ workings: saved.workings,
              computed-value time and the browser dropped it, so these banners have had no border. */
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: noticeIsNeutral ? 'var(--color-accent-neutral-wash)' : '#FEF3E2', border: noticeIsNeutral ? '0.5px solid var(--color-line)' : '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
-              {ghgAccess === 'expired' && !inventoryId
-                // Free mode for an ended plan (?start=new): there is no inventory to read yet.
-                ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can calculate a new inventory here, and saving it needs you to renew.</>
+              {editingFree
+                // LEAD1 L4, design section 8: the account's own free calculation, which saves whatever the plan says.
+                // ⚠️ L5: when the re-email route exists, design 8's "You can edit it and email it to yourself." goes
+                // here in place of "You can edit and save it."
+                ? <>{KEEP_COPY.freeRowBanner}</>
+                : ghgAccess === 'expired' && !inventoryId
+                // Free mode for an ended plan (?start=new): there is no inventory to read yet. Since LEAD1 L4 an
+                // account whose free calculation is unused can keep this one free.
+                ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> {showKeep ? 'You can calculate a new inventory here and keep it as your one free calculation. Saving more needs you to renew.' : 'You can calculate a new inventory here, and saving it needs you to renew.'}</>
                 : ghgAccess === 'expired'
                 ? <><strong style={{ fontWeight: 600 }}>Your GHG access has expired.</strong> You can read this inventory and everything in it. Saving changes is off until you renew.</>
                 : ghgAccess === 'unknown'
@@ -3467,16 +3527,55 @@ workings: saved.workings,
                 the page, and pricing drops to the outline. There is deliberately no calculator button here: it
                 would link this page to itself, and a reload drops whatever has been typed. The arms that
                 report something wrong keep the filled button. */}
+            {/* LEAD1 L4: "Keep my results" is the primary button wherever the prompt shows (design 1.1), and pricing
+                is the outline beside it. */}
+            {(showKeep || ghgAccess !== 'unknown') && (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
+            {showKeep && (
+              <button type="button" data-keep-results="banner" onClick={openKeepForm} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>{KEEP_COPY.button}</button>
+            )}
             {ghgAccess !== 'unknown' && (
-              <a href="/pricing?modules=ghg" style={noticeIsNeutral
+              <a href="/pricing?modules=ghg" style={noticeIsNeutral || showKeep
                 ? { fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none', whiteSpace: 'nowrap' as const }
                 : { fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
+            )}
+            </div>
             )}
           </div>
         )}
         {/* An ?id= that did not open, on an account with no saved inventory to list: the redirect
             lands here, in a blank wizard, and the sentence says so rather than leaving a customer to
             wonder why their link opened a new inventory. */}
+        {/* LEAD1 L4: the claim saved this calculation and reopened it here (?kept=). ⚠️ L5: once the results email
+            is sent on claim, its sentence ("We've emailed your results to {email}.") goes after this one. Not
+            before: nothing is emailed yet. */}
+        {keptMessage && inventoryId && (
+          <div role="status" style={{ background: '#E1F5EE', border: '0.5px solid color-mix(in srgb, #0F6E56 25%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56', lineHeight: 1.6, fontWeight: 500 }}>
+            {keptMessage}
+          </div>
+        )}
+        {keepModal && (
+          <KeepResultsModal
+            start={keepModal.start}
+            pending={keepModal.pending}
+            inventory={inventory}
+            onClose={() => setKeepModal(null)}
+            onKeepBoth={() => { leaving.current = true; void stashDraftAndGoToPricing() }}
+            onCompanyYearChange={(company, year) => setInventory(inv => ({ ...inv, company_name: company, company_id: null, reporting_year: year }))}
+            onLeaving={() => { leaving.current = true }}
+            onSignedIn={() => {
+              // Signed in by the code, in this tab: the page read the session at mount, so it is told. Save and the
+              // placements then route as for a signed-in account (lib/ghg/keepResults.ts).
+              setSignedIn(true)
+              void supabase.auth.getSession().then(({ data: { session } }) => {
+                const u = session?.user
+                if (u?.id && u.email) setCurrentUser({ userId: u.id, email: u.email })
+              })
+              void supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
+                .then(({ data }) => setHasFreeCalc(!!data && data.length > 0))
+            }}
+          />
+        )}
         {loadError && (
           <div role="alert" style={{ background: '#FEF3C7', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.75rem', marginBottom: 16, fontSize: 12, color: '#92400E', lineHeight: 1.6 }}>
             {loadError}
@@ -3497,9 +3596,18 @@ workings: saved.workings,
              Border: see the note on the read-on banner above for why the old `var(--color-state-warn)33`
              rendered no border at all. */
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' as const, background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 20%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: '1.5rem' }}>
-            {ghgAccess === 'none' || (ghgAccess === 'expired' && !inventoryId) ? (
+            {/* LEAD1 L4 (design section 8): lib/ghg/keepResults.ts unsavedNudgeArm. Signed out: the free account.
+                A new calculation on an account whose free one is used: says so, and goes to pricing. Everyone
+                else: Save, which decideSave routes (a no-plan account's first calculation is saved as its free
+                one). */}
+            {unsavedNudgeArm(visitor) === 'keep' ? (
               <>
-                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>{ghgAccess === 'expired' ? 'Saving needs an active GHG plan.' : 'Saving needs the GHG module.'} {draftKeptSentence(signedIn !== true)}</span>
+                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>{KEEP_COPY.line}</span>
+                <button type="button" data-keep-results="nudge" onClick={openKeepForm} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>{KEEP_COPY.button}</button>
+              </>
+            ) : unsavedNudgeArm(visitor) === 'one_free' ? (
+              <>
+                <span style={{ fontSize: 13, color: '#0d0d0d', fontWeight: 500 }}>{KEEP_COPY.oneFreeNudge} {draftKeptSentence(false)}</span>
                 <button onClick={() => { void stashDraftAndGoToPricing() }} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>See GHG pricing →</button>
               </>
             ) : (

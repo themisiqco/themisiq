@@ -127,7 +127,10 @@ describe('the pages', () => {
   it('P2: /auth/confirm verifies and lands on the calculator', () => {
     const c = read('app/auth/confirm/page.tsx')
     expect(c).toContain('completeSignIn(window.location.href, supabase.auth)')
-    expect(c).toContain('window.location.replace(CONFIRM_LANDING)')
+    // Since LEAD1 L4 it claims the held calculation first; with nothing waiting it lands here as before
+    // (lib/ghg/keepResults.test.ts K13, K14).
+    expect(c).toContain('window.location.replace(step.go)')
+    expect(c).toContain('if (!session) return { go: CONFIRM_LANDING }')
     expect(CONFIRM_LANDING).toBe('/dashboard/ghg')
   })
 

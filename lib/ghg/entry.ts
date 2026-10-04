@@ -61,16 +61,6 @@ export function entryWall(input: {
   return input.access
 }
 
-/**
- * Whether Save goes to pricing (stashing the draft) instead of writing. The database refuses the write anyway;
- * this refuses first so nothing is written on the way, in particular the companies row handleSave creates before
- * the inventory, which would be left behind as an orphan.
- * - Signed out, or no GHG plan: as before.
- * - Plan ended, on a NEW inventory (only reachable in free mode, ?start=new): the same, since there is no saved
- *   record to keep and the company row would be orphaned. An expired customer editing a saved inventory keeps
- *   today's behaviour: the trigger refuses and says why.
- */
-export function saveGoesToPricing(input: { signedIn: boolean; access: EntitlementAccess; hasInventoryId: boolean }): boolean {
-  if (!input.signedIn || input.access === 'none') return true
-  return input.access === 'expired' && !input.hasInventoryId
-}
+// SAVE ROUTING moved to lib/ghg/keepResults.ts decideSave (LEAD1 L4, Oct 2026). saveGoesToPricing answered yes or no;
+// Save now has four outcomes (design 1.1), and none of them is pricing: a signed-out visitor gets the "Keep my results"
+// form, and an account with no plan keeps one free calculation.
