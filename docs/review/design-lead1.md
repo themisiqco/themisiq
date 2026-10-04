@@ -179,7 +179,7 @@ every later save of a free calculation, **never updates a row that is not the fr
 |---|---|
 | Code typed in the same tab | The calculation never leaves memory. After `verifyOtp` the page calls the claim route with it |
 | Tab closed or reloaded before the code is typed | On submit, before the code is sent, the client also writes the draft to localStorage (as today) and to a server-side pending record (below). Coming back to `/dashboard/ghg` restores from localStorage; the code can still be typed |
-| Link clicked on a different device | `/auth/confirm` verifies, then calls the claim route with no calculation; the route takes the newest unexpired pending record for the verified email, so the calculation appears on the new device |
+| Link clicked on a different device | `/auth/confirm` verifies, then calls the claim route with no calculation; the route takes the newest unexpired pending record for the verified email, so the calculation appears on the new device. **Decided in L3: the link carries no pending id.** The "Magic Link" template is a fixed URL and stays as it is; the verified email is the key, and an id the client does pass must belong to that same email. Nothing in the template needs to change |
 
 **The pending record**, table `free_calc_pending` (M4):
 - **Written** on submit by `POST /api/ghg/free-calc/pending`, without a session. It holds the inventory inputs (the
@@ -540,8 +540,8 @@ None open for Lisa in this document. The three items in section 5 are for her la
 | Email OTP expiry | **3600 s (1 hour), deliberately** | The same setting governs sign-up confirmation links and the purchase email's first sign-in link, so shortening it to 10 minutes would also cut those to 10 minutes. Codes therefore work for 1 hour; every template and screen says 1 hour, never 10 minutes |
 | Redirect URLs | `https://themisiq.co/**` and `https://themisiq-*-lisa-foster-s-projects.vercel.app/**` | Covers /auth/callback, /auth/confirm and /reset-password in production and previews |
 | Turnstile widget | Created, Managed mode, hostnames `themisiq.co` and `www.themisiq.co` only | Previews and local development cannot use it; they use Cloudflare's test key (10.2) |
-| Email templates | **Not yet changed** | After L2 is live (10.3, step 3) |
-| Supabase CAPTCHA protection | **Not yet on** | The last step (10.3, step 5) |
+| Email templates | **Done 4 Oct 2026, after L2 went live** (10.3, step 3) | "Magic Link": subject "Your ThemisIQ sign-in code: {{ .Token }}", body with `{{ .Token }}`, a link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`, and the footer. "Confirm signup": `{{ .ConfirmationURL }}` plus `{{ .Token }}` and the footer. "Reset Password": footer added. A typed code and the link opened on a phone were both tested on production |
+| Supabase CAPTCHA protection | **OFF, by decision (Lisa, 4 Oct 2026)** | Stays off until the launch checklist (10.4), so sign-in keeps working on previews and locally while L3 to L9 are built and tested (10.2 explains why it would not) |
 
 ### 10.2 Turnstile keys by environment
 
@@ -632,7 +632,8 @@ Supabase project for previews (a larger change, not planned). Everything else on
 4. **Re-check the purchase email's first sign-in link** (make a test purchase, or ask a customer who bought since the
    deploy). It uses the admin API and the fixed /auth/callback, and is not affected by steps 3 or 5.
 
-5. **LAST: Supabase → Authentication → Attack Protection → Enable CAPTCHA protection.** Provider: Cloudflare
+5. **LAST, AT LAUNCH (moved to the launch checklist, 10.4, by decision on 4 Oct 2026): Supabase → Authentication →
+   Attack Protection → Enable CAPTCHA protection.** Provider: Cloudflare
    Turnstile. Secret key: the widget's secret key (the same one as `TURNSTILE_SECRET_KEY`). Save.
 
    Test straight away, on production:
@@ -647,3 +648,23 @@ Supabase project for previews (a larger change, not planned). Everything else on
 
    **Rollback:** turn "Enable CAPTCHA protection" off again. Sign-in returns at once to how it was after step 4, and
    nothing else needs undoing. Previews regain auth flows at the same moment (10.2).
+
+### 10.4 Launch checklist (before the free account is announced)
+
+Each item is a launch blocker unless marked otherwise.
+1. **L0 to L8 and L10 merged and live**, and every L-migration RUN with its verify script passed: L0-ENF1, L1 (M1, M3,
+   M2, LEAD1-verify), L3 (M4, M6, and their verify scripts).
+2. **The "results emailed" copy on main** is replaced by L10's wording, or "Email me my results" works end to end
+   (section 9).
+3. **Supabase CAPTCHA protection ON**, as in 10.3 step 5:
+   - Authentication → Attack Protection → Enable CAPTCHA protection;
+   - Cloudflare Turnstile, with the widget's secret key (the same value as Vercel's `TURNSTILE_SECRET_KEY`).
+
+   Test the five paths on production at once: password sign-up, password login, forgot password, a code typed on
+   /login, and the code email's link on a phone. **Rollback:** switch it off again. From this point, auth flows on
+   previews and locally stop working (10.2); test them on production.
+4. **`TURNSTILE_SECRET_KEY` is set for Production** in Vercel. Without it, `/api/ghg/free-calc/pending` skips its own
+   Turnstile check and logs "TURNSTILE_SECRET_KEY is not set: Turnstile was NOT verified" on every hold; that line in
+   production logs means this item is not done.
+5. **Lawyer review** of the items in section 5 (CASL and the privacy and Terms additions).
+
