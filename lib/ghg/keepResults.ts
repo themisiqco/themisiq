@@ -18,15 +18,23 @@ import type { EntitlementAccess } from '../useEntitlement'
 export type SaveOutcome = 'keep_form' | 'claim_free' | 'one_free_choice' | 'save'
 
 export type VisitorState = {
-  signedIn: boolean
+  /** Whether a session exists. null: NOT READ YET, which is not the same as signed out (fix1, below). */
+  signedIn: boolean | null
   access: EntitlementAccess
   /** An inventory is open by id (the wizard's inventoryId). */
   hasInventoryId: boolean
   /** The open inventory is this account's free calculation (ghg_inventories.free_tier). */
   editingFree: boolean
-  /** This account already has a free calculation saved. */
-  hasFreeCalc: boolean
+  /** This account already has a free calculation saved. null: NOT KNOWN, because the lookup is still in flight or
+   *  failed; never read as "none" (fix1, below). */
+  hasFreeCalc: boolean | null
 }
+
+// ⚠️ LEAD1 L4 FIX1 (5 Oct 2026). signedIn and hasFreeCalc were plain booleans, and the page passed `signedIn === true`
+// and a hasFreeCalc that started false. So a signed-in account with a free calculation read as SIGNED OUT until the
+// session read landed, and as having NO free calculation until the lookup landed, and FOR GOOD if the lookup failed:
+// its error was read as "no rows". The plan read ('none') can land before either, so "Keep my results" showed to the
+// one visitor it must never show to. Unknown is now its own value, and no prompt shows on an unknown.
 
 /**
  * What Save does.
@@ -41,10 +49,14 @@ export type VisitorState = {
  * - 'loading' and 'unknown': save as before; the trigger decides and says why.
  */
 export function decideSave(v: VisitorState): SaveOutcome {
+  // handleSave reads the session itself, so signedIn is never null here; null is treated as signed out only because
+  // there is no session to claim with.
   if (!v.signedIn) return 'keep_form'
   if (v.access !== 'none' && v.access !== 'expired') return 'save'
   if (v.editingFree || v.hasInventoryId) return 'save'
-  return v.hasFreeCalc ? 'one_free_choice' : 'claim_free'
+  // An unknown free calculation goes to the claim route, which reads the account itself and states the one-free
+  // choice if there is one. Both outcomes open the modal at the claim.
+  return v.hasFreeCalc === true ? 'one_free_choice' : 'claim_free'
 }
 
 /**
@@ -54,9 +66,10 @@ export function decideSave(v: VisitorState): SaveOutcome {
  */
 export function keepPromptShown(v: VisitorState): boolean {
   if (v.access === 'active' || v.access === 'loading') return false
+  if (v.signedIn === null) return false
   if (!v.signedIn) return true
   if (v.access === 'unknown' || v.hasInventoryId) return false
-  return !v.hasFreeCalc
+  return v.hasFreeCalc === false
 }
 
 /**
@@ -68,9 +81,11 @@ export function keepPromptShown(v: VisitorState): boolean {
  */
 export function unsavedNudgeArm(v: VisitorState): 'keep' | 'one_free' | 'save' {
   if (v.access === 'active' || v.access === 'loading' || v.access === 'unknown') return 'save'
+  // Not read yet: "save your draft", whose Save reads the session itself and routes correctly either way.
+  if (v.signedIn === null) return 'save'
   if (!v.signedIn) return 'keep'
   if (v.hasInventoryId || v.editingFree) return 'save'
-  return v.hasFreeCalc ? 'one_free' : 'save'
+  return v.hasFreeCalc === true ? 'one_free' : 'save'
 }
 
 // ── Customer-facing words (L4) ──────────────────────────────────────────────────────────────────────────────────

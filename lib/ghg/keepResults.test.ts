@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { decideSave, keepPromptShown, unsavedNudgeArm, type VisitorState } from './keepResults'
+import { showUnsavedNudge } from './unsavedChanges'
 import {
   keepReducer, initialKeepState, claimOutcome, confirmStep, savedHref, inventoryHref, keptLine, normaliseCode,
   parsePendingMarker, readPendingMarker, writePendingMarker, clearPendingMarker, clearDraftOnRestore,
@@ -291,5 +293,70 @@ describe('after the code or the link', () => {
 
   it('K25: a link claim that saved clears this browser\'s draft and marker', () => {
     expect(read(CONFIRM)).toContain("if (outcome.kind === 'saved') { clearGhgDraft(); clearPendingMarker() }")
+  })
+})
+
+// LEAD1 L4 fix1 (Lisa's preview test, 5 Oct 2026): signed in by code on /login as the account from test A, which has
+// its free calculation, then /dashboard/ghg?start=new. "Keep my results" showed, and the one-free banner did not.
+describe('fix1: a signed-in account with its free calculation, on a new calculation', () => {
+  // Every state the page passes through on ?start=new while its three reads land, in any order: the session
+  // (null until read), the plan ('loading' until read), the free-calculation lookup (null until read, and only
+  // sent once there is a session).
+  const states: VisitorState[] = []
+  for (const signedIn of [null, true] as const)
+    for (const access of ['loading', 'none'] as const)
+      for (const hasFreeCalc of (signedIn ? [null, true] : [null]) as Array<boolean | null>)
+        states.push({ signedIn, access, hasInventoryId: false, editingFree: false, hasFreeCalc })
+
+  it('F1: no "Keep my results" prompt at any point while the reads land, so nothing flashes up', () => {
+    expect(states).toHaveLength(6)
+    for (const v of states) {
+      expect(keepPromptShown(v), JSON.stringify(v)).toBe(false)
+      expect(unsavedNudgeArm(v), JSON.stringify(v)).not.toBe('keep')
+    }
+  })
+
+  it('F2: once everything is read: no prompt, the one-free banner after the first edit, and Save offers the one-free choice', () => {
+    const v: VisitorState = { signedIn: true, access: 'none', hasInventoryId: false, editingFree: false, hasFreeCalc: true }
+    expect(keepPromptShown(v)).toBe(false)
+    expect(showUnsavedNudge({ mode: 'wizard', dirty: false })).toBe(false)
+    expect(showUnsavedNudge({ mode: 'wizard', dirty: true })).toBe(true)
+    expect(unsavedNudgeArm(v)).toBe('one_free')
+    expect(KEEP_COPY.oneFreeNudge).toBe('Your free account keeps one calculation.')
+    // handleSave passes the session it has just read.
+    expect(decideSave(v)).toBe('one_free_choice')
+    // And while the lookup is still in flight, Save still goes to the claim, never to the sign-up form: the claim
+    // route reads the account and states the one-free choice itself.
+    expect(decideSave({ ...v, hasFreeCalc: null })).toBe('claim_free')
+    expect(decideSave({ ...v, hasFreeCalc: null })).not.toBe('keep_form')
+  })
+
+  it('F3: a failed lookup is not "no free calculation": no prompt, Save goes to the claim route', () => {
+    const v: VisitorState = { signedIn: true, access: 'none', hasInventoryId: false, editingFree: false, hasFreeCalc: null }
+    expect(keepPromptShown(v)).toBe(false)
+    expect(unsavedNudgeArm(v)).toBe('save')
+    expect(decideSave(v)).toBe('claim_free')
+  })
+
+  it('F4: a signed-out visitor still gets the prompt, once the session read says signed out', () => {
+    const out: VisitorState = { signedIn: false, access: 'none', hasInventoryId: false, editingFree: false, hasFreeCalc: null }
+    expect(keepPromptShown({ ...out, signedIn: null })).toBe(false)
+    expect(keepPromptShown(out)).toBe(true)
+    expect(unsavedNudgeArm(out)).toBe('keep')
+    expect(decideSave(out)).toBe('keep_form')
+  })
+
+  it('F5: the page passes unknown through, reads the free calculation on every entry, and logs a failed lookup', () => {
+    const p = read(PAGE)
+    expect(p).toContain('const visitor = { signedIn, access: ghgAccess, hasInventoryId: !!inventoryId, editingFree, hasFreeCalc }')
+    expect(p).not.toContain('signedIn: signedIn === true')
+    expect(p).toContain('const [hasFreeCalc, setHasFreeCalc] = useState<boolean | null>(null)')
+    expect(p).toContain("if (error) { console.error('[ghg] free calculation lookup failed:', error.message); return null }")
+    // In the mount effect, which no URL parameter gates (not the ?id= load effect).
+    const mount = p.slice(p.indexOf('const sessionUser = useRef'), p.indexOf('return () => { cancelled = true; sub.subscription.unsubscribe() }'))
+    expect(mount).toContain('void readFreeCalc().then(')
+    expect(mount).not.toContain("searchParams")
+    // It follows sign-ins and sign-outs after mount, outside supabase-js's auth lock.
+    expect(mount).toContain("if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setTimeout(() => apply(session), 0)")
   })
 })

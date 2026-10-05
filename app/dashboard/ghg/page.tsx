@@ -379,6 +379,18 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
 //
 // onUnlock, NOT AN HREF, because the draft has to be stashed before the navigation. See
 // stashDraftAndGoToPricing.
+/**
+ * Whether the signed-in account already has its free calculation (LEAD1 L4). RLS scopes the read to the owner.
+ * ⚠️ AN ERROR IS NOT "NONE" (fix1, 5 Oct 2026). It resolves to null, which shows no "Keep my results" prompt, and is
+ * logged with the error's own words; reading it as "no free calculation" offered a second free account to someone
+ * who has one. Save is unaffected either way: the claim route reads the account itself.
+ */
+async function readFreeCalc(): Promise<boolean | null> {
+  const { data, error } = await supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
+  if (error) { console.error('[ghg] free calculation lookup failed:', error.message); return null }
+  return (data ?? []).length > 0
+}
+
 function PaywallOverlay({ frameworks, onUnlock, anon, onKeep }: { frameworks: string[]; onUnlock: () => void; anon: boolean; onKeep?: () => void }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 10, backdropFilter: 'blur(8px)', background: 'rgba(248,247,245,0.85)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -672,21 +684,38 @@ const searchParams = useSearchParams()
   // keepModal: the "Keep my results" modal, and where it starts. leaving: set just before the modal navigates, so the
   // unsaved-changes prompt does not stop a save that has already happened.
   const [editingFree, setEditingFree] = useState(false)
-  const [hasFreeCalc, setHasFreeCalc] = useState(false)
+  // null until known (fix1): not read yet, or the read failed. See readFreeCalc.
+  const [hasFreeCalc, setHasFreeCalc] = useState<boolean | null>(null)
   const [keepModal, setKeepModal] = useState<null | { start: 'form' | 'claim' | 'code'; pending: PendingMarker | null }>(null)
   const leaving = useRef(false)
+  // The session, and with it whether this account's one free calculation is used (LEAD1 L4), read on EVERY entry,
+  // ?start=new and ?id= alike. ⚠️ FIX1 (5 Oct 2026): read once at mount, the page never learned of a session that
+  // arrived or changed afterwards (a sign-in in another tab of this site, a sign-out), so it could go on describing a
+  // visitor who had changed. It now follows Supabase's auth events too. Each answer is tagged with the user it is for,
+  // so a late lookup for one user is never applied to another, and the same user signing in again (supabase-js
+  // re-announces a session on a refresh) does not reset what is known.
+  const sessionUser = useRef<string | null | undefined>(undefined)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let cancelled = false
+    const apply = (session: { user?: { id?: string; email?: string } } | null) => {
+      if (cancelled) return
       const u = session?.user
+      const id = u?.id ?? null
       setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
-      setSignedIn(!!session)
-      // Whether this account's one free calculation is used (LEAD1 L4): it decides the "Keep my results" placements
-      // and what Save does for an account with no plan. RLS scopes the read to the owner.
-      if (session) {
-        void supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
-          .then(({ data }) => setHasFreeCalc(!!data && data.length > 0))
-      }
+      setSignedIn(!!id)
+      if (sessionUser.current === id) return
+      sessionUser.current = id
+      if (!id) { setHasFreeCalc(null); return }
+      setHasFreeCalc(null)
+      void readFreeCalc().then(has => { if (!cancelled && sessionUser.current === id) setHasFreeCalc(has) })
+    }
+    supabase.auth.getSession().then(({ data: { session } }) => apply(session))
+    // Deferred, not called in the callback: supabase-js holds its auth lock while the callback runs, and a query made
+    // inside it waits on that same lock.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setTimeout(() => apply(session), 0)
     })
+    return () => { cancelled = true; sub.subscription.unsubscribe() }
   }, [])
 
   // Keyed `${locIdx}:${docType}`. For the two failures that leave nothing on a document to read: the
@@ -726,7 +755,8 @@ const searchParams = useSearchParams()
   // LEAD1 L4: a free account in its own free calculation is information too, whatever the plan says.
   const noticeIsNeutral = (ghgAccess === 'none' && !inventoryId) || editingFree
   // Who is looking, for lib/ghg/keepResults.ts: Save routing, the placements and the unsaved-changes banner.
-  const visitor = { signedIn: signedIn === true, access: ghgAccess, hasInventoryId: !!inventoryId, editingFree, hasFreeCalc }
+  // signedIn and hasFreeCalc go in as they are, null included (fix1): unknown is not "signed out" or "none".
+  const visitor = { signedIn, access: ghgAccess, hasInventoryId: !!inventoryId, editingFree, hasFreeCalc }
   const showKeep = keepPromptShown(visitor)
   const openKeepForm = () => setKeepModal({ start: 'form', pending: null })
   // ?kept=free|plan: the claim saved this calculation and reopened it here (lib/ghg/keepResults.ts savedHref).
@@ -3566,13 +3596,13 @@ workings: saved.workings,
             onSignedIn={() => {
               // Signed in by the code, in this tab: the page read the session at mount, so it is told. Save and the
               // placements then route as for a signed-in account (lib/ghg/keepResults.ts).
+              // The auth listener above also hears this sign-in; this is the same answer, sooner.
               setSignedIn(true)
               void supabase.auth.getSession().then(({ data: { session } }) => {
                 const u = session?.user
                 if (u?.id && u.email) setCurrentUser({ userId: u.id, email: u.email })
               })
-              void supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
-                .then(({ data }) => setHasFreeCalc(!!data && data.length > 0))
+              void readFreeCalc().then(setHasFreeCalc)
             }}
           />
         )}
