@@ -38,10 +38,6 @@ export function parseGhgDraft(u: unknown): GhgDraft | null {
   // a non-finite number here is corruption rather than emptiness.
   const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
   const bool = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined)
-  // NULL IS A VALUE HERE, NOT AN ABSENCE: company_id is nullable and "no company row yet" is a real
-  // state the save path branches on. Collapsing it to undefined would let the merge restore a default.
-  const nullableStr = (v: unknown): string | null | undefined =>
-    v === null ? null : typeof v === 'string' ? v : undefined
 
   const draft: GhgDraft = {}
   const assign = <K extends keyof GhgDraft>(k: K, v: GhgDraft[K] | undefined) => {
@@ -49,7 +45,13 @@ export function parseGhgDraft(u: unknown): GhgDraft | null {
   }
 
   assign('company_name', str(o.company_name))
-  assign('company_id', nullableStr(o.company_id))
+  // ⚠️ A RESTORED DRAFT NEVER CARRIES A company_id, ONLY null (stale-state fix, 5 Oct 2026). A companies row belongs to
+  // ONE account, and a draft belongs to a browser: lib/drafts.ts records no owner, and one written signed in never
+  // expires. A draft stashed by one account and restored under another put that account's company_id into the form,
+  // and handleSave inserted with it; the ghg_inventories_owner WITH CHECK (company_id in the user's own companies)
+  // refused the save. Save resolves the company by (user, name) when company_id is null, so nothing is lost, and the
+  // null keeps its meaning: "no company row chosen yet".
+  if (o.company_id === null || typeof o.company_id === 'string') draft.company_id = null
   assign('reporting_year', num(o.reporting_year))
   assign('revenue_millions', num(o.revenue_millions))
   assign('employee_count', num(o.employee_count))

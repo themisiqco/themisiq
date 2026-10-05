@@ -27,7 +27,7 @@
 // back to the page's own defaults, because the caller merges this PARTIAL over them — never the
 // reverse. Merging the other way would let a missing key blank a field the form had already defaulted.
 
-import { DRAFT_KEYS, readDraft, saveDraft, clearDraft, ANON_TTL_MS } from '../drafts'
+import { DRAFT_KEYS, readDraft, readDraftWithOwner, saveDraft, clearDraft, ANON_TTL_MS } from '../drafts'
 
 // The draft's shape and parser live in ./draftParse (no imports, so server routes can parse a draft too) and are
 // re-exported here unchanged for every existing caller.
@@ -36,8 +36,26 @@ export { parseGhgDraft }
 export type { GhgDraft }
 
 /** Stash before bouncing to /login. Swallows a disabled localStorage, as lib/drafts.ts does. */
-export function saveGhgDraft(inventory: unknown, opts: { anon: boolean }): void {
+export function saveGhgDraft(inventory: unknown, opts: { anon: boolean; owner?: string | null }): void {
   saveDraft(DRAFT_KEYS.ghg, inventory, opts)
+}
+
+/** The draft and who wrote it (lib/drafts.ts readDraftWithOwner), or null. */
+export function readGhgDraftOwned(): { draft: GhgDraft; owner: string | null | undefined } | null {
+  const r = readDraftWithOwner(DRAFT_KEYS.ghg, parseGhgDraft)
+  return r ? { draft: r.value, owner: r.owner } : null
+}
+
+/**
+ * ⚠️ A DRAFT WRITTEN BY ONE ACCOUNT IS NOT RESTORED UNDER ANOTHER (5 Oct 2026). A browser used for several accounts
+ * (testing, or a shared computer) kept one account's figures and restored them into the next one's form. A draft that
+ * names its writer is restored only for that same user. Written signed out (null), or before owners were kept
+ * (undefined): restored as before; such a draft carries no company_id (lib/ghg/draftParse.ts), so nothing in it is
+ * tied to an account.
+ */
+export function draftBelongsTo(owner: string | null | undefined, sessionUserId: string | null): boolean {
+  if (owner === null || owner === undefined) return true
+  return owner === sessionUserId
 }
 
 /** Read and validate. Returns null when absent, expired, from an older build, or unusable. */

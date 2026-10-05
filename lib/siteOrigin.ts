@@ -1,14 +1,19 @@
 // lib/siteOrigin.ts
 //
-// THE SITE'S ORIGIN FOR LINKS IN APP EMAIL (LEAD1 L5, Oct 2026): https://themisiq.co, no www.
+// THE SITE'S CANONICAL ORIGIN: https://www.themisiq.co (decided by Lisa, 5 Oct 2026). One constant for every link the
+// server writes (app email, the sitemap, robots.txt, metadataBase) and for the fallbacks where a browser origin is
+// not available.
 //
-// It is the origin Supabase Auth's Site URL is set to (Lisa, 5 Oct 2026), which is what {{ .SiteURL }} puts in the
-// sign-in code email's link (docs/review/design-lead1.md section 10). The results email links to the same origin, so a
-// recipient sees one address for ThemisIQ in both emails, and the sign-in a link may need happens on that origin's
-// storage. The value lives in the Supabase dashboard and is not readable from here; if it ever changes there, change
-// it here in the same pass.
+// WHY www. Vercel serves www.themisiq.co as the Production domain and 307-redirects the apex (themisiq.co) to it, and
+// Supabase Auth's Site URL is https://www.themisiq.co, so {{ .SiteURL }} in the sign-in email lands on www too. Linking
+// to the apex costs every reader a redirect, and a sign-in session is stored per origin: one made on the apex is not
+// visible on www. Supabase's redirect allow-list keeps https://themisiq.co/** as well, for links already sent.
 //
-// A constant, not NEXT_PUBLIC_SITE_URL: a preview deployment's results email still links to production, where the
-// account and the saved calculation are (previews share the production Supabase project).
+// It replaced 'https://themisiq.co' (L5, 5 Oct 2026, the same day). The Supabase and Vercel settings are not readable
+// from here; if the canonical host ever changes there, change this in the same pass (docs/review/design-lead1.md 10.1).
+//
+// A constant, not NEXT_PUBLIC_SITE_URL: a preview's results email still links to production, where the account and the
+// saved calculation are (previews share the production Supabase project). Routes that already honoured
+// NEXT_PUBLIC_SITE_URL keep doing so, with this as their fallback.
 
-export const SITE_ORIGIN = 'https://themisiq.co'
+export const SITE_ORIGIN = 'https://www.themisiq.co'

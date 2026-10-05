@@ -61,6 +61,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { SITE_ORIGIN } from '../../../lib/siteOrigin'
 
 const GRAD = 'var(--color-brand)'
 const GREEN = '#0F6E56'
@@ -601,7 +602,7 @@ export default function StakeholderSurvey() {
       <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f8f7f5', color: 'var(--color-ink-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: 24 }}>✓</div>
       <div style={{ fontSize: 15, color: '#0d0d0d', lineHeight: 1.75 }}>{closedMessage}</div>
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: 'var(--color-ink-muted)' }}>
-        Powered by <a href="https://www.themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
+        Powered by <a href={SITE_ORIGIN} style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
       </div>
     </div>
   )
@@ -648,7 +649,7 @@ export default function StakeholderSurvey() {
         {savedCount} of {total} questions answered. This link is now closed and cannot be reopened.
       </div>
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: '0.5px solid #e8e7e4', fontSize: 12, color: 'var(--color-ink-muted)' }}>
-        Powered by <a href="https://www.themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
+        Powered by <a href={SITE_ORIGIN} style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
       </div>
     </div>
   )
@@ -1064,7 +1065,7 @@ export default function StakeholderSurvey() {
             promise at the foot of the page is the drift docs/survey-intro-copy.md warns about — two
             wordings of one claim, and the weaker one is the one someone would edit. */}
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 12, color: 'var(--color-ink-muted)', lineHeight: 1.7 }}>
-          Powered by <a href="https://www.themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
+          Powered by <a href={SITE_ORIGIN} style={{ color: 'var(--color-brand)', textDecoration: 'none' }}>ThemisIQ</a>
         </div>
       </div>
     </div>

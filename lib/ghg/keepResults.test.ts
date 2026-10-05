@@ -209,7 +209,7 @@ describe('the draft survives a pending code (design 1.6)', () => {
 
   it('K18: the modal writes the draft BEFORE the hold and the code, drops ?start=new, and clears both only on a save', () => {
     const m = read(MODAL)
-    const draft = m.indexOf('saveGhgDraft(inventory, { anon: true })')
+    const draft = m.indexOf('saveGhgDraft(inventory, { anon: true, owner: null })')
     const hold = m.indexOf("fetch('/api/ghg/free-calc/pending'")
     const otp = m.indexOf('const failed = await askForCode(addr)')
     const marker = m.indexOf('writePendingMarker({ email: addr')
@@ -362,5 +362,44 @@ describe('fix1: a signed-in account with its free calculation, on a new calculat
     expect(mount).not.toContain("searchParams")
     // It follows sign-ins and sign-outs after mount, outside supabase-js's auth lock.
     expect(mount).toContain("if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setTimeout(() => apply(session), 0)")
+  })
+})
+
+// Stale browser state after testing several accounts in one browser (Lisa, 5 Oct 2026): a draft stashed under one
+// account restored under another carried that account's company_id, and Save was refused by the owner policy.
+describe('stale state across accounts in one browser', () => {
+  it('S1: Save checks a company_id belongs to the signed-in account before using it, else resolves by name', () => {
+    const p = read(PAGE)
+    const save = p.slice(p.indexOf('let resolvedCompanyId = inventory.company_id || null'))
+    const check = save.indexOf(".from('companies').select('id').eq('id', resolvedCompanyId).eq('user_id', session.user.id).maybeSingle()")
+    const byName = save.indexOf('if (!resolvedCompanyId && trimmedName) {')
+    expect(check).toBeGreaterThan(0)
+    expect(save).toContain('if (!own) resolvedCompanyId = null')
+    expect(check).toBeLessThan(byName)
+  })
+
+  it('S2: a pending code for a different address is dropped once the session is known', () => {
+    const p = read(PAGE)
+    expect(p).toContain("if (id && marker && marker.email.trim().toLowerCase() !== (u?.email ?? '').trim().toLowerCase()) {")
+    expect(p).toContain("setKeepModal(k => (k?.start === 'code' ? null : k))")
+  })
+})
+
+describe('item 3 (5 Oct 2026): every save from one tab refused by the owner policy', () => {
+  it('S3: a sign-in change with the page open clears the company id and reads the company list again', () => {
+    const p = read(PAGE)
+    expect(p).toContain('const switched = sessionUser.current !== undefined')
+    expect(p).toContain('setInventory(inv => (inv.company_id ? { ...inv, company_id: null } : inv))')
+    expect(p).toContain(".from('companies').select('id, name').order('name').then(({ data }) => { if (!cancelled && sessionUser.current === id) setCompanies(data ?? []) })")
+  })
+
+  it('S4: Save with no company name is refused before anything is written', () => {
+    const p = read(PAGE)
+    expect(p).toContain("const COMPANY_NAME_NEEDED = 'Enter your company name on the first step before saving. Nothing was saved.'")
+    const save = p.slice(p.indexOf('const handleSave = async () => {'))
+    const guard = save.indexOf("if (!(inventory.company_name || '').trim()) {")
+    expect(guard).toBeGreaterThan(0)
+    expect(guard).toBeLessThan(save.indexOf('let resolvedCompanyId = inventory.company_id || null'))
+    expect(guard).toBeLessThan(save.indexOf(".from('ghg_inventories').insert(payload)"))
   })
 })

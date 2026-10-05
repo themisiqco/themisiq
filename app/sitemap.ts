@@ -9,8 +9,9 @@
 // already see. A bare list of URLs is the part that is both accurate and maintainable.
 
 import type { MetadataRoute } from 'next'
+import { SITE_ORIGIN } from '../lib/siteOrigin'
 
-const BASE = 'https://www.themisiq.co'
+const BASE = SITE_ORIGIN
 
 const ROUTES = [
   '/',

@@ -9,10 +9,10 @@ import { supabase } from '../../../lib/supabase'
 import { csvBlob } from '../../../lib/csv'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
 import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
-import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
+import { saveGhgDraft, readGhgDraftOwned, draftBelongsTo, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
 import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry'
 // "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
-import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, emailedLine, KEEP_COPY, readPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
+import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, emailedLine, KEEP_COPY, readPendingMarker, clearPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
 import KeepResultsModal from './_components/KeepResultsModal'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
 // The plan gates' messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
@@ -71,6 +71,7 @@ import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
   ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation,
 } from '../../../lib/ghg/engine'
+import { SITE_ORIGIN } from '../../../lib/siteOrigin'
 
 
 // ── Prior-year lookup for the comparability step ─────────────────────────────────────────────────
@@ -385,6 +386,9 @@ function GhgEntryWall({ access }: { access: Extract<EntitlementAccess, 'expired'
  * logged with the error's own words; reading it as "no free calculation" offered a second free account to someone
  * who has one. Save is unaffected either way: the claim route reads the account itself.
  */
+/** Save with no company name: refused before anything is written (5 Oct 2026). */
+const COMPANY_NAME_NEEDED = 'Enter your company name on the first step before saving. Nothing was saved.'
+
 async function readFreeCalc(): Promise<boolean | null> {
   const { data, error } = await supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
   if (error) { console.error('[ghg] free calculation lookup failed:', error.message); return null }
@@ -702,8 +706,25 @@ const searchParams = useSearchParams()
       const id = u?.id ?? null
       setCurrentUser(u?.id && u.email ? { userId: u.id, email: u.email } : null)
       setSignedIn(!!id)
+      // A pending sign-in code for a DIFFERENT address is stale here (stale-state fix, 5 Oct 2026): the code would sign
+      // this browser into that other account. Dropped, and its modal closed, once the session says who is signed in.
+      const marker = readPendingMarker()
+      if (id && marker && marker.email.trim().toLowerCase() !== (u?.email ?? '').trim().toLowerCase()) {
+        clearPendingMarker()
+        setKeepModal(k => (k?.start === 'code' ? null : k))
+      }
       if (sessionUser.current === id) return
+      // ⚠️ A DIFFERENT ACCOUNT NOW, WITH THIS PAGE STILL OPEN (5 Oct 2026). The company list and any company chosen
+      // from it belong to the account the page was opened under. Kept, the next Save carried that account's
+      // company_id under this one's user_id, and the owner policy refused every save from this tab. The id is cleared
+      // (Save resolves the company by name for whoever is signed in) and the list is read again.
+      const switched = sessionUser.current !== undefined
       sessionUser.current = id
+      if (switched) {
+        setInventory(inv => (inv.company_id ? { ...inv, company_id: null } : inv))
+        if (!id) setCompanies([])
+        else void supabase.from('companies').select('id, name').order('name').then(({ data }) => { if (!cancelled && sessionUser.current === id) setCompanies(data ?? []) })
+      }
       if (!id) { setHasFreeCalc(null); return }
       setHasFreeCalc(null)
       void readFreeCalc().then(has => { if (!cancelled && sessionUser.current === id) setHasFreeCalc(has) })
@@ -804,8 +825,11 @@ const searchParams = useSearchParams()
     // STILL AHEAD OF THE LIST AND TRENDS PATHS, which is what it was before and for the same reason: a
     // returning customer with saved inventories must get the work they were in the middle of, not a
     // redirect to /trends.
-    const draft = readGhgDraft()
-    if (draft) {
+    // ⚠️ A DRAFT FROM ANOTHER ACCOUNT IS DISCARDED, NOT RESTORED (5 Oct 2026, lib/ghg/draft.ts draftBelongsTo). A draft
+    // that names its writer waits for the session and is restored only for that user; otherwise it is cleared and the
+    // page carries on as if there were none. A draft written signed out, or before owners were kept, restores at once.
+    const stored = readGhgDraftOwned()
+    const restore = (draft: NonNullable<typeof stored>['draft']) => {
       // Merged OVER the defaults, never the reverse: a field the draft omits keeps the value the form
       // already had. locations is spread over emptyLocation() the same way, so a location missing a
       // field gets that field's default rather than undefined.
@@ -828,9 +852,8 @@ const searchParams = useSearchParams()
       skipSavedReset.current = false
       setBaseline(null)
       setMode('wizard')
-      return
     }
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const proceed = () => supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { setMode('wizard'); return }
       const { data } = await supabase
         .from('ghg_inventories')
@@ -852,6 +875,15 @@ const searchParams = useSearchParams()
         setMode('wizard')
       }
     })
+    if (stored && (stored.owner === null || stored.owner === undefined)) { restore(stored.draft); return }
+    if (stored) {
+      void supabase.auth.getSession().then(({ data: { session } }) => {
+        if (draftBelongsTo(stored.owner, session?.user?.id ?? null)) restore(stored.draft)
+        else { clearGhgDraft(); void proceed() }
+      })
+      return
+    }
+    void proceed()
   }, [searchParams])
 
   // Load the user's companies for the select-or-create company field.
@@ -1704,7 +1736,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // overlay says in copy they can read before clicking rather than in a modal after it.
   const stashDraftAndGoToPricing = async (message?: string) => {
     const { data: { session } } = await supabase.auth.getSession()
-    saveGhgDraft(inventory, { anon: !session })
+    saveGhgDraft(inventory, { anon: !session, owner: session?.user?.id ?? null })
     if (message) alert(message)
     window.location.href = '/pricing?modules=ghg'
   }
@@ -1762,8 +1794,25 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       setKeepModal({ start: outcome === 'keep_form' ? 'form' : 'claim', pending: null })
       return
     }
+    // ⚠️ NO COMPANY NAME, NO WRITE (5 Oct 2026). Save is reachable from every step, and with a blank name and no
+    // company chosen nothing below resolves a company, so the insert went with company_id null. The owner policy's
+    // `company_id IN (the user's companies)` is never true for null, and the customer saw the database's own
+    // "violates row-level security policy" text for what is a missing field.
+    if (!(inventory.company_name || '').trim()) {
+      lastSaveError.current = COMPANY_NAME_NEEDED
+      alert(COMPANY_NAME_NEEDED)
+      return
+    }
     // Resolve the company_id for this inventory's company_name.
     let resolvedCompanyId = inventory.company_id || null
+    // ⚠️ AN ID IN THE FORM IS CHECKED AGAINST THIS ACCOUNT BEFORE IT IS USED (stale-state fix, 5 Oct 2026). It can
+    // belong to another account: a draft restored after a different sign-in in this browser, or a sign-in changed in
+    // another tab while this page held the form. Used as it was, the insert carried another account's company and
+    // the owner policy refused it. Not this account's: resolved again by name below, as for a new company.
+    if (resolvedCompanyId) {
+      const { data: own } = await supabase.from('companies').select('id').eq('id', resolvedCompanyId).eq('user_id', session.user.id).maybeSingle()
+      if (!own) resolvedCompanyId = null
+    }
     const trimmedName = (inventory.company_name || '').trim()
     if (!resolvedCompanyId && trimmedName) {
       // look up an existing company by (user_id, name); reuse if present
@@ -4208,7 +4257,7 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
     load()
   }
 
-  const linkFor = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/verify/${token}`
+  const linkFor = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : SITE_ORIGIN}/verify/${token}`
 
   const copy = (token: string, id: string) => {
     navigator.clipboard.writeText(linkFor(token))

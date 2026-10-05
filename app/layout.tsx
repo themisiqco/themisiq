@@ -7,6 +7,7 @@ import {
   Archivo,
 } from "next/font/google";
 import "./globals.css";
+import { SITE_ORIGIN } from '../lib/siteOrigin'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,7 +51,7 @@ const archivo = Archivo({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.themisiq.co'),
+  metadataBase: new URL(SITE_ORIGIN),
   title: "ThemisIQ | Countless Compliance Requirements. One Intelligent Platform.",
   description: "See which compliance rules apply to your business, then collect data once and report across climate, supply chain, AI, cyber and workforce frameworks.",
 };

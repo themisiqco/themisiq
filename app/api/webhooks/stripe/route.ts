@@ -20,6 +20,7 @@ import { getSupabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { entitlementTerm } from '../../../../lib/entitlementTerm'
 import { CONCIERGE_KEY } from '../../../../lib/pricing'
 import { INK_MUTED } from '@/lib/brand'
+import { SITE_ORIGIN } from '../../../../lib/siteOrigin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,7 +30,7 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
 // ── Invoice-path login email (Resend) ─────────────────────────────────────────
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const FROM_EMAIL     = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
-const SITE_URL       = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.themisiq.co'
+const SITE_URL       = process.env.NEXT_PUBLIC_SITE_URL || SITE_ORIGIN
 
 // Same Resend fetch helper used by the transactional routes (replicated).
 async function sendEmail(to: string, subject: string, html: string, text?: string) {

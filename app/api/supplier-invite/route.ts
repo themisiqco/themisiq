@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthedClient, bearerFrom, AuthError } from '../../../lib/supabaseAuthed'
 import { BRAND, INK_MUTED } from '@/lib/brand'
 import { subjectText } from '../../../lib/emailSubject'
+import { SITE_ORIGIN } from '../../../lib/siteOrigin'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@themisiq.co'
@@ -113,7 +114,7 @@ const inviteEmailHtml = ({
 
     <!-- Footer -->
     <div style="background:#f8f7f5;border-top:0.5px solid #e8e7e4;padding:16px 32px;text-align:center;">
-      <div style="font-size:11px;color:${INK_MUTED};">Powered by <a href="https://www.themisiq.co" style="color:${BRAND};text-decoration:none;">ThemisIQ</a> · Sustainability Compliance Platform</div>
+      <div style="font-size:11px;color:${INK_MUTED};">Powered by <a href="${SITE_ORIGIN}" style="color:${BRAND};text-decoration:none;">ThemisIQ</a> · Sustainability Compliance Platform</div>
     </div>
   </div>
 </body>
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
 
   // Single source for the sender name across subject, invite body and reminder.
   const buyerCompany = campaign.buyer_company || campaign.name
-  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://www.themisiq.co'}/supplier/${cs.token}`
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || SITE_ORIGIN}/supplier/${cs.token}`
 
   // Not escaped: a subject is a header, not HTML. subjectText() removes CR and LF so an
   // interpolated company name cannot end the Subject header and begin another one.

@@ -55,7 +55,11 @@ export const DRAFT_KEYS = {
 // asking "is this visitor signed in?" during a restore is not possible without blocking. Asking it
 // at SAVE time is trivial — the answer is stamped into the draft and the reader just reads it.
 // So the restore path needs no session check at all.
-type Envelope<T> = { v: number; savedAt: number; anon: boolean; payload: T }
+//
+// `owner` (5 Oct 2026) is the user id that wrote the draft, or null when written signed out. OPTIONAL, so a draft written
+// before it existed still reads; the reader treats a missing owner as unknown. A tool that restores across sign-ins
+// (the GHG wizard) compares it with the session before restoring; see lib/ghg/draft.ts draftBelongsTo.
+type Envelope<T> = { v: number; savedAt: number; anon: boolean; owner?: string | null; payload: T }
 
 function isEnvelope(u: unknown): u is Envelope<unknown> {
   if (!u || typeof u !== 'object' || Array.isArray(u)) return false
@@ -87,6 +91,11 @@ function shouldExpire(env: Envelope<unknown>, now: number): boolean {
  * this build can use or null. It must not trust its input.
  */
 export function readDraft<T>(key: string, validate: (u: unknown) => T | null, now = Date.now()): T | null {
+  return readDraftWithOwner(key, validate, now)?.value ?? null
+}
+
+/** readDraft, with who wrote it: a user id, null (written signed out), or undefined (written before owners were kept). */
+export function readDraftWithOwner<T>(key: string, validate: (u: unknown) => T | null, now = Date.now()): { value: T; owner: string | null | undefined } | null {
   if (typeof window === 'undefined') return null
   let raw: string | null = null
   try {
@@ -104,13 +113,16 @@ export function readDraft<T>(key: string, validate: (u: unknown) => T | null, no
   }
   if (!isEnvelope(parsed)) return null
   if (shouldExpire(parsed, now)) return null
-  return validate(parsed.payload)
+  const value = validate(parsed.payload)
+  if (value === null) return null
+  const o = (parsed as { owner?: unknown }).owner
+  return { value, owner: typeof o === 'string' ? o : o === null ? null : undefined }
 }
 
-/** Write a draft, stamped with the version, the time, and whether the writer was signed out. */
-export function saveDraft<T>(key: string, payload: T, opts: { anon: boolean }, now = Date.now()): void {
+/** Write a draft, stamped with the version, the time, whether the writer was signed out, and who wrote it if known. */
+export function saveDraft<T>(key: string, payload: T, opts: { anon: boolean; owner?: string | null }, now = Date.now()): void {
   if (typeof window === 'undefined') return
-  const env: Envelope<T> = { v: DRAFT_VERSION, savedAt: now, anon: opts.anon, payload }
+  const env: Envelope<T> = { v: DRAFT_VERSION, savedAt: now, anon: opts.anon, ...(opts.owner !== undefined ? { owner: opts.owner } : {}), payload }
   try {
     localStorage.setItem(key, JSON.stringify(env))
   } catch {

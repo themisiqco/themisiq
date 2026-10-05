@@ -325,7 +325,7 @@ describe('L5 amendment 2', () => {
   })
 
   it('R23: the link is on the Site URL origin, from one constant, used by both routes', () => {
-    expect(SITE_ORIGIN).toBe('https://themisiq.co')
+    expect(SITE_ORIGIN).toBe('https://www.themisiq.co')
     for (const f of ['app/api/ghg/free-calc/claim/route.ts', 'app/api/ghg/free-calc/email/route.ts']) {
       const src = read(f)
       expect(src).toContain('siteUrl: SITE_ORIGIN,')

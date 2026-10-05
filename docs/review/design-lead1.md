@@ -538,10 +538,24 @@ None open for Lisa in this document. The three items in section 5 are for her la
 | Email rate limit | 100 an hour | |
 | Email OTP length | 6 | |
 | Email OTP expiry | **3600 s (1 hour), deliberately** | The same setting governs sign-up confirmation links and the purchase email's first sign-in link, so shortening it to 10 minutes would also cut those to 10 minutes. Codes therefore work for 1 hour; every template and screen says 1 hour, never 10 minutes |
-| Redirect URLs | `https://themisiq.co/**` and `https://themisiq-*-lisa-foster-s-projects.vercel.app/**` | Covers /auth/callback, /auth/confirm and /reset-password in production and previews |
+| Redirect URLs | `https://themisiq.co/**` and `https://themisiq-*-lisa-foster-s-projects.vercel.app/**`. **Amended 5 Oct 2026:** `https://www.themisiq.co/**`, `https://themisiq.co/**` and the preview pattern | Covers /auth/callback, /auth/confirm and /reset-password in production and previews. The apex entry stays for links already sent |
 | Turnstile widget | Created, Managed mode, hostnames `themisiq.co` and `www.themisiq.co` only | Previews and local development cannot use it; they use Cloudflare's test key (10.2) |
 | Email templates | **Done 4 Oct 2026, after L2 went live** (10.3, step 3) | "Magic Link": subject "Your ThemisIQ sign-in code: {{ .Token }}", body with `{{ .Token }}`, a link to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`, and the footer. "Confirm signup": `{{ .ConfirmationURL }}` plus `{{ .Token }}` and the footer. "Reset Password": footer added. A typed code and the link opened on a phone were both tested on production |
 | Supabase CAPTCHA protection | **OFF, by decision (Lisa, 4 Oct 2026)** | Stays off until the launch checklist (10.4), so sign-in keeps working on previews and locally while L3 to L9 are built and tested (10.2 explains why it would not) |
+
+### 10.1b Canonical host: https://www.themisiq.co (decided by Lisa, 5 Oct 2026)
+
+| Setting | As set | Note |
+|---|---|---|
+| Vercel | `www.themisiq.co` is the Production domain; the apex `themisiq.co` 307-redirects to it | Already so before the decision; the decision makes the code agree with it |
+| Supabase Site URL | `https://www.themisiq.co` (was the apex) | `{{ .SiteURL }}` in the "Magic Link" template, so the code email's link opens on www |
+| Supabase redirect URLs | `https://www.themisiq.co/**`, `https://themisiq.co/**`, the preview pattern | See 10.1 |
+| Turnstile hostnames | `www.themisiq.co` and `themisiq.co` | |
+| Code | `lib/siteOrigin.ts` `SITE_ORIGIN = 'https://www.themisiq.co'`, the one constant for links the server writes (results email, invites' fallback, the purchase email's first sign-in link fallback, sitemap, robots.txt, metadataBase) | `lib/siteOrigin.test.ts` fails on any other hard-coded origin in app/ or lib/ |
+| DNS | Vercel's recommended CNAME for www could not be saved at GoDaddy (another record is flagged invalid); the legacy CNAME remains and works | **Not in scope now.** Revisit before launch if Vercel starts warning on the domain |
+
+⚠️ **A sign-in session is stored per origin.** One made on the apex is not visible on www, which is why everything that
+writes a link now writes www: a link to the apex costs a redirect and lands where the session is not.
 
 ### 10.2 Turnstile keys by environment
 
@@ -667,4 +681,10 @@ Each item is a launch blocker unless marked otherwise.
    Turnstile check and logs "TURNSTILE_SECRET_KEY is not set: Turnstile was NOT verified" on every hold; that line in
    production logs means this item is not done.
 5. **Lawyer review** of the items in section 5 (CASL and the privacy and Terms additions).
+6. **Canonical host is www everywhere (10.1b).** Check on production:
+   - `https://themisiq.co` redirects to `https://www.themisiq.co`;
+   - a sign-in code email's link opens on `https://www.themisiq.co/auth/confirm`;
+   - the results email's link opens on `https://www.themisiq.co/dashboard/ghg?id=…`;
+   - `https://www.themisiq.co/robots.txt` names `https://www.themisiq.co/sitemap.xml`.
+   The GoDaddy DNS warning (10.1b) is not a blocker while the legacy CNAME serves www.
 

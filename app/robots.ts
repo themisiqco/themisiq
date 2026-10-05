@@ -9,6 +9,7 @@
 // Those URLs carry a credential and are protected by not being linked, not by this file.
 
 import type { MetadataRoute } from 'next'
+import { SITE_ORIGIN } from '../lib/siteOrigin'
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -32,6 +33,6 @@ export default function robots(): MetadataRoute.Robots {
         '/deals/',
       ],
     },
-    sitemap: 'https://www.themisiq.co/sitemap.xml',
+    sitemap: `${SITE_ORIGIN}/sitemap.xml`,
   }
 }

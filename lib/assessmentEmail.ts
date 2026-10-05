@@ -24,11 +24,12 @@ import {
   BRAND, BRAND_LINE, INK, INK_2, INK_MUTED, PAPER, GROUND, LINE, BAND, BAND_LINE, ON_DARK,
   ACCENT, STATE_ERROR, STATE_WARN, STATE_INFO, STATE_INFO_WASH,
 } from './brand'
+import { SITE_ORIGIN } from './siteOrigin'
 
 // EVERY LINK IN AN EMAIL MUST BE ABSOLUTE. The hrefs lib/obligations.ts returns are relative, because
 // the page renders them into its own document; dropped into an inbox they resolve against the mail
 // client and go nowhere. This prefixes them, and states the host once.
-export const SITE_URL = 'https://www.themisiq.co'
+export const SITE_URL = SITE_ORIGIN
 
 // THE MASTHEAD, ONE HOSTED IMAGE AT THE TOP OF BOTH EMAILS (1 Oct 2026): the aurora with the reversed logo
 // keyed onto it, built by scripts/build-email-masthead.py into public/images/email/masthead.jpg (1200 x 240,

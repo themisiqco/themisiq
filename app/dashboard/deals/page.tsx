@@ -37,6 +37,7 @@ import {
   resolveCs3d, makeMapFramework, regimeLabel, themisIqFigure as themisIqFigureOf, cs3dNoteWizard,
   resolveCanadaS211, canadaS211NoteWizard, buildDealReportModel, CHIP_LABELS, obligationRowPrice, compactMoneyRange, type DealReportModel,
 } from '../../../lib/deals/reportModel'
+import { SITE_ORIGIN } from '../../../lib/siteOrigin'
 
 // The framework name the Deals engine gives the S-211 row (lib/deals/assessment.ts).
 const DEALS_S211_FRAMEWORK = 'Canada S-211'
@@ -558,7 +559,7 @@ function DealsDashboardInner() {
   ]
 
   // Absolute public URL for the target-facing route (matches the verifier linkFor pattern).
-  const shareUrl = dealToken ? `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/deals/${dealToken}` : ''
+  const shareUrl = dealToken ? `${typeof window !== 'undefined' ? window.location.origin : SITE_ORIGIN}/deals/${dealToken}` : ''
 
   // Flip share_enabled — a normal owner-gated update (existing RLS covers it); no RPC, no policy change.
   // The WRITE is where the gate has authority. A render-level check only decides what is on screen;

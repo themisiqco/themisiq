@@ -1,10 +1,12 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 
 // The storage calls need a browser; the PARSE does not, and the parse is where every decision lives.
 // Same split lib/deals/draft.ts and lib/useEntitlement.ts already use.
 vi.mock('../supabase', () => ({ supabase: {} }))
 
-import { parseGhgDraft } from './draft'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { parseGhgDraft, saveGhgDraft, readGhgDraftOwned, draftBelongsTo } from './draft'
 
 describe('a GHG draft survives the sign-in round trip without carrying rubbish into the wizard', () => {
   // ⚠️ WHAT THIS PROTECTS. handleSave used to return silently with no session, so a visitor who built an
@@ -37,10 +39,13 @@ describe('a GHG draft survives the sign-in round trip without carrying rubbish i
     }
   })
 
-  it('keeps company_id: null, because "no company row yet" is a state the save path branches on', () => {
-    // Collapsing null to undefined would let the merge restore a default over a deliberate null.
+  it('never restores a company_id: a companies row belongs to one account, a draft to a browser (5 Oct 2026)', () => {
+    // null stays null, because "no company row yet" is a state the save path branches on. A stored id comes back as
+    // null too: restored under another account it named a row that account cannot use, and Save was refused. Save
+    // resolves the company by name for whoever is signed in.
     expect(parseGhgDraft({ company_id: null })).toEqual({ company_id: null })
-    expect(parseGhgDraft({ company_id: 'abc' })).toEqual({ company_id: 'abc' })
+    expect(parseGhgDraft({ company_id: 'abc' })).toEqual({ company_id: null })
+    expect(parseGhgDraft({ company_name: 'Acme', company_id: 'other-accounts-company' })).toEqual({ company_name: 'Acme', company_id: null })
     expect(parseGhgDraft({ company_id: 7 })).toBeNull()      // wrong type, and nothing else recognised
   })
 
@@ -102,5 +107,45 @@ describe('a GHG draft survives the sign-in round trip without carrying rubbish i
       selected_frameworks: ['SB 253'], locations: [{ id: '1', name: 'HQ' }],
     }
     expect(parseGhgDraft(JSON.parse(JSON.stringify(original)))).toEqual(original)
+  })
+})
+
+// Drafts record who wrote them (5 Oct 2026): a browser used for several accounts restored one account's figures
+// into the next one's form.
+describe('draft ownership', () => {
+  const mem = () => {
+    const m = new Map<string, string>()
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v) }, removeItem: (k: string) => { m.delete(k) } }
+  }
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('O1: a draft is restored only for the user who wrote it; signed-out and older drafts restore as before', () => {
+    expect(draftBelongsTo('user-a', 'user-a')).toBe(true)
+    expect(draftBelongsTo('user-a', 'user-b')).toBe(false)
+    expect(draftBelongsTo('user-a', null)).toBe(false)      // written signed in, read signed out: not restored
+    expect(draftBelongsTo(null, 'user-b')).toBe(true)       // written signed out
+    expect(draftBelongsTo(undefined, 'user-b')).toBe(true)  // written before owners were kept
+  })
+
+  it('O2: the owner is stored with the draft and read back; an older envelope reads as unknown', () => {
+    const storage = mem()
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('localStorage', storage)
+    saveGhgDraft({ company_name: 'Acme', company_id: 'co-1' }, { anon: false, owner: 'user-a' })
+    expect(readGhgDraftOwned()).toEqual({ draft: { company_name: 'Acme', company_id: null }, owner: 'user-a' })
+    saveGhgDraft({ company_name: 'Acme' }, { anon: true, owner: null })
+    expect(readGhgDraftOwned()?.owner).toBeNull()
+    saveGhgDraft({ company_name: 'Acme' }, { anon: false })
+    expect(readGhgDraftOwned()?.owner).toBeUndefined()
+  })
+
+  it('O3: the page waits for the session before restoring a draft that names its writer, and clears one that is not theirs', () => {
+    const page = readFileSync(join(__dirname, '..', '..', 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain('const stored = readGhgDraftOwned()')
+    expect(page).toContain('if (draftBelongsTo(stored.owner, session?.user?.id ?? null)) restore(stored.draft)')
+    expect(page).toContain('else { clearGhgDraft(); void proceed() }')
+    expect(page).toContain('saveGhgDraft(inventory, { anon: !session, owner: session?.user?.id ?? null })')
+    const modal = readFileSync(join(__dirname, '..', '..', 'app/dashboard/ghg/_components/KeepResultsModal.tsx'), 'utf8')
+    expect(modal).toContain('saveGhgDraft(claimInventory.current, { anon: false, owner: session?.user?.id ?? null })')
   })
 })

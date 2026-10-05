@@ -155,7 +155,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
     dispatch({ type: 'submit' })
     // The calculation goes to this browser first (design 1.6): a reload or a closed tab before the code is typed
     // finds it again. Signed out, so the draft's 2-hour lifetime applies.
-    saveGhgDraft(inventory, { anon: true })
+    saveGhgDraft(inventory, { anon: true, owner: null })
     dropStartNew()
     let held: Response
     try {
@@ -255,8 +255,9 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
     leaveTo(inventoryHref(id))
   }
   // 1.5b: "Open that inventory" keeps this calculation in the browser draft (signed in now, so no 2-hour limit).
-  const openExisting = (id: string) => {
-    saveGhgDraft(claimInventory.current, { anon: false })
+  const openExisting = async (id: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    saveGhgDraft(claimInventory.current, { anon: false, owner: session?.user?.id ?? null })
     clearPendingMarker()
     leaveTo(inventoryHref(id))
   }
@@ -337,7 +338,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
             <p style={para}>{state.message}</p>
             {!state.editing ? (
               <div style={choices}>
-                {state.existing && <button type="button" onClick={() => openExisting(state.existing!.id)} style={primary}>{KEEP_COPY.openExisting}</button>}
+                {state.existing && <button type="button" onClick={() => { void openExisting(state.existing!.id) }} style={primary}>{KEEP_COPY.openExisting}</button>}
                 <button type="button" onClick={() => dispatch({ type: 'edit_company_year' })} style={secondary}>{KEEP_COPY.changeCompanyYear}</button>
               </div>
             ) : (

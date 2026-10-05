@@ -36,6 +36,7 @@ import type {
 } from '../../../../lib/cbam/report/types'
 import type { SefaBenchmarkWorkings } from '../../../../lib/cbam/sefaCompute'
 import { itemHeadTight as itemHead, sectionHeadFixed as sectionHead } from '@/app/components/headingStyles'
+import { SITE_ORIGIN } from '../../../../lib/siteOrigin'
 
 // ── House style, matching app/dashboard/cbam/page.tsx ──
 const sectionSub: React.CSSProperties = { fontSize: 14, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '2rem' }
@@ -615,7 +616,7 @@ function CbamVerifierInvite({ installationId, companyId, reportingPeriod }: { in
     load()
   }
 
-  const linkFor = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : 'https://www.themisiq.co'}/verify-cbam/${token}`
+  const linkFor = (token: string) => `${typeof window !== 'undefined' ? window.location.origin : SITE_ORIGIN}/verify-cbam/${token}`
 
   const copy = (token: string, id: string) => {
     navigator.clipboard.writeText(linkFor(token))
