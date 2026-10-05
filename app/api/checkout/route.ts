@@ -31,6 +31,7 @@ import {
   type GhgTier,
 } from '../../../lib/pricing'
 import { billReviewOrder, type OwnedRow } from '../../../lib/billReviewOrder'
+import { checkoutSuccessPath } from '../../../lib/ghg/convertOnPurchase'
 
 // Stripe needs the Node.js runtime (not edge).
 export const runtime = 'nodejs'
@@ -187,6 +188,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 4.6) LEAD1 L8: with GHG in the cart, the buyer lands on their free calculation, which the webhook converts into
+    // their first inventory (lib/ghg/convertOnPurchase.ts). Read as the customer (RLS). A failed read is not a reason
+    // to refuse a payment: it falls back to /dashboard, as before L8.
+    let freeInventoryId: string | null = null
+    if (entitlementsToGrant.has('ghg')) {
+      const { data: freeRows, error: freeErr } = await supabase.from('ghg_inventories').select('id').eq('free_tier', true).limit(1)
+      if (freeErr) console.error('[checkout] free inventory read failed; landing on /dashboard:', freeErr.message)
+      freeInventoryId = ((freeRows ?? [])[0] as { id: string } | undefined)?.id ?? null
+    }
+
     // 5) Create the Checkout Session. Metadata travels to the webhook.
     const entitlements = Array.from(entitlementsToGrant).join(',')
     const metadata = {
@@ -212,7 +223,7 @@ export async function POST(req: NextRequest) {
       // Mirror metadata onto the PaymentIntent too, so it's available whichever
       // event the webhook ends up keying off.
       payment_intent_data: { metadata, receipt_email: email },
-      success_url: `${origin}/dashboard?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}${checkoutSuccessPath({ ghgInCart: entitlementsToGrant.has('ghg'), freeInventoryId })}`,
       cancel_url: `${origin}/pricing`,
     })
 

@@ -21,6 +21,7 @@ import { entitlementTerm } from '../../../../lib/entitlementTerm'
 import { CONCIERGE_KEY } from '../../../../lib/pricing'
 import { INK_MUTED } from '@/lib/brand'
 import { SITE_ORIGIN } from '../../../../lib/siteOrigin'
+import { convertFreeInventoryOnPurchase } from '../../../../lib/ghg/convertOnPurchase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -269,6 +270,25 @@ async function grantFromMetadata(
   }
 
   console.log(`[webhook] granted [${keys.join(', ')}] to user ${userId}`)
+
+  // LEAD1 L8: a GHG purchase turns the buyer's free calculation, if they have one, into their first inventory. AFTER
+  // the entitlement, because the gate (enforce_ghg_location_allowance) allows the flip only with an active plan. Never
+  // throws (lib/ghg/convertOnPurchase.ts): a failure is logged and the delivery still succeeds. Only this user's row,
+  // only while it is free, one row; a redelivery finds no free row and does nothing.
+  await convertFreeInventoryOnPurchase(userId, keys, {
+    findFreeInventory: async (uid) => {
+      const { data, error: fErr } = await supabaseAdmin.from('ghg_inventories').select('id')
+        .eq('user_id', uid).eq('free_tier', true).order('created_at', { ascending: true }).limit(1)
+      if (fErr) return { error: fErr.message }
+      const first = (data ?? [])[0] as { id: string } | undefined
+      return first ? { id: first.id } : null
+    },
+    markPaid: async (id, uid) => {
+      const { data, error: uErr } = await supabaseAdmin.from('ghg_inventories').update({ free_tier: false })
+        .eq('id', id).eq('user_id', uid).eq('free_tier', true).select('id')
+      return uErr ? { error: uErr.message } : { updated: (data ?? []).length }
+    },
+  })
 
   // Additive: persist the purchase-consent record (self-serve checkout only — present
   // when consent metadata was attached at checkout). The PRIMARY durable record is the

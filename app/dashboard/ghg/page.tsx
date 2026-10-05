@@ -14,6 +14,7 @@ import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry
 // "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
 import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, emailedLine, KEEP_COPY, readPendingMarker, clearPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
 import KeepResultsModal from './_components/KeepResultsModal'
+import { purchaseLine } from '../../../lib/ghg/convertOnPurchase'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
 // The plan gates' messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
 import { saveFailedText } from '../../../lib/planGateError'
@@ -782,6 +783,9 @@ const searchParams = useSearchParams()
   // ?kept=free|plan: the claim saved this calculation and reopened it here (lib/ghg/keepResults.ts savedHref).
   const keptMessage = keptLine(searchParams.get('kept'))
   const keptEmailed = emailedLine(searchParams.get('emailed'), currentUser?.email ?? null)
+  // LEAD1 L8: the landing after a GHG purchase (?purchase=success, checkoutSuccessPath). Converted, or the webhook not
+  // yet run, said as observed from the row's own free_tier.
+  const purchaseMessage = purchaseLine(searchParams.get('purchase'), editingFree)
   // L5: "Email me my results again", for the free calculation open by id. The route reads the row as this user and
   // sends to this session's address; its own sentence is shown, whatever it says.
   const [emailAgain, setEmailAgain] = useState<{ sending: boolean; ok: boolean; message: string | null }>({ sending: false, ok: false, message: null })
@@ -3651,6 +3655,11 @@ workings: saved.workings,
             wonder why their link opened a new inventory. */}
         {/* LEAD1 L4: the claim saved this calculation and reopened it here (?kept=). L5: then whether the results
             email went (?emailed=1 or 0), said as observed: the claim route reports Resend's answer, not a guess. */}
+        {purchaseMessage && inventoryId && (
+          <div role="status" data-purchase-landing style={{ background: '#E1F5EE', border: '0.5px solid color-mix(in srgb, #0F6E56 25%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56', lineHeight: 1.6, fontWeight: 500 }}>
+            {purchaseMessage}
+          </div>
+        )}
         {keptMessage && inventoryId && (
           <div role="status" style={{ background: '#E1F5EE', border: '0.5px solid color-mix(in srgb, #0F6E56 25%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56', lineHeight: 1.6, fontWeight: 500 }}>
             {keptMessage}{keptEmailed && <> {keptEmailed}</>}
