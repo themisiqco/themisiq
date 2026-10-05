@@ -14,7 +14,8 @@ import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry
 // "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
 import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, emailedLine, KEEP_COPY, readPendingMarker, clearPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
 import KeepResultsModal from './_components/KeepResultsModal'
-import { purchaseLine } from '../../../lib/ghg/convertOnPurchase'
+import { purchaseLine, initialPurchaseState, startConversionPoll, type PurchaseState } from '../../../lib/ghg/convertOnPurchase'
+import { accessFromRow } from '../../../lib/entitlementAccess'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
 // The plan gates' messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
 import { saveFailedText } from '../../../lib/planGateError'
@@ -766,7 +767,11 @@ const searchParams = useSearchParams()
   // ghg_inventories write without an ACTIVE pass since 11 Aug 2026, and it says something
   // different to a lapsed customer than to someone who never bought. This hook is what lets the
   // screen say the same thing BEFORE the work is done rather than after.
-  const ghgAccess = useEntitlementAccess('ghg')
+  const ghgAccessRead = useEntitlementAccess('ghg')
+  // L8-fix1: the plan as the purchase landing's re-check found it, once the free calculation has converted. The hook
+  // reads the plan once, at mount, which can be before the webhook ran; this replaces that read, never the reverse.
+  const [accessAfterPurchase, setAccessAfterPurchase] = useState<EntitlementAccess | null>(null)
+  const ghgAccess: EntitlementAccess = accessAfterPurchase ?? ghgAccessRead
   // "A ROW EXISTS", INCLUDING AN EXPIRED ONE, and three surfaces read it: step 5's PaywallOverlay, the
   // eleven DocUpload gates, and step 5's subtitle. Step 4 no longer does. An expired customer keeps all
   // three, which is the meaning every caller was written against.
@@ -783,9 +788,37 @@ const searchParams = useSearchParams()
   // ?kept=free|plan: the claim saved this calculation and reopened it here (lib/ghg/keepResults.ts savedHref).
   const keptMessage = keptLine(searchParams.get('kept'))
   const keptEmailed = emailedLine(searchParams.get('emailed'), currentUser?.email ?? null)
-  // LEAD1 L8: the landing after a GHG purchase (?purchase=success, checkoutSuccessPath). Converted, or the webhook not
-  // yet run, said as observed from the row's own free_tier.
-  const purchaseMessage = purchaseLine(searchParams.get('purchase'), editingFree)
+  // LEAD1 L8: the landing after a GHG purchase (?purchase=success, checkoutSuccessPath). L8-fix1: its state is set when
+  // the inventory loads (converted, or waiting while the row is still free) and moved on by the re-check below.
+  const [purchaseState, setPurchaseState] = useState<PurchaseState>('none')
+  const purchaseMessage = purchaseLine(purchaseState)
+  // ⚠️ THE RE-CHECK IS READ ONLY (L8-fix1). While the landing waits, it re-reads this inventory's free_tier and the
+  // account's GHG plan every 2 s for up to 20 s (lib/ghg/convertOnPurchase.ts startConversionPoll). It never writes,
+  // never calls the webhook and never converts anything: the conversion is the webhook's. Converted (the row is no
+  // longer free and the plan is active): the free banner goes, Save saves as a paid inventory, and the success line
+  // shows. Out of time: the slower line. Leaving the page stops it. Without ?purchase=success nothing starts.
+  useEffect(() => {
+    if (purchaseState !== 'waiting' || !inventoryId) return
+    const id = inventoryId
+    const poll = startConversionPoll({
+      check: async () => {
+        const [inv, ent] = await Promise.all([
+          supabase.from('ghg_inventories').select('free_tier').eq('id', id).maybeSingle(),
+          supabase.from('entitlements').select('module_key, term_end').eq('module_key', 'ghg').maybeSingle(),
+        ])
+        const access = accessFromRow(ent.error ? { ok: false } : { ok: true, row: ent.data }, new Date())
+        return { converted: !inv.error && inv.data?.free_tier === false && access === 'active', access }
+      },
+      onConverted: ({ access }) => {
+        setAccessAfterPurchase(access)
+        setEditingFree(false)
+        setHasFreeCalc(false)
+        setPurchaseState('converted')
+      },
+      onTimeout: () => setPurchaseState('slow'),
+    })
+    return () => poll.stop()
+  }, [purchaseState, inventoryId])
   // L5: "Email me my results again", for the free calculation open by id. The route reads the row as this user and
   // sends to this session's address; its own sentence is shown, whatever it says.
   const [emailAgain, setEmailAgain] = useState<{ sending: boolean; ok: boolean; message: string | null }>({ sending: false, ok: false, message: null })
@@ -1051,6 +1084,8 @@ const searchParams = useSearchParams()
         setInventoryId(data.id)
         // LEAD1 L4: the free calculation saves as itself and shows its own banner.
         setEditingFree(data.free_tier === true)
+        // L8-fix1: the purchase landing starts from the row as loaded.
+        setPurchaseState(initialPurchaseState(searchParams.get('purchase'), data.free_tier === true))
         setInventory(inv => ({
           ...inv,
           company_name: data.company_name || '',

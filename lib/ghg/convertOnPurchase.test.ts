@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { convertFreeInventoryOnPurchase, checkoutSuccessPath, purchaseLine, PURCHASE_COPY } from './convertOnPurchase'
+import {
+  convertFreeInventoryOnPurchase, checkoutSuccessPath, purchaseLine, PURCHASE_COPY, initialPurchaseState, startConversionPoll,
+  POLL_INTERVAL_MS, POLL_TIMEOUT_MS,
+} from './convertOnPurchase'
 
 // LEAD1 L8 (Oct 2026): the free calculation becomes the customer's first inventory on purchase. The webhook is driven
 // for real (app/api/webhooks/stripe/route.ts POST), with Stripe's signature check and the service-role client
@@ -176,11 +179,91 @@ describe('where the buyer lands', () => {
     expect(src).toContain(".from('ghg_inventories').select('id').eq('free_tier', true).limit(1)")
   })
 
-  it('C12: the landing line says what the row shows: converted, or the plan still being applied', () => {
-    expect(purchaseLine('success', false)).toBe(PURCHASE_COPY.converted)
-    expect(purchaseLine('success', true)).toBe(PURCHASE_COPY.pending)
-    expect(purchaseLine(null, false)).toBeNull()
-    expect(read('app/dashboard/ghg/page.tsx')).toContain("const purchaseMessage = purchaseLine(searchParams.get('purchase'), editingFree)")
-    for (const s of Object.values(PURCHASE_COPY)) expect(s).not.toContain('—')
+  it('C12: the landing starts from the row as loaded: converted, or waiting while it is still free; nothing without purchase=success', () => {
+    expect(initialPurchaseState('success', false)).toBe('converted')
+    expect(initialPurchaseState('success', true)).toBe('waiting')
+    expect(initialPurchaseState(null, true)).toBe('none')
+    expect(purchaseLine('converted')).toBe(PURCHASE_COPY.converted)
+    expect(purchaseLine('waiting')).toBe(PURCHASE_COPY.waiting)
+    expect(purchaseLine('slow')).toBe(PURCHASE_COPY.slow)
+    expect(purchaseLine('none')).toBeNull()
+    expect(read('app/dashboard/ghg/page.tsx')).toContain("setPurchaseState(initialPurchaseState(searchParams.get('purchase'), data.free_tier === true))")
+  })
+})
+
+// L8-fix1: the purchase landing re-checks by itself, read only, every 2 s for up to 20 s.
+describe('the purchase landing re-check', () => {
+  afterEach(() => { vi.useRealTimers() })
+  const poll = (results: boolean[]) => {
+    vi.useFakeTimers()
+    const calls = { checks: 0, converted: 0, timeout: 0 }
+    const handle = startConversionPoll({
+      check: async () => { const c = results[calls.checks] ?? false; calls.checks++; return { converted: c } },
+      onConverted: () => { calls.converted++ },
+      onTimeout: () => { calls.timeout++ },
+    })
+    return { calls, handle }
+  }
+
+  it('C13: converts during polling: the page swaps to the converted state and polling stops', async () => {
+    const { calls } = poll([false, false, true])
+    await vi.advanceTimersByTimeAsync(3 * POLL_INTERVAL_MS)
+    expect(calls).toEqual({ checks: 3, converted: 1, timeout: 0 })
+    await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS)
+    expect(calls).toEqual({ checks: 3, converted: 1, timeout: 0 })
+    // What the page does on conversion: the plan as re-read, the free banner off, Save as paid, the success line.
+    const page = read('app/dashboard/ghg/page.tsx')
+    const on = page.slice(page.indexOf('onConverted: ({ access }) => {'), page.indexOf("onTimeout: () => setPurchaseState('slow'),"))
+    for (const s of ['setAccessAfterPurchase(access)', 'setEditingFree(false)', 'setHasFreeCalc(false)', "setPurchaseState('converted')"]) expect(on).toContain(s)
+    expect(page).toContain('const ghgAccess: EntitlementAccess = accessAfterPurchase ?? ghgAccessRead')
+  })
+
+  it('C14: never converts: polling stops at 20 seconds and the fallback line shows', async () => {
+    const { calls } = poll([])
+    await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS - 1)
+    expect(calls.timeout).toBe(0)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(calls).toEqual({ checks: POLL_TIMEOUT_MS / POLL_INTERVAL_MS, converted: 0, timeout: 1 })
+    await vi.advanceTimersByTimeAsync(10 * POLL_INTERVAL_MS)
+    expect(calls.checks).toBe(POLL_TIMEOUT_MS / POLL_INTERVAL_MS)
+    expect(read('app/dashboard/ghg/page.tsx')).toContain("onTimeout: () => setPurchaseState('slow'),")
+    expect(purchaseLine('slow')).toBe(PURCHASE_COPY.slow)
+  })
+
+  it('C15: polling makes no writes: the re-check only selects, and calls no route', () => {
+    const page = read('app/dashboard/ghg/page.tsx')
+    const effect = page.slice(page.indexOf("if (purchaseState !== 'waiting' || !inventoryId) return"), page.indexOf('return () => poll.stop()'))
+    expect(effect).toContain(".from('ghg_inventories').select('free_tier').eq('id', id).maybeSingle()")
+    expect(effect).toContain(".from('entitlements').select('module_key, term_end').eq('module_key', 'ghg').maybeSingle()")
+    expect(effect).not.toMatch(/\.(update|insert|upsert|delete|rpc)\(|fetch\(/)
+    expect(read('lib/ghg/convertOnPurchase.ts').slice(read('lib/ghg/convertOnPurchase.ts').indexOf('export function startConversionPoll'))).not.toMatch(/supabase|fetch\(/)
+  })
+
+  it('C16: no purchase=success: no polling; leaving the page stops it', async () => {
+    expect(initialPurchaseState(null, true)).toBe('none')
+    const page = read('app/dashboard/ghg/page.tsx')
+    expect(page).toContain("if (purchaseState !== 'waiting' || !inventoryId) return")
+    expect(page).toContain('return () => poll.stop()')
+    const { calls, handle } = poll([])
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
+    handle.stop()
+    await vi.advanceTimersByTimeAsync(POLL_TIMEOUT_MS)
+    expect(calls).toEqual({ checks: 1, converted: 0, timeout: 0 })
+  })
+
+  it('C17: a check that fails counts as not yet, and polling carries on', async () => {
+    vi.useFakeTimers()
+    let n = 0
+    let converted = 0
+    startConversionPoll({ check: async () => { n++; if (n === 1) throw new Error('network'); return { converted: n === 2 } }, onConverted: () => { converted++ }, onTimeout: () => {} })
+    await vi.advanceTimersByTimeAsync(2 * POLL_INTERVAL_MS)
+    expect(converted).toBe(1)
+  })
+
+  it('C18: the three strings, word for word', () => {
+    expect(PURCHASE_COPY.converted).toBe('Your GHG plan is active. This is now your first inventory, and everything you entered has been kept.')
+    expect(PURCHASE_COPY.waiting).toBe("Payment received. We're applying your plan to this calculation now.")
+    expect(PURCHASE_COPY.slow).toBe("Your plan is taking a little longer than usual to apply. Refresh this page in a minute, or email hello@themisiq.co if it still hasn't updated.")
+    for (const s of Object.values(PURCHASE_COPY)) expect(s).not.toContain('\u2014')
   })
 })
