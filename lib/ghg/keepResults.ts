@@ -264,7 +264,9 @@ export function normaliseCode(raw: string): string | null {
 export const KEEP_PENDING_KEY = 'themisiq.ghg.keep-pending'
 export const CODE_TTL_MS = 60 * 60 * 1000
 
-export type PendingMarker = { email: string; fullName: string; company: string; sentAt: number }
+/** marketingConsent (L6): the box's state when the code was sent, so a reload before the code is typed claims with the
+ *  choice the visitor made. Absent on markers written before L6: no choice is recorded for those. */
+export type PendingMarker = { email: string; fullName: string; company: string; sentAt: number; marketingConsent?: boolean }
 
 export function parsePendingMarker(raw: string | null, now: number): PendingMarker | null {
   if (!raw) return null
@@ -277,6 +279,7 @@ export function parsePendingMarker(raw: string | null, now: number): PendingMark
       fullName: typeof o.fullName === 'string' ? o.fullName : '',
       company: typeof o.company === 'string' ? o.company : '',
       sentAt: o.sentAt,
+      ...(typeof o.marketingConsent === 'boolean' ? { marketingConsent: o.marketingConsent } : {}),
     }
   } catch {
     return null

@@ -12,6 +12,7 @@ import { emailResultsAgain, RESEND_RESULTS_LIMIT } from '../../../../../lib/ghg/
 import { RESULTS_EMAIL_COLUMNS, type SavedInventoryRow } from '../../../../../lib/ghg/resultsEmail'
 import { sendResultsEmail } from '../../../../../lib/ghg/resultsEmailSend'
 import { SITE_ORIGIN } from '../../../../../lib/siteOrigin'
+import { activeConsent, type ConsentRow } from '../../../../../lib/consent/marketing'
 
 const HOUR = 60 * 60 * 1000
 
@@ -49,6 +50,13 @@ export async function POST(req: NextRequest) {
     },
     sendResults: (to, email) => sendResultsEmail(to, email),
     siteUrl: SITE_ORIGIN,
+    // L6: the unsubscribe link goes only to an account whose marketing consent is active.
+    activeConsentId: async () => {
+      const { data, error } = await getSupabaseAdmin().from('marketing_consents').select('id, granted, created_at, withdrawn_at')
+        .eq('user_id', userId).eq('purpose', 'updates').order('created_at', { ascending: false }).limit(20)
+      if (error) { console.error('[free-calc/email] consent read failed:', error.message); return null }
+      return activeConsent((data ?? []) as ConsentRow[])?.id ?? null
+    },
   })
   return NextResponse.json(result.body, { status: result.status })
 }

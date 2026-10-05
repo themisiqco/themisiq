@@ -19,6 +19,9 @@ import { isHoneypotTripped, HONEYPOT_FIELD, recipientKey } from '../assessmentSu
 import type { GhgDraft } from './draftParse'
 import { buildResultsEmail, type SavedInventoryRow } from './resultsEmail'
 import type { SendResult } from './resultsEmailSend'
+import { readConsentChoice, KEEP_RESULTS_SOURCE } from '../consent/marketing'
+import { recordConsentChoice, unsubscribeFor, type ConsentInsert } from '../consent/consentService'
+import { signUnsubscribeToken } from '../consent/unsubscribeToken'
 
 export type RouteResult = { status: number; body: Record<string, unknown> }
 
@@ -31,6 +34,8 @@ export type PendingRow = {
 
 export type HoldDeps = {
   ip: string | null
+  /** L6: kept with a marketing choice made on the form, as proof of where it came from. */
+  userAgent?: string | null
   now: Date
   rateLimitOk(bucket: 'ip' | 'email', key: string | null): Promise<boolean>
   verifyCaptcha(token: unknown, ip: string | null): Promise<{ ok: boolean }>
@@ -54,12 +59,16 @@ export async function holdFreeCalc(body: unknown, deps: HoldDeps): Promise<Route
   const captcha = await deps.verifyCaptcha(o.turnstileToken, deps.ip)
   if (!captcha.ok) return { status: 400, body: { ok: false, code: 'captcha_failed', message: FREE_CALC_MESSAGES.captchaFailed } }
 
+  const holdChoice = readConsentChoice(o.marketingConsent, KEEP_RESULTS_SOURCE)
   const saved = await deps.insertPending({
     email: v.value.email,
     email_key: v.value.emailKey,
     full_name: v.value.fullName,
     company: v.value.company,
-    payload: v.value.draft,
+    // L6: the marketing choice made on the form travels with the hold, so a claim from another device (the email's
+    // link, /auth/confirm) records the choice the visitor actually made, with the IP and user agent of that moment.
+    // The draft parser ignores the extra key when the claim reads the calculation back.
+    payload: holdChoice ? { ...v.value.draft, marketingConsent: { ...holdChoice, ip: deps.ip, userAgent: deps.userAgent ?? null } } : v.value.draft,
     ip: deps.ip,
     expires_at: new Date(deps.now.getTime() + PENDING_TTL_MS).toISOString(),
   })
@@ -93,8 +102,16 @@ export type ClaimDeps = {
   readSavedRow(id: string): Promise<SavedInventoryRow | null>
   /** L5: the name on the profile, for a claim that carried none (a signed-in Save). */
   profileFullName(): Promise<string | null>
-  sendResults(to: string, email: { subject: string; html: string; text: string }): Promise<SendResult>
+  sendResults(to: string, email: { subject: string; html: string; text: string; headers?: Record<string, string> }): Promise<SendResult>
   siteUrl: string
+  /** L6: this request's IP and user agent, recorded with a marketing choice made in this tab. */
+  requestMeta?: { ip: string | null; userAgent: string | null }
+  /** L6: writes one marketing_consents row (service role). */
+  insertConsent?(row: ConsentInsert): Promise<{ id: string } | { error: string }>
+  /** L6: the id of this account's ACTIVE marketing consent (lib/consent/marketing.ts activeConsent), or null. */
+  activeConsentId?(): Promise<string | null>
+  /** L6: signs the unsubscribe token; the route leaves it to UNSUBSCRIBE_TOKEN_SECRET. */
+  signUnsubscribe?(consentId: string): string | null
 }
 
 const PLAN_CODES = new Set(['PT402', 'PT410'])
@@ -166,16 +183,43 @@ export async function claimFreeCalc(body: unknown, deps: ClaimDeps): Promise<Rou
     await deps.upsertProfile({ id: deps.user.id, email: deps.user.email, fullName, company, country: firstCountry(inv) })
   } catch (err) { console.error('[free-calc/claim] profile upsert failed:', err) }
 
+  // 5b. L6, the marketing choice (design 5), ticked or not: from this tab's form, or held with the calculation when the
+  //     claim comes from another device. A failure to record is logged and never undoes the save. No box shown (a
+  //     signed-in Save), no choice, no row.
+  const sameTab = readConsentChoice(o.marketingConsent, KEEP_RESULTS_SOURCE)
+  const heldRaw = (fromPending?.payload as { marketingConsent?: Record<string, unknown> } | null | undefined)?.marketingConsent
+  const held = sameTab ? null : readConsentChoice(heldRaw, KEEP_RESULTS_SOURCE)
+  const choice = sameTab ?? held
+  let consentRecorded: boolean | null = null
+  if (choice && deps.insertConsent) {
+    const meta = sameTab
+      ? deps.requestMeta ?? { ip: null, userAgent: null }
+      : { ip: typeof heldRaw?.ip === 'string' ? heldRaw.ip : null, userAgent: typeof heldRaw?.userAgent === 'string' ? heldRaw.userAgent : null }
+    const rec = await recordConsentChoice(choice, { userId: deps.user.id, email: deps.user.email, ...meta }, { insertConsent: deps.insertConsent })
+    consentRecorded = rec !== null
+  }
+
   // 6. L5, the results email (design 2): only here, after a save, so only to the address the code or link verified.
   //    Built from the row read back, never from what the client sent. A failure is reported, and never undoes the save.
   const emailed = await sendClaimEmail(deps, savedId, fullName)
 
-  return { status: 200, body: { ok: true, id: savedId, freeTier: !active, emailed } }
+  return { status: 200, body: { ok: true, id: savedId, freeTier: !active, emailed, ...(consentRecorded === null ? {} : { consentRecorded }) } }
+}
+
+/** L6: the unsubscribe link and headers for this account, only while its marketing consent is active. Never throws. */
+async function unsubscribeLinks(deps: Pick<ClaimDeps, 'activeConsentId' | 'signUnsubscribe' | 'siteUrl'>) {
+  if (!deps.activeConsentId) return null
+  try {
+    return unsubscribeFor(await deps.activeConsentId(), deps.siteUrl, deps.signUnsubscribe ?? signUnsubscribeToken)
+  } catch (err) {
+    console.error('[results-email] consent lookup failed; sent without an unsubscribe link:', err)
+    return null
+  }
 }
 
 /** Reads the saved row back and sends it. True only when Resend accepted the email. Never throws. */
 export async function sendClaimEmail(
-  deps: Pick<ClaimDeps, 'user' | 'readSavedRow' | 'profileFullName' | 'sendResults' | 'siteUrl'>,
+  deps: Pick<ClaimDeps, 'user' | 'readSavedRow' | 'profileFullName' | 'sendResults' | 'siteUrl' | 'activeConsentId' | 'signUnsubscribe'>,
   savedId: string,
   fullName: string | null,
 ): Promise<boolean> {
@@ -183,7 +227,8 @@ export async function sendClaimEmail(
     const row = await deps.readSavedRow(savedId)
     if (!row) { console.error('[free-calc/claim] saved row not readable for the results email:', savedId); return false }
     const name = fullName ?? await deps.profileFullName().catch(() => null)
-    const sent = await deps.sendResults(deps.user.email, buildResultsEmail({ row, fullName: name, siteUrl: deps.siteUrl }))
+    const unsubscribe = await unsubscribeLinks(deps)
+    const sent = await deps.sendResults(deps.user.email, buildResultsEmail({ row, fullName: name, siteUrl: deps.siteUrl, unsubscribe }))
     return sent.ok
   } catch (err) {
     console.error('[free-calc/claim] results email failed:', err)
@@ -220,7 +265,7 @@ export const RESULTS_AGAIN_MESSAGES = {
   sent: (email: string) => `We've emailed your results to ${email}.`,
 } as const
 
-export type ResultsAgainDeps = Pick<ClaimDeps, 'user' | 'readSavedRow' | 'profileFullName' | 'sendResults' | 'siteUrl'> & {
+export type ResultsAgainDeps = Pick<ClaimDeps, 'user' | 'readSavedRow' | 'profileFullName' | 'sendResults' | 'siteUrl' | 'activeConsentId' | 'signUnsubscribe'> & {
   rateLimitOk(): Promise<boolean>
 }
 
@@ -237,7 +282,8 @@ export async function emailResultsAgain(body: unknown, deps: ResultsAgainDeps): 
   const row = await deps.readSavedRow(id)
   if (!row) return fail(404, 'not_found', RESULTS_AGAIN_MESSAGES.notFound)
   const name = await deps.profileFullName().catch(() => null)
-  const sent = await deps.sendResults(deps.user.email, buildResultsEmail({ row, fullName: name, siteUrl: deps.siteUrl }))
+  const unsubscribe = await unsubscribeLinks(deps)
+  const sent = await deps.sendResults(deps.user.email, buildResultsEmail({ row, fullName: name, siteUrl: deps.siteUrl, unsubscribe }))
   if (!sent.ok) return fail(502, 'send_failed', RESULTS_AGAIN_MESSAGES.sendFailed)
   return { status: 200, body: { ok: true, message: RESULTS_AGAIN_MESSAGES.sent(deps.user.email) } }
 }

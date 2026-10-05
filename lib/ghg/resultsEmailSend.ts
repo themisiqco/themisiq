@@ -28,6 +28,8 @@ export async function sendResultsEmail(
       body: JSON.stringify({
         from: RESULTS_EMAIL_FROM, to: [to], reply_to: RESULTS_EMAIL_REPLY_TO,
         subject: email.subject, html: email.html, text: email.text,
+        // L6: List-Unsubscribe and List-Unsubscribe-Post, when the email carries the unsubscribe link.
+        ...(email.headers ? { headers: email.headers } : {}),
       }),
     })
     if (!res.ok) {

@@ -35,6 +35,8 @@ import type { FactorEditions } from './factorEditions'
 import { gridRegionName, residualRegionName } from './gridRegionNames'
 import { emailShell, EMAIL_POSTAL_ADDRESS, EMAIL_FONT_DISPLAY } from '../email/layout'
 import { INK, INK_MUTED, LINE, BRAND } from '../brand'
+import { CONSENT_COPY } from '../consent/marketing'
+import { unsubscribeHeaders } from '../consent/unsubscribeToken'
 
 const FOOTER_REASON = 'Questions: hello@themisiq.co. You received this because you asked for your results on themisiq.co.'
 
@@ -274,7 +276,9 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-export function resultsEmailText(m: ResultsEmailModel): string {
+export type UnsubscribeLinks = { page: string; oneClick: string }
+
+export function resultsEmailText(m: ResultsEmailModel, unsubscribe: UnsubscribeLinks | null = null): string {
   const out: string[] = [m.greeting, '', RESULTS_EMAIL_COPY.intro, '', `${m.company}, ${m.year}`, '', 'Totals']
   out.push(`Scope 1: ${tonnes(m.totals.scope1)}`)
   out.push(`Scope 2, location-based: ${tonnes(m.totals.scope2Location)}`)
@@ -295,6 +299,8 @@ export function resultsEmailText(m: ResultsEmailModel): string {
   out.push('', `${m.savedLine} ${m.link}`)
   if (m.nextStep) out.push('', m.nextStep)
   out.push('', RESULTS_EMAIL_COPY.footer)
+  // L6: only with active marketing consent (the caller passes the link only then).
+  if (unsubscribe) out.push(CONSENT_COPY.emailTextLine(unsubscribe.page))
   return out.join('\n')
 }
 
@@ -306,7 +312,7 @@ const h = (s: string) => `<p class="email-display" style="margin:22px 0 8px;font
 const tr = (a: string, b: string) => `<tr><td style="padding:6px 0;border-bottom:1px solid ${LINE};font-size:14px;color:${INK};">${a}</td><td style="padding:6px 0 6px 16px;border-bottom:1px solid ${LINE};font-size:14px;color:${INK};text-align:right;white-space:nowrap;">${b}</td></tr>`
 const table = (rows: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">${rows}</table>`
 
-export function resultsEmailHtml(m: ResultsEmailModel): string {
+export function resultsEmailHtml(m: ResultsEmailModel, unsubscribe: UnsubscribeLinks | null = null): string {
   const parts: string[] = []
   parts.push(p(esc(m.greeting)), p(esc(RESULTS_EMAIL_COPY.intro)))
   parts.push(`<p class="email-display" style="margin:0 0 4px;font-size:20px;line-height:1.3;color:${INK};font-family:${EMAIL_FONT_DISPLAY};">${esc(m.company)}, ${m.year}</p>`)
@@ -338,14 +344,25 @@ export function resultsEmailHtml(m: ResultsEmailModel): string {
     preheader: `${m.company}, ${m.year}: Scope 1 ${tonnes(m.totals.scope1)}, Scope 2 ${tonnes(m.totals.scope2Location)}.`,
     contentHtml: parts.join(''),
     footerLines: [FOOTER_REASON],
-    // ⚠️ L6: the marketing unsubscribe link goes here, and only when marketing consent was given (design 2, item 8).
-    footerExtraHtml: '',
+    // L6: the marketing unsubscribe link, only when marketing consent is active (design 2, item 8; design 5). The
+    // caller decides that and passes the link; without it there is none. The postal address stays either way.
+    footerExtraHtml: unsubscribe
+      ? `<p style="margin:6px 0 0;font-size:12px;line-height:1.6;color:${INK_MUTED};"><a href="${esc(unsubscribe.page)}" style="color:${INK_MUTED};text-decoration:underline;">${esc(CONSENT_COPY.emailLink)}</a></p>`
+      : '',
   })
 }
 
-export type ResultsEmail = { subject: string; html: string; text: string }
+export type ResultsEmail = { subject: string; html: string; text: string; headers?: Record<string, string> }
 
-export function buildResultsEmail(input: { row: SavedInventoryRow; fullName: string | null; siteUrl: string }): ResultsEmail {
+/**
+ * The email. `unsubscribe` is given ONLY when the recipient's marketing consent is active (L6); then the link appears
+ * in both parts and the List-Unsubscribe headers go with it. Without it, both parts are exactly as before L6.
+ */
+export function buildResultsEmail(input: { row: SavedInventoryRow; fullName: string | null; siteUrl: string; unsubscribe?: UnsubscribeLinks | null }): ResultsEmail {
   const m = resultsEmailModel(input)
-  return { subject: m.subject, html: resultsEmailHtml(m), text: resultsEmailText(m) }
+  const u = input.unsubscribe ?? null
+  return {
+    subject: m.subject, html: resultsEmailHtml(m, u), text: resultsEmailText(m, u),
+    ...(u ? { headers: unsubscribeHeaders(u.oneClick) } : {}),
+  }
 }

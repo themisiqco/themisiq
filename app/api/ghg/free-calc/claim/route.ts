@@ -14,6 +14,8 @@ import type { OwnInventory } from '../../../../../lib/ghg/freeCalc'
 import { RESULTS_EMAIL_COLUMNS, type SavedInventoryRow } from '../../../../../lib/ghg/resultsEmail'
 import { sendResultsEmail } from '../../../../../lib/ghg/resultsEmailSend'
 import { SITE_ORIGIN } from '../../../../../lib/siteOrigin'
+import { ipFromHeaders } from '../../../../../lib/rateLimit'
+import { activeConsent, type ConsentRow } from '../../../../../lib/consent/marketing'
 
 
 const PENDING_COLUMNS = 'id, email, email_key, full_name, company, payload, created_at, expires_at'
@@ -100,6 +102,18 @@ export async function POST(req: NextRequest) {
     },
     sendResults: (to, email) => sendResultsEmail(to, email),
     siteUrl: SITE_ORIGIN,
+    // L6: marketing consent (marketing_consents, service role only: docs/review/patches/L6-M5-marketing-consents.sql).
+    requestMeta: { ip: ipFromHeaders(req), userAgent: req.headers.get('user-agent') },
+    insertConsent: async (row) => {
+      const { data, error } = await admin.from('marketing_consents').insert(row).select('id').single()
+      return error || !data ? { error: error?.message ?? 'no row returned' } : { id: data.id as string }
+    },
+    activeConsentId: async () => {
+      const { data, error } = await admin.from('marketing_consents').select('id, granted, created_at, withdrawn_at')
+        .eq('user_id', userId).eq('purpose', 'updates').order('created_at', { ascending: false }).limit(20)
+      if (error) { console.error('[free-calc/claim] consent read failed:', error.message); return null }
+      return activeConsent((data ?? []) as ConsentRow[])?.id ?? null
+    },
   })
   return NextResponse.json(result.body, { status: result.status })
 }

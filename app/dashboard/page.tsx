@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { scope3ShortClaim } from '../../lib/scope3/methodSummary'
 import { useRouter } from 'next/navigation'
 import Nav from '../components/Nav'
+import EmailUpdatesSetting from './_components/EmailUpdatesSetting'
 import { supabase } from '../../lib/supabase'
 import { useEntitlementAccess } from '../../lib/useEntitlement'
 import { FLAT_MODULE_PRICES, GHG_TIER_LABELS, type ModuleKey } from '../../lib/pricing'
@@ -525,6 +526,8 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+        {/* L6: the marketing consent setting (design section 5), for a signed-in account. */}
+        {user && <EmailUpdatesSetting />}
       </div>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>

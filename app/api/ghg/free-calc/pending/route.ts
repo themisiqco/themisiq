@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
 
   const result = await holdFreeCalc(body, {
     ip,
+    userAgent: req.headers.get('user-agent'),
     now: new Date(),
     // Design section 6: 5 an hour per IP, 3 a day per address.
     rateLimitOk: async (kind, key) => {

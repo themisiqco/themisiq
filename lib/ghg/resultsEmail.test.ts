@@ -143,7 +143,8 @@ describe('the results email', () => {
     expect(e.html).toContain('/images/email/masthead.jpg')
     expect(e.html).not.toMatch(/<script/i)
     expect(e.html).toContain('A &lt;b&gt;&amp;&lt;/b&gt; Co')
-    expect(read('lib/ghg/resultsEmail.ts')).toContain('L6: the marketing unsubscribe link goes here')
+    // L6: the unsubscribe link only with active consent; this email was built without, so there is none.
+    expect(e.html).not.toContain('Unsubscribe from ThemisIQ updates')
   })
 })
 

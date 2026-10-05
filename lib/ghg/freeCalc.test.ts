@@ -226,11 +226,11 @@ describe('verifyTurnstile', () => {
 })
 
 describe('route wiring and SQL shape', () => {
-  it('W1: /claim writes inventories as the user, replaces only free rows, and uses the service role only for pending and profiles', () => {
+  it('W1: /claim writes inventories as the user, replaces only free rows, and uses the service role only for pending, profiles and (L6) marketing consents', () => {
     const r = read('app/api/ghg/free-calc/claim/route.ts')
     expect(r).toContain('getAuthedClient(bearerFrom(req))')
     expect(r).toContain(".update(row).eq('id', id).eq('free_tier', true)")
-    for (const m of r.matchAll(/admin\.from\('([a-z_]+)'\)/g)) expect(['free_calc_pending', 'profiles']).toContain(m[1])
+    for (const m of r.matchAll(/admin\.from\('([a-z_]+)'\)/g)) expect(['free_calc_pending', 'profiles', 'marketing_consents']).toContain(m[1])
     expect(r).not.toMatch(/upsert\(/)
   })
 

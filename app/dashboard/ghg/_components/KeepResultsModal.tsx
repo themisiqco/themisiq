@@ -37,6 +37,7 @@ import {
   writePendingMarker, clearPendingMarker, type PendingMarker,
 } from '../../../../lib/ghg/keepResults'
 import type { Inventory } from '../../../../lib/ghg/engine'
+import { MARKETING_CONSENT, KEEP_RESULTS_SOURCE } from '../../../../lib/consent/marketing'
 
 const TOKEN_WAIT_MS = 15_000
 
@@ -73,6 +74,12 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
   const [email, setEmail] = useState(pending?.email ?? '')
   const [company, setCompany] = useState(pending?.company || inventory.company_name || '')
   const [honeypot, setHoneypot] = useState('')
+  // L6: the marketing box. UNTICKED unless the visitor ticked it (or ticked it before a reload, kept in the marker).
+  // `askedConsent` is whether the box was shown at all: a signed-in Save opens at the claim with no form, and records no
+  // choice, because none was asked.
+  const [marketing, setMarketing] = useState(pending?.marketingConsent === true)
+  const askedConsent = props.start !== 'claim' && (props.start === 'form' || typeof pending?.marketingConsent === 'boolean')
+  const consentChoice = () => ({ granted: marketing, version: MARKETING_CONSENT.version, sourcePage: KEEP_RESULTS_SOURCE })
   const [code, setCode] = useState('')
   const [altCompany, setAltCompany] = useState(inventory.company_name || '')
   const [altYear, setAltYear] = useState(inventory.reporting_year)
@@ -162,7 +169,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
       held = await fetch('/api/ghg/free-calc/pending', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: addr, fullName: fullName.trim(), company: company.trim(), inventory, turnstileToken: await nextToken(), [HONEYPOT_FIELD]: honeypot }),
+        body: JSON.stringify({ email: addr, fullName: fullName.trim(), company: company.trim(), inventory, marketingConsent: consentChoice(), turnstileToken: await nextToken(), [HONEYPOT_FIELD]: honeypot }),
       })
     } catch {
       dispatch({ type: 'send_failed', message: 'Your calculation could not be sent. Check your connection and try again. Nothing was saved.' })
@@ -175,7 +182,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
     }
     const failed = await askForCode(addr)
     if (failed) { dispatch({ type: 'send_failed', message: failed }); return }
-    writePendingMarker({ email: addr, fullName: fullName.trim(), company: company.trim(), sentAt: Date.now() })
+    writePendingMarker({ email: addr, fullName: fullName.trim(), company: company.trim(), sentAt: Date.now(), marketingConsent: marketing })
     dispatch({ type: 'code_sent', email: addr })
   }
 
@@ -183,7 +190,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
     if (state.step !== 'code') return
     const failed = await askForCode(state.email)
     if (failed) { dispatch({ type: 'resend_failed', message: failed }); return }
-    writePendingMarker({ email: state.email, fullName: fullName.trim(), company: company.trim(), sentAt: Date.now() })
+    writePendingMarker({ email: state.email, fullName: fullName.trim(), company: company.trim(), sentAt: Date.now(), marketingConsent: marketing })
     dispatch({ type: 'code_sent', email: state.email, resent: true })
   }
 
@@ -207,6 +214,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
           ...(fullName.trim() ? { fullName: fullName.trim() } : {}),
           company: (claimInventory.current.company_name || company).trim(),
           ...(opts.replaceFreeId ? { replaceFreeId: opts.replaceFreeId } : {}),
+          ...(askedConsent ? { marketingConsent: consentChoice() } : {}),
         }),
       })
       outcome = claimOutcome(res.status, await res.json().catch(() => ({})))
@@ -291,8 +299,14 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
             <input id="keep-email" type="email" autoComplete="email" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} disabled={busy} style={input} />
             <label htmlFor="keep-company" style={label}>Company</label>
             <input id="keep-company" autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} disabled={busy} style={input} />
-            {/* ⚠️ L6: THE MARKETING CONSENT BOX GOES HERE (design section 5): unticked, optional, worded separately from
-                the Terms sentence, and recorded with its wording, version, IP and user agent. Not before L6. */}
+            {/* L6, design section 5: the marketing box. UNTICKED by default, optional, separate from the Terms sentence;
+                nothing depends on it. The words are MARKETING_CONSENT.wording, and the server stores the same words for
+                that version, with the IP, user agent and time, ticked or not (lib/consent/marketing.ts). */}
+            <label htmlFor="keep-marketing" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '14px 0 0', fontSize: 13, lineHeight: 1.5, color: '#0d0d0d', cursor: 'pointer' }}>
+              <input id="keep-marketing" type="checkbox" checked={marketing} onChange={e => setMarketing(e.target.checked)} disabled={busy}
+                style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: 'var(--color-brand)' }} />
+              <span>{MARKETING_CONSENT.wording}</span>
+            </label>
             {/* The honeypot (lib/assessmentSubmitGuard.ts): out of the layout, the tab order and the accessibility
                 tree, so a person never fills it; see the note in app/assess/page.tsx. */}
             <input value={honeypot} onChange={e => setHoneypot(e.target.value)} name={HONEYPOT_FIELD} tabIndex={-1} aria-hidden="true" autoComplete="off"

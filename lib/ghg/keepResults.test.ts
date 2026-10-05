@@ -230,8 +230,9 @@ describe('the modal and the placements, in the source', () => {
     for (const id of ['keep-name', 'keep-email', 'keep-company', 'keep-code']) expect(m).toContain(`id="${id}"`)
     expect(m).toContain('name={HONEYPOT_FIELD} tabIndex={-1} aria-hidden="true"')
     expect(m).toContain('<Turnstile onToken={onToken} resetKey={captchaReset} />')
-    expect(m).toContain('L6: THE MARKETING CONSENT BOX GOES HERE')
-    expect(m).not.toMatch(/type="checkbox"/)
+    // L6 filled the place L4 marked: one checkbox, the marketing box, unticked unless the visitor ticks it.
+    expect(m.match(/type="checkbox"/g) ?? []).toHaveLength(1)
+    expect(m).toContain('<input id="keep-marketing" type="checkbox" checked={marketing}')
     expect(m).toContain('>Terms</Link> and the <Link href="/privacy"')
     expect(KEEP_COPY.terms).toBe('By creating a free account you agree to the Terms and the Privacy Policy.')
     // Prefilled from the calculation.
