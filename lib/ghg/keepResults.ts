@@ -92,10 +92,9 @@ export function unsavedNudgeArm(v: VisitorState): 'keep' | 'one_free' | 'save' {
 
 export const KEEP_COPY = {
   button: 'Keep my results',
-  // ⚠️ L5: once the results email is sent on claim, this line becomes design 1.1's "Create a free account and we'll
-  // email your results to you and keep this calculation." Until then it promises only what happens.
-  line: 'Create a free account to keep this calculation.',
-  overlayLink: 'Keep my results with a free account',
+  // L5: the results email is sent on claim (lib/ghg/freeCalcService.ts), so design 1.1's line is now true.
+  line: 'Create a free account and we\'ll email your results to you and keep this calculation.',
+  overlayLink: 'Email me my results instead (free account)',
   oneFreeNudge: 'Your free account keeps one calculation.',
   modalTitle: 'Keep my results',
   terms: 'By creating a free account you agree to the Terms and the Privacy Policy.',
@@ -105,7 +104,12 @@ export const KEEP_COPY = {
   newCodeSent: 'A new code is on its way.',
   savedFree: 'Your calculation is saved to your free account.',
   savedPlan: 'Your calculation is saved to your account.',
-  freeRowBanner: 'This is your free calculation. You can edit and save it. Scope 3, uploads and downloads need a GHG plan.',
+  freeRowBanner: 'This is your free calculation. You can edit it and email it to yourself. Scope 3, uploads and downloads need a GHG plan.',
+  emailAgain: 'Email me my results again',
+  emailing: 'Sending…',
+  emailed: (email: string | null) => (email ? `We've emailed your results to ${email}.` : 'We\'ve emailed your results to you.'),
+  notEmailed: 'Your results email could not be sent just now. Nothing was sent; you can send it from this calculation with "Email me my results again".',
+  emailAgainFailed: 'Your results could not be emailed just now. Nothing was sent; try again in a moment.',
   replace: 'Replace it with this one',
   openSaved: 'Open my saved calculation',
   keepBoth: 'Keep both with a GHG plan',
@@ -121,7 +125,7 @@ export const KEEP_COPY = {
 export type InventoryRef = { id: string; company: string | null; year: number }
 
 export type ClaimOutcome =
-  | { kind: 'saved'; id: string; freeTier: boolean }
+  | { kind: 'saved'; id: string; freeTier: boolean; emailed: boolean }
   | { kind: 'one_free'; message: string; free: InventoryRef | null }
   | { kind: 'conflict'; message: string; existing: InventoryRef | null }
   | { kind: 'nothing'; message: string }
@@ -141,20 +145,30 @@ function ref(v: unknown): InventoryRef | null {
 export function claimOutcome(status: number, body: unknown): ClaimOutcome {
   const o = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
   const message = typeof o.message === 'string' && o.message ? o.message : KEEP_COPY.claimFailed
-  if (status === 200 && o.ok === true && typeof o.id === 'string') return { kind: 'saved', id: o.id, freeTier: o.freeTier !== false }
+  if (status === 200 && o.ok === true && typeof o.id === 'string') return { kind: 'saved', id: o.id, freeTier: o.freeTier !== false, emailed: o.emailed === true }
   if (o.code === 'one_free') return { kind: 'one_free', message, free: ref(o.free) }
   if (o.code === 'conflict') return { kind: 'conflict', message, existing: ref(o.existing) }
   if (status === 404 && o.code === 'nothing_to_claim') return { kind: 'nothing', message }
   return { kind: 'failed', message }
 }
 
-/** Where a saved claim opens: the saved calculation, with the confirmation line (?kept=free or ?kept=plan). */
-export function savedHref(id: string, freeTier: boolean): string {
-  return `/dashboard/ghg?id=${encodeURIComponent(id)}&kept=${freeTier ? 'free' : 'plan'}`
+/**
+ * Where a saved claim opens: the saved calculation, with the confirmation line (?kept=free or ?kept=plan) and whether
+ * the results email went (?emailed=1 or 0, L5).
+ */
+export function savedHref(id: string, freeTier: boolean, emailed = false): string {
+  return `/dashboard/ghg?id=${encodeURIComponent(id)}&kept=${freeTier ? 'free' : 'plan'}&emailed=${emailed ? 1 : 0}`
 }
 
 export function inventoryHref(id: string): string {
   return `/dashboard/ghg?id=${encodeURIComponent(id)}`
+}
+
+/** The sentence after the confirmation line, from ?emailed= (L5): sent, not sent, or nothing when absent. */
+export function emailedLine(param: string | null, email: string | null): string | null {
+  if (param === '1') return KEEP_COPY.emailed(email)
+  if (param === '0') return KEEP_COPY.notEmailed
+  return null
 }
 
 /** The confirmation line for ?kept=, or null. */
@@ -312,7 +326,7 @@ export type ConfirmStep = { go: string } | { message: string; actions: ConfirmAc
 export function confirmStep(outcome: ClaimOutcome, landing: string): ConfirmStep {
   const back = { label: 'Go to the calculator', href: landing }
   switch (outcome.kind) {
-    case 'saved': return { go: savedHref(outcome.id, outcome.freeTier) }
+    case 'saved': return { go: savedHref(outcome.id, outcome.freeTier, outcome.emailed) }
     case 'nothing': return { go: landing }
     case 'one_free':
       return { message: outcome.message, actions: outcome.free

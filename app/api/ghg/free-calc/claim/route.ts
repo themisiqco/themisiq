@@ -11,6 +11,10 @@ import { getSupabaseAdmin } from '../../../../../lib/supabaseAdmin'
 import { accessFromRow } from '../../../../../lib/entitlementAccess'
 import { claimFreeCalc, type PendingRow } from '../../../../../lib/ghg/freeCalcService'
 import type { OwnInventory } from '../../../../../lib/ghg/freeCalc'
+import { RESULTS_EMAIL_COLUMNS, type SavedInventoryRow } from '../../../../../lib/ghg/resultsEmail'
+import { sendResultsEmail } from '../../../../../lib/ghg/resultsEmailSend'
+import { SITE_ORIGIN } from '../../../../../lib/siteOrigin'
+
 
 const PENDING_COLUMNS = 'id, email, email_key, full_name, company, payload, created_at, expires_at'
 
@@ -84,6 +88,18 @@ export async function POST(req: NextRequest) {
         : await admin.from('profiles').insert({ id: p.id, email: p.email, signup_source: 'free_calc', ...fields })
       if (error) throw new Error(error.message)
     },
+    // L5: the results email (lib/ghg/resultsEmail.ts), from the row as saved, read as the user.
+    readSavedRow: async (id) => {
+      const { data, error } = await db.from('ghg_inventories').select(RESULTS_EMAIL_COLUMNS).eq('id', id).maybeSingle()
+      if (error) console.error('[free-calc/claim] saved row read failed:', error.message)
+      return (data as SavedInventoryRow | null) ?? null
+    },
+    profileFullName: async () => {
+      const { data } = await admin.from('profiles').select('full_name').eq('id', userId).maybeSingle()
+      return (data?.full_name as string | null | undefined) ?? null
+    },
+    sendResults: (to, email) => sendResultsEmail(to, email),
+    siteUrl: SITE_ORIGIN,
   })
   return NextResponse.json(result.body, { status: result.status })
 }

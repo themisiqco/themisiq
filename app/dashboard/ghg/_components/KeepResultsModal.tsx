@@ -218,7 +218,7 @@ export default function KeepResultsModal(props: KeepResultsModalProps) {
       // Saved: the draft and the marker have done their job, and the page reopens on the saved calculation.
       clearGhgDraft()
       clearPendingMarker()
-      leaveTo(savedHref(outcome.id, outcome.freeTier))
+      leaveTo(savedHref(outcome.id, outcome.freeTier, outcome.emailed))
     }
   }
 

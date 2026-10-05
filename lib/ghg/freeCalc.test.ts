@@ -23,7 +23,7 @@ const expectedS1 = () => calcInventory(deriveLocations(inventoryFromDraft(draft(
 
 // ── fakes ──
 function claimDeps(over: Partial<ClaimDeps> & { rows?: OwnInventory[]; access?: 'active' | 'expired' | 'none' | 'unknown'; pending?: PendingRow | null } = {}) {
-  const writes = { insert: [] as Record<string, unknown>[], replace: [] as Array<{ id: string; row: Record<string, unknown> }>, deleted: [] as string[], profiles: [] as unknown[] }
+  const writes = { insert: [] as Record<string, unknown>[], replace: [] as Array<{ id: string; row: Record<string, unknown> }>, deleted: [] as string[], profiles: [] as unknown[], emails: [] as Array<{ to: string; subject: string; text: string }> }
   const deps: ClaimDeps = {
     user: { id: 'user-1', email: 'Pat@Example.com' },
     now: NOW,
@@ -36,6 +36,14 @@ function claimDeps(over: Partial<ClaimDeps> & { rows?: OwnInventory[]; access?: 
     latestPending: async () => over.pending ?? null,
     deletePendingForEmail: async (k) => { writes.deleted.push(k) },
     upsertProfile: async (p) => { writes.profiles.push(p) },
+    // L5: the saved row read back is the row that was written, with its id.
+    readSavedRow: async (id) => {
+      const row = writes.replace.find(r => r.id === id)?.row ?? writes.insert[writes.insert.length - 1]
+      return row ? ({ ...row, id } as never) : null
+    },
+    profileFullName: async () => null,
+    sendResults: async (to, email) => { writes.emails.push({ to, subject: email.subject, text: email.text }); return { ok: true, id: 'em-1' } },
+    siteUrl: 'https://www.themisiq.co',
     ...over,
   }
   return { deps, writes }
@@ -172,7 +180,7 @@ describe('claimFreeCalc (/claim)', () => {
 
   it('C7: a successful claim deletes the held record, fills in the profile, and sets free_tier by the plan', async () => {
     const a = claimDeps({ pending: pending() })
-    expect(await claimFreeCalc({}, a.deps)).toEqual({ status: 200, body: { ok: true, id: 'inv-new', freeTier: true } })
+    expect(await claimFreeCalc({}, a.deps)).toEqual({ status: 200, body: { ok: true, id: 'inv-new', freeTier: true, emailed: true } })
     expect(a.writes.deleted).toEqual(['pat@example.com'])
     expect(a.writes.insert[0]).toMatchObject({ free_tier: true, company_name: 'Acme', reporting_year: 2025, company_id: 'co-1', user_id: 'user-1' })
     expect(a.writes.profiles[0]).toEqual({ id: 'user-1', email: 'Pat@Example.com', fullName: 'Pat Lee', company: 'Acme', country: 'US' })

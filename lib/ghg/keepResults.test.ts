@@ -27,7 +27,7 @@ describe('the modal states', () => {
   it('K1: form, sending, code, verifying, claiming, done', () => {
     const s = run(initialKeepState('form'),
       { type: 'submit' }, { type: 'code_sent', email: 'a@b.co' }, { type: 'verify' }, { type: 'claim' },
-      { type: 'claimed', outcome: { kind: 'saved', id: 'inv1', freeTier: true } })
+      { type: 'claimed', outcome: { kind: 'saved', id: 'inv1', freeTier: true, emailed: true } })
     expect(s).toEqual({ step: 'done', id: 'inv1', freeTier: true })
   })
 
@@ -71,7 +71,7 @@ describe('the modal states', () => {
     const done: KeepState = { step: 'done', id: 'i', freeTier: true }
     expect(run(done, { type: 'code_sent', email: 'a@b.co' }, { type: 'send_failed', message: 'x' }, { type: 'verify_failed', message: 'x' })).toBe(done)
     const code = initialKeepState('code', 'a@b.co')
-    expect(run(code, { type: 'claimed', outcome: { kind: 'saved', id: 'i', freeTier: true } })).toBe(code)
+    expect(run(code, { type: 'claimed', outcome: { kind: 'saved', id: 'i', freeTier: true, emailed: true } })).toBe(code)
     expect(run(code, { type: 'submit' })).toBe(code)
   })
 
@@ -102,6 +102,10 @@ describe('the claim response, as the route sends it', () => {
     latestPending: async () => null,
     deletePendingForEmail: async () => {},
     upsertProfile: async () => {},
+    readSavedRow: async () => null,
+    profileFullName: async () => null,
+    sendResults: async () => ({ ok: true, id: null }),
+    siteUrl: 'https://www.themisiq.co',
     ...over,
   })
   const outcomeOf = async (body: unknown, d: Partial<ClaimDeps>): Promise<ClaimOutcome> => {
@@ -110,8 +114,8 @@ describe('the claim response, as the route sends it', () => {
   }
 
   it('K9: saved, free or on a plan', async () => {
-    expect(await outcomeOf({ inventory }, {})).toEqual({ kind: 'saved', id: 'new1', freeTier: true })
-    expect(await outcomeOf({ inventory }, { getAccess: async () => 'active' })).toEqual({ kind: 'saved', id: 'new1', freeTier: false })
+    expect(await outcomeOf({ inventory }, {})).toEqual({ kind: 'saved', id: 'new1', freeTier: true, emailed: false })
+    expect(await outcomeOf({ inventory }, { getAccess: async () => 'active' })).toEqual({ kind: 'saved', id: 'new1', freeTier: false, emailed: false })
   })
 
   it('K10: the one-free choice and the conflict, with their ids and the exact sentences', async () => {
@@ -144,7 +148,7 @@ describe('the claim response, as the route sends it', () => {
 
 describe('/auth/confirm after the link', () => {
   it('K13: saved opens the calculation; nothing waiting lands as before; the choices keep the route\'s sentence', () => {
-    expect(confirmStep({ kind: 'saved', id: 'i1', freeTier: true }, CONFIRM_LANDING)).toEqual({ go: '/dashboard/ghg?id=i1&kept=free' })
+    expect(confirmStep({ kind: 'saved', id: 'i1', freeTier: true, emailed: true }, CONFIRM_LANDING)).toEqual({ go: '/dashboard/ghg?id=i1&kept=free&emailed=1' })
     expect(confirmStep({ kind: 'nothing', message: 'x' }, CONFIRM_LANDING)).toEqual({ go: CONFIRM_LANDING })
     expect(confirmStep({ kind: 'one_free', message: 'm', free: { id: 'f1', company: 'A', year: 2025 } }, CONFIRM_LANDING)).toEqual({
       message: 'm', actions: [{ label: KEEP_COPY.replace, replaceFreeId: 'f1' }, { label: KEEP_COPY.openSaved, href: '/dashboard/ghg?id=f1' }],
@@ -166,7 +170,7 @@ describe('/auth/confirm after the link', () => {
   })
 
   it('K15: the confirmation line, and the hrefs it is reached by', () => {
-    expect(savedHref('a b', false)).toBe('/dashboard/ghg?id=a%20b&kept=plan')
+    expect(savedHref('a b', false)).toBe('/dashboard/ghg?id=a%20b&kept=plan&emailed=0')
     expect(inventoryHref('x')).toBe('/dashboard/ghg?id=x')
     expect(keptLine('free')).toBe('Your calculation is saved to your free account.')
     expect(keptLine('plan')).toBe('Your calculation is saved to your account.')
@@ -267,10 +271,10 @@ describe('the modal and the placements, in the source', () => {
     expect(p).toContain('const showKeep = keepPromptShown(visitor)')
     expect(p).toContain('{unsavedNudgeArm(visitor) === \'keep\' ? (')
     expect(p).toContain('setEditingFree(data.free_tier === true)')
-    expect(p).toContain('<>{KEEP_COPY.freeRowBanner}</>')
+    expect(p).toContain('<>{KEEP_COPY.freeRowBanner}{emailAgain.message && ')
     expect(p).toContain('{keptMessage && inventoryId && (')
-    // The results email is L5: nothing on screen says results were emailed yet.
-    for (const v of Object.values(KEEP_COPY)) if (typeof v === 'string') expect(v.toLowerCase()).not.toContain('email your results')
+    // L5: the results email is sent on claim, so the prompt says so (design 1.1).
+    expect(KEEP_COPY.line).toBe('Create a free account and we\'ll email your results to you and keep this calculation.')
     expect(KEEP_COPY.savedFree).toBe('Your calculation is saved to your free account.')
   })
 

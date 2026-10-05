@@ -17,6 +17,8 @@ import {
 } from './freeCalc'
 import { isHoneypotTripped, HONEYPOT_FIELD, recipientKey } from '../assessmentSubmitGuard'
 import type { GhgDraft } from './draftParse'
+import { buildResultsEmail, type SavedInventoryRow } from './resultsEmail'
+import type { SendResult } from './resultsEmailSend'
 
 export type RouteResult = { status: number; body: Record<string, unknown> }
 
@@ -87,6 +89,12 @@ export type ClaimDeps = {
   latestPending(emailKey: string): Promise<PendingRow | null>
   deletePendingForEmail(emailKey: string): Promise<void>
   upsertProfile(p: { id: string; email: string; fullName: string | null; company: string | null; country: string | null }): Promise<void>
+  /** L5: the row as saved, read back after the write, as the user. The results email is built from this alone. */
+  readSavedRow(id: string): Promise<SavedInventoryRow | null>
+  /** L5: the name on the profile, for a claim that carried none (a signed-in Save). */
+  profileFullName(): Promise<string | null>
+  sendResults(to: string, email: { subject: string; html: string; text: string }): Promise<SendResult>
+  siteUrl: string
 }
 
 const PLAN_CODES = new Set(['PT402', 'PT410'])
@@ -158,7 +166,29 @@ export async function claimFreeCalc(body: unknown, deps: ClaimDeps): Promise<Rou
     await deps.upsertProfile({ id: deps.user.id, email: deps.user.email, fullName, company, country: firstCountry(inv) })
   } catch (err) { console.error('[free-calc/claim] profile upsert failed:', err) }
 
-  return { status: 200, body: { ok: true, id: savedId, freeTier: !active } }
+  // 6. L5, the results email (design 2): only here, after a save, so only to the address the code or link verified.
+  //    Built from the row read back, never from what the client sent. A failure is reported, and never undoes the save.
+  const emailed = await sendClaimEmail(deps, savedId, fullName)
+
+  return { status: 200, body: { ok: true, id: savedId, freeTier: !active, emailed } }
+}
+
+/** Reads the saved row back and sends it. True only when Resend accepted the email. Never throws. */
+export async function sendClaimEmail(
+  deps: Pick<ClaimDeps, 'user' | 'readSavedRow' | 'profileFullName' | 'sendResults' | 'siteUrl'>,
+  savedId: string,
+  fullName: string | null,
+): Promise<boolean> {
+  try {
+    const row = await deps.readSavedRow(savedId)
+    if (!row) { console.error('[free-calc/claim] saved row not readable for the results email:', savedId); return false }
+    const name = fullName ?? await deps.profileFullName().catch(() => null)
+    const sent = await deps.sendResults(deps.user.email, buildResultsEmail({ row, fullName: name, siteUrl: deps.siteUrl }))
+    return sent.ok
+  } catch (err) {
+    console.error('[free-calc/claim] results email failed:', err)
+    return false
+  }
 }
 
 function fail(status: number, code: string, message: string): RouteResult {
@@ -176,4 +206,38 @@ function dbFail(error: DbError): RouteResult {
   }
   console.error('[free-calc/claim] database refused:', code, error.message)
   return fail(500, 'save_failed', `The calculation could not be saved${code ? ` (${code})` : ''}. Nothing was saved; try again in a moment.`)
+}
+
+// ── /email (L5, "Email me my results again") ─────────────────────────────────────────────────────────────────────
+
+export const RESEND_RESULTS_LIMIT = 3
+
+export const RESULTS_AGAIN_MESSAGES = {
+  noId: 'There is no calculation to email.',
+  notFound: 'This calculation is not in your account.',
+  rateLimited: `Your results can be emailed ${RESEND_RESULTS_LIMIT} times an hour. Try again later.`,
+  sendFailed: 'Your results could not be emailed just now. Nothing was sent; try again in a moment.',
+  sent: (email: string) => `We've emailed your results to ${email}.`,
+} as const
+
+export type ResultsAgainDeps = Pick<ClaimDeps, 'user' | 'readSavedRow' | 'profileFullName' | 'sendResults' | 'siteUrl'> & {
+  rateLimitOk(): Promise<boolean>
+}
+
+/**
+ * Emails a saved calculation to the signed-in account's own verified address (design 2). Own calculation only: the row
+ * is read AS THE USER, so RLS returns nothing for anyone else's id, and that reads as "not in your account". The
+ * address is the session's, never one from the request.
+ */
+export async function emailResultsAgain(body: unknown, deps: ResultsAgainDeps): Promise<RouteResult> {
+  const o = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>
+  const id = typeof o.id === 'string' && o.id.trim() ? o.id.trim() : null
+  if (!id) return fail(400, 'no_id', RESULTS_AGAIN_MESSAGES.noId)
+  if (!(await deps.rateLimitOk())) return fail(429, 'rate_limited', RESULTS_AGAIN_MESSAGES.rateLimited)
+  const row = await deps.readSavedRow(id)
+  if (!row) return fail(404, 'not_found', RESULTS_AGAIN_MESSAGES.notFound)
+  const name = await deps.profileFullName().catch(() => null)
+  const sent = await deps.sendResults(deps.user.email, buildResultsEmail({ row, fullName: name, siteUrl: deps.siteUrl }))
+  if (!sent.ok) return fail(502, 'send_failed', RESULTS_AGAIN_MESSAGES.sendFailed)
+  return { status: 200, body: { ok: true, message: RESULTS_AGAIN_MESSAGES.sent(deps.user.email) } }
 }

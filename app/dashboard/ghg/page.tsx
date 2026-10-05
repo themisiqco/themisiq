@@ -12,7 +12,7 @@ import { buildComparabilityDisclosure, buildComparabilityRecord, observationLine
 import { saveGhgDraft, readGhgDraft, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
 import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry'
 // "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
-import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, KEEP_COPY, readPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
+import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, emailedLine, KEEP_COPY, readPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
 import KeepResultsModal from './_components/KeepResultsModal'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
 // The plan gates' messages (PT402/PT410, LEAD1 L1) are shown as written, without "Save failed:".
@@ -439,8 +439,7 @@ function PaywallOverlay({ frameworks, onUnlock, anon, onKeep }: { frameworks: st
           See GHG pricing →
         </button>
         {/* LEAD1 L4: the secondary way out, under the pricing button. Downloads stay paid; the free account keeps
-            the calculation. ⚠️ L5: once the results email is sent on claim, this becomes design 1.1's
-            "Email me my results instead (free account)". */}
+            the calculation and, since L5, emails the results to the verified address. */}
         {onKeep && (
           <button type="button" onClick={onKeep} style={{ display: 'block', width: '100%', fontSize: 13, fontWeight: 600, padding: '8px 0', marginBottom: 10, background: 'none', border: 'none', color: 'var(--color-brand)', textDecoration: 'underline', cursor: 'pointer' }}>
             {KEEP_COPY.overlayLink}
@@ -761,6 +760,28 @@ const searchParams = useSearchParams()
   const openKeepForm = () => setKeepModal({ start: 'form', pending: null })
   // ?kept=free|plan: the claim saved this calculation and reopened it here (lib/ghg/keepResults.ts savedHref).
   const keptMessage = keptLine(searchParams.get('kept'))
+  const keptEmailed = emailedLine(searchParams.get('emailed'), currentUser?.email ?? null)
+  // L5: "Email me my results again", for the free calculation open by id. The route reads the row as this user and
+  // sends to this session's address; its own sentence is shown, whatever it says.
+  const [emailAgain, setEmailAgain] = useState<{ sending: boolean; ok: boolean; message: string | null }>({ sending: false, ok: false, message: null })
+  const emailResultsAgain = async () => {
+    if (!inventoryId || emailAgain.sending) return
+    setEmailAgain({ sending: true, ok: false, message: null })
+    const { data: { session } } = await supabase.auth.getSession()
+    let ok = false
+    let message: string = KEEP_COPY.emailAgainFailed
+    try {
+      const res = await fetch('/api/ghg/free-calc/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({ id: inventoryId }),
+      })
+      const body = await res.json().catch(() => ({})) as { ok?: boolean; message?: string }
+      ok = res.ok && body.ok === true
+      if (body.message) message = body.message
+    } catch { /* message stays the plain failure: nothing was sent */ }
+    setEmailAgain({ sending: false, ok, message })
+  }
   const CONCIERGE_DEV = useHasConcierge()   // concierge gate: true when the customer holds any concierge tier entitlement
 
   // Decide initial view: ?id -> wizard (loads that one); else if user has inventories -> list; else -> blank wizard
@@ -3537,9 +3558,8 @@ workings: saved.workings,
             <span style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6 }}>
               {editingFree
                 // LEAD1 L4, design section 8: the account's own free calculation, which saves whatever the plan says.
-                // ⚠️ L5: when the re-email route exists, design 8's "You can edit it and email it to yourself." goes
-                // here in place of "You can edit and save it."
-                ? <>{KEEP_COPY.freeRowBanner}</>
+                // L5: "Email me my results again" beside it (POST /api/ghg/free-calc/email), and what it reported.
+                ? <>{KEEP_COPY.freeRowBanner}{emailAgain.message && <span role="status" style={{ display: 'block', marginTop: 4, fontWeight: 500, color: emailAgain.ok ? '#0F6E56' : '#92400E' }}>{emailAgain.message}</span>}</>
                 : ghgAccess === 'expired' && !inventoryId
                 // Free mode for an ended plan (?start=new): there is no inventory to read yet. Since LEAD1 L4 an
                 // account whose free calculation is unused can keep this one free.
@@ -3559,13 +3579,17 @@ workings: saved.workings,
                 report something wrong keep the filled button. */}
             {/* LEAD1 L4: "Keep my results" is the primary button wherever the prompt shows (design 1.1), and pricing
                 is the outline beside it. */}
-            {(showKeep || ghgAccess !== 'unknown') && (
+            {(showKeep || editingFree || ghgAccess !== 'unknown') && (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
+            {editingFree && (
+              <button type="button" data-email-results="again" onClick={() => { void emailResultsAgain() }} disabled={emailAgain.sending}
+                style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: emailAgain.sending ? 'wait' : 'pointer', whiteSpace: 'nowrap' as const }}>{emailAgain.sending ? KEEP_COPY.emailing : KEEP_COPY.emailAgain}</button>
+            )}
             {showKeep && (
               <button type="button" data-keep-results="banner" onClick={openKeepForm} style={{ fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' as const }}>{KEEP_COPY.button}</button>
             )}
             {ghgAccess !== 'unknown' && (
-              <a href="/pricing?modules=ghg" style={noticeIsNeutral || showKeep
+              <a href="/pricing?modules=ghg" style={noticeIsNeutral || showKeep || editingFree
                 ? { fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'none', color: 'var(--color-brand)', border: '0.5px solid var(--color-brand)', textDecoration: 'none', whiteSpace: 'nowrap' as const }
                 : { fontSize: 13, fontWeight: 600, padding: '9px 22px', borderRadius: 8, background: 'var(--color-brand)', color: 'var(--color-on-dark)', textDecoration: 'none', whiteSpace: 'nowrap' as const }}>{ghgAccess === 'expired' ? 'Renew GHG →' : 'See pricing →'}</a>
             )}
@@ -3576,12 +3600,11 @@ workings: saved.workings,
         {/* An ?id= that did not open, on an account with no saved inventory to list: the redirect
             lands here, in a blank wizard, and the sentence says so rather than leaving a customer to
             wonder why their link opened a new inventory. */}
-        {/* LEAD1 L4: the claim saved this calculation and reopened it here (?kept=). ⚠️ L5: once the results email
-            is sent on claim, its sentence ("We've emailed your results to {email}.") goes after this one. Not
-            before: nothing is emailed yet. */}
+        {/* LEAD1 L4: the claim saved this calculation and reopened it here (?kept=). L5: then whether the results
+            email went (?emailed=1 or 0), said as observed: the claim route reports Resend's answer, not a guess. */}
         {keptMessage && inventoryId && (
           <div role="status" style={{ background: '#E1F5EE', border: '0.5px solid color-mix(in srgb, #0F6E56 25%, transparent)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56', lineHeight: 1.6, fontWeight: 500 }}>
-            {keptMessage}
+            {keptMessage}{keptEmailed && <> {keptEmailed}</>}
           </div>
         )}
         {keepModal && (
