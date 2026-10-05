@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ENF2 (L0, Oct 2026): the guide checks that the GHG plan is ACTIVE (term_end after now), not merely that a ghg row
 // exists. Until then an expired customer kept the guide, and its paid model calls, indefinitely.
@@ -49,8 +49,11 @@ describe('/api/ghg-bot entitlement (ENF2)', () => {
     entError = null
     fetchMock.mockClear()
     vi.stubGlobal('fetch', fetchMock)
-    process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+    // Stubbed and restored (L5 fix1), not assigned: an assignment outlived this file in the worker and replaced
+    // whatever key the environment had for any later test in it.
+    vi.stubEnv('ANTHROPIC_API_KEY', 'test-key-not-real')
   })
+  afterEach(() => { vi.unstubAllEnvs() })
 
   it('B1: signed out → 401 unauthenticated, no model call', async () => {
     signedIn = false

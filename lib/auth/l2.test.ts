@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createElement } from 'react'
@@ -6,7 +6,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { linkAction, safeNext, CONFIRM_LANDING } from './linkAction'
 import { completeSignIn, LINK_NOT_COMPLETED, NO_LINK_HERE } from './completeSignIn'
 import { authErrorText, isCaptchaError, isNoAccountForCode, CAPTCHA_FAILED } from './authErrors'
-import Turnstile from '../../app/components/Turnstile'
 import { turnstileSiteKey, TURNSTILE_TEST_SITE_KEY } from './turnstileKey'
 
 // LEAD1 L2 (Oct 2026): sign-in links finished in the browser, sign-in by code on /login, and Turnstile tokens on every
@@ -170,7 +169,28 @@ describe('the pages', () => {
     const t = read('app/components/Turnstile.tsx')
     expect(t).toContain('turnstileSiteKey(process.env.NEXT_PUBLIC_VERCEL_ENV, process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)')
     expect(t).not.toMatch(/process\.env\.TURNSTILE_SECRET/)
-    // Under test (not production) the widget renders, with the test key.
-    expect(renderToStaticMarkup(createElement(Turnstile, { onToken: () => {} }))).toContain('data-turnstile')
+  })
+
+  // ⚠️ THE WIDGET'S KEY IS READ WHEN app/components/Turnstile.tsx IS IMPORTED, from NEXT_PUBLIC_VERCEL_ENV and
+  // NEXT_PUBLIC_TURNSTILE_SITE_KEY (L5 fix1, 5 Oct 2026). Rendered from a top-level import, this test asserted
+  // whatever the machine running it had set: it passed locally and on Preview, and would have failed a Production
+  // build (which runs the suite) without a site key. Each case now fixes both variables and imports the module afresh.
+  describe('P6b: what the widget renders, by environment', () => {
+    afterEach(() => { vi.unstubAllEnvs(); vi.resetModules() })
+    const render = async (vercelEnv: string, siteKey: string) => {
+      vi.stubEnv('NEXT_PUBLIC_VERCEL_ENV', vercelEnv)
+      vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', siteKey)
+      vi.resetModules()
+      const { default: Turnstile } = await import('../../app/components/Turnstile')
+      return renderToStaticMarkup(createElement(Turnstile, { onToken: () => {} }))
+    }
+    it('preview and development render the widget (with the public test key), whatever site key is set', async () => {
+      expect(await render('preview', '')).toContain('data-turnstile')
+      expect(await render('development', 'real-site-key')).toContain('data-turnstile')
+    })
+    it('production renders it with a site key, and renders nothing without one', async () => {
+      expect(await render('production', 'real-site-key')).toContain('data-turnstile')
+      expect(await render('production', '')).toBe('')
+    })
   })
 })

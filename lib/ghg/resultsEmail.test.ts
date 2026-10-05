@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -145,6 +145,11 @@ describe('the results email', () => {
 })
 
 describe('sending', () => {
+  // ⚠️ NO TEST HERE MAY READ THE REAL RESEND_API_KEY (L5 fix1, 5 Oct 2026). sendResultsEmail falls back to
+  // process.env.RESEND_API_KEY when it is passed no key, and Vercel Preview and Production set it while a local run
+  // does not, so "no key" passed locally and failed the Preview build. Every case below fixes the variable itself.
+  afterEach(() => { vi.unstubAllEnvs() })
+
   it('R10: from hello@themisiq.co with reply-to hello@themisiq.co, both parts; a refusal is reported, never thrown', async () => {
     const calls: Array<{ url: string; body: Record<string, unknown>; auth: string }> = []
     const ok = (async (url: string, init: RequestInit) => {
@@ -162,7 +167,20 @@ describe('sending', () => {
     expect(await sendResultsEmail('a@b.co', build(), refused, 'k')).toEqual({ ok: false, reason: 'resend_422' })
     const down = (async () => { throw new Error('offline') }) as unknown as typeof fetch
     expect(await sendResultsEmail('a@b.co', build(), down, 'k')).toEqual({ ok: false, reason: 'network' })
+    // No key passed and none in the environment: nothing is sent, whatever the machine running this has set.
+    vi.stubEnv('RESEND_API_KEY', '')
     expect(await sendResultsEmail('a@b.co', build(), ok, undefined)).toEqual({ ok: false, reason: 'not_configured' })
+  })
+
+  it('R10b: with no key passed, the environment\'s key is used', async () => {
+    let auth = ''
+    const ok = (async (_url: string, init: RequestInit) => {
+      auth = (init.headers as Record<string, string>).Authorization
+      return new Response(JSON.stringify({ id: 'em-2' }), { status: 200 })
+    }) as unknown as typeof fetch
+    vi.stubEnv('RESEND_API_KEY', 'env-key-not-real')
+    expect(await sendResultsEmail('a@b.co', build(), ok)).toEqual({ ok: true, id: 'em-2' })
+    expect(auth).toBe('Bearer env-key-not-real')
   })
 })
 
