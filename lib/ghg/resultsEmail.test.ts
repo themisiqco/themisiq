@@ -138,7 +138,10 @@ describe('the results email', () => {
       expect(part.toLowerCase()).not.toContain('traceable')
       expect(part).not.toContain('—')
     }
-    expect(e.html).not.toMatch(/<img|<script/i)
+    // One image only, the brand masthead (lib/email/layout.ts, Oct 2026); nothing else is an image, and no script.
+    expect(e.html.match(/<img\b/gi) ?? []).toHaveLength(1)
+    expect(e.html).toContain('/images/email/masthead.jpg')
+    expect(e.html).not.toMatch(/<script/i)
     expect(e.html).toContain('A &lt;b&gt;&amp;&lt;/b&gt; Co')
     expect(read('lib/ghg/resultsEmail.ts')).toContain('L6: the marketing unsubscribe link goes here')
   })

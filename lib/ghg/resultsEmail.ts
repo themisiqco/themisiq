@@ -33,6 +33,10 @@ import { RESULT_DP, workingsActivityCell } from './workingsCells'
 import { COUNTRY_WORDS } from './series'
 import type { FactorEditions } from './factorEditions'
 import { gridRegionName, residualRegionName } from './gridRegionNames'
+import { emailShell, EMAIL_POSTAL_ADDRESS, EMAIL_FONT_DISPLAY } from '../email/layout'
+import { INK, INK_MUTED, LINE, BRAND } from '../brand'
+
+const FOOTER_REASON = 'Questions: hello@themisiq.co. You received this because you asked for your results on themisiq.co.'
 
 export const SOURCE_LINE_LIMIT = 15
 export const TOTAL_DP = 2
@@ -55,7 +59,9 @@ export const RESULTS_EMAIL_COPY = {
     const price = GHG_TIERS.starter.priceUSD
     return `A GHG plan adds Scope 3, document uploads, report downloads for each framework and more inventories. Plans start at $${price?.toLocaleString('en-US')} USD a year.`
   },
-  footer: 'ThemisIQ, 11 Oak Drive, Niagara-on-the-Lake, ON L0S 1J0, Canada. Questions: hello@themisiq.co. You received this because you asked for your results on themisiq.co.',
+  // The address comes from the shared email shell (lib/email/layout.ts), so the plain text and the HTML footer say the
+  // same thing; the text is unchanged from before the shell.
+  footer: `${EMAIL_POSTAL_ADDRESS} ${FOOTER_REASON}`,
   marketNoContracts: 'No green power contracts or certificates were entered, so this uses the same grid factors as the location-based figure.',
   marketResidual: (regions: string[]) => `Electricity not covered by contracts you entered uses the ${andList(regions)} residual ${regions.length > 1 ? 'mixes' : 'mix'}.`,
   marketGridWithContracts: 'Electricity not covered by contracts you entered uses the same grid factors as the location-based figure.',
@@ -292,43 +298,49 @@ export function resultsEmailText(m: ResultsEmailModel): string {
   return out.join('\n')
 }
 
-// Plain HTML: one column, tables for alignment, inline styles, no images, no buttons, nothing that reads as marketing.
-const C = { ink: '#151A1D', muted: '#5A686E', line: '#e8e7e4', brand: '#095C6B' }
-const p = (s: string, extra = '') => `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:${C.ink};${extra}">${s}</p>`
-const h = (s: string) => `<p style="margin:20px 0 8px;font-size:13px;font-weight:600;color:${C.ink};">${esc(s)}</p>`
-const tr = (a: string, b: string) => `<tr><td style="padding:6px 0;border-bottom:1px solid ${C.line};font-size:14px;color:${C.ink};">${a}</td><td style="padding:6px 0 6px 16px;border-bottom:1px solid ${C.line};font-size:14px;color:${C.ink};text-align:right;white-space:nowrap;">${b}</td></tr>`
-const table = (rows: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}</table>`
+// HTML: the shared shell (lib/email/layout.ts: masthead, content, footer with the postal address) around one column of
+// plain content. Tables for alignment, inline styles, colours from lib/brand.ts, no buttons, nothing that reads as
+// marketing. The plain-text part (resultsEmailText) is separate and unchanged by the shell.
+const p = (s: string, extra = '') => `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:${INK};${extra}">${s}</p>`
+const h = (s: string) => `<p class="email-display" style="margin:22px 0 8px;font-size:15px;font-weight:600;color:${INK};font-family:${EMAIL_FONT_DISPLAY};">${esc(s)}</p>`
+const tr = (a: string, b: string) => `<tr><td style="padding:6px 0;border-bottom:1px solid ${LINE};font-size:14px;color:${INK};">${a}</td><td style="padding:6px 0 6px 16px;border-bottom:1px solid ${LINE};font-size:14px;color:${INK};text-align:right;white-space:nowrap;">${b}</td></tr>`
+const table = (rows: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">${rows}</table>`
 
 export function resultsEmailHtml(m: ResultsEmailModel): string {
   const parts: string[] = []
-  parts.push(p(esc(m.greeting)), p(esc(RESULTS_EMAIL_COPY.intro)), p(`<strong>${esc(m.company)}, ${m.year}</strong>`))
+  parts.push(p(esc(m.greeting)), p(esc(RESULTS_EMAIL_COPY.intro)))
+  parts.push(`<p class="email-display" style="margin:0 0 4px;font-size:20px;line-height:1.3;color:${INK};font-family:${EMAIL_FONT_DISPLAY};">${esc(m.company)}, ${m.year}</p>`)
   parts.push(h('Totals'))
   parts.push(table([
     tr('Scope 1', tonnes(m.totals.scope1)),
     tr('Scope 2, location-based', tonnes(m.totals.scope2Location)),
     ...(m.totals.scope2Market !== null ? [tr('Scope 2, market-based', tonnes(m.totals.scope2Market))] : []),
   ].join('')))
-  if (m.marketBasis) parts.push(p(esc(m.marketBasis), `margin-top:8px;font-size:12px;color:${C.muted};`))
+  if (m.marketBasis) parts.push(p(esc(m.marketBasis), `margin-top:8px;font-size:12px;color:${INK_MUTED};`))
   if (m.s3td !== null) {
-    parts.push(p(`${esc(RESULTS_EMAIL_COPY.s3td)}<br><strong>${tonnes(m.s3td)}</strong>. ${esc(RESULTS_EMAIL_COPY.s3tdNotInTotals)}`, `margin-top:12px;font-size:13px;color:${C.muted};`))
+    parts.push(p(`${esc(RESULTS_EMAIL_COPY.s3td)}<br><strong>${tonnes(m.s3td)}</strong>. ${esc(RESULTS_EMAIL_COPY.s3tdNotInTotals)}`, `margin-top:12px;font-size:13px;color:${INK_MUTED};`))
   }
   parts.push(h('By location'))
   parts.push(table(m.locations.map(l => tr(
-    `${esc(l.name)}<br><span style="font-size:12px;color:${C.muted};">${esc(l.country)}, grid region ${esc(l.gridRegion)}</span>`,
+    `${esc(l.name)}<br><span style="font-size:12px;color:${INK_MUTED};">${esc(l.country)}, grid region ${esc(l.gridRegion)}</span>`,
     l.scope1 === null ? esc(RESULTS_EMAIL_COPY.notIncluded) : `Scope 1 ${tonnes(l.scope1)}<br>Scope 2 ${tonnes(l.scope2 ?? 0)}`,
   )).join('')))
   parts.push(h('By source'))
   parts.push(m.sourceLines.map(s => p(esc(s), 'margin-bottom:6px;font-size:13px;')).join(''))
-  if (m.moreLines > 0) parts.push(p(esc(RESULTS_EMAIL_COPY.moreLines(m.moreLines)), `font-size:13px;color:${C.muted};`))
+  if (m.moreLines > 0) parts.push(p(esc(RESULTS_EMAIL_COPY.moreLines(m.moreLines)), `font-size:13px;color:${INK_MUTED};`))
   parts.push(h('Emission factors'))
   parts.push(p(`GWP basis: ${esc(m.gwpBasis)}`, 'margin-bottom:6px;font-size:13px;'))
   parts.push((m.editions.length > 0 ? m.editions : [RESULTS_EMAIL_COPY.noEditions]).map(e => p(esc(e), 'margin-bottom:6px;font-size:13px;')).join(''))
-  parts.push(p(`${esc(m.savedLine)} <a href="${esc(m.link)}" style="color:${C.brand};">${esc(m.link)}</a>`, 'margin-top:20px;'))
+  parts.push(p(`${esc(m.savedLine)} <a href="${esc(m.link)}" style="color:${BRAND};">${esc(m.link)}</a>`, 'margin-top:20px;'))
   if (m.nextStep) parts.push(p(esc(m.nextStep)))
-  // ⚠️ L6: the marketing unsubscribe link goes here, and only when marketing consent was given (design 2, item 8).
-  parts.push(`<p style="margin:24px 0 0;padding-top:12px;border-top:1px solid ${C.line};font-size:12px;line-height:1.6;color:${C.muted};">${esc(RESULTS_EMAIL_COPY.footer)}</p>`)
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(m.subject)}</title></head>`
-    + `<body style="margin:0;padding:0;background:#ffffff;"><div style="max-width:600px;margin:0 auto;padding:24px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">${parts.join('')}</div></body></html>`
+  return emailShell({
+    title: m.subject,
+    preheader: `${m.company}, ${m.year}: Scope 1 ${tonnes(m.totals.scope1)}, Scope 2 ${tonnes(m.totals.scope2Location)}.`,
+    contentHtml: parts.join(''),
+    footerLines: [FOOTER_REASON],
+    // ⚠️ L6: the marketing unsubscribe link goes here, and only when marketing consent was given (design 2, item 8).
+    footerExtraHtml: '',
+  })
 }
 
 export type ResultsEmail = { subject: string; html: string; text: string }
