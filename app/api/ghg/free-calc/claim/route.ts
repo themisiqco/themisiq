@@ -14,9 +14,12 @@ import type { OwnInventory } from '../../../../../lib/ghg/freeCalc'
 import { RESULTS_EMAIL_COLUMNS, type SavedInventoryRow } from '../../../../../lib/ghg/resultsEmail'
 import { sendResultsEmail } from '../../../../../lib/ghg/resultsEmailSend'
 import { SITE_ORIGIN } from '../../../../../lib/siteOrigin'
-import { ipFromHeaders } from '../../../../../lib/rateLimit'
+import { ipFromHeaders, checkAndRecordRateLimit } from '../../../../../lib/rateLimit'
 import { activeConsent, type ConsentRow } from '../../../../../lib/consent/marketing'
 
+
+/** L7: new free calculations a day from one IP (bucket free-calc-claim-ip). */
+const FREE_CLAIMS_PER_IP_PER_DAY = 5
 
 const PENDING_COLUMNS = 'id, email, email_key, full_name, company, payload, created_at, expires_at'
 
@@ -104,6 +107,10 @@ export async function POST(req: NextRequest) {
     siteUrl: SITE_ORIGIN,
     // L6: marketing consent (marketing_consents, service role only: docs/review/patches/L6-M5-marketing-consents.sql).
     requestMeta: { ip: ipFromHeaders(req), userAgent: req.headers.get('user-agent') },
+    // L7 (design section 6): new free calculations per IP per day. Office networks share an IP, hence 5, not 1.
+    claimIpRateLimitOk: async () => (await checkAndRecordRateLimit({
+      bucket: 'free-calc-claim-ip', ip: ipFromHeaders(req), email: null, ipLimit: FREE_CLAIMS_PER_IP_PER_DAY, emailLimit: 1_000_000, windowMs: 24 * 60 * 60 * 1000,
+    })).ok,
     insertConsent: async (row) => {
       const { data, error } = await admin.from('marketing_consents').insert(row).select('id').single()
       return error || !data ? { error: error?.message ?? 'no row returned' } : { id: data.id as string }

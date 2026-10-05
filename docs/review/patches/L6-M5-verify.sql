@@ -1,6 +1,8 @@
 -- docs/review/patches/L6-M5-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L6-M5-marketing-consents.sql, in the Supabase SQL editor, the whole file. It changes nothing:
+-- ⚠️ RUN 5 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M5: all 17 checks passed. DO NOT RUN AGAIN as
+-- part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER L6-M5-marketing-consents.sql, in the Supabase SQL editor, the whole file. It changes nothing:
 -- the test users and rows are created inside one PL/pgSQL block that ends by raising 'm5_undo', and catching it rolls
 -- the block back (the L0/L1/L3 pattern). Results are carried out in variables.
 --

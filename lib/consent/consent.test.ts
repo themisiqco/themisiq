@@ -281,11 +281,14 @@ describe('the dashboard setting', () => {
 })
 
 describe('M5 SQL', () => {
-  it('MC17: NOT RUN headers; the owner SELECT policy wraps auth.uid(); RLS on; anon nothing', () => {
+  it('MC17: headers record execution (M5 and verify RUN 5 Oct 2026, 17 checks passed; rollback NOT RUN); the owner SELECT policy wraps auth.uid(); RLS on; anon nothing', () => {
     const m5 = read('docs/review/patches/L6-M5-marketing-consents.sql')
-    expect(m5.split('\n')[2]).toContain('⚠️ NOT RUN.')
+    expect(m5.split('\n')[2]).toContain('⚠️ RUN 5 Oct 2026')
+    expect(m5).toContain('passed all 17 checks.\n-- DO NOT RUN AGAIN')
     expect(read('docs/review/patches/L6-M5-rollback.sql').split('\n')[2]).toContain('⚠️ NOT RUN.')
-    expect(read('docs/review/patches/L6-M5-verify.sql').split('\n')[2]).toContain('⚠️ NOT RUN.')
+    const verify = read('docs/review/patches/L6-M5-verify.sql')
+    expect(verify.split('\n')[2]).toContain('⚠️ RUN 5 Oct 2026')
+    expect(verify).toContain('all 17 checks passed. DO NOT RUN AGAIN')
     expect(m5).toContain('using ((select auth.uid()) = user_id);')
     expect(m5).not.toMatch(/[^(]auth\.uid\(\)\s*=/)
     expect(m5).toContain('alter table public.marketing_consents enable row level security;')

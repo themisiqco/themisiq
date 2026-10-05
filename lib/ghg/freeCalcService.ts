@@ -16,6 +16,7 @@ import {
   FREE_CALC_MESSAGES, PENDING_TTL_MS, MAX_TEXT, type OwnInventory,
 } from './freeCalc'
 import { isHoneypotTripped, HONEYPOT_FIELD, recipientKey } from '../assessmentSubmitGuard'
+import { emailKey as normalisedEmailKey } from '../emailKey'
 import type { GhgDraft } from './draftParse'
 import { buildResultsEmail, type SavedInventoryRow } from './resultsEmail'
 import type { SendResult } from './resultsEmailSend'
@@ -97,6 +98,8 @@ export type ClaimDeps = {
   getPendingById(id: string): Promise<PendingRow | null>
   latestPending(emailKey: string): Promise<PendingRow | null>
   deletePendingForEmail(emailKey: string): Promise<void>
+  /** L7: the per-IP cap on new free calculations a day (bucket free-calc-claim-ip). Records a hit when allowed. */
+  claimIpRateLimitOk?(): Promise<boolean>
   upsertProfile(p: { id: string; email: string; fullName: string | null; company: string | null; country: string | null }): Promise<void>
   /** L5: the row as saved, read back after the write, as the user. The results email is built from this alone. */
   readSavedRow(id: string): Promise<SavedInventoryRow | null>
@@ -119,7 +122,11 @@ const text = (v: unknown) => (typeof v === 'string' ? v.trim().slice(0, MAX_TEXT
 
 export async function claimFreeCalc(body: unknown, deps: ClaimDeps): Promise<RouteResult> {
   const o = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>
-  const emailKey = recipientKey(deps.user.email)
+  // L7: the normalised key (lib/emailKey.ts), as /pending stored it. Holds written before L7 used the plain key (trim and
+  // lower case); one is found under that key too, for the 24 hours such a hold can still exist.
+  const emailKey = normalisedEmailKey(deps.user.email)
+  const legacyKey = recipientKey(deps.user.email)
+  const ownKey = (k: string) => k === emailKey || k === legacyKey
   const pendingId = typeof o.pendingId === 'string' ? o.pendingId : null
 
   // 1. The calculation: in hand (same tab), or the pending record for THIS verified email (another device).
@@ -127,9 +134,10 @@ export async function claimFreeCalc(body: unknown, deps: ClaimDeps): Promise<Rou
   let company = text(o.company) || null
   let fromPending: PendingRow | null = null
   if (pendingId || o.inventory === undefined) {
-    fromPending = pendingId ? await deps.getPendingById(pendingId) : await deps.latestPending(emailKey)
+    fromPending = pendingId ? await deps.getPendingById(pendingId)
+      : (await deps.latestPending(emailKey)) ?? (legacyKey !== emailKey ? await deps.latestPending(legacyKey) : null)
     if (!fromPending) return fail(404, 'nothing_to_claim', FREE_CALC_MESSAGES.nothingToClaim)
-    if (fromPending.email_key !== emailKey) return fail(403, 'email_mismatch', FREE_CALC_MESSAGES.emailMismatch)
+    if (!ownKey(fromPending.email_key)) return fail(403, 'email_mismatch', FREE_CALC_MESSAGES.emailMismatch)
     if (new Date(fromPending.expires_at).getTime() <= deps.now.getTime()) return fail(410, 'expired', FREE_CALC_MESSAGES.expired)
   }
   const checked = checkDraft(o.inventory !== undefined ? o.inventory : fromPending?.payload)
@@ -172,13 +180,20 @@ export async function claimFreeCalc(body: unknown, deps: ClaimDeps): Promise<Rou
     if (r.updated !== 1) return fail(409, 'changed', 'Your saved calculation changed while you were working. Nothing was saved; reload the page and try again.')
     savedId = decision.id
   } else {
+    // L7: a NEW free calculation counts against the per-IP daily cap; a paid save and a replacement do not.
+    if (!active && deps.claimIpRateLimitOk && !(await deps.claimIpRateLimitOk())) {
+      return fail(429, 'claim_rate_limited', FREE_CALC_MESSAGES.claimRateLimited)
+    }
     const r = await deps.insertInventory(row)
     if ('error' in r) return dbFail(r.error)
     savedId = r.id
   }
 
   // 5. Housekeeping that must not undo a save that succeeded: the held copies go, the profile is filled in.
-  try { await deps.deletePendingForEmail(emailKey) } catch (err) { console.error('[free-calc/claim] pending delete failed:', err) }
+  try {
+    await deps.deletePendingForEmail(emailKey)
+    if (legacyKey !== emailKey) await deps.deletePendingForEmail(legacyKey)
+  } catch (err) { console.error('[free-calc/claim] pending delete failed:', err) }
   try {
     await deps.upsertProfile({ id: deps.user.id, email: deps.user.email, fullName, company, country: firstCountry(inv) })
   } catch (err) { console.error('[free-calc/claim] profile upsert failed:', err) }

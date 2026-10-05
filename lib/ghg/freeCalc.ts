@@ -13,7 +13,8 @@ import { emptyLocation, type Inventory, type Location } from './engine'
 import { figuresForSave } from './savePayload'
 import { parseGhgDraft, type GhgDraft } from './draftParse'
 import { defaultReportingYear } from '../reportingYears'
-import { recipientKey } from '../assessmentSubmitGuard'
+import { emailKey } from '../emailKey'
+import { isDisposableEmail, DISPOSABLE_EMAIL_MESSAGE } from '../disposableEmailDomains'
 
 export const PENDING_TTL_MS = 24 * 60 * 60 * 1000
 export const MAX_PAYLOAD_BYTES = 256 * 1024
@@ -32,6 +33,9 @@ export const FREE_CALC_MESSAGES = {
   nothingToClaim: 'There is no calculation waiting for this email address. Enter your figures again to keep them.',
   expired: 'This calculation was kept for 24 hours and has expired. Enter your figures again to keep them.',
   emailMismatch: 'This calculation was started with a different email address. Sign in with that address to keep it.',
+  // L7 (design section 6)
+  workEmail: DISPOSABLE_EMAIL_MESSAGE,
+  claimRateLimited: 'Too many free accounts have been set up from this connection today. Try again tomorrow, or email hello@themisiq.co.',
   oneFree: (company: string, year: number) =>
     `Your free account keeps one calculation: ${company || 'your company'}, ${year}.`,
   conflict: (company: string, year: number) =>
@@ -53,13 +57,16 @@ export function validateHold(body: unknown): { ok: true; value: HoldInput } | In
   const o = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>
   const email = text(o.email)
   if (!isPlausibleEmail(email)) return { ok: false, code: 'invalid_email', message: FREE_CALC_MESSAGES.invalidEmail }
+  // L7: throwaway inboxes are refused; free webmail is not (lib/disposableEmailDomains.ts).
+  if (isDisposableEmail(email)) return { ok: false, code: 'disposable_email', message: FREE_CALC_MESSAGES.workEmail }
   const fullName = text(o.fullName).slice(0, MAX_TEXT)
   if (!fullName) return { ok: false, code: 'missing_name', message: FREE_CALC_MESSAGES.missingName }
   const company = text(o.company).slice(0, MAX_TEXT)
   if (!company) return { ok: false, code: 'missing_company', message: FREE_CALC_MESSAGES.missingCompany }
   const draft = checkDraft(o.inventory)
   if (!draft.ok) return draft
-  return { ok: true, value: { email, emailKey: recipientKey(email), fullName, company, draft: draft.draft } }
+  // L7: the normalised key (lib/emailKey.ts) for the rate limit and the hold, the same one /claim looks up.
+  return { ok: true, value: { email, emailKey: emailKey(email), fullName, company, draft: draft.draft } }
 }
 
 /** The calculation itself: parseable, at most MAX_LOCATIONS sites, at most MAX_PAYLOAD_BYTES as JSON. */

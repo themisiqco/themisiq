@@ -1,6 +1,8 @@
 -- docs/review/patches/L6-M5-marketing-consents.sql
 --
--- ⚠️ NOT RUN. Drafted 5 Oct 2026 (LEAD1 task L6, migration M5; design in docs/review/design-lead1.md sections 4 "M5"
+-- ⚠️ RUN 5 Oct 2026 in the Supabase SQL editor (recorded by Lisa); L6-M5-verify.sql then passed all 17 checks.
+-- DO NOT RUN AGAIN: the pre-flight would refuse (public.marketing_consents already exists).
+-- Drafted 5 Oct 2026 (LEAD1 task L6, migration M5; design in docs/review/design-lead1.md sections 4 "M5"
 -- and 5). To become supabase/migrations/2026MMDD_marketing_consents.sql.
 --
 -- RUN ORDER (L6): AFTER the L6 code is deployed is fine and so is before: the code writes this table only through the
