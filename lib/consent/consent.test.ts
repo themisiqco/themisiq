@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -121,11 +121,18 @@ describe('the record', () => {
 })
 
 describe('the unsubscribe token', () => {
+  // ⚠️ NO KEY PASSED MEANS process.env.UNSUBSCRIBE_TOKEN_SECRET, which Vercel Preview sets (lead1-L6-fix1). The cases
+  // that pass none fix the variable themselves; vitest.setup.ts also clears it before every file.
+  afterEach(() => { vi.unstubAllEnvs() })
   it('MC7: round trip, and the id it names', () => {
     const t = signUnsubscribeToken(CID, SECRET, NOW)!
     expect(verifyUnsubscribeToken(t, SECRET, NOW)).toEqual({ ok: true, consentId: CID })
     expect(signUnsubscribeToken('not-a-uuid', SECRET, NOW)).toBeNull()
+    vi.stubEnv('UNSUBSCRIBE_TOKEN_SECRET', '')
     expect(signUnsubscribeToken(CID, undefined, NOW)).toBeNull()
+    // And with no key passed, the environment's is used.
+    vi.stubEnv('UNSUBSCRIBE_TOKEN_SECRET', SECRET)
+    expect(verifyUnsubscribeToken(signUnsubscribeToken(CID, undefined, NOW), undefined, NOW)).toEqual({ ok: true, consentId: CID })
   })
 
   it('MC8: tampered, re-signed with another secret, or expired: refused', () => {
@@ -141,6 +148,7 @@ describe('the unsubscribe token', () => {
     expect(verifyUnsubscribeToken('garbage', SECRET, NOW)).toEqual({ ok: false, reason: 'invalid' })
     const later = new Date(NOW.getTime() + (UNSUBSCRIBE_TOKEN_TTL_DAYS * 24 * 3600 + 1) * 1000)
     expect(verifyUnsubscribeToken(t, SECRET, later)).toEqual({ ok: false, reason: 'expired' })
+    vi.stubEnv('UNSUBSCRIBE_TOKEN_SECRET', '')
     expect(verifyUnsubscribeToken(t, undefined, NOW)).toEqual({ ok: false, reason: 'not_configured' })
   })
 })
