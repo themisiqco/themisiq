@@ -51,13 +51,19 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     expect(cat3InputsFrom(w, 'nope').reason).toEqual({ code: 'no_locations_data' })
   })
 
-  it('C3I-4 an unpriceable location contributes nothing and is named', () => {
-    // A US location holding a gas figure in m3: no factor for that unit there, so the engine excludes
-    // the whole location (engine.ts:2364-2394) and emits one row saying so.
+  it('C3I-4 an unpriced line contributes nothing and is named; the location\'s priced streams still arrive (FI1)', () => {
+    // A US location holding a gas figure in m3: no factor for that unit there. Before FI1 the engine
+    // excluded the whole location ('location_excluded'); now that ONE line is unpriced and named per stream.
     const l = answered({ name: 'Odd site', country: 'US', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas'])
     const r = cat3InputsFrom(workingsOf([l]), [l])
     expect(r.inputs!.rows).toEqual([])
-    expect(r.skipped).toEqual([{ code: 'location_excluded', location: 'Odd site' }])
+    expect(r.skipped).toEqual([{ code: 'scope1_not_priced', location: 'Odd site', stream: 'natural_gas' }])
+    // With priced electricity beside it, the electricity reaches Category 3.
+    const mixed = answered({ name: 'Odd site', country: 'US', grid_region: 'US_CA', electricity_kwh: 10_000,
+      has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas', 'electricity'])
+    const m = cat3InputsFrom(workingsOf([mixed]), [mixed])
+    expect(m.inputs!.rows.map(x => x.stream)).toEqual(['electricity'])
+    expect(m.skipped).toContainEqual({ code: 'scope1_not_priced', location: 'Odd site', stream: 'natural_gas' })
   })
 
   it('C3I-5 a duplicate name in two countries is unresolved, never the first one found', () => {
@@ -254,7 +260,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     }
   })
 
-  it('C3I-14 no_published_factor is the purchased-steam path; a Scope 1 fuel with no factor is a whole-location exclusion', () => {
+  it('C3I-14 no_published_factor is the purchased-steam path; a Scope 1 fuel with no factor is an unpriced line (FI1)', () => {
     // Which path a missing factor takes decides which skip reason is honest, so both are pinned
     // against the engine rather than asserted from the reading of it.
     // Scope 2: Canada publishes no purchased-steam factor (engine.test.ts T4).
@@ -269,15 +275,16 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     expect(sr.inputs?.rows ?? []).toHaveLength(0)
 
     // Scope 1: natural gas in m3 has no US factor (engine.test.ts GROUP K/L). The engine does NOT
-    // mark the row 'no_published_factor' — it excludes the whole location instead.
+    // mark the row 'no_published_factor'. Since FI1 it marks the LINE 'unpriced' (it used to exclude the
+    // whole location as 'unpriceable').
     const fuel = answered({ id: 'f', name: 'US plant', country: 'US',
                             has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' },
                           ['natural_gas'])
     const fuelRows = workingsOf([fuel])
     expect(fuelRows.filter(r => r.declaration === 'no_published_factor')).toHaveLength(0)
-    expect(fuelRows.filter(r => r.declaration === 'unpriceable')).toHaveLength(1)
+    expect(fuelRows.filter(r => r.declaration === 'unpriced')).toHaveLength(1)
     const fr = cat3InputsFrom(fuelRows, [fuel])
-    expect(fr.skipped).toContainEqual({ code: 'location_excluded', location: 'US plant' })
+    expect(fr.skipped).toContainEqual({ code: 'scope1_not_priced', location: 'US plant', stream: 'natural_gas' })
     expect(fr.inputs?.rows ?? []).toHaveLength(0)
   })
 

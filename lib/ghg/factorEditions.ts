@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD,
+  efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, hasPricedCombustionLine,
   COMBUSTION_EDITION, STEAM_EDITION,
 } from './engine'
 import type { Location } from './engine'
@@ -269,6 +269,8 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // MissingEmissionFactorError and rethrows everything else, and calcInventory and pctEstimated
     // already probe these same locations EARLIER in the same payload, so any other error has already
     // been raised before this line runs.
+    //   FI1: findUnpriceableLocations now returns country refusals only, so this skips exactly the
+    // locations excluded whole. A factor gap is a line (unpricedLines), handled by the family gates below.
     if (findUnpriceableLocations([loc], 'AR6', year).length > 0) continue
 
     // ── COMBUSTION — only if this location actually burned something priced by the table.
@@ -276,7 +278,10 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // because a `has_*` flag alone once meant both "no such supply" and "not yet asked", and a
     // location with has_diesel_stationary true and no figure priced nothing. 'quantified' is the
     // only state that produces a priced row, so it is the only state that names an edition.
-    if (COMBUSTION_STREAMS.some(s => streamState(loc, s) === 'quantified')) {
+    //   FI1: and at least one of those lines must actually price. A missing factor no longer excludes the
+    // location (it is an unpriced line), so a site whose only fuel line is unpriced burned nothing the
+    // table priced and names no combustion edition, while its priced electricity and steam still do.
+    if (COMBUSTION_STREAMS.some(s => streamState(loc, s) === 'quantified') && hasPricedCombustionLine(loc)) {
       const j = factorJurisdiction(loc, 'combustion')
       if (j) (out[j] ??= {}).combustion = { source: combustionSource(loc), edition: COMBUSTION_EDITION[j] }
     }

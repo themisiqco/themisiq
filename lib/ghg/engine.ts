@@ -36,6 +36,7 @@ import type { FactorEditions } from './factorEditions'
 // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
 import { countryRefusalText } from './countryRefusalCopy'
 import { DELIVERY_DOC_TYPES, docTypeLabel } from './conciergeDocTypes'
+import { unitLabel } from './unitLabels'
 // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
 // WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
 // country control is built from, so "a country this platform can express" has ONE definition and
@@ -241,10 +242,10 @@ const GWP = {
 // Seeding any of those without a year dimension would carry a 2023/24 value into a 2026 inventory
 // with nothing on the row saying so — which is the failure GRID_EF already keys by year to avoid.
 const EF_CA = {
-  // Natural gas: per m3 in source (1921 g CO2/m3 Ontario fallback; per-province override via EF_CA_NG_CO2).
-  // mcf conversion: 1 mcf = 28.3168 m3. CH4 0.037 g/m3, N2O 0.035 g/m3 (Res/Comm/Institutional).
-  natural_gas_mcf: { co2: 54.396611, ch4: 0.001048, n2o: 0.000991 },
-  natural_gas_m3: { co2: 1.921, ch4: 0.000037, n2o: 0.000035 },
+  // NATURAL GAS IS NOT IN THIS TABLE (FI1). Its CO2 is the province's own (EF_CA_NG_CO2_M3) and its
+  // CH4 and N2O are EF_CA_NG_CH4_N2O; pickEF assembles the factor from the two. The Ontario value that sat
+  // here as a fallback for a blank or unrecognised province is removed: such a line is unpriced, with an
+  // export-blocking issue asking for the province (ruling, design doc section 10).
   // Propane "All Other Uses" (Table 3.x): 1515 / 0.024 / 0.108 g/L. gallon = litre × 3.78541.
   propane_litre: { co2: 1.515, ch4: 0.000024, n2o: 0.000108 },
   propane_gallon: { co2: 5.734896, ch4: 0.000091, n2o: 0.000409 },
@@ -285,6 +286,17 @@ const EF_CA_NG_CO2_M3: Record<string, number> = {
   NB: 1.919, NS: 1.919, PE: 1.919, NL: 1.919, YT: 1.966, NT: 1.966, NU: 1.966,
 }
 const M3_PER_MCF = 1000 / 35.3147 // 28.3168
+// Canadian natural gas CH4 and N2O, ECCC Res/Comm/Institutional: 0.037 and 0.035 g/m3. Per mcf = per m3 x
+// 28.3168 (rounded as the table always stored it). The CO2 is never here: it is the province's (FI1).
+const EF_CA_NG_CH4_N2O: Record<'natural_gas_m3' | 'natural_gas_mcf', { ch4: number; n2o: number }> = {
+  natural_gas_m3: { ch4: 0.000037, n2o: 0.000035 },
+  natural_gas_mcf: { ch4: 0.001048, n2o: 0.000991 },
+}
+/** FI1: the province a Canadian location's gas is priced for, or null when it is blank or not one we hold. */
+function caGasProvince(loc: Pick<Location, 'grid_region' | 'province'>): string | null {
+  const prov = (loc.grid_region || loc.province || '').toUpperCase().trim()
+  return EF_CA_NG_CO2_M3[prov] !== undefined ? prov : null
+}
 
 // UK combustion factors — DEFRA/DESNZ 2026 "Greenhouse gas reporting: conversion factors"
 // (full set, Fuels tab). The mandatory basis for UK SECR reporting.
@@ -2502,10 +2514,12 @@ function steamTonnes(loc: Location, gwpVersion: GwpVersion): number {
 // while the sixth returned the raw `undefined` and crashed on `ef.co2`. The same absent factor was
 // a TypeError in the US and a silent NaN everywhere else, decided only by jurisdiction. Every
 // branch now returns THIS, and calcGas refuses it identically.
-interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string } }
+// `cause` 'province' (FI1): Canadian gas whose province is blank or not one ECCC publishes a value for. The
+// factor is not missing from a table; the input that selects it is, so the line asks for the province.
+interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string; cause?: 'province' } }
 
-const efMiss = (key: string, country: string): CombustionEF =>
-  ({ __missing: { key, country: country || '(unset)' } } as unknown as CombustionEF)
+const efMiss = (key: string, country: string, cause?: 'province'): CombustionEF =>
+  ({ __missing: { key, country: country || '(unset)', ...(cause ? { cause } : {}) } } as unknown as CombustionEF)
 
 // The ONE resolution step every branch below shares: take the table hit if there is one, else the
 // uniform miss. Scalar table entries — EF.ammonia, which is deliberately never priced because it has
@@ -2583,17 +2597,18 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
   if (j !== 'CA') {
     return efOr((EF as any)[key], String(key), ctry)
   }
-  const ef = efOr((EF_CA as any)[key] ?? (EF as any)[key], String(key), ctry)
-  // Per-province natural gas CO2 override (CH4/N2O remain sector-based). Skipped on a miss — there
-  // is no base factor to override, and stamping co2 onto a blank would manufacture a factor.
-  if ((key === 'natural_gas_mcf' || key === 'natural_gas_m3') && typeof ef.co2 === 'number') {
-    const prov = (loc.grid_region || loc.province || '').toUpperCase().trim()
-    const provCo2M3 = EF_CA_NG_CO2_M3[prov]
-    if (provCo2M3 !== undefined) {
-      ef.co2 = key === 'natural_gas_mcf' ? provCo2M3 * M3_PER_MCF : provCo2M3
+  // ⚠️ CANADIAN GAS, ANY UNIT, NEEDS THE PROVINCE (FI1). ECCC publishes natural gas CO2 by province; with no
+  // province there is no factor to apply, so the line is a miss with cause 'province', never the Ontario
+  // value it used to fall back to. m3 and mcf are assembled from the province's CO2 and the sector CH4 and N2O.
+  if (String(key).startsWith('natural_gas_')) {
+    const prov = caGasProvince(loc)
+    if (prov === null) return efMiss(String(key), ctry, 'province')
+    if (key === 'natural_gas_mcf' || key === 'natural_gas_m3') {
+      const co2M3 = EF_CA_NG_CO2_M3[prov]
+      return { co2: key === 'natural_gas_mcf' ? co2M3 * M3_PER_MCF : co2M3, ...EF_CA_NG_CH4_N2O[key] }
     }
   }
-  return ef
+  return efOr((EF_CA as any)[key] ?? (EF as any)[key], String(key), ctry)
 }
 
 // Source citation for an ELECTRICITY row, country-aware — the same shape as combustionSource below.
@@ -2729,50 +2744,164 @@ function calcGas(ef: CombustionEF | MissingEF | null | undefined, amount: number
   }
 }
 
-function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
-  let s1_stationary = 0, s1_mobile = 0
-  const gases = { co2: 0, ch4: 0, n2o: 0 }
-  if (loc.has_natural_gas && loc.natural_gas_amount > 0) {
-    const ef = pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF)
-    const g = calcGas(ef, loc.natural_gas_amount, gwpVersion)
-    s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
-  }
-  if (loc.has_propane && loc.propane_amount > 0) {
-    const ef = pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF)
-    const g = calcGas(ef, loc.propane_amount, gwpVersion)
-    s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
-  }
-  if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) {
-    const ef = pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-    const g = calcGas(ef, loc.diesel_stationary_amount, gwpVersion)
-    s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
-  }
-  // TWO GRADES, PRICED SEPARATELY. Both read the RAW stored amount here; buildWorkings reads the
-  // resolution-applied figure instead — see the note at its own call site.
+// ── FI1: THE SCOPE 1 LINES, AND WHICH OF THEM CANNOT BE PRICED ───────────────────────────────────────
+// ONE list of a location's combustion lines, in workings order, read by calcLocation, fuelEmissionsByType,
+// buildWorkings and unpricedLines, so the four cannot disagree about which lines exist or what key prices
+// them. A line exists when its "uses this fuel" switch is on and its figure is above zero, as before.
+interface CombustionLine {
+  field: keyof Location
+  stream: DeclarableStream
+  source: string          // the workings row label, and the noun in the factor_missing message
+  mobile: boolean         // s1_mobile rather than s1_stationary
+  entered: number         // the figure as entered (the derived figure, on deriveLocations output)
+  enteredUnit: string
+  unitField: keyof Location
+  efKey: string
+  priced: number          // `entered` converted to the unit the factor is per (fuel oil only differs)
+  note?: string           // the conversion note, when `priced` differs from `entered`
+}
+function combustionLines(loc: Location): CombustionLine[] {
+  const out: CombustionLine[] = []
+  const add = (l: Omit<CombustionLine, 'priced'> & { priced?: number }) => out.push({ ...l, priced: l.priced ?? l.entered })
+  const lit = (u: string) => (u === 'gallons' ? 'gallon' : 'litre')
+  if (loc.has_natural_gas && loc.natural_gas_amount > 0)
+    add({ field: 'natural_gas_amount', stream: 'natural_gas', source: 'Natural gas', mobile: false, entered: loc.natural_gas_amount, enteredUnit: loc.natural_gas_unit, unitField: 'natural_gas_unit', efKey: `natural_gas_${loc.natural_gas_unit}` })
+  if (loc.has_propane && loc.propane_amount > 0)
+    add({ field: 'propane_amount', stream: 'propane', source: 'Propane', mobile: false, entered: loc.propane_amount, enteredUnit: loc.propane_unit, unitField: 'propane_unit', efKey: propaneEfKey(loc.propane_unit) })
+  if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
+    add({ field: 'diesel_stationary_amount', stream: 'diesel_stationary', source: 'Diesel (stationary)', mobile: false, entered: loc.diesel_stationary_amount, enteredUnit: loc.diesel_stationary_unit, unitField: 'diesel_stationary_unit', efKey: `diesel_${lit(loc.diesel_stationary_unit)}` })
+  // TWO GRADES, PRICED SEPARATELY, each converted to the unit its factor is per (fuelOilPricing).
   if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
     const fo = fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)
-    const g = calcGas(pickEF(loc, fo.key as keyof typeof EF), fo.priced, gwpVersion)
-    s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
+    add({ field: 'fuel_oil_distillate_amount', stream: 'fuel_oil_distillate', source: 'Heating oil', mobile: false, entered: loc.fuel_oil_distillate_amount, enteredUnit: loc.fuel_oil_distillate_unit ?? 'gallons', unitField: 'fuel_oil_distillate_unit', efKey: fo.key, priced: fo.priced, note: fo.note })
   }
   if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
     const fo = fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)
-    const g = calcGas(pickEF(loc, fo.key as keyof typeof EF), fo.priced, gwpVersion)
-    s1_stationary += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
+    add({ field: 'fuel_oil_residual_amount', stream: 'fuel_oil_residual', source: 'Heavy fuel oil', mobile: false, entered: loc.fuel_oil_residual_amount, enteredUnit: loc.fuel_oil_residual_unit ?? 'gallons', unitField: 'fuel_oil_residual_unit', efKey: fo.key, priced: fo.priced, note: fo.note })
   }
-  if (loc.has_mobile) {
-    if (loc.gasoline_amount > 0) {
-      const ef = pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-      const g = calcGas(ef, loc.gasoline_amount, gwpVersion)
-      s1_mobile += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
+  if (loc.has_mobile && loc.gasoline_amount > 0)
+    add({ field: 'gasoline_amount', stream: 'mobile', source: 'Gasoline (mobile)', mobile: true, entered: loc.gasoline_amount, enteredUnit: loc.gasoline_unit, unitField: 'gasoline_unit', efKey: `gasoline_${lit(loc.gasoline_unit)}` })
+  if (loc.has_mobile && loc.diesel_mobile_amount > 0)
+    add({ field: 'diesel_mobile_amount', stream: 'mobile', source: 'Diesel (mobile)', mobile: true, entered: loc.diesel_mobile_amount, enteredUnit: loc.diesel_mobile_unit, unitField: 'diesel_mobile_unit', efKey: `diesel_mobile_${lit(loc.diesel_mobile_unit)}` })
+  return out
+}
+
+// The units a field can be entered in, to probe which of them the location's publisher prices (the
+// factor_missing message names them). The same sets the Location type allows.
+const LINE_UNITS: Partial<Record<keyof Location, string[]>> = {
+  natural_gas_amount: ['m3', 'mcf', 'therms', 'mmbtu', 'kwh'],
+  propane_amount: ['gallons', 'litres', 'kg'],
+  diesel_stationary_amount: ['gallons', 'litres'], gasoline_amount: ['gallons', 'litres'], diesel_mobile_amount: ['gallons', 'litres'],
+  fuel_oil_distillate_amount: ['gallons', 'litres'], fuel_oil_residual_amount: ['gallons', 'litres'],
+}
+
+/** FI1: the GWP a refrigerant type is held at, or null. Never 0 for a type we do not hold. */
+function refrigerantGwp(type: string, gwpVersion: GwpVersion): number | null {
+  const v = REFRIGERANT_GWP[type]?.[gwpVersion]
+  return typeof v === 'number' ? v : null
+}
+/** FI1: the refrigerant line exists when refrigerants are declared, kg are entered, and it is not ammonia. */
+const hasRefrigerantLine = (loc: Location): boolean =>
+  !loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0
+
+/**
+ * FI1 (docs/review/design-derived-figures.md): ONE row shape for a line that cannot be priced, keyed
+ * (location, field). It is excluded from every total, never counted as zero, its workings row carries
+ * `result_tco2e: null` and the message, and the location's other lines are still priced.
+ *   `reason` is open: T3c adds 'edition_missing' to the same shape. `factor` is the lookup that failed, in the
+ * `{ publisher, edition?, value }` shape FI2 and T3c extend; `value` is null because no factor applied.
+ */
+export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing'
+export interface UnpricedLine {
+  reason: UnpricedReason
+  locId: string
+  site: string
+  field: keyof Location
+  stream: DeclarableStream
+  source: string
+  amount: number
+  unit: string
+  country: string
+  factorKey: string
+  factor: { publisher: string; edition?: string; value: number | null }
+  /** factor_missing: the units this location's publisher does price this fuel in, in words. */
+  supportedUnits: string[]
+  message: string
+}
+
+// The plain-language messages (FI1). No em dash: they reach the customer and the verifier.
+export const UNPRICED_MESSAGE = {
+  factor_missing: (fuel: string, site: string, unit: string, publisher: string, units: string[]) =>
+    `${fuel} at ${site} is recorded in ${unit}, and ${publisher} publishes no factor this figure can be converted to exactly, so it is not counted. ${units.length ? `Enter it in ${listInWords(units).replace(/ and ([^ ]+)$/, ' or $1')}, or reject the bill.` : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
+  refrigerant_unknown: (site: string) =>
+    `The refrigerant type at ${site} is not one we hold a GWP for, so it is not counted. Choose the refrigerant type. Export is blocked until it is chosen.`,
+  province_missing: (site: string, unrecognised: string | null) => unrecognised
+    ? `The province for ${site} (${unrecognised}) is not one we hold a natural gas factor for, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.`
+    : `The province for ${site} is not set, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.`,
+}
+
+/**
+ * Every line at a location that cannot be priced, and why (FI1). A location refused for its country has no
+ * lines here: its exclusion is whole and stated (findUnpriceableLocations), not a line-level gap.
+ */
+export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): UnpricedLine[] {
+  const j = efJurisdiction(loc)
+  if (j === null) return []
+  const site = loc.name || 'Location'
+  const publisher = COMBUSTION_EDITION[j]
+  const out: UnpricedLine[] = []
+  for (const line of combustionLines(loc)) {
+    const ef = pickEF(loc, line.efKey as keyof typeof EF)
+    if (isPriceableEF(ef)) continue
+    const miss = (ef as unknown as MissingEF).__missing
+    const base = { locId: loc.id, site, field: line.field, stream: line.stream, source: line.source, amount: line.entered,
+      unit: line.enteredUnit, country: miss.country, factorKey: line.efKey, factor: { publisher, value: null } }
+    if (miss.cause === 'province') {
+      const typed = (loc.grid_region || loc.province || '').trim()
+      out.push({ ...base, reason: 'province_missing', supportedUnits: [], message: UNPRICED_MESSAGE.province_missing(site, typed || null) })
+      continue
     }
-    if (loc.diesel_mobile_amount > 0) {
-      const ef = pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF)
-      const g = calcGas(ef, loc.diesel_mobile_amount, gwpVersion)
-      s1_mobile += g.total; gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
-    }
+    // The units the same publisher DOES price this fuel in at this location: each candidate unit is put
+    // through the same line construction and lookup, so the list cannot name a unit that would also fail.
+    const supported = (LINE_UNITS[line.field] ?? []).filter(u => u !== line.enteredUnit && combustionLines({ ...loc, [line.unitField]: u } as Location)
+      .filter(l => l.field === line.field).every(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF))))
+    out.push({ ...base, reason: 'factor_missing', supportedUnits: supported.map(u => unitLabel(u)),
+      message: UNPRICED_MESSAGE.factor_missing(line.source, site, unitLabel(line.enteredUnit), publisher, supported.map(u => unitLabel(u))) })
   }
-  const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
-  const s1_fugitive = (!loc.uses_ammonia && loc.has_hfc_refrigerants) ? loc.refrigerant_purchased_kg * ref_gwp / 1000 : 0
+  if (hasRefrigerantLine(loc) && refrigerantGwp(loc.refrigerant_type, gwpVersion) === null) {
+    out.push({ reason: 'refrigerant_unknown', locId: loc.id, site, field: 'refrigerant_purchased_kg', stream: 'refrigerants',
+      source: `Refrigerant (${loc.refrigerant_type || 'type not chosen'})`, amount: loc.refrigerant_purchased_kg, unit: 'kg',
+      country: canonicalCountryCode(loc.country), factorKey: `refrigerant_${loc.refrigerant_type || ''}`,
+      factor: { publisher: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], value: null }, supportedUnits: [],
+      message: UNPRICED_MESSAGE.refrigerant_unknown(site) })
+  }
+  return out
+}
+
+/**
+ * FI1: true when at least one combustion line at the location is priced by its table. A location whose only
+ * fuel line is unpriced burned nothing the table priced, so it names no combustion edition (factorEditions).
+ */
+export function hasPricedCombustionLine(loc: Location): boolean {
+  return combustionLines(loc).some(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF)))
+}
+
+function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
+  let s1_stationary = 0, s1_mobile = 0
+  const gases = { co2: 0, ch4: 0, n2o: 0 }
+  // FI1: a line with no factor is skipped, never priced as zero and never taking the location with it.
+  // unpricedLines names it; findUnresolvedCoverage blocks export on it; buildWorkings writes its row.
+  for (const line of combustionLines(loc)) {
+    const ef = pickEF(loc, line.efKey as keyof typeof EF)
+    if (!isPriceableEF(ef)) continue
+    const g = calcGas(ef, line.priced, gwpVersion)
+    if (line.mobile) s1_mobile += g.total; else s1_stationary += g.total
+    gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
+  }
+  // FI1: an unrecognised or blank refrigerant type is unpriced (unpricedLines), never `?? 0`. The fugitive
+  // total is then 0 because NOTHING WAS PRICED, and the workings row says so with a null result.
+  const ref_gwp = hasRefrigerantLine(loc) ? refrigerantGwp(loc.refrigerant_type, gwpVersion) : null
+  const s1_fugitive = ref_gwp === null ? 0 : loc.refrigerant_purchased_kg * ref_gwp / 1000
   const s1_total = s1_stationary + s1_mobile + s1_fugitive
   // Grid-region gate: when the location's grid_region isn't a real GRID_EF key (us_average default,
   // '', unmapped country), OMIT the electricity Scope 2 entirely — no getGridFactor call, no electricity
@@ -2807,20 +2936,16 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, s3_td, gases, biogenic: loc.biogenic_co2_mt }
 }
 
-// ── Unpriceable locations: ONE decision, four consumers ──────────────────────────────────────────
-// A location is unpriceable when the factor tables carry nothing for the unit one of its fuels is
-// recorded in (e.g. a US location holding a gas figure in m3). calcGas refuses it by name; this is
-// the single place that decides what to DO about the refusal, so calcInventory, buildWorkings,
-// pctEstimated and the component's banner cannot disagree about which locations are in the total.
-//
-// EXCLUDED WHOLE, NOT PER-FUEL. calcLocation totals a location's streams together, so pricing the
-// rest and dropping the one that failed would put a knowingly-short figure into the total under
-// that location's name — the same defect as counting it as zero, just harder to see. A location
-// either contributes everything or nothing, and the exclusion is stated on screen and in the
-// workings. Its electricity is excluded too; that is the cost of not publishing a partial figure.
-//
-// Only MissingEmissionFactorError is absorbed. Any other error still propagates — a bug in the
-// arithmetic must not be silently converted into "this location is excluded".
+// ── Excluded locations: ONE decision, four consumers ────────────────────────────────────────────────
+// FI1 (ruling "no silent drop-out", design doc section 10): A MISSING FACTOR NO LONGER EXCLUDES A LOCATION.
+// It is one unpriced line (unpricedLines), excluded from every total, never counted as zero, with an
+// export-blocking factor_missing, refrigerant or province issue naming the site, the fuel and the unit;
+// the location's other lines are still priced. The earlier whole-location exclusion withheld every figure
+// at the site to avoid a "knowingly short" total; the line-level issue blocks export instead, so a short
+// total can never be exported unstated.
+//   The ONLY whole-location exclusion left is the country: a location whose country resolves to no factor
+// set (country_not_set, country_not_listed, country_not_supported). That is decided here, once, so
+// calcInventory, buildWorkings, pctEstimated and the component's banner cannot disagree.
 // ⚠️ GATES ONE CLAUSE OF ONE SENTENCE, AND IT EARNS ITS PLACE. "Its figures are kept as entered."
 // is a claim, and on a location where nothing has been entered it is a false one. Small, but it is
 // the kind of small falsehood that makes a customer doubt the larger sentence beside it.
@@ -2834,10 +2959,8 @@ function locationHasFigures(loc: Location): boolean {
     || loc.renewable_electricity_kwh > 0
 }
 
-/** Why a location contributes nothing: its country, or a unit no table for that country carries. */
-export type LocationBlock =
-  | { kind: 'country'; refusal: CountryRefusal }
-  | { kind: 'factor'; error: MissingEmissionFactorError }
+/** Why a location contributes nothing: its country (FI1: the only whole-location exclusion). */
+export type LocationBlock = { kind: 'country'; refusal: CountryRefusal }
 
 // ⚠️ THE COUNTRY IS CHECKED BEFORE calcLocation, AND THE ORDER IS LOAD BEARING.
 // calcLocation only asks for a factor when a stream HAS a figure, so a location in Japan with
@@ -2847,11 +2970,10 @@ export type LocationBlock =
 //   The country answer also wins when both apply. A site in Japan holding gas in m3 has two
 // problems, and "change the unit" is the wrong instruction for it: fixing the unit would not make
 // the figure priceable.
-function unpriceableReason(loc: Location, gwpVersion: GwpVersion, year: number): LocationBlock | null {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function unpriceableReason(loc: Location, _gwpVersion: GwpVersion, _year: number): LocationBlock | null {
   const refusal = countryRefusal(loc)
-  if (refusal) return { kind: 'country', refusal }
-  try { calcLocation(loc, gwpVersion, year); return null }
-  catch (e) { if (e instanceof MissingEmissionFactorError) return { kind: 'factor', error: e }; throw e }
+  return refusal ? { kind: 'country', refusal } : null
 }
 
 /**
@@ -2864,6 +2986,8 @@ function unpriceableReason(loc: Location, gwpVersion: GwpVersion, year: number):
  * off a country refusal, find empty strings, and print a sentence with holes in it.
  */
 export type UnpriceableLocation =
+  // ⚠️ NO LONGER PRODUCED (FI1): a factor gap is an unpriced line, not an excluded location. Kept in the type
+  // so the page still builds until FI1's second diff moves it to the per-line list; then it is removed.
   | {
       kind: 'factor'
       locId: string
@@ -2888,10 +3012,7 @@ export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpV
   for (const loc of locations) {
     const why = unpriceableReason(loc, gwpVersion, year)
     if (!why) continue
-    const locName = loc.name || 'Location'
-    out.push(why.kind === 'country'
-      ? { kind: 'country', locId: loc.id, locName, refusal: why.refusal }
-      : { kind: 'factor', locId: loc.id, locName, fuel: why.error.fuel, unit: why.error.unit, country: why.error.country })
+    out.push({ kind: 'country', locId: loc.id, locName: loc.name || 'Location', refusal: why.refusal })
   }
   return out
 }
@@ -2925,25 +3046,11 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
 function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number): Record<string, number> {
   const out: Record<string, number> = {}
   const add = (k: string, v: number) => { out[k] = (out[k] ?? 0) + v }
-  if (loc.has_natural_gas && loc.natural_gas_amount > 0)
-    add('natural_gas_amount', calcGas(pickEF(loc, `natural_gas_${loc.natural_gas_unit}` as keyof typeof EF), loc.natural_gas_amount, gwpVersion).total)
-  if (loc.has_propane && loc.propane_amount > 0)
-    add('propane_amount', calcGas(pickEF(loc, propaneEfKey(loc.propane_unit) as keyof typeof EF), loc.propane_amount, gwpVersion).total)
-  if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
-    add('diesel_stationary_amount', calcGas(pickEF(loc, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_stationary_amount, gwpVersion).total)
-  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
-    const fod = fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)
-    add('fuel_oil_distillate_amount', calcGas(pickEF(loc, fod.key as keyof typeof EF), fod.priced, gwpVersion).total)
-  }
-  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
-    const forr = fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)
-    add('fuel_oil_residual_amount', calcGas(pickEF(loc, forr.key as keyof typeof EF), forr.priced, gwpVersion).total)
-  }
-  if (loc.has_mobile) {
-    if (loc.gasoline_amount > 0)
-      add('gasoline_amount', calcGas(pickEF(loc, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.gasoline_amount, gwpVersion).total)
-    if (loc.diesel_mobile_amount > 0)
-      add('diesel_mobile_amount', calcGas(pickEF(loc, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}` as keyof typeof EF), loc.diesel_mobile_amount, gwpVersion).total)
+  // The same lines calcLocation prices, skipping the same unpriced ones (FI1), so a field's share here
+  // reconciles with the inventory total.
+  for (const line of combustionLines(loc)) {
+    const ef = pickEF(loc, line.efKey as keyof typeof EF)
+    if (isPriceableEF(ef)) add(String(line.field), calcGas(ef, line.priced, gwpVersion).total)
   }
   // Electricity = Scope 2 location-based (the series' headline basis). Same grid gate as calcLocation:
   // an unresolved grid_region contributes 0 there, so it must contribute 0 here too.
@@ -4074,10 +4181,6 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
           case 'country_not_listed':    rows.push({ ...cells, declaration: 'country_not_listed' }); break
           case 'country_not_supported': rows.push({ ...cells, declaration: 'country_not_supported' }); break
         }
-      } else {
-        rows.push({ ...base, declaration: 'unpriceable',
-          unpriceable: { fuel: blocked.error.fuel, unit: blocked.error.unit, country: blocked.error.country },
-          note: `EXCLUDED FROM TOTALS — ${blocked.error.message} No figure for this location is included in any total on this report.` })
       }
       continue
     }
@@ -4117,33 +4220,29 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       }
       return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths, entry_method: 'concierge' })
     }
-    if (loc.has_natural_gas && loc.natural_gas_amount > 0) pushFuel(loc, 'natural_gas', 'Natural gas', 1, figure('natural_gas_amount'), loc.natural_gas_unit, `natural_gas_${loc.natural_gas_unit}`, provOf('natural_gas_amount'))
-    if (loc.has_propane && loc.propane_amount > 0) pushFuel(loc, 'propane', 'Propane', 1, figure('propane_amount'), loc.propane_unit, propaneEfKey(loc.propane_unit), provOf('propane_amount'))
-    if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0) pushFuel(loc, 'diesel_stationary', 'Diesel (stationary)', 1, figure('diesel_stationary_amount'), loc.diesel_stationary_unit, `diesel_${loc.diesel_stationary_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('diesel_stationary_amount'))
-    // Reports the figure AS ENTERED with its own unit, and the conversion as the note — the factored
-    // gallons figure is inside the note, so all three steps are on one row.
-    // Convert AFTER applying resolutions, then hand pushFuel the gallons figure — the factor is
-    // published per gallon, so the activity it multiplies must be gallons or the row would state a
-    // result the engine did not compute. The note carries the entered figure and the arithmetic.
-    // figure() reads the derived location (T5), the same value calcLocation and calcInventory read when
-    // fed deriveLocations output, so the row and the total cannot disagree.
-    if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
-      const entered = figure('fuel_oil_distillate_amount')
-      // Same decision as calcLocation, from the same helper. Where the publisher prints per litre the
-      // key IS the litre key, fo.priced === entered, and there is no conversion note to carry.
-      const fo = fuelOilPricing(loc, 'distillate', entered)
-      pushFuel(loc, 'fuel_oil_distillate', 'Heating oil', 1, entered, loc.fuel_oil_distillate_unit ?? 'gallons', fo.key, provOf('fuel_oil_distillate_amount'), fo.note, fo.priced)
+    // FI1: every combustion line, from the same list calcLocation prices. A line with a factor is a priced
+    // row, as before. A line with none is ONE 'unpriced' row: its activity as entered, result null, the
+    // message, and its stream tag, so the declaration loop below does not also call the stream unanswered.
+    // The entered figure is the derived one (T5): figure() and line.entered read the same derived location.
+    // Fuel oil reports the figure AS ENTERED with its own unit, and the conversion to the factor's unit as
+    // the note, so all three steps are on one row (fuelOilPricing decides the basis).
+    const unpriced = new Map(unpricedLines(loc, gwpVersion).map(u => [String(u.field), u]))
+    const pushUnpriced = (u: UnpricedLine, prov?: Provenance) => rows.push({ location: loc.name || 'Location', stream: u.stream,
+      source: u.source, scope: 1, activity_data: u.amount, activity_unit: u.unit, emission_factor: NOT_PROVIDED,
+      emission_factor_display: NOT_PROVIDED, ef_source: NOT_PROVIDED, gwp_basis: 'unpriced', result_tco2e: null,
+      declaration: 'unpriced', entry_method: prov?.entry_method ?? 'manual',
+      unpriced: { reason: u.reason, field: String(u.field), factor_key: u.factorKey, publisher: u.factor.publisher, value: null },
+      note: `NOT PRICED: ${u.message}`, ...(prov ?? {}) })
+    for (const line of combustionLines(loc)) {
+      const u = unpriced.get(String(line.field))
+      if (u) { pushUnpriced(u, provOf(line.field)); continue }
+      pushFuel(loc, line.stream, line.source, 1, figure(line.field), line.enteredUnit, line.efKey, provOf(line.field), line.note, line.priced)
     }
-    if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
-      const entered = figure('fuel_oil_residual_amount')
-      const fo = fuelOilPricing(loc, 'residual', entered)
-      pushFuel(loc, 'fuel_oil_residual', 'Heavy fuel oil', 1, entered, loc.fuel_oil_residual_unit ?? 'gallons', fo.key, provOf('fuel_oil_residual_amount'), fo.note, fo.priced)
-    }
-    if (loc.has_mobile && loc.gasoline_amount > 0) pushFuel(loc, 'mobile', 'Gasoline (mobile)', 1, figure('gasoline_amount'), loc.gasoline_unit, `gasoline_${loc.gasoline_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('gasoline_amount'))
-    if (loc.has_mobile && loc.diesel_mobile_amount > 0) pushFuel(loc, 'mobile', 'Diesel (mobile)', 1, figure('diesel_mobile_amount'), loc.diesel_mobile_unit, `diesel_mobile_${loc.diesel_mobile_unit === 'gallons' ? 'gallon' : 'litre'}`, provOf('diesel_mobile_amount'))
-    if (!loc.uses_ammonia && loc.has_hfc_refrigerants && loc.refrigerant_purchased_kg > 0) {
-      const ref_gwp = REFRIGERANT_GWP[loc.refrigerant_type]?.[gwpVersion] ?? 0
-      rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
+    if (hasRefrigerantLine(loc)) {
+      const ref_gwp = refrigerantGwp(loc.refrigerant_type, gwpVersion)
+      const u = unpriced.get('refrigerant_purchased_kg')
+      if (u || ref_gwp === null) pushUnpriced(u as UnpricedLine)
+      else rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
     }
     // Grid-region gate: unresolved grid_region → OMIT the electricity Scope 2 rows entirely (no
     // getGridFactor call, no US_AVG row). NZ (T&D row below) is always resolved, so no real T&D is lost.
@@ -4338,7 +4437,7 @@ export interface CoverageIssue {
   fuelType: string
   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
   // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a),
-  // exact_duplicate (T15, rule R6).
+  // exact_duplicate (T15, rule R6), factor_missing | refrigerant_unknown | province_missing (FI1).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
   // T8: what the strip needs to place the issue and act on it. documentType on gap and overlap (the coverage
@@ -4420,6 +4519,8 @@ export function findExactDuplicates(loc: Location, allResolutions: CoverageResol
 //   all_rejected   every document for a field rejected, no figure entered (the field is 0), and no
 //            accepted used_none.
 //   none     a document with no figure read from it at all (unchanged from before T3).
+//   factor_missing, refrigerant_unknown, province_missing   a line that cannot be priced (FI1), keyed
+//            (location, field): excluded from every total, never counted as zero, until it is resolved.
 //   exact_duplicate   the same document under two document types (T15, rule R6) with no accepted
 //            exact_duplicate choice naming both: Same document, count once, or Not the same.
 export function findUnresolvedCoverage(
@@ -4494,6 +4595,13 @@ export function findUnresolvedCoverage(
       const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
       if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected', field,
         message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
+    }
+
+    // FI1: every line that cannot be priced blocks export, keyed (location, field), with its own message.
+    // Judged on the DERIVED location, as the totals are: a figure from bills is the figure that would price.
+    // status is the reason: factor_missing, refrigerant_unknown or province_missing.
+    for (const u of unpricedLines(derivedHere)) {
+      out.push({ locId: loc.id, fuelType: FIELD_FUEL[String(u.field)] ?? String(u.field), status: u.reason, field: String(u.field), message: u.message })
     }
 
     // T15 (rule R6): an exact duplicate across document types blocks export until the customer chooses.

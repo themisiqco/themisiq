@@ -148,7 +148,8 @@ describe('every declaration state the engine emits is named by both surfaces', (
     // The four the engine emits today, pinned BY NAME rather than by count — a name cannot go stale
     // quietly the way `>= 4` can. Adding a fifth state does not touch this list; the coverage tests
     // below pick it up on their own. Removing one is meant to fail here, and the message says so.
-    for (const s of ['attested_absent', 'undeclared', 'unpriceable', 'declared_unquantified']) {
+    // FI1: 'unpriceable' (a whole location excluded for a factor gap) became 'unpriced' (one line).
+    for (const s of ['attested_absent', 'undeclared', 'unpriced', 'declared_unquantified']) {
       expect(engineStates.has(s), `${ENGINE} no longer emits '${s}'. If that removal is intended, drop it from this list AND from both surfaces — see the dead-state test below.`).toBe(true)
     }
   })

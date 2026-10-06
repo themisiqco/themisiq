@@ -105,9 +105,10 @@ interface WorkingRow {
   // is: nobody answered the country, the operator said their country is not listed, or this
   // platform holds no factors for the country they named. The third is a limit of the product; the
   // first two are properties of the record.
-  declaration?: 'attested_absent' | 'undeclared' | 'unpriceable' | 'declared_unquantified' | 'no_published_factor' | 'country_not_set' | 'country_not_listed' | 'country_not_supported'
-  // Present only on 'unpriceable' rows: what could not be priced. The engine's own tokens.
-  unpriceable?: { fuel?: string; unit?: string; country?: string }
+  declaration?: 'attested_absent' | 'undeclared' | 'unpriced' | 'declared_unquantified' | 'no_published_factor' | 'country_not_set' | 'country_not_listed' | 'country_not_supported'
+  // Present only on 'unpriced' rows (FI1): which line could not be priced, and the lookup that failed. The
+  // engine's own tokens. `value` is null: no factor applied.
+  unpriced?: { reason?: string; field?: string; factor_key?: string; publisher?: string; edition?: string; value?: number | null }
   // Present only on the three country_* rows. The engine's own state, carried so this page can
   // render the same sentence the wizard and the exports do, from countryRefusalCopy.
   country_refusal?: CountryRefusal
@@ -1009,7 +1010,7 @@ export default function VerifierPage() {
                     // no figure, the third says the totals on this page are short by a known site.
                     // Equal weight is deliberate — the badge and the sentence separate them, not the
                     // colour. Grey means resolved, amber means stop; a fourth shade would blur that.
-                    background: w.declaration === 'undeclared' || w.declaration === 'unpriceable' || w.declaration === 'declared_unquantified' || w.declaration === 'no_published_factor'
+                    background: w.declaration === 'undeclared' || w.declaration === 'unpriced' || w.declaration === 'declared_unquantified' || w.declaration === 'no_published_factor'
                       || w.declaration === 'country_not_set' || w.declaration === 'country_not_listed' || w.declaration === 'country_not_supported' ? '#FEF3E2'
                       : w.declaration === 'attested_absent' ? '#f4f4f2'
                       : i % 2 === 0 ? '#fff' : '#f8f7f5',
@@ -1122,13 +1123,17 @@ export default function VerifierPage() {
                       {w.declaration === 'country_not_set' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
                       {w.declaration === 'country_not_listed' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
                       {w.declaration === 'country_not_supported' && w.country_refusal && <CountryRefusalCell refusal={w.country_refusal} />}
-                      {w.declaration === 'unpriceable' && (
+                      {/* FI1: ONE LINE not priced, not a location. The note says why (no factor for its unit, an
+                          unrecognised refrigerant type, or no province for Canadian gas); the operator's export
+                          was blocked on it. Its badge shares no word with 'Stream not priced' above. */}
+                      {w.declaration === 'unpriced' && (
                         <>
-                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Excluded from totals</span>
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Line left out</span>
                           <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-state-warn)' }}>
-                            No published emission factor exists for the unit this location&apos;s figures are in, so it
-                            could not be calculated. Every total on this page is missing this location. This is not
-                            a figure of zero.
+                            The operator reported this quantity, and it could not be priced; the note says why. The
+                            emissions it represents are missing from every total on this page. This is not a figure
+                            of zero, and no other country&apos;s factor has been substituted. The rest of this location
+                            is priced and included.
                           </div>
                         </>
                       )}

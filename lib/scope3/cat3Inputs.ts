@@ -59,6 +59,12 @@ export type Cat3Skipped =
    * then wrong: rename it `not_priced_in_ghg_inventory`, keeping `stream`, which already names it.
    */
   | { code: 'scope2_not_priced'; location: string; stream: string }
+  /**
+   * FI1: a Scope 1 line the GHG side could not price (declaration 'unpriced': no factor for its unit, or
+   * Canadian gas with no province). It replaces the whole-location exclusion a missing factor used to
+   * cause; the location's priced streams still reach this category.
+   */
+  | { code: 'scope1_not_priced'; location: string; stream: string }
 
 export interface Cat3InputsResult {
   /** null when the inventory cannot be read at all; `reason` says why. */
@@ -288,11 +294,16 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
     // 21 Sep 2026). Category 3 does not care WHICH: either way the GHG side put nothing from that
     // location into any total, so there is nothing for this module to price. The comment at the top
     // of Cat3Skipped anticipated this marker set widening; this is that.
-    if (declaration === 'unpriceable'
-        || declaration === 'country_not_set'
+    if (declaration === 'country_not_set'
         || declaration === 'country_not_listed'
         || declaration === 'country_not_supported') {
       skipped.push({ code: 'location_excluded', location })
+      continue
+    }
+    // FI1: one Scope 1 line the GHG side could not price. Named per stream, never passed over: the rest of
+    // the location is priced and reaches this category. An unpriced refrigerant is not a Category 3 input.
+    if (declaration === 'unpriced') {
+      skipped.push(stream === 'refrigerants' ? { code: 'refrigerants_not_in_category', location } : { code: 'scope1_not_priced', location, stream })
       continue
     }
     if (declaration === 'no_published_factor') {

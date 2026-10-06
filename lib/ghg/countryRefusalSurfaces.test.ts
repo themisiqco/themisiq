@@ -136,10 +136,13 @@ describe('the workings row states the exclusion once', () => {
     expect(row.gwp_basis, 'and once more in the basis cell, which is enough').toBe('excluded')
   })
 
-  it('a unit-mismatch row KEEPS its prefix, because its message does not say it', () => {
+  it('an unpriced line KEEPS a prefix, because its message is about the figure, not the row (FI1)', () => {
+    // Was 'unpriceable', a whole location with an "EXCLUDED FROM TOTALS" prefix. Since FI1 a unit with no
+    // factor leaves ONE line unpriced; its row is prefixed "NOT PRICED:" and carries no em dash.
     const rows = buildWorkings([loc({ country: 'US', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' })], 'AR6', 2025)
-    const row = rows.find(r => r.declaration === 'unpriceable')!
-    expect(row.note).toContain('EXCLUDED FROM TOTALS')
+    const row = rows.find(r => r.declaration === 'unpriced')!
+    expect(row.note!.startsWith('NOT PRICED: ')).toBe(true)
+    expect(row.note).not.toContain('\u2014')
   })
 })
 

@@ -91,20 +91,19 @@ const ALLOWED: AllowEntry[] = [
   },
   {
     file: 'lib/ghg/engine.ts',
-    calcLocation: 3,
-    calcGas: 18,
+    calcLocation: 2,
+    calcGas: 6,
     notes: [
       'calcLocation — the definition itself',
-      'unpriceableReason — IS the guard; wraps calcLocation in try/catch and returns the refusal',
-      'calcInventory — guarded by unpriceableReason; an unpriceable location is excluded from the reduce',
+      'calcInventory: guarded by unpriceableReason, which since FI1 refuses only a COUNTRY (calcLocation no longer throws on a missing factor)',
       'calcGas — the definition itself',
-      'calcLocation x7 (gas/propane/diesel/heating oil/heavy fuel oil/petrol/mobile diesel) — the origin; throws by design',
-      'fuelEmissionsByType x7 — sole caller is pctEstimated, which skips unpriceable locations first',
-      'buildWorkings pushFuel x1 — guarded; buildWorkings emits a declaration:"unpriceable" row and skips the location',
+      'calcLocation x1 (FI1: one loop over combustionLines): guarded by isPriceableEF; an unpriced line is skipped, never priced as zero',
+      'fuelEmissionsByType x1 (FI1: the same loop): guarded by isPriceableEF, the same skip as calcLocation',
+      'buildWorkings pushFuel x1: guarded; FI1: an unpriced line gets a declaration:"unpriced" row instead of pushFuel',
       // The two steam sites, added 14 Aug 2026 when EF.steam_mmbtu became a real triple (EPA Table 7)
       // and steam started pricing through calcGas instead of a bare CO2-only multiply.
-      'calcLocation steam x1 — CANNOT refuse: EF.steam_mmbtu is a module literal, not a pickEF lookup, so assertPriceable always passes. Inside unpriceableReason\'s try/catch regardless',
-      'buildWorkings steam row x1 — same factor, so same reason it cannot refuse; and it sits after the declaration:"unpriceable" continue, so a blocked location never reaches it',
+      'calcLocation steam x1: CANNOT refuse: EF.steam_mmbtu is a module literal, not a pickEF lookup, so assertPriceable always passes. (FI1: unpriceableReason no longer wraps calcLocation in a try/catch; nothing here needs one)',
+      'buildWorkings steam row x1: same factor, so same reason it cannot refuse; and it sits after the country-refusal continue, so a refused location never reaches it',
     ],
   },
   {

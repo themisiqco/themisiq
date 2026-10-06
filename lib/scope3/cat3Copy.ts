@@ -281,6 +281,8 @@ export function cat3SkippedText(s: Cat3Skipped): string {
       return `a ${streamText(s.stream)} row at ${s.location} carries no figure`
     case 'scope2_not_priced':
       return `${streamText(s.stream)} at ${s.location} has no published factor in that country, so the GHG inventory could not price it and nothing upstream of it is priced here`
+    case 'scope1_not_priced':
+      return `${streamText(s.stream)} at ${s.location} could not be priced in the GHG inventory, so nothing upstream of it is priced here; the GHG inventory says why and blocks its export until it is resolved`
   }
 }
 

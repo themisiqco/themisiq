@@ -174,7 +174,7 @@ describe('workings cell rendering', () => {
     // excludedRow. The same list declarationStates.test.ts holds, from the other direction.
     expect(shapes.sort(), 'the declaration branches on the operator page').toEqual([
       'attested_absent', 'country_not_listed', 'country_not_set', 'country_not_supported',
-      'declared_unquantified', 'no_published_factor', 'undeclared', 'unpriceable',
+      'declared_unquantified', 'no_published_factor', 'undeclared', 'unpriced',
     ])
 
     const rowShapes = [...operator.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map(m => m[1])

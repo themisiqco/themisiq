@@ -3019,7 +3019,9 @@ workings: saved.workings,
                             if (r.declaration === 'country_not_set') { return excludedRow(r, ri) }
                             if (r.declaration === 'country_not_listed') { return excludedRow(r, ri) }
                             if (r.declaration === 'country_not_supported') { return excludedRow(r, ri) }
-                            if (r.declaration === 'unpriceable') {
+                            // FI1: one line at a location that could not be priced (its factor, refrigerant type or
+                            // province); the rest of the location is priced. The engine's note says which and why.
+                            if (r.declaration === 'unpriced') {
                               return <tr key={ri} style={{ background: '#FEF3E2' }}>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)', fontWeight: 600 }}>{r.source}</td>
                                 <td style={{ ...wTd, color: 'var(--color-state-warn)' }}>{workingsActivityCell(r)}

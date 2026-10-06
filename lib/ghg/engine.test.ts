@@ -37,6 +37,7 @@ import {
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
   findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
   notCountedLines, FIX_DATES, FIX_REVERSED, FIX_UNITS,
+  unpricedLines, UNPRICED_MESSAGE,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
@@ -45,7 +46,7 @@ import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { contributionShareCell } from './workingsCells';
-import { convertToCanonical } from '../unitConversions';
+import { convertToCanonical, convertibleUnits } from '../unitConversions';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -574,7 +575,7 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
   const unpriceable: Array<{ country: string; unit: 'm3' | 'kwh'; key: string }> = [
     { country: 'US', unit: 'm3',  key: 'natural_gas_m3' },   // ← the reported crash
     { country: 'US', unit: 'kwh', key: 'natural_gas_kwh' },
-    { country: 'CA', unit: 'kwh', key: 'natural_gas_kwh' },
+    { country: 'CA', unit: 'kwh', key: 'natural_gas_kwh' },   // with a province (ON): FI1 makes a blank one its own case
     { country: 'GB', unit: 'm3',  key: 'natural_gas_m3' },
     { country: 'FR', unit: 'kwh', key: 'natural_gas_kwh' },  // EU branch
     { country: 'AU', unit: 'kwh', key: 'natural_gas_kwh' },
@@ -583,7 +584,7 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
 
   for (const { country, unit, key } of unpriceable) {
     it(`K ${country} + ${unit} throws MissingEmissionFactorError naming fuel, unit and country`, () => {
-      const l = loc({ country, has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
+      const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
 
       expect(() => calcGas(pickEF(l, key as any), 1000, 'AR6')).toThrow(MissingEmissionFactorError);
 
@@ -602,16 +603,14 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
         expect(err.message).toContain(country);
       }
 
-      // calcLocation is the per-location price and still refuses outright…
-      expect(() => calcLocation(l, 'AR6', 2024)).toThrow(MissingEmissionFactorError);
-      // …but calcInventory EXCLUDES rather than throws, so one bad location cannot take the
-      // dashboard down. Excluded, not zeroed: see GROUP L for what that distinction buys.
-      expect(() => calcInventory([l], 'AR6', 2024)).not.toThrow();
-      expect(findUnpriceableLocations([l], 'AR6', 2024)).toEqual([
-        // `kind` added 21 Sep 2026: the type is a union now, because a location can also be
-        // excluded for its COUNTRY, and that arm carries a refusal instead of a fuel and a unit.
-        { kind: 'factor', locId: l.id, locName: l.name, fuel: 'natural_gas', unit, country },
-      ]);
+      // FI1: calcLocation no longer refuses the LOCATION. The line is unpriced (skipped, never zero), the
+      // location is not excluded, and unpricedLines names the line with a blocking factor_missing issue.
+      expect(() => calcLocation(l, 'AR6', 2024)).not.toThrow();
+      expect(calcLocation(l, 'AR6', 2024).s1_total).toBe(0);
+      expect(findUnpriceableLocations([l], 'AR6', 2024)).toEqual([]);
+      const [u] = unpricedLines(l);
+      expect(u).toMatchObject({ reason: 'factor_missing', locId: l.id, field: 'natural_gas_amount', unit, country, factorKey: key, factor: { value: null } });
+      expect(findUnresolvedCoverage([l], 2024, 12, []).filter(i => i.status === 'factor_missing').map(i => i.field)).toEqual(['natural_gas_amount']);
     });
   }
 
@@ -622,7 +621,8 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
     // So this assertion is unchanged: a blank country reaching pickEF still names itself '(unset)'
     // rather than printing 'undefined'. T16 covers the refusal path for the same blank country.
     const l = loc({ country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
-    expect(() => calcLocation(l, 'AR6', 2024)).toThrow(/\(unset\)/);
+    // FI1: calcLocation no longer throws; the factor lookup itself still names the blank country.
+    expect(() => calcGas(pickEF(l, 'natural_gas_m3'), 1000, 'AR6')).toThrow(/\(unset\)/);
   });
 
   it('K every priceable (country, unit) pair still prices — the guard refuses absence, not everything', () => {
@@ -650,7 +650,10 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
 // The isolation contract: the dashboard renders, priceable locations keep their figures, and the
 // blocked one is EXCLUDED (contributing nothing) rather than counted as zero — with the exclusion
 // stated in the workings, which is what the saved inventory persists.
-describe('GROUP L — unpriceable locations are isolated, excluded, and recorded', () => {
+// FI1 (design doc section 11): REWRITTEN. This group pinned the whole-location exclusion a missing factor
+// used to cause. The ruling "no silent drop-out" replaced it: the LINE is unpriced (never zero, never
+// silent), the location stays in every total with its other lines, and export blocks on the line.
+describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the location is not excluded (FI1)', () => {
   const good = () => loc({ id: 'GOOD', name: 'Priceable Site', country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' });
   const bad = () => loc({ id: 'BAD', name: 'Blocked Site', country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
 
@@ -658,66 +661,63 @@ describe('GROUP L — unpriceable locations are isolated, excluded, and recorded
     const aloneTotal = calcInventory([good()], 'AR6', 2024).s1_total;
     const mixed = calcInventory([good(), bad()], 'AR6', 2024);
     expect(aloneTotal).toBeGreaterThan(0);
-    expect(mixed.s1_total).toBe(aloneTotal); // unchanged by the blocked neighbour
+    expect(mixed.s1_total).toBe(aloneTotal); // the unpriced gas adds nothing, not a zero claim
   });
 
-  it('L2 the blocked location is EXCLUDED, not counted as zero — order does not matter', () => {
-    const first = calcInventory([bad(), good()], 'AR6', 2024);
-    const last = calcInventory([good(), bad()], 'AR6', 2024);
-    expect(first).toEqual(last);
-    // Excluded means "absent from the sum", which is only distinguishable from a zero contribution
-    // by what the caller is told — hence findUnpriceableLocations and the workings row below.
-    expect(findUnpriceableLocations([good(), bad()], 'AR6', 2024).map(u => u.locId)).toEqual(['BAD']);
+  it('L2 the location is NOT excluded; its one line is unpriced, and order does not matter', () => {
+    expect(calcInventory([bad(), good()], 'AR6', 2024)).toEqual(calcInventory([good(), bad()], 'AR6', 2024));
+    expect(findUnpriceableLocations([good(), bad()], 'AR6', 2024)).toEqual([]);
+    expect(unpricedLines(bad()).map(u => [u.locId, u.field, u.reason])).toEqual([['BAD', 'natural_gas_amount', 'factor_missing']]);
+    expect(unpricedLines(good())).toEqual([]);
   });
 
-  it('L3 every scope is excluded, including electricity the location COULD be priced for', () => {
-    // Whole-location exclusion (the decision): its electricity is priceable on its own, and is
-    // still left out, because a part-priced location would put a knowingly-short figure in a total.
+  it('L3 WAS "every scope is excluded": now the location\'s priceable electricity IS in every total', () => {
     const badWithPower = loc({ ...bad(), grid_region: 'US_CA', electricity_kwh: 50_000 });
+    const powerOnly = loc({ ...badWithPower, has_natural_gas: false, natural_gas_amount: 0 });
     const inv = calcInventory([badWithPower], 'AR6', 2024);
     expect(inv.s1_total).toBe(0);
-    expect(inv.s2_location).toBe(0);
-    expect(calcInventory([loc({ ...good(), grid_region: 'US_CA', electricity_kwh: 50_000 })], 'AR6', 2024).s2_location).toBeGreaterThan(0);
+    expect(inv.s2_location).toBeGreaterThan(0);
+    expect(inv).toEqual(calcInventory([powerOnly], 'AR6', 2024));
   });
 
-  it('L4 buildWorkings does not throw, emits NO priced rows for the blocked location, and records why', () => {
-    const rows = buildWorkings([good(), bad()], 'AR6', 2024, [], 12);
+  it('L4 buildWorkings writes ONE unpriced row for the line, with null result and the message, beside its priced rows', () => {
+    const rows = buildWorkings([good(), loc({ ...bad(), grid_region: 'US_CA', electricity_kwh: 50_000 })], 'AR6', 2024, [], 12);
     const badRows = rows.filter(r => r.location === 'Blocked Site');
-    expect(badRows).toHaveLength(1);
-    expect(badRows[0].declaration).toBe('unpriceable');
-    expect(badRows[0].result_tco2e).toBeNull();       // an absence never renders as 0
-    expect(badRows[0].note).toMatch(/EXCLUDED FROM TOTALS/);
-    expect(badRows[0].unpriceable).toEqual({ fuel: 'natural_gas', unit: 'm3', country: 'US' });
-    // …while the priceable location's rows are untouched.
+    const gas = badRows.filter(r => r.stream === 'natural_gas');
+    expect(gas).toHaveLength(1);
+    expect(gas[0].declaration).toBe('unpriced');
+    expect(gas[0].result_tco2e).toBeNull();       // an absence never renders as 0
+    expect(gas[0].activity_data).toBe(1000);
+    expect(gas[0].activity_unit).toBe('m3');
+    expect(gas[0].note).toBe(`NOT PRICED: ${unpricedLines(bad())[0].message}`);
+    expect(gas[0].unpriced).toMatchObject({ reason: 'factor_missing', field: 'natural_gas_amount', factor_key: 'natural_gas_m3', value: null });
+    // Its electricity is priced, and no whole-location exclusion row exists any more.
+    expect(badRows.some(r => r.stream === 'electricity' && r.result_tco2e > 0)).toBe(true);
+    expect(rows.some(r => r.declaration === 'unpriceable')).toBe(false);
     expect(rows.filter(r => r.location === 'Priceable Site' && r.result_tco2e! > 0).length).toBeGreaterThan(0);
   });
 
-  it('L5 pctEstimated measures the estimated share against the same excluded set', () => {
-    // Blocked location out of BOTH numerator and denominator — otherwise its estimated emissions
-    // would be weighed against a total it is not part of.
+  it('L5 pctEstimated measures the estimated share against the same priced set', () => {
     expect(() => pctEstimated({ locations: [good(), bad()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).not.toThrow();
     expect(pctEstimated({ locations: [good(), bad()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6')).toBe(pctEstimated({ locations: [good()], coverage_resolutions: [], reporting_year: 2024 }, 'AR6'));
   });
 
-  it('L6 the probe is GWP-independent — the same locations are excluded on AR4, AR5 and AR6', () => {
-    // This is what licenses the component probing once at AR6 and reusing the answer for all three
-    // bases. Whether a factor EXISTS is a property of the table, not of the GWP version.
+  it('L6 the probe is GWP-independent: the same lines are unpriced on AR4, AR5 and AR6', () => {
     const ls = [good(), bad()];
-    const ids = (g: 'AR4' | 'AR5' | 'AR6') => findUnpriceableLocations(ls, g, 2024).map(u => u.locId);
-    expect(ids('AR4')).toEqual(['BAD']);
-    expect(ids('AR5')).toEqual(['BAD']);
-    expect(ids('AR6')).toEqual(['BAD']);
+    const lines = (g: 'AR4' | 'AR5' | 'AR6') => ls.flatMap(l => unpricedLines(l, g)).map(u => `${u.locId}:${u.field}`);
+    expect(lines('AR4')).toEqual(['BAD:natural_gas_amount']);
+    expect(lines('AR5')).toEqual(lines('AR4'));
+    expect(lines('AR6')).toEqual(lines('AR4'));
   });
 
-  it('L7 a non-pricing error is NOT absorbed as an exclusion', () => {
-    // The catch is narrowed to MissingEmissionFactorError on purpose: a bug in the arithmetic must
-    // not quietly become "this location is excluded", which would hide it behind a customer-facing
-    // message about units.
+  it('L7 a non-pricing error is NOT absorbed as an unpriced line', () => {
+    // Nothing is caught any more: an unpriced line is decided by a lookup, never by a catch, so a bug in
+    // the arithmetic still surfaces rather than turning into a customer-facing message about units.
     const exploding = new Proxy(good(), {
       get(t, p) { if (p === 'has_propane') throw new TypeError('boom'); return (t as any)[p] },
     }) as Location;
     expect(() => calcInventory([exploding], 'AR6', 2024)).toThrow(TypeError);
-    expect(() => findUnpriceableLocations([exploding], 'AR6', 2024)).toThrow(TypeError);
+    expect(() => unpricedLines(exploding)).toThrow(TypeError);
   });
 });
 
@@ -762,7 +762,9 @@ describe('M. workings rows recompute from what they display', () => {
     // factor at all, so that location is 'unpriceable' and emits no priced row — which is what the
     // first draft of this test hit, and a useful reminder that the fixture has to be a location the
     // engine can actually price.
-    const l = { ...loc(), name: 'CA site', country: 'CA',
+    // FI1: with a province. A Canadian gas line with none is now unpriced (it was silently priced at
+    // Ontario's 1.921, which is the very factor this row checks); ON gives that same factor, chosen.
+    const l = { ...loc(), name: 'CA site', country: 'CA', grid_region: 'ON',
       has_natural_gas: true, natural_gas_amount: 120000, natural_gas_unit: 'm3' } as any
     const rows = buildWorkings([l], 'AR6', 2024, []);
     const gas = rows.find((r: any) => r.source === 'Natural gas')!
@@ -1721,31 +1723,26 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // the key was written at each site and is simply not measurable now — so what is asserted is the
     // thing that actually mattered: THREE pricing sites, each going through the ONE chooser, and no
     // path reaching the retired ungraded key.
+    // FI1: the three sites became ONE. combustionLines builds every line once, through the chooser, and
+    // calcLocation, fuelEmissionsByType and buildWorkings all read it, so they cannot disagree about a grade.
     const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
     const calls = src.split('\n').filter(l => /fuelOilPricing\(loc, '(distillate|residual)'/.test(l));
-    expect(calls.length, 'two grades x three sites, all through the one chooser').toBe(6);
-    expect(calls.filter(c => c.includes("'distillate'")).length, 'three distillate sites').toBe(3);
-    expect(calls.filter(c => c.includes("'residual'")).length, 'three residual sites').toBe(3);
+    expect(calls.length, 'two grades, one site, through the one chooser').toBe(2);
+    const lines = src.slice(src.indexOf('function combustionLines('), src.indexOf('const LINE_UNITS'));
+    expect(lines).toContain("fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)");
+    expect(lines).toContain("fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)");
+    for (const fn of ['function calcLocation(', 'function fuelEmissionsByType(', 'function buildWorkings(']) {
+      const body = src.slice(src.indexOf(fn));
+      expect(body.slice(0, body.indexOf('\n}\n')), fn).toContain('combustionLines(loc)');
+    }
     // The chooser itself may only ever build a graded key — never the retired 'fuel_oil_gallon'.
     const chooser = src.slice(src.indexOf('function fuelOilPricing'), src.indexOf('const fuelOilInGallons'));
     expect(chooser).toContain('`fuel_oil_${grade}_litre`');
     expect(chooser).toContain('`fuel_oil_${grade}_gallon`');
     expect(chooser, "'fuel_oil_gallon' was retired — no alias was kept").not.toContain("'fuel_oil_gallon'");
-    // THE RAW/RESOLVED DISTINCTION SURVIVES THE SPLIT. buildWorkings prices the coverage-resolution
-    // -applied figure; the other two read the stored amount. Collapsing them would silently drop
-    // estimation adjustments from the workings row.
-    // Asserted as the PROPERTY rather than the call spelling: buildWorkings hoists the resolved
-    // figure into `entered` (so the activity column can show it) before converting, so
-    // `fuelOilToGallons(figure(...))` is no longer one substring. What must remain true is that the
-    // workings path reads figure() and the calc path reads the raw amount.
-    // buildWorkings prices the coverage-resolution-APPLIED figure...
-    expect(src).toContain("fuelOilPricing(loc, 'distillate', entered)");
-    expect(src).toContain("fuelOilPricing(loc, 'residual', entered)");
-    // ...while the two calc paths read the STORED amount. Collapsing them would silently drop
-    // estimation adjustments from the workings row. (fuelOilInGallons, the old raw-value wrapper, is
-    // gone: it always converted to gallons, which is now the exception rather than the rule.)
-    expect(src).toContain("fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)");
-    expect(src).toContain("fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)");
+    // THE RAW/RESOLVED DISTINCTION IS GONE, AND SAFELY (FI1). Since T5 buildWorkings prices DERIVED
+    // locations, so a location's stored amount and its resolution-applied figure are the same number;
+    // combustionLines reads it once for every consumer.
     expect(src, 'the always-convert wrapper must not come back').not.toContain('const fuelOilInGallons =');
   });
 
@@ -4136,11 +4133,14 @@ describe('T4 deriveLocations', () => {
     expect(pctEstimated({ ...i, locations: deriveLocations(i) }, 'AR6')).toBeCloseTo(50, 9);
   });
 
-  it('findUnpriceableLocations judges the derived figure: a stale stored figure no document supports is not priced', () => {
+  it('unpriced lines are judged on the derived figure: a stale stored figure no document supports is not priced', () => {
     // An unpriceable unit on a stale field: stored says 100 m3-on-a-UK-site, but the only bill is pending.
+    // FI1: the judgement is now per line (unpricedLines), not a whole-location exclusion; the property holds.
     const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'GB', natural_gas_unit: 'm3' });
-    expect(findUnpriceableLocations([site], 'AR6', 2025), 'stored: blocked on a figure nothing supports').toHaveLength(1);
-    expect(findUnpriceableLocations(deriveLocations(inv([site])), 'AR6', 2025)).toEqual([]);
+    expect(unpricedLines(site), 'stored: an unpriced line on a figure nothing supports').toHaveLength(1);
+    expect(unpricedLines(deriveLocations(inv([site]))[0])).toEqual([]);
+    // findUnresolvedCoverage derives first, so it does not block on the stale figure either.
+    expect(findUnresolvedCoverage([site], 2025, 12, []).filter(i => i.status === 'factor_missing')).toEqual([]);
   });
 });
 
@@ -4381,12 +4381,16 @@ describe('T6 monthly split', () => {
     expect(r3.skipped.map(k => k.reason)).toEqual(['not counted: undated']);
   });
 
-  it('a location the totals exclude as unpriceable writes no monthly row', () => {
+  it('an unpriced line writes no monthly row, and the bill is skipped by name (FI1)', () => {
+    // WAS "a location the totals exclude as unpriceable writes no monthly row". FI1 keeps the location;
+    // the unpriced bill still writes nothing, and lands in skipped with the reason calcGas gives.
+    // (The dedicated factor_missing skip reason is FI1's second diff.)
     const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'GB' });
     const r = buildMonthlyEmissions(inv([blocked], 2025), deps, 'AR6');
-    expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toHaveLength(1);
+    expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toEqual([]);
+    expect(unpricedLines(deriveLocations(inv([blocked], 2025))[0]).map(u => u.reason)).toEqual(['factor_missing']);
     expect(r.slices).toEqual([]);
-    expect(r.skipped).toContainEqual({ fuelType: 'all', document_type: 'all', reason: 'location excluded: unpriceable' });
+    expect(r.skipped.some(x => x.reason.startsWith('cannot price natural_gas_m3'))).toBe(true);
   });
 
   it('slices carry their location id, for matching by location', () => {
@@ -5252,5 +5256,187 @@ describe('T15-fix2 not-counted line under each confirmed, uncounted reading', ()
     ];
     expect(all.length).toBeGreaterThan(2);
     for (const t of all) expect(t).not.toContain('\u2014');
+  });
+});
+
+// ── FI1: an unpriceable input is a blocking line, never a dropped site ───────────────────────────────
+// docs/review/design-derived-figures.md, "FI1". Rulings: no silent drop-out; Canadian gas with no province
+// blocks; an unknown refrigerant is an unpriced line, never `?? 0`; an unsupported country stays a stated,
+// non-blocking exclusion.
+describe('FI1 unpriced lines', () => {
+  const BLOCKING = new Set(['factor_missing', 'refrigerant_unknown', 'province_missing']);
+  const gate = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => BLOCKING.has(i.status));
+
+  // Every fuel line the wizard or a bill can store: its switch, amount and unit fields, the wizard's own
+  // options for the country, and (for a bill) every unit convertibleUnits accepts for the fuel.
+  const FUELS: { field: keyof Location; unitField: keyof Location; on: Partial<Location>; options: (c: string) => string[]; bill?: 'natural_gas' | 'propane' | 'diesel' | 'gasoline' }[] = [
+    { field: 'natural_gas_amount', unitField: 'natural_gas_unit', on: { has_natural_gas: true }, options: c => ngUnitOptions(c).map(([v]) => v), bill: 'natural_gas' },
+    { field: 'propane_amount', unitField: 'propane_unit', on: { has_propane: true }, options: c => propaneUnitOptions(c).map(([v]) => v), bill: 'propane' },
+    { field: 'diesel_stationary_amount', unitField: 'diesel_stationary_unit', on: { has_diesel_stationary: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
+    { field: 'fuel_oil_distillate_amount', unitField: 'fuel_oil_distillate_unit', on: { has_fuel_oil_distillate: true }, options: c => liquidUnitOptions(c).map(([v]) => v) },
+    { field: 'fuel_oil_residual_amount', unitField: 'fuel_oil_residual_unit', on: { has_fuel_oil_residual: true }, options: c => liquidUnitOptions(c).map(([v]) => v) },
+    { field: 'gasoline_amount', unitField: 'gasoline_unit', on: { has_mobile: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'gasoline' },
+    { field: 'diesel_mobile_amount', unitField: 'diesel_mobile_unit', on: { has_mobile: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
+  ];
+  const SUPPORTED = ['US', 'CA', 'GB', ...EU_COUNTRIES, 'AU', 'NZ'].filter(c => efRouting({ country: c }).supported);
+
+  it('property: every supported country x fuel x unit is priced, or unpriced with a blocking issue; never ?? 0, never excluded', () => {
+    let priced = 0, unpriced = 0;
+    for (const country of SUPPORTED) {
+      for (const f of FUELS) {
+        const units = new Set([...f.options(country), ...(f.bill ? convertibleUnits(f.bill) : [])]);
+        for (const unit of units) {
+          const l = loc({ name: 'Site', country, grid_region: country === 'CA' ? 'ON' : '', ...f.on, [f.field]: 1000, [f.unitField]: unit } as Partial<Location>);
+          const label = `${country} ${String(f.field)} in ${unit}`;
+          expect(findUnpriceableLocations([l], 'AR6', 2025), `${label}: never excluded`).toEqual([]);
+          const lines = unpricedLines(l);
+          const s1 = calcInventory([l], 'AR6', 2025).s1_total;
+          if (lines.length === 0) {
+            priced++;
+            expect(s1, `${label}: priced, so above zero`).toBeGreaterThan(0);
+            expect(gate(l), `${label}: priced lines raise nothing`).toEqual([]);
+          } else {
+            unpriced++;
+            expect(lines.map(u => u.field), label).toEqual([f.field]);
+            expect(s1, `${label}: unpriced is absent from the total, never a figure`).toBe(0);
+            expect(gate(l).map(i => [i.status, i.field]), `${label}: blocks export`).toEqual([[lines[0].reason, String(f.field)]]);
+            const row = buildWorkings([l], 'AR6', 2025).find(r => r.declaration === 'unpriced');
+            expect(row?.result_tco2e, `${label}: null, not zero`).toBeNull();
+          }
+        }
+      }
+    }
+    // Not vacuous either way: the sweep must reach both outcomes.
+    expect(priced).toBeGreaterThan(20);
+    expect(unpriced).toBeGreaterThan(5);
+  });
+
+  it('a location with one unpriceable line still has its other lines priced and in every total', () => {
+    const mixed = loc({ id: 'M', name: 'Mixed', country: 'US', grid_region: 'US_CA', electricity_kwh: 40_000,
+      has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3',          // no US factor per m3
+      has_diesel_stationary: true, diesel_stationary_amount: 500, diesel_stationary_unit: 'gallons' });
+    const without = loc({ ...mixed, has_natural_gas: false, natural_gas_amount: 0 });
+    expect(calcInventory([mixed], 'AR6', 2025)).toEqual(calcInventory([without], 'AR6', 2025));
+    expect(calcInventory([mixed], 'AR6', 2025).s1_total).toBeGreaterThan(0);
+    expect(calcInventory([mixed], 'AR6', 2025).s2_location).toBeGreaterThan(0);
+    const rows = buildWorkings([mixed], 'AR6', 2025);
+    expect(rows.filter(r => r.result_tco2e > 0).map(r => r.stream).sort()).toEqual(['diesel_stationary', 'electricity', 'electricity']);
+    expect(rows.filter(r => r.declaration === 'unpriced').map(r => r.stream)).toEqual(['natural_gas']);
+    expect(pctEstimated({ locations: [mixed], reporting_year: 2025 }, 'AR6')).toBe(pctEstimated({ locations: [without], reporting_year: 2025 }, 'AR6'));
+    // The message names the fuel, the site, the unit, the publisher and the units it does price.
+    expect(gate(mixed)).toEqual([{ locId: 'M', fuelType: 'natural_gas', status: 'factor_missing', field: 'natural_gas_amount',
+      message: 'Natural gas at Mixed is recorded in m³, and US EPA 2024 publishes no factor this figure can be converted to exactly, so it is not counted. Enter it in Mcf, therms or MMBtu, or reject the bill. Export is blocked until this is resolved.' }]);
+  });
+
+  describe('refrigerants', () => {
+    const site = (type: string) => loc({ name: 'Depot', country: 'US', has_hfc_refrigerants: true, refrigerant_type: type, refrigerant_purchased_kg: 50 });
+    for (const [name, type] of [['an unrecognised type', 'r999x'], ['a blank type', '']] as const) {
+      it(`${name} with 50 kg: an unpriced line, the issue, and a fugitive 0 that is not a priced zero`, () => {
+        const l = site(type);
+        expect(unpricedLines(l).map(u => [u.reason, u.field, u.amount, u.unit])).toEqual([['refrigerant_unknown', 'refrigerant_purchased_kg', 50, 'kg']]);
+        expect(gate(l).map(i => i.message)).toEqual(['The refrigerant type at Depot is not one we hold a GWP for, so it is not counted. Choose the refrigerant type. Export is blocked until it is chosen.']);
+        expect(calcLocation(l, 'AR6', 2025).s1_fugitive).toBe(0);
+        const row = buildWorkings([l], 'AR6', 2025).find(r => r.stream === 'refrigerants')!;
+        expect(row.declaration).toBe('unpriced');
+        expect(row.result_tco2e, 'not a priced zero').toBeNull();
+        expect(row.activity_data).toBe(50);
+      });
+    }
+    it('choosing a held type clears the issue and prices at kg x GWP', () => {
+      const l = site('r410a');
+      expect(unpricedLines(l)).toEqual([]);
+      expect(gate(l)).toEqual([]);
+      expect(calcLocation(l, 'AR6', 2025).s1_fugitive).toBeCloseTo(50 * 2256 / 1000, 12);
+      const row = buildWorkings([l], 'AR6', 2025).find(r => r.stream === 'refrigerants')!;
+      expect(row.declaration).toBeUndefined();
+      expect(row.result_tco2e).toBeCloseTo(50 * 2256 / 1000, 12);
+    });
+    it('ammonia is unchanged: no line, no issue', () => {
+      const l = loc({ ...site(''), uses_ammonia: true });
+      expect(unpricedLines(l)).toEqual([]);
+      expect(gate(l)).toEqual([]);
+      expect(calcLocation(l, 'AR6', 2025).s1_fugitive).toBe(0);
+    });
+    it('source: no REFRIGERANT_GWP read anywhere falls back to ?? 0', () => {
+      const root = join(__dirname, '..', '..');
+      const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
+        const rel = `${dir}/${n}`;
+        if (n === 'node_modules' || n.startsWith('.')) return [];
+        return statSync(join(root, rel)).isDirectory() ? walk(rel) : /\.tsx?$/.test(n) && !/\.test\.tsx?$/.test(n) ? [rel] : [];
+      });
+      const hits = [...walk('lib'), ...walk('app')].flatMap(f => stripTsComments(readFileSync(join(root, f), 'utf8')).split('\n')
+        .filter(l => /REFRIGERANT_GWP\b/.test(l) && /\?\?\s*0\b/.test(l)).map(l => `${f}: ${l.trim()}`));
+      expect(hits).toEqual([]);
+      expect(readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8')).toContain('REFRIGERANT_GWP[type]?.[gwpVersion]');
+    });
+  });
+
+  describe('Canada: natural gas needs the province', () => {
+    const ca = (o: Partial<Location> = {}) => loc({ name: 'Moncton', country: 'CA', grid_region: '', province: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3', ...o });
+    it('no province: unpriced with the province issue, and NOT priced at 1.921', () => {
+      const l = ca();
+      expect(unpricedLines(l).map(u => u.reason)).toEqual(['province_missing']);
+      expect(gate(l).map(i => i.message)).toEqual(['The province for Moncton is not set, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.']);
+      expect(calcInventory([l], 'AR6', 2025).s1_total).toBe(0);
+      expect(() => calcGas(pickEF(l, 'natural_gas_m3'), 1000, 'AR6')).toThrow(MissingEmissionFactorError);
+      // Every unit, not just m3: the province selects the factor whatever the gas is billed in.
+      for (const unit of ['mcf', 'kwh', 'therms', 'mmbtu'] as const)
+        expect(unpricedLines(ca({ natural_gas_unit: unit })).map(u => u.reason), unit).toEqual(['province_missing']);
+    });
+    it('an unrecognised province says so, by its own value', () => {
+      expect(gate(ca({ grid_region: 'ZZ' })).map(i => i.message)).toEqual(['The province for Moncton (ZZ) is not one we hold a natural gas factor for, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.']);
+    });
+    it("choosing ON prices at Ontario's value, AB at Alberta's, and clears the issue", () => {
+      const on = ca({ grid_region: 'ON', province: 'ON' }), ab = ca({ grid_region: 'AB', province: 'AB' });
+      expect(gate(on)).toEqual([]);
+      expect(pickEF(on, 'natural_gas_m3')).toEqual({ co2: 1.921, ch4: 0.000037, n2o: 0.000035 });
+      expect(pickEF(ab, 'natural_gas_m3')).toEqual({ co2: 1.962, ch4: 0.000037, n2o: 0.000035 });
+      expect(pickEF(on, 'natural_gas_mcf').co2).toBeCloseTo(1.921 * 1000 / 35.3147, 9);
+      expect(calcInventory([on], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(on, 'natural_gas_m3'), 1000, 'AR6').total, 12);
+    });
+    it('source: the Ontario fallback value is gone from EF_CA', () => {
+      const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
+      const table = src.slice(src.indexOf('const EF_CA = {'), src.indexOf('const EF_CA_NG_CO2_M3'));
+      expect(table).not.toMatch(/natural_gas_m3:\s*\{\s*co2/);
+      expect(table).not.toMatch(/natural_gas_mcf:\s*\{\s*co2/);
+    });
+  });
+
+  describe('country refusals are unchanged', () => {
+    it('an unsupported country is still excluded, stated, and does not block', () => {
+      const jp = loc({ name: 'Osaka', country: 'JP', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
+      const [u] = findUnpriceableLocations([jp], 'AR6', 2025);
+      expect(u.kind === 'country' && u.refusal.state).toBe('country_not_supported');
+      expect(u.kind === 'country' && refusalIsFixable(u.refusal)).toBe(false);
+      expect(unpricedLines(jp)).toEqual([]);
+      expect(gate(jp)).toEqual([]);
+      expect(buildWorkings([jp], 'AR6', 2025).map(r => r.declaration)).toEqual(['country_not_supported']);
+    });
+    it('a not-listed country still blocks (fixable), and has no line-level issue', () => {
+      const xx = loc({ name: 'Somewhere', country: 'Atlantis', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
+      const [u] = findUnpriceableLocations([xx], 'AR6', 2025);
+      expect(u.kind === 'country' && u.refusal.state).toBe('country_not_listed');
+      expect(u.kind === 'country' && refusalIsFixable(u.refusal)).toBe(true);
+      expect(unpricedLines(xx)).toEqual([]);
+    });
+  });
+
+  it('monthly and annual agree with an unpriced line present: reconcile reports zero unexplained', () => {
+    const b = (id: string, value: number, unit: string, fuelType: string, document_type: string) =>
+      ({ ...doc(document_type, [prop({ fuelType, value, unit, periodStart: '2025-01-01', periodEnd: '2025-12-31' })], id), file_name: `${id}.pdf` });
+    const l = loc({ name: 'Mixed', country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_unit: 'm3',
+      source_docs: [b('gas', 1000, 'm3', 'natural_gas', 'utility_bill_gas'), b('power', 20_000, 'kwh', 'electricity', 'utility_electricity')] });
+    const inv = { locations: [l], reporting_year: 2025 };
+    expect(unpricedLines(deriveLocations(inv)[0]).map(u => u.field)).toEqual(['natural_gas_amount']);
+    const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+    const r = reconcile(buildMonthlyEmissions(inv, deps, 'AR6').slices, inv, 'AR6');
+    expect(r.reconciles).toBe(true);
+    expect(r.scope2_evidenced).toBeGreaterThan(0);
+  });
+
+  it('no message carries an em dash', () => {
+    const all = [UNPRICED_MESSAGE.factor_missing('Natural gas', 'A', 'm³', 'P', ['kWh']), UNPRICED_MESSAGE.factor_missing('Natural gas', 'A', 'm³', 'P', []),
+      UNPRICED_MESSAGE.refrigerant_unknown('A'), UNPRICED_MESSAGE.province_missing('A', null), UNPRICED_MESSAGE.province_missing('A', 'ZZ')];
+    for (const m of all) expect(m).not.toContain('\u2014');
   });
 });

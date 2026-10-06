@@ -8,7 +8,7 @@ import {
 import type { FactorEditions } from './factorEditions'
 import { buildCompanySeries } from './series'
 import type { InventoryRow } from './series'
-import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, buildWorkings } from './engine'
+import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, unpricedLines, buildWorkings } from './engine'
 import type { Location } from './engine'
 
 // THE COLUMN EXISTS BECAUSE A 26% FALL LOOKED LIKE PERFORMANCE.
@@ -965,29 +965,32 @@ describe('a location excluded from the totals records no edition', () => {
   it('F26 EVERY route to exclusion records nothing — all 18', () => {
     for (const [name, over] of UNPRICEABLE) {
       const l = bare(over)
-      // NOT VACUOUS: assert the location really is excluded before asserting the consequence. A
-      // fixture that stopped being unpriceable would otherwise pass this test by accident.
-      expect(findUnpriceableLocations([l], 'AR6', 2025).length, `${name}: fixture must be unpriceable`).toBe(1)
+      // NOT VACUOUS: assert the fixture really prices nothing before asserting the consequence. Since FI1
+      // a factor gap is an unpriced LINE (the location stays in), and only a country excludes a location,
+      // so each route is one or the other.
+      expect(findUnpriceableLocations([l], 'AR6', 2025).length + unpricedLines(l).length, `${name}: fixture must price nothing`).toBe(1)
       expect(buildFactorEditions([l], 2025), `${name}: excluded location must name no edition`).toEqual({})
     }
   })
 
-  it('F27 all three families are covered, not just combustion', () => {
-    // The exclusion is decided per LOCATION; the family gates are decided per STREAM. So no
-    // stream-level condition could have caught this, and each family had to be checked separately.
+  it('F27 FI1: a site with one unpriced fuel line records the editions of what DID price, and no combustion', () => {
+    // WAS: all three families recorded nothing, because a missing factor excluded the whole location and its
+    // electricity and steam with it. FI1 ends that exclusion: the gas line is unpriced, the electricity and
+    // steam are in the totals, so their editions are recorded exactly as for the same site with no gas.
     const base = { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
-    // electricity: resolved region AND quantified kWh — its own gate is fully satisfied.
+    const noGas = (l: Location): Location => ({ ...l, has_natural_gas: false, natural_gas_amount: 0 })
     const withElec = bare({ ...base, grid_region: 'US_CA', electricity_kwh: 100_000 })
-    expect(findUnpriceableLocations([withElec], 'AR6', 2025).length).toBe(1)
-    expect(buildFactorEditions([withElec], 2025), 'electricity edition on an excluded location').toEqual({})
-    // steam: quantified, published US factor, no supplier figure — its own gate is fully satisfied.
+    expect(findUnpriceableLocations([withElec], 'AR6', 2025)).toEqual([])
+    expect(unpricedLines(withElec).map(u => u.reason)).toEqual(['factor_missing'])
+    expect(buildFactorEditions([withElec], 2025)).toEqual(buildFactorEditions([noGas(withElec)], 2025))
+    expect(buildFactorEditions([withElec], 2025).US?.combustion, 'no combustion line priced').toBeUndefined()
+    expect(buildFactorEditions([withElec], 2025).US?.electricity, 'the priced electricity names its edition').toBeDefined()
     const withSteam = bare({ ...base, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
-    expect(findUnpriceableLocations([withSteam], 'AR6', 2025).length).toBe(1)
-    expect(buildFactorEditions([withSteam], 2025), 'steam edition on an excluded location').toEqual({})
-    // And all three at once.
+    expect(buildFactorEditions([withSteam], 2025)).toEqual(buildFactorEditions([noGas(withSteam)], 2025))
+    expect(buildFactorEditions([withSteam], 2025).US?.combustion).toBeUndefined()
     const all = bare({ ...base, grid_region: 'US_CA', electricity_kwh: 100_000,
       has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
-    expect(buildFactorEditions([all], 2025)).toEqual({})
+    expect(buildFactorEditions([all], 2025)).toEqual(buildFactorEditions([noGas(all)], 2025))
   })
 
   it('F28 A MIXED INVENTORY STILL RECORDS THE EDITION, FROM THE PRICEABLE LOCATION', () => {
@@ -1003,7 +1006,8 @@ describe('a location excluded from the totals records no edition', () => {
     const bad = { ...emptyLocation('bad', 'Excluded'), country: 'US',
       has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
     expect(findUnpriceableLocations([good], 'AR6', 2025).length, 'good must be priceable').toBe(0)
-    expect(findUnpriceableLocations([bad], 'AR6', 2025).length, 'bad must be excluded').toBe(1)
+    // FI1: bad is no longer excluded; its one line is unpriced, and it prices nothing else.
+    expect(unpricedLines(bad).length, 'bad must hold an unpriced line').toBe(1)
 
     const mixed = buildFactorEditions([good, bad], 2025)
     const aloneGood = buildFactorEditions([good], 2025)

@@ -25,7 +25,7 @@ import {
   type YearDataStatus,
   type YearExclusion,
 } from "./series";
-import { findUnpriceableLocations, deriveStoredLocations, type Location } from "./engine";
+import { findUnpriceableLocations, unpricedLines, deriveStoredLocations, type Location } from "./engine";
 import type { FactorEditions } from "./factorEditions";
 import { anyPublishedFactorApplied } from "./factorEditions";
 import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
@@ -133,12 +133,19 @@ export function assessCompleteness(workings: unknown, locationsData: unknown, re
     // The row's own year (T7 revision): the check is "can this year be priced with today's tables", and
     // the tables are looked up by reporting year. Called without it, every year was checked as 2024.
     const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear);
-    if (unpriceable.length > 0) {
-      const names = unpriceable.map((u) => u.locName).join(", ");
+    // FI1: a missing factor is now one unpriced line, not an excluded location, so a location holding one
+    // is named here too. A row saved before the marker existed was totalled under the old rule (the whole
+    // location left out), so whether its figures include that location's other lines cannot be told.
+    const withUnpricedLine = (locationsData as Location[])
+      .filter((l) => unpricedLines(l).length > 0 && !unpriceable.some((u) => u.locId === l.id))
+      .map((l) => ({ locName: l.name || "Location" }));
+    const blocked = [...unpriceable, ...withUnpricedLine];
+    if (blocked.length > 0) {
+      const names = blocked.map((u) => u.locName).join(", ");
       return {
         dataStatus: "unverifiable",
         exclusions: null,
-        unverifiableReason: `${unpriceable.length} location${unpriceable.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out, and this year was saved before we started recording that, so we can't tell whether its figures include them`,
+        unverifiableReason: `${blocked.length} location${blocked.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out, and this year was saved before we started recording that, so we can't tell whether its figures include them`,
       };
     }
   } catch {
