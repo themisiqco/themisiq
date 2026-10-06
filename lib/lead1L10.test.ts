@@ -230,13 +230,14 @@ describe('L10 amendment', () => {
   })
 
   it('L10-14: dates and versions: Privacy v2.3 and Terms effective October 6, 2026; CLAUDE.md cites §14; both recorded', () => {
-    expect(read('app/privacy/page.tsx')).toContain("{['Effective: October 6, 2026', 'TIQ-PRV-001 · v2.3',")
+    // RET1 then moved Privacy to v2.4 on the same date (lib/ret1.test.ts).
+    expect(read('app/privacy/page.tsx')).toMatch(/\{\['Effective: October 6, 2026', 'TIQ-PRV-001 · v2\.[34]',/)
     expect(read('app/terms/page.tsx')).toContain("{['Effective: October 6, 2026',")
     const claude = read('CLAUDE.md')
     expect(claude).toContain('Terms §14 is the liability cap')
     expect(claude).not.toContain('Terms §13')
     const readme = read('docs/policy-snapshots/README.md')
-    expect(readme).toContain('`2026-10-privacy-v2.3.md` | Privacy Policy v2.3 (current)')
+    expect(readme).toContain('`2026-10-privacy-v2.3.md` | Privacy Policy v2.3')
     expect(readme).toContain('`2026-10-terms.md` | Terms of Service effective October 6, 2026 (current)')
     expect(read('docs/policy-snapshots/2026-10-privacy-v2.3.md')).toContain(FREE_ACCOUNT_MARKETING)
     expect(read('docs/policy-snapshots/2026-10-terms.md')).toContain(FREE_ACCOUNT_TERMS_INTRO)

@@ -12,9 +12,9 @@ export const FREE_ACCOUNT_ROWS: ReadonlyArray<readonly [string, string, string]>
   ['Your name', 'To address your results email and identify your account.', 'While the account exists.'],
   ['Your work email', 'To send your sign-in code, sign you in, and email you your results.', 'While the account exists.'],
   ['Your company', 'To name the company your calculation is saved under.', 'While the account exists.'],
-  ['Your calculation: the sites and figures you entered, and the results worked out from them', 'To save it to your account and email it to you. Until you confirm your email, we hold a copy so that you can confirm on another device.', 'The held copy: deleted when you confirm, or no longer usable after 24 hours. The saved calculation: while the account exists.'],
+  ['Your calculation: the sites and figures you entered, and the results worked out from them', 'To save it to your account and email it to you. Until you confirm your email, we hold a copy so that you can confirm on another device.', 'The held copy: deleted when you confirm, or deleted within a day after its 24 hours end. The saved calculation: while the account exists.'],
   ['The country of your first site', 'To understand which countries our free accounts report from.', 'While the account exists.'],
-  ['Your IP address', 'To limit repeated requests and sign-ups from one connection, which protects the service from abuse.', 'With the held copy, for up to 24 hours. In our rate-limit records, as security records.'],
+  ['Your IP address', 'To limit repeated requests and sign-ups from one connection, which protects the service from abuse.', 'With the held copy, until that copy is deleted. In our rate-limit records, for 30 days.'],
   ['Your marketing choice, with your IP address and browser details (user agent) and the time', 'To prove what you agreed to, as Canada\'s anti-spam law (CASL) requires. We record your choice whether or not you tick the box.', 'As a marketing consent record: 3 years from your last interaction with us.'],
 ] as const
 

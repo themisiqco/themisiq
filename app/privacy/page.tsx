@@ -36,7 +36,7 @@ export default function PrivacyPage() {
             Privacy <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
-            {['Effective: October 6, 2026', 'TIQ-PRV-001 · v2.3', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
+            {['Effective: October 6, 2026', 'TIQ-PRV-001 · v2.4', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
               <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
@@ -183,7 +183,9 @@ export default function PrivacyPage() {
                   ['Customer platform data', 'Subscription duration + 12 months', 'Contract'],
                   ['Account and contact data (customers who have bought a plan)', '7 years from last activity', 'Canada Revenue Agency'],
                   ['Free accounts that never buy a plan, and their calculation', 'While the account is used. A free account with no sign-in for 24 months may be deleted, after 30 days\' notice by email', 'PIPEDA: limiting retention'],
-                  ['Calculation held while you confirm your email', '24 hours at most: deleted when you confirm, or no longer usable after 24 hours', 'Providing the service you asked for'],
+                  ['Calculation held while you confirm your email', 'Deleted when you confirm, or deleted within a day after its 24 hours end', 'Providing the service you asked for'],
+                  // RET1: deleted daily by the pg_cron job ret1-purge-rate-limits (docs/review/patches/RET1-M10-retention-jobs.sql).
+                  ['Rate-limit records (IP address and email key)', '30 days, then deleted automatically', 'Protecting the service from abuse'],
                   ['Marketing consent records', '3 years from last interaction', 'CASL'],
                   ['Assessment / lead data', '3 years from collection', 'PIPEDA / CASL'],
                   ['Security and audit logs', '5 years', 'Legitimate interest: security'],

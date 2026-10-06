@@ -9,7 +9,8 @@ one published version, so that editing the live page does not erase the wording 
 | `2026-06-v2-final.md` | Terms, Refund Policy and the consent wording under consent version `2026-06-v2-final`, and the Privacy Policy at v2.0 |
 | `2026-09-privacy-v2.1.md` | Privacy Policy v2.1 |
 | `2026-09-privacy-v2.2.md` | Privacy Policy v2.2 |
-| `2026-10-privacy-v2.3.md` | Privacy Policy v2.3 (current): what changed from v2.2, word for word (LEAD1 L10, the free account) |
+| `2026-10-privacy-v2.3.md` | Privacy Policy v2.3: what changed from v2.2, word for word (LEAD1 L10, the free account) |
+| `2026-10-privacy-v2.4.md` | Privacy Policy v2.4 (current): what changed from v2.3, word for word (RET1, rate-limit records and held calculations deleted on a schedule) |
 | `2026-10-terms.md` | Terms of Service effective October 6, 2026 (current): what changed, word for word |
 
 ## Checkout consent versions
