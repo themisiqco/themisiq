@@ -35,7 +35,7 @@ import {
   canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
   valueProblem, NO_VALUE_MESSAGE, proposalNeedsAttention,
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
-  findExactDuplicates,
+  findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
@@ -3529,7 +3529,7 @@ describe('T1 billContributions', () => {
   // T5 adds buildWorkings (contributions on rows) and the evidenced quantity per field, which T6 moved into
   // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split; T8 adds the
   // coverage strip, which shows each bill's prorated share.
-  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField, buildMonthlyEmissions and the coverage strip (T2, T3, T5, T6, T8)', () => {
+  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField, buildMonthlyEmissions, the coverage strip and the upload\'s not-counted note (T2, T3, T5, T6, T8, T15-fix1)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
@@ -3541,7 +3541,8 @@ describe('T1 billContributions', () => {
       const n = (src.match(/billContributions\(/g) ?? []).length;
       return n ? [`${f}: ${n}`] : [];
     });
-    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1', 'app/dashboard/ghg/_components/CoverageStrip.tsx: 1']);
+    // page.tsx: DocUpload reads which readings were left out as an exact duplicate, to say so beside them (T15-fix1).
+    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1', 'app/dashboard/ghg/_components/CoverageStrip.tsx: 1', 'app/dashboard/ghg/page.tsx: 1']);
     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
     for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(']) {
       const body = engineSrc.slice(engineSrc.indexOf(fn));
@@ -4958,8 +4959,9 @@ describe('T15 exact duplicate across document types', () => {
   ]);
   const gate = (l: Location, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], 2025, 12, r).filter(i => i.status === 'exact_duplicate');
   const contrib = (l: Location, r: CoverageResolution[], id: string) => billContributions(l, r, periodFromYearAndEnd(2025, 12)).find(c => c.docId === id) as BillContribution;
-  const once = (l: Location) => exactDuplicateCountOnce({ locId: l.id, fuelType: 'diesel', counted: { id: 'tank', file: 'tank.pdf' }, excluded: { id: 'fleet', file: 'fleet.pdf' }, by, at: AT });
-  const notSame = (l: Location) => exactDuplicateNotSame({ locId: l.id, fuelType: 'diesel', docs: [{ id: 'tank', file: 'tank.pdf' }, { id: 'fleet', file: 'fleet.pdf' }], by, at: AT });
+  const TANK = { id: 'tank', file: 'tank.pdf', documentType: 'fuel_diesel' }, FLEET = { id: 'fleet', file: 'fleet.pdf', documentType: 'fleet_fuel' };
+  const once = (l: Location) => exactDuplicateCountOnce({ locId: l.id, fuelType: 'diesel', counted: TANK, excluded: FLEET, by, at: AT });
+  const notSame = (l: Location) => exactDuplicateNotSame({ locId: l.id, fuelType: 'diesel', docs: [TANK, FLEET], by, at: AT });
 
   it('the same hash across fuel_diesel and fleet_fuel warns, even when the readings differ', () => {
     const l = twin('ab12', 'ab12', { value: 80, periodStart: '2025-03-02' });
@@ -5000,8 +5002,8 @@ describe('T15 exact duplicate across document types', () => {
 
   it('an unacknowledged warning blocks export, naming the site and both documents', () => {
     expect(gate(twin('h', 'h'))).toEqual([{ locId: 'L1', fuelType: 'diesel', status: 'exact_duplicate', docIds: ['tank', 'fleet'],
-      message: 'tank.pdf and fleet.pdf at Depot are the same file, uploaded as two different kinds of document. Choose Same document, count once, or Not the same. Export is blocked until you choose.' }]);
-    expect(gate(twin())[0].message).toBe(COVERAGE_MESSAGE.exact_duplicate('Depot', 'tank.pdf', 'fleet.pdf', 'reading', 'diesel'));
+      message: 'tank.pdf (Diesel purchase record) and fleet.pdf (Fleet fuel record) at Depot are the same file, uploaded as two different kinds of document. Choose Same document, count once, or Not the same. Export is blocked until you choose.' }]);
+    expect(gate(twin())[0].message).toBe(COVERAGE_MESSAGE.exact_duplicate('Depot', TANK, FLEET, 'reading', 'diesel'));
     expect(gate(twin())[0].message).toContain('show the same diesel figure, unit and dates');
     // A warning, not a coverage issue: neither document's coverage group reports it.
     expect(findUnresolvedCoverage([twin('h', 'h')], 2025, 12, []).filter(i => i.status === 'overlap')).toEqual([]);
@@ -5016,11 +5018,11 @@ describe('T15 exact duplicate across document types', () => {
     expect([d.diesel_stationary_amount, d.diesel_mobile_amount]).toEqual([100, 0]);
     expect(gate(l, r)).toEqual([]);
     expect(findExactDuplicates(l, r)[0].resolution).toEqual(r[0]);
-    expect(r[0].note).toBe('jo@acme.example confirmed on 2 April 2025 that tank.pdf and fleet.pdf are the same document, so it is counted once, from tank.pdf.');
+    expect(r[0].note).toBe('jo@acme.example confirmed on 2 April 2025 that tank.pdf (Diesel purchase record) and fleet.pdf (Fleet fuel record) are the same document, so it is counted once, as the Diesel purchase record.');
     // The excluded copy is retained as evidence on the workings, and an audit row records the choice.
     const rows = buildWorkings([l], 'AR6', 2025, r);
     expect(rows.find(w => w.gwp_basis === 'all_bills_excluded')?.contributions?.[0]).toMatchObject({ docId: 'fleet', reason: 'exact_duplicate_of' });
-    expect(rows.filter(w => w.gwp_basis === 'coverage_resolution').map(w => w.emission_factor)).toEqual(['Same document, counted once, chosen by jo@acme.example on 2 April 2025']);
+    expect(rows.filter(w => w.gwp_basis === 'coverage_resolution').map(w => w.emission_factor)).toEqual(['Same document, counted once as the Diesel purchase record, chosen by jo@acme.example on 2 April 2025']);
   });
 
   it('not_same counts both, and the warning clears', () => {
@@ -5078,5 +5080,82 @@ describe('T15 exact duplicate across document types', () => {
     const alone = calcInventory(deriveLocations({ locations: [site([l.source_docs[0]])], reporting_year: 2025 }), 'AR6', 2025);
     expect(annual.s1_total).toBeGreaterThan(0);
     expect(annual.s1_total).toBeCloseTo(alone.s1_total, 12);
+  });
+});
+
+// ── T15-fix1: one file uploaded twice, under the same name ────────────────────────────────────────────────
+// Found on the preview: test-diesel-receipt-A.pdf, 1,200 litres delivered 14 Mar 2025, uploaded at MONCTON as a
+// Diesel purchase record and as a Fleet fuel record. Every T15 fixture used two different file names, so the
+// warning that named both copies by file name ("A.pdf and A.pdf") passed its tests and told the customer nothing.
+describe('T15-fix1 the same file uploaded twice under one name', () => {
+  const by = { userId: 'u-1', email: 'lisa@acme.example' };
+  const AT = '2025-04-02T09:00:00Z';
+  const FILE = 'test-diesel-receipt-A.pdf';
+  const delivery = (): ExtractedProposal => prop({ fuelType: 'diesel', rawValue: 1200, rawUnit: 'litres', value: 1200, unit: 'litres',
+    periodStart: null, periodEnd: null, deliveryDate: '2025-03-14', periodOrigin: 'delivery', sourceQuote: '1,200 L' });
+  const copy = (id: string, document_type: string): SourceDoc => ({ ...doc(document_type, [delivery()], id), file_name: FILE, sha256: 'ab12' });
+  const moncton = () => loc({ name: 'MONCTON', country: 'CA', province: 'NB', grid_region: 'CA_NB',
+    has_diesel_stationary: true, diesel_stationary_unit: 'litres', has_mobile: true, diesel_mobile_unit: 'litres',
+    source_docs: [copy('tank', 'fuel_diesel'), copy('fleet', 'fleet_fuel')] } as Partial<Location>);
+  const TANK = { id: 'tank', file: FILE, documentType: 'fuel_diesel' }, FLEET = { id: 'fleet', file: FILE, documentType: 'fleet_fuel' };
+  const choose = (counted: typeof TANK, excluded: typeof TANK): CoverageResolution[] => upsertResolution(
+    upsertResolution([], deliveriesCompleteResolution({ locId: 'L1', fuelType: 'diesel', documentType: 'fuel_diesel', docIds: ['tank'], statement: 's', by, at: AT })),
+    exactDuplicateCountOnce({ locId: 'L1', fuelType: 'diesel', counted, excluded, by, at: AT }));
+
+  it('Part 2 repro: 1,200 litres counted once, whichever copy counts, in derived figures, totals and workings', () => {
+    const l = moncton();
+    const allTotal = (r: CoverageResolution[]) => calcInventory(deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: r }), 'AR6', 2025).s1_total;
+    const onlyOne = (id: string) => calcInventory(deriveLocations({ locations: [{ ...l, source_docs: l.source_docs.filter(d => d.id === id) }], reporting_year: 2025 }), 'AR6', 2025).s1_total;
+    for (const [counted, excluded, countedField, zeroField] of [
+      [TANK, FLEET, 'diesel_stationary_amount', 'diesel_mobile_amount'],
+      [FLEET, TANK, 'diesel_mobile_amount', 'diesel_stationary_amount'],
+    ] as const) {
+      const r = choose(counted, excluded);
+      const d = deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: r })[0];
+      expect(d[countedField], counted.documentType).toBe(1200);
+      expect(d[zeroField], counted.documentType).toBe(0);
+      expect(allTotal(r)).toBeGreaterThan(0);
+      expect(allTotal(r), counted.documentType).toBeCloseTo(onlyOne(counted.id), 12);
+      const rows = buildWorkings([l], 'AR6', 2025, r);
+      const diesel = rows.filter(w => typeof w.activity_data === 'number' && w.activity_data > 0 && /diesel/i.test(String(w.source)));
+      expect(diesel.map(w => w.activity_data), counted.documentType).toEqual([1200]);
+    }
+  });
+
+  it('the gate message names the file once and the two kinds of record', () => {
+    const msg = findUnresolvedCoverage([moncton()], 2025, 12, []).find(i => i.status === 'exact_duplicate')?.message;
+    expect(msg).toBe('test-diesel-receipt-A.pdf at MONCTON was uploaded twice, as a Diesel purchase record and as a Fleet fuel record. Choose Same document, count once, or Not the same. Export is blocked until you choose.');
+    expect(COVERAGE_MESSAGE.exact_duplicate('MONCTON', TANK, FLEET, 'reading', 'diesel')).toBe(
+      'test-diesel-receipt-A.pdf at MONCTON was uploaded as a Diesel purchase record and as a Fleet fuel record, and both show the same diesel figure, unit and dates. Choose Same document, count once, or Not the same. Export is blocked until you choose.');
+    expect(COVERAGE_MESSAGE.exact_duplicate('Main', { file: 'x.pdf', documentType: 'utility_electricity' }, { file: 'x.pdf', documentType: 'renewable_cert' }, 'sha256', 'electricity'))
+      .toBe('x.pdf at Main was uploaded twice, as an Electricity bill and as a REC / PPA certificate. Choose Same document, count once, or Not the same. Export is blocked until you choose.');
+  });
+
+  it('the audit row and the stored note name the counted copy by type, so either choice reads differently', () => {
+    const l = moncton();
+    const method = (r: CoverageResolution[]) => buildWorkings([l], 'AR6', 2025, r).filter(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'exact_duplicate').map(w => w.emission_factor);
+    expect(method(choose(TANK, FLEET))).toEqual(['Same document, counted once as the Diesel purchase record, chosen by lisa@acme.example on 2 April 2025']);
+    expect(method(choose(FLEET, TANK))).toEqual(['Same document, counted once as the Fleet fuel record, chosen by lisa@acme.example on 2 April 2025']);
+    expect(choose(TANK, FLEET)[1].note).toBe('lisa@acme.example confirmed on 2 April 2025 that test-diesel-receipt-A.pdf, uploaded as a Diesel purchase record and as a Fleet fuel record, is one document, so it is counted once, as the Diesel purchase record.');
+    const not = exactDuplicateNotSame({ locId: 'L1', fuelType: 'diesel', docs: [TANK, FLEET], by, at: AT });
+    expect(not.note).toBe('lisa@acme.example confirmed on 2 April 2025 that test-diesel-receipt-A.pdf, uploaded as a Diesel purchase record and as a Fleet fuel record, are two different documents, so both are counted.');
+    expect(buildWorkings([l], 'AR6', 2025, [not]).filter(w => w.activity_unit === 'exact_duplicate').map(w => w.emission_factor))
+      .toEqual(['Not the same document, the Diesel purchase record and the Fleet fuel record each counted, chosen by lisa@acme.example on 2 April 2025']);
+  });
+
+  it('the left-out reading says it is not counted, and which copy is', () => {
+    expect(EXACT_DUPLICATE_NOT_COUNTED('fuel_diesel')).toBe('Not counted: this is the same document as the Diesel purchase record, which is counted.');
+    expect(twoCopies(TANK, FLEET)).toBe('test-diesel-receipt-A.pdf, uploaded as a Diesel purchase record and as a Fleet fuel record,');
+    expect(twoCopies({ file: 'a.pdf', documentType: 'fuel_diesel' }, { file: 'b.pdf', documentType: 'fleet_fuel' })).toBe('a.pdf (Diesel purchase record) and b.pdf (Fleet fuel record)');
+  });
+
+  it('none of the new copy has an em dash', () => {
+    const texts = [
+      ...findUnresolvedCoverage([moncton()], 2025, 12, []).map(i => i.message ?? ''),
+      ...choose(TANK, FLEET).map(r => r.note),
+      EXACT_DUPLICATE_NOT_COUNTED('fleet_fuel'),
+      ...buildWorkings([moncton()], 'AR6', 2025, choose(FLEET, TANK)).filter(w => w.activity_unit === 'exact_duplicate').map(w => String(w.emission_factor)),
+    ];
+    for (const t of texts) expect(t).not.toContain('\u2014');
   });
 });

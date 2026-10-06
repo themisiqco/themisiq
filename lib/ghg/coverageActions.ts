@@ -22,7 +22,8 @@
 //                        for the same documents replaces the earlier one.
 // Legacy duplicate and straddle keep the old (location, fuel, kind) key; nothing writes them any more.
 
-import type { CoverageResolution } from './engine'
+import { twoCopies, type CoverageResolution, type DocCopy } from './engine'
+import { docTypeLabel } from './conciergeDocTypes'
 
 export function resolutionKey(r: CoverageResolution): string {
   switch (r.kind) {
@@ -139,28 +140,33 @@ export function deliveriesCompleteResolution(a: {
 /**
  * T15 (rule R6), "Same document, count once": the same file or reading uploaded as two kinds of document.
  * `counted` counts; `excluded` is retained as evidence, not counted. Records who chose it and when.
+ * T15-fix1: each copy is named by its document type, so the note says which copy counts even when both
+ * copies have the same file name.
  */
+type Copy = DocCopy & { id: string }
 export function exactDuplicateCountOnce(a: {
-  locId: string; fuelType: string; counted: { id: string; file: string }; excluded: { id: string; file: string }
+  locId: string; fuelType: string; counted: Copy; excluded: Copy
   by: { userId: string; email: string }; at: string
 }): CoverageResolution {
+  const pair = twoCopies(a.counted, a.excluded)
   return {
     locId: a.locId, fuelType: a.fuelType, kind: 'exact_duplicate', choice: 'count_once',
     countedDocId: a.counted.id, excludedDocIds: [a.excluded.id], by: a.by,
-    note: `${a.by.email} confirmed on ${plainDate(a.at)} that ${a.counted.file} and ${a.excluded.file} are the same document, so it is counted once, from ${a.counted.file}.`,
+    note: `${a.by.email} confirmed on ${plainDate(a.at)} that ${pair} ${a.counted.file === a.excluded.file ? 'is one document' : 'are the same document'}, so it is counted once, as the ${docTypeLabel(a.counted.documentType)}.`,
     acknowledgedAt: a.at,
   }
 }
 
 /** T15 (rule R6), "Not the same": both documents count. Records who chose it and when. */
 export function exactDuplicateNotSame(a: {
-  locId: string; fuelType: string; docs: [{ id: string; file: string }, { id: string; file: string }]
+  locId: string; fuelType: string; docs: [Copy, Copy]
   by: { userId: string; email: string }; at: string
 }): CoverageResolution {
+  const [x, y] = a.docs
   return {
     locId: a.locId, fuelType: a.fuelType, kind: 'exact_duplicate', choice: 'not_same',
     docIds: a.docs.map(d => d.id), by: a.by,
-    note: `${a.by.email} confirmed on ${plainDate(a.at)} that ${a.docs[0].file} and ${a.docs[1].file} are not the same document, so both are counted.`,
+    note: `${a.by.email} confirmed on ${plainDate(a.at)} that ${twoCopies(x, y)} ${x.file === y.file ? 'are two different documents' : 'are not the same document'}, so both are counted.`,
     acknowledgedAt: a.at,
   }
 }

@@ -16,7 +16,8 @@
 //
 // T15 (rule R6): the same document uploaded as two kinds of document (the same file, or the same figure, unit
 // and dates) is shown under both uploads, with "Same document, count once" and "Not the same". Each records who
-// chose it and when; export waits until one is chosen. Once chosen, the choice is shown.
+// chose it and when; export waits until one is chosen. Once chosen, the choice is shown. Each copy is named by its
+// document type (T15-fix1): "Count the Diesel purchase record", never a file name both copies may share.
 //
 // All text here is shown to the customer: plain language, no em dash.
 
@@ -32,6 +33,7 @@ import {
   deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame,
 } from '../../../../lib/ghg/coverageActions'
 import { unitLabel } from '../../../../lib/ghg/unitLabels'
+import { docTypeLabel } from '../../../../lib/ghg/conciergeDocTypes'
 import { formatActivity } from '../../../../lib/ghg/workingsCells'
 
 export type CurrentUser = { userId: string; email: string }
@@ -296,6 +298,9 @@ export function CoverageStrip(p: CoverageStripProps) {
         )
         const by = p.currentUser
         const off = { opacity: by ? 1 : 0.5 }
+        // T15-fix1: a copy is named by its document type. The commonest duplicate is one file uploaded twice,
+        // so a file name cannot tell the two copies apart; the buttons always say which kind of record counts.
+        const copy = (id: string) => ({ id, file: fileOf(id), documentType: location.source_docs.find(d => d.id === id)?.document_type ?? '' })
         return (
           <div key={key} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
             <div>⚠ {issue.message}</div>
@@ -304,12 +309,12 @@ export function CoverageStrip(p: CoverageStripProps) {
               {[[a, b], [b, a]].map(([counted, excluded]) => (
                 <button key={counted} style={{ ...plainButton, ...off }} disabled={!by} onClick={() => by && p.onAdd(exactDuplicateCountOnce({
                   locId: location.id, fuelType: x.fuelType, by, at: now(),
-                  counted: { id: counted, file: fileOf(counted) }, excluded: { id: excluded, file: fileOf(excluded) },
-                }))}>Count {fileOf(counted)}</button>
+                  counted: copy(counted), excluded: copy(excluded),
+                }))}>Count the {docTypeLabel(copy(counted).documentType)}</button>
               ))}
               <button style={{ ...plainButton, ...off }} disabled={!by} onClick={() => by && p.onAdd(exactDuplicateNotSame({
                 locId: location.id, fuelType: x.fuelType, by, at: now(),
-                docs: [{ id: a, file: fileOf(a) }, { id: b, file: fileOf(b) }],
+                docs: [copy(a), copy(b)],
               }))}>Not the same</button>
             </div>
           </div>

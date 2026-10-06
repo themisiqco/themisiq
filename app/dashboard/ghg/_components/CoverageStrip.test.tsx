@@ -235,10 +235,10 @@ describe('coverage strip: the same document under two kinds of upload (T15)', ()
   it('shows the message and both choices under each of the two uploads', () => {
     for (const docType of ['fuel_diesel', 'fleet_fuel']) {
       const t = text(drawAt(docType))
-      expect(t, docType).toContain('tank.pdf and fleet.pdf at Depot are the same file, uploaded as two different kinds of document.')
+      expect(t, docType).toContain('tank.pdf (Diesel purchase record) and fleet.pdf (Fleet fuel record) at Depot are the same file, uploaded as two different kinds of document.')
       expect(t, docType).toContain('Same document, count once:')
-      expect(t, docType).toContain('Count tank.pdf')
-      expect(t, docType).toContain('Count fleet.pdf')
+      expect(t, docType).toContain('Count the Diesel purchase record')
+      expect(t, docType).toContain('Count the Fleet fuel record')
       expect(t, docType).toContain('Not the same')
     }
   })
@@ -257,6 +257,65 @@ describe('coverage strip: the same document under two kinds of upload (T15)', ()
 
   it('cannot be answered without a signed-in user, since the choice records who made it', () => {
     const html = drawAt('fuel_diesel', { currentUser: null })
-    expect(html.match(/disabled=""[^>]*>(Count tank\.pdf|Count fleet\.pdf|Not the same)</g)?.length).toBe(3)
+    expect(html.match(/disabled=""[^>]*>(Count the Diesel purchase record|Count the Fleet fuel record|Not the same)</g)?.length).toBe(3)
+  })
+})
+
+describe('coverage strip: one file uploaded twice under the same name (T15-fix1)', () => {
+  const FILE = 'test-diesel-receipt-A.pdf'
+  const copy = (id: string, document_type: string): SourceDoc => ({
+    id, file_name: FILE, document_type, uploaded_at: '2025-04-01', file_path: `/${id}.pdf`, sha256: 'ab12',
+    extracted: [prop({ fuelType: 'diesel', value: 1200, unit: 'litres', periodStart: null, periodEnd: null, deliveryDate: '2025-03-14' })],
+  })
+  const moncton = (): Location => ({ ...emptyLocation('L1', 'MONCTON'), has_diesel_stationary: true, has_mobile: true,
+    source_docs: [copy('tank', 'fuel_diesel'), copy('fleet', 'fleet_fuel')] })
+  const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(m => m[1])
+
+  it('names the file once and both kinds of record, and the two count-once buttons differ', () => {
+    for (const docType of ['fuel_diesel', 'fleet_fuel']) {
+      const html = draw(moncton(), { docType })
+      expect(text(html), docType).toContain('test-diesel-receipt-A.pdf at MONCTON was uploaded twice, as a Diesel purchase record and as a Fleet fuel record.')
+      const counts = buttons(html).filter(b => b.startsWith('Count the '))
+      expect(counts, docType).toEqual(['Count the Diesel purchase record', 'Count the Fleet fuel record'])
+      expect(new Set(counts).size).toBe(2)
+      expect(text(html)).not.toContain(`Count ${FILE}`)
+    }
+  })
+
+  it('each button records the copy it names as the one that counts', () => {
+    const added: CoverageResolution[] = []
+    const strip = CoverageStrip({ location: moncton(), docType: 'fuel_diesel', reportingYear: 2025, fiscalYearEndMonth: 12, resolutions: [],
+      currentUser: { userId: 'u-1', email: 'lisa@acme.example' }, onAdd: r => added.push(r), onLabelMeter: () => {}, onEnterManually: () => {} })
+    // Walk the rendered tree for the two count-once buttons and press each.
+    const found: { label: string; onClick: () => void }[] = []
+    const visit = (n: unknown): void => {
+      if (Array.isArray(n)) { n.forEach(visit); return }
+      if (!n || typeof n !== 'object') return
+      const el = n as { type?: unknown; props?: { children?: unknown; onClick?: () => void } }
+      if (el.type === 'button' && el.props?.onClick) {
+        const label = ([] as unknown[]).concat(el.props.children).join('')
+        if (label.startsWith('Count the ')) found.push({ label, onClick: el.props.onClick })
+      }
+      if (el.props?.children) visit(el.props.children)
+    }
+    visit(strip)
+    for (const b of found) b.onClick()
+    expect(found.map(b => b.label)).toEqual(['Count the Diesel purchase record', 'Count the Fleet fuel record'])
+    expect(added.map(r => [r.countedDocId, r.excludedDocIds])).toEqual([['tank', ['fleet']], ['fleet', ['tank']]])
+  })
+
+  it('once chosen, the note says which kind of record counts', () => {
+    const chosen = { locId: 'L1', fuelType: 'diesel', kind: 'exact_duplicate', choice: 'count_once', countedDocId: 'fleet', excludedDocIds: ['tank'],
+      by: { userId: 'u-1', email: 'lisa@acme.example' }, acknowledgedAt: '2025-04-02T09:00:00Z',
+      note: 'lisa@acme.example confirmed on 2 April 2025 that test-diesel-receipt-A.pdf, uploaded as a Diesel purchase record and as a Fleet fuel record, is one document, so it is counted once, as the Fleet fuel record.' } as CoverageResolution
+    const t = text(draw(moncton(), { docType: 'fuel_diesel', resolutions: [chosen] }))
+    expect(t).toContain('so it is counted once, as the Fleet fuel record.')
+    expect(t).not.toContain('Same document, count once:')
+  })
+
+  it('the upload says beside a left-out reading that it is not counted', () => {
+    const page = stripTsComments(readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8'))
+    expect(page).toContain(".filter(c => c.reason === 'exact_duplicate_of' && c.reasonRef)")
+    expect(page).toContain('EXACT_DUPLICATE_NOT_COUNTED(duplicateOf.get(`${doc.id}:${pi}`) as string)')
   })
 })

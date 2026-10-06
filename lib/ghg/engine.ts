@@ -35,7 +35,7 @@ import type { FactorEditions } from './factorEditions'
 // reads in an export and the sentence the customer reads on screen come from ONE module and cannot
 // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
 import { countryRefusalText } from './countryRefusalCopy'
-import { DELIVERY_DOC_TYPES } from './conciergeDocTypes'
+import { DELIVERY_DOC_TYPES, docTypeLabel } from './conciergeDocTypes'
 // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
 // WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
 // country control is built from, so "a country this platform can express" has ONE definition and
@@ -3072,15 +3072,17 @@ function fuelTypeForDocType(docType: string): string | null {
 // Both are called with ACCEPTED resolutions only (applyResolutions' extrapolations, and buildWorkings' audit
 // rows after validateResolution), so a legacy 'duplicate' or 'straddle' never reaches them and has no wording
 // here (T13).
-function resolutionMethod(r: CoverageResolution): string {
+// `loc` names the copies of an exact duplicate by document type (T15-fix1); without it they read "Source document".
+function resolutionMethod(r: CoverageResolution, loc?: Location): string {
+  const typeOf = (id?: string) => docTypeLabel(loc?.source_docs.find(d => d.id === id)?.document_type ?? '')
   return r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
     : r.kind === 'same_bill' ? 'Same bill, counted once'
     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
     : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
     : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
     : r.kind === 'exact_duplicate' ? (r.choice === 'count_once'
-      ? `Same document, counted once, chosen by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
-      : `Not the same document, each counted, chosen by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`)
+      ? `Same document, counted once as the ${typeOf(r.countedDocId)}, chosen by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
+      : `Not the same document, the ${(r.docIds ?? []).map(typeOf).join(' and the ')} each counted, chosen by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`)
     : r.kind
 }
 function resolutionBasis(r: CoverageResolution): string {
@@ -3240,6 +3242,29 @@ const FUEL_NAME: Record<string, string> = {
 
 // The plain-language messages behind the export-blocking coverage issues (T3 ruling "no silent zero", and
 // "all documents rejected"). Shown by the strip in T8. invalid_period uses INVALID_PERIOD_MESSAGE (T1).
+/** T15-fix1: one copy of a document, as the customer sees it: its file name and the kind of document it was uploaded as. */
+export type DocCopy = { file: string; documentType: string }
+/** "a Diesel purchase record", "an Electricity bill". The labels are DOC_TYPE_LABELS nouns, kept as written. */
+export const withArticle = (label: string): string => `${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label}`
+/**
+ * T15-fix1: two copies named so they can be told apart. Different file names: each with its type in brackets.
+ * The same file name: the file once, then the two types it was uploaded as.
+ */
+export function twoCopies(a: DocCopy, b: DocCopy): string {
+  const A = docTypeLabel(a.documentType), B = docTypeLabel(b.documentType)
+  return a.file === b.file
+    ? `${a.file}, uploaded as ${withArticle(A)} and as ${withArticle(B)},`
+    : `${a.file} (${A}) and ${b.file} (${B})`
+}
+
+/**
+ * T15-fix1: shown on the reading of a copy left out by "Same document, count once". The reading itself still
+ * says what was read from the file, so without this a customer sees the same figure, confirmed, under both
+ * uploads and cannot tell that only one of them reaches the total.
+ */
+export const EXACT_DUPLICATE_NOT_COUNTED = (countedDocumentType: string): string =>
+  `Not counted: this is the same document as the ${docTypeLabel(countedDocumentType)}, which is counted.`
+
 export const COVERAGE_MESSAGE = {
   undated: (file: string) =>
     `${file} has no billing period, so it is not counted. Enter the dates as they appear on the bill.`,
@@ -3264,8 +3289,16 @@ export const COVERAGE_MESSAGE = {
   deliveries_changed: (fuel: string, site: string, email: string, date: string) =>
     `The ${fuel} deliveries for ${site} have changed since ${email} confirmed them on ${date}. Check the list and confirm again. Export is blocked until you do.`,
   // T15 (rule R6): the same document under two document types. What was observed is stated, not guessed at.
-  exact_duplicate: (site: string, fileA: string, fileB: string, match: 'sha256' | 'reading', fuel: string) =>
-    `${fileA} and ${fileB} at ${site} ${match === 'sha256' ? 'are the same file' : `show the same ${fuel} figure, unit and dates`}, uploaded as two different kinds of document. Choose Same document, count once, or Not the same. Export is blocked until you choose.`,
+  // T15-fix1: each copy is named by its document type, because the commonest case is ONE file uploaded twice,
+  // and two identical file names told the customer nothing about which copy was which.
+  exact_duplicate: (site: string, a: DocCopy, b: DocCopy, match: 'sha256' | 'reading', fuel: string) => {
+    const A = docTypeLabel(a.documentType), B = docTypeLabel(b.documentType)
+    const tail = 'Choose Same document, count once, or Not the same. Export is blocked until you choose.'
+    if (a.file === b.file) return match === 'sha256'
+      ? `${a.file} at ${site} was uploaded twice, as ${withArticle(A)} and as ${withArticle(B)}. ${tail}`
+      : `${a.file} at ${site} was uploaded as ${withArticle(A)} and as ${withArticle(B)}, and both show the same ${fuel} figure, unit and dates. ${tail}`
+    return `${a.file} (${A}) and ${b.file} (${B}) at ${site} ${match === 'sha256' ? 'are the same file' : `show the same ${fuel} figure, unit and dates`}, uploaded as two different kinds of document. ${tail}`
+  },
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
 }
@@ -4222,7 +4255,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       scope: 0,
       activity_data: null,
       activity_unit: r.kind,
-      emission_factor: resolutionMethod(r),
+      emission_factor: resolutionMethod(r, owner),
       ef_source: r.note,
       gwp_basis: 'coverage_resolution',
       result_tco2e: null,
@@ -4408,10 +4441,11 @@ export function findUnresolvedCoverage(
     }
 
     // T15 (rule R6): an exact duplicate across document types blocks export until the customer chooses.
+    const copyOf = (docId: string): DocCopy => ({ file: fileOf(docId), documentType: loc.source_docs.find(d => d.id === docId)?.document_type ?? '' })
     for (const x of findExactDuplicates(loc, allResolutions)) {
       if (x.resolution) continue
       out.push({ locId: loc.id, fuelType: x.fuelType, status: 'exact_duplicate', docIds: [...x.docIds],
-        message: COVERAGE_MESSAGE.exact_duplicate(site, fileOf(x.docIds[0]), fileOf(x.docIds[1]), x.match, FUEL_NAME[x.fuelType] ?? x.fuelType) })
+        message: COVERAGE_MESSAGE.exact_duplicate(site, copyOf(x.docIds[0]), copyOf(x.docIds[1]), x.match, FUEL_NAME[x.fuelType] ?? x.fuelType) })
     }
 
     // Confirmed bills under a "uses this fuel" switch that is off (T6 ruling). The annual figure omits a
