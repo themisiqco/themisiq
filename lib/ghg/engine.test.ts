@@ -35,9 +35,10 @@ import {
   canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
   valueProblem, NO_VALUE_MESSAGE, proposalNeedsAttention,
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
+  findExactDuplicates,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
-import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE } from './coverageActions';
+import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
@@ -4936,5 +4937,146 @@ describe('T13 F-09, F-10, F-11 regressions', () => {
     const undated = loc({ source_docs: [edoc('nodates', elec(700, null, null, { periodConfidence: 'low' }))] });
     expect(billContributions(undated, [], W(2026))[0]).toMatchObject({ counted: false, reason: 'undated' });
     expect(findUnresolvedCoverage([undated], 2026, 12, []).some(i => i.status === 'undated' && i.docIds?.includes('nodates'))).toBe(true);
+  });
+});
+
+// ── T15: exact duplicate across document types (rule R6, docs/review/design-derived-figures.md) ──────────
+// The same diesel receipt uploaded as stationary fuel (fuel_diesel) and as fleet fuel (fleet_fuel) was counted
+// in both fields. It is now a warning that blocks export until the customer says whether it is the same document.
+describe('T15 exact duplicate across document types', () => {
+  const by = { userId: 'u-1', email: 'jo@acme.example' };
+  const AT = '2025-04-02T09:00:00Z';
+  const diesel = (value: number, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'diesel', value, unit: 'gallons', periodStart: '2025-03-01', periodEnd: '2025-03-31', sourceQuote: `${value} gal`, ...o });
+  const sdoc = (id: string, document_type: string, p: ExtractedProposal, sha256?: string): SourceDoc =>
+    ({ ...doc(document_type, [p], id), file_name: `${id}.pdf`, ...(sha256 ? { sha256 } : {}) });
+  const site = (docs: SourceDoc[]) => loc({ name: 'Depot', country: 'US', grid_region: 'US_CA', has_diesel_stationary: true, has_mobile: true, source_docs: docs });
+  // Same receipt, two kinds of document, same reading: criterion (b). With a shared hash: criterion (a) as well.
+  const twin = (hashA?: string, hashB?: string, b: Partial<ExtractedProposal> = {}) => site([
+    sdoc('tank', 'fuel_diesel', diesel(100), hashA),
+    sdoc('fleet', 'fleet_fuel', diesel(100, b), hashB),
+  ]);
+  const gate = (l: Location, r: CoverageResolution[] = []) => findUnresolvedCoverage([l], 2025, 12, r).filter(i => i.status === 'exact_duplicate');
+  const contrib = (l: Location, r: CoverageResolution[], id: string) => billContributions(l, r, periodFromYearAndEnd(2025, 12)).find(c => c.docId === id) as BillContribution;
+  const once = (l: Location) => exactDuplicateCountOnce({ locId: l.id, fuelType: 'diesel', counted: { id: 'tank', file: 'tank.pdf' }, excluded: { id: 'fleet', file: 'fleet.pdf' }, by, at: AT });
+  const notSame = (l: Location) => exactDuplicateNotSame({ locId: l.id, fuelType: 'diesel', docs: [{ id: 'tank', file: 'tank.pdf' }, { id: 'fleet', file: 'fleet.pdf' }], by, at: AT });
+
+  it('the same hash across fuel_diesel and fleet_fuel warns, even when the readings differ', () => {
+    const l = twin('ab12', 'ab12', { value: 80, periodStart: '2025-03-02' });
+    expect(findExactDuplicates(l, [])).toEqual([{ locId: 'L1', fuelType: 'diesel', docIds: ['tank', 'fleet'], match: 'sha256', resolution: null }]);
+  });
+
+  it('the same value, unit and period warns with no hash at all', () => {
+    expect(findExactDuplicates(twin(), []).map(x => x.match)).toEqual(['reading']);
+  });
+
+  it('a missing hash never matches by hash', () => {
+    const differ = { value: 80 };
+    expect(findExactDuplicates(twin(undefined, undefined, differ), [])).toEqual([]);
+    expect(findExactDuplicates(twin('ab12', undefined, differ), [])).toEqual([]);
+    expect(findExactDuplicates(twin('', '', differ), [])).toEqual([]);
+    // Different hashes, same reading: (b) still fires.
+    expect(findExactDuplicates(twin('ab12', 'cd34'), []).map(x => x.match)).toEqual(['reading']);
+  });
+
+  it('is only across document types, only for one fuel, and only for accepted proposals', () => {
+    // Same type: an overlap, answered by Same bill (rule R3), not an exact duplicate.
+    expect(findExactDuplicates(site([sdoc('a', 'fuel_diesel', diesel(100), 'h'), sdoc('b', 'fuel_diesel', diesel(100), 'h')]), [])).toEqual([]);
+    // One dual-fuel file read once for gas and once for electricity counts each fuel once.
+    const dual = loc({ source_docs: [
+      sdoc('g', 'utility_bill_gas', prop({ fuelType: 'natural_gas', value: 40, unit: 'mcf', periodStart: '2025-03-01', periodEnd: '2025-03-31' }), 'h'),
+      sdoc('e', 'utility_electricity', prop({ fuelType: 'electricity', value: 900, unit: 'kwh', periodStart: '2025-03-01', periodEnd: '2025-03-31' }), 'h'),
+    ] });
+    expect(findExactDuplicates(dual, [])).toEqual([]);
+    expect(findExactDuplicates(twin('h', 'h', { status: 'extracted' }), [])).toEqual([]);
+    expect(findExactDuplicates(twin('h', 'h', { status: 'rejected' }), [])).toEqual([]);
+  });
+
+  it('a delivery date stands for both ends of the period in criterion (b)', () => {
+    const delivered = (o: Partial<ExtractedProposal> = {}) => diesel(100, { periodStart: null, periodEnd: null, deliveryDate: '2025-03-14', ...o });
+    expect(findExactDuplicates(site([sdoc('tank', 'fuel_diesel', delivered()), sdoc('fleet', 'fleet_fuel', delivered())]), []).length).toBe(1);
+    expect(findExactDuplicates(site([sdoc('tank', 'fuel_diesel', delivered()), sdoc('fleet', 'fleet_fuel', delivered({ deliveryDate: '2025-03-15' }))]), [])).toEqual([]);
+  });
+
+  it('an unacknowledged warning blocks export, naming the site and both documents', () => {
+    expect(gate(twin('h', 'h'))).toEqual([{ locId: 'L1', fuelType: 'diesel', status: 'exact_duplicate', docIds: ['tank', 'fleet'],
+      message: 'tank.pdf and fleet.pdf at Depot are the same file, uploaded as two different kinds of document. Choose Same document, count once, or Not the same. Export is blocked until you choose.' }]);
+    expect(gate(twin())[0].message).toBe(COVERAGE_MESSAGE.exact_duplicate('Depot', 'tank.pdf', 'fleet.pdf', 'reading', 'diesel'));
+    expect(gate(twin())[0].message).toContain('show the same diesel figure, unit and dates');
+    // A warning, not a coverage issue: neither document's coverage group reports it.
+    expect(findUnresolvedCoverage([twin('h', 'h')], 2025, 12, []).filter(i => i.status === 'overlap')).toEqual([]);
+  });
+
+  it('count_once excludes one: exact_duplicate_of the counted document, and the warning clears', () => {
+    const l = twin('h', 'h');
+    const r = [once(l)];
+    expect(contrib(l, r, 'fleet')).toMatchObject({ counted: false, reason: 'exact_duplicate_of', reasonRef: 'tank' });
+    expect(contrib(l, r, 'tank')).toMatchObject({ counted: true, reason: 'counted' });
+    const d = deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: r })[0];
+    expect([d.diesel_stationary_amount, d.diesel_mobile_amount]).toEqual([100, 0]);
+    expect(gate(l, r)).toEqual([]);
+    expect(findExactDuplicates(l, r)[0].resolution).toEqual(r[0]);
+    expect(r[0].note).toBe('jo@acme.example confirmed on 2 April 2025 that tank.pdf and fleet.pdf are the same document, so it is counted once, from tank.pdf.');
+    // The excluded copy is retained as evidence on the workings, and an audit row records the choice.
+    const rows = buildWorkings([l], 'AR6', 2025, r);
+    expect(rows.find(w => w.gwp_basis === 'all_bills_excluded')?.contributions?.[0]).toMatchObject({ docId: 'fleet', reason: 'exact_duplicate_of' });
+    expect(rows.filter(w => w.gwp_basis === 'coverage_resolution').map(w => w.emission_factor)).toEqual(['Same document, counted once, chosen by jo@acme.example on 2 April 2025']);
+  });
+
+  it('not_same counts both, and the warning clears', () => {
+    const l = twin('h', 'h');
+    const r = [notSame(l)];
+    expect(contrib(l, r, 'fleet')).toMatchObject({ counted: true, reason: 'counted' });
+    const d = deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: r })[0];
+    expect([d.diesel_stationary_amount, d.diesel_mobile_amount]).toEqual([100, 100]);
+    expect(gate(l, r)).toEqual([]);
+  });
+
+  it('choosing again for the same documents replaces the earlier choice', () => {
+    const l = twin('h', 'h');
+    const list = upsertResolution([once(l)], notSame(l));
+    expect(list.map(r => r.choice)).toEqual(['not_same']);
+  });
+
+  it('validateResolution accepts the two choices and refuses malformed ones', () => {
+    const l = twin('h', 'h');
+    expect(validateResolution(once(l), l)).toBeNull();
+    expect(validateResolution(notSame(l), l)).toBeNull();
+    const bad: Array<[string, Partial<CoverageResolution>]> = [
+      ['Resolution is for a different location.', { locId: 'L2' }],
+      ['Every document named must be on this site and carry this fuel.', { excludedDocIds: ['nowhere'] }],
+      ['The document that counts cannot also be excluded.', { excludedDocIds: ['tank'] }],
+      ['Choose the document that counts.', { countedDocId: undefined }],
+      ['Choose the document that is the same as it.', { excludedDocIds: [] }],
+      ['A choice must record who made it.', { by: undefined }],
+      ['Choose Same document, count once, or Not the same.', { choice: undefined }],
+    ];
+    for (const [msg, o] of bad) expect(validateResolution({ ...once(l), ...o } as CoverageResolution, l), msg).toBe(msg);
+    expect(validateResolution({ ...notSame(l), docIds: ['tank'] }, l)).toBe('Name the two documents that are not the same.');
+    expect(validateResolution({ ...notSame(l), docIds: ['tank', 'nowhere'] }, l)).toBe('Every document named must be on this site and carry this fuel.');
+    const sameType = site([sdoc('a', 'fuel_diesel', diesel(100)), sdoc('b', 'fuel_diesel', diesel(100))]);
+    expect(validateResolution({ ...once(sameType), countedDocId: 'a', excludedDocIds: ['b'] }, sameType))
+      .toBe('These documents are the same kind, so choose Same bill, count it once.');
+    // A refused choice changes nothing and clears nothing.
+    const refused = { ...once(l), by: undefined } as CoverageResolution;
+    expect(contrib(l, [refused], 'fleet').counted).toBe(true);
+    expect(gate(l, [refused]).length).toBe(1);
+  });
+
+  it('monthly figures and reconcile agree with the annual figure under count_once', () => {
+    const l = twin('h', 'h');
+    const inv = { locations: [l], reporting_year: 2025, coverage_resolutions: [once(l)] };
+    const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+    const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
+    const annual = calcInventory(deriveLocations(inv), 'AR6', 2025);
+    const r = reconcile(slices, inv, 'AR6');
+    expect(r.reconciles).toBe(true);
+    expect(r.scope1_evidenced).toBeCloseTo(annual.s1_total, 3);
+    // One slice, the counted copy's 100 gallons in March. The excluded copy writes no month.
+    expect(slices.map(x => [x.period_month, x.activity_value])).toEqual([['2025-03-01', 100]]);
+    // And the figure is the counted copy alone, not both.
+    const alone = calcInventory(deriveLocations({ locations: [site([l.source_docs[0]])], reporting_year: 2025 }), 'AR6', 2025);
+    expect(annual.s1_total).toBeGreaterThan(0);
+    expect(annual.s1_total).toBeCloseTo(alone.s1_total, 12);
   });
 });

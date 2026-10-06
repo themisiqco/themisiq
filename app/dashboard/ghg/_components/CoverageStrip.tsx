@@ -14,17 +14,22 @@
 // the fuel, the site and the window. It is never estimated. "Estimate the missing months" is offered only when
 // at least one month is covered, and an estimate the engine refuses is shown with its reason, never hidden.
 //
+// T15 (rule R6): the same document uploaded as two kinds of document (the same file, or the same figure, unit
+// and dates) is shown under both uploads, with "Same document, count once" and "Not the same". Each records who
+// chose it and when; export waits until one is chosen. Once chosen, the choice is shown.
+//
 // All text here is shown to the customer: plain language, no em dash.
 
 import { useState } from 'react'
 import {
   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
   parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords, proposalNeedsAttention,
+  findExactDuplicates,
   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
 } from '../../../../lib/ghg/engine'
 import {
   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
-  deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE,
+  deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame,
 } from '../../../../lib/ghg/coverageActions'
 import { unitLabel } from '../../../../lib/ghg/unitLabels'
 import { formatActivity } from '../../../../lib/ghg/workingsCells'
@@ -139,9 +144,13 @@ export function CoverageStrip(p: CoverageStripProps) {
 
   // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
   const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
+  // T15: exact duplicates with a document on this upload, answered or not. The message is the engine's issue.
+  const duplicates = findExactDuplicates(location, p.resolutions).filter(x => x.docIds.some(id => docIdsHere.has(id)))
+    .map(x => ({ x, issue: issues.find(i => i.status === 'exact_duplicate' && i.fuelType === x.fuelType
+      && (i.docIds ?? []).length === 2 && x.docIds.every(id => (i.docIds ?? []).includes(id))) }))
 
   if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0
-    && deliveryFuels.length === 0 && refused.length === 0) return null
+    && deliveryFuels.length === 0 && refused.length === 0 && duplicates.length === 0) return null
   const yearText = reportingYearLabel(win).inText
   const many = groups.size > 1
 
@@ -277,6 +286,35 @@ export function CoverageStrip(p: CoverageStripProps) {
           </div>
         </div>
       ))}
+      {duplicates.map(({ x, issue }) => {
+        const [a, b] = x.docIds
+        const key = `duplicate|${x.fuelType}|${a}|${b}`
+        if (!issue) return (
+          <div key={key} style={{ marginTop: 8, background: '#E1F5EE', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>
+            ✓ {x.resolution?.note}
+          </div>
+        )
+        const by = p.currentUser
+        const off = { opacity: by ? 1 : 0.5 }
+        return (
+          <div key={key} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
+            <div>⚠ {issue.message}</div>
+            <div style={row}>
+              <span style={prompt}>Same document, count once:</span>
+              {[[a, b], [b, a]].map(([counted, excluded]) => (
+                <button key={counted} style={{ ...plainButton, ...off }} disabled={!by} onClick={() => by && p.onAdd(exactDuplicateCountOnce({
+                  locId: location.id, fuelType: x.fuelType, by, at: now(),
+                  counted: { id: counted, file: fileOf(counted) }, excluded: { id: excluded, file: fileOf(excluded) },
+                }))}>Count {fileOf(counted)}</button>
+              ))}
+              <button style={{ ...plainButton, ...off }} disabled={!by} onClick={() => by && p.onAdd(exactDuplicateNotSame({
+                locId: location.id, fuelType: x.fuelType, by, at: now(),
+                docs: [{ id: a, file: fileOf(a) }, { id: b, file: fileOf(b) }],
+              }))}>Not the same</button>
+            </div>
+          </div>
+        )
+      })}
       {notices.map((i, k) => (
         <div key={`notice|${k}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
           ⚠ {i.message}

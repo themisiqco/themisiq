@@ -32,6 +32,7 @@ import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_compon
 import { FigureInput } from './_components/FigureInput'
 import { addOverride, removeOverride } from '../../../lib/ghg/overrides'
 import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
+import { sha256Hex } from '../../../lib/ghg/fileHash'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
 import type { YearDataStatus } from '../../../lib/ghg/series'
@@ -1249,6 +1250,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     for (const file of Array.from(files)) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${safeName}`
+      // T15 (rule R6): the file's SHA-256, for duplicate detection only (client-supplied, not an integrity
+      // guarantee). A failure gives null and the upload goes ahead without one; it never blocks an upload.
+      const sha256 = await sha256Hex(file)
       const { error } = await supabase.storage.from('source-documents').upload(path, file)
       if (error) {
         // (d) The file never reached storage. There is no document to attach a note to, so this is
@@ -1260,7 +1264,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         continue
       }
       {
-        const doc: SourceDoc = { id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, file_name: file.name, document_type: docType, uploaded_at: new Date().toISOString(), file_path: path }
+        const doc: SourceDoc = { id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, file_name: file.name, document_type: docType, uploaded_at: new Date().toISOString(), file_path: path, ...(sha256 ? { sha256 } : {}) }
 
         // ── Concierge step 5: read bill, convert via lib (single source of truth), attach proposals to the doc. No field write yet. ──
         // Skipped entirely for the document types the concierge cannot read a figure from — see
@@ -3303,7 +3307,7 @@ workings: saved.workings,
                         {steamFactorGaps.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'}: ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
                         )}
-                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap, overlap, or boundary-straddle is resolved, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
+                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap or overlap is resolved, every document that appears under two kinds of upload is answered as the same or not, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}
                     <div style={{ background: "#fff", border: "1px solid #e8e7e4", borderRadius: 8, padding: "14px 16px", marginTop: 16, marginBottom: 16 }}>

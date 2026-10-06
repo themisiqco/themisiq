@@ -18,6 +18,8 @@
 //   - used_none:         (location, fuel, field);
 //   - deliveries_complete (T10b): (location, document type, fuel), so confirming again replaces the earlier
 //                        confirmation rather than keeping both.
+//   - exact_duplicate (T15): (location, fuel, the SET of documents), whichever choice, so changing the answer
+//                        for the same documents replaces the earlier one.
 // Legacy duplicate and straddle keep the old (location, fuel, kind) key; nothing writes them any more.
 
 import type { CoverageResolution } from './engine'
@@ -34,6 +36,10 @@ export function resolutionKey(r: CoverageResolution): string {
       return `used_none|${r.locId}|${r.fuelType}|${r.field ?? ''}`
     case 'deliveries_complete':
       return `deliveries_complete|${r.locId}|${r.documentType ?? ''}|${r.fuelType}`
+    case 'exact_duplicate': {
+      const ids = r.choice === 'count_once' ? [r.countedDocId ?? '', ...(r.excludedDocIds ?? [])] : [...(r.docIds ?? [])]
+      return `exact_duplicate|${r.locId}|${r.fuelType}|${ids.sort().join(',')}`
+    }
     default:
       return `${r.kind}|${r.locId}|${r.fuelType}`
   }
@@ -126,6 +132,35 @@ export function deliveriesCompleteResolution(a: {
     locId: a.locId, fuelType: a.fuelType, kind: 'deliveries_complete', documentType: a.documentType,
     docIds: [...a.docIds], by: a.by,
     note: `${a.by.email} confirmed on ${plainDate(a.at)}: ${a.statement}`,
+    acknowledgedAt: a.at,
+  }
+}
+
+/**
+ * T15 (rule R6), "Same document, count once": the same file or reading uploaded as two kinds of document.
+ * `counted` counts; `excluded` is retained as evidence, not counted. Records who chose it and when.
+ */
+export function exactDuplicateCountOnce(a: {
+  locId: string; fuelType: string; counted: { id: string; file: string }; excluded: { id: string; file: string }
+  by: { userId: string; email: string }; at: string
+}): CoverageResolution {
+  return {
+    locId: a.locId, fuelType: a.fuelType, kind: 'exact_duplicate', choice: 'count_once',
+    countedDocId: a.counted.id, excludedDocIds: [a.excluded.id], by: a.by,
+    note: `${a.by.email} confirmed on ${plainDate(a.at)} that ${a.counted.file} and ${a.excluded.file} are the same document, so it is counted once, from ${a.counted.file}.`,
+    acknowledgedAt: a.at,
+  }
+}
+
+/** T15 (rule R6), "Not the same": both documents count. Records who chose it and when. */
+export function exactDuplicateNotSame(a: {
+  locId: string; fuelType: string; docs: [{ id: string; file: string }, { id: string; file: string }]
+  by: { userId: string; email: string }; at: string
+}): CoverageResolution {
+  return {
+    locId: a.locId, fuelType: a.fuelType, kind: 'exact_duplicate', choice: 'not_same',
+    docIds: a.docs.map(d => d.id), by: a.by,
+    note: `${a.by.email} confirmed on ${plainDate(a.at)} that ${a.docs[0].file} and ${a.docs[1].file} are not the same document, so both are counted.`,
     acknowledgedAt: a.at,
   }
 }

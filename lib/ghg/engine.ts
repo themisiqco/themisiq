@@ -1650,6 +1650,10 @@ interface SourceDoc {
   // The meter or account this document belongs to, when a location has more than one per fuel. Absent is
   // the default single meter. Read by billContributions (T1); set by the 'different_meters' resolution (T3).
   meter_label?: string
+  // T15 (rule R6): SHA-256 of the file's bytes, hex, computed in the browser at upload. FOR DUPLICATE DETECTION
+  // ONLY: it is supplied by the client, so it is not an integrity guarantee. Absent on documents uploaded before
+  // T15, or when hashing failed; a missing hash never matches (findExactDuplicates).
+  sha256?: string
 }
 
 interface Location {
@@ -1961,7 +1965,7 @@ interface CoverageResolution {
   fuelType: string
   // Written kinds (T3): extrapolate, same_bill, different_meters, used_none. 'duplicate' and 'straddle' are
   // LEGACY: readable, never accepted (validateResolution), so they change no figure and resolve no issue.
-  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle' | 'deliveries_complete'
+  kind: 'extrapolate' | 'same_bill' | 'different_meters' | 'used_none' | 'duplicate' | 'straddle' | 'deliveries_complete' | 'exact_duplicate'
   // extrapolate: gross up partial-year data by coverage ratio
   monthsCovered?: number          // for extrapolate: e.g. 11
   pctEstimated?: number           // for extrapolate: e.g. 8.3
@@ -1972,7 +1976,12 @@ interface CoverageResolution {
   // (fleet_fuel) share fuelType 'diesel', so without this one estimate grossed up and cleared both.
   // Absent is accepted only where the location has a single document type for the fuel.
   documentType?: string
-  // same_bill: the document that counts, and the ones retained as evidence but not counted.
+  // exact_duplicate (T15, rule R6): the customer's answer to an exact duplicate across document types.
+  //   count_once: countedDocId counts; excludedDocIds are retained as evidence, not counted (exact_duplicate_of).
+  //   not_same:   docIds all count. Both record who chose (`by`) and when (`acknowledgedAt`).
+  choice?: 'count_once' | 'not_same'
+  // same_bill, and exact_duplicate count_once: the document that counts, and the ones retained as evidence
+  // but not counted.
   countedDocId?: string
   excludedDocIds?: string[]
   // different_meters: the document the meter label was given to.
@@ -3069,6 +3078,9 @@ function resolutionMethod(r: CoverageResolution): string {
     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
     : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
     : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
+    : r.kind === 'exact_duplicate' ? (r.choice === 'count_once'
+      ? `Same document, counted once, chosen by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
+      : `Not the same document, each counted, chosen by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`)
     : r.kind
 }
 function resolutionBasis(r: CoverageResolution): string {
@@ -3134,6 +3146,27 @@ export function validateResolution(r: CoverageResolution, loc: Location): string
       if (!r.field || !USED_NONE_FIELDS.has(r.field)) return 'Name the figure that is being confirmed as none.'
       if (!r.by?.userId || !r.by?.email) return 'A confirmation must record who confirmed it.'
       return null
+    case 'exact_duplicate': {
+      if (!r.by?.userId || !r.by?.email) return 'A choice must record who made it.'
+      const typeOf = (id: string) => docs.find(d => d.id === id)?.document_type
+      if (r.choice === 'count_once') {
+        const ex = r.excludedDocIds ?? []
+        if (!r.countedDocId) return 'Choose the document that counts.'
+        if (ex.length === 0) return 'Choose the document that is the same as it.'
+        if (ex.includes(r.countedDocId)) return 'The document that counts cannot also be excluded.'
+        if (![r.countedDocId, ...ex].every(hasFuel)) return 'Every document named must be on this site and carry this fuel.'
+        // R6 is across document types. Two documents of one type are an overlap, answered by Same bill.
+        if (ex.some(id => typeOf(id) === typeOf(r.countedDocId as string))) return 'These documents are the same kind, so choose Same bill, count it once.'
+        return null
+      }
+      if (r.choice === 'not_same') {
+        const ids = r.docIds ?? []
+        if (new Set(ids).size < 2) return 'Name the two documents that are not the same.'
+        if (!ids.every(hasFuel)) return 'Every document named must be on this site and carry this fuel.'
+        return null
+      }
+      return 'Choose Same document, count once, or Not the same.'
+    }
     case 'duplicate':
       return 'This resolution is no longer accepted. Choose Same bill, count it once, or Different meters or accounts.'
     case 'straddle':
@@ -3230,6 +3263,9 @@ export const COVERAGE_MESSAGE = {
     `Confirm these are all the ${fuel} deliveries for ${site} between ${from} and ${to}. Export is blocked until you confirm.`,
   deliveries_changed: (fuel: string, site: string, email: string, date: string) =>
     `The ${fuel} deliveries for ${site} have changed since ${email} confirmed them on ${date}. Check the list and confirm again. Export is blocked until you do.`,
+  // T15 (rule R6): the same document under two document types. What was observed is stated, not guessed at.
+  exact_duplicate: (site: string, fileA: string, fileB: string, match: 'sha256' | 'reading', fuel: string) =>
+    `${fileA} and ${fileB} at ${site} ${match === 'sha256' ? 'are the same file' : `show the same ${fuel} figure, unit and dates`}, uploaded as two different kinds of document. Choose Same document, count once, or Not the same. Export is blocked until you choose.`,
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
     `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
 }
@@ -3270,7 +3306,8 @@ export function streamSwitchOff(loc: Location, field: keyof Location | string): 
 //                  the canonical period). Not counted. Distinct from undated (ruled).
 //   undated        confirmed, but no usable period: dates missing. No evidence of in-year days, so no
 //                  contribution; the coverage gate's 'none' still blocks export.
-// T3 RULING: of the not-counted reasons only outside_year and same_bill_as may be silent. undated,
+// T3 RULING: of the not-counted reasons only outside_year and same_bill_as may be silent (and, since T15,
+// exact_duplicate_of, which the customer chose). undated,
 // invalid_period and mixed_units must each raise an export-blocking coverage issue with a plain-language
 // message, so a field can never drop to zero without the customer being told. T1 only labels the rows.
 //   outside_year   no day inside the window (rule R1).
@@ -3279,7 +3316,8 @@ export function streamSwitchOff(loc: Location, field: keyof Location | string): 
 // A proposal with value null produces NO row (ruled): there is no figure to count or exclude, and the
 // document's read_outcome already says why. A proposal whose (document_type, fuelType) maps to no field
 // produces no row either, as applyResolutions skips it today.
-// same_bill_as, exact_duplicate_of and manual_override are reserved for T3, T15 and T10; nothing sets them yet.
+// same_bill_as (T3), exact_duplicate_of (T15) and manual_override (T10) are set from the customer's choices;
+// reasonRef names the document that counts instead.
 //
 // `value` is the bill's full canonical value. What it contributes is value × share when counted (T2).
 // `periodStart` is kept VERBATIM as stored; `periodEndExclusive` is the canonical boundary.
@@ -3412,8 +3450,8 @@ function isRealIsoDate(s: string): boolean {
   return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d
 }
 
-// `resolutions`: T3 reads accepted same_bill resolutions (excluded documents → same_bill_as). T10 and T14
-// extend it.
+// `resolutions`: T3 reads accepted same_bill resolutions (excluded documents → same_bill_as), and T15 accepted
+// exact_duplicate count_once ones (excluded documents → exact_duplicate_of). T10 and T14 extend it.
 export function billContributions(
   loc: Location,
   resolutions: CoverageResolution[],
@@ -3421,8 +3459,12 @@ export function billContributions(
 ): BillContribution[] {
   // same_bill (T3): documents excluded by an accepted resolution, keyed docId → the document that counts.
   const excludedBy = new Map<string, string>()
+  // exact_duplicate count_once (T15): the same, for a copy uploaded under another document type.
+  const duplicateOf = new Map<string, string>()
   for (const r of acceptedResolutions(loc, resolutions)) {
     if (r.kind === 'same_bill') for (const id of r.excludedDocIds ?? []) excludedBy.set(`${id}|${r.fuelType}`, r.countedDocId as string)
+    if (r.kind === 'exact_duplicate' && r.choice === 'count_once')
+      for (const id of r.excludedDocIds ?? []) duplicateOf.set(`${id}|${r.fuelType}`, r.countedDocId as string)
   }
   const DAY = 86400000
   const dayCount = (a: Date, b: Date): number => Math.round((b.getTime() - a.getTime()) / DAY)
@@ -3438,7 +3480,7 @@ export function billContributions(
   const unitsByField = new Map<string, Set<string>>()
   loc.source_docs.forEach(d => d.extracted?.forEach(p => {
     if (p.status !== 'confirmed' || p.value == null) return
-    if (excludedBy.has(`${d.id}|${p.fuelType}`)) return   // not counted, so it cannot make a field mixed
+    if (excludedBy.has(`${d.id}|${p.fuelType}`) || duplicateOf.has(`${d.id}|${p.fuelType}`)) return   // not counted, so it cannot make a field mixed
     const map = fieldFor(d.document_type, p.fuelType)
     if (!map) return
     const units = unitsByField.get(String(map.amount)) ?? new Set<string>()
@@ -3487,11 +3529,13 @@ export function billContributions(
     }
 
     const sameBillAs = excludedBy.get(`${d.id}|${p.fuelType}`)
+    const exactDuplicateOf = duplicateOf.get(`${d.id}|${p.fuelType}`)
     const reason: ContributionReason =
       p.status !== 'confirmed' ? 'not_confirmed'
       // T10: the customer entered this figure by hand instead; the bill stays as evidence, not counted.
       : activeOverride(loc, map.amount) ? 'manual_override'
       : sameBillAs ? 'same_bill_as'
+      : exactDuplicateOf ? 'exact_duplicate_of'
       : (unitsByField.get(String(map.amount))?.size ?? 0) > 1 ? 'mixed_units'
       : periodProblem ? 'invalid_period'
       : deliveryDate !== null ? (deliveredInWindow ? 'delivered' : 'outside_year')
@@ -3518,6 +3562,7 @@ export function billContributions(
       reason,
       ...(reason === 'invalid_period' && periodProblem ? { periodProblem } : {}),
       ...(reason === 'same_bill_as' && sameBillAs ? { reasonRef: sameBillAs } : {}),
+      ...(reason === 'exact_duplicate_of' && exactDuplicateOf ? { reasonRef: exactDuplicateOf } : {}),
       ...(deliveryDate !== null && periodProblem === null ? { deliveryDate } : {}),
       // T9: the original reading and the customer's changes travel with the contribution into workings.
       ...(p.asRead ? { asRead: p.asRead } : {}),
@@ -4111,7 +4156,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       if (figure(z.field) !== 0) continue
       const contrib = contributionsFor(z.field)
       const confirmed = contrib.filter(c => c.reason !== 'not_confirmed')
-      if (confirmed.length === 0 || !confirmed.every(c => c.reason === 'outside_year' || c.reason === 'same_bill_as')) continue
+      if (confirmed.length === 0 || !confirmed.every(c => c.reason === 'outside_year' || c.reason === 'same_bill_as' || c.reason === 'exact_duplicate_of')) continue
       rows.push({ location: loc.name || 'Location', source: z.source, scope: z.scope,
         activity_data: 0, activity_unit: z.unitField ? String((loc as unknown as Record<string, string>)[String(z.unitField)]) : z.unit,
         emission_factor: NOT_APPLICABLE, emission_factor_display: NOT_APPLICABLE, ef_source: NOT_APPLICABLE,
@@ -4203,7 +4248,8 @@ export interface CoverageIssue {
   locId: string
   fuelType: string
   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
-  // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a).
+  // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a),
+  // exact_duplicate (T15, rule R6).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
   // T8: what the strip needs to place the issue and act on it. documentType on gap and overlap (the coverage
@@ -4214,6 +4260,64 @@ export interface CoverageIssue {
   fields?: string[]
   docIds?: string[]
   meterLabel?: string | null
+}
+
+// ── T15: EXACT DUPLICATES ACROSS DOCUMENT TYPES (rule R6, docs/review/design-derived-figures.md) ──────────
+// Within one location, two ACCEPTED proposals (confirmed, with a figure, for a field not entered by hand) from
+// DIFFERENT document types, for the same fuel, are an exact duplicate when either:
+//   (a) their documents carry the same sha256 (a missing hash never matches); or
+//   (b) the same canonical value and unit, and the same periodStart and periodEnd. A delivery has no period, so
+//       its delivery date stands for both ends.
+// Same fuel, because only a fuel read twice can be counted twice: a dual-fuel bill uploaded as the gas bill and
+// as the electricity bill, read once for each fuel, counts each fuel once.
+// A WARNING, NOT A COVERAGE ISSUE: it is not in analyzeCoverage's issues. findUnresolvedCoverage still blocks
+// export on it until an accepted exact_duplicate resolution names both documents.
+export interface ExactDuplicate {
+  locId: string
+  fuelType: string
+  docIds: [string, string]
+  match: 'sha256' | 'reading'
+  /** The accepted choice that answers this pair, or null while it is unanswered. */
+  resolution: CoverageResolution | null
+}
+
+export function findExactDuplicates(loc: Location, allResolutions: CoverageResolution[]): ExactDuplicate[] {
+  type Cand = { doc: SourceDoc; p: ExtractedProposal }
+  const cands: Cand[] = []
+  loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
+    if (p.status !== 'confirmed' || p.value == null) return
+    const map = fieldFor(d.document_type, p.fuelType)
+    if (!map || activeOverride(loc, map.amount)) return
+    cands.push({ doc: d, p })
+  }))
+  const startOf = (p: ExtractedProposal) => p.periodStart ?? p.deliveryDate ?? null
+  const endOf = (p: ExtractedProposal) => p.periodEnd ?? p.deliveryDate ?? null
+  const sameReading = (a: ExtractedProposal, b: ExtractedProposal) =>
+    a.value === b.value && a.unit != null && a.unit === b.unit
+    && startOf(a) != null && startOf(a) === startOf(b) && endOf(a) != null && endOf(a) === endOf(b)
+  const accepted = acceptedResolutions(loc, allResolutions).filter(r => r.kind === 'exact_duplicate')
+  const answers = (r: CoverageResolution, fuelType: string, a: string, b: string) => {
+    if (r.fuelType !== fuelType) return false
+    const ids = r.choice === 'count_once' ? [r.countedDocId, ...(r.excludedDocIds ?? [])] : (r.docIds ?? [])
+    return ids.includes(a) && ids.includes(b)
+  }
+  const found = new Map<string, ExactDuplicate>()
+  for (let i = 0; i < cands.length; i++) {
+    for (let j = i + 1; j < cands.length; j++) {
+      const A = cands[i], B = cands[j]
+      if (A.doc.id === B.doc.id || A.doc.document_type === B.doc.document_type || A.p.fuelType !== B.p.fuelType) continue
+      const byHash = !!A.doc.sha256 && A.doc.sha256 === B.doc.sha256
+      if (!byHash && !sameReading(A.p, B.p)) continue
+      const key = `${A.p.fuelType}|${[A.doc.id, B.doc.id].sort().join('|')}`
+      const prev = found.get(key)
+      if (prev && (prev.match === 'sha256' || !byHash)) continue
+      found.set(key, {
+        locId: loc.id, fuelType: A.p.fuelType, docIds: [A.doc.id, B.doc.id], match: byHash ? 'sha256' : 'reading',
+        resolution: accepted.filter(r => answers(r, A.p.fuelType, A.doc.id, B.doc.id)).at(-1) ?? null,
+      })
+    }
+  }
+  return [...found.values()]
 }
 
 // Every export-blocking coverage issue. Coverage groups are keyed (document_type, fuelType, meter_label)
@@ -4227,6 +4331,8 @@ export interface CoverageIssue {
 //   all_rejected   every document for a field rejected, no figure entered (the field is 0), and no
 //            accepted used_none.
 //   none     a document with no figure read from it at all (unchanged from before T3).
+//   exact_duplicate   the same document under two document types (T15, rule R6) with no accepted
+//            exact_duplicate choice naming both: Same document, count once, or Not the same.
 export function findUnresolvedCoverage(
   locations: Location[],
   reportingYear: number,
@@ -4299,6 +4405,13 @@ export function findUnresolvedCoverage(
       const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
       if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected', field,
         message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
+    }
+
+    // T15 (rule R6): an exact duplicate across document types blocks export until the customer chooses.
+    for (const x of findExactDuplicates(loc, allResolutions)) {
+      if (x.resolution) continue
+      out.push({ locId: loc.id, fuelType: x.fuelType, status: 'exact_duplicate', docIds: [...x.docIds],
+        message: COVERAGE_MESSAGE.exact_duplicate(site, fileOf(x.docIds[0]), fileOf(x.docIds[1]), x.match, FUEL_NAME[x.fuelType] ?? x.fuelType) })
     }
 
     // Confirmed bills under a "uses this fuel" switch that is off (T6 ruling). The annual figure omits a

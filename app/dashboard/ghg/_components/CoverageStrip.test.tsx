@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CoverageStrip, type CoverageStripProps } from './CoverageStrip'
-import { emptyLocation, deriveLocations, type Location, type SourceDoc, type ExtractedProposal } from '@/lib/ghg/engine'
+import { emptyLocation, deriveLocations, type Location, type SourceDoc, type ExtractedProposal, type CoverageResolution } from '@/lib/ghg/engine'
 import { stripTsComments } from '@/lib/testing/stripComments'
 
 const prop = (o: Partial<ExtractedProposal>): ExtractedProposal => ({
@@ -220,5 +220,43 @@ describe('coverage strip: what it says is not counted is not in the figure (T13,
     const without = { ...l, source_docs: l.source_docs.filter(d => d.id !== 'old') }
     expect(deriveLocations({ locations: [without], reporting_year: 2025 })[0].natural_gas_amount).toBe(150)
     expect(text(draw(without))).not.toContain('not counted')
+  })
+})
+
+describe('coverage strip: the same document under two kinds of upload (T15)', () => {
+  const diesel = (id: string, document_type: string): SourceDoc => ({
+    id, file_name: `${id}.pdf`, document_type, uploaded_at: '2025-06-01', file_path: `/${id}.pdf`, sha256: 'ab12',
+    extracted: [prop({ fuelType: 'diesel', value: 100, unit: 'gallons', periodStart: '2025-03-01', periodEnd: '2025-03-31' })],
+  })
+  const depot = (): Location => ({ ...emptyLocation('L1', 'Depot'), has_diesel_stationary: true, has_mobile: true,
+    source_docs: [diesel('tank', 'fuel_diesel'), diesel('fleet', 'fleet_fuel')] })
+  const drawAt = (docType: string, o: Partial<CoverageStripProps> = {}) => draw(depot(), { docType, ...o })
+
+  it('shows the message and both choices under each of the two uploads', () => {
+    for (const docType of ['fuel_diesel', 'fleet_fuel']) {
+      const t = text(drawAt(docType))
+      expect(t, docType).toContain('tank.pdf and fleet.pdf at Depot are the same file, uploaded as two different kinds of document.')
+      expect(t, docType).toContain('Same document, count once:')
+      expect(t, docType).toContain('Count tank.pdf')
+      expect(t, docType).toContain('Count fleet.pdf')
+      expect(t, docType).toContain('Not the same')
+    }
+  })
+
+  it('records who chose and when, and once chosen shows the choice instead', () => {
+    const added: CoverageResolution[] = []
+    const html = drawAt('fuel_diesel', { onAdd: r => added.push(r) })
+    expect(html).not.toContain('disabled=""')
+    const chosen = { locId: 'L1', fuelType: 'diesel', kind: 'exact_duplicate', choice: 'not_same', docIds: ['tank', 'fleet'],
+      by: { userId: 'u-1', email: 'jo@acme.example' }, note: 'jo@acme.example confirmed on 2 April 2025 that tank.pdf and fleet.pdf are not the same document, so both are counted.',
+      acknowledgedAt: '2025-04-02T09:00:00Z' } as CoverageResolution
+    const t = text(drawAt('fleet_fuel', { resolutions: [chosen] }))
+    expect(t).toContain('jo@acme.example confirmed on 2 April 2025 that tank.pdf and fleet.pdf are not the same document, so both are counted.')
+    expect(t).not.toContain('Same document, count once:')
+  })
+
+  it('cannot be answered without a signed-in user, since the choice records who made it', () => {
+    const html = drawAt('fuel_diesel', { currentUser: null })
+    expect(html.match(/disabled=""[^>]*>(Count tank\.pdf|Count fleet\.pdf|Not the same)</g)?.length).toBe(3)
   })
 })
