@@ -14,6 +14,7 @@
 import { useState, Suspense } from 'react'
 // RELATIVE, not '@/lib/...': tsconfig resolves the alias and vitest does not.
 import { HONEYPOT_FIELD } from '../../lib/assessmentSubmitGuard'
+import { SERVICE_UNAVAILABLE_MESSAGE, quoteSubmitOutcome } from '../../lib/serviceUnavailable'
 import { useSearchParams } from 'next/navigation'
 import {
   LEGACY_PRICING_PAGE_ID,
@@ -76,7 +77,8 @@ function OrderInner() {
   // `hp` is the honeypot's LOCAL state name; the wire field is HONEYPOT_FIELD, shared with the route
   // and with /assess so one edit moves all three. See lib/assessmentSubmitGuard.ts.
   const [q, setQ] = useState({ name: '', email: '', company: '', phone: '', hp: '' })
-  const [quoteStatus, setQuoteStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
+  // 'unavailable' (ENF-RL1): the route answered 503, its limiter could not run and nothing was sent; the form is kept.
+  const [quoteStatus, setQuoteStatus] = useState<'idle' | 'sending' | 'done' | 'error' | 'unavailable'>('idle')
 
   // ── Params → canonical keys + validated tier ──────────────────────────────────
   const rawTier = searchParams.get('tier')
@@ -148,7 +150,7 @@ function OrderInner() {
           order: { modules: keys, tier, totalUSD: quote.totalUSD, ref: ref ?? undefined },
         }),
       })
-      setQuoteStatus(res.ok ? 'done' : 'error')
+      setQuoteStatus(quoteSubmitOutcome(res.status))
     } catch {
       setQuoteStatus('error')
     }
@@ -244,6 +246,9 @@ function OrderInner() {
 
                 {quoteStatus === 'error' && (
                   <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 12 }}>Something went wrong sending your request. Please try again.</div>
+                )}
+                {quoteStatus === 'unavailable' && (
+                  <div role="alert" data-quote-unavailable style={{ fontSize: 12, color: '#B91C1C', marginTop: 12 }}>{SERVICE_UNAVAILABLE_MESSAGE}</div>
                 )}
 
                 <button

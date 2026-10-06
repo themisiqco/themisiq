@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
+import { checkAndRecordRateLimit, ipFromHeaders, RATE_LIMIT_UNAVAILABLE_MESSAGE } from '../../../../lib/rateLimit'
 import { HONEYPOT_FIELD, isHoneypotTripped } from '../../../../lib/assessmentSubmitGuard'
 import { createDraftInvoiceForOrder } from '../../../../lib/order/invoice'
 import { isGhgTier, type Tier } from '../../../../lib/pricing'
@@ -73,7 +73,12 @@ export async function POST(req: NextRequest) {
 
     // ── Rate limit (Supabase-backed; per IP + per email). 429 when exceeded ────
     const ip = ipFromHeaders(req)
-    const rl = await checkAndRecordRateLimit({ bucket: 'order-quote-request', ip, email: vEmail, ipLimit: 8, emailLimit: 3, windowMs: 60 * 60 * 1000 })
+    // ENF-RL1: fails CLOSED, because this route emails the address the visitor typed. A table outage answers 503 with
+    // a plain sentence; nothing is sent and no invoice is drafted.
+    const rl = await checkAndRecordRateLimit({ bucket: 'order-quote-request', ip, email: vEmail, ipLimit: 8, emailLimit: 3, windowMs: 60 * 60 * 1000, failClosed: true })
+    if (!rl.ok && rl.reason === 'unavailable') {
+      return NextResponse.json({ error: RATE_LIMIT_UNAVAILABLE_MESSAGE }, { status: 503 })
+    }
     if (!rl.ok) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later, or email hello@themisiq.co.' },

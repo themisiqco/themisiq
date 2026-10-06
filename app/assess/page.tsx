@@ -5,6 +5,7 @@ import { Fragment, useState } from 'react'
 // here typechecks clean and then fails app/assess/obligations.test.ts at import time. Every other
 // import in this file is relative for the same reason.
 import { HONEYPOT_FIELD } from '../../lib/assessmentSubmitGuard'
+import { SERVICE_UNAVAILABLE_MESSAGE, assessSubmitOutcome } from '../../lib/serviceUnavailable'
 import {
   AI_ACT_HIGH_RISK_STANDALONE, AI_ACT_HIGH_RISK_EMBEDDED, AI_ACT_HIGH_RISK_SENTENCE,
 } from '../../lib/aiAct'
@@ -740,15 +741,23 @@ export default function AssessPage() {
   const goNext = () => setStep(s => s + 1)
   const goBack = () => setStep(s => s - 1)
 
-  const submitToAPI = async () => {
+  // ENF-RL1: the submit now waits for the route's answer, because one answer changes what happens next. A 503 means the
+  // route could not check its limits and sent nothing (lib/rateLimit.ts failClosed): the visitor stays on this step,
+  // with every answer kept, and sees the route's sentence. Any other answer, including the silent success the route
+  // gives a reached limit, and a request that got no answer at all, shows the results exactly as before.
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const submitToAPI = async (): Promise<number | null> => {
     try {
-      await fetch('/api/assessment/submit', {
+      const res = await fetch('/api/assessment/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead: { first: email.first, last: email.last, email: email.emailAddr, company: email.company, role: email.role, [HONEYPOT_FIELD]: email.website }, obligations, profile: answerProfile(answers) }),
       })
+      return res.status
     } catch (e) {
       console.error('Email send failed:', e)
+      return null
     }
   }
   const toggleExpand = (id: string) => setExpanded(e => ({ ...e, [id]: !e[id] }))
@@ -1004,12 +1013,18 @@ export default function AssessPage() {
               supply_chain: the visitor submitted the form and was shown a question again. */}
           {/* Background and label colour come from .tq-btn-brand, NOT inline: an inline background would
               switch the hover off. The label was #0d0d0d on brand, 2.55:1. */}
-          <button className="tq-btn-brand" onClick={() => {
+          <button className="tq-btn-brand" disabled={submitting} onClick={async () => {
             if (!email.emailAddr.includes('@')) { setEmailError('Enter your work email address, including the @.'); return }
-            submitToAPI(); setStep(RESULTS_STEP)
-          }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer', marginTop: 4 }}>
+            setSubmitError(null)
+            setSubmitting(true)
+            const status = await submitToAPI()
+            setSubmitting(false)
+            if (assessSubmitOutcome(status) === 'unavailable') { setSubmitError(SERVICE_UNAVAILABLE_MESSAGE); return }
+            setStep(RESULTS_STEP)
+          }} style={{ fontSize: 14, fontWeight: 500, padding: 12, borderRadius: 8, border: 'none', cursor: submitting ? 'wait' : 'pointer', marginTop: 4 }}>
             Show my Compliance Obligation Map →
           </button>
+          {submitError && <p id="assess-submit-error" role="alert" style={{ fontSize: 13, color: 'var(--color-state-error)', margin: '6px 0 0', lineHeight: 1.5 }}>{submitError}</p>}
           <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', textAlign: 'center' as const, margin: 0 }}>No spam. No sales calls unless you ask.</p>
         </div>
         <div style={{ marginTop: '1rem' }}>

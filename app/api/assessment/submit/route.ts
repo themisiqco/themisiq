@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 // (resolved from lib/obligations.ts, never posted by the client). A route file may export only its HTTP
 // handlers, so the builders live there, where they are tested and can be previewed without sending.
 import { buildLeadEmailHtml, buildNotifyHtml } from '../../../../lib/assessmentEmail'
-import { checkAndRecordRateLimit, ipFromHeaders } from '../../../../lib/rateLimit'
+import { checkAndRecordRateLimit, ipFromHeaders, RATE_LIMIT_UNAVAILABLE_MESSAGE } from '../../../../lib/rateLimit'
 import {
   ASSESSMENT_IP_BUCKET, ASSESSMENT_IP_LIMIT, ASSESSMENT_IP_WINDOW_MS,
   ASSESSMENT_EMAIL_BUCKET, ASSESSMENT_EMAIL_LIMIT, ASSESSMENT_EMAIL_WINDOW_MS,
@@ -38,6 +38,10 @@ export async function POST(req: NextRequest) {
     // provider receipt. The client reads neither field; a future consumer that needs to distinguish
     // them should be given a channel that is not this response.
     const silentOk = () => NextResponse.json({ success: true })
+    // ⚠️ EXCEPT WHEN THE LIMITER COULD NOT RUN (ENF-RL1). Both buckets fail CLOSED, because this route emails the address
+    // the visitor typed: a table outage must not become a way to mail other people. That refusal is a 503 with a plain
+    // sentence, not the silent success: it says nothing about limits or addresses, so it is no oracle. Nothing is sent.
+    const unavailable = () => NextResponse.json({ error: RATE_LIMIT_UNAVAILABLE_MESSAGE }, { status: 503 })
 
     // ⚠️ THE HONEYPOT IS CHECKED FIRST, BEFORE THE LIMITER, SO A BOT CANNOT FILL `rate_limits`. Every
     // allowed limiter call INSERTS a row; running the limiter on traffic already known to be a bot
@@ -55,8 +59,9 @@ export async function POST(req: NextRequest) {
     const ipRl = await checkAndRecordRateLimit({
       bucket: ASSESSMENT_IP_BUCKET, ip, email: null,
       ipLimit: ASSESSMENT_IP_LIMIT, emailLimit: ASSESSMENT_IP_LIMIT,
-      windowMs: ASSESSMENT_IP_WINDOW_MS,
+      windowMs: ASSESSMENT_IP_WINDOW_MS, failClosed: true,
     })
+    if (!ipRl.ok && ipRl.reason === 'unavailable') return unavailable()
     if (!ipRl.ok) {
       console.warn('[assessment/submit] IP limit reached, dropping submission')
       return silentOk()
@@ -67,8 +72,9 @@ export async function POST(req: NextRequest) {
     const emailRl = await checkAndRecordRateLimit({
       bucket: ASSESSMENT_EMAIL_BUCKET, ip: null, email: recipientKey(lead.email),
       ipLimit: ASSESSMENT_EMAIL_LIMIT, emailLimit: ASSESSMENT_EMAIL_LIMIT,
-      windowMs: ASSESSMENT_EMAIL_WINDOW_MS,
+      windowMs: ASSESSMENT_EMAIL_WINDOW_MS, failClosed: true,
     })
+    if (!emailRl.ok && emailRl.reason === 'unavailable') return unavailable()
     if (!emailRl.ok) {
       console.warn('[assessment/submit] recipient limit reached, dropping submission')
       return silentOk()

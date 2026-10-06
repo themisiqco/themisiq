@@ -7,8 +7,13 @@
 // The `rate_limits` table (migration 20260702_rate_limits.sql) is the single shared store
 // this stack has (no Redis/KV in deps). Writes go through the service-role admin client.
 //
-// FAILS OPEN: if the store errors, we ALLOW the request (a DB hiccup must not block a
+// FAILS OPEN BY DEFAULT: if the store errors, we ALLOW the request (a DB hiccup must not block a
 // legitimate submission) — the fault is logged. Input validation still applies regardless.
+//
+// ⚠️ failClosed (ENF-RL1, Oct 2026) REFUSES INSTEAD, for a bucket guarding a route that emails an address the
+// visitor TYPES (/api/assessment/submit, /api/order/quote-request). Failing open there would let a table outage be
+// used to send mail to other people's addresses. The result then says why (reason 'unavailable'), so the route can
+// answer 503 rather than its "limit reached" reply. Every other bucket keeps failing open.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getSupabaseAdmin } from './supabaseAdmin'
@@ -20,12 +25,20 @@ export interface RateLimitCheck {
   ipLimit: number          // max hits per window per IP
   emailLimit: number       // max hits per window per email
   windowMs: number
+  /** Refuse, not allow, when the table cannot be read or written. Default false (fail open). */
+  failClosed?: boolean
 }
 
 export interface RateLimitResult {
   ok: boolean
   retryAfterSec: number
+  /** Why ok is false: the limit was reached, or (failClosed only) the table could not be used. */
+  reason?: 'limited' | 'unavailable'
 }
+
+/** What a failClosed route answers, with 503, when the table cannot be used (ENF-RL1). One sentence, shared with the
+ *  pages that show it (lib/serviceUnavailable.ts, client-safe). */
+export { SERVICE_UNAVAILABLE_MESSAGE as RATE_LIMIT_UNAVAILABLE_MESSAGE } from './serviceUnavailable'
 
 // Count recent hits per ip and per email in the window; deny if either is at/over its limit,
 // otherwise record one row and allow. Fixed-window — simple and robust for this purpose.
@@ -43,7 +56,7 @@ export async function checkAndRecordRateLimit(c: RateLimitCheck): Promise<RateLi
         .eq('ip', c.ip)
         .gte('created_at', sinceISO)
       if (error) throw error
-      if ((count ?? 0) >= c.ipLimit) return { ok: false, retryAfterSec }
+      if ((count ?? 0) >= c.ipLimit) return { ok: false, retryAfterSec, reason: 'limited' }
     }
 
     if (c.email) {
@@ -54,7 +67,7 @@ export async function checkAndRecordRateLimit(c: RateLimitCheck): Promise<RateLi
         .eq('email', c.email)
         .gte('created_at', sinceISO)
       if (error) throw error
-      if ((count ?? 0) >= c.emailLimit) return { ok: false, retryAfterSec }
+      if ((count ?? 0) >= c.emailLimit) return { ok: false, retryAfterSec, reason: 'limited' }
     }
 
     const { error: insErr } = await admin
@@ -64,6 +77,10 @@ export async function checkAndRecordRateLimit(c: RateLimitCheck): Promise<RateLi
 
     return { ok: true, retryAfterSec }
   } catch (err) {
+    if (c.failClosed) {
+      console.error(`[rateLimit] check failed (failing closed): bucket ${c.bucket}:`, err)
+      return { ok: false, retryAfterSec, reason: 'unavailable' }
+    }
     // Fail OPEN — never let a limiter/store fault block a legitimate request. Logged.
     console.error('[rateLimit] check failed (failing open):', err)
     return { ok: true, retryAfterSec }
