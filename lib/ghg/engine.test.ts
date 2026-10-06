@@ -36,6 +36,7 @@ import {
   valueProblem, NO_VALUE_MESSAGE, proposalNeedsAttention,
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
   findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
+  notCountedLines, FIX_DATES, FIX_REVERSED, FIX_UNITS,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
@@ -3529,7 +3530,7 @@ describe('T1 billContributions', () => {
   // T5 adds buildWorkings (contributions on rows) and the evidenced quantity per field, which T6 moved into
   // emissionsByLocationField (shared by pctEstimated and reconcile); T6 adds the monthly split; T8 adds the
   // coverage strip, which shows each bill's prorated share.
-  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField, buildMonthlyEmissions, the coverage strip and the upload\'s not-counted note (T2, T3, T5, T6, T8, T15-fix1)', () => {
+  it('is called only by applyResolutions, findUnresolvedCoverage, buildWorkings, emissionsByLocationField, notCountedLines, buildMonthlyEmissions and the coverage strip (T2, T3, T5, T6, T8, T15-fix2)', () => {
     const root = join(__dirname, '..', '..');
     const walk = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(n => {
       const rel = `${dir}/${n}`;
@@ -3541,10 +3542,11 @@ describe('T1 billContributions', () => {
       const n = (src.match(/billContributions\(/g) ?? []).length;
       return n ? [`${f}: ${n}`] : [];
     });
-    // page.tsx: DocUpload reads which readings were left out as an exact duplicate, to say so beside them (T15-fix1).
-    expect(calls).toEqual(['lib/ghg/engine.ts: 4', 'lib/ghg/monthlyEmissions.ts: 1', 'app/dashboard/ghg/_components/CoverageStrip.tsx: 1', 'app/dashboard/ghg/page.tsx: 1']);
+    // T15-fix2: the fifth engine call is notCountedLines, which the page's reading rows read instead of calling
+    // billContributions themselves (T15-fix1 did, and that call is gone).
+    expect(calls).toEqual(['lib/ghg/engine.ts: 5', 'lib/ghg/monthlyEmissions.ts: 1', 'app/dashboard/ghg/_components/CoverageStrip.tsx: 1']);
     const engineSrc = readFileSync(join(root, 'lib/ghg/engine.ts'), 'utf8');
-    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(']) {
+    for (const fn of ['export function applyResolutions(', 'export function findUnresolvedCoverage(', 'function buildWorkings(', 'export function emissionsByLocationField(', 'export function notCountedLines(']) {
       const body = engineSrc.slice(engineSrc.indexOf(fn));
       expect(body.slice(0, body.indexOf('\n}\n')), fn).toMatch(/billContributions\(/);
     }
@@ -5157,5 +5159,98 @@ describe('T15-fix1 the same file uploaded twice under one name', () => {
       ...buildWorkings([moncton()], 'AR6', 2025, choose(FLEET, TANK)).filter(w => w.activity_unit === 'exact_duplicate').map(w => String(w.emission_factor)),
     ];
     for (const t of texts) expect(t).not.toContain('\u2014');
+  });
+});
+
+// ── T15-fix2: every confirmed reading that is not counted says so, under the reading ─────────────────────
+// A reading shows its figure and "Confirmed". Where it reaches no total, notCountedLines gives the line the page
+// prints under it (app/dashboard/ghg/page.tsx, DocUpload). Never for a counted, prorated or delivered reading.
+describe('T15-fix2 not-counted line under each confirmed, uncounted reading', () => {
+  const W = periodFromYearAndEnd(2025, 12);
+  const gas = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart, periodEnd, ...o });
+  const gdoc = (id: string, p: ExtractedProposal, o: Partial<SourceDoc> = {}): SourceDoc =>
+    ({ ...doc('utility_bill_gas', [p], id), file_name: `${id}.pdf`, ...o });
+  const site = (docs: SourceDoc[], o: Partial<Location> = {}) => loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs, ...o });
+  const lines = (l: Location, r: CoverageResolution[] = []) => Object.fromEntries(notCountedLines(l, r, W));
+  const same = (counted: string, excluded: string): CoverageResolution =>
+    ({ locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: counted, excludedDocIds: [excluded], note: 'n', acknowledgedAt: '2025-04-02T09:00:00Z' });
+
+  it('never for a counted, prorated or delivered reading, nor one not yet confirmed', () => {
+    const l = site([
+      gdoc('jan', gas(100, '2025-01-01', '2025-01-31')),
+      gdoc('edge', gas(310, '2024-12-20', '2025-01-19')),        // prorated: counted
+      gdoc('pending', gas(90, '2025-02-01', '2025-02-28', { status: 'extracted' })),
+      gdoc('rejected', gas(90, '2025-03-01', '2025-03-31', { status: 'rejected' })),
+    ]);
+    const d = loc({ has_diesel_stationary: true, diesel_stationary_unit: 'litres', source_docs: [
+      { ...doc('fuel_diesel', [prop({ fuelType: 'diesel', value: 500, unit: 'litres', periodStart: null, periodEnd: null, deliveryDate: '2025-05-02' })], 'dd'), file_name: 'dd.pdf' }] });
+    expect(billContributions(l, [], W).find(c => c.docId === 'edge')?.reason).toBe('prorated');
+    expect(lines(l)).toEqual({});
+    expect(lines(d)).toEqual({});
+  });
+
+  it('outside_year: billed or delivered outside the reporting year', () => {
+    const l = site([gdoc('jan', gas(100, '2025-01-01', '2025-01-31')), gdoc('old', gas(999, '2024-03-01', '2024-03-31'))]);
+    expect(lines(l)).toEqual({ 'old:0': 'Not counted: billed outside reporting year 2025.' });
+    const d = loc({ has_diesel_stationary: true, source_docs: [
+      { ...doc('fuel_diesel', [prop({ fuelType: 'diesel', value: 500, unit: 'litres', periodStart: null, periodEnd: null, deliveryDate: '2024-11-02' })], 'dd'), file_name: 'dd.pdf' }] });
+    expect(lines(d)).toEqual({ 'dd:0': 'Not counted: delivered outside reporting year 2025.' });
+  });
+
+  it('same_bill_as: names the counted copy by file, or by upload date when the names are the same', () => {
+    const bills = (aName: string, bName: string, aAt = '2025-04-01T10:05:00', bAt = '2025-04-03T16:40:00') => site([
+      gdoc('a', gas(100, '2025-01-01', '2025-01-31'), { file_name: aName, uploaded_at: aAt }),
+      gdoc('b', gas(100, '2025-01-01', '2025-01-31'), { file_name: bName, uploaded_at: bAt }),
+    ]);
+    expect(lines(bills('jan-a.pdf', 'jan-b.pdf'), [same('a', 'b')])).toEqual({ 'b:0': 'Not counted: this is the same bill as jan-a.pdf, which is counted.' });
+    expect(lines(bills('jan.pdf', 'jan.pdf'), [same('a', 'b')])).toEqual({ 'b:0': 'Not counted: this is the same bill as the copy uploaded on 1 April 2025, which is counted.' });
+    // Same name, same day: to the minute, so the two copies still read differently.
+    expect(lines(bills('jan.pdf', 'jan.pdf', '2025-04-01T10:05:00', '2025-04-01T16:40:00'), [same('b', 'a')]))
+      .toEqual({ 'a:0': 'Not counted: this is the same bill as the copy uploaded on 1 April 2025 at 16:40, which is counted.' });
+  });
+
+  it('exact_duplicate_of: the T15-fix1 line, unchanged', () => {
+    const copy = (id: string, t: string): SourceDoc => ({ ...doc(t, [prop({ fuelType: 'diesel', value: 1200, unit: 'litres', periodStart: null, periodEnd: null, deliveryDate: '2025-03-14' })], id), file_name: 'r.pdf', sha256: 'h' });
+    const l = loc({ has_diesel_stationary: true, has_mobile: true, source_docs: [copy('tank', 'fuel_diesel'), copy('fleet', 'fleet_fuel')] });
+    const r = exactDuplicateCountOnce({ locId: 'L1', fuelType: 'diesel', counted: { id: 'tank', file: 'r.pdf', documentType: 'fuel_diesel' }, excluded: { id: 'fleet', file: 'r.pdf', documentType: 'fleet_fuel' }, by: { userId: 'u', email: 'e@x' }, at: '2025-04-02T09:00:00Z' });
+    expect(lines(l, [r])).toEqual({ 'fleet:0': EXACT_DUPLICATE_NOT_COUNTED('fuel_diesel') });
+  });
+
+  it('manual_override: you entered this figure by hand instead', () => {
+    const l = site([gdoc('jan', gas(100, '2025-01-01', '2025-01-31'))],
+      { natural_gas_amount: 1200, manual_overrides: [{ field: 'natural_gas_amount', reason: 'meter read', at: '2025-04-02T09:00:00Z', by: { userId: 'u', email: 'e@x' } }] });
+    expect(lines(l)).toEqual({ 'jan:0': 'Not counted: you entered this figure by hand instead.' });
+  });
+
+  it('mixed_units, invalid_period and undated: not counted until resolved, with the gate\'s own instruction', () => {
+    const mixed = site([gdoc('a', gas(100, '2025-01-01', '2025-01-31')), gdoc('b', gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' }))]);
+    const mixedLine = `Not counted until resolved: the natural gas bills for this site are in different units. ${FIX_UNITS}`;
+    expect(lines(mixed)).toEqual({ 'a:0': mixedLine, 'b:0': mixedLine });
+    expect(findUnresolvedCoverage([mixed], 2025, 12, []).find(i => i.status === 'mixed_units')?.message).toContain(FIX_UNITS);
+    const bad = site([gdoc('rev', gas(100, '2025-03-10', '2025-03-01')), gdoc('junk', gas(100, '2025-02-30', '2025-03-31'))]);
+    expect(lines(bad)).toEqual({
+      'rev:0': `Not counted until resolved: the billing period ends before it starts. ${FIX_REVERSED}`,
+      'junk:0': `Not counted until resolved: the billing period could not be read as dates. ${FIX_DATES}`,
+    });
+    const undated = site([gdoc('nd', gas(100, null, null))]);
+    expect(lines(undated)).toEqual({ 'nd:0': `Not counted until resolved: this bill has no billing period. ${FIX_DATES}` });
+    // The gate gives the same instruction, from the same constant.
+    for (const [l, status, fix] of [[bad, 'invalid_period', FIX_REVERSED], [undated, 'undated', FIX_DATES]] as const)
+      expect(findUnresolvedCoverage([l], 2025, 12, []).find(i => i.status === status)?.message).toContain(fix);
+  });
+
+  it('a counted bill under a switched-off stream: not counted until resolved', () => {
+    const l = site([gdoc('jan', gas(100, '2025-01-01', '2025-01-31'))], { has_natural_gas: false });
+    expect(lines(l)).toEqual({ 'jan:0': 'Not counted until resolved: this site is marked as not using natural gas. Turn natural gas on for this site, or reject the bill.' });
+  });
+
+  it('no line has an em dash', () => {
+    const all = [
+      ...notCountedLines(site([gdoc('old', gas(9, '2024-03-01', '2024-03-31')), gdoc('nd', gas(1, null, null)), gdoc('t', gas(2, '2025-01-01', '2025-01-31', { unit: 'therms' }))]), [], W).values(),
+      ...notCountedLines(site([gdoc('j', gas(1, '2025-01-01', '2025-01-31'))], { has_natural_gas: false }), [], W).values(),
+    ];
+    expect(all.length).toBeGreaterThan(2);
+    for (const t of all) expect(t).not.toContain('\u2014');
   });
 });

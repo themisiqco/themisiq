@@ -51,7 +51,7 @@ import {
   detectGridRegion, gridRegionForCountry, pickEF,
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
-  billContributions, acceptedResolutions, EXACT_DUPLICATE_NOT_COUNTED,
+  notCountedLines,
   deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
@@ -3859,11 +3859,10 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemov
   // Uploads with nothing read from them that block export (T10 ruling); every other such upload is evidence.
   const unreadBlocking = new Set(findUnresolvedCoverage([location], reportingYear, fiscalYearEndMonth, coverageResolutions)
     .filter(i => i.status === 'none').flatMap(i => i.docIds ?? []))
-  // T15-fix1: readings left out as the same document as a copy under another upload, keyed `${docId}:${index}`
-  // to the counted copy's document type. Each reading still shows what was read; this says it is not counted.
-  const duplicateOf = new Map(billContributions(location, acceptedResolutions(location, coverageResolutions), periodFromYearAndEnd(reportingYear, fiscalYearEndMonth))
-    .filter(c => c.reason === 'exact_duplicate_of' && c.reasonRef)
-    .map(c => [`${c.docId}:${c.proposalIndex}`, location.source_docs.find(d => d.id === c.reasonRef)?.document_type ?? '']))
+  // T15-fix1, T15-fix2: the line under each confirmed reading that reaches no total, keyed `${docId}:${index}`.
+  // Each reading still shows what was read; this says it is not counted, and why. Built by the engine from the
+  // same contributions the figure is folded from (notCountedLines).
+  const notCounted = notCountedLines(location, coverageResolutions, periodFromYearAndEnd(reportingYear, fiscalYearEndMonth))
   return (
     <div
       onDragOver={e => { e.preventDefault(); setDragActive(true) }}
@@ -3960,8 +3959,8 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemov
                   </div>
                   {p.sourceQuote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
                   {p.conversionNote && <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{p.conversionNote}</div>}
-                  {duplicateOf.has(`${doc.id}:${pi}`) && (
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-2)', marginTop: 2 }}>{EXACT_DUPLICATE_NOT_COUNTED(duplicateOf.get(`${doc.id}:${pi}`) as string)}</div>
+                  {notCounted.has(`${doc.id}:${pi}`) && (
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-2)', marginTop: 2 }}>{notCounted.get(`${doc.id}:${pi}`)}</div>
                   )}
                   {editing === `${doc.id}:${pi}` ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>

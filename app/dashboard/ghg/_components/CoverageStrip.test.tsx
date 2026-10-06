@@ -315,7 +315,8 @@ describe('coverage strip: one file uploaded twice under the same name (T15-fix1)
 
   it('the upload says beside a left-out reading that it is not counted', () => {
     const page = stripTsComments(readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8'))
-    expect(page).toContain(".filter(c => c.reason === 'exact_duplicate_of' && c.reasonRef)")
-    expect(page).toContain('EXACT_DUPLICATE_NOT_COUNTED(duplicateOf.get(`${doc.id}:${pi}`) as string)')
+    // T15-fix2: one engine helper builds every not-counted line, exact duplicates included.
+    expect(page).toContain('const notCounted = notCountedLines(location, coverageResolutions, periodFromYearAndEnd(reportingYear, fiscalYearEndMonth))')
+    expect(page).toContain('{notCounted.get(`${doc.id}:${pi}`)}')
   })
 })

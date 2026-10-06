@@ -3257,6 +3257,13 @@ export function twoCopies(a: DocCopy, b: DocCopy): string {
     : `${a.file} (${A}) and ${b.file} (${B})`
 }
 
+// T15-fix2: the instructions the gate gives for a bill it does not count, ONCE, so the gate message and the
+// line under the reading (notCountedLines) cannot word the same fix two ways.
+export const FIX_DATES = 'Enter the dates as they appear on the bill.'
+export const FIX_REVERSED = 'Check the dates and correct them.'
+export const FIX_UNITS = 'Correct the units, or enter the figure manually.'
+export const FIX_STREAM_OFF = (stream: string, n: number): string => `Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`
+
 /**
  * T15-fix1: shown on the reading of a copy left out by "Same document, count once". The reading itself still
  * says what was read from the file, so without this a customer sees the same figure, confirmed, under both
@@ -3267,9 +3274,9 @@ export const EXACT_DUPLICATE_NOT_COUNTED = (countedDocumentType: string): string
 
 export const COVERAGE_MESSAGE = {
   undated: (file: string) =>
-    `${file} has no billing period, so it is not counted. Enter the dates as they appear on the bill.`,
+    `${file} has no billing period, so it is not counted. ${FIX_DATES}`,
   mixed_units: (fuel: string, site: string, units: string[], files: string[]) =>
-    `The ${fuel} bills for ${site} are in different units (${units.join(', ')}: ${files.join(', ')}), so none of them is counted. Correct the units, or enter the figure manually.`,
+    `The ${fuel} bills for ${site} are in different units (${units.join(', ')}: ${files.join(', ')}), so none of them is counted. ${FIX_UNITS}`,
   overlap: (fileA: string, fileB: string, from: string, to: string) =>
     `${fileA} and ${fileB} cover the same days (${from} to ${to}). Choose Same bill, count it once, or Different meters or accounts.`,
   all_rejected: (fuel: string, site: string) =>
@@ -3300,7 +3307,7 @@ export const COVERAGE_MESSAGE = {
     return `${a.file} (${A}) and ${b.file} (${B}) at ${site} ${match === 'sha256' ? 'are the same file' : `show the same ${fuel} figure, unit and dates`}, uploaded as two different kinds of document. ${tail}`
   },
   stream_off: (site: string, verb: 'use' | 'have', stream: string, n: number, fuel: string) =>
-    `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. Turn ${stream} on for this site, or reject the bill${n === 1 ? '' : 's'}.`,
+    `${site} is marked as not ${verb === 'use' ? 'using' : 'having'} ${stream}, but ${n} ${fuel} bill${n === 1 ? ' is' : 's are'} confirmed. ${FIX_STREAM_OFF(stream, n)}`,
 }
 
 // The "uses this fuel" switch behind each document-backed field (T6 ruling). calcLocation and buildWorkings
@@ -3466,10 +3473,10 @@ export type InvalidPeriodKind = 'unparseable' | 'reversed'
 // T3's export-blocking issue and any surface that explains a row use the same words.
 export const INVALID_PERIOD_MESSAGE: Record<InvalidPeriodKind, (fileName: string, start: string, end: string) => string> = {
   unparseable: (fileName, start, end) =>
-    `The billing period on ${fileName} could not be read as dates ("${start}" to "${end}"). Enter the dates as they appear on the bill.`,
+    `The billing period on ${fileName} could not be read as dates ("${start}" to "${end}"). ${FIX_DATES}`,
   // T10c: real dates are shown in words; the unparseable message above keeps the stored text, as evidence.
   reversed: (fileName, start, end) =>
-    `The billing period on ${fileName} ends before it starts (${isoDateInWords(start)} to ${isoDateInWords(end)}). Check the dates and correct them.`,
+    `The billing period on ${fileName} ends before it starts (${isoDateInWords(start)} to ${isoDateInWords(end)}). ${FIX_REVERSED}`,
 }
 
 // A stored period date that is a real calendar date in yyyy-mm-dd form. parseLocalDate reads the first ten
@@ -3603,6 +3610,55 @@ export function billContributions(
       ...(p.statusLog?.length ? { statusLog: p.statusLog } : {}),
     })
   }))
+  return out
+}
+
+// ── T15-fix2: WHAT THE READING ITSELF SAYS WHEN IT IS NOT COUNTED ─────────────────────────────────────────
+// A confirmed reading shows its figure and "Confirmed". Where it reaches no total, the line under it says so, so
+// "1,200 litres, Confirmed" is never read as counted. Built from billContributions, the same rows the figure is
+// folded from, so the line and the figure cannot disagree. Keyed `${docId}:${proposalIndex}`.
+//   counted, prorated, delivered   no line (a prorated bill IS counted; the strip shows its share)
+//   not_confirmed                  no line (the reading's own badge says it is not confirmed)
+//   exact_duplicate_of, same_bill_as, outside_year, manual_override   "Not counted: ..."
+//   mixed_units, invalid_period, undated   "Not counted until resolved: ...", with the gate's own instruction
+//   counted, but its "uses this fuel" switch is off (stream_off)   "Not counted until resolved: ..."
+export function notCountedLines(loc: Location, allResolutions: CoverageResolution[], win: { start: Date; end: Date }): Map<string, string> {
+  const out = new Map<string, string>()
+  const docOf = (id?: string) => loc.source_docs.find(d => d.id === id)
+  const yearText = reportingYearLabel(win).inText
+  const sameBillName = (self: SourceDoc | undefined, counted: SourceDoc | undefined): string => {
+    if (!counted) return 'another document'
+    if (self?.file_name !== counted.file_name) return counted.file_name
+    // The same file name on both copies: name the counted one by when it was uploaded, to the minute if both
+    // were uploaded on the same day.
+    const at = new Date(counted.uploaded_at)
+    const sameDay = self?.uploaded_at && dateInWords(new Date(self.uploaded_at)) === dateInWords(at)
+    const time = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+    return `the copy uploaded on ${dateInWords(at)}${sameDay ? ` at ${time}` : ''}`
+  }
+  for (const c of billContributions(loc, acceptedResolutions(loc, allResolutions), win)) {
+    const key = `${c.docId}:${c.proposalIndex}`
+    const self = docOf(c.docId)
+    let line: string | null = null
+    switch (c.reason) {
+      case 'exact_duplicate_of': line = EXACT_DUPLICATE_NOT_COUNTED(docOf(c.reasonRef)?.document_type ?? ''); break
+      case 'same_bill_as': line = `Not counted: this is the same bill as ${sameBillName(self, docOf(c.reasonRef))}, which is counted.`; break
+      case 'outside_year': line = `Not counted: ${c.deliveryDate ? 'delivered' : 'billed'} outside ${yearText}.`; break
+      case 'manual_override': line = 'Not counted: you entered this figure by hand instead.'; break
+      case 'mixed_units': line = `Not counted until resolved: the ${FUEL_NAME[c.fuelType] ?? c.fuelType} bills for this site are in different units. ${FIX_UNITS}`; break
+      case 'invalid_period': line = c.periodProblem === 'reversed'
+        ? `Not counted until resolved: the billing period ends before it starts. ${FIX_REVERSED}`
+        : `Not counted until resolved: the billing period could not be read as dates. ${FIX_DATES}`; break
+      case 'undated': line = `Not counted until resolved: this bill has no billing period. ${FIX_DATES}`; break
+      case 'counted': case 'prorated': case 'delivered':
+        if (streamSwitchOff(loc, c.field)) {
+          const meta = STREAM_META[FIELD_STREAM[c.field] as DeclarableStream]
+          line = `Not counted until resolved: this site is marked as not ${meta.verb === 'use' ? 'using' : 'having'} ${meta.name}. ${FIX_STREAM_OFF(meta.name, 1)}`
+        }
+        break
+    }
+    if (line) out.set(key, line)
+  }
   return out
 }
 
