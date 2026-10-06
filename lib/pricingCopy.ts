@@ -45,13 +45,14 @@ export const BILL_REVIEW_HUMAN_DESCRIPTION =
  * free use prints these two sentences, so the free/paid line is drawn once. It must match the gates in
  * app/dashboard/ghg/page.tsx and its siblings; docs/review/free-claims-audit.md section 1 is the audit.
  */
-// ⚠️ "EMAILED TO YOU DIRECTLY" IS TRUE ONLY ONCE LEAD1 ("Email me my results") SHIPS. It is a launch blocker
-// in docs/review/design-derived-figures.md section 11: this sentence must not reach a public launch before it.
+// LEAD1 L10 (design section 8): the results are emailed when the visitor creates the free account ("Keep my results",
+// L4 and L5), not before, so the sentence says that; and the free account keeps one calculation, so saving one is no
+// longer something only a plan does.
 export const GHG_FREE_USE_SENTENCE =
-  'Scope 1 and Scope 2 can be calculated free, in your browser, without an account, with your results emailed to you directly.'
+  'Scope 1 and Scope 2 can be calculated free, in your browser, without an account. Create a free account to get your results by email and keep your calculation.'
 
 export const GHG_PLAN_USE_SENTENCE =
-  'Saving, Scope 3, document uploads, the GHG guide, Trends, SBTi targets, verifier sharing and report downloads need a GHG plan.'
+  'Scope 3, document uploads, the GHG guide, Trends, SBTi targets, verifier sharing, report downloads and more than one inventory need a GHG plan.'
 
 /**
  * THE FREE SCOPE 1 AND SCOPE 2 CALCULATOR, AS ONE CALL TO ACTION (free-calc-cta, Oct 2026). Rendered by
@@ -69,7 +70,7 @@ export const FREE_CALC_LABEL = 'Calculate your Scope 1 and Scope 2 emissions fre
 /** For a header, a small card or any slot the full label will not fit. */
 export const FREE_CALC_SHORT_LABEL = 'Free emissions calculator'
 
-export const FREE_CALC_SUBLINE = 'In your browser, no account needed.'
+export const FREE_CALC_SUBLINE = 'No account needed to start. Create a free account to keep your results.'
 
 /**
  * The site header's form (free-calc-cta-2, Oct 2026): "Emissions calculator" with a small "Free" tag after it.

@@ -55,7 +55,7 @@ describe('card-any-amount', () => {
     // /pricing says it in one line near the buy button (calc-copy, Oct 2026); /order keeps the fuller form.
     expect(read('app/pricing/page.tsx')).toContain('Pay by card or <Link href={invoiceHref}')
     expect(read('app/order/page.tsx')).toContain('Request an invoice')
-    // §3 states no threshold; §13's US$10,000 is the liability cap.
+    // §4 (Fees and payment) states no threshold; §14's US$10,000 is the liability cap. Both moved up one when L10 added §3.
     const terms = read('app/terms/page.tsx')
     expect(terms).not.toContain('Orders up to US$10,000')
     expect(terms).toContain('Orders of any amount may be paid by card')

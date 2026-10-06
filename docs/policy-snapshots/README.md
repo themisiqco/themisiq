@@ -8,7 +8,18 @@ one published version, so that editing the live page does not erase the wording 
 |---|---|
 | `2026-06-v2-final.md` | Terms, Refund Policy and the consent wording under consent version `2026-06-v2-final`, and the Privacy Policy at v2.0 |
 | `2026-09-privacy-v2.1.md` | Privacy Policy v2.1 |
-| `2026-09-privacy-v2.2.md` | Privacy Policy v2.2 (current) |
+| `2026-09-privacy-v2.2.md` | Privacy Policy v2.2 |
+| `2026-10-privacy-v2.3.md` | Privacy Policy v2.3 (current): what changed from v2.2, word for word (LEAD1 L10, the free account) |
+| `2026-10-terms.md` | Terms of Service effective October 6, 2026 (current): what changed, word for word |
+
+## Checkout consent versions
+
+`purchase_consents.consent_version` records which text a purchase agreed to. Each value maps to exact text here.
+
+| `consent_version` | In use | Terms | Refund Policy and Consent Part C |
+|---|---|---|---|
+| `2026-06-v2-final` | Until October 6, 2026 | June 22, 2026: `2026-06-v2-final.md` | `2026-06-v2-final.md` |
+| `2026-10-v3` | From October 6, 2026 | October 6, 2026: `2026-10-terms.md`, with `2026-06-v2-final.md` for the sections it leaves unchanged | `2026-06-v2-final.md`, unchanged |
 
 **A snapshot is never edited to match a newer version.** Each is the record of its own version, and
 `2026-06-v2-final.md` and `2026-09-privacy-v2.2.md` both say so in their own text. `purchase_consents.consent_version`

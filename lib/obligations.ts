@@ -105,7 +105,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     name: 'California SB 253: Climate Corporate Data Accountability Act',
     modules: ['ghg'],
     does: {
-      ghg: 'Builds the Scope 1 and Scope 2 inventory and gives you a report to prepare your SB 253 filing, with every figure traceable to the documents you upload.',
+      ghg: 'Builds the Scope 1 and Scope 2 inventory and gives you a report to prepare your SB 253 filing, with figures traceable to your source documents where you\'ve uploaded them.',
     },
   },
 
@@ -281,7 +281,7 @@ export const OBLIGATIONS: Record<ObligationId, Obligation> = {
     name: 'EcoVadis Sustainability Rating',
     modules: ['ghg', 'supply-chain'],
     does: {
-      ghg: 'Produces the Scope 1, 2 and 3 figures the Environment theme is scored on, as a dated inventory traceable to source documents rather than a self-declared number.',
+      ghg: 'Produces the Scope 1, 2 and 3 figures the Environment theme is scored on, as a dated inventory, traceable to your source documents where you\'ve uploaded them.',
       'supply-chain': 'Answers the Sustainable Procurement theme with documents rather than assertions: a supplier risk register, the questionnaires you issued and the responses returned, and gap-analyses the scorecard to show which criteria you hold no evidence for.',
     },
   },

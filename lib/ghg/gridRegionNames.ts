@@ -56,6 +56,17 @@ export function gridRegionName(code: string | null | undefined): string | null {
   return null
 }
 
+/**
+ * A grid region as wizard step 2 shows it (LEAD1 L10): the readable name with the engine's code in brackets, so a
+ * customer reads "Ontario" and a verifier still sees "ON", the key the workings and the CSV carry. An unknown code is
+ * shown as itself.
+ */
+export function gridRegionDisplay(code: string | null | undefined): string {
+  if (!code) return ''
+  const name = gridRegionName(code)
+  return name ? `${name} (${code})` : code
+}
+
 const SUBREGIONS = new Map(US_SUBREGIONS.map(([code, label]) => [code, label.replace(/^[A-Z]+\s*—\s*/, '')]))
 
 /** The residual-mix region the engine applied (an eGRID subregion, an EU member state, or Australia), in words. */

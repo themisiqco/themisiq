@@ -14,6 +14,7 @@ import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry
 // "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
 import { decideSave, keepPromptShown, unsavedNudgeArm, keptLine, emailedLine, KEEP_COPY, readPendingMarker, clearPendingMarker, clearDraftOnRestore, type PendingMarker } from '../../../lib/ghg/keepResults'
 import KeepResultsModal from './_components/KeepResultsModal'
+import { gridRegionDisplay } from '../../../lib/ghg/gridRegionNames'
 import { purchaseLine, initialPurchaseState, startConversionPoll, type PurchaseState } from '../../../lib/ghg/convertOnPurchase'
 import { accessFromRow } from '../../../lib/entitlementAccess'
 import { uploadFailureMessage, UPLOADS_OFF_EXPIRED, UPLOAD_NEEDS_ACTIVE_PLAN, DOCUMENTS_KEPT_INACTIVE, removedAll } from '../../../lib/ghg/uploadRefusal'
@@ -410,7 +411,7 @@ function PaywallOverlay({ frameworks, onUnlock, anon, onKeep }: { frameworks: st
         {/* "One click" is gone with it: the path from here is /pricing, the configurator, the consent
             step, Stripe, and then the webhook. The last sentence is the draft promise, said where it can
             be read BEFORE the button rather than in a modal after it. */}
-        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package and saving. {draftKeptSentence(anon)}</div>
+        <div style={{ fontSize: 13, color: '#555553', lineHeight: 1.7, marginBottom: '1.5rem', fontWeight: 400 }}>Your Scope 1 and Scope 2 figures for {frameworks.join(', ')} are calculated and on screen, and the workings behind them are yours to read. The module adds the downloads, the assurance package, Scope 3 and more inventories. {draftKeptSentence(anon)}</div>
         <div style={{ background: '#f8f7f5', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', textAlign: 'left' as const }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-muted)', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>What you unlock</div>
           {[
@@ -419,7 +420,8 @@ function PaywallOverlay({ frameworks, onUnlock, anon, onKeep }: { frameworks: st
             // purchase instant; inventory.reporting_year and fiscal_year_end_month are independent
             // fields. The old line also advertised "unlimited" updates, which described the absence of
             // a limit that never existed.
-            'Save and update your inventory for 12 months from purchase',
+            // LEAD1 L10 (design section 8): a free account already saves one calculation, so the unlock is MORE than one.
+            'Save and update more than one inventory for 12 months from purchase',
             // "Downloadable", because step 4 already shows the figures and the workings for nothing.
             // The old line said "submission-ready", which asserts a portal integration that does not
             // exist anywhere in this codebase: generateExport writes a CSV per framework.
@@ -2547,20 +2549,20 @@ workings: saved.workings,
                     whose region is unresolved, which is a real and fixable state. */}
                 {countryRefusal(loc) ? null : loc.country === 'AU'
                   ? (loc.grid_region.startsWith('AU_')
-                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
+                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
                       : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Select your state above to resolve the grid emission factor.</div>)
                   : loc.state
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion?.label}</strong>: {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion ? gridRegionDisplay(detectedRegion.value) : ''}</strong>: {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
                   : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK' || loc.grid_region === 'NZ')
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? `DEFRA ${getGridFactor(loc.grid_region, inventory.reporting_year).usedYear}` : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? `DEFRA ${getGridFactor(loc.grid_region, inventory.reporting_year).usedYear}` : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
                   : isResolvedGridRegion(loc.grid_region)
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{loc.grid_region}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
                   : (loc.country === 'CA' || loc.country === 'US')
                   ? <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                       <div style={{ fontSize: 12, color: '#92400e' }}>Select your {loc.country === 'CA' ? 'province' : 'state'}/region to resolve the grid emission factor.</div>
                       {loc.country === 'CA'
-                        ? <select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{r.label}: {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
-                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{s}: {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
+                        ? <select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{gridRegionDisplay(r.value)}: {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
+                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{gridRegionDisplay('US_' + s)}: {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
                     </div>
                   : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Grid factor not available for this jurisdiction: <a href="mailto:hello@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>contact us</a>.</div>
                 }

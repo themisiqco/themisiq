@@ -7,12 +7,13 @@
 // money-touching consent logic lives in one place.
 
 import { useState } from 'react'
+import { PURCHASE_CONSENT_VERSION } from '../../lib/purchaseConsentVersion'
 
 const GRAD = 'var(--color-brand)'
 
-// Counsel-final consent wording version (Terms / Refund Policy / Consent Part C).
-// Must match what the checkout API records — do NOT change without legal sign-off.
-export const CONSENT_VERSION = '2026-06-v2-final'
+// The consent version (Terms / Refund Policy / Consent Part C), from lib/purchaseConsentVersion.ts, which the checkout
+// API also reads. Each value names exact text recorded in docs/policy-snapshots/; do NOT change it without legal sign-off.
+export const CONSENT_VERSION = PURCHASE_CONSENT_VERSION
 
 export interface ConsentPayload {
   business: { name: string; regNumber: string }
@@ -66,7 +67,8 @@ export default function ConsentForm({
       <input value={bizReg} onChange={e => setBizReg(e.target.value)} placeholder="e.g. 12-3456789" style={consentInput} />
       <label style={consentLabel}>Your name</label>
       <input value={purchaserName} onChange={e => setPurchaserName(e.target.value)} placeholder="Full name" style={consentInput} />
-      {/* Consent wording — Terms/Refund/Consent Part C; counsel-final (2026-06-v2-final) */}
+      {/* Consent wording: Consent Part C, counsel-final under 2026-06-v2-final and unchanged under 2026-10-v3 (only the
+          Terms changed). The version recorded is CONSENT_VERSION. */}
       <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <label style={consentCheckRow}>
           <input type="checkbox" checked={cBiz} onChange={e => setCBiz(e.target.checked)} style={{ marginTop: 3, flexShrink: 0 }} />

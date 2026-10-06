@@ -88,7 +88,8 @@ export default function Page() {
           </p>
           <p style={{ ...bodyCopy, marginBottom: '2rem' }}>
             Scope 1, 2 and 3 under the GHG Protocol, built from your own bills and records, with the
-            method, the factor edition and the source document kept behind every figure.
+            method and the factor edition kept behind every figure,
+            traceable to your source documents where you&apos;ve uploaded them.
           </p>
           {/* THE FREE CALCULATOR LEADS (free-calc-cta, Oct 2026): until then the GHG module page had no link into
               the calculator at all. The price is the outline beside it; the assessment left this hero in
@@ -194,7 +195,7 @@ export default function Page() {
       <ModuleSection tinted>
         <EvidenceSection
           moduleKey={KEY}
-          workings="Every figure keeps the method, the factor edition and the source document behind it, so a reviewer can follow a total back to the bill it came from."
+          workings="Every figure keeps its method and its factor edition, and is traceable to your source documents where you've uploaded them, so a reviewer can follow those totals back to the bills they came from."
         />
       </ModuleSection>
 
@@ -303,7 +304,7 @@ const FAQ: readonly Faq[] = [
   { q: 'We have never done this before. Where do we start?',
     a: 'With a utility bill. Upload what you have and the extractor reads electricity, natural gas, diesel, propane and gasoline automatically. Some documents it deliberately will not read: a refrigerant service record is a judgement call rather than a figure to lift off a page, and a renewable certificate states kWh certificated rather than kWh consumed. Those are kept as evidence and you enter the number yourself, because a confident-looking wrong number is worse than a blank.' },
   { q: 'Will this survive third-party assurance?',
-    a: "It is built for it. Every figure carries its method, its factor edition and the document it came from, the assurance package is assembled for ISO 14064-3 and ISAE 3410 engagements, and your verifier sees the same view you do through access you grant and can revoke. ThemisIQ produces an assurance-ready package; the assurance itself is your verifier's to give." },
+    a: "It is built for it. Every figure carries its method and its factor edition, and is traceable to your source documents where you've uploaded them; the assurance package is assembled for ISO 14064-3 and ISAE 3410 engagements, and your verifier sees the same view you do through access you grant and can revoke. ThemisIQ produces an assurance-ready package; the assurance itself is your verifier's to give." },
   { q: 'What if you do not hold factors for one of our countries?',
     a: 'Six jurisdictions have their own published factor editions: the US, Canada, the UK, the EU, Australia and New Zealand. Everywhere else uses US EPA combustion factors, and the workings row says so rather than hiding it. Anything that cannot be converted confidently is flagged for review instead of being estimated, and refrigerants are a declared gap rather than a silent one.' },
   { q: 'Can we compare this year against last year?',

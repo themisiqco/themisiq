@@ -32,6 +32,7 @@ import {
 } from '../../../lib/pricing'
 import { billReviewOrder, type OwnedRow } from '../../../lib/billReviewOrder'
 import { checkoutSuccessPath } from '../../../lib/ghg/convertOnPurchase'
+import { PURCHASE_CONSENT_VERSION } from '../../../lib/purchaseConsentVersion'
 
 // Stripe needs the Node.js runtime (not edge).
 export const runtime = 'nodejs'
@@ -184,7 +185,8 @@ export async function POST(req: NextRequest) {
         consent_digital_access: 'true',
         consent_data_authority: 'true',
         consent_at: c!.atISO ?? new Date().toISOString(),
-        consent_version: c!.version ?? '2026-06-v2-final',
+        // The form sends the version it was built with; the fallback is the current one, never a retired value.
+        consent_version: c!.version ?? PURCHASE_CONSENT_VERSION,
       }
     }
 

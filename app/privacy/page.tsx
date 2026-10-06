@@ -3,19 +3,21 @@
 import { useState } from 'react'
 import Nav from '../components/Nav'
 import Footer from '@/app/components/Footer'
+import { FREE_ACCOUNT_INTRO, FREE_ACCOUNT_ROWS, FREE_ACCOUNT_PROCESSORS, FREE_ACCOUNT_MARKETING } from '../../lib/legal/freeAccountCopy'
 
 const sections = [
   { id: 's1', num: '01', title: 'Who we are' },
   { id: 's2', num: '02', title: 'What we collect' },
-  { id: 's3', num: '03', title: 'How we use your data' },
-  { id: 's4', num: '04', title: 'Legal basis' },
-  { id: 's5', num: '05', title: 'Data sharing' },
-  { id: 's6', num: '06', title: 'International transfers' },
-  { id: 's7', num: '07', title: 'Data retention' },
-  { id: 's8', num: '08', title: 'Your rights' },
-  { id: 's9', num: '09', title: 'US residents', highlight: true },
-  { id: 's10', num: '10', title: 'Cookies' },
-  { id: 's11', num: '11', title: 'Contact & complaints' },
+  { id: 's3', num: '03', title: 'Free accounts' },
+  { id: 's4', num: '04', title: 'How we use your data' },
+  { id: 's5', num: '05', title: 'Legal basis' },
+  { id: 's6', num: '06', title: 'Data sharing' },
+  { id: 's7', num: '07', title: 'International transfers' },
+  { id: 's8', num: '08', title: 'Data retention' },
+  { id: 's9', num: '09', title: 'Your rights' },
+  { id: 's10', num: '10', title: 'US residents', highlight: true },
+  { id: 's11', num: '11', title: 'Cookies' },
+  { id: 's12', num: '12', title: 'Contact & complaints' },
 ]
 
 export default function PrivacyPage() {
@@ -34,13 +36,13 @@ export default function PrivacyPage() {
             Privacy <span style={{ fontStyle: 'italic', color: 'var(--color-brand)' }}>Policy</span>
           </h1>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' as const, marginBottom: '1rem' }}>
-            {['Effective: September 12, 2026', 'TIQ-PRV-001 · v2.2', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
+            {['Effective: October 6, 2026', 'TIQ-PRV-001 · v2.3', 'ThemisIQ Compliance Inc. · Canada', 'privacy@themisiq.co'].map(item => (
               <span key={item} style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{item}</span>
             ))}
           </div>
           <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
             <div className="tq-callout-heading">Governing law: Canada (PIPEDA · Law 25 · CASL) + US state privacy laws + GDPR / UK GDPR for EU/UK customers</div>
-            <div className="tq-callout-text">ThemisIQ Compliance Inc. is a Canadian company. This Privacy Policy complies with Canadian federal and provincial privacy law as the primary framework. Additional rights for US residents (CCPA/CPRA, state laws, CAN-SPAM, COPPA) are set out in Section 9.</div>
+            <div className="tq-callout-text">ThemisIQ Compliance Inc. is a Canadian company. This Privacy Policy complies with Canadian federal and provincial privacy law as the primary framework. Additional rights for US residents (CCPA/CPRA, state laws, CAN-SPAM, COPPA) are set out in Section 10.</div>
           </div>
         </div>
       </div>
@@ -79,6 +81,7 @@ export default function PrivacyPage() {
                   ['Account data', 'Name, work email, job title, company, billing address', 'Controller'],
                   ['Platform data', 'GHG data, workforce metrics, supply chain data, AI inventories entered into ThemisIQ modules', 'Processor: you are the controller'],
                   ['Assessment data', 'Compliance Assessment answers, email, company, role', 'Controller'],
+                  ['Free account data', 'Name, work email, company, one Scope 1 and Scope 2 calculation, the country of its first site, sign-in records, and the IP address and browser details recorded with a marketing consent choice', 'Controller'],
                   ['Usage data', 'Log data, IP addresses, browser type, pages visited, feature usage', 'Controller'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
@@ -90,8 +93,26 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
+          {/* LEAD1 L10 (design section 5): the free account, as the code does it. Every row is checked against
+              lib/ghg/freeCalcService.ts, lib/consent/, the claim and pending routes and the M4, M5 and M6 SQL.
+              Nothing here describes the retention job (L11), which does not exist yet: the 24-month row says "may". */}
           <div id="s3" style={sectionStyle}>
             <div style={eyebrow}>Section 3</div>
+            <h2 style={sectionHead}>Free accounts</h2>
+            <p style={body}>{FREE_ACCOUNT_INTRO}</p>
+            <table style={tableStyle}>
+              <thead><tr>{['What we collect', 'Why', 'How long we keep it'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
+              <tbody>
+                {FREE_ACCOUNT_ROWS.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
+              </tbody>
+            </table>
+            <p style={body}>{FREE_ACCOUNT_PROCESSORS}</p>
+            <p style={body}>{FREE_ACCOUNT_MARKETING}</p>
+          </div>
+          <div style={divider} />
+
+          <div id="s4" style={sectionStyle}>
+            <div style={eyebrow}>Section 4</div>
             <h2 style={sectionHead}>How we use your data</h2>
             <table style={tableStyle}>
               <thead><tr>{['Purpose', 'Data used', 'Legal basis'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
@@ -99,6 +120,7 @@ export default function PrivacyPage() {
                 {[
                   ['Delivering the ThemisIQ platform', 'Account data, platform data', 'Contract performance'],
                   ['Sending assessment results', 'Assessment data, email', 'Express consent (CASL)'],
+                  ['Sending the results you asked for, sign-in codes, and keeping your free calculation', 'Free account data', 'Contract performance (your request)'],
                   ['Marketing emails', 'Account data, email', 'Express consent (CASL): unsubscribe anytime'],
                   ['Billing and invoicing', 'Account data', 'Contract / legal obligation (CRA)'],
                   ['Platform security', 'Usage data, log data', 'Legitimate interests'],
@@ -108,8 +130,8 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s4" style={sectionStyle}>
-            <div style={eyebrow}>Section 4</div>
+          <div id="s5" style={sectionStyle}>
+            <div style={eyebrow}>Section 5</div>
             <h2 style={sectionHead}>Legal basis</h2>
             <p style={body}>For Canadian residents, our basis is the <strong>PIPEDA fair information principles</strong>: primarily consent and legitimate business purposes.</p>
             <p style={body}>For EU/EEA/UK residents, our bases under GDPR / UK GDPR are: contract performance (Art. 6(1)(b)), consent (Art. 6(1)(a)), legal obligation (Art. 6(1)(c)), and legitimate interests (Art. 6(1)(f)).</p>
@@ -117,8 +139,8 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s5" style={sectionStyle}>
-            <div style={eyebrow}>Section 5</div>
+          <div id="s6" style={sectionStyle}>
+            <div style={eyebrow}>Section 6</div>
             <h2 style={sectionHead}>Data sharing</h2>
             <table style={tableStyle}>
               <thead><tr>{['Recipient', 'Data shared', 'Purpose', 'Location'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
@@ -127,7 +149,8 @@ export default function PrivacyPage() {
                   ['Supabase (AWS)', 'All platform data', 'Database, auth, storage', 'USA'],
                   ['Vercel', 'Application traffic', 'Hosting and CDN', 'Global'],
                   ['Stripe', 'Billing data', 'Payment processing', 'USA'],
-                  ['Resend', 'Name, email', 'Transactional email', 'USA'],
+                  ['Resend', 'Name, email', 'Transactional email, including sign-in codes (sent for Supabase) and results emails', 'USA'],
+                  ['Cloudflare (Turnstile)', 'IP address, browser details', 'Checking that sign-up, sign-in and "Keep my results" forms are used by a person', 'Global'],
                   ['Anthropic', 'Structured prompts; uploaded source documents (Bill Review)', 'Reading figures off Bill Review documents, answering GHG guide questions', 'USA'],
                 ].map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ ...tdStyle, background: i % 2 === 0 ? '#fff' : '#f8f7f5' }}>{cell}</td>)}</tr>)}
               </tbody>
@@ -139,8 +162,8 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s6" style={sectionStyle}>
-            <div style={eyebrow}>Section 6</div>
+          <div id="s7" style={sectionStyle}>
+            <div style={eyebrow}>Section 7</div>
             <h2 style={sectionHead}>International transfers</h2>
             <p style={body}>ThemisIQ is Canadian. Data is processed in Canada and transferred to sub-processors in the United States.</p>
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
@@ -150,15 +173,17 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s7" style={sectionStyle}>
-            <div style={eyebrow}>Section 7</div>
+          <div id="s8" style={sectionStyle}>
+            <div style={eyebrow}>Section 8</div>
             <h2 style={sectionHead}>Data retention</h2>
             <table style={tableStyle}>
               <thead><tr>{['Data type', 'Retention period', 'Basis'].map(h => <th key={h} style={thStyle}>{h}</th>)}</tr></thead>
               <tbody>
                 {[
                   ['Customer platform data', 'Subscription duration + 12 months', 'Contract'],
-                  ['Account and contact data', '7 years from last activity', 'Canada Revenue Agency'],
+                  ['Account and contact data (customers who have bought a plan)', '7 years from last activity', 'Canada Revenue Agency'],
+                  ['Free accounts that never buy a plan, and their calculation', 'While the account is used. A free account with no sign-in for 24 months may be deleted, after 30 days\' notice by email', 'PIPEDA: limiting retention'],
+                  ['Calculation held while you confirm your email', '24 hours at most: deleted when you confirm, or no longer usable after 24 hours', 'Providing the service you asked for'],
                   ['Marketing consent records', '3 years from last interaction', 'CASL'],
                   ['Assessment / lead data', '3 years from collection', 'PIPEDA / CASL'],
                   ['Security and audit logs', '5 years', 'Legitimate interest: security'],
@@ -169,16 +194,16 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s8" style={sectionStyle}>
-            <div style={eyebrow}>Section 8</div>
+          <div id="s9" style={sectionStyle}>
+            <div style={eyebrow}>Section 9</div>
             <h2 style={sectionHead}>Your rights (all jurisdictions)</h2>
             <p style={body}>To exercise any right, email <a href="mailto:privacy@themisiq.co" style={link}>privacy@themisiq.co</a>. We respond within 30 days (Canada/EU) or 45 days (US). No charge for the first request in any 12-month period.</p>
           </div>
           <div style={divider} />
 
-          <div id="s9" style={{ ...sectionStyle, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 15%, transparent)', borderRadius: 12, padding: '1.5rem' }}>
+          <div id="s10" style={{ ...sectionStyle, background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 15%, transparent)', borderRadius: 12, padding: '1.5rem' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, background: 'color-mix(in srgb, var(--color-brand) 10%, transparent)', color: 'var(--color-brand)', padding: '3px 10px', borderRadius: 99, marginBottom: 10 }}>🇺🇸 US residents: additional rights</div>
-            <div style={eyebrow}>Section 9</div>
+            <div style={eyebrow}>Section 10</div>
             <h2 style={sectionHead}>Additional rights for US residents</h2>
             <p style={body}>ThemisIQ does not sell personal information as defined under CCPA §1798.140(ad). You do not need to submit a "Do Not Sell or Share" request because we do not engage in these activities.</p>
             <p style={body}>Residents of California, Virginia, Colorado, Connecticut, Texas, Montana, Oregon, Delaware, New Hampshire, New Jersey, Nebraska, and Maryland have rights to access, delete, correct, and port their personal data. To exercise any right, email <a href="mailto:privacy@themisiq.co" style={link}>privacy@themisiq.co</a>.</p>
@@ -187,15 +212,15 @@ export default function PrivacyPage() {
           </div>
           <div style={divider} />
 
-          <div id="s10" style={sectionStyle}>
-            <div style={eyebrow}>Section 10</div>
+          <div id="s11" style={sectionStyle}>
+            <div style={eyebrow}>Section 11</div>
             <h2 style={sectionHead}>Cookies</h2>
             <p style={body}>We use essential cookies (session management, authentication) and optional analytics cookies (anonymised usage). We do not use advertising cookies, tracking pixels, or third-party behavioural targeting. ThemisIQ products are entirely ad-free.</p>
           </div>
           <div style={divider} />
 
-          <div id="s11" style={sectionStyle}>
-            <div style={eyebrow}>Section 11</div>
+          <div id="s12" style={sectionStyle}>
+            <div style={eyebrow}>Section 12</div>
             <h2 style={sectionHead}>Contact & complaints</h2>
             <div className="tq-callout tq-callout-note" style={{ '--tq-state': 'var(--color-brand)', '--tq-state-wash': 'color-mix(in srgb, var(--color-brand) 5%, transparent)' } as React.CSSProperties}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 400, marginBottom: 8 }}>Privacy Officer, ThemisIQ Compliance Inc.</div>

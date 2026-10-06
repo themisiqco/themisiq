@@ -185,7 +185,7 @@ const FAQ_LD = {
       name: "Can I try it before I pay?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: `Yes. ${GHG_FREE_USE_SENTENCE} Nothing is saved until you have a GHG plan. ${GHG_PLAN_USE_SENTENCE} Payment is handled securely by Stripe.`,
+        text: `Yes. ${GHG_FREE_USE_SENTENCE} Nothing is saved until you create a free account, which keeps one Scope 1 and Scope 2 calculation. ${GHG_PLAN_USE_SENTENCE} Payment is handled securely by Stripe.`,
       },
     },
     {
@@ -462,7 +462,7 @@ export default function CalculateEmissionsPage() {
               <a className="btn btn-ghost" href={CONFIG.CONTACT_HREF}>Get in touch</a>
             </div>
             <p className="reassure">{GHG_FREE_USE_SENTENCE}* {GHG_PLAN_USE_SENTENCE}</p>
-            <p className="hero-foot">*Your Scope 1 and Scope 2 figures are calculated in your browser, instantly and at no cost, and your results will be emailed to you directly. Nothing is saved in ThemisIQ until you have a GHG plan. A GHG plan, from ${ghgFrom} USD a year, adds saving, Scope 3 and report downloads under any framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2 and more.</p>
+            <p className="hero-foot">*Your Scope 1 and Scope 2 figures are calculated in your browser, instantly and at no cost. Create a free account to get your results by email and keep your calculation. A GHG plan, from ${ghgFrom} USD a year, adds Scope 3, report downloads and more inventories under any framework you need: SB&nbsp;253, CSRD&nbsp;(ESRS&nbsp;E1), IFRS&nbsp;S2 and more.</p>
           </div>
         </section>
 
@@ -549,7 +549,7 @@ export default function CalculateEmissionsPage() {
                 <div className="vnum">04</div>
                 <div className="vstep-body">
                   <div className="vstep-title">Enter your energy &amp; fuel data</div>
-                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals for the year and enter them in the right fields. Your <strong>Scope 1 and Scope 2 emissions, in metric tons of CO&#8322;e,</strong> calculate in real time as you type. Then enter your email address and we&rsquo;ll send your results to you directly. Rather not add up the bills yourself? With <a href="#support">Bill Review</a>, added to a GHG plan, you upload your bills, we read the figures for you, and you approve each one.</p>
+                  <p className="vstep-desc">Have your monthly or annual <strong>invoices and statements</strong>? Add up the totals for the year and enter them in the right fields. Your <strong>Scope 1 and Scope 2 emissions, in metric tons of CO&#8322;e,</strong> calculate in real time as you type. Then create a free account and we&rsquo;ll email your results to you and keep your calculation. Rather not add up the bills yourself? With <a href="#support">Bill Review</a>, added to a GHG plan, you upload your bills, we read the figures for you, and you approve each one.</p>
                   <div className="calcchips">
                     <span className="chip">Electricity <b>1,200,000 kWh</b></span>
                     <span className="chip">Natural gas <b>8,500 therms</b></span>
@@ -730,7 +730,7 @@ export default function CalculateEmissionsPage() {
               <details className="qa">
                 <summary>Can I try it before I pay?</summary>
                 <div className="qa-body">
-                  Yes. {GHG_FREE_USE_SENTENCE} Nothing is saved until you have a GHG plan. {GHG_PLAN_USE_SENTENCE} Payment is handled securely by <strong>Stripe</strong>.
+                  Yes. {GHG_FREE_USE_SENTENCE} Nothing is saved until you create a free account, which keeps one Scope 1 and Scope 2 calculation. {GHG_PLAN_USE_SENTENCE} Payment is handled securely by <strong>Stripe</strong>.
                 </div>
               </details>
 

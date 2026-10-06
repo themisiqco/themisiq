@@ -43,7 +43,8 @@ describe('free-use claims', () => {
       expect(src, file).toContain('GHG_PLAN_USE_SENTENCE')
     }
     expect(GHG_FREE_USE_SENTENCE).toContain('free')
-    for (const gated of ['Saving', 'Scope 3', 'uploads', 'guide', 'Trends', 'SBTi', 'verifier sharing', 'downloads']) {
+    // L10 (design section 8): one calculation is kept free, so "Saving" left the list and "more than one inventory" joined it.
+    for (const gated of ['Scope 3', 'uploads', 'guide', 'Trends', 'SBTi', 'verifier sharing', 'downloads', 'more than one inventory']) {
       expect(GHG_PLAN_USE_SENTENCE).toContain(gated)
     }
   })

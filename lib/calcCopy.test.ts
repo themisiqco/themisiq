@@ -19,7 +19,8 @@ describe('/calculate-emissions copy', () => {
     for (const retired of ['no sales call', 'submittable', 'ready to <strong>submit', 'Missing any documents', '~535']) {
       expect(PAGE, retired).not.toContain(retired)
     }
-    expect(PAGE).toContain('we&rsquo;ll send your results to you directly')
+    // L10: the email goes when the free account is created, and the step says so.
+    expect(PAGE).toContain('Then create a free account and we&rsquo;ll email your results to you and keep your calculation.')
   })
 
   it('CC3: the example figure is the engine figure for the stated inputs', () => {
@@ -41,8 +42,9 @@ describe('/calculate-emissions copy', () => {
     expect(PAGE).toContain('proposed for {SB253_FIRST_REPORT_DATE} and not yet final; Scope 3 is expected from {SB253_SCOPE3_FROM}')
   })
 
-  it('CC4: free use says the results are emailed, in the form the ruling gave', () => {
-    expect(GHG_FREE_USE_SENTENCE).toBe('Scope 1 and Scope 2 can be calculated free, in your browser, without an account, with your results emailed to you directly.')
-    expect(PAGE).toContain('your results will be emailed to you directly. Nothing is saved in ThemisIQ until you have a GHG plan.')
+  it('CC4: free use says the results are emailed once a free account is created (LEAD1 L10, design section 8)', () => {
+    expect(GHG_FREE_USE_SENTENCE).toBe('Scope 1 and Scope 2 can be calculated free, in your browser, without an account. Create a free account to get your results by email and keep your calculation.')
+    expect(PAGE).toContain('instantly and at no cost. Create a free account to get your results by email and keep your calculation.')
+    expect(PAGE).not.toContain('emailed to you directly')
   })
 })

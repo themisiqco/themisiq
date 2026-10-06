@@ -151,13 +151,17 @@ function parseSupplyChainDraft(u: unknown): SupplyChainInventory | null {
 // The calculator is never gated. Anyone — logged out, unentitled, expired — runs it and sees real
 // supplier scores; the gates are on OUTPUT, which is the CSV export and now saving a register.
 //
-// These sentences are deliberately identical to what enforce_supply_chain_entitlement() raises for
-// the same two conditions. The check in handleSave saves a round trip; the trigger is the actual
-// enforcement. Two wordings for one refusal would be two things to keep in step, and the customer
-// would get different text depending on which layer caught it.
+// These sentences are meant to match what enforce_supply_chain_entitlement() raises for the same two
+// conditions. The check in handleSave saves a round trip; the trigger is the actual enforcement. Two
+// wordings for one refusal would be two things to keep in step, and the customer would get different
+// text depending on which layer caught it.
+// ⚠️ THEY MATCH ONLY ONCE docs/review/patches/L10-M9-supply-chain-message.sql HAS RUN. Until then the trigger's
+// never-bought sentence is the old one ("…requires the Supply Chain module. Your suppliers are still on screen,"
+// then a dash, "purchase to save them."). The expired sentence already matches. If either is changed, change both
+// here and in the trigger, by a migration like M9.
 const SAVE_REFUSAL: Record<'expired' | 'none' | 'unknown', string> = {
   expired: 'Your Supply Chain access has expired. Renew to save a new register. Your existing registers are still here and still readable.',
-  none: 'Saving a register requires the Supply Chain module. Your suppliers are still on screen. Purchase to save them.',
+  none: 'Saving a register needs the Supply Chain module. Your suppliers are still on screen; choose a plan to keep them.',
   // States what was observed, not a guess at why. The read failed; naming a cause we cannot verify
   // is how a wrong one ends up on screen for months.
   unknown: 'We could not check your Supply Chain access, so nothing was saved. This is usually temporary. Try again in a moment.',
