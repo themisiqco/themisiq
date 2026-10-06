@@ -1779,12 +1779,12 @@ export function deliveriesStatement(fuel: string, site: string, win: { start: Da
 // in buildWorkings so every estimate is traceable.
 interface CoveragePeriod { docId: string; pi: number; start: Date; end: Date }
 interface CoverageResult {
-  status: 'full' | 'gap' | 'overlap' | 'straddle' | 'none'
+  status: 'full' | 'gap' | 'overlap' | 'none'
   // EVERY condition that holds, not just the one the scalar `status` collapsed to. `status` is a scalar
   // and the conditions are NOT mutually exclusive — a fuel with BOTH a gap and an overlap used to report
   // only 'overlap', so acknowledging the duplicate slipped the gap past the gate (the D1 masking bug).
   // The gate iterates `issues` and requires a resolution for EACH. `status` is kept for display/callsites.
-  issues: Array<'gap' | 'overlap' | 'straddle'>
+  issues: Array<'gap' | 'overlap'>
   monthsCovered: number
   coverageRatio: number               // monthsCovered / 12
   pctEstimated: number                // (12 - monthsCovered)/12, for disclosure
@@ -1984,11 +1984,10 @@ interface CoverageResolution {
   docIds?: string[]
   // Who confirmed (used_none: required). The account's user id and email at the time of confirming.
   by?: { userId: string; email: string }
-  // LEGACY straddle: day-level proration choice (ignored since T2)
+  // LEGACY straddle and duplicate fields: still present on rows stored before T3, read by nothing (T13).
   straddleChoice?: 'this_year' | 'next_year' | 'prorate'
   daysInYear?: number
   totalDays?: number
-  // LEGACY duplicate: which doc/proposal was dropped
   droppedDocId?: string
   note: string                    // human-readable, flows into workings
   acknowledgedAt: string          // ISO timestamp
@@ -3061,14 +3060,15 @@ function fuelTypeForDocType(docType: string): string | null {
 // adjustment (applyResolutions) and the coverage-resolution audit rows in buildWorkings
 // read from these, so the claim on the figure and the claim in the audit trail cannot
 // drift apart — the divergence they used to have IS the SEV 0 bug.
+// Both are called with ACCEPTED resolutions only (applyResolutions' extrapolations, and buildWorkings' audit
+// rows after validateResolution), so a legacy 'duplicate' or 'straddle' never reaches them and has no wording
+// here (T13).
 function resolutionMethod(r: CoverageResolution): string {
   return r.kind === 'extrapolate' ? `Extrapolation (×12/${r.monthsCovered}, ${r.pctEstimated}% estimated)`
     : r.kind === 'same_bill' ? 'Same bill, counted once'
     : r.kind === 'different_meters' ? `Different meters or accounts: ${r.meterLabel ?? ''}`
     : r.kind === 'used_none' ? `Site used none, confirmed by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
     : r.kind === 'deliveries_complete' ? `Deliveries confirmed complete by ${r.by?.email ?? ''} on ${dateInWords(new Date(r.acknowledgedAt))}`
-    : r.kind === 'duplicate' ? 'Overlap confirmed (no double-count adjustment)'
-    : r.kind === 'straddle' ? `Straddle — ${r.straddleChoice}${r.daysInYear != null && r.totalDays != null ? ` (${r.daysInYear}/${r.totalDays} days in year)` : ''}`
     : r.kind
 }
 function resolutionBasis(r: CoverageResolution): string {
@@ -3077,12 +3077,6 @@ function resolutionBasis(r: CoverageResolution): string {
     const multStr = Number.isInteger(mult) ? String(mult) : mult.toFixed(2)
     return `${r.monthsCovered} of 12 months from bills; grossed ×${multStr} for acknowledged coverage gap`
   }
-  if (r.kind === 'straddle') {
-    return r.daysInYear != null && r.totalDays != null
-      ? `${r.daysInYear} of ${r.totalDays} days fall in the reporting year`
-      : `boundary-straddling bill resolved by ${r.straddleChoice}`
-  }
-  if (r.kind === 'duplicate') return 'overlapping bills accepted as-is; no double-count adjustment applied'
   if (r.kind === 'same_bill') return `document ${r.countedDocId} counted; ${(r.excludedDocIds ?? []).join(', ')} retained as evidence, not counted`
   return r.note
 }
@@ -3685,9 +3679,9 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
  *     (section 3.3; the T3 all-rejected ruling).
  * A proposal with no value backs nothing (T1: it has no contribution row).
  *
- * ⚠️ KNOWN LIMIT UNTIL T7. While the page still writes fields, a stored value on an all-rejected field,
- * or on a location whose last document was removed, may be a stale copy rather than a typed figure, and
- * the two cannot be told apart here. T7 stops the writes, after which a stored value is only ever typed.
+ * Since T7 the page never writes a document-backed figure (locations_data is saved raw, lib/ghg/savePayload.ts),
+ * so a stored value on an all-rejected field, or on a location whose last document was removed, is only ever
+ * the customer's typed figure.
  *
  * Pure: locations in, new locations out. Units are taken from the documents where a figure is derived.
  */

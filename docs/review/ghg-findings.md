@@ -292,6 +292,14 @@ Rows that show "Not applicable" in the vintage cell:
 
 ## F-09. A bill wholly outside the inventory year is shown as "not counted" but is added in full to the annual figure
 
+**Status: FIXED** (recorded 6 Oct 2026, T13). The annual figure is the fold of each bill's contribution, and a
+bill wholly outside the year has reason `outside_year`, share 0 (`billContributions`, T1 d924f33; fold in
+`applyResolutions`, T2 7c413d6). The page no longer writes a figure into the location: every reader derives it
+(`deriveLocations`, T4 fac4bdd; saves raw, T7 cbbda08). The coverage strip forms its groups from the same
+contributions (T8 62521bb). The text below describes the code before those commits. Regression tests: "T13 F-09,
+F-10, F-11 regressions" in lib/ghg/engine.test.ts, and "what it says is not counted is not in the figure" in
+app/dashboard/ghg/_components/CoverageStrip.test.tsx. T13 commit: `<commit>` (added by Lisa).
+
 **Where the strip decides "not counted".** `analyzeCoverage` computes each bill's in-window days on the
 half-open window. A bill with none is pushed to `outOfWindow`:
 
@@ -331,6 +339,14 @@ days", and then not per bill.**
   written, and the proposals are flagged for review (page.tsx:1252-1264).
 
 ## F-10. An overlapping month-only "Jan 2026" bill and a "Jan 1 – Feb 1 2026" bill are both summed
+
+**Status: FIXED** (recorded 6 Oct 2026, T13). Overlap is compared on full bill periods, so two copies outside
+the year still raise it, and it is resolved only as `same_bill` (one counted) or `different_meters`; a stored
+`duplicate` is never accepted (`validateResolution`, T3 de782a6). "Confirm not a duplicate" is gone from the
+strip (T8 62521bb). A month-only bill cannot be confirmed until the customer confirms its dates (`guardConfirm`
+and `acceptanceProblem`, T9 616200c). Bills outside the year add 0 (T2 7c413d6), and the monthly split reads the
+same contributions (T6 90ad99c). The text below describes the code before those commits. Regression test: "T13
+F-09, F-10, F-11 regressions" in lib/ghg/engine.test.ts. T13 commit: `<commit>` (added by Lisa).
 
 **Inputs and intervals.** "Jan 2026" is stored as 2026-01-01 to 2026-01-31 (month-only rule,
 app/api/concierge/extract/route.ts:65), giving `[2026-01-01, 2026-02-01)`. "Jan 1 – Feb 1 2026" is stored
@@ -380,6 +396,13 @@ full quantity (lib/ghg/monthlyEmissions.ts:236-253). The monthly module has no o
 2026 carries both.
 
 ## F-11. `periodConfidence` is saved but never read
+
+**Status: FIXED** (recorded 6 Oct 2026, T13). Extraction maps it to `periodOrigin` ('high' to printed,
+'medium' to billing_month, app/dashboard/ghg/page.tsx), and `periodOriginOf` reads it for proposals saved before
+T9. `acceptanceProblem` refuses a billing_month proposal until its dates are confirmed, and `guardConfirm` applies
+that to every patch the page makes (T9 616200c). 'low' still means null dates, which is undated, not counted and
+export-blocking (T3 de782a6). The text below describes the code before those commits. Regression test: "T13
+F-09, F-10, F-11 regressions" in lib/ghg/engine.test.ts. T13 commit: `<commit>` (added by Lisa).
 
 **Written.**
 - **The extraction prompt** sets it: "high" for printed dates, "medium" for a month-only period, "low" when no

@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CoverageStrip, type CoverageStripProps } from './CoverageStrip'
-import { emptyLocation, type Location, type SourceDoc, type ExtractedProposal } from '@/lib/ghg/engine'
+import { emptyLocation, deriveLocations, type Location, type SourceDoc, type ExtractedProposal } from '@/lib/ghg/engine'
 import { stripTsComments } from '@/lib/testing/stripComments'
 
 const prop = (o: Partial<ExtractedProposal>): ExtractedProposal => ({
@@ -206,5 +206,19 @@ describe('coverage strip: fix bills before estimating (T10c)', () => {
     const t = text(draw(site(months(6))))
     expect(t).toContain('Estimate the missing months')
     expect(t).not.toContain('Fix any bills marked above before estimating.')
+  })
+})
+
+describe('coverage strip: what it says is not counted is not in the figure (T13, F-09)', () => {
+  it('a bill wholly outside the year is listed as not counted and adds 0 to the annual figure', () => {
+    const l = site([gdoc('jan', month(1)), gdoc('feb', { ...month(2), value: 50 }), gdoc('old', { value: 999, periodStart: '2024-03-01', periodEnd: '2024-03-31' })])
+    const t = text(draw(l))
+    expect(t).toContain('1 bill falls outside reporting year 2025 and is not counted:')
+    // The figure the totals read is the two in-year bills only. On the old code it was 1149.
+    expect(deriveLocations({ locations: [l], reporting_year: 2025 })[0].natural_gas_amount).toBe(150)
+    // Remove the bill the strip calls not counted, and the figure does not move.
+    const without = { ...l, source_docs: l.source_docs.filter(d => d.id !== 'old') }
+    expect(deriveLocations({ locations: [without], reporting_year: 2025 })[0].natural_gas_amount).toBe(150)
+    expect(text(draw(without))).not.toContain('not counted')
   })
 })

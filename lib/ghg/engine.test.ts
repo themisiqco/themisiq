@@ -34,7 +34,9 @@ import {
   documentsBacking, deriveStoredLocations, factorDerivationsFor,
   canonicalPeriod, deliveryDateOf, deliveriesStatement, isDeliveryGroup, sameDocSet,
   valueProblem, NO_VALUE_MESSAGE, proposalNeedsAttention,
+  acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
 } from './engine';
+import { guardConfirm, editPeriod } from './proposalEdits';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE } from './coverageActions';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
@@ -4853,5 +4855,86 @@ describe('T10c run-through wording', () => {
       expect(EF_SOURCES[k].startsWith('DCCEEW NGA 2025'), k).toBe(true);
     }
     expect(Object.values(EF_SOURCES).join(' ')).not.toMatch(/NGA Factors|National Greenhouse Accounts/);
+  });
+});
+
+// ── T13: F-09, F-10 and F-11 closed (docs/review/ghg-findings.md) ─────────────────────────────────────
+// Each test fails on the code the finding describes. F-09: a bill wholly outside the year was added in full
+// to the annual figure while the strip said "not counted". F-10: a month-only "Jan 2026" bill and a
+// "Jan 1 to Feb 1 2026" bill were both summed, and the only resolution ("Confirm not a duplicate") changed
+// nothing. F-11: periodConfidence was saved and never read, so a month-only period was treated as printed.
+describe('T13 F-09, F-10, F-11 regressions', () => {
+  const W = (y: number) => periodFromYearAndEnd(y, 12);
+  const editor = { userId: 'u-1', email: 'jo@acme.example' };
+  const elec = (value: number, periodStart: string | null, periodEnd: string | null, o: Partial<ExtractedProposal> = {}) =>
+    prop({ fuelType: 'electricity', value, unit: 'kwh', periodStart, periodEnd, periodConfidence: 'high', sourceQuote: `${value} kWh`, ...o });
+  const edoc = (id: string, p: ExtractedProposal): SourceDoc => ({ ...doc('utility_electricity', [p], id), file_name: `${id}.pdf` });
+  const kwh = (l: Location, y: number, r: CoverageResolution[] = []) => applyResolutions(l, r, W(y).start, W(y).end).electricity_kwh?.value;
+
+  it('F-09: a bill wholly outside the year contributes 0 to the annual figure, and the not-counted list matches', () => {
+    const l = loc({ country: 'US', grid_region: 'US_CA', source_docs: [
+      edoc('jan', elec(1000, '2025-01-01', '2025-01-31')),
+      edoc('feb', elec(900, '2025-02-01', '2025-02-28')),
+      edoc('old', elec(5000, '2024-03-01', '2024-03-31')),
+    ] });
+    const c = billContributions(l, [], W(2025));
+    const old = c.find(x => x.docId === 'old') as BillContribution;
+    expect(old).toMatchObject({ counted: false, reason: 'outside_year', share: 0 });
+    // The annual figure is the in-year bills only. On the old code it was rawSum, 6900.
+    expect(kwh(l, 2025)).toBe(1900);
+    expect(deriveLocations({ locations: [l], reporting_year: 2025 })[0].electricity_kwh).toBe(1900);
+    const total = calcInventory(deriveLocations({ locations: [l], reporting_year: 2025 }), 'AR6', 2025);
+    const inYearOnly = calcInventory(deriveLocations({ locations: [{ ...l, source_docs: l.source_docs.filter(d => d.id !== 'old') }], reporting_year: 2025 }), 'AR6', 2025);
+    expect(inYearOnly.s2_location).toBeGreaterThan(0);
+    expect(total.s2_location).toBeCloseTo(inYearOnly.s2_location, 12);
+    // What the strip lists as not counted (analyzeCoverage.outOfWindow) is exactly the outside_year bills,
+    // and the figure is the sum of the counted ones, so the two cannot disagree.
+    const periods: CoveragePeriod[] = c.filter(x => x.counted || x.reason === 'outside_year')
+      .map(x => ({ docId: x.docId, pi: x.proposalIndex, start: new Date(`${x.periodStart}T00:00:00`), end: new Date(`${l.source_docs.find(d => d.id === x.docId)!.extracted![0].periodEnd}T00:00:00`) }));
+    const cov = analyzeCoverage(periods, W(2025).start, W(2025).end);
+    expect(cov.outOfWindow.length).toBe(c.filter(x => x.reason === 'outside_year').length);
+    expect(c.filter(x => x.counted).reduce((s, x) => s + x.value * (x.share ?? 0), 0)).toBe(kwh(l, 2025));
+  });
+
+  it('F-10: a month-only Jan 2026 bill and a Jan 1 to Feb 1 2026 bill cannot both be summed without a resolution', () => {
+    const monthOnly = elec(1150, '2026-01-01', '2026-01-31', { periodConfidence: 'medium', periodOrigin: 'billing_month', status: 'extracted' });
+    const printed = elec(1200, '2026-01-01', '2026-02-01');
+    // 1. The month-only bill cannot be confirmed until its dates are (R5). Confirm alone is dropped.
+    expect(guardConfirm(monthOnly, { status: 'confirmed' }).status).toBeUndefined();
+    const pending = loc({ source_docs: [edoc('printed', printed), edoc('monthOnly', monthOnly)] });
+    expect(kwh(pending, 2026), 'only the printed bill counts while the month-only one waits').toBe(1200);
+    // 2. Once its dates are confirmed, both count, and the overlap blocks export until it is resolved.
+    const confirmed = { ...monthOnly, ...guardConfirm(monthOnly, editPeriod(monthOnly, { start: '2026-01-01', end: '2026-01-31', by: editor, at: '2026-02-10T09:00:00Z', confirm: true })) };
+    expect(confirmed.status).toBe('confirmed');
+    const both = loc({ source_docs: [edoc('printed', printed), edoc('monthOnly', confirmed)] });
+    const overlap = (y: number, r: CoverageResolution[] = []) => findUnresolvedCoverage([both], y, 12, r).filter(i => i.status === 'overlap');
+    expect(overlap(2026).map(i => i.docIds)).toEqual([['printed', 'monthOnly']]);
+    // 3. The old "Confirm not a duplicate" resolution no longer clears it.
+    const dup = { locId: 'L1', fuelType: 'electricity', kind: 'duplicate', note: 'accepted as-is', acknowledgedAt: '2026-02-10T09:00:00Z' } as CoverageResolution;
+    expect(overlap(2026, [dup]).length).toBe(1);
+    // 4. Same bill: counted once, and the overlap clears.
+    const same = { locId: 'L1', fuelType: 'electricity', kind: 'same_bill', countedDocId: 'printed', excludedDocIds: ['monthOnly'], note: 'same', acknowledgedAt: '2026-02-10T09:00:00Z' } as CoverageResolution;
+    expect(overlap(2026, [same])).toEqual([]);
+    expect(kwh(both, 2026, [same])).toBe(1200);
+    // 5. In FY2025 both are outside the year: they add 0, and the overlap is still raised (full periods).
+    expect(kwh(both, 2025)).toBe(0);
+    expect(overlap(2025).length).toBe(1);
+  });
+
+  it('F-11: periodConfidence is read: a month-only period saved before T9 cannot be confirmed until its dates are', () => {
+    // A proposal saved before T9 carries periodConfidence and no periodOrigin. periodOriginOf reads it.
+    const legacy = elec(1150, '2026-01-01', '2026-01-31', { periodConfidence: 'medium', status: 'extracted' });
+    delete (legacy as Partial<ExtractedProposal>).periodOrigin;
+    expect(periodOriginOf(legacy)).toBe('billing_month');
+    expect(acceptanceProblem(legacy)).toBe(BILLING_MONTH_CONFIRM_MESSAGE);
+    expect(guardConfirm(legacy, { status: 'confirmed' }).status, 'medium is not treated as printed').toBeUndefined();
+    // Printed dates confirm as before; a recorded periodOrigin wins over periodConfidence.
+    expect(periodOriginOf({ periodConfidence: 'high' })).toBe('printed');
+    expect(guardConfirm(elec(1, '2026-01-01', '2026-01-31', { status: 'extracted' }), { status: 'confirmed' }).status).toBe('confirmed');
+    expect(periodOriginOf({ periodConfidence: 'medium', periodOrigin: 'customer_confirmed' })).toBe('customer_confirmed');
+    // 'low' (no period visible) gives null dates: undated, not counted, and an export-blocking issue names it.
+    const undated = loc({ source_docs: [edoc('nodates', elec(700, null, null, { periodConfidence: 'low' }))] });
+    expect(billContributions(undated, [], W(2026))[0]).toMatchObject({ counted: false, reason: 'undated' });
+    expect(findUnresolvedCoverage([undated], 2026, 12, []).some(i => i.status === 'undated' && i.docIds?.includes('nodates'))).toBe(true);
   });
 });
