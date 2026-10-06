@@ -2812,6 +2812,8 @@ const hasRefrigerantLine = (loc: Location): boolean =>
  * `{ publisher, edition?, value }` shape FI2 and T3c extend; `value` is null because no factor applied.
  */
 export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing'
+/** The coverage-issue statuses an unpriced line raises (FI1): the reason, used as the status. */
+export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing'])
 export interface UnpricedLine {
   reason: UnpricedReason
   locId: string
@@ -2977,31 +2979,18 @@ function unpriceableReason(loc: Location, _gwpVersion: GwpVersion, _year: number
 }
 
 /**
- * A location excluded from every total, and why.
- *
- * ⚠️ A DISCRIMINATED UNION, NOT AN OPTIONAL FIELD, SO NO SURFACE CAN RENDER THE TWO ALIKE. The two
- * blocks need opposite instructions: a factor gap says "check the country on this location, or the
- * unit on the bill", which is actionable; a country refusal has no unit to check and, for two of
- * its three states, no remedy at all. An optional `refusal?` would let a surface read fuel and unit
- * off a country refusal, find empty strings, and print a sentence with holes in it.
+ * A location excluded from every total, and why: its country (FI1). A factor gap used to be a second kind
+ * here, with a fuel and a unit; it is now an unpriced line, reported per line by unpricedLines and the
+ * coverage gate, so this type has one arm.
  */
-export type UnpriceableLocation =
-  // ⚠️ NO LONGER PRODUCED (FI1): a factor gap is an unpriced line, not an excluded location. Kept in the type
-  // so the page still builds until FI1's second diff moves it to the per-line list; then it is removed.
-  | {
-      kind: 'factor'
-      locId: string
-      locName: string
-      fuel: string      // engine token, e.g. 'natural_gas' — the wording is the component's job
-      unit: string      // e.g. 'm3'
-      country: string   // e.g. 'US', or '(unset)' when the location has no country
-    }
-  | {
-      kind: 'country'
-      locId: string
-      locName: string
-      refusal: CountryRefusal
-    }
+// FI1: a COUNTRY refusal only. A factor gap is an unpriced line (unpricedLines), never an excluded location,
+// so the 'factor' arm this union carried is gone. `kind` stays so every surface keeps branching on it.
+export type UnpriceableLocation = {
+  kind: 'country'
+  locId: string
+  locName: string
+  refusal: CountryRefusal
+}
 
 // Pure probe, same shape as findUnresolvedCoverage / findUndeclaredStreams: a list of what is
 // wrong, which the component turns into a per-location state, a note on every affected total,

@@ -70,7 +70,8 @@ describe('export precision', () => {
     expect(s).toContain("['Scope 1 total (tCO₂e)', totals.s1_total.toFixed(CSV_DP)]")
     expect(s).toContain("['Scope 2 location-based (tCO₂e)', totals.s2_location.toFixed(CSV_DP)]")
     expect(s).toContain("[['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(CSV_INTENSITY_DP)]]")
-    expect(s).toContain("return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), '']")
+    // FI1: the Note cell names any unpriced lines the location's figures leave out (empty when there are none).
+    expect(s).toContain("return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), missing]")
   })
 
   it('LOCATION BREAKDOWN sums to RESULTS, within what CSV_DP rounding can introduce', () => {

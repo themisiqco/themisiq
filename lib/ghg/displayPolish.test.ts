@@ -28,6 +28,10 @@ describe('display polish (T10d)', () => {
   })
 
   it('the live results panel says "nothing is lost" once', () => {
-    expect(PAGE).toContain('{!factorGapHasCountry(blockedHere) && (')
+    // FI1: the results panel's blocked state is a country refusal only, so the sentence is said once, plainly;
+    // an unpriced line says it in the per-line panel's trailer instead.
+    const panel = PAGE.slice(PAGE.indexOf('{refusalResultsHeading(blockedHere.refusal)}'), PAGE.indexOf('{refusalResultsHeading(blockedHere.refusal)}') + 900)
+    expect(panel.split("nothing you&apos;ve entered here is lost").length - 1).toBe(1)
+    expect(PAGE).not.toContain('factorGapHasCountry')
   })
 })

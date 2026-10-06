@@ -269,10 +269,11 @@ describe('the GHG page surfaces', () => {
     expect(notes, 'exactly one exclusion note between the intensity and the end of the card').toBe(1)
   })
 
-  it('the Review card drops its prefix for a refusal, and keeps it for a unit mismatch on a location with no country', () => {
-    // T10c: a factor gap on a location whose country is set has its own sentence, which says it is not in the
-    // totals, so only the no-country case keeps the prefix.
-    expect(PAGE).toContain("{blocked.kind !== 'country' && !factorGapHasCountry(blocked) ? 'Not included in any total. ' : ''}")
+  it('the Review card states a refusal with its own sentence and no prefix (FI1: no factor-gap case is left)', () => {
+    // A refusal's sentence already says the location is in no total. The unit-mismatch case this test also
+    // covered is gone: since FI1 a missing factor is an unpriced line, listed with its own message.
+    expect(PAGE).toContain("⚠ {countryRefusalText(blocked.refusal, 'review', locationHasEnteredFigures(loc))}")
+    expect(PAGE).not.toContain("'Not included in any total. '")
   })
 
   it('no surface carries a hard-coded publisher catalogue any more', () => {

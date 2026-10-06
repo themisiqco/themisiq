@@ -81,12 +81,14 @@ interface WorkingRow {
   note?: string
   // Rows that record ABSENCE rather than a calculation. A verifier needs these more than the
   // operator does: 'attested_absent' is evidence (someone confirmed there is none, and when),
-  // 'undeclared' is the absence of evidence (nobody answered), 'unpriceable' is a location the
-  // TOTALS THEMSELVES LEAVE OUT because no published factor exists for the unit its fuel is in.
+  // 'undeclared' is the absence of evidence (nobody answered), 'unpriced' is ONE LINE the TOTALS
+  // THEMSELVES LEAVE OUT because it could not be priced (FI1: no factor for its unit, an unrecognised
+  // refrigerant type, or no province for Canadian gas). Before FI1 a missing factor left out the whole
+  // location, as 'unpriceable'; the engine no longer emits that state.
   // Filtering them off this page would hide the incomplete parts of an inventory from the surface
   // used to assess completeness.
   //
-  // 'unpriceable' was emitted by the engine and rendered here GENERICALLY — a row with a dash in
+  // 'unpriceable' (FI1's predecessor of 'unpriced') was emitted and rendered here GENERICALLY: a row with a dash in
   // every column and no badge, sitting in the ordinary striped background, because the union did
   // not name it and neither branch matched. The one row on the page that says a total is short was
   // the least visible thing in the table.
@@ -116,12 +118,10 @@ interface WorkingRow {
 // The badge and evidence sentence for a location excluded because of its country. One component,
 // three call sites, so the three states cannot drift apart in wording or in styling.
 //
-// ⚠️ A SEPARATE BADGE FROM 'unpriceable', AND SEPARATE ON PURPOSE. Both drop a whole location from
-// every total, so the CONSEQUENCE is identical, but the cause is not and a verifier is judging the
-// cause. 'unpriceable' means the figures are in a unit no table for that country carries, which the
-// operator can fix. These three mean the country itself resolves to no factor set, and for two of
-// them there is nothing to fix. Sharing a badge would tell a verifier the operator had left
-// something undone when they had not.
+// ⚠️ A SEPARATE BADGE FROM 'unpriced', AND SEPARATE ON PURPOSE. 'unpriced' (FI1) leaves out ONE LINE
+// the operator can fix, and the rest of the location is priced. These three leave out the WHOLE
+// location, because the country itself resolves to no factor set, and for two of them there is nothing
+// to fix. Sharing a badge would tell a verifier the operator had left something undone when they had not.
 function CountryRefusalCell({ refusal }: { refusal: CountryRefusal }) {
   return (
     <>
@@ -1004,10 +1004,10 @@ export default function VerifierPage() {
               <tbody>
                 {inv.workings.map((w, i) => (
                   <tr key={i} style={{
-                    // 'unpriceable' and 'declared_unquantified' take the same amber as 'undeclared'.
+                    // 'unpriced' and 'declared_unquantified' take the same amber as 'undeclared'.
                     // All three are rows a verifier must not read past: one says nobody established
                     // whether something is there, one says the operator confirmed it IS there and gave
-                    // no figure, the third says the totals on this page are short by a known site.
+                    // no figure, the third says the totals on this page are short by a known line.
                     // Equal weight is deliberate — the badge and the sentence separate them, not the
                     // colour. Grey means resolved, amber means stop; a fourth shade would blur that.
                     background: w.declaration === 'undeclared' || w.declaration === 'unpriced' || w.declaration === 'declared_unquantified' || w.declaration === 'no_published_factor'
@@ -1088,13 +1088,13 @@ export default function VerifierPage() {
                           renders in the Result column and carries the factor-lookup reason verbatim;
                           this states the consequence a verifier is deciding on — the totals shown
                           elsewhere on this page do not include this site. */}
-                      {/* PLACED BESIDE 'unpriceable', THE ONE IT WOULD BE CONFUSED WITH, AND THE BADGES
-                          SHARE NO WORD. Both mean "no factor was available", and a verifier must be
-                          able to tell them apart at a glance because the SCOPE of what is missing
-                          differs completely: 'unpriceable' drops a WHOLE LOCATION from every total,
-                          this drops ONE STREAM at a location whose other streams are fully priced.
-                          This row also shows the quantity, which that one cannot — the operator did
-                          supply a figure, and how big it is, is what a verifier is judging. */}
+                      {/* PLACED BESIDE 'unpriced', THE ONE IT WOULD BE CONFUSED WITH, AND THE BADGES
+                          SHARE NO WORD. Both leave ONE line out of every total at a location whose other
+                          lines are priced, and both show the quantity the operator supplied. They differ
+                          in cause: this one means the jurisdiction publishes no steam factor at all,
+                          and 'unpriced' (FI1) means a line the operator can fix (its unit, refrigerant
+                          type or province). Before FI1 the neighbour was 'unpriceable', which dropped a
+                          whole location; that state is no longer emitted. */}
                       {w.declaration === 'no_published_factor' && (
                         <>
                           <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, color: 'var(--color-state-warn)', background: 'color-mix(in srgb, var(--color-state-warn) 12%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Stream not priced</span>
@@ -1107,13 +1107,11 @@ export default function VerifierPage() {
                           </div>
                         </>
                       )}
-                      {/* ⚠️ A SEPARATE BADGE FROM 'unpriceable', AND SEPARATE ON PURPOSE. Both drop a
-                          whole location from every total, so the CONSEQUENCE is identical, but the
-                          cause is not and a verifier is judging the cause. 'unpriceable' means the
-                          figures are in a unit no table for that country carries, which the operator
-                          can fix. These three mean the country itself resolves to no factor set, and
-                          for two of them there is nothing to fix. Sharing a badge would tell a
-                          verifier the operator had left something undone when they had not. */}
+                      {/* ⚠️ A SEPARATE BADGE FROM 'unpriced', AND SEPARATE ON PURPOSE. 'unpriced' (FI1)
+                          leaves out one line the operator can fix; these three leave out the whole
+                          location, because the country resolves to no factor set, and for two of them
+                          there is nothing to fix. Sharing a badge would tell a verifier the operator
+                          had left something undone when they had not. */}
                       {/* ⚠️ THREE BRANCHES, ONE CELL, AND THE REPETITION IS DELIBERATE.
                           declarationStates.test.ts requires each state to be NAMED beside a render
                           branch on this page, and it matches `declaration === 'x' &&`. A single

@@ -37,7 +37,7 @@ import {
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
   findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
   notCountedLines, FIX_DATES, FIX_REVERSED, FIX_UNITS,
-  unpricedLines, UNPRICED_MESSAGE,
+  unpricedLines, UNPRICED_MESSAGE, UNPRICED_STATUSES,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
@@ -4383,14 +4383,14 @@ describe('T6 monthly split', () => {
 
   it('an unpriced line writes no monthly row, and the bill is skipped by name (FI1)', () => {
     // WAS "a location the totals exclude as unpriceable writes no monthly row". FI1 keeps the location;
-    // the unpriced bill still writes nothing, and lands in skipped with the reason calcGas gives.
-    // (The dedicated factor_missing skip reason is FI1's second diff.)
+    // the unpriced bill still writes nothing, and lands in skipped with the line's own reason (FI1 diff 2).
     const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'GB' });
     const r = buildMonthlyEmissions(inv([blocked], 2025), deps, 'AR6');
     expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toEqual([]);
     expect(unpricedLines(deriveLocations(inv([blocked], 2025))[0]).map(u => u.reason)).toEqual(['factor_missing']);
     expect(r.slices).toEqual([]);
-    expect(r.skipped.some(x => x.reason.startsWith('cannot price natural_gas_m3'))).toBe(true);
+    expect(r.skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'factor_missing' });
+    expect(r.skipped.some(x => x.reason.startsWith('cannot price'))).toBe(false);
   });
 
   it('slices carry their location id, for matching by location', () => {
@@ -5438,5 +5438,64 @@ describe('FI1 unpriced lines', () => {
     const all = [UNPRICED_MESSAGE.factor_missing('Natural gas', 'A', 'm³', 'P', ['kWh']), UNPRICED_MESSAGE.factor_missing('Natural gas', 'A', 'm³', 'P', []),
       UNPRICED_MESSAGE.refrigerant_unknown('A'), UNPRICED_MESSAGE.province_missing('A', null), UNPRICED_MESSAGE.province_missing('A', 'ZZ')];
     for (const m of all) expect(m).not.toContain('\u2014');
+  });
+});
+
+// ── FI1 diff 2: consumers. The monthly split, and every issue clearing the moment its input is fixed ────
+describe('FI1 consumers', () => {
+  const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+  const bill = (id: string, document_type: string, fuelType: string, value: number, unit: string) =>
+    ({ ...doc(document_type, [prop({ fuelType, value, unit, periodStart: '2025-01-01', periodEnd: '2025-06-30' })], id), file_name: `${id}.pdf` });
+
+  it('monthly: an unpriced bill is skipped with factor_missing, and reconcile reports zero unexplained', () => {
+    const l = loc({ name: 'Leeds', country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_unit: 'm3',
+      source_docs: [bill('gas', 'utility_bill_gas', 'natural_gas', 900, 'm3'), bill('power', 'utility_electricity', 'electricity', 20_000, 'kwh')] });
+    const inv = { locations: [l], reporting_year: 2025 };
+    const m = buildMonthlyEmissions(inv, deps, 'AR6');
+    expect(m.skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'factor_missing' });
+    expect(m.slices.every(x => x.fuel_type === 'electricity')).toBe(true);
+    const r = reconcile(m.slices, inv, 'AR6');
+    expect(r.reconciles).toBe(true);
+    expect(r.unexplained_delta).toBeCloseTo(0, 6);
+  });
+
+  it('monthly: Canadian gas with no province is skipped with province_missing', () => {
+    const l = loc({ name: 'Moncton', country: 'CA', grid_region: '', province: '', has_natural_gas: true, natural_gas_unit: 'm3',
+      source_docs: [bill('gas', 'utility_bill_gas', 'natural_gas', 900, 'm3')] });
+    const m = buildMonthlyEmissions({ locations: [l], reporting_year: 2025 }, deps, 'AR6');
+    expect(m.skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'province_missing' });
+    expect(m.slices).toEqual([]);
+  });
+
+  it('monthly: the location-level unpriceable skip is gone, because the country check already covers it', () => {
+    const src = stripTsComments(readFileSync(join(process.cwd(), 'lib/ghg/monthlyEmissions.ts'), 'utf8'));
+    expect(src).not.toContain('location excluded: unpriceable');
+    expect(src).not.toContain('findUnpriceableLocations');
+    // A refused location still writes nothing, and says so, through the country check.
+    const jp = loc({ name: 'Osaka', country: 'JP', grid_region: 'US_CA', electricity_kwh: 1000,
+      source_docs: [bill('power', 'utility_electricity', 'electricity', 20_000, 'kwh')] });
+    const m = buildMonthlyEmissions({ locations: [jp], reporting_year: 2025 }, deps, 'AR6');
+    expect(m.slices).toEqual([]);
+    expect(m.skipped).toContainEqual({ fuelType: 'all', document_type: 'all', reason: 'location excluded: country_not_supported' });
+  });
+
+  it('each issue clears the moment its input is fixed: unit, refrigerant type, province', () => {
+    // The page derives on every render (deriveLocations of the live inventory), so these are what it shows.
+    const issues = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => UNPRICED_STATUSES.has(i.status)).map(i => i.status);
+    const gas = loc({ name: 'A', country: 'US', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' });
+    expect(issues(gas)).toEqual(['factor_missing']);
+    expect(issues({ ...gas, natural_gas_unit: 'mcf' })).toEqual([]);
+    const ref = loc({ name: 'A', country: 'US', has_hfc_refrigerants: true, refrigerant_type: 'r999x', refrigerant_purchased_kg: 50 });
+    expect(issues(ref)).toEqual(['refrigerant_unknown']);
+    expect(issues({ ...ref, refrigerant_type: 'r134a' })).toEqual([]);
+    const ca = loc({ name: 'A', country: 'CA', grid_region: '', province: '', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' });
+    expect(issues(ca)).toEqual(['province_missing']);
+    // The page writes the province into grid_region as well (page.tsx updateLocation), so both are set.
+    expect(issues({ ...ca, province: 'QC', grid_region: 'QC' })).toEqual([]);
+    // From bills too: the figure is derived, so fixing the bill's unit clears it with no save.
+    const fromBill = loc({ name: 'A', country: 'US', has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'm3')] });
+    expect(unpricedLines(deriveLocations({ locations: [fromBill], reporting_year: 2025 })[0]).map(u => u.reason)).toEqual(['factor_missing']);
+    const fixed = { ...fromBill, source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'mcf')] };
+    expect(unpricedLines(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0])).toEqual([]);
   });
 });

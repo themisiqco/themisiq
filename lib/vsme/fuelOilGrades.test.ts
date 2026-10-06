@@ -105,10 +105,9 @@ describe('the retired fuel_oil token is gone from the ONE FUEL_WORDS map', () =>
     // exact statement: FUEL_WORDS was collapsed first and its two sibling maps followed on the same
     // day, so the statement now names three symbols and pinning its spelling would break on the next
     // one added. lib/ghg/wordMaps.test.ts owns the general form of this guard.
-    const importLine = pageSrc.split('\n').filter(l => l.includes("from '../../../lib/ghg/series'") && !l.startsWith('import type'))
-    expect(importLine, 'one value import from series.ts').toHaveLength(1)
-    expect(importLine[0], 'FUEL_WORDS must be imported').toContain('FUEL_WORDS')
-    expect(pageSrc, 'and it is still used to word the unpriceable-location message').toContain('FUEL_WORDS[u.fuel]')
+    // FI1: the page no longer words the factor-gap message (the engine's UNPRICED_MESSAGE does), so it
+    // imports no FUEL_WORDS at all; lib/ghg/wordMaps.test.ts W3 and W4 pin that the sentence is the engine's.
+    expect(pageSrc, 'the wizard prints the engine message for an unpriced line').toContain('{u.message}')
   })
 })
 

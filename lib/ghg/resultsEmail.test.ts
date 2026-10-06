@@ -136,7 +136,7 @@ describe('the results email', () => {
     expect(e.html).toContain(footer)
     for (const part of [e.text, e.html, e.subject]) {
       expect(part.toLowerCase()).not.toContain('traceable')
-      expect(part).not.toContain('—')
+      expect(part).not.toContain('\u2014')
     }
     // One image only, the brand masthead (lib/email/layout.ts, Oct 2026); nothing else is an image, and no script.
     expect(e.html.match(/<img\b/gi) ?? []).toHaveLength(1)
@@ -336,5 +336,52 @@ describe('L5 amendment 2', () => {
       expect(src).not.toContain('www.themisiq.co')
       expect(src).not.toContain('NEXT_PUBLIC_SITE_URL')
     }
+  })
+})
+
+// FI1 diff 2: a free calculation can hold a figure the engine cannot price (here US gas in m3, which the EPA does not
+// publish per m3). The saved totals leave it out, and the email must say so rather than present a total as whole.
+describe('the results email with an unpriced line (FI1)', () => {
+  const site = { id: 'm1', name: 'Mill', country: 'US', grid_region: 'US_CA', electricity_kwh: 50000,
+    has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'm3' }
+  const invU = inventoryFromDraft({ company_name: 'FI1 Co', reporting_year: 2025, locations: [site] } as never, 'FI1 Co', NOW)
+  const rowU = ({ ...inventoryRow(invU, 'user-1', 'co-1', true, NOW), id: 'inv-u' }) as unknown as SavedInventoryRow
+  const mU = resultsEmailModel({ row: rowU, fullName: 'Pat', siteUrl: SITE })
+  const mail = buildResultsEmail({ row: rowU, fullName: 'Pat', siteUrl: SITE })
+
+  it('F1: the totals are the priced figures only, and the email says they leave the line out', () => {
+    expect(mU.totals.scope1).toBe(0)
+    expect(mU.totals.scope2Location).toBeGreaterThan(0)
+    expect(mU.notPriced).toEqual(['Mill, Natural gas: 1,200 m³, not included in your totals.'])
+    expect(mail.text).toContain(RESULTS_EMAIL_COPY.totalsExclude(1))
+    expect(mail.text).toContain(`${RESULTS_EMAIL_COPY.notPricedHeading}\nMill, Natural gas: 1,200 m³, not included in your totals.`)
+    expect(mail.html).toContain(RESULTS_EMAIL_COPY.totalsExclude(1))
+    expect(mail.html).toContain('Not calculated')
+  })
+
+  it('F2: the location keeps its priced figures and is marked as excluding one figure, not as excluded', () => {
+    const [l] = mU.locations
+    expect(l.scope1).toBe(0)
+    expect(l.scope2).toBeGreaterThan(0)
+    expect(l.notPriced).toBe(1)
+    expect(mail.text).toContain(`(${RESULTS_EMAIL_COPY.locationExcludes(1)})`)
+    const millLine = mail.text.split('\n').find(t => t.startsWith('Mill ('))!
+    expect(millLine).toContain('Scope 1')
+    expect(millLine).not.toContain(RESULTS_EMAIL_COPY.notIncluded)
+  })
+
+  it('F3: the unpriced line is never listed as a priced source line', () => {
+    expect(mU.sourceLines.some(s => s.includes('Natural gas'))).toBe(false)
+  })
+
+  it('F4: no em dash in the new copy', () => {
+    for (const s of [RESULTS_EMAIL_COPY.totalsExclude(1), RESULTS_EMAIL_COPY.totalsExclude(2), RESULTS_EMAIL_COPY.notPricedHeading,
+      RESULTS_EMAIL_COPY.notPricedLine('A', 'B', 'C'), RESULTS_EMAIL_COPY.locationExcludes(2), ...mU.notPriced]) expect(s).not.toContain('\u2014')
+  })
+
+  it('F5: a priced inventory says nothing about unpriced figures', () => {
+    const m = model()
+    expect(m.notPriced).toEqual([])
+    expect(build().text).not.toContain(RESULTS_EMAIL_COPY.notPricedHeading)
   })
 })

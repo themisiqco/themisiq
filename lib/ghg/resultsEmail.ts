@@ -56,6 +56,12 @@ export const RESULTS_EMAIL_COPY = {
   savedPlan: 'This calculation is saved in your ThemisIQ account. Open it any time:',
   moreLines: (n: number) => `and ${n} more ${n === 1 ? 'line' : 'lines'} in your account`,
   notIncluded: 'Not included in your totals',
+  // FI1: a figure that could not be calculated. The totals above leave it out, and the email says so, so a
+  // total is never read as including it.
+  totalsExclude: (n: number) => `These totals leave out ${n} ${n === 1 ? 'figure' : 'figures'} we could not calculate yet, listed under Not calculated.`,
+  notPricedHeading: 'Not calculated',
+  notPricedLine: (site: string, source: string, activity: string) => `${site}, ${source}: ${activity}, not included in your totals.`,
+  locationExcludes: (n: number) => `excludes ${n} ${n === 1 ? 'figure' : 'figures'} not calculated`,
   noEditions: 'No published emission factor table priced these figures.',
   nextStep: () => {
     const price = GHG_TIERS.starter.priceUSD
@@ -104,8 +110,10 @@ export type ResultsEmailModel = {
   /** One sentence under Scope 2 market-based, or null when it was not computed. */
   marketBasis: string | null
   s3td: number | null
-  locations: Array<{ name: string; country: string; gridRegion: string; scope1: number | null; scope2: number | null }>
+  locations: Array<{ name: string; country: string; gridRegion: string; scope1: number | null; scope2: number | null; notPriced: number }>
   sourceLines: string[]
+  /** FI1: one sentence per line the totals leave out as unpriced ('unpriced' workings rows). */
+  notPriced: string[]
   moreLines: number
   gwpBasis: string
   editions: string[]
@@ -221,7 +229,11 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
     !code ? 'Not applicable' : gridRegionName(code) ?? `${countryWords(c)} grid`
   const locations = names.map(name => {
     const mine = rows.filter(r => (r.location ?? 'Location') === name)
+    // A whole location left out: its country (country_*), or, on a row saved before FI1, a missing factor
+    // ('unpriceable'). Since FI1 a missing factor is one 'unpriced' line instead: the location's other lines
+    // are in its totals, and notPriced counts what they leave out.
     const excluded = mine.some(r => r.declaration === 'unpriceable' || (r.declaration ?? '').startsWith('country_'))
+    const notPriced = mine.filter(r => r.declaration === 'unpriced').length
     const s1 = mine.filter(r => r.scope === 1 && priced(r))
     const s2 = mine.filter(r => r.scope === 2 && r.scope2_method === 'location-based' && priced(r))
     const loc = locs.find(l => (l?.name || 'Location') === name)
@@ -231,8 +243,11 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
       gridRegion: gridWords(s2.map(gridCodeOf).find(Boolean) ?? null, loc?.country),
       scope1: excluded ? null : s1.reduce((a, r) => a + (r.result_tco2e as number), 0),
       scope2: excluded ? null : s2.reduce((a, r) => a + (r.result_tco2e as number), 0),
+      notPriced: excluded ? 0 : notPriced,
     }
   })
+  const notPricedLines = rows.filter(r => r.declaration === 'unpriced')
+    .map(r => plain(RESULTS_EMAIL_COPY.notPricedLine(r.location ?? 'Location', sourceWords(r), workingsActivityCell(r))))
 
   const lines = scope12.filter(r => priced(r) && r.scope2_method !== 'market-based').map(r => {
     const factor = r.emission_factor_display ?? r.emission_factor
@@ -264,6 +279,7 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
     s3td,
     locations,
     sourceLines: lines.slice(0, SOURCE_LINE_LIMIT),
+    notPriced: notPricedLines,
     moreLines: Math.max(0, lines.length - SOURCE_LINE_LIMIT),
     gwpBasis: row.gwp_version || 'AR6',
     editions,
@@ -284,16 +300,18 @@ export function resultsEmailText(m: ResultsEmailModel, unsubscribe: UnsubscribeL
   out.push(`Scope 2, location-based: ${tonnes(m.totals.scope2Location)}`)
   if (m.totals.scope2Market !== null) out.push(`Scope 2, market-based: ${tonnes(m.totals.scope2Market)}`)
   if (m.marketBasis) out.push(m.marketBasis)
+  if (m.notPriced.length > 0) out.push(RESULTS_EMAIL_COPY.totalsExclude(m.notPriced.length))
   if (m.s3td !== null) out.push('', RESULTS_EMAIL_COPY.s3td, `${tonnes(m.s3td)}. ${RESULTS_EMAIL_COPY.s3tdNotInTotals}`)
   out.push('', 'By location')
   for (const l of m.locations) {
     out.push(l.scope1 === null
       ? `${l.name} (${l.country}, grid region ${l.gridRegion}): ${RESULTS_EMAIL_COPY.notIncluded}`
-      : `${l.name} (${l.country}, grid region ${l.gridRegion}): Scope 1 ${tonnes(l.scope1)}, Scope 2 ${tonnes(l.scope2 ?? 0)}`)
+      : `${l.name} (${l.country}, grid region ${l.gridRegion}): Scope 1 ${tonnes(l.scope1)}, Scope 2 ${tonnes(l.scope2 ?? 0)}${l.notPriced > 0 ? ` (${RESULTS_EMAIL_COPY.locationExcludes(l.notPriced)})` : ''}`)
   }
   out.push('', 'By source')
   for (const s of m.sourceLines) out.push(s)
   if (m.moreLines > 0) out.push(RESULTS_EMAIL_COPY.moreLines(m.moreLines))
+  if (m.notPriced.length > 0) out.push('', RESULTS_EMAIL_COPY.notPricedHeading, ...m.notPriced)
   out.push('', 'Emission factors', `GWP basis: ${m.gwpBasis}`)
   for (const e of m.editions.length > 0 ? m.editions : [RESULTS_EMAIL_COPY.noEditions]) out.push(e)
   out.push('', `${m.savedLine} ${m.link}`)
@@ -323,17 +341,22 @@ export function resultsEmailHtml(m: ResultsEmailModel, unsubscribe: UnsubscribeL
     ...(m.totals.scope2Market !== null ? [tr('Scope 2, market-based', tonnes(m.totals.scope2Market))] : []),
   ].join('')))
   if (m.marketBasis) parts.push(p(esc(m.marketBasis), `margin-top:8px;font-size:12px;color:${INK_MUTED};`))
+  if (m.notPriced.length > 0) parts.push(p(esc(RESULTS_EMAIL_COPY.totalsExclude(m.notPriced.length)), 'margin-top:8px;font-size:13px;font-weight:600;'))
   if (m.s3td !== null) {
     parts.push(p(`${esc(RESULTS_EMAIL_COPY.s3td)}<br><strong>${tonnes(m.s3td)}</strong>. ${esc(RESULTS_EMAIL_COPY.s3tdNotInTotals)}`, `margin-top:12px;font-size:13px;color:${INK_MUTED};`))
   }
   parts.push(h('By location'))
   parts.push(table(m.locations.map(l => tr(
     `${esc(l.name)}<br><span style="font-size:12px;color:${INK_MUTED};">${esc(l.country)}, grid region ${esc(l.gridRegion)}</span>`,
-    l.scope1 === null ? esc(RESULTS_EMAIL_COPY.notIncluded) : `Scope 1 ${tonnes(l.scope1)}<br>Scope 2 ${tonnes(l.scope2 ?? 0)}`,
+    l.scope1 === null ? esc(RESULTS_EMAIL_COPY.notIncluded) : `Scope 1 ${tonnes(l.scope1)}<br>Scope 2 ${tonnes(l.scope2 ?? 0)}${l.notPriced > 0 ? `<br><span style="font-size:12px;color:${INK_MUTED};">${esc(RESULTS_EMAIL_COPY.locationExcludes(l.notPriced))}</span>` : ''}`,
   )).join('')))
   parts.push(h('By source'))
   parts.push(m.sourceLines.map(s => p(esc(s), 'margin-bottom:6px;font-size:13px;')).join(''))
   if (m.moreLines > 0) parts.push(p(esc(RESULTS_EMAIL_COPY.moreLines(m.moreLines)), `font-size:13px;color:${INK_MUTED};`))
+  if (m.notPriced.length > 0) {
+    parts.push(h(RESULTS_EMAIL_COPY.notPricedHeading))
+    parts.push(m.notPriced.map(s => p(esc(s), 'margin-bottom:6px;font-size:13px;')).join(''))
+  }
   parts.push(h('Emission factors'))
   parts.push(p(`GWP basis: ${esc(m.gwpBasis)}`, 'margin-bottom:6px;font-size:13px;'))
   parts.push((m.editions.length > 0 ? m.editions : [RESULTS_EMAIL_COPY.noEditions]).map(e => p(esc(e), 'margin-bottom:6px;font-size:13px;')).join(''))

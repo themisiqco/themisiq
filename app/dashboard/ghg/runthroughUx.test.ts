@@ -42,10 +42,11 @@ describe('the GHG wizard after the run-through (T10c)', () => {
   })
 
   it('an unsupported unit for a country does not read as the customer\'s mistake', () => {
-    expect(PAGE).toContain("`We can't calculate ${fuel} billed in ${unit} for ${country} yet, so this location isn't included in your totals. Your other locations are unaffected, and nothing you've entered is lost.`")
-    // The older sentence stays for the CSV export, and for a location with no country set; no on-screen surface uses it.
-    expect((CODE.match(/unpriceableMessage\(/g) ?? []).length, 'its definition, the no-country fallback and the CSV').toBe(3)
-    expect((CODE.match(/unpriceablePanelMessage\(/g) ?? []).length, 'the definition and the three on-screen surfaces').toBe(4)
+    // FI1: the location-level sentence is gone. One unpriced line shows the engine's message, which says what
+    // is not counted and what to enter instead, and the panel trailer says the rest is calculated and nothing
+    // is lost. Neither tells the customer they made a mistake.
+    expect(CODE).not.toMatch(/unpriceableMessage\(|unpriceablePanelMessage\(/)
+    expect(PAGE).toContain("\"Everything else at this location is calculated and included in your totals. Nothing you've entered is lost.\"")
   })
 
   it('wording: dates in words on the review line, the electricity and gas hint, and totals in t CO2e', () => {

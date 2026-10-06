@@ -83,8 +83,12 @@ export type Scope3Basis = 'measured' | 'covers_nothing' | 'not_recorded' | 'abse
  * can't work out for "). The discriminant makes describeYearStatus branch instead.
  */
 export type YearExclusion =
+  // A year saved before FI1, whose workings left out a whole location for a missing factor ('unpriceable').
   | { kind: 'factor'; locationName: string; fuel: string; unit: string; country: string }
   | { kind: 'country'; locationName: string; refusal: CountryRefusal }
+  // FI1: one line the year's totals leave out because it could not be priced ('unpriced'); the rest of
+  // the location is in the totals. `source` is the workings row label, `unit` the unit as entered.
+  | { kind: 'line'; locationName: string; source: string; unit: string; reason: string }
 
 /** Subset of a saved ghg_inventories row needed for the series. */
 export interface InventoryRow {
@@ -331,7 +335,16 @@ export function describeYearStatus(y: SeriesYear): string | null {
   if (y.dataStatus === "ok") return null;
 
   if (y.dataStatus === "excluded") {
-    const ex = y.exclusions ?? [];
+    const all = y.exclusions ?? [];
+    // FI1: lines left out are worded as lines, never as a location that "can't be worked out".
+    const lineEx = all.filter((e): e is Extract<YearExclusion, { kind: 'line' }> => e.kind === "line");
+    const ex = all.filter((e) => e.kind !== "line");
+    const lineDetail = lineEx.map((e) => `${e.locationName}: ${e.source.toLowerCase()} in ${UNIT_WORDS[e.unit] ?? e.unit} is not priced`).join("; ");
+    const k = lineEx.length;
+    const linesSentence = k === 0 ? "" : `${k} line${k === 1 ? " is" : "s are"} not priced, and that year's totals exclude ${k === 1 ? "it" : "them"} (${lineDetail})`;
+    if (ex.length === 0) {
+      return `${y.year} isn't shown: ${linesSentence}. The rest of that year was measured normally, but a total missing a line can't be compared with one that isn't.`;
+    }
     const detail = ex
       .map((e) => {
         if (e.kind === "country") {
@@ -339,6 +352,7 @@ export function describeYearStatus(y: SeriesYear): string | null {
           // in any total on this report." clause: this list already says that once, for all of them.
           return `${e.locationName}: ${countryRefusalLabel(e.refusal).toLowerCase()}`;
         }
+        if (e.kind !== "factor") return "";
         const country = COUNTRY_WORDS[e.country] ?? (e.country === "(unset)" ? "no country" : e.country);
         const unit = UNIT_WORDS[e.unit] ?? e.unit;
         const fuel = FUEL_WORDS[e.fuel] ?? e.fuel.replace(/_/g, " ");
@@ -346,7 +360,7 @@ export function describeYearStatus(y: SeriesYear): string | null {
       })
       .join("; ");
     const n = ex.length;
-    return `${y.year} isn't shown: ${n} location${n === 1 ? " was" : "s were"} left out of that year's figures${detail ? ` (${detail})` : ""}. The rest of that year was measured normally, but a total missing a site can't be compared with one that isn't.`;
+    return `${y.year} isn't shown: ${n} location${n === 1 ? " was" : "s were"} left out of that year's figures${detail ? ` (${detail})` : ""}${linesSentence ? `, and ${linesSentence}` : ""}. The rest of that year was measured normally, but a total missing a site can't be compared with one that isn't.`;
   }
 
   return `${y.year} isn't shown: we can't confirm its figures are complete${y.unverifiableReason ? `: ${y.unverifiableReason}` : ""}. We'd rather leave a gap than plot a number we can't stand behind.`;

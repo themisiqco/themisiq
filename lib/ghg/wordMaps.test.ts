@@ -64,33 +64,26 @@ describe('the wizard imports the display vocabulary rather than copying it', () 
     }
   })
 
-  it('W3 ...and imports all three from series.ts, in one statement', () => {
-    // THE ANTI-DELETION HALF OF W2. Anchored on the import line itself so "no local declaration"
-    // cannot be satisfied by the vocabulary having been dropped instead of shared.
+  // FI1: the wizard no longer words a factor gap itself. The message an unpriced line shows is the engine's
+  // (UNPRICED_MESSAGE) and a refused location's is countryRefusalCopy's, so the page needs none of the maps.
+  // The guard against a second copy (W2) stands; what replaces "and still uses them" is proof that the page
+  // prints the engine's sentence rather than composing one, so a local copy has no reason to come back.
+  it('W3 page.tsx no longer imports the maps, because it words no factor gap itself (FI1)', () => {
     const imports = pageSrc.split('\n').filter(l => l.includes("from '../../../lib/ghg/series'") && !l.startsWith('import type'))
-    expect(imports, 'exactly one value import from series.ts').toHaveLength(1)
-    for (const { name } of MAPS) {
-      expect(imports[0], `${name} must be imported`).toContain(name)
-    }
+    expect(imports, 'no value import from series.ts is needed').toHaveLength(0)
+    for (const { name } of MAPS) expect(pageSrc, `${name} is not referenced`).not.toMatch(new RegExp(`\\b${name}\\[`))
   })
 
-  it('W4 ...and still uses all three to word the unpriceable-location message', () => {
-    // THE SECOND ANTI-DELETION GUARD. An import with no call site is dead code that a linter will
-    // eventually remove, taking W3 with it and leaving W2 passing over a page that says nothing.
-    for (const { name, callSite } of MAPS) {
-      expect(pageSrc, `${name} is imported but no longer read — the message lost its ${name} lookup`)
-        .toContain(callSite)
-    }
+  it('W4 ...and prints the engine\'s own message for every unpriced line', () => {
+    expect(pageSrc).toContain('{u.message}')
+    expect(pageSrc).toContain('⚠ {line.message}')
+    expect(pageSrc).not.toContain('function unpriceableMessage(')
+    expect(pageSrc).not.toContain('function unpriceablePanelMessage(')
   })
 
   it('W5 every map falls back to the raw token rather than a blank', () => {
-    // The property the message depends on and the reason `?? raw` appears at each call site: an
-    // unfamiliar word the customer can still search for beats a sentence with a hole in it.
     for (const { name, map } of MAPS) {
       expect(map['definitely_not_a_key'], `${name} must not resolve an unknown token`).toBeUndefined()
     }
-    expect(pageSrc).toContain('COUNTRY_WORDS[u.country] ??')
-    expect(pageSrc).toContain('UNIT_WORDS[u.unit] ??')
-    expect(pageSrc).toContain('FUEL_WORDS[u.fuel] ??')
   })
 })

@@ -38,7 +38,7 @@
 
 import {
   parseLocalDate, countryRefusal, billContributions, acceptedResolutions, periodFromYearAndEnd,
-  deriveLocations, findUnpriceableLocations, emissionsByLocationField, streamSwitchOff,
+  deriveLocations, unpricedLines, emissionsByLocationField, streamSwitchOff,
 } from "./engine";
 import type { CoverageResolution, Location } from "./engine";
 
@@ -202,9 +202,13 @@ export function buildMonthlyEmissions(
   const winStart = new Date(win.start.getFullYear(), win.start.getMonth(), win.start.getDate());
   const winEndExcl = new Date(win.end.getFullYear(), win.end.getMonth(), win.end.getDate() + 1);
   const resolutions = inventory.coverage_resolutions ?? [];
-  // The same location set as the annual totals: a location the totals exclude as unpriceable writes no
-  // monthly row either, judged on its derived figures as the totals are (T4).
-  const unpriceable = new Set(findUnpriceableLocations(deriveLocations(inventory), gwp, year).map(u => u.locId));
+  // FI1: the lines the annual totals leave out as unpriced, keyed `${locId}|${field}`, judged on the derived
+  // figures as the totals are (T4). A bill for such a line is skipped with the line's own reason
+  // (factor_missing, province_missing), so the monthly split leaves out exactly what the annual does.
+  //   The location-level "unpriceable" skip that sat here is gone: since FI1 findUnpriceableLocations returns
+  // only country refusals, which the countryRefusal check below already skips. Both read the location's
+  // country, and deriveLocations never changes it, so the two could only ever agree.
+  const unpricedReason = new Map(deriveLocations(inventory).flatMap(l => unpricedLines(l, gwp)).map(u => [`${u.locId}|${String(u.field)}`, u.reason]));
 
   for (const loc of inventory.locations) {
     // ⚠️ A LOCATION REFUSED FOR ITS COUNTRY CONTRIBUTES NO MONTHLY ROW AT ALL, AND THE FUEL GUARD
@@ -223,10 +227,6 @@ export function buildMonthlyEmissions(
       skipped.push({ fuelType: "all", document_type: "all", reason: `location excluded: ${refusal.state}` });
       continue;
     }
-    if (unpriceable.has(loc.id)) {
-      skipped.push({ fuelType: "all", document_type: "all", reason: "location excluded: unpriceable" });
-      continue;
-    }
     // A confirmed proposal with no value has no contribution row (T1), so it is reported here.
     for (const doc of loc.source_docs ?? []) for (const p of doc.extracted ?? []) {
       if (p.status === "confirmed" && p.value == null) skipped.push({ fuelType: p.fuelType, document_type: doc.document_type, reason: "no canonical value (needs_manual_review)" });
@@ -241,6 +241,12 @@ export function buildMonthlyEmissions(
       // matches, and the export-blocking stream_off issue says why (T6 ruling).
       if (streamSwitchOff(loc, c.field)) {
         skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: "stream_off" });
+        continue;
+      }
+      // FI1: a bill for an unpriced line writes no slice, and says why in the line's own words.
+      const unpriced = unpricedReason.get(`${loc.id}|${String(c.field)}`);
+      if (unpriced) {
+        skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: unpriced });
         continue;
       }
       const resolved = resolveBill(doc.document_type, c.fuelType, c.unit);

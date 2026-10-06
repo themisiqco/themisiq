@@ -20,6 +20,7 @@ import type { CountryRefusal } from "./engine";
 import { supabase } from "../supabase";
 import {
   buildCompanySeries,
+  UNIT_WORDS,
   type InventoryRow,
   type CompanySeries,
   type YearDataStatus,
@@ -74,6 +75,9 @@ export interface LoadSeriesResult {
 interface WorkingsRow {
   location?: string;
   declaration?: string;
+  source?: string;
+  activity_unit?: string;
+  unpriced?: { reason?: string };
   unpriceable?: { fuel?: string; unit?: string; country?: string };
   country_refusal?: CountryRefusal;
 }
@@ -102,13 +106,16 @@ export function assessCompleteness(workings: unknown, locationsData: unknown, re
     // keeping, for a year where the record is perfectly good. Wrong, and wrong in the direction
     // that makes a real exclusion look like a missing marker.
     const marked = (workings as WorkingsRow[]).filter((w) =>
-      w?.declaration === "unpriceable" || w?.declaration === "country_not_set"
+      w?.declaration === "unpriceable" || w?.declaration === "unpriced" || w?.declaration === "country_not_set"
       || w?.declaration === "country_not_listed" || w?.declaration === "country_not_supported");
     if (marked.length > 0) {
       return {
         dataStatus: "excluded",
         exclusions: marked.map((w) => w.country_refusal
           ? { kind: "country" as const, locationName: w.location ?? "Location", refusal: w.country_refusal }
+          // FI1: one line the stored totals left out, not the location.
+          : w.declaration === "unpriced"
+          ? { kind: "line" as const, locationName: w.location ?? "Location", source: w.source ?? "Source", unit: w.activity_unit ?? "", reason: w.unpriced?.reason ?? "" }
           : {
               kind: "factor" as const,
               locationName: w.location ?? "Location",
@@ -133,19 +140,28 @@ export function assessCompleteness(workings: unknown, locationsData: unknown, re
     // The row's own year (T7 revision): the check is "can this year be priced with today's tables", and
     // the tables are looked up by reporting year. Called without it, every year was checked as 2024.
     const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear);
-    // FI1: a missing factor is now one unpriced line, not an excluded location, so a location holding one
-    // is named here too. A row saved before the marker existed was totalled under the old rule (the whole
-    // location left out), so whether its figures include that location's other lines cannot be told.
-    const withUnpricedLine = (locationsData as Location[])
-      .filter((l) => unpricedLines(l).length > 0 && !unpriceable.some((u) => u.locId === l.id))
-      .map((l) => ({ locName: l.name || "Location" }));
-    const blocked = [...unpriceable, ...withUnpricedLine];
-    if (blocked.length > 0) {
-      const names = blocked.map((u) => u.locName).join(", ");
+    // FI1: a missing factor is one unpriced LINE, not an excluded location, so it is named as a line. A row
+    // with no marker was saved before either was recorded, and totalled under an older rule (the whole
+    // location left out), so whether its totals include those lines, or the rest of the location, cannot
+    // be told. Refused locations keep their own sentence.
+    const lines = (locationsData as Location[])
+      .filter((l) => !unpriceable.some((u) => u.locId === l.id))
+      .flatMap((l) => unpricedLines(l));
+    const parts: string[] = [];
+    if (unpriceable.length > 0) {
+      const names = unpriceable.map((u) => u.locName).join(", ");
+      parts.push(`${unpriceable.length} location${unpriceable.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out`);
+    }
+    if (lines.length > 0) {
+      // The same unit words as describeYearStatus, so the two sentences about one year cannot disagree.
+      const named = lines.map((u) => `${u.site}: ${u.source.toLowerCase()} in ${UNIT_WORDS[u.unit] ?? u.unit}`).join(", ");
+      parts.push(`${lines.length} line${lines.length > 1 ? "s" : ""} in this year's inventory can't be priced (${named})`);
+    }
+    if (parts.length > 0) {
       return {
         dataStatus: "unverifiable",
         exclusions: null,
-        unverifiableReason: `${blocked.length} location${blocked.length > 1 ? "s" : ""} in this year's inventory (${names}) can no longer be worked out, and this year was saved before we started recording that, so we can't tell whether its figures include them`,
+        unverifiableReason: `${parts.join(", and ")}, and this year was saved before we started recording that, so we can't tell whether its totals include them`,
       };
     }
   } catch {

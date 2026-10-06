@@ -34,7 +34,6 @@ import { addOverride, removeOverride } from '../../../lib/ghg/overrides'
 import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
 import { sha256Hex } from '../../../lib/ghg/fileHash'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
-import { COUNTRY_WORDS, UNIT_WORDS, FUEL_WORDS } from '../../../lib/ghg/series'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
@@ -52,7 +51,7 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
   notCountedLines,
-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
+  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
@@ -74,7 +73,7 @@ import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, wo
 import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
-  ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation,
+  ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation, UnpricedLine,
 } from '../../../lib/ghg/engine'
 import { SITE_ORIGIN } from '../../../lib/siteOrigin'
 
@@ -486,25 +485,12 @@ function PaywallOverlay({ frameworks, onUnlock, anon, onKeep }: { frameworks: st
 // upload is either sent and rejected, or skipped when it could have been read.
 const CONCIERGE_READABLE_MEDIA = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 
-// ── Wording for a location we cannot price ───────────────────────────────────────────────────────
-// The engine refuses in its own vocabulary (fuel token, unit token, ISO country code) because it
-// has no business writing customer copy. Turning that into a sentence is presentation, so it lives
-// here. Nothing below leaks a field name, an enum value, or the phrase "emission factor" — the
-// customer did not choose those words and cannot act on them.
-//
-// Anything not in these maps falls back to the raw token rather than a blank: an unfamiliar word
-// the customer can still search for beats a sentence with a hole in it.
-//
-// ⚠️ ALL THREE MAPS ARE IMPORTED FROM lib/ghg/series.ts, NOT DECLARED HERE — see the import at the
-// top of this file. Until 14 Aug 2026 this file carried its own COUNTRY_WORDS, UNIT_WORDS and
-// FUEL_WORDS, each a byte-identical second copy of the one over there (33 / 9 / 7 keys, same values,
-// same key order — checked, not assumed, before merging).
-//   The cost of the duplication was never a wrong figure, which is why it survived: it was a wrong
-// WORD. A unit added to one map and not the other makes this message print 'mmbtu' where the trends
-// surface prints 'MMBtu', or 'fuel_oil_residual' where the other says 'heavy fuel oil' — two
-// descriptions of one inventory, in front of one verifier, with nothing failing to flag it.
-//   lib/ghg/wordMaps.test.ts asserts none of the three has come back as a local declaration, and
-// that the import that replaced them is real.
+// ── Wording for what we cannot price (FI1) ─────────────────────────────────────────────────────────
+// This page writes no factor-gap sentence of its own. A line that cannot be priced carries the engine's
+// message (UNPRICED_MESSAGE, built once in lib/ghg/engine.ts) and a refused location carries
+// countryRefusalCopy's, so the wizard, the workings, the CSV and the verifier page say one thing. The
+// COUNTRY_WORDS / UNIT_WORDS / FUEL_WORDS maps live in lib/ghg/series.ts and are not copied here;
+// lib/ghg/wordMaps.test.ts guards that.
 // Mirrors the engine's own locationHasFigures. ⚠️ THE ENGINE'S COPY IS NOT EXPORTED and this one
 // gates ONE clause of ONE sentence; if a third caller ever needs it, export the engine's and delete
 // this rather than keeping two.
@@ -532,8 +518,8 @@ interface WorkingsRowCells {
   result_tco2e?: number | null
 }
 
-// The workings row for a location excluded because of its country. Identical in shape to the
-// 'unpriceable' row beside it, because the consequence is identical: no figures, and the engine's
+// The workings row for a location excluded because of its country. The same shape as the
+// 'unpriced' row for one line (FI1), because both state an absence rather than a figure, and the engine's
 // own note in the Factor source column (where it has sat since this row shape was written; see the
 // note-placement finding in the report, this page puts it there and the verifier page puts it in the
 // Activity data cell). The note is composed in the engine from countryRefusalCopy, which
@@ -557,56 +543,47 @@ function excludedRow(r: WorkingsRowCells, ri: number) {
   </tr>
 }
 
-// The banner shell around whichever message is shown.
-//
-// ⚠️ THE UNIT-MISMATCH WORDING IS UNCHANGED, DELIBERATELY. That state is always fixable, "yet" is
-// true of it, and its trailer does not repeat its sentence. Only the refusal states needed their
-// own, and they get them from countryRefusalCopy so the verifier page and the exports cannot end up
-// with a different account of the same location.
+// The banner shell for a location excluded because of its country (FI1: the only whole-location exclusion
+// left). Heading and trailer come from countryRefusalCopy, so the verifier page and the exports cannot give a
+// different account of the same location. A missing factor is not a location state any more: it is one
+// unpriced line, listed by UnpricedLinesPanel and beside its own field (UnpricedNote).
 function exclusionBannerHeading(u: UnpriceableLocation): string {
-  return u.kind === 'country'
-    ? refusalBannerHeading(u.refusal)
-    : "We can't work out this location's emissions yet"
+  return refusalBannerHeading(u.refusal)
 }
 function exclusionBannerTrailer(u: UnpriceableLocation, hasFigures: boolean): string {
-  // T10c: the factor-gap sentence (unpriceablePanelMessage) already says the location is left out and nothing is
-  // lost, so it carries no trailer of its own.
-  if (u.kind === 'country') return refusalBannerTrailer(u.refusal, hasFigures)
-  return factorGapHasCountry(u) ? '' : "Until then this location is left out of your totals: it isn't counted as zero, and nothing else you've entered here is lost."
-}
-/** T10c: a factor gap on a location whose country is set, which gets the self-contained panel sentence. */
-function factorGapHasCountry(u: UnpriceableLocation): boolean {
-  return u.kind !== 'country' && !!(COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country))
+  return refusalBannerTrailer(u.refusal, hasFigures)
 }
 
 /**
- * T10c: the factor-gap sentence ON SCREEN. It must not imply the customer made a mistake: the gap is ours (a
- * fuel billed in a unit we hold no factor for in that country), which FI1 and FI2 close. A location with no
- * country set keeps its own sentence, because choosing the country is the customer's to do. The CSV keeps
- * unpriceableMessage below.
+ * FI1: the engine's own message for one unpriced line, beside the control that fixes it (the figure box for a
+ * fuel, the refrigerant type select, the province select). Renders nothing when the line is priced, so it
+ * clears the moment the input is fixed: unpricedLines runs on the derived locations on every render.
  */
-function unpriceablePanelMessage(u: UnpriceableLocation, hasFigures: boolean): string {
-  if (u.kind === 'country') return countryRefusalText(u.refusal, 'review', hasFigures)
-  const country = COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country)
-  if (!country) return unpriceableMessage(u, hasFigures)
-  const unit = UNIT_WORDS[u.unit] ?? u.unit
-  const fuel = FUEL_WORDS[u.fuel] ?? u.fuel.replace(/_/g, ' ')
-  return `We can't calculate ${fuel} billed in ${unit} for ${country} yet, so this location isn't included in your totals. Your other locations are unaffected, and nothing you've entered is lost.`
+function UnpricedNote({ line }: { line?: UnpricedLine }) {
+  if (!line) return null
+  return <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>⚠ {line.message}</div>
 }
 
-function unpriceableMessage(u: UnpriceableLocation, hasFigures: boolean): string {
-  // ⚠️ THE COUNTRY REFUSAL IS A DIFFERENT SENTENCE FROM A DIFFERENT MODULE, NOT A BRANCH OF THIS
-  // ONE. Its three states are also rendered by the verifier page, the workings note and the
-  // multi-year series, and one of them must not read differently here. countryRefusalCopy is the
-  // single source for all four, for the same reason the three word maps above were de-duplicated.
-  if (u.kind === 'country') return countryRefusalText(u.refusal, 'review', hasFigures)
-  const country = COUNTRY_WORDS[u.country] ?? (u.country === '(unset)' ? '' : u.country)
-  const unit = UNIT_WORDS[u.unit] ?? u.unit
-  const fuel = FUEL_WORDS[u.fuel] ?? u.fuel.replace(/_/g, ' ')
-  // No country picked yet is a different sentence: naming "(unset)" would read as a place.
-  if (!country) return `This location has no country set, and its ${fuel} figure is in ${unit}. Choose the country for this location, or check the unit on the bill.`
-  return `This location is set to ${country}, but its ${fuel} figure is in ${unit}. Check the country on this location, or the unit on the bill.`
+/**
+ * FI1: every unpriced line at one location, each with the engine's message (the site, the fuel or refrigerant,
+ * the unit and the fix), and what it means: the rest of the location is calculated and in the totals.
+ */
+function UnpricedLinesPanel({ lines }: { lines: UnpricedLine[] }) {
+  if (lines.length === 0) return null
+  return (
+    <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ {unpricedPanelHeading(lines.length)}</div>
+      {lines.map(u => (
+        <div key={String(u.field)} style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{u.message}</div>
+      ))}
+      <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 6 }}>{UNPRICED_PANEL_TRAILER}</div>
+    </div>
+  )
 }
+const unpricedPanelHeading = (n: number): string =>
+  n === 1 ? "One figure at this location can't be calculated yet" : `${n} figures at this location can't be calculated yet`
+const UNPRICED_PANEL_TRAILER =
+  "Everything else at this location is calculated and included in your totals. Nothing you've entered is lost."
 
 function LockedDocUpload({ label }: { label: string }) {
   return (
@@ -1565,6 +1542,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // mixed_units, all_rejected). A straddle is not an issue (T3). conciergeReady composes over it.
   const coverageResolutions = inventory.coverage_resolutions ?? []
   const unresolvedCoverage = findUnresolvedCoverage(inventory.locations, inventory.reporting_year, inventory.fiscal_year_end_month, coverageResolutions)
+  // FI1: the issues explained under an upload. An unpriced line is a coverage issue too (it blocks export
+  // through conciergeReady), but it is explained on its own line and beside its field, not under an upload.
+  const uploadCoverageIssues = unresolvedCoverage.filter(i => !UNPRICED_STATUSES.has(i.status))
   const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
   // Grid-region gate: locations whose grid_region isn't a real GRID_EF key (us_average default, '',
   // or an unmapped country) — these silently fall back to US_AVG in getGridFactor. Consumed by the
@@ -1606,9 +1586,15 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // three, and calcInventory (called three times, one per basis) excludes the same locations each
   // time. Running the probe per basis would triple a pure-arithmetic sweep to reach that same
   // answer, and — worse — would invite a future reader to believe the sets could differ.
+  // FI1: a COUNTRY refusal is the only whole-location exclusion. A missing factor is one unpriced line.
   const unpriceableLocations = findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year)
-  const refusedLocations = unpriceableLocations.filter(u => u.kind === 'country')
-  const factorGapLocations = unpriceableLocations.filter(u => u.kind === 'factor')
+  const refusedLocations = unpriceableLocations
+  // FI1: every line that cannot be priced (a unit with no factor, an unknown refrigerant type, Canadian gas
+  // with no province), from the DERIVED locations on every render, so a line clears the moment its input is
+  // fixed, without a save. One list, read by the step-2 panel, the field notes, the gate and the totals note.
+  const unpricedAll = derivedLocations.flatMap(l => unpricedLines(l))
+  const unpricedAt = (locId: string) => unpricedAll.filter(u => u.locId === locId)
+  const unpricedFor = (locId: string, field: string) => unpricedAll.find(u => u.locId === locId && String(u.field) === field)
   // ⚠️ THE EXPORT GATE BLOCKS ONLY ON WHAT THE CUSTOMER CAN FIX, AND THAT IS NOT A RELAXATION.
   // A blocked export is an instruction: go and do something. For a location whose country is set to
   // "Not listed", or whose country this platform holds no factors for, there is nothing to go and
@@ -1619,11 +1605,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // stronger than a gate, because a gate that can never be cleared eventually gets removed.
   //   refusalIsFixable is the same predicate that decides whether the sentence offers a remedy, so
   // the two cannot disagree: we block exactly where we tell the customer what to do.
-  const blockingRefusals = refusedLocations.filter(u => u.kind === 'country' && refusalIsFixable(u.refusal))
-  const statedRefusals = refusedLocations.filter(u => u.kind === 'country' && !refusalIsFixable(u.refusal))
-  // Blocks on factor gaps (always fixable: change the unit or the country) and on fixable refusals.
-  // A stated refusal is excluded from the totals and named everywhere, and does not block.
-  const pricingReady = factorGapLocations.length === 0 && blockingRefusals.length === 0
+  const blockingRefusals = refusedLocations.filter(u => refusalIsFixable(u.refusal))
+  const statedRefusals = refusedLocations.filter(u => !refusalIsFixable(u.refusal))
+  // Blocks on unpriced lines (each is fixable: the unit, the refrigerant type or the province) and on fixable
+  // refusals. A stated refusal is excluded from the totals and named everywhere, and does not block.
+  const pricingReady = unpricedAll.length === 0 && blockingRefusals.length === 0
   const unpriceableById = new Map(unpriceableLocations.map(u => [u.locId, u]))
   // Every publisher that priced anything in this inventory, in first-appearance order. The union of
   // the per-location lists, so the checklist note and each location's own line cannot disagree.
@@ -1641,9 +1627,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // stated refusal leaves pricingReady TRUE and still excludes a location from every total, so
   // keying on the gate would have silenced the note on exactly the reports that go out with a
   // location missing. The note is the thing that makes not blocking safe.
-  const exclusionNote = unpriceableLocations.length === 0 ? null : [
-    factorGapLocations.length > 0
-      ? `Excludes ${factorGapLocations.length} location${factorGapLocations.length > 1 ? 's' : ''} we can't work out yet (${factorGapLocations.map(u => u.locName).join(', ')}).`
+  const exclusionNote = unpriceableLocations.length === 0 && unpricedAll.length === 0 ? null : [
+    unpricedAll.length > 0
+      ? `Excludes ${unpricedAll.length} figure${unpricedAll.length > 1 ? 's' : ''} we can't calculate yet (${unpricedAll.map(u => `${u.site}: ${u.source.toLowerCase()}`).join(', ')}).`
       : null,
     refusedLocations.length > 0
       ? `Excludes ${refusedLocations.length} location${refusedLocations.length > 1 ? 's' : ''} we hold no emission factors for (${refusedLocations.map(u => u.locName).join(', ')}).`
@@ -1947,12 +1933,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       factor_editions: saved.factor_editions,
       status: 'draft',
 // ⚠️ THIS IS ALSO THE RECORD OF WHAT THE SAVED TOTALS LEFT OUT. scope1_total / scope2_* above are
-// computed with unpriceable locations EXCLUDED, and buildWorkings emits one `declaration:
-// 'unpriceable'` row per excluded location (result_tco2e null, with the reason in `note`). So the
-// omission travels with the figures, in the same column a verifier reads, and no schema change was
-// needed to record it. If that row is ever dropped from buildWorkings, these saved totals become
-// silently short — the stored inventory would assert a company-wide figure that omits a site with
-// nothing on the record saying so.
+// computed with refused locations EXCLUDED and unpriced lines left out (FI1), and buildWorkings emits one
+// country_* row per refused location and one `declaration: 'unpriced'` row per unpriced line (result_tco2e
+// null, with the reason in `note`). So the omission travels with the figures, in the same column a verifier
+// reads, and no schema change was needed to record it. If those rows are ever dropped from buildWorkings,
+// these saved totals become silently short, with nothing on the record saying so.
 workings: saved.workings,
       updated_at: new Date().toISOString(),
     }
@@ -2295,6 +2280,8 @@ workings: saved.workings,
     ))}
   </select>
 )}
+{/* FI1: Canadian gas is priced by province; with none chosen, its line says so here, where it is chosen. */}
+{loc.country === 'CA' && <UnpricedNote line={unpricedAll.find(u => u.locId === loc.id && u.reason === 'province_missing')} />}
 {loc.country === 'AU' && (
   <select value={loc.state || ''} onChange={e => updateLocation(i, 'state', e.target.value)} style={{ ...inputStyle, width: 130 }}>
     <option value="">State…</option>
@@ -2376,18 +2363,20 @@ workings: saved.workings,
           ))}
           <button onClick={addLocation} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', }}>+ Add location</button>
         </div>
-        {/* The blocking state for the location being edited, at the top of its own step — this is
-            where the two things named in the message (the country, and the unit on the bill) are
-            actually changed, so the customer is told next to the controls that fix it. */}
+        {/* The blocking state for the location being edited, at the top of its own step, which is where
+            the country is changed. FI1: a country refusal only; an unpriced line is the per-line panel below. */}
         {unpriceableById.get(loc.id) && (
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1.25rem' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 4 }}>⚠ {exclusionBannerHeading(unpriceableById.get(loc.id)!)}</div>
-            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{unpriceablePanelMessage(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
+            <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>{countryRefusalText(unpriceableById.get(loc.id)!.refusal, 'review', locationHasEnteredFigures(loc))}</div>
             {exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc)) && (
               <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.6, marginTop: 4 }}>{exclusionBannerTrailer(unpriceableById.get(loc.id)!, locationHasEnteredFigures(loc))}</div>
             )}
           </div>
         )}
+        {/* FI1: each figure here that cannot be calculated, with the engine's message naming the site, the fuel
+            or refrigerant, the unit and the fix. The same message also sits beside the field it concerns. */}
+        <UnpricedLinesPanel lines={unpricedAt(loc.id)} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 20 }}>
             <QuestionCard question={streamQuestion('natural_gas')} hint="For heating, boilers, furnaces: check your gas utility bills" checked={loc.has_natural_gas} onToggle={v => updateLocation(activeLocation, 'has_natural_gas', v)}>
@@ -2401,6 +2390,7 @@ workings: saved.workings,
                   </div>
                   <Field label={`Total natural gas: ${inventory.reporting_year} (${unitLabel(loc.natural_gas_unit)})`} hint="Sum of the bills covering this year">
                     <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
+                    <UnpricedNote line={unpricedFor(loc.id, 'natural_gas_amount')} />
                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
                         {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit)}
@@ -2421,6 +2411,7 @@ workings: saved.workings,
                   </div>
                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${unitLabel(loc.propane_unit)})`}>
                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
+                    <UnpricedNote line={unpricedFor(loc.id, 'propane_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
@@ -2436,6 +2427,7 @@ workings: saved.workings,
                   </div>
                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
+                    <UnpricedNote line={unpricedFor(loc.id, 'diesel_stationary_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
@@ -2464,6 +2456,7 @@ workings: saved.workings,
                   </div>
                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_distillate_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
@@ -2480,6 +2473,7 @@ workings: saved.workings,
                   </div>
                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_residual_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
@@ -2498,6 +2492,7 @@ workings: saved.workings,
                         ))}
                       </select>
                     </div>
+                    <UnpricedNote line={unpricedFor(loc.id, 'gasoline_amount')} />
                   </Field>
                   <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -2508,6 +2503,7 @@ workings: saved.workings,
                         ))}
                       </select>
                     </div>
+                    <UnpricedNote line={unpricedFor(loc.id, 'diesel_mobile_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
@@ -2526,6 +2522,7 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ background: '#FEF3E2', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#633806' }}>Check refrigeration service records: refrigerant purchased for top-up = refrigerant leaked (GHG Protocol methodology)</div>
                   <Field label="Refrigerant type"><select value={loc.refrigerant_type} onChange={e => updateLocation(activeLocation, 'refrigerant_type', e.target.value)} style={inputStyle}><option value="r410a">R-410A</option><option value="r22">R-22</option><option value="r134a">R-134a</option><option value="r404a">R-404A</option><option value="r507">R-507</option></select></Field>
+                  <UnpricedNote line={unpricedFor(loc.id, 'refrigerant_purchased_kg')} />
                   <Field label="Refrigerant purchased for top-up this year (kg)" hint="From service records or supplier invoices">
                     <input id={`figure-${loc.id}-refrigerant_purchased_kg`} type="number" value={loc.refrigerant_purchased_kg || ''} onChange={e => updateLocation(activeLocation, 'refrigerant_purchased_kg', Number(e.target.value))} placeholder="0" style={inputStyle} />
                   </Field>
@@ -2566,7 +2563,8 @@ workings: saved.workings,
                   ? <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                       <div style={{ fontSize: 12, color: '#92400e' }}>Select your {loc.country === 'CA' ? 'province' : 'state'}/region to resolve the grid emission factor.</div>
                       {loc.country === 'CA'
-                        ? <select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{gridRegionDisplay(r.value)}: {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
+                        ? <><select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{gridRegionDisplay(r.value)}: {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
+                          <UnpricedNote line={unpricedAll.find(u => u.locId === loc.id && u.reason === 'province_missing')} /></>
                         : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{gridRegionDisplay('US_' + s)}: {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
                     </div>
                   : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Grid factor not available for this jurisdiction: <a href="mailto:hello@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>contact us</a>.</div>
@@ -2722,14 +2720,11 @@ workings: saved.workings,
                   The rows are removed and the reason takes their place. */}
               {blockedHere ? (
                 <div style={{ padding: '2px 0 6px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>⚠ {blockedHere.kind === 'country' ? refusalResultsHeading(blockedHere.refusal) : 'No results for this location yet'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{unpriceablePanelMessage(blockedHere, locationHasEnteredFigures(loc))}</div>
-                  {/* T10d: the factor-gap sentence on a location with a country already says this; say it once. */}
-                  {!factorGapHasCountry(blockedHere) && (
-                    <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
-                      Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
-                    </div>
-                  )}
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 6 }}>⚠ {refusalResultsHeading(blockedHere.refusal)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{countryRefusalText(blockedHere.refusal, 'review', locationHasEnteredFigures(loc))}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-ink-2)', lineHeight: 1.6, marginTop: 6 }}>
+                    Your other locations are unaffected, and nothing you&apos;ve entered here is lost.
+                  </div>
                 </div>
               ) : [
                 { label: 'Heating & fuel', val: calc!.s1_stationary, color: 'var(--color-module-deals-ink)' },
@@ -2743,6 +2738,12 @@ workings: saved.workings,
                   <span style={{ fontSize: 12, color, fontWeight: bold ? 700 : 400 }}>{val.toFixed(2)} tCO₂e</span>
                 </div>
               ))}
+              {/* FI1: these figures leave out each unpriced line; say which, so a short total is never read as whole. */}
+              {!blockedHere && unpricedAt(loc.id).length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 8, lineHeight: 1.5 }}>
+                  ⚠ Not included above: {unpricedAt(loc.id).map(u => u.source.toLowerCase()).join(', ')}. See the note beside {unpricedAt(loc.id).length === 1 ? 'it' : 'each'}.
+                </div>
+              )}
               {/* ⚠️ THE PUBLISHERS THAT PRICED THIS LOCATION, NOT THE CATALOGUE OF ALL OF THEM.
                   This line was the fixed string "EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) ·
                   IPCC AR6 GWP · eGRID 2023", rendered under every location whatever its country. A
@@ -2980,7 +2981,7 @@ workings: saved.workings,
                       {/* No numbers for a blocked location — not even a dash beside "S1:", which
                           still reads as a measured scope. The reason takes the figures' place. */}
                       {blocked
-                        ? <div style={{ fontSize: 12, color: 'var(--color-state-warn)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {blocked.kind !== 'country' && !factorGapHasCountry(blocked) ? 'Not included in any total. ' : ''}{unpriceablePanelMessage(blocked, locationHasEnteredFigures(loc))}</div>
+                        ? <div style={{ fontSize: 12, color: 'var(--color-state-warn)', marginTop: 2, lineHeight: 1.5, maxWidth: 620 }}>⚠ {countryRefusalText(blocked.refusal, 'review', locationHasEnteredFigures(loc))}</div>
                         : <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 2 }}>S1: {c!.s1_total.toFixed(2)} t CO₂e · S2: {c!.s2_location.toFixed(2)} t CO₂e · Total: {(c!.s1_total + c!.s2_location).toFixed(2)} t CO₂e</div>}
                     </div>
                     <span style={{ fontSize: 12, color: 'var(--color-ink-muted)' }}>{showWorkings[key] ? '▲ Hide' : '▼ Show workings'}</span>
@@ -3286,13 +3287,19 @@ workings: saved.workings,
                     {(!conciergeReady || !gridReady || !declarationsReady || !pricingReady || !steamFactorsReady) && (
                       <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
                         {unpriceableLocations.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')}: fix the country or the unit on the Energy &amp; fuel step</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unpriceableLocations.length} location{unpriceableLocations.length > 1 ? 's' : ''} can&apos;t be worked out and would be left out of this report: {unpriceableLocations.map(u => u.locName).join(', ')}: check the country on the Energy &amp; fuel step</div>
                         )}
+                        {/* FI1: each figure that cannot be calculated, with its own message; it blocks export until fixed. */}
+                        {unpricedAll.map(u => (
+                          <div key={`${u.locId}|${String(u.field)}`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {u.message}</div>
+                        ))}
                       {conciergePending.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {conciergePending.length} uploaded figure{conciergePending.length > 1 ? 's' : ''} still need{conciergePending.length > 1 ? '' : 's'} your confirmation</div>
                         )}
-                        {unresolvedCoverage.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedCoverage.length} coverage issue{unresolvedCoverage.length > 1 ? 's' : ''} need{unresolvedCoverage.length > 1 ? '' : 's'} resolving. Each one is explained under its upload.</div>
+                        {/* The unpriced-line issues are listed one by one above, so they are not counted here: this
+                            line says each issue is explained under its upload, and those are not. */}
+                        {uploadCoverageIssues.length > 0 && (
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {uploadCoverageIssues.length} coverage issue{uploadCoverageIssues.length > 1 ? 's' : ''} need{uploadCoverageIssues.length > 1 ? '' : 's'} resolving. Each one is explained under its upload.</div>
                         )}
                         {unresolvedGridLocations.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
@@ -3310,7 +3317,7 @@ workings: saved.workings,
                         {steamFactorGaps.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'}: ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
                         )}
-                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap or overlap is resolved, every document that appears under two kinds of upload is answered as the same or not, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
+                        <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap or overlap is resolved, every document that appears under two kinds of upload is answered as the same or not, every figure can be calculated, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}
                     <div style={{ background: "#fff", border: "1px solid #e8e7e4", borderRadius: 8, padding: "14px 16px", marginTop: 16, marginBottom: 16 }}>
@@ -3476,7 +3483,7 @@ workings: saved.workings,
       // than the one on screen — so one bad location would abort the whole CSV mid-generation.
       // The export gate (pricingReady) currently makes this unreachable, but A GATE IS NOT A GUARD:
       // it protects this call only for as long as nobody loosens it or adds a second caller. The
-      // 'Note' column carries the same claim as the `declaration: 'unpriceable'` row buildWorkings
+      // 'Note' column carries the same claim as the country_* and 'unpriced' rows buildWorkings
       // writes, so the breakdown and the workings in the same export cannot disagree.
       ['Location', 'Grid region', 'S1 Total', 'S2 Location', 'Note'],
       ...derivedLocations.map(loc => {
@@ -3487,15 +3494,15 @@ workings: saved.workings,
           // different facts and the export must not render them alike. Not 'Not provided' — the
           // operator may well have provided the data; it is our calculation that does not exist.
           return [loc.name, loc.grid_region, NOT_QUANTIFIED, NOT_QUANTIFIED,
-            blocked.kind === 'country'
-              // ⚠️ NO "EXCLUDED FROM TOTALS" PREFIX ON A REFUSAL ROW. The sentence already ends
-              // "Nothing from this location is included in any total on this report", and the GWP
-              // basis cell beside it reads "excluded". Three statements of one fact in one row.
-              ? countryRefusalText(blocked.refusal, 'verifier', locationHasEnteredFigures(loc))
-              : `EXCLUDED FROM TOTALS: ${unpriceableMessage(blocked, locationHasEnteredFigures(loc))} No figure for this location is included in any total on this report.`]
+            // ⚠️ NO "EXCLUDED FROM TOTALS" PREFIX ON A REFUSAL ROW. The sentence already ends
+            // "Nothing from this location is included in any total on this report", and the GWP
+            // basis cell beside it reads "excluded". Three statements of one fact in one row.
+            countryRefusalText(blocked.refusal, 'verifier', locationHasEnteredFigures(loc))]
         }
         const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
-        return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), '']
+        // FI1: a location's totals leave out its unpriced lines; the note names each, with its message.
+        const missing = unpricedAt(loc.id).map(u => `NOT PRICED: ${u.message}`).join(' ')
+        return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), missing]
       }),
       [''],
       ['DISCLAIMER'],
