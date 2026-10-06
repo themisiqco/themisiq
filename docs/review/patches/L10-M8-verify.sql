@@ -1,6 +1,8 @@
 -- docs/review/patches/L10-M8-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L10-M8-gate-message.sql, in the Supabase SQL editor, the whole file. It changes nothing: the
+-- ⚠️ RUN 6 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M8: all 11 checks passed. DO NOT RUN AGAIN as
+-- part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER L10-M8-gate-message.sql, in the Supabase SQL editor, the whole file. It changes nothing: the
 -- test user, entitlement, company and inventories are created inside one PL/pgSQL block that ends by raising
 -- 'm8_undo', and catching it rolls the block back (the L0/L1/L3/L6 pattern). Results are carried out in variables.
 --

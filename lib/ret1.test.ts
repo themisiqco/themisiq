@@ -13,10 +13,12 @@ const VERIFY = 'docs/review/patches/RET1-M10-verify.sql'
 const row = (label: string) => FREE_ACCOUNT_ROWS.find(r => r[0] === label)!
 
 describe('M10', () => {
-  it('RT1: NOT RUN headers; pg_cron enabled if absent; must run before the Privacy change', () => {
+  it('RT1: RUN 6 Oct 2026 headers, 8 checks passed; pg_cron enabled if absent; must run before the Privacy change', () => {
     const m10 = read(M10)
-    expect(m10.split('\n')[2]).toContain('⚠️ NOT RUN.')
-    expect(read(VERIFY).split('\n')[2]).toContain('⚠️ NOT RUN.')
+    expect(m10.split('\n')[2]).toContain('⚠️ RUN 6 Oct 2026')
+    expect(m10).toContain('passed all 8 checks.\n-- DO NOT RUN AGAIN')
+    expect(read(VERIFY).split('\n')[2]).toContain('⚠️ RUN 6 Oct 2026')
+    expect(read(VERIFY)).toContain('all 8 checks passed. DO NOT RUN AGAIN')
     expect(m10).toContain('create extension if not exists pg_cron with schema pg_catalog;')
     expect(m10).toContain('THIS FILE MUST RUN BEFORE THAT PAGE GOES LIVE')
   })

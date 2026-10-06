@@ -1,6 +1,8 @@
 -- docs/review/patches/L10-M8-gate-message.sql
 --
--- ⚠️ NOT RUN. Drafted 6 Oct 2026 (LEAD1 task L10, migration M8). To become
+-- ⚠️ RUN 6 Oct 2026 in the Supabase SQL editor (recorded by Lisa); L10-M8-verify.sql then passed all 11 checks.
+-- DO NOT RUN AGAIN: the pre-flight would refuse (the new message is already in place).
+-- Drafted 6 Oct 2026 (LEAD1 task L10, migration M8). To become
 -- supabase/migrations/2026MMDD_ghg_gate_message.sql.
 --
 -- WHAT IT DOES: changes ONE string in public.enforce_ghg_location_allowance(), the refusal shown when an account that

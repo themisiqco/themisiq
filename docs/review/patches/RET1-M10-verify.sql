@@ -1,6 +1,8 @@
 -- docs/review/patches/RET1-M10-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER RET1-M10-retention-jobs.sql, in the Supabase SQL editor, the whole file. It changes nothing: the
+-- ⚠️ RUN 6 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M10: all 8 checks passed. DO NOT RUN AGAIN as
+-- part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER RET1-M10-retention-jobs.sql, in the Supabase SQL editor, the whole file. It changes nothing: the
 -- test rows are inserted, both purge functions are called, and the block ends by raising 'm10_undo', which rolls it all
 -- back, INCLUDING any real rows the purge calls deleted (the jobs delete those at their own time). The L0 to M9 pattern.
 --

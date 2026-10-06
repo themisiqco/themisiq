@@ -1,6 +1,8 @@
 -- docs/review/patches/RET1-M10-retention-jobs.sql
 --
--- ⚠️ NOT RUN. Drafted 6 Oct 2026 (RET1, migration M10). To become supabase/migrations/2026MMDD_retention_jobs.sql.
+-- ⚠️ RUN 6 Oct 2026 in the Supabase SQL editor (recorded by Lisa); RET1-M10-verify.sql then passed all 8 checks.
+-- DO NOT RUN AGAIN: nothing needs it. (A second run would leave one job of each name, but no one needs to repeat it.)
+-- Drafted 6 Oct 2026 (RET1, migration M10). To become supabase/migrations/2026MMDD_retention_jobs.sql.
 --
 -- WHY. Two tables hold personal data with no deletion (PIPEDA's limiting-retention principle; Quebec's Law 25):
 --   public.rate_limits         IP addresses and email keys, written by lib/rateLimit.ts and never deleted

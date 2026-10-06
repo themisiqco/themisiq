@@ -200,11 +200,13 @@ describe('L10 amendment', () => {
     expect(FREE_ACCOUNT_TERMS.join(' ')).not.toContain('until you have reviewed them')
   })
 
-  it('L10-12: M8 changes only the PT402 sentence, from the exact L1-M2 body; both files NOT RUN', () => {
+  it('L10-12: M8 changes only the PT402 sentence, from the exact L1-M2 body; both files RUN 6 Oct 2026, 11 checks passed', () => {
     const m8 = read('docs/review/patches/L10-M8-gate-message.sql')
     const verify = read('docs/review/patches/L10-M8-verify.sql')
-    expect(m8.split('\n')[2]).toContain('⚠️ NOT RUN.')
-    expect(verify.split('\n')[2]).toContain('⚠️ NOT RUN.')
+    expect(m8.split('\n')[2]).toContain('⚠️ RUN 6 Oct 2026')
+    expect(m8).toContain('passed all 11 checks.\n-- DO NOT RUN AGAIN')
+    expect(verify.split('\n')[2]).toContain('⚠️ RUN 6 Oct 2026')
+    expect(verify).toContain('all 11 checks passed. DO NOT RUN AGAIN')
     // The body both files carry is byte for byte the body L1-M2 installed (RUN 4 Oct 2026), with the old sentence once.
     const body = m2Body()
     expect(body.length).toBeGreaterThan(500)
@@ -312,11 +314,13 @@ describe('L10 amendment 2', () => {
   const embedded = (f: string) => { const s = read(f); const a = s.indexOf('$body$') + 6; return s.slice(a, s.indexOf('$body$', a)) }
   const SC_NEW = 'Saving a register needs the Supply Chain module. Your suppliers are still on screen; choose a plan to keep them.'
 
-  it('L10-18: M9 swaps only the never-bought sentence, from the exact live body; both files NOT RUN', () => {
+  it('L10-18: M9 swaps only the never-bought sentence, from the exact live body; both files RUN 6 Oct 2026, 8 checks passed', () => {
     const m9 = read('docs/review/patches/L10-M9-supply-chain-message.sql')
     const verify = read('docs/review/patches/L10-M9-verify.sql')
-    expect(m9.split('\n')[2]).toContain('⚠️ NOT RUN.')
-    expect(verify.split('\n')[2]).toContain('⚠️ NOT RUN.')
+    expect(m9.split('\n')[2]).toContain('⚠️ RUN 6 Oct 2026')
+    expect(m9).toContain('passed all 8 checks.\n-- DO NOT RUN AGAIN')
+    expect(verify.split('\n')[2]).toContain('⚠️ RUN 6 Oct 2026')
+    expect(verify).toContain('all 8 checks passed. DO NOT RUN AGAIN')
     const body = DUMP_BODY()
     expect(body).toContain('purchase to save them.')
     expect(embedded('docs/review/patches/L10-M9-supply-chain-message.sql')).toBe(body)

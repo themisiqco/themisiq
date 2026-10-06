@@ -1,6 +1,8 @@
 -- docs/review/patches/L10-M9-verify.sql
 --
--- ⚠️ NOT RUN. Run AFTER L10-M9-supply-chain-message.sql, in the Supabase SQL editor, the whole file. It changes nothing:
+-- ⚠️ RUN 6 Oct 2026 in the Supabase SQL editor (recorded by Lisa), after M9: all 8 checks passed. DO NOT RUN AGAIN as
+-- part of the rollout. It is safe to re-run as a check (it undoes itself), but no one needs to repeat it.
+-- Run AFTER L10-M9-supply-chain-message.sql, in the Supabase SQL editor, the whole file. It changes nothing:
 -- the test user, entitlement and registers are created inside one PL/pgSQL block that ends by raising 'm9_undo', and
 -- catching it rolls the block back (the L0/L1/L3/L6/M8 pattern).
 --
