@@ -2,7 +2,7 @@
 //
 // FI9 diff 1. Transcribed from ~/themisiq-sources/mfe/NZ_emission_factors_2026_v2.xlsx (release 2026.2, published
 // 2026-05-29), sheet "data", Section "Fuel", SubSection "Transport Fuel" (rows 1422 to 1461). Units: kg CO2-e per
-// litre, by gas, as MfE prints them (column J "EmissionFactor", GHG in column I) (R5). Nothing reads this yet.
+// litre, by gas, as MfE prints them (column J "EmissionFactor", GHG in column I) (R5). Priced by engine pickFleet (FI9 2b).
 //
 // MfE prints ONE transport row per fuel, with no split by vehicle type, so Light and Heavy take the same row and
 // R16's "highest row" never applies. Regular Petrol is the row EF_NZ already uses for petrol; Premium Petrol

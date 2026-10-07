@@ -2,7 +2,7 @@
 //
 // FI9 diff 1. Transcribed from ~/themisiq-sources/nga/national-greenhouse-account-factors-2025.pdf (Table 9, pp. 26 to
 // 27; the pre-2004 note on p. 28) and the matching .xlsx (sheet "Table 9"). Units: kg CO2-e per GJ, with the energy
-// content in GJ per kL, as NGA prints them (R5). Nothing reads this yet.
+// content in GJ per kL, as NGA prints them (R5). Priced by engine pickFleet (FI9 2b).
 //
 // NGA p. 26: "Fuels used for transport purposes produce different methane and nitrous oxide emissions than if the
 // same fuels were used for stationary energy purposes. While CO2 emissions are only dependant on the fuel type, CH4

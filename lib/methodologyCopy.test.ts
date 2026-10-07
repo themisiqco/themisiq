@@ -48,7 +48,7 @@ describe('methodology page: emission factors (FI8)', () => {
   it('quotes only figures the engine applies', () => {
     // JEC densities (R9), on the EU litre rows.
     const eu = notesFor(loc({ country: 'DE', grid_region: 'EU_DE', has_diesel_stationary: true, diesel_stationary_amount: 100,
-      diesel_stationary_unit: 'litres', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres',
+      diesel_stationary_unit: 'litres', has_mobile: true, fleet_light: true, light_petrol_amount: 100, light_petrol_unit: 'litres',
       has_fuel_oil_residual: true, fuel_oil_residual_amount: 100, fuel_oil_residual_unit: 'litres' } as Partial<Location>))
     for (const d of ['832', '743', '970']) {
       expect(PAGE).toContain(d)

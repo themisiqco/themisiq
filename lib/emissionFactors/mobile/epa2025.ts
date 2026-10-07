@@ -2,7 +2,7 @@
 //
 // FI9 diff 1. Transcribed from ~/themisiq-sources/epa/ghg-emission-factors-hub-2025.xlsx (sheet "Emission Factors
 // Hub", the cell on each row) and checked against the PDF of the same edition ("Last Modified: 15 January 2025";
-// Tables 2 and 3 on p. 2, Tables 4 and 5 on p. 3). Units are EPA's own (R5). Nothing reads this yet.
+// Tables 2 and 3 on p. 2, Tables 4 and 5 on p. 3). Units are EPA's own (R5). Priced by engine pickFleet (FI9 2b).
 //
 // CO2 is per gallon (Table 2). CH4 and N2O are per VEHICLE-MILE on the road (Tables 3 and 4), by vehicle type and
 // model year, and per gallon off road (Table 5), by equipment and engine. Every table's note reads: "The factors

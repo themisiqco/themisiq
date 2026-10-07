@@ -260,12 +260,16 @@ describe('GROUP C — one fuel resolves, the other silently does not', () => {
 
     // THE FIX (gate keyed per (docType, fuelType)): acknowledging gasoline ONLY leaves diesel's identical
     // gap unresolved. The old per-docType gate let the gasoline resolution clear the whole strip.
-    const afterGasOnly = findUnresolvedCoverage([l], 2024, 12, [gasRes]);
+    // FI9: until diff 4 gives a fleet-fuel bill its vehicle type, its figures land on the legacy fields, which are unpriced
+    // until assigned (fleet_type_missing). That line is not a coverage issue, so it is set aside here; the coverage gate
+    // itself is unchanged.
+    const cov = (xs: ReturnType<typeof findUnresolvedCoverage>) => xs.filter(u => u.status !== 'fleet_type_missing');
+    const afterGasOnly = cov(findUnresolvedCoverage([l], 2024, 12, [gasRes]));
     expect(afterGasOnly.some(u => u.fuelType === 'diesel')).toBe(true);
     expect(afterGasOnly.some(u => u.fuelType === 'gasoline')).toBe(false);
 
     // THE OUTCOME: acknowledging BOTH clears the gate AND grosses both fields ×12/9.
-    expect(findUnresolvedCoverage([l], 2024, 12, [gasRes, dieselRes]).length).toBe(0);
+    expect(cov(findUnresolvedCoverage([l], 2024, 12, [gasRes, dieselRes])).length).toBe(0);
     const rows = buildWorkings([l], 'AR6', 2024, [gasRes, dieselRes]);
     const gasoline = rows.find(r => r.source === 'Gasoline (mobile)');
     const diesel = rows.find(r => r.source === 'Diesel (mobile)');
@@ -831,7 +835,7 @@ describe('N. no stream can be silent', () => {
     diesel_stationary: { declare: { has_diesel_stationary: true }, quantify: { diesel_stationary_amount: 300 } },
     fuel_oil_distillate: { declare: { has_fuel_oil_distillate: true }, quantify: { fuel_oil_distillate_amount: 400 } },
     fuel_oil_residual: { declare: { has_fuel_oil_residual: true },  quantify: { fuel_oil_residual_amount: 400 } },
-    mobile:            { declare: { has_mobile: true },            quantify: { diesel_mobile_amount: 900 } },
+    mobile:            { declare: { has_mobile: true },            quantify: { fleet_light: true, light_diesel_amount: 900 } },   // FI9
     refrigerants:      { declare: { has_hfc_refrigerants: true },  quantify: { refrigerant_purchased_kg: 12 } },
     purchased_steam:   { declare: { has_purchased_steam: true },   quantify: { purchased_steam_mmbtu: 100 } },
     // Electricity has NO checkbox in the wizard — the kWh field is both signals at once, so its
@@ -986,23 +990,28 @@ describe('N10. the golden inventory is unchanged', () => {
   const golden = (): Location => loc({
     country: 'CA', province: 'ON', grid_region: 'ON',
     has_natural_gas: true, natural_gas_amount: 120_000, natural_gas_unit: 'm3',
-    has_mobile: true, diesel_mobile_amount: 5_000, diesel_mobile_unit: 'litres',
+    // FI9: the 5,000 L of fleet diesel are light vehicles, priced from ECCC's mobile table (NIR 2025 Table A6.1-15,
+    // LDDT Advanced Control, the highest light diesel row with no model year): CO2 2,680.50, CH4 0.068, N2O 0.22 g/L.
+    has_mobile: true, fleet_light: true, light_diesel_amount: 5_000, light_diesel_unit: 'litres',
     has_hfc_refrigerants: true, refrigerant_type: 'r410a', refrigerant_purchased_kg: 12,
     electricity_kwh: 850_000,
   });
 
-  it('ON, RY2025, gas 120,000 m3 + diesel mobile 5,000 L + R-410A 12 kg + 850,000 kWh = 304.6176 tCO2e', () => {
+  // FI9 MOVES THIS NUMBER, ON PURPOSE: the fleet diesel was priced on ECCC's stationary row (13.446652 t, total 304.6176)
+  // and is now priced on its mobile row (13.712932 t). Every other component is unchanged.
+  it('ON, RY2025, gas 120,000 m3 + light-vehicle diesel 5,000 L + R-410A 12 kg + 850,000 kWh = 304.883844 tCO2e', () => {
     const t = calcInventory([golden()], 'AR6', 2025) as any;
-    expect(t.s1_total + t.s2_location).toBeCloseTo(304.6176, 4);
+    expect(t.s1_total + t.s2_location).toBeCloseTo(304.883844, 6);
     // The components, so a future failure says WHICH one moved rather than only that the total did.
-    expect(t.s1_total).toBeCloseTo(272.317564, 6);   // gas 231.798912 + diesel 13.446652 + R-410A 27.072
+    // Diesel: 5,000 x 2.6805 = 13.4025 t CO2; CH4 5,000 x 0.068 g = 0.34 kg x 29.8; N2O 5,000 x 0.22 g = 1.1 kg x 273.
+    expect(t.s1_total).toBeCloseTo(272.583844, 6);   // gas 231.798912 + diesel 13.712932 + R-410A 27.072
     expect(t.s2_location).toBeCloseTo(32.3, 6);      // 850,000 kWh x ON 2025 grid 0.038
   });
 
   it('the declaration rows carry no figure, so the workings still sum to the same total', () => {
     const rows = buildWorkings([golden()], 'AR6', 2025, [], 12) as any[];
     const scope12 = rows.filter(r => r.result_tco2e != null && r.scope !== 3 && r.scope2_method !== 'market-based');
-    expect(scope12.reduce((n, r) => n + r.result_tco2e, 0)).toBeCloseTo(304.6176, 4);
+    expect(scope12.reduce((n, r) => n + r.result_tco2e, 0)).toBeCloseTo(304.883844, 6);
     // Four streams are absent from this site and every one of them is on the record as absent.
     const declarations = rows.filter(r => r.declaration).map(r => r.stream).sort();
     expect(declarations).toEqual(['diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'propane', 'purchased_steam']);
@@ -1773,8 +1782,9 @@ describe('Z. fuel oil grades are seeded per table', () => {
       'workbook puts two editions in one table with nothing on any row saying which priced it.';
     expect((EF_UK as any).natural_gas_kwh.co2, WHY).toBe(0.18231);
     expect((EF_UK as any).diesel_litre.co2, WHY).toBe(2.58354);
-    expect((EF_UK as any).diesel_mobile_litre.co2, `${WHY} (mobile reuses the diesel row)`).toBe(2.58354);
-    expect((EF_UK as any).gasoline_litre.co2, WHY).toBe(2.075);
+    // FI9: no mobile key in EF_UK. The fleet rows read the same Fuels rows through lib/emissionFactors/mobile/defra2026.ts.
+    expect((EF_UK as any).diesel_mobile_litre).toBeUndefined();
+    expect((EF_UK as any).gasoline_litre).toBeUndefined();
     // Unchanged between editions — CONFIRMED against the 2026 workbook, not assumed.
     expect((EF_UK as any).propane_litre.co2, 'propane did not move between editions').toBe(1.54358);
     // The residual-oil FACTOR did not move either.
@@ -1785,8 +1795,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // FI2 diff 2 (ruling R5): the seven pre-multiplied gallon keys are gone. A gallon figure converts at pricing.
     const G = 3.785411784;
     const gb = loc({ country: 'GB' });
-    for (const [l, g] of [['propane_litre', 'propane_gallon'], ['diesel_litre', 'diesel_gallon'], ['diesel_mobile_litre', 'diesel_mobile_gallon'],
-      ['gasoline_litre', 'gasoline_gallon'], ['fuel_oil_residual_litre', 'fuel_oil_residual_gallon'], ['fuel_oil_distillate_litre', 'fuel_oil_distillate_gallon']]) {
+    for (const [l, g] of [['propane_litre', 'propane_gallon'], ['diesel_litre', 'diesel_gallon'],
+      ['fuel_oil_residual_litre', 'fuel_oil_residual_gallon'], ['fuel_oil_distillate_litre', 'fuel_oil_distillate_gallon']]) {
       const p = pickEF(gb, g);
       expect(p.key, g).toBe(l);
       expect(p.factor.co2, `${g} = ${l} x L_PER_GAL, exactly`).toBeCloseTo((EF_UK as any)[l].co2 * G, 12);
@@ -2062,8 +2072,9 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
     expect(EF.fuel_oil_distillate_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
     expect(EF.fuel_oil_residual_gallon).toEqual({ co2: 11.27, ch4: 0.00045, n2o: 0.00009 });
-    expect(EF.gasoline_gallon).toEqual({ co2: 8.78, ch4: 0.00038, n2o: 0.00008 });
-    expect(EF.diesel_mobile_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
+    // FI9: the two mobile keys are gone; fleet fuel prices from EPA's mobile tables (Tables 2 to 5).
+    expect((EF as Record<string, unknown>).gasoline_gallon).toBeUndefined();
+    expect((EF as Record<string, unknown>).diesel_mobile_gallon).toBeUndefined();
     expect((EF as any).ammonia).toBe(0);
     // steam_mmbtu was the bare scalar 66.33 — EPA Table 7's CO2 column alone — until 14 Aug 2026.
     // Full three-column pin and the 80%-efficiency derivation live in group S below.
@@ -2726,15 +2737,17 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
   const fuelRow = (l: Location) => rowsOf(l).find(r => r.scope === 1 && r.stream && r.stream !== 'refrigerants' && !r.declaration);
 
   it('U1 every EU litre key IS MRR factor x MRR NCV x JEC density: CO2 at 6 s.f., CH4 and N2O at 4, one density for all three', () => {
-    const cases: [string, keyof typeof JEC][] = [['diesel_litre', 'gas_diesel_oil'], ['diesel_mobile_litre', 'gas_diesel_oil'],
-      ['gasoline_litre', 'motor_gasoline'], ['fuel_oil_residual_litre', 'residual_oil']];
+    // FI9: the two mobile keys (diesel_mobile_litre, gasoline_litre) are gone; fleet rows take IPCC Ch. 3 (EU_FLEET).
+    const cases: [string, keyof typeof JEC][] = [['diesel_litre', 'gas_diesel_oil'], ['fuel_oil_residual_litre', 'residual_oil']];
     for (const [key, fuel] of cases) {
       const f = ANNEX_VI[fuel], d = JEC[fuel]
       expect(EU[key].co2, key).toBe(round(perLitre(f, d), 6))
       expect(EU[key].ch4, key).toBe(round(RATE.liquid.ch4 * f.ncv_TJ_per_Gg * 1e-6 * d, 4))
       expect(EU[key].n2o, key).toBe(round(RATE.liquid.n2o * f.ncv_TJ_per_Gg * 1e-6 * d, 4))
     }
-    expect([EU.diesel_litre.co2, EU.gasoline_litre.co2, EU.fuel_oil_residual_litre.co2]).toEqual([2.651, 2.281, 3.03315])
+    expect([EU.diesel_litre.co2, EU.fuel_oil_residual_litre.co2]).toEqual([2.651, 3.03315])
+    expect(EU.gasoline_litre).toBeUndefined()
+    expect(EU.diesel_mobile_litre).toBeUndefined()
   })
 
   it('U2 the mass keys are MRR mass basis, one table: factor per TJ x NCV per Gg', () => {
@@ -3187,7 +3200,7 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
   // N2O per gallon). So the uniform rate is checked as EPA printed it: each key is its heat content x the one published
   // per-mmBtu rate, to within half the last printed digit. A key moved to another rate misses by far more than that.
   const HEAT_CONTENT: Record<string, number> = { propane_gallon: 0.091, diesel_gallon: 0.138, fuel_oil_gallon: 0.138,
-    fuel_oil_distillate_gallon: 0.138, fuel_oil_residual_gallon: 0.15, gasoline_gallon: 0.125, diesel_mobile_gallon: 0.138 };
+    fuel_oil_distillate_gallon: 0.138, fuel_oil_residual_gallon: 0.15 };   // FI9: no mobile keys in EF
   const asPrinted = (stored_kg: number, derived_g: number, halfDigit_g: number) => Math.abs(stored_kg * 1000 - derived_g) <= halfDigit_g + 1e-12;
 
   it('AB1 EPA petroleum CH4/N2O are UNIFORM across the block — this is what makes "no choice" true', () => {
@@ -3216,7 +3229,6 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     expect([EF_.propane_gallon.ch4, EF_.propane_gallon.n2o]).toEqual([0.00027, 0.00005]);
     expect([EF_.fuel_oil_distillate_gallon.ch4, EF_.fuel_oil_distillate_gallon.n2o]).toEqual([0.00041, 0.00008]);
     expect([EF_.fuel_oil_residual_gallon.ch4, EF_.fuel_oil_residual_gallon.n2o]).toEqual([0.00045, 0.00009]);
-    expect([EF_.gasoline_gallon.ch4, EF_.gasoline_gallon.n2o]).toEqual([0.00038, 0.00008]);
     expect([EF_.natural_gas_mcf.ch4, EF_.natural_gas_mcf.n2o]).toEqual([0.00103, 0.0001]);
   });
 
@@ -3246,8 +3258,6 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     near(EU.diesel_litre.n2o, perLitre(IPCC_T22.gas_diesel_oil.n2o, 43.0, 0.832), 'diesel N2O');
     near(EU.fuel_oil_residual_litre.ch4, perLitre(IPCC_T22.residual_oil.ch4, 40.4, 0.970), 'residual CH4');
     near(EU.fuel_oil_residual_litre.n2o, perLitre(IPCC_T22.residual_oil.n2o, 40.4, 0.970), 'residual N2O');
-    near(EU.gasoline_litre.ch4, perLitre(IPCC_T22.motor_gasoline.ch4, 44.3, 0.743), 'gasoline CH4');
-    near(EU.gasoline_litre.n2o, perLitre(IPCC_T22.motor_gasoline.n2o, 44.3, 0.743), 'gasoline N2O');
     // Natural gas per kWh gross (R7): rate x 0.90 x 3.6e-6 TJ/kWh.
     expect(EU.natural_gas_kwh.ch4).toBeCloseTo(IPCC_T22.natural_gas.ch4 * 0.9 * 3.6e-6, 15);
     expect(EU.natural_gas_kwh.n2o).toBeCloseTo(IPCC_T22.natural_gas.n2o * 0.9 * 3.6e-6, 15);
@@ -3264,7 +3274,6 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     const EU = EF_EU as any;
     const T24 = { gas_diesel_oil: 10, motor_gasoline: 10, residual_oil: 10, lpg: 5, natural_gas: 5 };
     expect(EU.diesel_litre.ch4).not.toBeCloseTo(perLitre(T24.gas_diesel_oil, 43.0, 0.832), 8);
-    expect(EU.gasoline_litre.ch4).not.toBeCloseTo(perLitre(T24.motor_gasoline, 44.3, 0.743), 8);
     expect(EU.fuel_oil_residual_litre.ch4).not.toBeCloseTo(perLitre(T24.residual_oil, 40.4, 0.970), 8);
     expect(EU.natural_gas_kwh.ch4).not.toBeCloseTo(T24.natural_gas * 0.9 * 3.6e-6, 10);
     // The switch is NOT uniform scaling — liquids 3.33x, LPG and gas 5x. Recorded so a future change
@@ -3301,11 +3310,10 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     expect(CA.diesel_litre.n2o).toBeCloseTo(0.022 / 1000, 10);
     expect(CA.propane_litre.ch4).toBeCloseTo(0.024 / 1000, 10);
     expect(CA.propane_litre.n2o).toBeCloseTo(0.108 / 1000, 10);
-    expect(CA.gasoline_litre.ch4).toBeCloseTo(0.100 / 1000, 10);
-    expect(CA.gasoline_litre.n2o).toBeCloseTo(0.02 / 1000, 10);
-    // And a gallon figure prices at those same rates x L_PER_GAL, converted exactly (FI2: no gallon keys).
-    expect(CA.gasoline_gallon, 'the pre-multiplied gallon key is gone').toBeUndefined();
-    expect(pickEF(loc({ country: 'CA' }), 'gasoline_gallon').factor.ch4).toBeCloseTo(0.100 / 1000 * G, 14);
+    // FI9: motor gasoline is not in EF_CA; fleet petrol prices from ECCC's mobile table. A gallon figure of a stationary
+    // fuel prices at the per-litre rate x L_PER_GAL, converted exactly (FI2: no gallon keys).
+    expect(CA.gasoline_litre).toBeUndefined();
+    expect(pickEF(loc({ country: 'CA' }), 'diesel_gallon').factor.ch4).toBeCloseTo(0.078 / 1000 * G, 14);
   });
 
   it('AB7 UK, AU and NZ have NO sector-varying gas split to pin — the gases are combined at source', () => {
@@ -4312,7 +4320,9 @@ describe('T5 gap estimates name their document type', () => {
     const ef = calcInventory([loc({ has_mobile: true, diesel_mobile_amount: 120, diesel_mobile_unit: 'gallons' })], 'AR6', 2025).s1_total;
     const pct = pctEstimated({ locations: [l], reporting_year: 2025, coverage_resolutions: [r] }, 'AR6');
     expect(pct).toBeCloseTo(0.5 * es / (es + ef) * 100, 9);
-    expect(pct, 'not half of both diesel streams').not.toBeCloseTo(50, 1);
+    // FI9: a fleet-fuel bill lands on the legacy field until diff 4 gives it a vehicle type, and a legacy figure is unpriced
+    // until assigned, so the fleet diesel prices nothing here. The estimate is still the stationary meter's alone.
+    expect(ef, 'legacy fleet diesel is unpriced until assigned').toBe(0);
   });
 });
 
@@ -5136,7 +5146,8 @@ describe('T15-fix1 the same file uploaded twice under one name', () => {
       const d = deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: r })[0];
       expect(d[countedField], counted.documentType).toBe(1200);
       expect(d[zeroField], counted.documentType).toBe(0);
-      expect(allTotal(r)).toBeGreaterThan(0);
+      // FI9: the fleet copy lands on the legacy field (unpriced until assigned, diff 4 types it), so only the tank copy prices.
+      if (counted === TANK) expect(allTotal(r)).toBeGreaterThan(0);
       expect(allTotal(r), counted.documentType).toBeCloseTo(onlyOne(counted.id), 12);
       const rows = buildWorkings([l], 'AR6', 2025, r);
       const diesel = rows.filter(w => typeof w.activity_data === 'number' && w.activity_data > 0 && /diesel/i.test(String(w.source)));
@@ -5280,7 +5291,7 @@ describe('T15-fix2 not-counted line under each confirmed, uncounted reading', ()
 // blocks; an unknown refrigerant is an unpriced line, never `?? 0`; an unsupported country stays a stated,
 // non-blocking exclusion.
 describe('FI1 unpriced lines', () => {
-  const BLOCKING = new Set(['factor_missing', 'refrigerant_unknown', 'province_missing']);
+  const BLOCKING = new Set(['factor_missing', 'refrigerant_unknown', 'province_missing', 'fleet_type_missing', 'equipment_missing']);
   const gate = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => BLOCKING.has(i.status));
 
   // Every fuel line the wizard or a bill can store: its switch, amount and unit fields, the wizard's own
@@ -5291,6 +5302,14 @@ describe('FI1 unpriced lines', () => {
     { field: 'diesel_stationary_amount', unitField: 'diesel_stationary_unit', on: { has_diesel_stationary: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
     { field: 'fuel_oil_distillate_amount', unitField: 'fuel_oil_distillate_unit', on: { has_fuel_oil_distillate: true }, options: c => liquidUnitOptions(c).map(([v]) => v) },
     { field: 'fuel_oil_residual_amount', unitField: 'fuel_oil_residual_unit', on: { has_fuel_oil_residual: true }, options: c => liquidUnitOptions(c).map(([v]) => v) },
+    // FI9: the six fleet fields (light and heavy road, non-road with an equipment type); the legacy two are unpriced until
+    // assigned, and are checked on their own below.
+    { field: 'light_petrol_amount', unitField: 'light_petrol_unit', on: { has_mobile: true, fleet_light: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'gasoline' },
+    { field: 'light_diesel_amount', unitField: 'light_diesel_unit', on: { has_mobile: true, fleet_light: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
+    { field: 'heavy_petrol_amount', unitField: 'heavy_petrol_unit', on: { has_mobile: true, fleet_heavy: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'gasoline' },
+    { field: 'heavy_diesel_amount', unitField: 'heavy_diesel_unit', on: { has_mobile: true, fleet_heavy: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
+    { field: 'nonroad_petrol_amount', unitField: 'nonroad_petrol_unit', on: { has_mobile: true, fleet_nonroad: true, nonroad_petrol_equipment: 'agriculture' }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'gasoline' },
+    { field: 'nonroad_diesel_amount', unitField: 'nonroad_diesel_unit', on: { has_mobile: true, fleet_nonroad: true, nonroad_diesel_equipment: 'agriculture' }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
     { field: 'gasoline_amount', unitField: 'gasoline_unit', on: { has_mobile: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'gasoline' },
     { field: 'diesel_mobile_amount', unitField: 'diesel_mobile_unit', on: { has_mobile: true }, options: c => liquidUnitOptions(c).map(([v]) => v), bill: 'diesel' },
   ];
@@ -5683,10 +5702,10 @@ describe('FI2 exact conversions and honest provenance', () => {
       ['DE', 'natural_gas_amount', 'therms', 'natural_gas_kwh'], ['DE', 'natural_gas_amount', 'mmbtu', 'natural_gas_kwh'],
       ['AU', 'natural_gas_amount', 'mcf', 'natural_gas_m3'], ['AU', 'natural_gas_amount', 'therms', 'natural_gas_gj'],
       ['AU', 'propane_amount', 'gallons', 'propane_litre'], ['AU', 'diesel_stationary_amount', 'gallons', 'diesel_litre'],
-      ['AU', 'gasoline_amount', 'gallons', 'gasoline_litre'], ['AU', 'diesel_mobile_amount', 'gallons', 'diesel_mobile_litre'],
+      // FI9: the fleet cases left this list; fleet fuel prices from each publisher's mobile row (FI9 tests below).
       ['NZ', 'natural_gas_amount', 'mcf', 'unpriced'], ['NZ', 'natural_gas_amount', 'therms', 'natural_gas_kwh'], ['NZ', 'natural_gas_amount', 'mmbtu', 'natural_gas_kwh'],
       ['NZ', 'propane_amount', 'gallons', 'unpriced'], ['NZ', 'propane_amount', 'litres', 'unpriced'],
-      ['NZ', 'diesel_stationary_amount', 'gallons', 'diesel_litre'], ['NZ', 'gasoline_amount', 'gallons', 'gasoline_litre'], ['NZ', 'diesel_mobile_amount', 'gallons', 'diesel_mobile_litre'],
+      ['NZ', 'diesel_stationary_amount', 'gallons', 'diesel_litre'],
     ];
     const ON: Record<string, Partial<Location>> = { natural_gas_amount: { has_natural_gas: true }, propane_amount: { has_propane: true },
       diesel_stationary_amount: { has_diesel_stationary: true }, gasoline_amount: { has_mobile: true }, diesel_mobile_amount: { has_mobile: true } };
@@ -5756,7 +5775,7 @@ describe('FI2 exact conversions and honest provenance', () => {
     const cases: [string, Partial<Location>, RegExp][] = [
       ['DE', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'kwh' }, /0\.90 net per gross \(IPCC 2006 Vol\. 2 Ch\. 1 section 1\.4\.1\.2/],
       ['DE', { has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: 'gallons' }, /832 kg\/m³ \(JEC Well-to-Tank report v5/],
-      ['FR', { has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' }, /743 kg\/m³ \(JEC Well-to-Tank report v5/],
+      // FI9: EU fleet petrol is cited to its mobile document (FLEET_SOURCE.EU); its note names the same JEC density.
       ['DE', { has_fuel_oil_residual: true, fuel_oil_residual_amount: 100, fuel_oil_residual_unit: 'litres' }, /970 kg\/m³ \(JEC Well-to-Tank report v5/],
     ];
     for (const [country, o, value] of cases) {
@@ -5776,12 +5795,15 @@ describe('FI2 exact conversions and honest provenance', () => {
   });
 
   it('the export source list names the table that priced each line', () => {
-    const nzGallons = loc({ country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'gallons' });
-    const nzLitres = loc({ id: 'L2', country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' });
-    // FI2 diff 2: NZ petrol in gallons now converts to MfE's per-litre factor, so both name MfE.
-    // FI10: with the use class that priced them, as the PDF and XLSX have no per-row column for it.
-    expect(combustionSourcesFor([nzGallons])).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
-    expect(combustionSourcesFor([nzLitres, nzGallons])).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
+    const nzGallons = loc({ country: 'NZ', has_mobile: true, fleet_light: true, light_petrol_amount: 100, light_petrol_unit: 'gallons' });
+    const nzLitres = loc({ id: 'L2', country: 'NZ', has_mobile: true, fleet_light: true, light_petrol_amount: 100, light_petrol_unit: 'litres' });
+    const nzStationary = loc({ id: 'L3', country: 'NZ', has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: 'gallons' });
+    // FI2 diff 2: a gallon figure converts to MfE's per-litre factor, so both name MfE. FI9: fleet petrol is MfE's
+    // Transport Fuel row, which no use class selects, so it is cited without one.
+    expect(combustionSourcesFor([nzGallons])).toEqual([EF_SOURCES.combustion_nz]);
+    expect(combustionSourcesFor([nzLitres, nzGallons])).toEqual([EF_SOURCES.combustion_nz]);
+    // FI10: a stationary row names the use class that priced it, as the PDF and XLSX have no per-row column for it.
+    expect(combustionSourcesFor([nzStationary])).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
     // A location with no combustion keeps its country's citation, as before.
     expect(combustionSourcesFor([loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100 })])).toEqual([EF_SOURCES.combustion_nz]);
   });
@@ -5814,12 +5836,12 @@ describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how i
     const perScf = { co2: 0.05444, ch4: 0.00103 / 1000, n2o: 0.0001 / 1000 }
     for (const g of ['co2', 'ch4', 'n2o'] as const) expect(EF.natural_gas_mcf[g], g).toBeCloseTo(perScf[g] * 1000, 12)
     const distillate = { co2: 10.21, ch4: 0.41 / 1000, n2o: 0.08 / 1000 }
-    for (const k of ['diesel_gallon', 'fuel_oil_gallon', 'fuel_oil_distillate_gallon', 'diesel_mobile_gallon'] as const) {
+    for (const k of ['diesel_gallon', 'fuel_oil_gallon', 'fuel_oil_distillate_gallon'] as const) {   // FI9: no mobile key
       for (const g of ['co2', 'ch4', 'n2o'] as const) expect((EF as any)[k][g], `${k} ${g}`).toBeCloseTo(distillate[g], 12)
     }
     const per = (co2: number, ch4_g: number, n2o_g: number) => ({ co2, ch4: ch4_g / 1000, n2o: n2o_g / 1000 })
     const printed: [keyof typeof EF, ReturnType<typeof per>][] = [
-      ['gasoline_gallon', per(8.78, 0.38, 0.08)], ['propane_gallon', per(5.72, 0.27, 0.05)], ['fuel_oil_residual_gallon', per(11.27, 0.45, 0.09)]]
+      ['propane_gallon', per(5.72, 0.27, 0.05)], ['fuel_oil_residual_gallon', per(11.27, 0.45, 0.09)]]
     for (const [k, v] of printed) for (const g of ['co2', 'ch4', 'n2o'] as const) expect((EF as any)[k][g], `${k} ${g}`).toBeCloseTo(v[g], 12)
     // The per-mmBtu key is EPA's own column and did not move.
     expect(EF.natural_gas_mmbtu).toEqual({ co2: 53.06, ch4: 0.001, n2o: 0.0001 })
@@ -5831,21 +5853,20 @@ describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how i
     expect(t('propane_gallon')).toBeCloseTo(5.741696, 9)
     expect(t('fuel_oil_distillate_gallon')).toBeCloseTo(10.244058, 9)
     expect(t('fuel_oil_residual_gallon')).toBeCloseTo(11.30798, 9)
-    expect(t('gasoline_gallon')).toBeCloseTo(8.813164, 9)
   })
 
   it('FI2c3 every US row priced from a printed per-unit column cites Table 1 and the printed figures', () => {
     const rows = rowsOf(fuels({ country: 'US', state: 'NY', natural_gas_unit: 'mcf', propane_unit: 'gallons', diesel_stationary_unit: 'gallons',
       fuel_oil_distillate_unit: 'gallons', fuel_oil_residual_unit: 'gallons', gasoline_unit: 'gallons', diesel_mobile_unit: 'gallons' }))
-    expect(rows).toHaveLength(7)
+    // FI9: the two legacy fleet figures are unpriced until assigned to a vehicle type, so five stationary rows price.
+    expect(rows).toHaveLength(5)
     const noteOf = (src: string) => rows.find(r => r.source === src)!.note ?? ''
     expect(noteOf('Natural gas')).toBe(`${TABLE_1}, Natural Gas, per scf: 0.05444 kg CO2, 0.00103 g CH4, 0.0001 g N2O; per Mcf is per scf × 1,000`)
     expect(noteOf('Propane')).toBe(`${TABLE_1}, Propane, per gallon: 5.72 kg CO2, 0.27 g CH4, 0.05 g N2O`)
-    for (const src of ['Diesel (stationary)', 'Heating oil', 'Diesel (mobile)']) {
+    for (const src of ['Diesel (stationary)', 'Heating oil']) {
       expect(noteOf(src), src).toBe(`${TABLE_1}, Distillate Fuel Oil No. 2, per gallon: 10.21 kg CO2, 0.41 g CH4, 0.08 g N2O`)
     }
     expect(noteOf('Heavy fuel oil')).toBe(`${TABLE_1}, Residual Fuel Oil No. 6, per gallon: 11.27 kg CO2, 0.45 g CH4, 0.09 g N2O`)
-    expect(noteOf('Gasoline (mobile)')).toBe(`${TABLE_1}, Motor Gasoline, per gallon: 8.78 kg CO2, 0.38 g CH4, 0.08 g N2O`)
     for (const r of rows) expect(r.note ?? '', r.source).not.toContain('\u2014')
     // A converted entry carries the conversion AND the citation; the per-mmBtu key needs neither.
     const m3 = rowsOf(loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }))[0]
@@ -5859,13 +5880,11 @@ describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how i
     const rows = rowsOf(fuels({ country: 'AU', state: 'VIC', grid_region: 'AU_VIC', natural_gas_unit: 'm3', propane_unit: 'litres',
       diesel_stationary_unit: 'litres', fuel_oil_distillate_unit: 'litres', fuel_oil_residual_unit: 'litres', gasoline_unit: 'litres',
       diesel_mobile_unit: 'litres' }))
-    expect(rows).toHaveLength(7)
+    expect(rows).toHaveLength(5)   // FI9: the legacy fleet figures are unpriced until assigned
     const noteOf = (src: string) => rows.find(r => r.source === src)!.note ?? ''
     const NGA = 'DCCEEW NGA 2025, Energy - Scope 1 sheet'
     const DIESEL = `${NGA} (Table 8), Diesel oil: 2,709.72 kg CO2-e/kL; per litre is per kL ÷ 1,000`
     expect(noteOf('Diesel (stationary)')).toBe(DIESEL)
-    expect(noteOf('Diesel (mobile)'), 'the stationary row, as before (FI9)').toBe(DIESEL)
-    expect(noteOf('Gasoline (mobile)')).toBe(`${NGA} (Table 8), Automotive gasoline/petrol: 2,318.76 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
     expect(noteOf('Propane')).toBe(`${NGA} (Table 8), Liquefied petroleum gas (LPG): 1,557.42 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
     expect(noteOf('Heating oil')).toBe(`${NGA} (Table 8), Heating oil: 2,600.929 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
     expect(noteOf('Heavy fuel oil')).toBe(`${NGA} (Table 8), Fuel oil: 2,931.448 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
@@ -5937,8 +5956,11 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
 
   it('FI2d3 each AU value is NGA\'s printed Energy - Scope 1 figure, per kL / 1,000 (per m3 as printed)', () => {
     const EA: Record<string, { co2: number; ch4: number; n2o: number }> = EF_AU
-    const printed: [string, number][] = [['diesel_litre', 2709.72], ['diesel_mobile_litre', 2709.72], ['gasoline_litre', 2318.76],
+    // FI9: no mobile keys in EF_AU (fleet fuel prices from NGA Table 9, or Table 8 for non-road).
+    const printed: [string, number][] = [['diesel_litre', 2709.72],
       ['propane_litre', 1557.42], ['fuel_oil_distillate_litre', 2600.929], ['fuel_oil_residual_litre', 2931.448]]
+    expect(EA.gasoline_litre).toBeUndefined()
+    expect(EA.diesel_mobile_litre).toBeUndefined()
     for (const [k, perKl] of printed) {
       expect(EA[k], k).toEqual({ co2: EA[k].co2, ch4: 0, n2o: 0 })
       expect(EA[k].co2, k).toBeCloseTo(perKl / 1000, 12)
@@ -5950,13 +5972,13 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
     expect(34.2 * 67.8).toBeCloseTo(2318.76, 9)
     // 1,000 units: the old 3dp values against the printed ones.
     const t = (k: string) => 1000 * EA[k].co2 / 1000
-    expect([t('natural_gas_m3'), t('diesel_litre'), t('gasoline_litre'), t('propane_litre')]).toEqual([2.025129, 2.70972, 2.31876, 1.55742])
+    expect([t('natural_gas_m3'), t('diesel_litre'), t('propane_litre')]).toEqual([2.025129, 2.70972, 1.55742])
   })
 
   it('FI2d4 the methods tables list every conversion and derivation a row notes, and nothing else', () => {
     const locs: Location[] = [
       ukGas('mcf', 10),
-      loc({ id: 'L2', name: 'Lyon', country: 'FR', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' }),
+      loc({ id: 'L2', name: 'Lyon', country: 'FR', has_mobile: true, fleet_light: true, light_petrol_amount: 100, light_petrol_unit: 'litres' }),
       loc({ id: 'L3', name: 'Perth', country: 'AU', state: 'WA', grid_region: 'AU_WA', has_diesel_stationary: true, diesel_stationary_amount: 50, diesel_stationary_unit: 'gallons' }),
       loc({ id: 'L4', name: 'Austin', country: 'US', state: 'TX', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }),
       loc({ id: 'L5', name: 'Leeds', country: 'GB', grid_region: 'UK', has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' }),
@@ -5964,7 +5986,7 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
     const methods = factorDerivationsFor(locs)
     expect(methods).toEqual([
       'Natural gas: Mcf converted to m³ (1 Mcf = 28.316846592 m³, exact).',
-      `Gasoline (mobile): ${(buildWorkings([locs[1]], 'AR6', 2025) as { note?: string; stream?: string }[]).find(r => r.stream === 'mobile')!.note}`,
+      `Petrol (light vehicles): ${(buildWorkings([locs[1]], 'AR6', 2025) as { note?: string; stream?: string }[]).find(r => r.stream === 'mobile')!.note}`,
       'Diesel (stationary): US gallons converted to litres (1 US gallon = 3.785411784 litres, exact).',
       'Purchased steam: GJ converted to kWh (1 kWh = 0.0036 GJ, exact).',
     ])
@@ -6440,7 +6462,7 @@ describe('FI10. NZ use class on every row', () => {
 // two, so no figure moves in this diff (diff 2b gives each its publisher's mobile row). The legacy figures are moved
 // only by the customer's button (assignLegacyFleet).
 import {
-  FLEET_FIELDS, assignLegacyFleet, legacyFleetFigures, UNIT_FIELDS as FI9_UNIT_FIELDS, FIELD_NAME as FI9_FIELD_NAME,
+  FLEET_FIELDS, FLEET_SOURCE, assignLegacyFleet, legacyFleetFigures, UNIT_FIELDS as FI9_UNIT_FIELDS, FIELD_NAME as FI9_FIELD_NAME,
   streamSwitchOff as fi9StreamSwitchOff, changeUnit as fi9ChangeUnit, applyUnitOutcomes as fi9ApplyUnitOutcomes,
 } from './engine';
 import { buildB3Energy } from '../vsme/b3Energy';
@@ -6462,11 +6484,13 @@ describe('FI9 diff 2a: fleet fields by vehicle type (R16)', () => {
     }
   });
 
-  it('a fleet figure prices exactly as the legacy field did (no figure moves in 2a), only under its type tick', () => {
-    const legacy = calcLocation(fleet({ diesel_mobile_amount: 1000, diesel_mobile_unit: 'litres' }), 'AR6', 2026);
+  it('a fleet figure prices under its type tick; a legacy figure is unpriced until assigned (2b)', () => {
+    const legacyLoc = fleet({ diesel_mobile_amount: 1000, diesel_mobile_unit: 'litres' });
+    expect(calcLocation(legacyLoc, 'AR6', 2026).s1_mobile).toBe(0);
+    expect(unpricedLines(legacyLoc).map(u => u.reason)).toEqual(['fleet_type_missing']);
+    // UK: DEFRA's Fuels row, which DEFRA states applies to vehicles: 1,000 L x 2.58354 kg CO2e/L, the same figure as before.
     const split = calcLocation(fleet({ fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'AR6', 2026);
-    expect(split.s1_mobile).toBeCloseTo(legacy.s1_mobile, 12);
-    expect(split.s1_mobile).toBeGreaterThan(0);
+    expect(split.s1_mobile).toBeCloseTo(2.58354, 12);
     // Not ticked, or the stream switched off: no line and nothing priced.
     expect(calcLocation(fleet({ light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'AR6', 2026).s1_mobile).toBe(0);
     expect(calcLocation(fleet({ has_mobile: false, fleet_light: true, light_diesel_amount: 1000 }), 'AR6', 2026).s1_mobile).toBe(0);
@@ -6501,8 +6525,9 @@ describe('FI9 diff 2a: fleet fields by vehicle type (R16)', () => {
     expect(after.fleet_assignments).toEqual([{ from: 'gasoline_amount', to: 'light', field: 'light_petrol_amount', value: 200,
       unit: 'litres', at: '2026-10-07T00:00:00Z', by: BY }]);
     expect(legacyFleetFigures(after)).toEqual([]);
-    // In 2a the move does not change the figure: the same mobile key prices it.
-    expect(calcLocation(after, 'AR6', 2026).s1_mobile).toBeCloseTo(calcLocation(before, 'AR6', 2026).s1_mobile, 12);
+    // Unpriced before the move (no vehicle type); priced after it, from DEFRA's petrol row: 200 L x 2.075 kg CO2e/L.
+    expect(calcLocation(before, 'AR6', 2026).s1_mobile).toBe(0);
+    expect(calcLocation(after, 'AR6', 2026).s1_mobile).toBeCloseTo(0.415, 12);
     // Refused, never merged: the target already holds a figure, or there is nothing to move.
     expect(assignLegacyFleet({ ...before, light_petrol_amount: 5, fleet_light: true }, 'gasoline_amount', 'light', 't', BY))
       .toEqual({ ok: false, reason: 'target_has_figure' });
@@ -6527,5 +6552,152 @@ describe('FI9 diff 2a: fleet fields by vehicle type (R16)', () => {
     expect(asSplit).toBeGreaterThan(0);
     expect(asSplit).toBeCloseTo(asLegacy, 12);
     expect(buildB3Energy([fleet({ heavy_diesel_amount: 1000 }) as never]).totalMWh).toBe(0);   // not ticked
+  });
+});
+
+// ── FI9 DIFF 2b (ruling R16): FLEET FUEL FROM EACH PUBLISHER'S MOBILE ROW ─────────────────────────────
+// Expected values are typed from the publishers' documents (docs/review/mobile-factors.md), not read from the data files.
+describe('FI9 diff 2b: fleet pricing per publisher (R16)', () => {
+  const site = (o: Partial<Location>): Location => loc({ name: 'Depot', has_mobile: true, ...o });
+  const fleetRow = (l: Location, src: string) => buildWorkings([l], 'AR6', 2025, [], 12).find(r => r.source === src && !r.declaration)!;
+  const t = (l: Location) => calcLocation(l, 'AR6', 2025).s1_mobile;
+  const G = 3.785411784;
+  const CH4 = 29.8, N2O = 273;   // AR6, the inventory's set; CO2-e-printed rows (UK, AU, NZ) are applied as published.
+
+  it('no stationary table holds a mobile key; the UK row cites DEFRA\'s statement that its Fuels rows apply to vehicles', () => {
+    for (const [name, table] of [['EF', EF], ['EF_CA', EF_CA], ['EF_UK', EF_UK], ['EF_EU', EF_EU], ['EF_AU', EF_AU],
+      ['EF_NZ commercial', EF_NZ.commercial], ['EF_NZ industrial', EF_NZ.industrial]] as const) {
+      expect(Object.keys(table as object).filter(k => /mobile|gasoline/.test(k)), name).toEqual([]);
+    }
+    const uk = fleetRow(site({ country: 'GB', grid_region: 'UK', fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'Diesel (light vehicles)');
+    expect(uk.note).toContain('Passenger vehicles!A11 and Delivery vehicles!A11');
+    expect(uk.result_tco2e).toBeCloseTo(1000 * (2.55035 + 0.00029 + 0.0329) / 1000, 12);
+  });
+
+  it('every country prices Light, Heavy and Non-road diesel from its mobile row, by value and citation', () => {
+    const cases: [string, Partial<Location>, string, number][] = [
+      // [country, location, source, expected tCO2e for 1,000 units entered]
+      ['CA', { country: 'CA', province: 'ON', grid_region: 'ON', fleet_heavy: true, heavy_diesel_amount: 1000, heavy_diesel_unit: 'litres' },
+        'Diesel (heavy vehicles)', (2680.50 + 0.11 * CH4 + 0.151 * N2O) / 1000],   // NIR 2025 A6.1-15 HDDV Advanced Control
+      ['AU', { country: 'AU', state: 'VIC', grid_region: 'AU_VIC', fleet_heavy: true, heavy_diesel_amount: 1000, heavy_diesel_unit: 'litres' },
+        'Diesel (heavy vehicles)', (69.9 + 0.2 + 0.4) * 38.6 / 1000],                // NGA 2025 Table 9, Euro i, at 38.6 GJ/kL
+      ['NZ', { country: 'NZ', grid_region: 'NZ', fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' },
+        'Diesel (light vehicles)', 2.63045 + 0.00394905 + 0.0373749],               // MfE Transport Fuel Diesel
+      ['DE', { country: 'DE', grid_region: 'EU_DE', fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' },
+        'Diesel (light vehicles)', 2.65100 + 43.0e-6 * 0.832 * (3.9 * CH4 + 3.9 * N2O)], // MRR CO2; IPCC T3.2.2 per TJ, MRR NCV x JEC
+      ['US', { country: 'US', state: 'TX', fleet_nonroad: true, nonroad_diesel_amount: 1000, nonroad_diesel_unit: 'gallons', nonroad_diesel_equipment: 'construction_mining' },
+        'Diesel (non-road equipment)', 10.21 + (1.01 * CH4 + 0.94 * N2O) / 1000],    // EPA T2 CO2; T5 Construction/Mining Diesel Equipment
+    ];
+    for (const [c, o, src, want] of cases) {
+      const r = fleetRow(site(o), src);
+      expect(r.result_tco2e, c).toBeCloseTo(want, 9);
+      expect(r.ef_source, c).toBe(FLEET_SOURCE[c === 'DE' ? 'EU' : c as 'US'].publisher);
+      expect(r.note, c).not.toContain('\u2014');
+    }
+  });
+
+  it('NZ fleet diesel is MfE Transport Fuel (CO2 2.63045), not the stationary 2.65984', () => {
+    const r = fleetRow(site({ country: 'NZ', grid_region: 'NZ', fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'Diesel (light vehicles)');
+    expect(r.note).toContain('CO2 2.63045 kg CO2-e/litre');
+    expect(r.note).not.toContain('2.65984');
+    expect(r.note).toContain('Diesel (litre) (data!J1438, data!J1440), 0.00394905 and 0.0373749 kg CO2-e/litre');
+  });
+
+  it('AU non-road diesel prices from NGA Table 8, cited to the NGER Determination', () => {
+    const r = fleetRow(site({ country: 'AU', state: 'NSW', grid_region: 'AU_NSW', fleet_nonroad: true, nonroad_diesel_amount: 1000,
+      nonroad_diesel_unit: 'litres', nonroad_diesel_equipment: 'construction_mining' }), 'Diesel (non-road equipment)');
+    expect(r.result_tco2e).toBeCloseTo((69.9 + 0.1 + 0.2) * 38.6 / 1000, 12);   // 2.70972, Table 8 "Diesel oil"
+    expect(r.note).toContain('Table 8, Diesel oil (p. 23), 0.1 and 0.2 kg CO2-e/GJ');
+    expect(r.note).toContain('Determination s 2.41(2), p. 78');
+    expect(r.note).toContain('Table 8 energy content');
+  });
+
+  it('US road: with miles, CH4 and N2O per mile; without, CO2 only, the not-counted sentence, and export not blocked', () => {
+    const base = { country: 'US', state: 'NY', fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'gallons' as const };
+    const none = site(base);
+    const r0 = fleetRow(none, 'Diesel (light vehicles)');
+    expect(r0.result_tco2e).toBeCloseTo(10.21, 12);   // 1,000 gallons x 10.21 kg CO2 (Table 2)
+    expect(r0.ch4_n2o).toBe('not_counted');
+    expect(r0.ch4_n2o_note).toBe('Methane and nitrous oxide for diesel in light vehicles at Depot are not counted because EPA ' +
+      'publishes them per mile and no miles were entered. Enter the miles to include them.');
+    expect(r0.note).toContain(r0.ch4_n2o_note);
+    expect(unpricedLines(none)).toEqual([]);
+    expect(findUnresolvedCoverage([none], 2025, 12, []).filter(i => i.field === 'light_diesel_amount')).toEqual([]);
+    // 2024 with 15,000 miles: after the latest row (2007-2022), which is used and said (R16, wording 6).
+    const r1 = fleetRow(site({ ...base, light_model_year: 2024, light_diesel_miles: 15000 }), 'Diesel (light vehicles)');
+    expect(r1.result_tco2e).toBeCloseTo(10.21 + 15000 * (0.029 * CH4 + 0.0214 * N2O) / 1e6, 12);
+    expect(r1.note).toContain('Table 4, Light-Duty Trucks, Diesel, 2007-2022 (p. 3), 0.029 and 0.0214 g/vehicle-mile, x 15,000 miles entered.');
+    expect(r1.note).toContain('Model year 2024 is after the latest published row (2007-2022), so the 2007-2022 row is used.');
+    expect(r1.ch4_n2o).toBeUndefined();
+  });
+
+  it('model year: a tied row, a year no row ties (the highest), and the highest when none is given', () => {
+    // US 2015 light petrol, 10,000 miles: the car row (0.0068, 0.0042) is higher than the truck row in CO2-e.
+    const us = fleetRow(site({ country: 'US', state: 'NY', fleet_light: true, light_petrol_amount: 500, light_petrol_unit: 'gallons',
+      light_model_year: 2015, light_petrol_miles: 10000 }), 'Petrol (light vehicles)');
+    expect(us.result_tco2e).toBeCloseTo(500 * 8.78 / 1000 + 10000 * (0.0068 * CH4 + 0.0042 * N2O) / 1e6, 12);
+    expect(us.note).toContain('Gasoline Passenger Cars, 2015');
+    // CA light diesel 2000: the NIR ties no row to 1996 to 2003, so the highest (LDDT Advanced Control).
+    const ca = fleetRow(site({ country: 'CA', province: 'ON', grid_region: 'ON', fleet_light: true, light_diesel_amount: 1000,
+      light_diesel_unit: 'litres', light_model_year: 2000 }), 'Diesel (light vehicles)');
+    expect(ca.note).toContain('ties no row to model year 2000, so the highest published row for light vehicles is used.');
+    expect(ca.result_tco2e).toBeCloseTo((2680.50 + 0.068 * CH4 + 0.22 * N2O) / 1000, 12);
+    // AU light petrol, no year: the pre-2004 note row (0.6, 1.6), the highest.
+    const au = fleetRow(site({ country: 'AU', state: 'VIC', grid_region: 'AU_VIC', fleet_light: true, light_petrol_amount: 1000,
+      light_petrol_unit: 'litres' }), 'Petrol (light vehicles)');
+    expect(au.note).toContain('Model year not given, so the highest published row for light vehicles is used.');
+    expect(au.result_tco2e).toBeCloseTo((67.4 + 0.6 + 1.6) * 34.2 / 1000, 12);
+  });
+
+  it('non-road: each equipment type selects its row; with none chosen where the publisher splits, a blocking line', () => {
+    const want: [string, number, number][] = [['industrial_commercial', 0.43, 0.62], ['construction_mining', 1.01, 0.94],
+      ['agriculture', 1.26, 1.07], ['forestry', 0.49, 1.26], ['lawn_garden', 0.67, 0.49]];   // EPA Table 5, g/gallon
+    for (const [eq, ch4, n2o] of want) {
+      const r = fleetRow(site({ country: 'US', state: 'TX', fleet_nonroad: true, nonroad_diesel_amount: 100, nonroad_diesel_unit: 'gallons',
+        nonroad_diesel_equipment: eq as never }), 'Diesel (non-road equipment)');
+      expect(r.result_tco2e, eq).toBeCloseTo(100 * (10.21 + (ch4 * CH4 + n2o * N2O) / 1000) / 1000, 12);
+    }
+    const none = site({ country: 'US', state: 'TX', fleet_nonroad: true, nonroad_petrol_amount: 100, nonroad_petrol_unit: 'gallons' });
+    expect(t(none)).toBe(0);
+    const u = unpricedLines(none);
+    expect(u.map(x => [x.reason, x.field])).toEqual([['equipment_missing', 'nonroad_petrol_amount']]);
+    expect(u[0].message).toBe('US EPA publishes non-road factors by equipment type, so the petrol used in non-road equipment at ' +
+      'Depot is not counted until the equipment type is chosen. Choose the equipment type. Export is blocked until it is chosen.');
+    expect(findUnresolvedCoverage([none], 2025, 12, []).map(i => i.status)).toContain('equipment_missing');
+    // A publisher with no sector split (UK) does not ask: the one Fuels row prices it.
+    expect(t(site({ country: 'GB', grid_region: 'UK', fleet_nonroad: true, nonroad_petrol_amount: 100, nonroad_petrol_unit: 'litres' })))
+      .toBeCloseTo(100 * (2.06107 + 0.00806 + 0.00587) / 1000, 12);
+  });
+
+  it('a legacy fleet figure is an export-blocking line naming the site, the figure and the fuel, until assigned', () => {
+    const l = site({ country: 'CA', province: 'ON', grid_region: 'ON', diesel_mobile_amount: 250, diesel_mobile_unit: 'litres' });
+    const u = unpricedLines(l);
+    expect(u.map(x => x.reason)).toEqual(['fleet_type_missing']);
+    expect(u[0].message).toBe('Depot has 250 litres of diesel for vehicles recorded before vehicle types were asked, so it is not counted. ' +
+      'Choose the vehicles it was used in: light vehicles, heavy vehicles or non-road equipment. Export is blocked until it is chosen.');
+    expect(UNPRICED_STATUSES.has('fleet_type_missing')).toBe(true);
+    expect(findUnresolvedCoverage([l], 2025, 12, []).map(i => i.status)).toContain('fleet_type_missing');
+    expect(t(l)).toBe(0);
+  });
+
+  it('a gallon figure converts exactly to a per-litre publisher, and the conversion is on the row', () => {
+    const r = fleetRow(site({ country: 'CA', province: 'ON', grid_region: 'ON', fleet_heavy: true, heavy_diesel_amount: 100,
+      heavy_diesel_unit: 'gallons' }), 'Diesel (heavy vehicles)');
+    expect(r.result_tco2e).toBeCloseTo(100 * G * (2680.50 + 0.11 * CH4 + 0.151 * N2O) / 1e6, 12);
+    expect(r.conversion_note).toBe('100 US gallons converted to 378.54 litres (1 US gallon = 3.785411784 litres, exact).');
+  });
+
+  it('Category 3 covers every fleet fuel line, all six vehicle-type sources', () => {
+    const all = { country: 'GB', grid_region: 'UK', fleet_light: true, fleet_heavy: true, fleet_nonroad: true,
+      light_petrol_amount: 1, light_diesel_amount: 2, heavy_petrol_amount: 3, heavy_diesel_amount: 4, nonroad_petrol_amount: 5,
+      nonroad_diesel_amount: 6, light_petrol_unit: 'litres', light_diesel_unit: 'litres', heavy_petrol_unit: 'litres',
+      heavy_diesel_unit: 'litres', nonroad_petrol_unit: 'litres', nonroad_diesel_unit: 'litres' } as Partial<Location>;
+    const l = { ...site(all), id: 'c6', stream_attestations: DECLARABLE_STREAMS.filter(s => s !== 'mobile')
+      .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })) } as Location;
+    const read = cat3InputsFrom(buildWorkings([l], 'AR6', 2026, [], 12), [l]);
+    expect(read.skipped.filter(s => s.code === 'mobile_fuel_not_named')).toEqual([]);
+    const fleet = read.inputs!.rows.filter(r => r.stream === 'mobile_gasoline' || r.stream === 'mobile_diesel');
+    expect(fleet.map(r => [r.stream, r.activity])).toEqual([['mobile_gasoline', 1], ['mobile_diesel', 2], ['mobile_gasoline', 3],
+      ['mobile_diesel', 4], ['mobile_gasoline', 5], ['mobile_diesel', 6]]);
   });
 });

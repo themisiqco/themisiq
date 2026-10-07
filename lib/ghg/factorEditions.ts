@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, steamPricing, nzUseClassVariant, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, combustionLinePublishers,
+  efJurisdiction, steamFactorFor, steamPricing, nzUseClassVariant, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, fleetLinePublishers, combustionLinePublishers,
   COMBUSTION_EDITION, STEAM_EDITION,
 } from './engine'
 import type { Location } from './engine'
@@ -59,9 +59,12 @@ export type FactorJurisdiction = 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ'
  * would be pointed at the wrong one. It is also only published in two of the six jurisdictions, so a
  * shared family would have to carry an absence the combustion family never has.
  */
-export type FactorFamily = 'combustion' | 'electricity' | 'steam'
+// FI9 (R16): MOBILE IS ITS OWN FAMILY, for the same reason as steam. Fleet fuel prices from each publisher's mobile
+// document (EPA Tables 2 to 5, ECCC NIR Table A6.1-15, NGA Table 9, IPCC Ch. 3, ...), which is a different table, and
+// sometimes a different edition, from the stationary combustion table. Filed under combustion it would name the wrong one.
+export type FactorFamily = 'combustion' | 'electricity' | 'steam' | 'mobile'
 /** Iterated wherever every family must be visited. One list, so a new family cannot be half-added. */
-const FAMILIES: readonly FactorFamily[] = ['combustion', 'electricity', 'steam']
+const FAMILIES: readonly FactorFamily[] = ['combustion', 'electricity', 'steam', 'mobile']
 
 export type FactorEdition = {
   /** The citation as the workings row and the assurance PDF print it — engine-derived, never retyped. */
@@ -212,6 +215,8 @@ export function factorJurisdiction(loc: Location, family: FactorFamily): FactorJ
     const j = efJurisdiction(loc) as FactorJurisdiction
     return CITATIONS[j].steam ? j : null
   }
+  // FI9: mobile resolves by router too; every jurisdiction prices fleet fuel from a mobile document.
+  if (family === 'mobile') return efJurisdiction(loc) as FactorJurisdiction | null
   const cite = family === 'combustion' ? combustionSource(loc) : gridSource(loc)
   return JURISDICTIONS.find(j => CITATIONS[j][family] === cite) ?? null
 }
@@ -291,6 +296,10 @@ export function buildFactorEditions(locations: readonly Location[], year: number
       ;(out[src.jurisdiction] ??= {}).combustion = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction],
         // FI10: the MfE use class(es) that priced NZ combustion, across every NZ location.
         ...(src.jurisdiction === 'NZ' ? { variant: joinVariants(prev?.variant, nzUseClassVariant(loc)) } : {}) }
+    }
+    // ── MOBILE (FI9): the mobile document that priced each fleet line, from the line itself.
+    for (const src of fleetLinePublishers(loc)) {
+      ;(out[src.jurisdiction] ??= {}).mobile = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction] }
     }
 
     // ── ELECTRICITY — the SAME gate calcLocation applies, deliberately mirrored.

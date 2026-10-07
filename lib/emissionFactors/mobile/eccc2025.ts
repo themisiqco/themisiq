@@ -3,7 +3,7 @@
 // FI9 diff 1. Transcribed from ~/themisiq-sources/eccc/2025NIR%20-%20Part%202.pdf: Environment and Climate Change
 // Canada (2025), National Inventory Report 1990–2023: Greenhouse Gas Sources and Sinks in Canada, Part 2, Annex 6,
 // Table A6.1–15 "Emission Factors for Energy Mobile Combustion Sources", p. 253. Units: g/L fuel, as printed (R5).
-// Nothing reads this yet.
+// Priced by lib/ghg/engine.ts pickFleet (FI9 diff 2b).
 //
 // The same values are in lib/ghg/mobile.ts (MOBILE_CA), which cites "NIR 2026 (1990-2024)", p. 541. That edition is
 // not in the local sources; every value there matches the 2025 edition here (docs/review/mobile-factors.md, section

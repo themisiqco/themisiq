@@ -2,9 +2,9 @@
 //
 // FI9 diff 1. One file per publisher in this folder (epa2025, eccc2025, defra2026, nga2025, mfe2026,
 // ipcc2006), each transcribed from ~/themisiq-sources and nothing else, in the publisher's own unit (R5),
-// keyed by edition for T3c. NOTHING READS THESE YET: FI9 diff 2 adds the fleet split by vehicle type
-// (ruling R16) and diff 3 wires pricing. The research record is docs/review/mobile-factors.md. Which row applies
-// to a site is decided in select.ts (R16 as refined on 7 Oct 2026).
+// keyed by edition for T3c. The engine prices every fleet line from them (lib/ghg/engine.ts pickFleet, FI9 diff 2b).
+// The research record is docs/review/mobile-factors.md. Which row applies to a site is decided in select.ts (R16 as
+// refined on 7 Oct 2026).
 //
 // WHY A NEW FOLDER AND NOT lib/ghg/mobile.ts. That file mixes two publishers in one module, carries its
 // own shape, and cites an ECCC edition the local sources do not hold (NIR 2026, p. 541; the local copy is

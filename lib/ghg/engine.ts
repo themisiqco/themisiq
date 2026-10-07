@@ -45,7 +45,14 @@ import { unitLabel } from './unitLabels'
 //   It carries NO display name into the engine, deliberately. A name shown to a customer is copy,
 // is locale-sensitive, and belongs in the copy module where it can be pinned to ['en'] once.
 import { countryByIso2 } from '../emissionFactors/countryOptions'
-import type { EquipmentType, FleetType } from '../emissionFactors/mobile/types'
+import type { EquipmentType, FleetType, MobileGasRow, MobilePublisher } from '../emissionFactors/mobile/types'
+import { selectMobileRow } from '../emissionFactors/mobile/select'
+import { EPA_MOBILE_2025 } from '../emissionFactors/mobile/epa2025'
+import { ECCC_MOBILE_2025 } from '../emissionFactors/mobile/eccc2025'
+import { DEFRA_MOBILE_2026 } from '../emissionFactors/mobile/defra2026'
+import { NGA_MOBILE_2025, NGA_MOBILE_ENERGY_CONTENT_2025 } from '../emissionFactors/mobile/nga2025'
+import { MFE_MOBILE_2026 } from '../emissionFactors/mobile/mfe2026'
+import { IPCC_MOBILE_2006 } from '../emissionFactors/mobile/ipcc2006'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -158,10 +165,7 @@ const GWP = {
   // 0.15 x 75.10 = 11.265 rather than the printed 11.27, so that the row matched the derivation; ruling R5 reverses
   // that: the row cites the value EPA printed, and nothing is derived.
   fuel_oil_residual_gallon: { co2: 11.27, ch4: 0.00045, n2o: 0.00009 },
-  // MOTOR GASOLINE, per gallon: 8.78 kg CO2, 0.38 g CH4, 0.08 g N2O (was 0.125 x 70.22 = 8.7775).
-  gasoline_gallon: { co2: 8.78, ch4: 0.00038, n2o: 0.00008 },
-  // Mobile diesel shares the Distillate No. 2 row, as before. (EPA's mobile CO2 table prints the same 10.21 kg.)
-  diesel_mobile_gallon: { co2: 10.21, ch4: 0.00041, n2o: 0.00008 },
+  // FI9 (R16): no mobile key here. Fleet fuel prices from EPA's mobile tables (lib/emissionFactors/mobile/epa2025.ts).
   ammonia: 0,
   // ── PURCHASED STEAM / DISTRICT HEAT — EPA Hub 2025 Table 7 (Steam and Heat) ────────────────────
   // ⚠️ THIS WAS THE BARE SCALAR 66.33 UNTIL 14 AUG 2026 — THE CO2 COLUMN ALONE. Table 7 publishes
@@ -256,9 +260,8 @@ const EF_CA = {
   // gone; a figure in US gallons converts to litres exactly at pricing.
   fuel_oil_distillate_litre: { co2: 2.753, ch4: 0.000006, n2o: 0.000031 },
   fuel_oil_residual_litre: { co2: 3.156, ch4: 0.00012, n2o: 0.000064 },
-  // Motor gasoline (Table 4.x): 2307 / 0.100 / 0.02 g/L.
-  gasoline_litre: { co2: 2.307, ch4: 0.0001, n2o: 0.00002 },
-  diesel_mobile_litre: { co2: 2.681, ch4: 0.000078, n2o: 0.000022 },
+  // FI9 (R16): no mobile key here. Fleet fuel prices from ECCC's mobile table, NIR Table A6.1-15
+  // (lib/emissionFactors/mobile/eccc2025.ts).
 }
 
 // Per-province natural gas CO2 (kg/m3) — ECCC Tables 1.1-1.3, "MARKETABLE" column.
@@ -352,7 +355,8 @@ const EF_UK = {
   propane_kg: { co2: 2.99763233, ch4: 0, n2o: 0 },
   // Diesel (average biofuel blend), litres: 2.58354 kgCO2e/L (CO2 2.55035, CH4 0.00029, N2O 0.0329).
   diesel_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
-  diesel_mobile_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
+  // FI9 (R16): no mobile key here. Fleet fuel prices from the same Fuels rows through lib/emissionFactors/mobile/
+  // defra2026.ts, which cites DEFRA's statement that they apply to vehicles (Passenger and Delivery vehicles!A11).
   // Fuel oil, litres 3.17492 (DEFRA "Processed fuel oils - residual oil"). (FI2 diff 2: the per-gallon keys are gone.)
   // The FACTOR is unchanged from 2025; only the gallon conversion is corrected (see the header).
   // ── GRADE-EXPLICIT KEYS — DEFRA/DESNZ 2026 full set, Fuels tab, kg CO2e per litre ──────────────
@@ -382,8 +386,6 @@ const EF_UK = {
   //   This was written as corroboration for the EU distillate key while its IPCC category mapping was
   // still unconfirmed. That mapping is now CONFIRMED against IPCC Table 1.1 (13 Aug 2026) — see
   // EF_EU — so this note stands as a second publisher agreeing, not as the evidence it was.
-  // Petrol (average biofuel blend), litres: 2.075 kgCO2e/L (CO2 2.06107, CH4 0.00806, N2O 0.00587).
-  gasoline_litre: { co2: 2.075, ch4: 0, n2o: 0 },
   // ── DISTRICT HEAT AND STEAM — Scope 2, PER kWh ────────────────────────────────────────────────
   // DESNZ/DEFRA 2026 conversion factors, flat file v1.2 (updated 2026-07-10), Scope 2 sheet,
   // "Heat and steam" > "District heat and steam". Published columns, per kWh:
@@ -506,11 +508,8 @@ const EF_EU = {
   //   CO2 74.1 x 43.0 x 0.832 / 1000 = 2.651002 -> 2.65100   CH4 3 x 43.0e-6 x 0.832 = 1.07328e-4 -> 0.0001073
   //   N2O 0.6 x 43.0e-6 x 0.832 = 2.14656e-5 -> 0.00002147
   diesel_litre: { co2: 2.65100, ch4: 0.0001073, n2o: 0.00002147 },
-  diesel_mobile_litre: { co2: 2.65100, ch4: 0.0001073, n2o: 0.00002147 },
-  // Motor gasoline, JEC Gasoline 743 kg/m³:
-  //   CO2 69.3 x 44.3 x 0.743 / 1000 = 2.281003 -> 2.28100   CH4 3 x 44.3e-6 x 0.743 = 9.87447e-5 -> 0.00009874
-  //   N2O 0.6 x 44.3e-6 x 0.743 = 1.974894e-5 -> 0.00001975
-  gasoline_litre: { co2: 2.28100, ch4: 0.00009874, n2o: 0.00001975 },
+  // FI9 (R16): no mobile key here. Fleet fuel takes IPCC Ch. 3's mobile CH4 and N2O (EU_FLEET below), with CO2 and the
+  // litres-to-TJ step from MRR and JEC as above.
   // Residual fuel oil, JEC HFO 970 kg/m³:
   //   CO2 77.4 x 40.4 x 0.970 / 1000 = 3.033151 -> 3.03315   CH4 3 x 40.4e-6 x 0.970 = 1.17564e-4 -> 0.0001176
   //   N2O 0.6 x 40.4e-6 x 0.970 = 2.35128e-5 -> 0.00002351
@@ -551,9 +550,6 @@ const EU_DERIVATION: Partial<Record<string, string>> = {
   diesel_litre:
     '74.1 t CO₂/TJ × 43.0 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil) × 832 kg/m³ (JEC Well-to-Tank report v5, ' +
     'Annexes section 4.1, Diesel) = 2.65100 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.',
-  gasoline_litre:
-    '69.3 t CO₂/TJ × 44.3 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Motor gasoline) × 743 kg/m³ (JEC Well-to-Tank report v5, ' +
-    'Annexes section 4.1, Gasoline) = 2.28100 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.',
   fuel_oil_residual_litre:
     '77.4 t CO₂/TJ × 40.4 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Residual fuel oil) × 970 kg/m³ (JEC Well-to-Tank report v5, ' +
     'Annexes section 4.1, HFO) = 3.03315 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.',
@@ -575,11 +571,11 @@ const EU_DERIVATION: Partial<Record<string, string>> = {
     '1.4.1.2, and the notes under Ch. 2 Tables 2.6 to 2.8) × 0.0036 GJ/kWh = 0.181764 kg CO₂ per kWh gross, as ' +
     'billed. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same basis.',
 }
-// diesel_mobile is the same fuel as diesel_litre, so it reads that note rather than a copy. Heating oil no longer
+// FI9: no mobile key is aliased here any more; fleet rows carry their own note. Heating oil no longer
 // aliases to diesel (R8): the two share the Gas/Diesel oil row's NCV and factor, but not a density, and heating oil has
 // no litre key. A unit entered in another unit of the same quantity (gallons, tonnes, MJ) converts exactly to the key
 // the table holds, and the note is read under that key, so no gallon or tonne alias is needed.
-const EU_DERIVATION_ALIAS: Record<string, string> = { diesel_mobile_litre: 'diesel_litre' }
+const EU_DERIVATION_ALIAS: Record<string, string> = {}
 
 /** The derivation disclosure for a row, or undefined where the publisher gave us the figure directly. */
 function euDerivationNote(loc: Location, key: string): string | undefined {
@@ -599,15 +595,13 @@ const NGA_PER_KL = (fuel: string, perKl: string, table: number) =>
 const AU_PUBLISHED_NOTE: Record<string, string> = {
   natural_gas_m3: `${NGA_SCOPE_1} (Table 5), Natural gas distributed in a pipeline: 2.025129 kg CO2-e/m³`,
   diesel_litre: NGA_PER_KL('Diesel oil', '2,709.72', 8),
-  gasoline_litre: NGA_PER_KL('Automotive gasoline/petrol', '2,318.76', 8),
   propane_litre: NGA_PER_KL('Liquefied petroleum gas (LPG)', '1,557.42', 8),
   fuel_oil_distillate_litre: NGA_PER_KL('Heating oil', '2,600.929', 8),
   fuel_oil_residual_litre: NGA_PER_KL('Fuel oil', '2,931.448', 8),
 }
-// Keys that hold the same NGA value as a key above, mapped so the two rows cannot describe it differently.
-// ⚠️ diesel_mobile_litre IS THE STATIONARY Diesel oil row (Table 8). NGA's transport table (Table 9) differs; moving
-// fleet fuel onto it is FI9, not this change.
-const AU_PUBLISHED_ALIAS: Record<string, string> = { diesel_mobile_litre: 'diesel_litre' }
+// Keys that hold the same NGA value as a key above, mapped so the two rows cannot describe it differently. FI9: none
+// now; fleet fuel prices from NGA Table 9 (and Table 8 for non-road) through lib/emissionFactors/mobile/nga2025.ts.
+const AU_PUBLISHED_ALIAS: Record<string, string> = {}
 function auPublishedNote(loc: Location, key: string): string | undefined {
   if (efJurisdiction(loc) !== 'AU') return undefined
   return AU_PUBLISHED_NOTE[AU_PUBLISHED_ALIAS[key] ?? key]
@@ -628,9 +622,7 @@ const US_PUBLISHED_NOTE: Record<string, string> = {
   diesel_gallon: EPA_DISTILLATE_NOTE,
   fuel_oil_gallon: EPA_DISTILLATE_NOTE,
   fuel_oil_distillate_gallon: EPA_DISTILLATE_NOTE,
-  diesel_mobile_gallon: EPA_DISTILLATE_NOTE,
   fuel_oil_residual_gallon: `${EPA_TABLE_1}, Residual Fuel Oil No. 6, per gallon: 11.27 kg CO2, 0.45 g CH4, 0.09 g N2O`,
-  gasoline_gallon: `${EPA_TABLE_1}, Motor Gasoline, per gallon: 8.78 kg CO2, 0.38 g CH4, 0.08 g N2O`,
 }
 
 /**
@@ -654,7 +646,10 @@ export function factorDerivationsFor(locations: readonly { country?: string }[])
       if (!picked.publisher) continue
       const c = picked.conversion
       if (c) out.push(`${line.source}: ${words(c.from)} converted to ${words(c.to)} (${c.statement}, exact).`)
-      const derived = picked.publisher.jurisdiction === 'EU' ? euDerivationNote(loc, picked.key ?? line.efKey) : undefined
+      // FI9: an EU fleet row is derived through MRR's NCV and JEC's density (R10), so its note is listed, as the EU
+      // stationary derivations are.
+      const derived = picked.publisher.jurisdiction !== 'EU' ? undefined
+        : picked.fleet ? picked.fleet.note : euDerivationNote(loc, picked.key ?? line.efKey)
       if (derived) out.push(`${line.source}: ${derived}`)
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
@@ -693,10 +688,8 @@ const EF_AU = {
   natural_gas_gj: { co2: 51.53, ch4: 0, n2o: 0 },
   // Diesel oil (Table 8): 38.6 GJ/kL × 70.2 kg CO2-e/GJ, printed 2,709.72 kg CO2-e/kL (was 2.710 per litre, cited "Table 4/Table 1").
   diesel_litre: { co2: 2.70972, ch4: 0, n2o: 0 },
-  // ⚠️ THE STATIONARY Diesel oil row, as before. NGA's transport table (Table 9) differs; that is FI9.
-  diesel_mobile_litre: { co2: 2.70972, ch4: 0, n2o: 0 },
-  // Automotive gasoline/petrol (Table 8): 34.2 GJ/kL × 67.8 kg CO2-e/GJ, printed 2,318.76 kg CO2-e/kL (was 2.319, cited Table 4).
-  gasoline_litre: { co2: 2.31876, ch4: 0, n2o: 0 },
+  // FI9 (R16): no mobile key here. Fleet fuel prices from NGA Table 9 (and Table 8 for non-road equipment, under the
+  // NGER Determination s 2.41(2)) through lib/emissionFactors/mobile/nga2025.ts.
   // Liquefied petroleum gas (LPG) (Table 8): 25.7 GJ/kL × 60.6 kg CO2-e/GJ, printed 1,557.42 kg CO2-e/kL (was 1.557, cited Table 4).
   propane_litre: { co2: 1.55742, ch4: 0, n2o: 0 },
   // GRADE-EXPLICIT KEYS: DCCEEW NGA 2025 Table 8. Held per litre like the keys above (FI2: a US-gallon figure converts
@@ -717,9 +710,8 @@ const EF_AU = {
 // NOT respond to the AR toggle. Use-class selectable: Commercial (default) / Industrial only — the MfE
 // stationary-combustion workbook has NO Residential row for these fuels (only coal), so Residential is
 // intentionally absent (we do not invent factors). NG is per kWh; LPG is per kg (MfE publishes kg, engine
-// gains a kg input path); liquids per litre. Petrol has NO stationary factor in MfE — it exists only as a
-// Transport fuel, so gasoline_litre maps to Transport Regular Petrol (2.36143); Industrial has no petrol
-// row and falls back to that same Regular transport value.
+// gains a kg input path); liquids per litre. Petrol has NO stationary factor in MfE. FI9 (R16): fleet fuel, petrol and
+// diesel, prices from MfE's Transport Fuel rows through lib/emissionFactors/mobile/mfe2026.ts, not from this table.
 // ── END-USE SECTOR: THE ONLY TABLE WITH A SELECTOR, AND THE PRECEDENT FOR THE OTHERS ────────────
 // MfE publishes stationary combustion by use class, and this is the one table where the customer
 // picks: Location.nz_use_class ('commercial' | 'industrial', defaulting to commercial), read by
@@ -736,9 +728,7 @@ const EF_NZ = {
   commercial: {
     natural_gas_kwh: { co2: 0.19543, ch4: 0, n2o: 0 },   // MfE Stationary Combustion, Commercial
     diesel_litre: { co2: 2.6759, ch4: 0, n2o: 0 },
-    diesel_mobile_litre: { co2: 2.6759, ch4: 0, n2o: 0 }, // stationary value reused for mobile (deliberate, for consistency)
     propane_kg: { co2: 2.97164, ch4: 0, n2o: 0 },        // LPG per kg (MfE)
-    gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // Transport Regular Petrol (no stationary petrol row)
     // MfE Measuring Emissions Catalogue 2026 Table 3.2, per-gas columns already AR5-multiplied, so the
     // combined kgCO2e/L goes in `co2` like every other NZ key. Per US GALLON: the fuel-oil path
     // converts before pricing. Light 2.97088 x 3.785411784 = 11.246004; Heavy 3.05359 -> 11.559096.
@@ -749,9 +739,7 @@ const EF_NZ = {
   industrial: {
     natural_gas_kwh: { co2: 0.195067, ch4: 0, n2o: 0 },  // MfE Stationary Combustion, Industrial
     diesel_litre: { co2: 2.66873, ch4: 0, n2o: 0 },
-    diesel_mobile_litre: { co2: 2.66873, ch4: 0, n2o: 0 },
     propane_kg: { co2: 2.96632, ch4: 0, n2o: 0 },
-    gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // no Industrial petrol → Regular transport fallback
     // MfE 2026 Table 3.2, Industrial. Light 2.96335 x 3.785411784 = 11.217500; Heavy 3.04601 -> 11.530402.
     // PER-LITRE — MfE 2026 Table 3.2 Industrial, printed values.
     fuel_oil_distillate_litre: { co2: 2.96335, ch4: 0, n2o: 0 },
@@ -1806,13 +1794,15 @@ export interface FleetAssignment {
 
 // ── FI9 (R16): THE SIX FLEET FIELDS, IN ONE TABLE ─────────────────────────────────────────────────────────
 // Every map that names a field (units, streams, switches, names, cleared figures, combustion lines) is derived from
-// this list, so a seventh field cannot be added to one map and missed by another. `legacyKey` is the fuel token of the
-// mobile factor key the line prices through today; FI9 diff 2b replaces that with the publisher's mobile row.
+// this list, so a seventh field cannot be added to one map and missed by another. Each line prices from its publisher's
+// mobile row (pickFleet, FI9 diff 2b).
 export type FleetFuel = 'petrol' | 'diesel'
 export interface FleetField {
   type: FleetType; fuel: FleetFuel
   amount: keyof Location; unit: keyof Location; typeSwitch: keyof Location
-  source: string; name: string; legacyKey: 'gasoline' | 'diesel_mobile'
+  source: string; name: string
+  /** Optional per-type inputs (R16): the typical model year (road), miles (US road, per fuel), equipment type (non-road). */
+  modelYear?: keyof Location; miles?: keyof Location; equipment?: keyof Location
 }
 const FLEET_TYPE_SWITCH: Record<FleetType, keyof Location> = { light: 'fleet_light', heavy: 'fleet_heavy', non_road: 'fleet_nonroad' }
 const FLEET_TYPE_WORDS: Record<FleetType, string> = { light: 'light vehicles', heavy: 'heavy vehicles', non_road: 'non-road equipment' }
@@ -1825,7 +1815,9 @@ export const FLEET_FIELDS: readonly FleetField[] = (['light', 'heavy', 'non_road
     typeSwitch: FLEET_TYPE_SWITCH[type],
     source: `${fuel === 'petrol' ? 'Petrol' : 'Diesel'} (${FLEET_TYPE_WORDS[type]})`,
     name: `${fuel} in ${FLEET_TYPE_WORDS[type]}`,
-    legacyKey: fuel === 'petrol' ? 'gasoline' as const : 'diesel_mobile' as const,
+    ...(type === 'non_road'
+      ? { equipment: `nonroad_${fuel}_equipment` as keyof Location }
+      : { modelYear: `${FLEET_PREFIX[type]}_model_year` as keyof Location, miles: `${FLEET_PREFIX[type]}_${fuel}_miles` as keyof Location }),
   })))
 const fleetNum = (loc: Location, f: FleetField): number => Number((loc as unknown as Record<string, unknown>)[f.amount] ?? 0) || 0
 const fleetUnit = (loc: Location, f: FleetField): string => String((loc as unknown as Record<string, unknown>)[f.unit] ?? 'gallons')
@@ -2837,9 +2829,12 @@ function steamTonnes(loc: Location, gwpVersion: GwpVersion): number {
 // branch now returns THIS, and calcGas refuses it identically.
 // `cause` 'province' (FI1): Canadian gas whose province is blank or not one ECCC publishes a value for. The
 // factor is not missing from a table; the input that selects it is, so the line asks for the province.
-interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string; cause?: 'province' } }
+// FI9: 'fleet_legacy', a fleet figure entered before vehicle types were asked; 'equipment', non-road fuel whose publisher
+// splits by equipment type, with none chosen. Like 'province', the factor exists; the input that selects it is missing.
+type MissCause = 'province' | 'fleet_legacy' | 'equipment'
+interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string; cause?: MissCause } }
 
-const efMiss = (key: string, country: string, cause?: 'province'): CombustionEF =>
+const efMiss = (key: string, country: string, cause?: MissCause): CombustionEF =>
   ({ __missing: { key, country: country || '(unset)', ...(cause ? { cause } : {}) } } as unknown as CombustionEF)
 
 // FI2: the shared resolution step that lived here (efOr) is tableLookup, below pickEF, which also returns the table
@@ -2889,6 +2884,9 @@ export interface PickedFactor {
   publisher: FactorSource | null
   key?: string
   conversion?: { from: string; to: string; toPerFrom: number; statement: string }
+  /** FI9: a fleet row's note (publisher, row used, why) and, for a US road line with no miles, the sentence saying
+   *  methane and nitrous oxide are not counted. */
+  fleet?: { note: string; notCounted?: string; type: FleetType; fuel: FleetFuel }
 }
 
 /**
@@ -2928,6 +2926,7 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
   // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS. efMiss is the uniform marker a missing factor produces, so calcGas's
   // assertPriceable refuses it, and the country refusal excludes the location.
   if (j === null) return { factor: efMiss(String(key), loc.country || ''), publisher: null }
+  if (String(key).startsWith('fleet:')) return pickFleet(loc, String(key), j, ctry)
   let own: Record<string, unknown> =
     j === 'US' ? EF : j === 'CA' ? EF_CA : j === 'UK' ? EF_UK : j === 'EU' ? EF_EU : j === 'AU' ? EF_AU
       : (EF_NZ as Record<string, Record<string, unknown>>)[loc.nz_use_class ?? 'commercial']   // NZ is use-class keyed
@@ -2945,6 +2944,119 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
       natural_gas_gj: { co2: perM3.co2 * m3PerGj, ch4: perM3.ch4 * m3PerGj, n2o: perM3.n2o * m3PerGj } }
   }
   return routeFactor(own, String(key), j, ctry)
+}
+
+// ── FI9 (R16): FLEET FUEL FROM EACH PUBLISHER'S MOBILE ROW ─────────────────────────────────────────────────
+// A fleet line's key is `fleet:{type}:{fuel}:{unit}` (or `fleet:legacy:{fuel}:{unit}` for a figure with no type). The row
+// is chosen by selectMobileRow (model year, equipment type, the latest-row rule, the highest row), and the value is the
+// publisher's own, in its own unit, converted to the unit entered only by an exact conversion (FI2):
+//   US EPA: CO2 per gallon (Table 2); road CH4 and N2O per vehicle-mile (Tables 3, 4), so they need the miles, and with
+//     none they are not counted (said on the row, not blocking); non-road per gallon (Table 5).
+//   ECCC: g per litre (NIR Table A6.1-15). DEFRA and MfE: kg CO2e per litre as published. NGA: kg CO2-e per GJ at the
+//     table's own energy content. IPCC (EU): kg per TJ, through MRR's NCV and JEC's density (FI3, R10), CO2 from MRR.
+// A stationary key is never read for a vehicle. The UK's Fuels rows are the same figures DEFRA states apply to vehicles.
+const FLEET_PUBLISHER: Record<EfJurisdiction, MobilePublisher> = {
+  US: EPA_MOBILE_2025, CA: ECCC_MOBILE_2025, UK: DEFRA_MOBILE_2026, EU: IPCC_MOBILE_2006, AU: NGA_MOBILE_2025, NZ: MFE_MOBILE_2026,
+}
+/** FI9: the document each jurisdiction's fleet rows are cited to, and its edition label. */
+export const FLEET_SOURCE: Record<EfJurisdiction, FactorSource> = {
+  US: { jurisdiction: 'US', publisher: 'US EPA GHG Emission Factors Hub 2025 (Last Modified 15 January 2025), Tables 2 to 5, mobile combustion', edition: 'US EPA 2025' },
+  CA: { jurisdiction: 'CA', publisher: 'ECCC National Inventory Report 1990 to 2023 (2025), Part 2, Annex 6, Table A6.1-15, mobile combustion', edition: 'ECCC NIR 2025' },
+  UK: { jurisdiction: 'UK', publisher: EF_SOURCES.combustion_uk, edition: COMBUSTION_EDITION.UK },
+  EU: { jurisdiction: 'EU', publisher: 'IPCC 2006 Guidelines Vol. 2 Ch. 3, Tables 3.2.2 and 3.3.1 (CH4 and N2O); CO2, NCV and density: EU MRR 2018/2066 Annex VI Table 1 and JEC Well-to-Tank report v5', edition: 'IPCC 2006' },
+  AU: { jurisdiction: 'AU', publisher: 'DCCEEW NGA 2025, Table 9 (transport) and Table 8 (non-road equipment); NGER (Measurement) Determination 2008, Compilation No. 21', edition: COMBUSTION_EDITION.AU },
+  NZ: { jurisdiction: 'NZ', publisher: EF_SOURCES.combustion_nz, edition: COMBUSTION_EDITION.NZ },
+}
+/** FI3 and R10, for the EU fleet rows: litres to TJ (MRR NCV x JEC density) and CO2 per litre (MRR factor). */
+const EU_FLEET = {
+  diesel: { tjPerL: 43.0e-6 * 0.832, co2PerL: EF_EU.diesel_litre.co2, props: '43.0 TJ/Gg (MRR, Gas/Diesel oil) x 832 kg/m3 (JEC, Diesel)' },
+  // Motor gasoline: 69.3 t CO2/TJ x 44.3 TJ/Gg x 0.743 t/m3 / 1000 = 2.281003, to 6 significant figures 2.28100 kg/L.
+  petrol: { tjPerL: 44.3e-6 * 0.743, co2PerL: 2.28100, props: '44.3 TJ/Gg (MRR, Motor gasoline) x 743 kg/m3 (JEC, Gasoline)' },
+}
+const FLEET_TYPE_SHORT: Record<FleetType, string> = { light: 'light', heavy: 'heavy', non_road: 'non-road' }
+// Values exactly as the publisher prints them (no rounding, no grouping); miles grouped for reading.
+const nFleet = (x: number) => String(x)
+const fleetWhere = (r: MobileGasRow['cite']) => r.page ? ` (p. ${r.page})` : r.cell ? ` (${r.cell})` : ''
+/** "Table 9 Direct (scope 1) ... equipment, notes" to "Table 9, notes"; "Fuels" to "Fuels sheet". The full title is in
+ *  the data file and the citation; the row names the table by its number. */
+const fleetTable = (t: string): string => {
+  const m = t.match(/^Table [A-Z]?\d+(?:[.–-]\d+)*/)
+  const base = m ? m[0] : t === 'Fuels' ? 'Fuels sheet' : t
+  return t.endsWith(', notes') ? `${base}, notes` : base
+}
+
+function pickFleet(loc: Location, key: string, j: EfJurisdiction, ctry: string): PickedFactor {
+  const [, typeTok, fuelTok, unitTok] = key.split(':')
+  const fuel = fuelTok as FleetFuel
+  if (typeTok === 'legacy') return { factor: efMiss(key, ctry, 'fleet_legacy'), publisher: null }
+  const type = typeTok as FleetType
+  const field = FLEET_FIELDS.find(f => f.type === type && f.fuel === fuel)!
+  const val = (k?: keyof Location) => (k ? (loc as unknown as Record<string, unknown>)[k] : undefined)
+  const pub = FLEET_PUBLISHER[j]
+  const equipment = val(field.equipment) as EquipmentType | undefined
+  const modelYear = typeof val(field.modelYear) === 'number' ? val(field.modelYear) as number : undefined
+  if (type === 'non_road' && !equipment && pub.rows.some(r => r.type === 'non_road' && r.fuel === fuel && r.equipment !== undefined)) {
+    return { factor: efMiss(key, ctry, 'equipment'), publisher: null }
+  }
+  const sel = selectMobileRow(pub, { type, fuel, ...(modelYear !== undefined ? { modelYear } : {}), ...(equipment ? { equipmentType: equipment } : {}) })
+  const co2 = pub.co2.find(c => c.fuel === fuel)
+  if (!sel || !co2) return { factor: efMiss(key, ctry), publisher: null }
+  const row = sel.row
+  // The publisher's own unit, and the factor per that unit (kg).
+  const nativeUnit = j === 'US' ? 'gallon' : 'litre'
+  let native: CombustionEF
+  let valueText: string
+  let notCounted: string | undefined
+  if (j === 'US') {
+    const perMile = row.unit === 'g/vehicle-mile'
+    native = { co2: co2.value, ch4: perMile ? 0 : row.ch4 / 1000, n2o: perMile ? 0 : row.n2o / 1000 }
+    valueText = `CO2 ${fleetTable(co2.cite.table)}, ${co2.cite.row}, ${nFleet(co2.value)} ${co2.unit}`
+  } else if (j === 'CA') {
+    native = { co2: co2.value / 1000, ch4: row.ch4 / 1000, n2o: row.n2o / 1000 }
+    valueText = `CO2 ${nFleet(co2.value)} ${co2.unit}`
+  } else if (j === 'UK' || j === 'NZ') {
+    // Published in kg CO2e per litre, by gas, on AR5: applied as published, like every other UK and NZ factor.
+    native = { co2: co2.value + row.ch4 + row.n2o, ch4: 0, n2o: 0 }
+    valueText = `CO2 ${nFleet(co2.value)} ${co2.unit}`
+  } else if (j === 'AU') {
+    const ec = NGA_MOBILE_ENERGY_CONTENT_2025[fuel].value
+    native = { co2: (co2.value + row.ch4 + row.n2o) * ec / 1000, ch4: 0, n2o: 0 }
+    valueText = `CO2 ${nFleet(co2.value)} ${co2.unit}, at ${nFleet(ec)} GJ/kL (Table ${type === 'non_road' ? 8 : 9} energy content)`
+  } else {
+    const eu = EU_FLEET[fuel]
+    native = { co2: eu.co2PerL, ch4: row.ch4 * eu.tjPerL, n2o: row.n2o * eu.tjPerL }
+    valueText = `CO2 ${nFleet(eu.co2PerL)} kg/L (MRR); litres to TJ at ${eu.props}`
+  }
+  const c = unitTok === nativeUnit ? null : exactConversion(unitTok, nativeUnit)
+  if (unitTok !== nativeUnit && !c) return { factor: efMiss(key, ctry), publisher: null }
+  const k = c ? c.toPerFrom : 1
+  const factor: CombustionEF = { co2: native.co2 * k, ch4: native.ch4 * k, n2o: native.n2o * k }
+  // US road CH4 and N2O are per vehicle-mile: with miles, the total over the year spread across the fuel entered; with
+  // none, not counted, said on the row. Never estimated from a fuel economy (R16).
+  let milesText = ''
+  if (j === 'US' && row.unit === 'g/vehicle-mile') {
+    const miles = Number(val(field.miles) ?? 0)
+    const entered = fleetNum(loc, field)
+    if (miles > 0 && entered > 0) {
+      factor.ch4 = miles * row.ch4 / 1000 / entered
+      factor.n2o = miles * row.n2o / 1000 / entered
+      milesText = `, x ${miles.toLocaleString('en-US')} miles entered`
+    } else {
+      notCounted = `Methane and nitrous oxide for ${fuel} in ${FLEET_TYPE_SHORT[type]} vehicles at ${loc.name || 'Location'} are ` +
+        `not counted because EPA publishes them per mile and no miles were entered. Enter the miles to include them.`
+    }
+  }
+  const src = FLEET_SOURCE[j]
+  const gases = notCounted ? '' :
+    ` CH4 and N2O ${fleetTable(row.cite.table)}, ${row.cite.row}${fleetWhere(row.cite)}, ${nFleet(row.ch4)} and ${nFleet(row.n2o)} ${row.unit}${milesText}.`
+  const basis = row.cite.basis && (type === 'non_road' || j === 'UK') ? ` ${row.cite.basis}` : ''
+  const note = `${pub.publisher}, ${pub.edition}: ${valueText}.${gases} ${notCounted ? '' : sel.reason}${basis}${notCounted ? notCounted : ''}`
+    .replace(/\s+/g, ' ').trim()
+  return {
+    factor, publisher: src, key: `mobile: ${fleetTable(row.cite.table)}, ${row.cite.row}`,
+    ...(c ? { conversion: { from: unitTok, to: nativeUnit, toPerFrom: k, statement: c.statement } } : {}),
+    fleet: { note, ...(notCounted ? { notCounted } : {}), type, fuel },
+  }
 }
 
 /**
@@ -3109,7 +3221,8 @@ export function combustionSourcesFor(locations: readonly { country?: string }[])
   // therefore adds that table's citation instead of hiding behind the location's.
   // FI10: an NZ citation names the use class that priced it, as the PDF and XLSX have no per-row column for it.
   return [...new Set(locations.filter(l => !countryRefusal(l)).flatMap(l => {
-    const priced = combustionLinePublishers(l as Location).map(p => p.jurisdiction === 'NZ' ? `${p.publisher}, ${nzUseClassVariant(l as Location)}` : p.publisher)
+    const priced = [...combustionLinePublishers(l as Location).map(p => p.jurisdiction === 'NZ' ? `${p.publisher}, ${nzUseClassVariant(l as Location)}` : p.publisher),
+      ...fleetLinePublishers(l as Location).map(p => p.publisher)]
     return priced.length > 0 ? priced : [combustionSource(l as Location)]
   }))]
 }
@@ -3164,17 +3277,18 @@ function combustionLines(loc: Location): CombustionLine[] {
     add({ field: 'fuel_oil_distillate_amount', stream: 'fuel_oil_distillate', source: 'Heating oil', mobile: false, entered: loc.fuel_oil_distillate_amount, enteredUnit: loc.fuel_oil_distillate_unit ?? 'gallons', unitField: 'fuel_oil_distillate_unit', efKey: `fuel_oil_distillate_${lit(loc.fuel_oil_distillate_unit ?? 'gallons')}` })
   if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0)
     add({ field: 'fuel_oil_residual_amount', stream: 'fuel_oil_residual', source: 'Heavy fuel oil', mobile: false, entered: loc.fuel_oil_residual_amount, enteredUnit: loc.fuel_oil_residual_unit ?? 'gallons', unitField: 'fuel_oil_residual_unit', efKey: `fuel_oil_residual_${lit(loc.fuel_oil_residual_unit ?? 'gallons')}` })
+  // FI9 (R16 choice 2): a legacy fleet figure is a line with no vehicle type, so it cannot be priced (pickFleet misses it,
+  // cause 'fleet_legacy') and blocks export until the customer assigns it to a type. It is never moved silently.
   if (loc.has_mobile && loc.gasoline_amount > 0)
-    add({ field: 'gasoline_amount', stream: 'mobile', source: 'Gasoline (mobile)', mobile: true, entered: loc.gasoline_amount, enteredUnit: loc.gasoline_unit, unitField: 'gasoline_unit', efKey: `gasoline_${lit(loc.gasoline_unit)}` })
+    add({ field: 'gasoline_amount', stream: 'mobile', source: 'Gasoline (mobile)', mobile: true, entered: loc.gasoline_amount, enteredUnit: loc.gasoline_unit, unitField: 'gasoline_unit', efKey: `fleet:legacy:petrol:${lit(loc.gasoline_unit)}` })
   if (loc.has_mobile && loc.diesel_mobile_amount > 0)
-    add({ field: 'diesel_mobile_amount', stream: 'mobile', source: 'Diesel (mobile)', mobile: true, entered: loc.diesel_mobile_amount, enteredUnit: loc.diesel_mobile_unit, unitField: 'diesel_mobile_unit', efKey: `diesel_mobile_${lit(loc.diesel_mobile_unit)}` })
-  // FI9 (R16): one line per vehicle type and fuel, under the stream switch and the type's tick. FI9 diff 2a prices them
-  // through the same mobile keys as the two legacy fields above, so no figure moves; diff 2b gives each its publisher's
-  // mobile row.
+    add({ field: 'diesel_mobile_amount', stream: 'mobile', source: 'Diesel (mobile)', mobile: true, entered: loc.diesel_mobile_amount, enteredUnit: loc.diesel_mobile_unit, unitField: 'diesel_mobile_unit', efKey: `fleet:legacy:diesel:${lit(loc.diesel_mobile_unit)}` })
+  // FI9 (R16): one line per vehicle type and fuel, under the stream switch and the type's tick, priced from the
+  // publisher's mobile row (pickFleet).
   for (const f of FLEET_FIELDS) {
     if (!fleetOn(loc, f) || !(fleetNum(loc, f) > 0)) continue
     const unit = fleetUnit(loc, f)
-    add({ field: f.amount, stream: 'mobile', source: f.source, mobile: true, entered: fleetNum(loc, f), enteredUnit: unit, unitField: f.unit, efKey: `${f.legacyKey}_${lit(unit)}` })
+    add({ field: f.amount, stream: 'mobile', source: f.source, mobile: true, entered: fleetNum(loc, f), enteredUnit: unit, unitField: f.unit, efKey: `fleet:${f.type}:${f.fuel}:${lit(unit)}` })
   }
   return out
 }
@@ -3206,8 +3320,10 @@ const hasRefrigerantLine = (loc: Location): boolean =>
  * `{ publisher, edition?, value }` shape FI2 and T3c extend; `value` is null because no factor applied.
  */
 export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing' | 'figure_cleared' | 'steam_factor_missing'
+  | 'fleet_type_missing' | 'equipment_missing'
 /** The coverage-issue statuses an unpriced line raises (FI1): the reason, used as the status. */
-export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing', 'figure_cleared', 'steam_factor_missing'])
+export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing', 'figure_cleared', 'steam_factor_missing',
+  'fleet_type_missing', 'equipment_missing'])
 export interface UnpricedLine {
   reason: UnpricedReason
   locId: string
@@ -3242,6 +3358,13 @@ export const UNPRICED_MESSAGE = {
   eu_property: (fuel: string, site: string, unit: string, property: 'density' | 'energy content', remedy: 'mass' | 'kwh' | null) =>
     `The EU factor for ${fuel} at ${site} is published per unit of energy, and we hold no cited ${property} to convert ${unit} to it, so this line is not counted. ${remedy === 'mass' ? 'Enter the quantity in kilograms or tonnes, or reject the bill.' : remedy === 'kwh' ? 'Enter the quantity in kWh, as shown on your gas bill, or reject the bill.' : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
   // R14: also for purchased steam, whose estimate is priced from the province's natural gas factor.
+  // FI9 (R16 choice 2): a fleet figure entered before vehicle types were asked. The assign buttons (FI9 diff 3) say
+  // "These were light vehicles", "These were heavy vehicles", "This was non-road equipment".
+  fleet_type_missing: (site: string, amount: string, unit: string, fuel: string) =>
+    `${site} has ${amount} ${unit} of ${fuel} for vehicles recorded before vehicle types were asked, so it is not counted. Choose the vehicles it was used in: light vehicles, heavy vehicles or non-road equipment. Export is blocked until it is chosen.`,
+  // FI9 (R16): non-road fuel where the publisher's factors differ by equipment type, with none chosen.
+  equipment_missing: (site: string, fuel: string, publisher: string) =>
+    `${publisher} publishes non-road factors by equipment type, so the ${fuel} used in non-road equipment at ${site} is not counted until the equipment type is chosen. Choose the equipment type. Export is blocked until it is chosen.`,
   province_missing: (site: string, unrecognised: string | null, what: 'natural gas' | 'purchased steam' = 'natural gas') => unrecognised
     ? `The province for ${site} (${unrecognised}) is not one we hold a natural gas factor for, so its ${what} is not counted. Choose the province. Export is blocked until it is chosen.`
     : `The province for ${site} is not set, so its ${what} is not counted. Choose the province. Export is blocked until it is chosen.`,
@@ -3266,6 +3389,19 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
     if (miss.cause === 'province') {
       const typed = (loc.grid_region || loc.province || '').trim()
       out.push({ ...base, reason: 'province_missing', supportedUnits: [], message: UNPRICED_MESSAGE.province_missing(site, typed || null) })
+      continue
+    }
+    // FI9: a legacy fleet figure (no vehicle type), or non-road fuel with no equipment type where the publisher splits.
+    if (miss.cause === 'fleet_legacy') {
+      const fuel = line.field === 'gasoline_amount' ? 'petrol' : 'diesel'
+      out.push({ ...base, reason: 'fleet_type_missing', supportedUnits: [],
+        message: UNPRICED_MESSAGE.fleet_type_missing(site, line.entered.toLocaleString('en-US', { maximumFractionDigits: 4 }), unitLabel(line.enteredUnit), fuel) })
+      continue
+    }
+    if (miss.cause === 'equipment') {
+      const f = FLEET_FIELDS.find(x => x.amount === line.field)!
+      out.push({ ...base, reason: 'equipment_missing', factor: { publisher: FLEET_SOURCE[j].publisher, value: null }, supportedUnits: [],
+        message: UNPRICED_MESSAGE.equipment_missing(site, f.fuel, FLEET_PUBLISHER[j].publisher) })
       continue
     }
     // The units the same publisher DOES price this fuel in at this location: each candidate unit is put
@@ -3357,8 +3493,22 @@ export function hasPricedCombustionLine(loc: Location): boolean {
 export function combustionLinePublishers(loc: Location): FactorSource[] {
   const out: FactorSource[] = []
   for (const l of combustionLines(loc)) {
+    // FI9: fleet rows are cited to their own mobile document (fleetLinePublishers), not to the stationary table, so they
+    // do not name the combustion edition here. Recording mobile editions in factor_editions is T3c's.
+    if (l.efKey.startsWith('fleet:')) continue
     const p = pickEF(loc, l.efKey as keyof typeof EF)
     if (isPriceableEF(p.factor) && p.publisher && !out.some(o => o.jurisdiction === p.publisher!.jurisdiction)) out.push(p.publisher)
+  }
+  return out
+}
+
+/** FI9: the mobile documents that priced this location's fleet lines, each once. */
+export function fleetLinePublishers(loc: Location): FactorSource[] {
+  const out: FactorSource[] = []
+  for (const l of combustionLines(loc)) {
+    if (!l.efKey.startsWith('fleet:')) continue
+    const p = pickEF(loc, l.efKey)
+    if (isPriceableEF(p.factor) && p.publisher && !out.some(o => o.publisher === p.publisher!.publisher)) out.push(p.publisher)
   }
   return out
 }
@@ -4604,7 +4754,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const unitChange = field ? unitChangeBehind(loc, field, entered, enteredUnit) : undefined
     const conversion_note = [unitChange ? unitChangeNote(unitChange) : '', picked.conversion ? conversionNote(entered, picked.conversion) : '']
       .filter(Boolean).join(' ') || undefined
-    const note = [conversion_note,
+    // FI9: a fleet row's note is its own (publisher, row used, why), and replaces the table notes below.
+    const note = picked.fleet ? [conversion_note, picked.fleet.note].filter(Boolean).join(' · ') : [conversion_note,
       fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
       fromTable === 'AU' ? auPublishedNote(loc, heldKey) : '',
       fromTable === 'US' ? US_PUBLISHED_NOTE[heldKey] : '',
@@ -4634,7 +4785,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // where the unit entered differs, the exact conversion to it (conversion_factor = held units per unit entered).
       factor_key: heldKey,
       // FI10: the MfE use class that selected the table, on every row it priced.
-      ...(fromTable === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}),
+      ...(fromTable === 'NZ' && !picked.fleet ? { factor_variant: nzUseClassVariant(loc) } : {}),
+      // FI9: the vehicle type and fuel of a fleet row, and, for a US road line with no miles, that methane and nitrous
+      // oxide are not counted (a priced row; it does not block export on its own).
+      ...(picked.fleet ? { fleet_type: picked.fleet.type, fleet_fuel: picked.fleet.fuel } : {}),
+      ...(picked.fleet?.notCounted ? { ch4_n2o: 'not_counted', ch4_n2o_note: picked.fleet.notCounted } : {}),
       ...(conversion_note ? { conversion_note } : {}),
       ...(picked.conversion ? { conversion_factor: picked.conversion.toPerFrom } : {}),
       ...(unitChange ? { unit_change: unitChange } : {}),

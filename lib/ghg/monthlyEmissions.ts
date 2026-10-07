@@ -179,8 +179,10 @@ function resolveBill(
   if (docType === "utility_bill_gas" && fuelType === "natural_gas") return { kind: "gas", efKey: `natural_gas_${unit}`, scope: 1 };
   if (docType === "fuel_propane" && fuelType === "propane") return { kind: "gas", efKey: `propane_${tok}`, scope: 1 };
   if (docType === "fuel_diesel" && fuelType === "diesel") return { kind: "gas", efKey: `diesel_${tok}`, scope: 1 };
-  if (docType === "fleet_fuel" && fuelType === "diesel") return { kind: "gas", efKey: `diesel_mobile_${tok}`, scope: 1 };
-  if (docType === "fleet_fuel" && fuelType === "gasoline") return { kind: "gas", efKey: `gasoline_${tok}`, scope: 1 };
+  // FI9: a fleet-fuel bill carries no vehicle type until FI9 diff 4, so it lands on the legacy fields, which cannot be
+  // priced until assigned (fleet_type_missing). The key says so, and the engine's pickEF refuses it.
+  if (docType === "fleet_fuel" && fuelType === "diesel") return { kind: "gas", efKey: `fleet:legacy:diesel:${tok}`, scope: 1 };
+  if (docType === "fleet_fuel" && fuelType === "gasoline") return { kind: "gas", efKey: `fleet:legacy:petrol:${tok}`, scope: 1 };
   return null; // renewable_cert (no own emissions) and anything else: not a monthly emissions line
 }
 

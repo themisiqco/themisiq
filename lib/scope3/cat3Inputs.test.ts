@@ -232,7 +232,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     const us = answered({ id: 'us', name: 'US site', country: 'US', grid_region: 'US_CA',
                           electricity_kwh: 200_000,
                           has_natural_gas: true, natural_gas_amount: 1_000, natural_gas_unit: 'therms',
-                          has_mobile: true, diesel_mobile_amount: 500, diesel_mobile_unit: 'gallons' },
+                          has_mobile: true, fleet_heavy: true, heavy_diesel_amount: 500, heavy_diesel_unit: 'gallons' },   // FI9
                         ['electricity', 'natural_gas', 'mobile'])
     const r = cat3InputsFrom(workingsOf([uk, us]), [uk, us])
     expect(r.reason).toBeNull()

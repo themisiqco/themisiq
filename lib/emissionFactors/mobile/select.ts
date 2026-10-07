@@ -1,6 +1,6 @@
 // ── R16: WHICH PUBLISHED MOBILE ROW APPLIES TO A SITE'S FLEET FUEL ──────────────────────────────────
 //
-// FI9 diff 1b (ruling R16 as refined 7 Oct 2026). Pure selection over the transcribed tables; nothing reads it yet.
+// FI9 diff 1b (ruling R16 as refined 7 Oct 2026). Pure selection over the transcribed tables; read by engine pickFleet (2b).
 //
 // - Road (Light, Heavy): an optional typical model year per vehicle type. Given, the publisher's row(s) for that
 //   year; a year after the publisher's latest row, the latest row (said on the row); where the publisher ties no

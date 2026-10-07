@@ -432,11 +432,12 @@ describe('FI9: shape and R16 selection (refined 7 Oct 2026)', () => {
     expect(road.reason).toMatch(/^IPCC 2006 default for CH4 and N2O; DCCEEW National Greenhouse Accounts Factors publishes no road factor for petrol\. /)
   })
 
-  it('the engine reads only the types from this folder until FI9 diff 2b, and no file carries an em dash', () => {
+  it('the engine prices fleet fuel from every publisher file here (FI9 diff 2b), and no file carries an em dash', () => {
     const dir = __dirname
     for (const f of readdirSync(dir)) expect(readFileSync(join(dir, f), 'utf8'), f).not.toContain('\u2014')
     const engine = readFileSync(join(dir, '..', '..', 'ghg', 'engine.ts'), 'utf8')
-    const imports = engine.match(/^import .*emissionFactors\/mobile\/.*$/gm) ?? []
-    expect(imports).toEqual(["import type { EquipmentType, FleetType } from '../emissionFactors/mobile/types'"])
+    for (const m of ['select', 'epa2025', 'eccc2025', 'defra2026', 'nga2025', 'mfe2026', 'ipcc2006']) {
+      expect(engine, m).toContain(`from '../emissionFactors/mobile/${m}'`)
+    }
   })
 })

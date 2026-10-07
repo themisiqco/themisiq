@@ -2,7 +2,7 @@
 //
 // FI9 diff 1. Transcribed from ~/themisiq-sources/ipcc/V2_3_Ch3_Mobile_Combustion.pdf: Table 3.2.1 (road CO2, p. 3.16),
 // Table 3.2.2 (road CH4 and N2O, p. 3.21) and Table 3.3.1 (off-road CO2, CH4 and N2O, p. 3.36). Units: kg per TJ of
-// fuel, net calorific basis, as IPCC prints them (R5). Nothing reads this yet.
+// fuel, net calorific basis, as IPCC prints them (R5). Priced by engine pickFleet (FI9 2b).
 //
 // A litre reaches a TJ the way FI3 does it for the EU's stationary rows (R10): EU MRR (Reg. (EU) 2018/2066) Annex VI
 // Table 1 NCV and the JEC Well-to-Tank report v5 density (docs/review/eu-fuel-properties.md). The derivation belongs

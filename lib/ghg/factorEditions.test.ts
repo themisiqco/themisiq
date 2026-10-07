@@ -1070,13 +1070,26 @@ describe('a location excluded from the totals records no edition', () => {
 
 // FI2 diff 1: an edition is recorded for each TABLE that priced a line, never assumed from the location's country.
 describe('the editions name the tables that priced (FI2)', () => {
-  it('a NZ site with petrol in litres and fleet diesel in gallons records MfE only (FI2 diff 2: gallons convert to MfE litres)', () => {
-    const nz = { ...emptyLocation('n1', 'Auckland'), country: 'NZ', grid_region: 'NZ', has_mobile: true,
-      gasoline_amount: 100, gasoline_unit: 'litres' as const, diesel_mobile_amount: 50, diesel_mobile_unit: 'gallons' as const }
+  it('a NZ site with stationary diesel in gallons and fleet fuel records MfE only (FI2 diff 2: gallons convert to MfE litres)', () => {
+    const nz = { ...emptyLocation('n1', 'Auckland'), country: 'NZ', grid_region: 'NZ', has_diesel_stationary: true,
+      diesel_stationary_amount: 50, diesel_stationary_unit: 'gallons' as const, has_mobile: true, fleet_light: true,
+      light_petrol_amount: 100, light_petrol_unit: 'litres' as const, light_diesel_amount: 50, light_diesel_unit: 'gallons' as const }
     const ed = buildFactorEditions([nz], 2026)
     // FI10: with the use class that priced it.
     expect(ed.NZ?.combustion).toEqual({ source: EF_SOURCES.combustion_nz, edition: 'MfE 2026 v2', variant: 'Commercial use class' })
+    // FI9: the fleet lines are their own family, MfE's Transport Fuel rows, which no use class selects.
+    expect(ed.NZ?.mobile).toEqual({ source: EF_SOURCES.combustion_nz, edition: 'MfE 2026 v2' })
     expect(ed.US, 'no US table priced anything').toBeUndefined()
+  })
+
+  it('FI9: a US fleet line records the EPA mobile document, a different edition from the stationary table', () => {
+    const us = { ...emptyLocation('u1', 'Austin'), country: 'US', state: 'TX', grid_region: 'US_TX', has_diesel_stationary: true,
+      diesel_stationary_amount: 10, diesel_stationary_unit: 'gallons' as const, has_mobile: true, fleet_heavy: true,
+      heavy_diesel_amount: 100, heavy_diesel_unit: 'gallons' as const }
+    const ed = buildFactorEditions([us], 2026)
+    expect(ed.US?.combustion?.edition).toBe('US EPA 2024')
+    expect(ed.US?.mobile?.edition).toBe('US EPA 2025')
+    expect(ed.US?.mobile?.source).toMatch(/^US EPA GHG Emission Factors Hub 2025/)
   })
 
   it('an AU site with propane in gallons names NGA, which now prices it through the exact litre conversion', () => {
