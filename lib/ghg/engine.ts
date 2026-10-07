@@ -1779,6 +1779,19 @@ interface Location {
   nonroad_petrol_equipment?: EquipmentType; nonroad_diesel_equipment?: EquipmentType
   /** Every legacy fleet figure the customer assigned to a vehicle type, with who and when (R16 choice 2). */
   fleet_assignments?: FleetAssignment[]
+  /** FI9 diff 3: an optional fleet answer cleared by a country change (miles off a US site, an equipment type where the
+   *  new publisher does not split by it), with the sentence shown and who and when. FI5's record, for answers that are
+   *  not figures. */
+  fleet_changes?: FleetChange[]
+}
+
+/** FI9 diff 3: one optional fleet answer a country change cleared. */
+export interface FleetChange {
+  field: string
+  valueBefore: string | number
+  message: string
+  at: string
+  by: { userId: string; email: string } | null
 }
 
 /** FI9: one legacy fleet figure moved to a vehicle type by the customer. */
@@ -2958,6 +2971,20 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
 const FLEET_PUBLISHER: Record<EfJurisdiction, MobilePublisher> = {
   US: EPA_MOBILE_2025, CA: ECCC_MOBILE_2025, UK: DEFRA_MOBILE_2026, EU: IPCC_MOBILE_2006, AU: NGA_MOBILE_2025, NZ: MFE_MOBILE_2026,
 }
+/**
+ * FI9 diff 3: which optional fleet questions a site's publisher needs. Miles: US only (EPA's road CH4 and N2O are per
+ * vehicle-mile). Equipment type, per fuel: only where the publisher splits non-road by it (US EPA Table 5, IPCC Table
+ * 3.3.1 for the EU); elsewhere one non-road row prices every equipment type and nothing is asked. A refused country
+ * asks nothing.
+ */
+export function fleetAsks(loc: Pick<Location, 'country'>): { miles: boolean; equipment: Record<FleetFuel, boolean>; publisher: string | null } {
+  const j = efJurisdiction(loc as Location)
+  if (j === null) return { miles: false, equipment: { petrol: false, diesel: false }, publisher: null }
+  const pub = FLEET_PUBLISHER[j]
+  const splits = (fuel: FleetFuel) => pub.rows.some(r => r.type === 'non_road' && r.fuel === fuel && r.equipment !== undefined)
+  return { miles: j === 'US', equipment: { petrol: splits('petrol'), diesel: splits('diesel') }, publisher: pub.publisher }
+}
+
 /** FI9: the document each jurisdiction's fleet rows are cited to, and its edition label. */
 export const FLEET_SOURCE: Record<EfJurisdiction, FactorSource> = {
   US: { jurisdiction: 'US', publisher: 'US EPA GHG Emission Factors Hub 2025 (Last Modified 15 January 2025), Tables 2 to 5, mobile combustion', edition: 'US EPA 2025' },

@@ -116,8 +116,16 @@ describe('the page: unread uploads and the export summary (T10 ruling)', () => {
     expect(page).toContain('Uploaded as evidence. No figure was read from it.')
     expect(page).toContain("(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id)")
   })
+  it('FI9 diff 3: the six fleet fields go through the same FigureInput, in the FleetBlock figure render', () => {
+    expect(page).toContain('<FigureInput loc={loc} field={amount}')
+    expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/FleetBlock.tsx'), 'utf8')).toContain('{p.figure(f.amount, f.unit)}')
+  })
+  it('FI9 diff 3: an unread fleet upload names the legacy fields until diff 4; Enter manually goes to the vehicle-type ticks', () => {
+    expect(page).toContain("field === 'gasoline_amount' || field === 'diesel_mobile_amount' ? `fleet-${locId}-light`")
+    expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/FleetBlock.tsx'), 'utf8')).toContain('id={`fleet-${loc.id}-${t}`}')
+  })
   it('every field an unread upload can name has an input "Enter the figure manually" can reach', () => {
-    for (const f of ['natural_gas_amount', 'propane_amount', 'diesel_stationary_amount', 'gasoline_amount', 'diesel_mobile_amount', 'electricity_kwh', 'renewable_electricity_kwh']) {
+    for (const f of ['natural_gas_amount', 'propane_amount', 'diesel_stationary_amount', 'electricity_kwh', 'renewable_electricity_kwh']) {
       expect(page, f).toContain(`<FigureInput loc={loc} field="${f}"`)
     }
     for (const f of ['fuel_oil_distillate_amount', 'fuel_oil_residual_amount', 'refrigerant_purchased_kg', 'purchased_steam_mmbtu', 'biogenic_co2_mt']) {

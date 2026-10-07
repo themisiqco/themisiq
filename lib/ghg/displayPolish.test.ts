@@ -26,7 +26,8 @@ describe('display polish (T10d)', () => {
     expect(unitOptionsShowing(fr, 'kwh', false)).toEqual([['m3', 'm³'], ['kwh', 'kWh (not accepted here)']])
     expect(unitOptionsShowing(fr, 'm3', true), 'already offered').toEqual(fr)
     expect(unitOptionsShowing(fr, 'm3', false), 'already offered').toEqual(fr)
-    expect((PAGE.match(/unitOptionsShowing\(/g) ?? []).length, 'gas, propane, stationary diesel, heating oil, heavy fuel oil, petrol, fleet diesel, steam').toBe(8)
+    // FI9 diff 3: the six fleet fields share one call, in the FleetBlock figure render.
+    expect((PAGE.match(/unitOptionsShowing\(/g) ?? []).length, 'gas, propane, stationary diesel, heating oil, heavy fuel oil, fleet (six fields, one call), steam').toBe(7)
   })
 
   it('the live results panel says "nothing is lost" once', () => {

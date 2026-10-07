@@ -32,6 +32,9 @@ import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
 import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
 import { FigureInput } from './_components/FigureInput'
+import { FleetBlock } from './_components/FleetBlock'
+import { fieldsOf, typeHasFigures, untickFleetType, modelYearValue, fleetForCountryChange, assignLegacy, legacyFleetFigures } from '../../../lib/ghg/fleetForm'
+import type { FleetType } from '../../../lib/emissionFactors/mobile/types'
 import { addOverride, removeOverride } from '../../../lib/ghg/overrides'
 import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
 import { sha256Hex } from '../../../lib/ghg/fileHash'
@@ -60,7 +63,7 @@ import {
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  periodFromYearAndEnd, FLEET_FIELDS,
+  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -674,6 +677,10 @@ const searchParams = useSearchParams()
   // written synchronously, so a second click in the same tick is ignored; the state disables the control.
   const removeInFlight = useRef(new Set<string>())
   const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set())
+  // FI9 diff 3: a vehicle type the customer is unticking while it holds figures (the question is asked first), and the
+  // last refusal from a legacy figure's button, each per location id.
+  const [pendingUntick, setPendingUntick] = useState<Record<string, FleetType | null>>({})
+  const [legacyRefusal, setLegacyRefusal] = useState<Record<string, string | null>>({})
   const markRemoving = (key: string, on: boolean) => setRemoving(prev => {
     const next = new Set(prev); if (on) next.add(key); else next.delete(key); return next
   })
@@ -1187,6 +1194,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // FI5: each figure is converted exactly or cleared and asked for, never relabelled; a figure from documents
         // keeps its locked unit. Every conversion and clear is recorded on the location (unit_changes).
         locs[idx] = applyUnitOutcomes(locs[idx], unitsForCountryChange(value, locs[idx] as never), new Date().toISOString(), currentUser)
+        // FI9 diff 3: miles leave a site that is no longer in the US, and an equipment type leaves a site whose new
+        // publisher does not split non-road equipment by it, each recorded with its sentence (FI5's style).
+        locs[idx] = fleetForCountryChange(locs[idx], new Date().toISOString(), currentUser)
         // FI5: the eGRID subregion belongs to a US site. A country change clears it, so a stale one cannot price a
         // market-based row in another country (residualRegionFor also ignores one off a US site).
         locs[idx].residual_region = ''
@@ -1594,7 +1604,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   }
   // "Enter the figure manually": the field is editable (all its bills were rejected), so put the cursor there.
   const enterManually = (locId: string, field: string) => {
-    const el = document.getElementById(`figure-${locId}-${field}`) as HTMLInputElement | null
+    // FI9 diff 3: an unread fleet-fuel upload still names the two legacy fields until diff 4 types its readings. They
+    // have no input now; entering fleet fuel by hand starts at the vehicle-type ticks, so that is where focus goes.
+    const id = field === 'gasoline_amount' || field === 'diesel_mobile_amount' ? `fleet-${locId}-light` : `figure-${locId}-${field}`
+    const el = document.getElementById(id) as HTMLInputElement | null
     el?.focus()
   }
   // THE DERIVED LOCATIONS (T4, T7). Every figure on screen, every gate and every saved total reads these;
@@ -1603,6 +1616,33 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const derivedLocations = useMemo(() => deriveLocations(inventory), [inventory])
   // T10: "Enter this figure manually instead", with a reason, and "Use the bills instead". The figure starts
   // from what the documents gave (derivedLocations), so switching never drops it to zero on its own.
+  // ── FI9 diff 3: the fleet block's actions ─────────────────────────────────────────────────────────────────
+  const setLocation = (idx: number, next: Location) => setInventory(inv => {
+    const locs = [...inv.locations]; locs[idx] = next; return { ...inv, locations: locs }
+  })
+  const fleetTick = (idx: number, type: FleetType, ticked: boolean) => {
+    const l = inventory.locations[idx]
+    if (!ticked && typeHasFigures(l, type)) { setPendingUntick(p => ({ ...p, [l.id]: type })); return }
+    updateLocation(idx, fieldsOf(type)[0].typeSwitch, ticked)
+  }
+  const fleetUntickAnswer = (idx: number, type: FleetType, answer: 'remove' | 'keep') => {
+    const l = inventory.locations[idx]
+    setLocation(idx, untickFleetType(l, type, answer))
+    setPendingUntick(p => ({ ...p, [l.id]: null }))
+  }
+  const fleetModelYear = (idx: number, type: FleetType, raw: string) => {
+    const v = modelYearValue(raw, new Date())
+    if (v === null) return   // not a year we accept: the block shows why, and nothing is stored
+    updateLocation(idx, fieldsOf(type)[0].modelYear!, v)
+  }
+  const fleetAssignLegacy = (idx: number, from: 'gasoline_amount' | 'diesel_mobile_amount', to: FleetType) => {
+    const l = inventory.locations[idx]
+    if (!currentUser) { setLegacyRefusal(p => ({ ...p, [l.id]: 'Sign in to move this figure, so the move records who made it.' })); return }
+    const r = assignLegacy(l, from, to, new Date().toISOString(), currentUser)
+    if ('location' in r) { setLocation(idx, r.location); setLegacyRefusal(p => ({ ...p, [l.id]: null })) }
+    else setLegacyRefusal(p => ({ ...p, [l.id]: r.refusal }))
+  }
+
   const overrideFigure = (locIdx: number, field: keyof Location, reason: string) => {
     if (!currentUser) return
     const startFrom = Number((derivedLocations[locIdx] as unknown as Record<string, number>)[String(field)] ?? 0)
@@ -2588,30 +2628,31 @@ workings: saved.workings,
             <QuestionCard question={streamQuestion('mobile')} hint="Delivery trucks, forklifts, company cars: check fleet fuel cards" checked={loc.has_mobile} onToggle={v => updateLocation(activeLocation, 'has_mobile', v)}>
               {loc.has_mobile && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
-                  <Field label={`Gasoline for company vehicles: ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'gasoline_amount', r)} onUseBills={() => switchToBills(activeLocation, 'gasoline_amount')} style={{ ...inputStyle, flex: 1 }} />
-                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => changeFieldUnit(activeLocation, 'gasoline_unit', e.target.value)} style={{ ...inputStyle, width: 130 }}>
-                        {unitOptionsShowing(liquidUnitOptions(loc.country), loc.gasoline_unit, documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')).map(([val, label]) => (
-                          <option key={val} value={val}>{label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <UnpricedNote line={unpricedFor(loc.id, 'gasoline_amount')} />
-                    <UnitChangeNote change={convertedUnitChange(loc, 'gasoline_amount')} />
-                  </Field>
-                  <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_mobile_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_mobile_amount')} style={{ ...inputStyle, flex: 1 }} />
-                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => changeFieldUnit(activeLocation, 'diesel_mobile_unit', e.target.value)} style={{ ...inputStyle, width: 130 }}>
-                        {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_mobile_unit, documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')).map(([val, label]) => (
-                          <option key={val} value={val}>{label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <UnpricedNote line={unpricedFor(loc.id, 'diesel_mobile_amount')} />
-                    <UnitChangeNote change={convertedUnitChange(loc, 'diesel_mobile_amount')} />
-                  </Field>
+                  {/* FI9 diff 3 (ruling R16): fleet fuel by vehicle type. The old petrol and diesel inputs are gone; a figure
+                      still in them is shown above the block with a button per vehicle type. */}
+                  <FleetBlock loc={loc} asks={fleetAsks(loc)} now={new Date()}
+                    legacy={legacyFleetFigures(loc)} legacyRefusal={legacyRefusal[loc.id] ?? null} pendingUntick={pendingUntick[loc.id] ?? null}
+                    onTick={(t, v) => fleetTick(activeLocation, t, v)} onUntickAnswer={(t, a) => fleetUntickAnswer(activeLocation, t, a)}
+                    onModelYear={(t, raw) => fleetModelYear(activeLocation, t, raw)}
+                    onMiles={(field, v) => updateLocation(activeLocation, field, v)}
+                    onEquipment={(field, v) => updateLocation(activeLocation, field, v)}
+                    onAssignLegacy={(from, to) => fleetAssignLegacy(activeLocation, from, to)}
+                    figure={(amount, unit) => {
+                      const locked = documentsBacking(loc, amount) > 0 && !activeOverride(loc, amount)
+                      const held = String((loc as unknown as Record<string, unknown>)[unit] ?? 'gallons')
+                      return (<>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <FigureInput loc={loc} field={amount} onChange={v => updateLocation(activeLocation, amount, v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, amount, r)} onUseBills={() => switchToBills(activeLocation, amount)} style={{ ...inputStyle, flex: 1 }} />
+                          <select value={held} disabled={locked} onChange={e => changeFieldUnit(activeLocation, unit as UnitFieldName, e.target.value)} style={{ ...inputStyle, width: 130 }}>
+                            {unitOptionsShowing(liquidUnitOptions(loc.country), held, locked).map(([val, label]) => (
+                              <option key={val} value={val}>{label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <UnpricedNote line={unpricedFor(loc.id, String(amount))} />
+                        <UnitChangeNote change={convertedUnitChange(loc, String(amount))} />
+                      </>)
+                    }} />
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
               )}

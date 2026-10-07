@@ -31,9 +31,12 @@ describe('the GHG page explains every unpriced line (FI1)', () => {
 
   it('each line also shows beside the field that fixes it: every fuel, the refrigerant, and both province selects', () => {
     for (const field of ['natural_gas_amount', 'propane_amount', 'diesel_stationary_amount', 'fuel_oil_distillate_amount',
-      'fuel_oil_residual_amount', 'gasoline_amount', 'diesel_mobile_amount', 'refrigerant_purchased_kg']) {
+      'fuel_oil_residual_amount', 'refrigerant_purchased_kg']) {
       expect(CODE, field).toContain(`<UnpricedNote line={unpricedFor(loc.id, '${field}')} />`)
     }
+    // FI9 diff 3: the six fleet fields, once, in the FleetBlock figure render. A legacy figure's line is shown above the
+    // block with its buttons, and in the location's panel of unpriced lines.
+    expect(CODE).toContain('<UnpricedNote line={unpricedFor(loc.id, String(amount))} />')
     const province = "<UnpricedNote line={unpricedAll.find(u => u.locId === loc.id && u.reason === 'province_missing')} />"
     expect(CODE.split(province).length - 1, 'the step-1 province select and the step-2 region prompt').toBe(2)
     // The note sits inside the refrigerant card, after the type select.
