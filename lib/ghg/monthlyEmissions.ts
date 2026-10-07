@@ -171,7 +171,8 @@ const PLURAL_TO_SINGULAR = (u: string): string => (u === "gallons" ? "gallon" : 
 function resolveBill(
   docType: string,
   fuelType: string,
-  unit: string | null
+  unit: string | null,
+  field = ""
 ): { kind: "gas"; efKey: string; scope: 1 } | { kind: "electricity"; scope: 2 } | null {
   if (docType === "utility_electricity" && fuelType === "electricity") return { kind: "electricity", scope: 2 };
   if (!unit) return null;
@@ -179,10 +180,15 @@ function resolveBill(
   if (docType === "utility_bill_gas" && fuelType === "natural_gas") return { kind: "gas", efKey: `natural_gas_${unit}`, scope: 1 };
   if (docType === "fuel_propane" && fuelType === "propane") return { kind: "gas", efKey: `propane_${tok}`, scope: 1 };
   if (docType === "fuel_diesel" && fuelType === "diesel") return { kind: "gas", efKey: `diesel_${tok}`, scope: 1 };
-  // FI9: a fleet-fuel bill carries no vehicle type until FI9 diff 4, so it lands on the legacy fields, which cannot be
-  // priced until assigned (fleet_type_missing). The key says so, and the engine's pickEF refuses it.
-  if (docType === "fleet_fuel" && fuelType === "diesel") return { kind: "gas", efKey: `fleet:legacy:diesel:${tok}`, scope: 1 };
-  if (docType === "fleet_fuel" && fuelType === "gasoline") return { kind: "gas", efKey: `fleet:legacy:petrol:${tok}`, scope: 1 };
+  // FI9 diff 4: a fleet-fuel bill prices on its vehicle type's mobile row, read from the field it landed on
+  // ("heavy_diesel_amount" is heavy, diesel). A bill read before FI9 with no type chosen lands on the legacy field and is
+  // refused by the engine (fleet_type_missing), as its annual figure is.
+  if (docType === "fleet_fuel" && (fuelType === "diesel" || fuelType === "gasoline")) {
+    const fuel = fuelType === "gasoline" ? "petrol" : "diesel";
+    const m = /^(light|heavy|nonroad)_(petrol|diesel)_amount$/.exec(field);
+    const type = m ? (m[1] === "nonroad" ? "non_road" : m[1]) : "legacy";
+    return { kind: "gas", efKey: `fleet:${type}:${fuel}:${tok}`, scope: 1 };
+  }
   return null; // renewable_cert (no own emissions) and anything else: not a monthly emissions line
 }
 
@@ -252,7 +258,7 @@ export function buildMonthlyEmissions(
         skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: unpriced });
         continue;
       }
-      const resolved = resolveBill(doc.document_type, c.fuelType, c.unit);
+      const resolved = resolveBill(doc.document_type, c.fuelType, c.unit, String(c.field));
       if (!resolved) { skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `no EF mapping for (${doc.document_type}, ${c.fuelType}, ${c.unit ?? "—"})` }); continue; }
 
       // The whole bill's emissions; each month takes its days' fraction of it.

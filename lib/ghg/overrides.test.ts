@@ -120,8 +120,9 @@ describe('the page: unread uploads and the export summary (T10 ruling)', () => {
     expect(page).toContain('<FigureInput loc={loc} field={amount}')
     expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/FleetBlock.tsx'), 'utf8')).toContain('{p.figure(f.amount, f.unit)}')
   })
-  it('FI9 diff 3: an unread fleet upload names the legacy fields until diff 4; Enter manually goes to the vehicle-type ticks', () => {
-    expect(page).toContain("field === 'gasoline_amount' || field === 'diesel_mobile_amount' ? `fleet-${locId}-light`")
+  it('FI9 diff 4: Enter manually goes to the field, or to its vehicle-type tick while that type is unticked; diff 3\'s stopgap is gone', () => {
+    expect(page).not.toContain("field === 'gasoline_amount' || field === 'diesel_mobile_amount' ? `fleet-${locId}-light`")
+    expect(page).toContain("document.getElementById(`figure-${locId}-${field}`) ?? (type ? document.getElementById(`fleet-${locId}-${type}`) : null)")
     expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/FleetBlock.tsx'), 'utf8')).toContain('id={`fleet-${loc.id}-${t}`}')
   })
   it('every field an unread upload can name has an input "Enter the figure manually" can reach', () => {

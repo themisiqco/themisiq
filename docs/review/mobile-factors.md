@@ -446,7 +446,9 @@ total without a fuel economy, which the Hub does not give.
 - Whether the Determination's transport list ("includes ... (a) to (d)") is meant to be closed: not stated in the
   compilation.
 - Whether ECCC's 2026 NIR prints Table A6.1–15 on p. 541 with the same values (the citation in `lib/ghg/mobile.ts`):
-  NIR 2026, Part 2.
+  NIR 2026, Part 2. **Superseded (FI9 diff 4, 7 Oct 2026):** fleet lines are priced from the NIR 2025 transcription in
+  `lib/emissionFactors/mobile/eccc2025.ts` (Table A6.1-15, p. 253), which is the edition that was checked; no fleet
+  figure reads `mobile.ts`'s p. 541 citation, so the question no longer affects a number.
 
 ## ⚑ Decisions for Lisa
 

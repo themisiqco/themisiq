@@ -8,8 +8,9 @@
 // All text here is shown to the customer: plain language, no em dash.
 
 import { useState } from 'react'
-import { periodOriginOf, type ExtractedProposal } from '../../../../lib/ghg/engine'
-import { editPeriod, editUnit, type Editor } from '../../../../lib/ghg/proposalEdits'
+import { periodOriginOf, fleetTypeProblem, type ExtractedProposal } from '../../../../lib/ghg/engine'
+import { editPeriod, editUnit, chooseFleetType, type Editor } from '../../../../lib/ghg/proposalEdits'
+import type { FleetType } from '../../../../lib/emissionFactors/mobile/types'
 import { convertibleUnits, normalizeUnit, type FuelType } from '../../../../lib/unitConversions'
 import { plainDate } from '../../../../lib/ghg/coverageActions'
 import { unitLabel } from '../../../../lib/ghg/unitLabels'
@@ -103,4 +104,35 @@ export function ProposalNotes({ p }: { p: ExtractedProposal }) {
   }
   if (lines.length === 0) return null
   return <>{lines.map((l, i) => <div key={i} style={note}>{l}</div>)}</>
+}
+
+// ── FI9 diff 4 (ruling R16): THE VEHICLE TYPE OF A FLEET-FUEL READING ─────────────────────────────────────────────
+// "Vehicles: Light / Heavy / Non-road", with no default. The reader never sets it; the customer does, and the choice is
+// recorded with who and when (chooseFleetType). Until one is chosen the reading cannot be confirmed, and the message
+// says so. A reading made before FI9 shows the same chooser; choosing moves it to the type's field.
+const FLEET_CHOICES: [FleetType, string][] = [['light', 'Light'], ['heavy', 'Heavy'], ['non_road', 'Non-road']]
+export function FleetTypeChooser({ p, by, onChoose }: {
+  p: ExtractedProposal
+  by: Editor | null
+  onChoose: (patch: Partial<ExtractedProposal>) => void
+}) {
+  const problem = fleetTypeProblem('fleet_fuel', p)
+  const last = (p.fleetTypeLog ?? []).at(-1)
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div role="group" aria-label="Vehicles" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#555553' }}>Vehicles:</span>
+        {FLEET_CHOICES.map(([t, label]) => (
+          <button key={t} type="button" aria-pressed={p.fleetType === t} disabled={!by}
+            onClick={() => by && onChoose(chooseFleetType(p, t, { by, at: new Date().toISOString() }))}
+            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, cursor: by ? 'pointer' : 'default', opacity: by ? 1 : 0.5,
+              background: p.fleetType === t ? 'var(--color-brand)' : '#fff', color: p.fleetType === t ? '#fff' : '#555553',
+              border: `0.5px solid ${p.fleetType === t ? 'var(--color-brand)' : '#e8e7e4'}` }}>{label}</button>
+        ))}
+      </div>
+      {problem
+        ? <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4 }}>{problem}</div>
+        : last && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4 }}>Vehicle type chosen by {last.by.email}, {plainDate(last.at)}.</div>}
+    </div>
+  )
 }

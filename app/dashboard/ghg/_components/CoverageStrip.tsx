@@ -24,10 +24,13 @@
 import { useState } from 'react'
 import {
   findUnresolvedCoverage, billContributions, acceptedResolutions, analyzeCoverage, periodFromYearAndEnd,
-  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, validateResolution, deliveriesStatement, dateInWords, proposalNeedsAttention,
+  parseLocalDate, reportingYearLabel, fieldFor, FIELD_NAME, fleetTypeOfField, validateResolution, deliveriesStatement, dateInWords, proposalNeedsAttention,
   findExactDuplicates,
   type Location, type SourceDoc, type CoverageResolution, type CoveragePeriod,
 } from '../../../../lib/ghg/engine'
+import type { FleetType } from '@/lib/emissionFactors/mobile/types'
+/** FI9 diff 4: the vehicle type in a coverage line ("Diesel in light vehicles: ..."). */
+const FLEET_GROUP_WORDS: Record<FleetType, string> = { light: 'light vehicles', heavy: 'heavy vehicles', non_road: 'non-road equipment' }
 import {
   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution,
   deliveriesCompleteResolution, resolutionKey, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame,
@@ -108,13 +111,15 @@ export function CoverageStrip(p: CoverageStripProps) {
 
   // Coverage groups for this document type, as the engine forms them: counted or outside-the-year bills
   // with a usable period, keyed by fuel and meter.
-  const groups = new Map<string, { fuelType: string; meterLabel: string | null; periods: CoveragePeriod[] }>()
+  // FI9 diff 4: fleet-fuel bills are checked per vehicle type, as the engine's gate checks them.
+  const groups = new Map<string, { fuelType: string; meterLabel: string | null; fleetType: FleetType | null; periods: CoveragePeriod[] }>()
   for (const c of contributions) {
     if (!(c.counted || c.reason === 'outside_year') || !c.periodStart || !c.periodEndExclusive) continue
     const d = docs.find(x => x.id === c.docId) as SourceDoc
     const prop = d.extracted![c.proposalIndex]
-    const key = `${c.fuelType}|${c.meterLabel ?? ''}`
-    const g = groups.get(key) ?? { fuelType: c.fuelType, meterLabel: c.meterLabel, periods: [] }
+    const ft = fleetTypeOfField(c.field)
+    const key = `${c.fuelType}|${c.meterLabel ?? ''}|${ft ?? ''}`
+    const g = groups.get(key) ?? { fuelType: c.fuelType, meterLabel: c.meterLabel, fleetType: ft, periods: [] }
     g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(prop.periodStart as string), end: parseLocalDate(prop.periodEnd as string) })
     groups.set(key, g)
   }
@@ -134,12 +139,12 @@ export function CoverageStrip(p: CoverageStripProps) {
     .map(r => ({ r, reason: validateResolution(r, location) }))
     .filter((x): x is { r: CoverageResolution; reason: string } => x.reason !== null)
 
-  const inGroup = (i: { fuelType: string; meterLabel?: string | null; documentType?: string }, fuelType: string, meterLabel: string | null) =>
-    i.documentType === docType && i.fuelType === fuelType && (i.meterLabel ?? null) === meterLabel
+  const inGroup = (i: { fuelType: string; meterLabel?: string | null; documentType?: string; fleetType?: FleetType }, fuelType: string, meterLabel: string | null, fleetType: FleetType | null = null) =>
+    i.documentType === docType && i.fuelType === fuelType && (i.meterLabel ?? null) === meterLabel && (i.fleetType ?? null) === fleetType
 
   // Issues that belong to this upload but not to a coverage group: the all-rejected question, and the
   // plain-language messages for bills that are not counted (their controls arrive in T9).
-  const fieldsHere = new Set(docs.flatMap(d => (d.extracted ?? []).map(x => fieldFor(docType, x.fuelType)?.amount)).filter(Boolean).map(String))
+  const fieldsHere = new Set(docs.flatMap(d => (d.extracted ?? []).map(x => fieldFor(docType, x.fuelType, x.fleetType)?.amount)).filter(Boolean).map(String))
   const allRejected = issues.filter(i => i.status === 'all_rejected' && i.field && fieldsHere.has(i.field))
   const notices = issues.filter(i => ['undated', 'invalid_period', 'mixed_units', 'stream_off', 'no_value'].includes(i.status)
     && (i.docIds ?? []).some(id => docIdsHere.has(id)) && i.message)
@@ -160,11 +165,11 @@ export function CoverageStrip(p: CoverageStripProps) {
     <>
       {[...groups.values()].map(g => {
         const cov = analyzeCoverage(g.periods, win.start, win.end)
-        const gap = issues.find(i => i.status === 'gap' && inGroup(i, g.fuelType, g.meterLabel))
-        const overlaps = issues.filter(i => i.status === 'overlap' && inGroup(i, g.fuelType, g.meterLabel))
+        const gap = issues.find(i => i.status === 'gap' && inGroup(i, g.fuelType, g.meterLabel, g.fleetType))
+        const overlaps = issues.filter(i => i.status === 'overlap' && inGroup(i, g.fuelType, g.meterLabel, g.fleetType))
         const resolved = !gap && overlaps.length === 0
         const tone = resolved ? { bg: '#E1F5EE', fg: '#0F6E56', icon: '✓' } : { bg: '#FEF3E2', fg: 'var(--color-state-warn)', icon: '⚠' }
-        const prefix = many || g.meterLabel ? `${fuelName(g.fuelType)}${g.meterLabel ? `, meter ${g.meterLabel}` : ''}: ` : ''
+        const prefix = many || g.meterLabel || g.fleetType ? `${fuelName(g.fuelType)}${g.fleetType ? ` in ${FLEET_GROUP_WORDS[g.fleetType]}` : ''}${g.meterLabel ? `, meter ${g.meterLabel}` : ''}: ` : ''
         const missing = cov.gaps.map(x => x.label).join(', ')
         // T10b: statements in a delivery-based field are counted for the days they cover; the field's
         // completeness is the deliveries confirmation below, not a count of months.
@@ -175,9 +180,10 @@ export function CoverageStrip(p: CoverageStripProps) {
           : resolved && cov.issues.includes('gap')
             ? `${cov.monthsCovered} of 12 months from bills; the other ${12 - cov.monthsCovered} are estimated (${cov.pctEstimated}% of the total).`
             : `${cov.monthsCovered} of 12 months covered by bills.${missing ? ` Missing: ${missing}.` : ''}`
-        const prorated = contributions.filter(c => c.reason === 'prorated' && c.fuelType === g.fuelType && (c.meterLabel ?? null) === g.meterLabel)
+        const prorated = contributions.filter(c => c.reason === 'prorated' && c.fuelType === g.fuelType && (c.meterLabel ?? null) === g.meterLabel
+          && fleetTypeOfField(c.field) === g.fleetType)
         return (
-          <div key={`${g.fuelType}|${g.meterLabel ?? ''}`} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
+          <div key={`${g.fuelType}|${g.meterLabel ?? ''}|${g.fleetType ?? ''}`} style={{ marginTop: 8, background: tone.bg, borderRadius: 6, padding: '8px 10px', fontSize: 11, color: tone.fg, fontWeight: 600 }}>
             <div>{tone.icon} {prefix}{headline}</div>
             {cov.outOfWindow.length > 0 && (
               <div style={{ marginTop: 4, fontWeight: 400, color: '#555553' }}>
@@ -194,6 +200,7 @@ export function CoverageStrip(p: CoverageStripProps) {
                 <span style={prompt}>Upload the missing bill above, or:</span>
                 <button style={warnButton} onClick={() => p.onAdd(estimateResolution({
                   locId: location.id, fuelType: g.fuelType, documentType: docType, meterLabel: g.meterLabel,
+                  ...(g.fleetType ? { fleetType: g.fleetType } : {}),
                   monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, at: now(),
                 }))}>Estimate the missing months</button>
                 {unsettled(g.fuelType) && <span style={prompt}>Fix any bills marked above before estimating.</span>}

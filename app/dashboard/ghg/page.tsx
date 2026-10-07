@@ -30,7 +30,7 @@ import { unitLabel, unitOptionsShowing } from '../../../lib/ghg/unitLabels'
 import { AU_GAS_AREA_STATES } from '../../../lib/emissionFactors/ngaScope3_2025'
 import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
-import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
+import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable, FleetTypeChooser } from './_components/ProposalEdits'
 import { FigureInput } from './_components/FigureInput'
 import { FleetBlock } from './_components/FleetBlock'
 import { fieldsOf, typeHasFigures, untickFleetType, modelYearValue, fleetForCountryChange, assignLegacy, legacyFleetFigures } from '../../../lib/ghg/fleetForm'
@@ -56,7 +56,7 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
   notCountedLines,
-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
+  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, fleetTypeProblem, fleetTypeOfField, withFleetTypeTicked, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor, steamPricing, STEAM_ESTIMATE_SHORT,
@@ -1574,9 +1574,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           if (d.id !== docId || !d.extracted) return d
           // guardConfirm (T9, rule R5): a patch can never confirm a month-only proposal whose days the
           // customer has not confirmed. Only the target proposal is touched.
-          return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...guardConfirm(p, patch) } : p) }
+          return { ...d, extracted: d.extracted.map((p, i) => i === propIdx ? { ...p, ...guardConfirm(p, patch, d.document_type) } : p) }
         }),
       }
+      // FI9 diff 4: a vehicle type chosen at review ticks that type, so the reading is counted where it was routed.
+      if (patch.fleetType) locs[locIdx] = withFleetTypeTicked(locs[locIdx], patch.fleetType)
       return { ...inv, locations: locs }
     })
   }
@@ -1603,11 +1605,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     }))
   }
   // "Enter the figure manually": the field is editable (all its bills were rejected), so put the cursor there.
+  // FI9 diff 4: a vehicle-type field has no input until its type is ticked, so the cursor goes to that type's tick.
   const enterManually = (locId: string, field: string) => {
-    // FI9 diff 3: an unread fleet-fuel upload still names the two legacy fields until diff 4 types its readings. They
-    // have no input now; entering fleet fuel by hand starts at the vehicle-type ticks, so that is where focus goes.
-    const id = field === 'gasoline_amount' || field === 'diesel_mobile_amount' ? `fleet-${locId}-light` : `figure-${locId}-${field}`
-    const el = document.getElementById(id) as HTMLInputElement | null
+    const type = fleetTypeOfField(field)
+    const el = (document.getElementById(`figure-${locId}-${field}`) ?? (type ? document.getElementById(`fleet-${locId}-${type}`) : null)) as HTMLInputElement | null
     el?.focus()
   }
   // THE DERIVED LOCATIONS (T4, T7). Every figure on screen, every gate and every saved total reads these;
@@ -4115,6 +4116,10 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemov
                   </div>
                   {p.sourceQuote && <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontStyle: 'italic', marginTop: 2 }}>“{p.sourceQuote}”</div>}
                   {p.conversionNote && <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{p.conversionNote}</div>}
+                  {/* FI9 diff 4: a fleet-fuel reading's vehicle type, chosen here before it can be confirmed. */}
+                  {doc.document_type === 'fleet_fuel' && p.status !== 'rejected' && (p.fuelType === 'diesel' || p.fuelType === 'gasoline') && (
+                    <FleetTypeChooser p={p} by={currentUser} onChoose={patch => onUpdateProposal(locIdx, doc.id, pi, patch)} />
+                  )}
                   {notCounted.has(`${doc.id}:${pi}`) && (
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-ink-2)', marginTop: 2 }}>{notCounted.get(`${doc.id}:${pi}`)}</div>
                   )}
@@ -4137,9 +4142,9 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemov
                       ) : periodEditing?.key === `${doc.id}:${pi}` && periodEditing.confirm ? null : (
                         // T10c: hidden while the month-only date confirmation is open; that step has its own button.
                         // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.
-                        <button disabled={valueProblem(p) !== null} onClick={() => valueProblem(p) ? undefined : acceptanceProblem(p)
+                        <button disabled={valueProblem(p) !== null || fleetTypeProblem(doc.document_type, p) !== null} onClick={() => valueProblem(p) || fleetTypeProblem(doc.document_type, p) ? undefined : acceptanceProblem(p)
                           ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
-                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: valueProblem(p) ? 0.5 : 1 }}>Confirm</button>
+                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: valueProblem(p) || fleetTypeProblem(doc.document_type, p) ? 0.5 : 1 }}>Confirm</button>
                       )}
                       <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit figure</button>
                       <button onClick={() => { setUnitEditing(null); setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: false }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit dates</button>

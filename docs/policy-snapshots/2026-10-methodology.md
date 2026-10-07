@@ -63,3 +63,26 @@ hierarchy", and as the Category 3 method in the Scope 3 export. Rendered text, w
 ### Methodology changes, entry added (GHG Inventory: Scope 1 & 2 section, listed first)
 
 > 7 October 2026. Australian Category 3 gas and electricity use NGA 2025 Scope 3 factors by state; gas also by metro or non-metro area, asked per site. The upstream electricity factor includes grid losses, so there is no separate transmission and distribution line.
+
+---
+
+## Addendum (FI9, 7 October 2026): fuel used in vehicles
+
+Added after the text above was recorded. Nothing above is changed. Ruling R16 (docs/review/design-derived-figures.md
+section 10; docs/review/mobile-factors.md). Rendered text, word for word.
+
+### Emission factors, paragraphs added (fourth to sixth of eight, before the steam paragraph)
+
+Before: no such paragraphs. The page said nothing about fuel used in vehicles.
+
+After:
+
+> Fuel used in vehicles is entered by vehicle type: light vehicles, heavy vehicles and non-road equipment. Each is priced with the publisher's own mobile combustion factors for carbon dioxide, methane and nitrous oxide; a stationary factor is never used for a vehicle unless the publisher says its factor covers both, as DEFRA does for the UK. In the EU, carbon dioxide uses the EU Monitoring and Reporting Regulation's factor, and methane and nitrous oxide use the IPCC 2006 Guidelines' mobile defaults, because the Regulation publishes none.
+>
+> Where a publisher splits a vehicle type further, by model year, emission-control technology, emission standard, engine or equipment type, we use the row that matches what you tell us, and otherwise the published row with the highest methane and nitrous oxide for that type (combined on fixed AR5 values), and the row says so. For a model year later than the publisher's latest row, the latest row is used. In the United States and the EU, where the publisher's non-road factors differ by equipment type, non-road equipment is priced only once you choose its equipment type. In the United States, EPA publishes methane and nitrous oxide for road vehicles per mile, so they are counted when miles are entered and otherwise shown as not counted.
+>
+> In Australia, non-road equipment uses NGA's stationary factors, because the NGER Measurement Determination treats fuel not used for transport by vehicles registered for road use, rail, water or air as stationary energy; in New Zealand, non-road equipment uses MfE's transport fuel factors, because MfE classes fuel used to move a vehicle as transport. IPCC's default off-road factors, used for EU non-road equipment, carry a high nitrous oxide value for diesel, so methane and nitrous oxide are a larger share of those lines than in other countries. A vehicle fuel figure recorded before vehicle types were asked is not counted, and the inventory cannot be exported, until you choose the vehicles it was used in.
+
+### Methodology changes, entry added (GHG Inventory: Scope 1 & 2 section, listed first)
+
+> 7 October 2026. Fuel used in vehicles is entered by vehicle type and priced with each publisher's mobile combustion factors.

@@ -22,6 +22,7 @@
 //                        for the same documents replaces the earlier one.
 // Legacy duplicate and straddle keep the old (location, fuel, kind) key; nothing writes them any more.
 
+import type { FleetType } from '../emissionFactors/mobile/types'
 import { twoCopies, type CoverageResolution, type DocCopy } from './engine'
 import { docTypeLabel } from './conciergeDocTypes'
 
@@ -32,7 +33,7 @@ export function resolutionKey(r: CoverageResolution): string {
     case 'different_meters':
       return `different_meters|${r.locId}|${r.docId ?? ''}`
     case 'extrapolate':
-      return `extrapolate|${r.locId}|${r.documentType ?? ''}|${r.fuelType}|${r.meterLabel ?? ''}`
+      return `extrapolate|${r.locId}|${r.documentType ?? ''}|${r.fuelType}|${r.meterLabel ?? ''}${r.fleetType ? `|${r.fleetType}` : ''}`
     case 'used_none':
       return `used_none|${r.locId}|${r.fuelType}|${r.field ?? ''}`
     case 'deliveries_complete':
@@ -89,6 +90,8 @@ export const NO_MONTHS_TO_ESTIMATE =
 export function estimateResolution(a: {
   locId: string; fuelType: string; documentType: string; meterLabel: string | null
   monthsCovered: number; pctEstimated: number; at: string
+  /** FI9 diff 4: a fleet-fuel gap's vehicle type. */
+  fleetType?: FleetType
 }): CoverageResolution {
   if (!(a.monthsCovered >= 1)) throw new Error(NO_MONTHS_TO_ESTIMATE)
   const m = a.monthsCovered
@@ -96,6 +99,7 @@ export function estimateResolution(a: {
   return {
     locId: a.locId, fuelType: a.fuelType, kind: 'extrapolate', documentType: a.documentType,
     ...(a.meterLabel ? { meterLabel: a.meterLabel } : {}),
+    ...(a.fleetType ? { fleetType: a.fleetType } : {}),
     monthsCovered: m, pctEstimated: a.pctEstimated,
     note: `${meter}${m} of 12 months evidenced by bills; remaining ${12 - m} month${12 - m === 1 ? '' : 's'} estimated by scaling metered data ×12/${m} (${a.pctEstimated}% estimated).`,
     acknowledgedAt: a.at,

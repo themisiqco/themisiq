@@ -70,7 +70,7 @@ describe('month-only bills (rule R5)', () => {
     // T10b: a delivery date (no period) is a delivery; otherwise the R5 mapping is unchanged.
     expect(page).toContain("periodOrigin: !f.periodStart && !f.periodEnd && f.deliveryDate ? 'delivery'")
     expect(page).toContain(": f.periodConfidence === 'high' ? 'printed' : f.periodConfidence === 'medium' ? 'billing_month' : null,")
-    expect(page).toContain('i === propIdx ? { ...p, ...guardConfirm(p, patch) } : p')
+    expect(page).toContain('i === propIdx ? { ...p, ...guardConfirm(p, patch, d.document_type) } : p')
   })
 })
 
@@ -241,8 +241,65 @@ describe('T10a: a proposal with no figure can never be confirmed', () => {
   })
   it('the page disables Confirm and says what to do', () => {
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
-    expect(page).toContain('<button disabled={valueProblem(p) !== null}')
+    expect(page).toContain('<button disabled={valueProblem(p) !== null || fleetTypeProblem(doc.document_type, p) !== null}')
     expect(page).toContain("{p.status !== 'rejected' && valueProblem(p) && (")
     expect(NO_VALUE_MESSAGE).toBe("We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included.")
+  })
+})
+
+// ── FI9 diff 4 (ruling R16): a fleet-fuel reading's vehicle type, chosen at review ──────────────────────────────
+import { chooseFleetType } from './proposalEdits'
+
+describe('FI9 diff 4: the vehicle type of a fleet-fuel reading', () => {
+  const fuel = prop({ fuelType: 'diesel', value: 500, unit: 'litres', rawValue: 500, rawUnit: 'litres', status: 'extracted',
+    periodStart: '2025-01-01', periodEnd: '2025-12-31' })
+  const fdoc = (p: ExtractedProposal): SourceDoc => ({ ...gdoc('f', p), document_type: 'fleet_fuel' })
+
+  it('a receipt cannot be confirmed without a type; with one it can', () => {
+    expect(guardConfirm(fuel, { status: 'confirmed' }, 'fleet_fuel')).toEqual({})
+    const typed = { ...fuel, ...chooseFleetType(fuel, 'heavy', { by: BY, at: AT }) }
+    expect(guardConfirm(typed, { status: 'confirmed' }, 'fleet_fuel')).toEqual({ status: 'confirmed' })
+    // Other document types are not asked.
+    expect(guardConfirm(fuel, { status: 'confirmed' }, 'fuel_diesel')).toEqual({ status: 'confirmed' })
+  })
+
+  it('choosing Heavy routes the reading to heavy_diesel_amount, and the derived figure lands there', () => {
+    const typed = { ...fuel, ...chooseFleetType(fuel, 'heavy', { by: BY, at: AT }) }
+    const confirmed = { ...typed, ...guardConfirm(typed, { status: 'confirmed' }, 'fleet_fuel') }
+    const l = { ...emptyLocation('L1', 'Depot'), country: 'GB', grid_region: 'UK', has_mobile: true, fleet_heavy: true, source_docs: [fdoc(confirmed)] } as Location
+    const d = deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
+    expect([d.heavy_diesel_amount, d.diesel_mobile_amount]).toEqual([500, 0])
+    expect(buildWorkings([d], 'AR6', 2025).filter(r => r.stream === 'mobile').map(r => [r.source, r.activity_data])).toEqual([['Diesel (heavy vehicles)', 500]])
+  })
+
+  it('the choice is recorded with who and when; changing a confirmed reading\'s type sends it back for confirming', () => {
+    const p1 = chooseFleetType(fuel, 'light', { by: BY, at: AT })
+    expect(p1).toEqual({ fleetType: 'light', fleetTypeLog: [{ from: null, to: 'light', at: AT, by: BY }] })
+    const confirmed = { ...fuel, ...p1, status: 'confirmed' as const }
+    expect(chooseFleetType(confirmed, 'light', { by: BY, at: AT }), 'the same type changes nothing').toEqual({})
+    const p2 = chooseFleetType(confirmed, 'non_road', { by: BY, at: '2026-10-03T00:00:00.000Z' })
+    expect(p2.status).toBe('extracted')
+    expect(p2.fleetTypeLog).toEqual([{ from: null, to: 'light', at: AT, by: BY }, { from: 'light', to: 'non_road', at: '2026-10-03T00:00:00.000Z', by: BY }])
+  })
+
+  it('an old-field document (read before FI9, no type) is moved by the chooser, with who and when', () => {
+    const old = { ...fuel, status: 'confirmed' as const }
+    const l = { ...emptyLocation('L1', 'Depot'), country: 'GB', grid_region: 'UK', has_mobile: true, source_docs: [fdoc(old)] } as Location
+    const before = deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
+    expect(before.diesel_mobile_amount).toBe(500)
+    expect(findUnresolvedCoverage([l], 2025, 12, []).map(i => i.status)).toContain('fleet_type_missing')
+    const patch = chooseFleetType(old, 'heavy', { by: BY, at: AT })
+    expect(patch).toEqual({ fleetType: 'heavy', fleetTypeLog: [{ from: null, to: 'heavy', at: AT, by: BY }] })
+    const moved = { ...l, fleet_heavy: true, source_docs: [fdoc({ ...old, ...patch })] } as Location
+    const after = deriveLocations({ locations: [moved], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
+    expect([after.heavy_diesel_amount, after.diesel_mobile_amount]).toEqual([500, 0])
+    expect(findUnresolvedCoverage([moved], 2025, 12, [])).toEqual([])
+  })
+
+  it('the page gates Confirm on the type, shows the chooser for fleet fuel, and ticks the chosen type', () => {
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain("{doc.document_type === 'fleet_fuel' && p.status !== 'rejected' && (p.fuelType === 'diesel' || p.fuelType === 'gasoline') && (")
+    expect(page).toContain('<FleetTypeChooser p={p} by={currentUser} onChoose={patch => onUpdateProposal(locIdx, doc.id, pi, patch)} />')
+    expect(page).toContain('if (patch.fleetType) locs[locIdx] = withFleetTypeTicked(locs[locIdx], patch.fleetType)')
   })
 })

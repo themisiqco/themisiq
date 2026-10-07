@@ -11,7 +11,8 @@
 //     convertToCanonical, the same audited conversion as at extraction. It never relabels the converted unit.
 //   - Rule R5: a month-only proposal cannot be confirmed until the customer confirms or corrects its dates.
 
-import { acceptanceProblem, valueProblem, type ExtractedProposal } from './engine'
+import { acceptanceProblem, valueProblem, fleetTypeProblem, type ExtractedProposal } from './engine'
+import type { FleetType } from '../emissionFactors/mobile/types'
 import { convertToCanonical, type FuelType } from '../unitConversions'
 
 export type Editor = { userId: string; email: string }
@@ -92,11 +93,29 @@ export function undoRejection(p: ExtractedProposal, a: { by: Editor; at: string 
  * Every patch the page applies passes through here (R5). A patch that would confirm a proposal the
  * acceptance validator refuses has its status change dropped; everything else in it is kept.
  */
-export function guardConfirm(p: ExtractedProposal, patch: Patch): Patch {
+export function guardConfirm(p: ExtractedProposal, patch: Patch, docType = ''): Patch {
   if (patch.status !== 'confirmed') return patch
   // T10a: nor a proposal with no figure. "Edit figure" passes, because its patch carries the figure.
-  if (acceptanceProblem({ ...p, ...patch }) === null && valueProblem({ ...p, ...patch }) === null) return patch
+  // FI9 diff 4: nor a fleet-fuel reading with no vehicle type.
+  if (acceptanceProblem({ ...p, ...patch }) === null && valueProblem({ ...p, ...patch }) === null
+    && fleetTypeProblem(docType, { ...p, ...patch }) === null) return patch
   const rest = { ...patch }
   delete rest.status
   return rest
+}
+
+/**
+ * FI9 diff 4 (ruling R16): the review chooser, "Vehicles: Light / Heavy / Non-road". Sets the reading's vehicle type and
+ * records who chose it and when. A first choice on a reading made before FI9 moves it (and its figure) from the legacy
+ * field to the type's field and keeps its status. Changing a type already chosen on a confirmed reading un-confirms it,
+ * as a date edit does, because the figure now lands on another field.
+ */
+export function chooseFleetType(p: ExtractedProposal, to: FleetType, a: { by: Editor; at: string }): Patch {
+  if (p.fleetType === to) return {}
+  const from = p.fleetType ?? null
+  return {
+    fleetType: to,
+    fleetTypeLog: [...(p.fleetTypeLog ?? []), { from, to, at: a.at, by: a.by }],
+    ...(from !== null && p.status === 'confirmed' ? { status: 'extracted' as const } : {}),
+  }
 }

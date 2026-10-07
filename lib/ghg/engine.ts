@@ -1671,6 +1671,11 @@ interface ExtractedProposal {
   // T9 (Reject and Undo): every rejection and every undo, with who, when and the status before it, in order.
   // A rejected proposal stays on its document as evidence; it is simply not counted.
   statusLog?: { action: 'rejected' | 'undone'; at: string; by: { userId: string; email: string }; statusBefore: ConciergeStatus }[]
+  // FI9 diff 4 (ruling R16): a fleet-fuel reading's vehicle type, chosen by the customer at review (never inferred by the
+  // reader), with every choice recorded. Absent on a fleet reading made before FI9: it lands on the legacy field until a
+  // type is chosen, which moves it.
+  fleetType?: FleetType
+  fleetTypeLog?: { from: FleetType | null; to: FleetType; at: string; by: { userId: string; email: string } }[]
 }
 
 interface SourceDoc {
@@ -1838,6 +1843,22 @@ const fleetUnit = (loc: Location, f: FleetField): string => String((loc as unkno
 const fleetOn = (loc: Location, f: FleetField): boolean =>
   loc.has_mobile && (loc as unknown as Record<string, unknown>)[f.typeSwitch] === true
 
+/** FI9 diff 4: the vehicle type a fleet field belongs to, or null for any other field (and the legacy two). */
+export const fleetTypeOfField = (field: keyof Location | string): FleetType | null =>
+  FLEET_FIELDS.find(f => f.amount === field)?.type ?? null
+
+/** FI9 diff 4: the fleet fields an unread fleet-fuel upload is evidence for: the ticked types', or all six if none is. */
+export function unreadFleetFields(loc: Location): (keyof Location)[] {
+  const ticked = FLEET_FIELDS.filter(f => (loc as unknown as Record<string, unknown>)[f.typeSwitch] === true)
+  return (ticked.length > 0 ? ticked : FLEET_FIELDS).map(f => f.amount)
+}
+
+/** FI9 diff 4: choosing a reading's vehicle type at review ticks that type, so the figure it routes to is counted and
+ *  never lands on a field nothing prices. Unticking stays the customer's own step (untickFleetType). */
+export function withFleetTypeTicked(loc: Location, type: FleetType): Location {
+  return { ...loc, has_mobile: true, [FLEET_TYPE_SWITCH[type]]: true } as Location
+}
+
 /** FI9: the legacy fleet figures still waiting for a vehicle type, in field order. */
 export function legacyFleetFigures(loc: Location): { field: 'gasoline_amount' | 'diesel_mobile_amount'; fuel: FleetFuel; value: number; unit: string }[] {
   const out: { field: 'gasoline_amount' | 'diesel_mobile_amount'; fuel: FleetFuel; value: number; unit: string }[] = []
@@ -1850,18 +1871,25 @@ export function legacyFleetFigures(loc: Location): { field: 'gasoline_amount' | 
  * FI9 (R16 choice 2): the customer's button, "These were {type}". Moves one legacy figure, its unit and its unit-change
  * history to the type's field, ticks the type, and records the move with who and when. Nothing else calls it: a legacy
  * figure is never assigned without the customer saying which type.
- *   Refused, with the reason, where the move would lose or merge something: the target field already holds a figure,
- * or documents back the legacy field (they move with their proposals, FI9 diff 4).
+ *   Refused, with the reason, where the move would lose or merge something: the target field already holds a typed
+ * figure. Documents behind the legacy field move with it (FI9 diff 4).
  */
 export function assignLegacyFleet(
   loc: Location, from: 'gasoline_amount' | 'diesel_mobile_amount', to: FleetType, at: string, by: FleetAssignment['by'],
-): { ok: true; location: Location } | { ok: false; reason: 'nothing_to_move' | 'target_has_figure' | 'documents_back_field' } {
+): { ok: true; location: Location } | { ok: false; reason: 'nothing_to_move' | 'target_has_figure' } {
   const fuel: FleetFuel = from === 'gasoline_amount' ? 'petrol' : 'diesel'
   const target = FLEET_FIELDS.find(f => f.type === to && f.fuel === fuel)!
   const value = loc[from]
-  if (!(value > 0)) return { ok: false, reason: 'nothing_to_move' }
-  if (fleetNum(loc, target) > 0) return { ok: false, reason: 'target_has_figure' }
-  if (documentsBacking(loc, from) > 0) return { ok: false, reason: 'documents_back_field' }
+  // FI9 diff 4: documents that still name the legacy field move too: each untyped fleet reading of this fuel takes the
+  // vehicle type, recorded with who and when, exactly as choosing it at review would (chooseFleetType).
+  const fuelType = fuel === 'petrol' ? 'gasoline' : 'diesel'
+  const untyped = loc.source_docs.some(d => d.document_type === 'fleet_fuel' && (d.extracted ?? []).some(p => p.fuelType === fuelType && !p.fleetType))
+  if (!(value > 0) && !untyped) return { ok: false, reason: 'nothing_to_move' }
+  if (value > 0 && fleetNum(loc, target) > 0) return { ok: false, reason: 'target_has_figure' }
+  const source_docs = loc.source_docs.map(d => d.document_type !== 'fleet_fuel' || !d.extracted ? d : {
+    ...d, extracted: d.extracted.map(p => p.fuelType !== fuelType || p.fleetType ? p : {
+      ...p, fleetType: to, fleetTypeLog: [...(p.fleetTypeLog ?? []), { from: null, to, at, by }] }) })
+  if (!(value > 0)) return { ok: true, location: { ...loc, source_docs, has_mobile: true, [target.typeSwitch]: true } as Location }
   const fromUnit = from === 'gasoline_amount' ? loc.gasoline_unit : loc.diesel_mobile_unit
   const fromUnitField = from === 'gasoline_amount' ? 'gasoline_unit' : 'diesel_mobile_unit'
   const rekey = <T extends { field: string }>(xs: T[] | undefined, field: string, to2: string): T[] | undefined =>
@@ -1877,6 +1905,7 @@ export function assignLegacyFleet(
       : c.field === fromUnitField ? { ...c, field: String(target.unit) } : c)),
     manual_overrides: rekey(loc.manual_overrides, from, String(target.amount)),
     fleet_assignments: [...(loc.fleet_assignments ?? []), { from, to, field: String(target.amount), value, unit: fromUnit, at, by }],
+    source_docs,
   } as Location }
 }
 
@@ -2162,6 +2191,10 @@ interface CoverageResolution {
   // (fleet_fuel) share fuelType 'diesel', so without this one estimate grossed up and cleared both.
   // Absent is accepted only where the location has a single document type for the fuel.
   documentType?: string
+  // extrapolate (FI9 diff 4): which vehicle type's fleet-fuel gap. Light and heavy diesel share document type and fuel,
+  // so without this one estimate would gross up both. Absent for every other document type, and for a legacy (untyped)
+  // fleet reading.
+  fleetType?: FleetType
   // exact_duplicate (T15, rule R6): the customer's answer to an exact duplicate across document types.
   //   count_once: countedDocId counts; excludedDocIds are retained as evidence, not counted (exact_duplicate_of).
   //   not_same:   docIds all count. Both record who chose (`by`) and when (`acknowledgedAt`).
@@ -3790,7 +3823,13 @@ export function pctEstimated(
 
 // Map a concierge (docType, fuelType) pair to its inventory field(s). Module-scoped so both the
 // confirm path (updateProposal / addCoverageResolution) and buildWorkings share one join key.
-function fieldFor(docType: string, fuelType: string): { amount: keyof Location; unit?: keyof Location } | null {
+function fieldFor(docType: string, fuelType: string, fleetType?: FleetType): { amount: keyof Location; unit?: keyof Location } | null {
+  // FI9 diff 4: a fleet-fuel reading with a vehicle type lands on that type's field; without one (read before FI9), on
+  // the legacy field, which is unpriced until the type is chosen.
+  if (docType === 'fleet_fuel' && fleetType && (fuelType === 'diesel' || fuelType === 'gasoline')) {
+    const f = FLEET_FIELDS.find(x => x.type === fleetType && x.fuel === (fuelType === 'gasoline' ? 'petrol' : 'diesel'))!
+    return { amount: f.amount, unit: f.unit }
+  }
   if (docType === 'utility_electricity' && fuelType === 'electricity') return { amount: 'electricity_kwh' }
   if (docType === 'renewable_cert' && fuelType === 'electricity') return { amount: 'renewable_electricity_kwh' }
   if (docType === 'utility_bill_gas' && fuelType === 'natural_gas') return { amount: 'natural_gas_amount', unit: 'natural_gas_unit' }
@@ -3969,7 +4008,8 @@ export const DOC_TYPE_FIELDS: Record<string, (keyof Location)[]> = {
   utility_electricity: ['electricity_kwh'],
   fuel_propane: ['propane_amount'],
   fuel_diesel: ['diesel_stationary_amount'],
-  fleet_fuel: ['gasoline_amount', 'diesel_mobile_amount'],
+  // FI9 diff 4: the six vehicle-type fields; an unread upload names only the ticked types' (unreadFleetFields).
+  fleet_fuel: FLEET_FIELDS.map(f => f.amount),
   fuel_oil: ['fuel_oil_distillate_amount', 'fuel_oil_residual_amount'],
   purchased_steam: ['purchased_steam_mmbtu'],
   service_record: ['refrigerant_purchased_kg'],
@@ -4192,6 +4232,15 @@ export function acceptanceProblem(p: Pick<ExtractedProposal, 'periodOrigin' | 'p
   return periodOriginOf(p) === 'billing_month' ? BILLING_MONTH_CONFIRM_MESSAGE : null
 }
 
+/**
+ * FI9 diff 4 (ruling R16): a fleet-fuel reading cannot be confirmed until the customer chooses the vehicles it was used
+ * in. The reader never infers the type, so a confirmed fleet figure always names a type someone chose.
+ */
+export function fleetTypeProblem(docType: string, p: Pick<ExtractedProposal, 'fuelType' | 'fleetType'>): string | null {
+  if (docType !== 'fleet_fuel' || p.fleetType) return null
+  return `Choose the vehicles this ${p.fuelType === 'gasoline' ? 'petrol' : p.fuelType} was used in before confirming.`
+}
+
 /** T10a, worded by T10c: why a proposal with no figure cannot be confirmed, shown beside the disabled Confirm. */
 export const NO_VALUE_MESSAGE =
   "We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included."
@@ -4278,7 +4327,7 @@ export function billContributions(
   loc.source_docs.forEach(d => d.extracted?.forEach(p => {
     if (p.status !== 'confirmed' || p.value == null) return
     if (excludedBy.has(`${d.id}|${p.fuelType}`) || duplicateOf.has(`${d.id}|${p.fuelType}`)) return   // not counted, so it cannot make a field mixed
-    const map = fieldFor(d.document_type, p.fuelType)
+    const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
     if (!map) return
     const units = unitsByField.get(String(map.amount)) ?? new Set<string>()
     if (p.unit) units.add(p.unit)
@@ -4288,7 +4337,7 @@ export function billContributions(
   const out: BillContribution[] = []
   loc.source_docs.forEach(d => d.extracted?.forEach((p, pi) => {
     if (p.value == null) return
-    const map = fieldFor(d.document_type, p.fuelType)
+    const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
     if (!map) return
 
     let endExcl: Date | null = null
@@ -4479,7 +4528,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
   loc.source_docs.forEach(d => {
     d.extracted?.forEach((p, pi) => {
       if (p.status !== 'confirmed' || p.value == null) return
-      const map = fieldFor(d.document_type, p.fuelType)
+      const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
       // T10: an overridden field is the customer's typed figure, not the documents', so it has no entry here.
       if (!map || activeOverride(loc, map.amount)) return
       const key = String(map.amount)
@@ -4513,7 +4562,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
       // Matched on document type too (T5): accepted resolutions without one exist only where the fuel has
       // a single document type at this location, so `null` cannot reach a second group.
       const r = resolutions.find(x => x.kind === 'extrapolate' && x.fuelType === a.fuelType && (x.meterLabel ?? null) === meter
-        && (x.documentType == null || x.documentType === a.documentType))
+        && (x.documentType == null || x.documentType === a.documentType) && (x.fleetType ?? null) === fleetTypeOfField(key))
       if (r) extrs.push({ meter, r })
       grossed += sum * (r && r.monthsCovered ? 12 / r.monthsCovered : 1)
     }
@@ -4590,7 +4639,7 @@ export function deriveLocations(inventory: {
     // Pending first: a field with a pending proposal is document-backed even when nothing is confirmed.
     loc.source_docs.forEach(d => d.extracted?.forEach(p => {
       if (p.value == null || (p.status !== 'extracted' && p.status !== 'needs_manual_review')) return
-      const map = fieldFor(d.document_type, p.fuelType)
+      const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
       // T10: an overridden field keeps the typed figure, whatever its documents say.
       if (map && !activeOverride(loc, map.amount)) set(map.amount, 0)
     }))
@@ -4639,7 +4688,7 @@ export function documentsBacking(loc: Location, field: keyof Location): number {
   const ids = new Set<string>()
   loc.source_docs.forEach(d => d.extracted?.forEach(p => {
     if (p.value == null || p.status === 'rejected') return
-    if (fieldFor(d.document_type, p.fuelType)?.amount === field) ids.add(d.id)
+    if (fieldFor(d.document_type, p.fuelType, p.fleetType)?.amount === field) ids.add(d.id)
   }))
   return ids.size
 }
@@ -4674,6 +4723,8 @@ const ZERO_ROW_FIELDS: { field: keyof Location; source: string; scope: number; u
   { field: 'diesel_stationary_amount', source: 'Diesel (stationary)', scope: 1, unitField: 'diesel_stationary_unit', unit: '' },
   { field: 'gasoline_amount', source: 'Gasoline (mobile)', scope: 1, unitField: 'gasoline_unit', unit: '' },
   { field: 'diesel_mobile_amount', source: 'Diesel (mobile)', scope: 1, unitField: 'diesel_mobile_unit', unit: '' },
+  // FI9 diff 4: fleet-fuel bills land on the vehicle-type fields once their type is chosen.
+  ...FLEET_FIELDS.map(f => ({ field: f.amount, source: f.source, scope: 1, unitField: f.unit, unit: '' })),
   { field: 'electricity_kwh', source: 'Electricity', scope: 2, unit: 'kWh' },
 ]
 
@@ -5134,6 +5185,8 @@ export interface CoverageIssue {
   fields?: string[]
   docIds?: string[]
   meterLabel?: string | null
+  /** FI9 diff 4: a fleet-fuel gap or overlap's vehicle type, so its estimate names it. */
+  fleetType?: FleetType
 }
 
 // ── T15: EXACT DUPLICATES ACROSS DOCUMENT TYPES (rule R6, docs/review/design-derived-figures.md) ──────────
@@ -5160,7 +5213,7 @@ export function findExactDuplicates(loc: Location, allResolutions: CoverageResol
   const cands: Cand[] = []
   loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
     if (p.status !== 'confirmed' || p.value == null) return
-    const map = fieldFor(d.document_type, p.fuelType)
+    const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
     if (!map || activeOverride(loc, map.amount)) return
     cands.push({ doc: d, p })
   }))
@@ -5238,7 +5291,8 @@ export function findUnresolvedCoverage(
       || resolutions.some(r => r.kind === 'used_none' && r.field === String(f))
     loc.source_docs.forEach(d => {
       if ((d.extracted?.length ?? 0) > 0) return
-      const fields = DOC_TYPE_FIELDS[d.document_type] ?? []
+      // FI9 diff 4: an unread fleet-fuel upload names the ticked vehicle types' fields (all six when none is ticked).
+      const fields = d.document_type === 'fleet_fuel' ? unreadFleetFields(loc) : DOC_TYPE_FIELDS[d.document_type] ?? []
       if (fields.length === 0 || fields.some(hasFigure)) return
       out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id],
         fields: fields.map(String), message: COVERAGE_MESSAGE.unread(d.file_name, listInWords(fields.map(f => FIELD_NAME[String(f)] ?? String(f))), site) })
@@ -5269,7 +5323,7 @@ export function findUnresolvedCoverage(
     loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
       // T10a: a proposal with no figure is still a document for its field. Skipping it let a field whose only
       // bills had no figure and were rejected fall to zero with no issue (found by the property test).
-      const map = fieldFor(d.document_type, p.fuelType)
+      const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
       if (!map) return
       const e = byField.get(String(map.amount)) ?? { fuelType: p.fuelType, statuses: [] }
       e.statuses.push(p.status)
@@ -5305,7 +5359,7 @@ export function findUnresolvedCoverage(
     const confirmedByField = new Map<string, { fuelType: string; docIds: Set<string>; n: number }>()
     loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
       if (p.status !== 'confirmed' || p.value == null) return
-      const map = fieldFor(d.document_type, p.fuelType)
+      const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
       if (!map || !streamSwitchOff(loc, map.amount)) return
       const e = confirmedByField.get(String(map.amount)) ?? { fuelType: p.fuelType, docIds: new Set(), n: 0 }
       e.n += 1; e.docIds.add(d.id)
@@ -5346,12 +5400,14 @@ export function findUnresolvedCoverage(
     // Coverage groups: confirmed, counted-or-outside-year bills with a usable period, keyed by
     // (document_type, fuelType, meter_label). Same-bill exclusions, undated, invalid and mixed bills are
     // not placed (each is reported above, or is a resolved overlap).
-    const groups = new Map<string, { documentType: string; fuelType: string; meterLabel: string | null; periods: CoveragePeriod[] }>()
+    // FI9 diff 4: and by vehicle type, so a fleet-fuel gap in light vehicles is not covered by heavy-vehicle bills.
+    const groups = new Map<string, { documentType: string; fuelType: string; meterLabel: string | null; fleetType: FleetType | null; periods: CoveragePeriod[] }>()
     for (const c of contributions) {
       if (!(c.counted || c.reason === 'outside_year') || !c.periodStart || !c.periodEndExclusive) continue
       const d = loc.source_docs.find(x => x.id === c.docId)!
-      const key = `${d.document_type}|${c.fuelType}|${c.meterLabel ?? ''}`
-      const g = groups.get(key) ?? { documentType: d.document_type, fuelType: c.fuelType, meterLabel: c.meterLabel, periods: [] }
+      const ft = fleetTypeOfField(c.field)
+      const key = `${d.document_type}|${c.fuelType}|${c.meterLabel ?? ''}|${ft ?? ''}`
+      const g = groups.get(key) ?? { documentType: d.document_type, fuelType: c.fuelType, meterLabel: c.meterLabel, fleetType: ft, periods: [] }
       const p = d.extracted![c.proposalIndex]
       g.periods.push({ docId: c.docId, pi: c.proposalIndex, start: parseLocalDate(p.periodStart as string), end: parseLocalDate(p.periodEnd as string) })
       groups.set(key, g)
@@ -5361,8 +5417,9 @@ export function findUnresolvedCoverage(
       // T10b: a delivery-based group has no monthly gap; its statements are still checked for overlaps.
       if (cov.issues.includes('gap') && !deliveryGroups.has(`${g.documentType}|${g.fuelType}`)) {
         const res = resolutions.some(r => r.kind === 'extrapolate' && r.fuelType === g.fuelType && (r.meterLabel ?? null) === g.meterLabel
-          && (r.documentType == null || r.documentType === g.documentType))
-        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel, documentType: g.documentType })
+          && (r.documentType == null || r.documentType === g.documentType) && (r.fleetType ?? null) === g.fleetType)
+        if (!res) out.push({ locId: loc.id, fuelType: g.fuelType, status: 'gap', meterLabel: g.meterLabel, documentType: g.documentType,
+          ...(g.fleetType ? { fleetType: g.fleetType } : {}) })
       }
       for (const pair of cov.overlaps) {
         const from = pair.a.start > pair.b.start ? pair.a.start : pair.b.start
@@ -5370,6 +5427,7 @@ export function findUnresolvedCoverage(
         const toExcl = endA < endB ? endA : endB
         const to = new Date(toExcl.getFullYear(), toExcl.getMonth(), toExcl.getDate() - 1)
         out.push({ locId: loc.id, fuelType: g.fuelType, status: 'overlap', docIds: [pair.a.docId, pair.b.docId], meterLabel: g.meterLabel, documentType: g.documentType,
+          ...(g.fleetType ? { fleetType: g.fleetType } : {}),
           message: COVERAGE_MESSAGE.overlap(fileOf(pair.a.docId), fileOf(pair.b.docId), dateInWords(from), dateInWords(to)) })
       }
     }

@@ -151,15 +151,12 @@ export const legacyFleetText = (value: number, unit: string, fuel: FleetFuel) =>
   `recorded before vehicle types were asked. Choose the vehicles it was used in.`
 
 /** A refused move, in plain words. */
-export function legacyRefusalText(reason: 'nothing_to_move' | 'target_has_figure' | 'documents_back_field', to: FleetType, fuel: FleetFuel, site: string): string {
+export function legacyRefusalText(reason: 'nothing_to_move' | 'target_has_figure', to: FleetType, fuel: FleetFuel, site: string): string {
   switch (reason) {
     case 'nothing_to_move': return 'There is no figure here to move.'
     case 'target_has_figure':
       return `${FLEET_TYPE_NAME[to]} already hold a ${fuelWords(fuel)} figure at ${site}, so this one was not moved. ` +
         'Change or remove that figure first, or choose another vehicle type.'
-    case 'documents_back_field':
-      return 'This figure comes from uploaded documents. It was not moved: each document will be assigned to a vehicle ' +
-        'type with its reading.'
   }
 }
 

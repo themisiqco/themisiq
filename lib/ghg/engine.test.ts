@@ -4607,7 +4607,9 @@ describe('T10 unread uploads: evidence when the fuel has a figure, a blocker nam
       message: 'scan.pdf is uploaded for natural gas at Site A, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no natural gas.' }]);
   });
   it('a document type covering several fuels lists them', () => {
-    expect(none(site({ source_docs: [unreadDoc('fleet', 'fleet_fuel')] }))[0].message).toContain('uploaded for gasoline and diesel at Site A')
+    // FI9 diff 4: a fleet upload is evidence for the ticked vehicle types' fields, or all six when none is ticked.
+    expect(none(site({ fleet_heavy: true, source_docs: [unreadDoc('fleet', 'fleet_fuel')] }))[0].message).toContain('uploaded for petrol in heavy vehicles and diesel in heavy vehicles at Site A')
+    expect(none(site({ source_docs: [unreadDoc('fleet', 'fleet_fuel')] }))[0].fields).toEqual(['light_petrol_amount', 'light_diesel_amount', 'heavy_petrol_amount', 'heavy_diesel_amount', 'nonroad_petrol_amount', 'nonroad_diesel_amount'])
     expect(none(site({ source_docs: [unreadDoc('oil', 'fuel_oil')] }))[0].message).toContain('confirm this site used no heating oil and heavy fuel oil.')
   });
   it('each action clears it: a typed figure, or "used none"', () => {
@@ -6699,5 +6701,108 @@ describe('FI9 diff 2b: fleet pricing per publisher (R16)', () => {
     const fleet = read.inputs!.rows.filter(r => r.stream === 'mobile_gasoline' || r.stream === 'mobile_diesel');
     expect(fleet.map(r => [r.stream, r.activity])).toEqual([['mobile_gasoline', 1], ['mobile_diesel', 2], ['mobile_gasoline', 3],
       ['mobile_diesel', 4], ['mobile_gasoline', 5], ['mobile_diesel', 6]]);
+  });
+});
+
+// ── FI9 DIFF 4 (ruling R16): FLEET-FUEL DOCUMENTS BY VEHICLE TYPE ─────────────────────────────────────────────────
+// A fleet-fuel reading carries the vehicle type the customer chose at review (never the reader's). The type routes it to
+// the type and fuel field, coverage is checked per type, and a reading with no type stays on the legacy field, which is
+// not priced, until one is chosen.
+import {
+  fleetTypeProblem as fi9dTypeProblem, fleetTypeOfField as fi9dTypeOfField, withFleetTypeTicked as fi9dTicked,
+  assignLegacyFleet as fi9dAssign,
+} from './engine';
+
+describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
+  const BY = { userId: 'u1', email: 'a@b.co' };
+  const fuelProp = (o: Partial<ExtractedProposal> = {}) => prop({ fuelType: 'diesel', value: 500, unit: 'litres',
+    periodStart: '2025-01-01', periodEnd: '2025-12-31', sourceQuote: '500 litres', ...o });
+  const site = (docs: SourceDoc[], o: Partial<Location> = {}) => loc({ country: 'GB', grid_region: 'UK', has_mobile: true, source_docs: docs, ...o });
+  const derived = (l: Location, res: CoverageResolution[] = []) =>
+    deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: res })[0];
+
+  it('a reading with no vehicle type cannot be confirmed, and says so', () => {
+    expect(fi9dTypeProblem('fleet_fuel', { fuelType: 'diesel' })).toBe('Choose the vehicles this diesel was used in before confirming.');
+    expect(fi9dTypeProblem('fleet_fuel', { fuelType: 'gasoline' })).toBe('Choose the vehicles this petrol was used in before confirming.');
+    expect(fi9dTypeProblem('fleet_fuel', { fuelType: 'diesel', fleetType: 'heavy' })).toBeNull();
+    expect(fi9dTypeProblem('fuel_diesel', { fuelType: 'diesel' }), 'only fleet-fuel documents ask').toBeNull();
+  });
+
+  it('Heavy routes the reading to heavy_diesel_amount, and the derived figure is priced there', () => {
+    const l = site([doc('fleet_fuel', [fuelProp({ fleetType: 'heavy' })])], { fleet_heavy: true });
+    const d = derived(l);
+    expect([d.heavy_diesel_amount, d.heavy_diesel_unit, d.diesel_mobile_amount, d.light_diesel_amount]).toEqual([500, 'litres', 0, 0]);
+    // DEFRA's Fuels row, which DEFRA states applies to vehicles: 500 L x 2.58354 kg CO2e/L.
+    expect(calcLocation(d, 'AR6', 2026).s1_mobile).toBeCloseTo(1.29177, 12);
+    expect(findUnresolvedCoverage([l], 2025, 12, [])).toEqual([]);
+    // With no type, the same reading lands on the legacy field and blocks until one is chosen.
+    const untyped = site([doc('fleet_fuel', [fuelProp()])]);
+    expect(derived(untyped).diesel_mobile_amount).toBe(500);
+    expect(findUnresolvedCoverage([untyped], 2025, 12, []).map(i => i.status)).toContain('fleet_type_missing');
+  });
+
+  it('choosing a type at review ticks it, so a routed reading is never left on a field nothing counts', () => {
+    const l = site([doc('fleet_fuel', [fuelProp({ fleetType: 'non_road' })])]);
+    expect(calcLocation(derived(l), 'AR6', 2026).s1_mobile, 'unticked: not counted').toBe(0);
+    const ticked = fi9dTicked(l, 'non_road');
+    expect([ticked.fleet_nonroad, ticked.has_mobile]).toEqual([true, true]);
+    expect(calcLocation(derived(ticked), 'AR6', 2026).s1_mobile).toBeGreaterThan(0);
+    expect(fi9dTypeOfField('nonroad_diesel_amount')).toBe('non_road');
+    expect(fi9dTypeOfField('diesel_mobile_amount')).toBeNull();
+  });
+
+  it('coverage is checked per vehicle type: light January to June and heavy July to December each leave a gap', () => {
+    const l = site([
+      doc('fleet_fuel', [fuelProp({ fleetType: 'light', periodStart: '2025-01-01', periodEnd: '2025-06-30' })], 'a'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2025-07-01', periodEnd: '2025-12-31' })], 'b'),
+    ], { fleet_light: true, fleet_heavy: true });
+    const issues = findUnresolvedCoverage([l], 2025, 12, []);
+    expect(issues.filter(i => i.status === 'gap').map(i => i.fleetType).sort()).toEqual(['heavy', 'light']);
+    expect(issues.some(i => i.status === 'overlap')).toBe(false);
+    // The same two periods for one type cover the year.
+    const one = site([
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2025-01-01', periodEnd: '2025-06-30' })], 'a'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2025-07-01', periodEnd: '2025-12-31' })], 'b'),
+    ], { fleet_heavy: true });
+    expect(findUnresolvedCoverage([one], 2025, 12, [])).toEqual([]);
+    expect(derived(one).heavy_diesel_amount).toBe(1000);
+    // Two types over the same days are two vehicle groups, not an overlap.
+    const both = site([
+      doc('fleet_fuel', [fuelProp({ fleetType: 'light' })], 'a'), doc('fleet_fuel', [fuelProp({ fleetType: 'heavy' })], 'b'),
+    ], { fleet_light: true, fleet_heavy: true });
+    expect(findUnresolvedCoverage([both], 2025, 12, [])).toEqual([]);
+  });
+
+  it('an old-field document moves with the legacy button: the type is set on the reading with who and when', () => {
+    const l = site([doc('fleet_fuel', [fuelProp(), fuelProp({ fuelType: 'gasoline', value: 80 })])]);
+    const r = fi9dAssign(l, 'diesel_mobile_amount', 'heavy', '2026-10-07T00:00:00Z', BY) as { ok: true; location: Location };
+    expect(r.ok).toBe(true);
+    const [diesel, petrol] = r.location.source_docs[0].extracted!;
+    expect(diesel.fleetType).toBe('heavy');
+    expect(diesel.fleetTypeLog).toEqual([{ from: null, to: 'heavy', at: '2026-10-07T00:00:00Z', by: BY }]);
+    expect(petrol.fleetType, 'only the fuel the button names').toBeUndefined();
+    expect(r.location.fleet_heavy).toBe(true);
+    const d = derived(r.location);
+    expect([d.heavy_diesel_amount, d.diesel_mobile_amount]).toEqual([500, 0]);
+    expect(fi9dAssign(r.location, 'diesel_mobile_amount', 'light', 't', BY)).toEqual({ ok: false, reason: 'nothing_to_move' });
+  });
+
+  it('the monthly chart includes fleet bills per type, priced on the type\'s mobile row and labelled by fuel', () => {
+    const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+    const l = site([
+      doc('fleet_fuel', [fuelProp({ fleetType: 'light', value: 120, periodStart: '2025-01-01', periodEnd: '2025-12-31' })], 'a'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', value: 240, periodStart: '2025-01-01', periodEnd: '2025-12-31' })], 'b'),
+    ], { fleet_light: true, fleet_heavy: true });
+    const out = buildMonthlyEmissions({ locations: [l], reporting_year: 2025, coverage_resolutions: [] }, deps, 'AR6');
+    const diesel = out.slices.filter(s => s.fuel_type === 'diesel');
+    expect(diesel).toHaveLength(24);
+    const total = diesel.reduce((a, s) => a + s.tco2e, 0);
+    // Each slice is stored to six decimals, so the sum agrees to the sixth.
+    expect(total).toBeCloseTo(360 * 2.58354 / 1000, 5);
+    expect(total).toBeCloseTo(calcLocation(derived(l), 'AR6', 2026).s1_mobile, 5);
+    // An untyped reading is not priced in the chart either; it is listed as skipped.
+    const untyped = buildMonthlyEmissions({ locations: [site([doc('fleet_fuel', [fuelProp()])])], reporting_year: 2025, coverage_resolutions: [] }, deps, 'AR6');
+    expect(untyped.slices).toEqual([]);
+    expect(untyped.skipped.length).toBeGreaterThan(0);
   });
 });
