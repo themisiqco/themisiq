@@ -1074,7 +1074,8 @@ describe('the editions name the tables that priced (FI2)', () => {
     const nz = { ...emptyLocation('n1', 'Auckland'), country: 'NZ', grid_region: 'NZ', has_mobile: true,
       gasoline_amount: 100, gasoline_unit: 'litres' as const, diesel_mobile_amount: 50, diesel_mobile_unit: 'gallons' as const }
     const ed = buildFactorEditions([nz], 2026)
-    expect(ed.NZ?.combustion).toEqual({ source: EF_SOURCES.combustion_nz, edition: 'MfE 2026 v2' })
+    // FI10: with the use class that priced it.
+    expect(ed.NZ?.combustion).toEqual({ source: EF_SOURCES.combustion_nz, edition: 'MfE 2026 v2', variant: 'Commercial use class' })
     expect(ed.US, 'no US table priced anything').toBeUndefined()
   })
 

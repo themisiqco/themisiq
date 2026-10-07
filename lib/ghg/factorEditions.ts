@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, steamPricing, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, combustionLinePublishers,
+  efJurisdiction, steamFactorFor, steamPricing, nzUseClassVariant, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, combustionLinePublishers,
   COMBUSTION_EDITION, STEAM_EDITION,
 } from './engine'
 import type { Location } from './engine'
@@ -69,6 +69,11 @@ export type FactorEdition = {
   source: string
   /** Short edition label. Combustion: declared in COMBUSTION_EDITION. Electricity: usedYear. */
   edition: string
+  /**
+   * FI10: the table variant(s) that priced the family, where the publisher prints more than one (today the MfE use
+   * classes), sorted and joined with '; '. Absent where the table has no variants, and on maps saved before FI10.
+   */
+  variant?: string
 }
 
 /**
@@ -283,7 +288,10 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     //   FI2: recorded for each TABLE that priced a line, from the line itself, never from the location's country. A
     // line whose key came from the US fallback (until FI2 diff 2) records the US edition, because that is what priced it.
     for (const src of combustionLinePublishers(loc)) {
-      (out[src.jurisdiction] ??= {}).combustion = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction] }
+      const prev = out[src.jurisdiction]?.combustion
+      ;(out[src.jurisdiction] ??= {}).combustion = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction],
+        // FI10: the MfE use class(es) that priced NZ combustion, across every NZ location.
+        ...(src.jurisdiction === 'NZ' ? { variant: joinVariants(prev?.variant, nzUseClassVariant(loc)) } : {}) }
     }
 
     // ── ELECTRICITY — the SAME gate calcLocation applies, deliberately mirrored.
@@ -321,7 +329,10 @@ export function buildFactorEditions(locations: readonly Location[], year: number
       // what priced it, and it is recorded as such, marked as the estimate. No estimate (a Canadian site with no
       // province) priced nothing and records nothing.
       const j = efJurisdiction(loc) as FactorJurisdiction | null
-      if (j) (out[j] ??= {}).steam = { source: `${CITATIONS[j].combustion}: natural gas / 0.80 (steam estimate, R14)`, edition: COMBUSTION_EDITION[j] }
+      const prev = j ? out[j]?.steam : undefined
+      if (j) (out[j] ??= {}).steam = { source: `${CITATIONS[j].combustion}: natural gas / 0.80 (steam estimate, R14)`, edition: COMBUSTION_EDITION[j],
+        // FI10: the NZ estimate reads the gas factor for the location's use class.
+        ...(j === 'NZ' ? { variant: joinVariants(prev?.variant, nzUseClassVariant(loc)) } : {}) }
     }
   }
 
@@ -384,6 +395,11 @@ export function factorEditionsForSave(
  * with the same year, two different editions would compare equal here. The fix then is a more
  * specific label — never a return to comparing prose.
  */
+/** FI10: the set of variants seen so far plus one more, sorted and joined, so the stored string is stable. */
+function joinVariants(prev: string | undefined, next: string): string {
+  return [...new Set([...(prev ? prev.split('; ') : []), next])].sort().join('; ')
+}
+
 export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<FactorJurisdiction>
   for (const j of keys) {
@@ -395,6 +411,9 @@ export function sameFactorEditions(a: FactorEditions, b: FactorEditions): boolea
       const x = a[j]?.[f], y = b[j]?.[f]
       if (!x !== !y) return false
       if (x && y && x.edition !== y.edition) return false
+      // FI10: a different table variant (an MfE use class) is a different table. Compared only where both maps recorded
+      // one: a map saved before FI10 has none, and that absence says nothing about which use class priced it.
+      if (x?.variant && y?.variant && x.variant !== y.variant) return false
     }
   }
   return true

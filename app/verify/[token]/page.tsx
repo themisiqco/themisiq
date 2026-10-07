@@ -56,6 +56,8 @@ interface WorkingRow {
   // The factor's own vintage, distinct from the inventory's reporting year. 'Electricity (ON, 2025)'
   // read like a reporting year and was in fact the year of the ECCC factor table applied.
   factor_vintage?: string
+  /** FI10: the variant of the table that priced the row (an MfE use class), shown in the Factor source cell. */
+  factor_variant?: string
   // Refrigerants: what the figure counts. Recharge treated as emitted.
   quantification_method?: string
   result_tco2e: number | null

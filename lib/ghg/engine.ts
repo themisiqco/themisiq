@@ -724,14 +724,14 @@ const EF_AU = {
 // ── END-USE SECTOR: THE ONLY TABLE WITH A SELECTOR, AND THE PRECEDENT FOR THE OTHERS ────────────
 // MfE publishes stationary combustion by use class, and this is the one table where the customer
 // picks: Location.nz_use_class ('commercial' | 'industrial', defaulting to commercial), read by
-// pickEF's NZ branch and offered in the wizard behind an "Advanced" <details>.
+// pickEF's NZ branch and offered in the wizard ("Use class: Commercial (change)").
 //
-// ⚠️ IT IS THE MODEL FOR THE OPEN ITEMS ON EF_CA AND EF_EU — and it also shows what such a selector
-// still would NOT give you, so a future design starts from the real baseline: nz_use_class appears on
-// NO workings row and in NO citation (combustionSource returns one string for both classes), and
-// factorEditions does not record it, so two inventories differing only in use class compare EQUAL.
-// A verifier cannot today tell which use class priced an NZ figure. Any selector added elsewhere
-// should carry the disclosure this one lacks.
+// FI10 (7 Oct 2026): THE USE CLASS IS DISCLOSED WHEREVER IT PRICED SOMETHING. Every row priced from this table, and
+// the NZ steam estimate (R14) that reads its gas factor, carries factor_variant ('Commercial use class' or 'Industrial
+// use class'). It is shown in the Factor source cell (workings table, review table, verifier page), in the NZ
+// combustion citation of the PDF and XLSX methods lists, and in factor_editions, so two years differing only in use
+// class compare as changed. It is the model for the open items on EF_CA and EF_EU: a selector added there carries the
+// same disclosure through the same field.
 // UNCHANGED BY THE 14 Aug 2026 sector-documentation pass — that pass added comments only.
 const EF_NZ = {
   commercial: {
@@ -2773,6 +2773,16 @@ export interface PickedFactor {
  *   CA (FI3, R12): EF_CA's per-GJ gas key is per GJ GROSS, from ECCC's national gross heat content (NIR Table A4-2).
  */
 const GAS_CALORIFIC_BASIS: Partial<Record<EfJurisdiction, 'gross'>> = { US: 'gross', UK: 'gross', AU: 'gross', NZ: 'gross', EU: 'gross', CA: 'gross' }
+/**
+ * FI10: which variant of a publisher's table priced a row, where the publisher prints more than one for the same fuel.
+ * Today only MfE's use classes. A later variant (the CA and EU fixed end-use CH4 and N2O rows) extends this union and
+ * is carried on the same row field, `factor_variant`.
+ */
+export type FactorVariant = 'Commercial use class' | 'Industrial use class'
+/** FI10: the use class that selected the EF_NZ table, as the row names it. pickEF defaults to commercial, and so does this. */
+export function nzUseClassVariant(loc: Pick<Location, 'nz_use_class'>): FactorVariant {
+  return loc.nz_use_class === 'industrial' ? 'Industrial use class' : 'Commercial use class'
+}
 /** R4: the note on every NZ natural gas row, saying which calorific basis the MfE per-kWh factor is on. */
 export const NZ_GAS_BASIS_NOTE =
   'MfE natural gas factor per kWh, on a gross calorific value basis: Measuring Emissions Guide, Appendix A (A.1), "we have used gross calorific values".'
@@ -2969,8 +2979,9 @@ export function combustionSourcesFor(locations: readonly { country?: string }[])
   // FI2: the publishers of the tables that priced each location's combustion lines; a location with none keeps its
   // country's citation, as before. A line whose value came from another table (the US fallback, until FI2 diff 2)
   // therefore adds that table's citation instead of hiding behind the location's.
+  // FI10: an NZ citation names the use class that priced it, as the PDF and XLSX have no per-row column for it.
   return [...new Set(locations.filter(l => !countryRefusal(l)).flatMap(l => {
-    const priced = combustionLinePublishers(l as Location).map(p => p.publisher)
+    const priced = combustionLinePublishers(l as Location).map(p => p.jurisdiction === 'NZ' ? `${p.publisher}, ${nzUseClassVariant(l as Location)}` : p.publisher)
     return priced.length > 0 ? priced : [combustionSource(l as Location)]
   }))]
 }
@@ -4475,6 +4486,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // FI2: the key the value was read under, in the table ef_source names, so a verifier can find the figure; and,
       // where the unit entered differs, the exact conversion to it (conversion_factor = held units per unit entered).
       factor_key: heldKey,
+      // FI10: the MfE use class that selected the table, on every row it priced.
+      ...(fromTable === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}),
       ...(conversion_note ? { conversion_note } : {}),
       ...(picked.conversion ? { conversion_factor: picked.conversion.toPerFrom } : {}),
       ...(unitChange ? { unit_change: unitChange } : {}),
@@ -4671,7 +4684,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // like, and ef_source already names the supplier route. Same gate buildFactorEditions applies.
       // R14: an estimated row records the edition of the gas table it was computed from.
       const steamVintage = priced.supplier ? undefined : priced.estimated ? priced.estimated.vintage : vintageOf(STEAM_EDITION, loc).factor_vintage
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(priced.estimated && efJurisdiction(loc) === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
       }
     }
     // ── All-excluded fields: a zero row carrying the contributions (T5 ruling) ─────────────────────

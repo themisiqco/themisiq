@@ -48,6 +48,8 @@ import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { unitOptionsShowing } from './unitLabels';
+import { workingsFactorSourceCell } from './workingsCells';
+import { buildFactorEditions, sameFactorEditions } from './factorEditions';
 import { contributionShareCell } from './workingsCells';
 import { convertToCanonical, convertibleUnits, exactConversion, SELECTOR_UNITS, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
 
@@ -5703,8 +5705,9 @@ describe('FI2 exact conversions and honest provenance', () => {
     const nzGallons = loc({ country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'gallons' });
     const nzLitres = loc({ id: 'L2', country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' });
     // FI2 diff 2: NZ petrol in gallons now converts to MfE's per-litre factor, so both name MfE.
-    expect(combustionSourcesFor([nzGallons])).toEqual([EF_SOURCES.combustion_nz]);
-    expect(combustionSourcesFor([nzLitres, nzGallons])).toEqual([EF_SOURCES.combustion_nz]);
+    // FI10: with the use class that priced them, as the PDF and XLSX have no per-row column for it.
+    expect(combustionSourcesFor([nzGallons])).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
+    expect(combustionSourcesFor([nzLitres, nzGallons])).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
     // A location with no combustion keeps its country's citation, as before.
     expect(combustionSourcesFor([loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100 })])).toEqual([EF_SOURCES.combustion_nz]);
   });
@@ -6288,3 +6291,72 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
   })
 
 });
+
+// ── FI10: the New Zealand use class is shown on every row it priced ───────────────────────────────────────────
+describe('FI10. NZ use class on every row', () => {
+  const nz = (uc: 'commercial' | 'industrial', o: Partial<Location> = {}) => loc({ name: 'Auckland', country: 'NZ', grid_region: 'NZ', nz_use_class: uc,
+    has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh', has_diesel_stationary: true, diesel_stationary_amount: 1000,
+    diesel_stationary_unit: 'litres', ...o })
+  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; scope?: number; declaration?: string; factor_variant?: string; result_tco2e: number | null; ef_source?: string; gwp_basis?: string }[])
+    .filter(r => !r.declaration && r.result_tco2e != null)
+
+  it('FI10-1 an NZ industrial location\'s rows carry "Industrial use class" and price at the industrial values; commercial likewise', () => {
+    for (const [uc, variant, gas, diesel] of [['industrial', 'Industrial use class', 0.195067, 2.66873], ['commercial', 'Commercial use class', 0.19543, 2.6759]] as const) {
+      const rows = rowsOf(nz(uc)).filter(r => r.scope === 1)
+      expect(rows.map(r => [r.stream, r.factor_variant])).toEqual([['natural_gas', variant], ['diesel_stationary', variant]])
+      expect(rows.find(r => r.stream === 'natural_gas')!.result_tco2e).toBeCloseTo(gas, 12)
+      expect(rows.find(r => r.stream === 'diesel_stationary')!.result_tco2e).toBeCloseTo(diesel, 12)
+    }
+  })
+
+  it('FI10-2 the NZ steam estimate row carries the use class it used', () => {
+    const l = nz('industrial', { has_natural_gas: false, has_diesel_stationary: false, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' })
+    const steam = rowsOf(l).find(r => r.stream === 'purchased_steam')!
+    expect(steam.factor_variant).toBe('Industrial use class')
+    expect(steam.result_tco2e).toBeCloseTo(100 * 0.195067 / 0.0036 / 0.8 / 1000, 12)
+  })
+
+  it('FI10-3 two inventories differing only in use class are not the same factor editions; a map saved before FI10 is not called changed', () => {
+    const a = buildFactorEditions([nz('commercial')], 2025), b = buildFactorEditions([nz('industrial')], 2025)
+    expect(a.NZ?.combustion?.variant).toBe('Commercial use class')
+    expect(b.NZ?.combustion?.variant).toBe('Industrial use class')
+    expect(sameFactorEditions(a, b)).toBe(false)
+    expect(sameFactorEditions(a, buildFactorEditions([nz('commercial')], 2025))).toBe(true)
+    const legacy = { NZ: { combustion: { source: a.NZ!.combustion!.source, edition: a.NZ!.combustion!.edition } } }
+    expect(sameFactorEditions(legacy, b), 'no recorded variant says nothing about which use class priced it').toBe(true)
+    // Both classes across two NZ sites are both recorded.
+    expect(buildFactorEditions([nz('commercial'), { ...nz('industrial'), id: 'L2' }], 2025).NZ?.combustion?.variant).toBe('Commercial use class; Industrial use class')
+    // And the steam estimate records the class it read.
+    const st = buildFactorEditions([nz('industrial', { has_natural_gas: false, has_diesel_stationary: false, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' })], 2025)
+    expect(st.NZ?.steam?.variant).toBe('Industrial use class')
+  })
+
+  it('FI10-4 it renders in the Factor source cell (workings, review, verifier) and in the PDF and XLSX citation text', () => {
+    const r = rowsOf(nz('industrial'))[0]
+    expect(workingsFactorSourceCell(r)).toBe(`${EF_SOURCES.combustion_nz}, Industrial use class`)
+    expect(combustionSourcesFor([nz('industrial')])).toEqual([`${EF_SOURCES.combustion_nz}, Industrial use class`])
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain('{workingsFactorSourceCell(r)}')
+    expect(page).toContain("...combustionSourcesFor(derivedLocations).map(src => ['Combustion factors', src]),")
+    const verify = readFileSync(join(process.cwd(), 'app/verify/[token]/page.tsx'), 'utf8')
+    expect(verify).toContain('const factorSourceOf = (w: WorkingRow): string => workingsFactorSourceCell(w)')
+    expect(verify).toContain('factor_variant?: string')
+    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain('...combustionCitations.map(src => [\'Combustion factors\', src]),')
+  })
+
+  it('FI10-5 no non-NZ row carries factor_variant', () => {
+    for (const country of ['US', 'CA', 'GB', 'DE', 'AU']) {
+      const l = loc({ country, grid_region: country === 'CA' ? 'ON' : country === 'GB' ? 'UK' : '', province: country === 'CA' ? 'ON' : undefined,
+        has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres',
+        has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: country === 'US' ? 'mmbtu' : country === 'GB' ? 'kwh' : 'gj' })
+      for (const r of rowsOf(l)) expect(r.factor_variant, `${country} ${r.stream}`).toBeUndefined()
+    }
+  })
+
+  it('FI10-6 the wizard states the use class plainly, with the hint, and no "Advanced" wording', () => {
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain("'Use class: Industrial (change)' : 'Use class: Commercial (change)'")
+    expect(page).toContain('MfE publishes separate natural gas, LPG and coal factors for commercial and industrial use. Choose the one that matches this site.')
+    expect(page).not.toContain('Advanced: change use-class')
+  })
+})

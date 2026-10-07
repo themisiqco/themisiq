@@ -515,6 +515,8 @@ interface WorkingsRowCells {
   emission_factor_display?: string
   ef_source?: string
   factor_vintage?: string
+  /** FI10: the variant of the table that priced the row (an MfE use class). */
+  factor_variant?: string
   scope2_method?: string
   result_tco2e?: number | null
 }
@@ -2658,12 +2660,14 @@ workings: saved.workings,
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#0d0d0d', marginBottom: 3 }}>Combustion use-class</div>
                       <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 8 }}>MfE publishes stationary-combustion factors by use-class. Most sites are Commercial (default).</div>
                       <details>
-                        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-brand)' }}>{(loc.nz_use_class ?? 'commercial') === 'industrial' ? 'Industrial selected: change use-class' : 'Advanced: change use-class (using Commercial)'}</summary>
+                        {/* FI10: the use class changes the number, so the summary states the choice plainly. */}
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-brand)' }}>{(loc.nz_use_class ?? 'commercial') === 'industrial' ? 'Use class: Industrial (change)' : 'Use class: Commercial (change)'}</summary>
                         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                           {(['commercial', 'industrial'] as const).map(uc => (
                             <button key={uc} onClick={() => updateLocation(activeLocation, 'nz_use_class', uc)} style={unitBtn((loc.nz_use_class ?? 'commercial') === uc)}>{uc === 'commercial' ? 'Commercial' : 'Industrial'}</button>
                           ))}
                         </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>MfE publishes separate natural gas, LPG and coal factors for commercial and industrial use. Choose the one that matches this site.</div>
                       </details>
                     </div>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#555553', cursor: 'pointer' }}>

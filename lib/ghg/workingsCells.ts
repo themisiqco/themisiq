@@ -192,8 +192,10 @@ export const COVERAGE_ROW_BASIS = 'coverage_resolution'
  * whose citation was never written — a missing value, which is a different thing from one that does not
  * apply, and the words must not flatten the two.
  */
-export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: string | null }): string {
+export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: string | null; factor_variant?: string | null }): string {
   if (r.gwp_basis === COVERAGE_ROW_BASIS) return NOT_APPLICABLE
+  // FI10: the variant of the table that priced the row (an MfE use class), so a verifier can see which table it was.
+  if (r.ef_source && r.factor_variant) return `${r.ef_source}, ${r.factor_variant}`
   return r.ef_source || NOT_PROVIDED
 }
 
