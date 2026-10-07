@@ -3943,22 +3943,53 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
 // ── T3a: the reporting-year label, built in one place from the window ─────────────────────────────────
 // reporting_year is the calendar year in which the window ENDS (periodFromYearAndEnd: end = last day of the
 // year-end month IN reporting_year), so FY2025 with a March year end is 1 Apr 2024 to 31 Mar 2025.
+import { yearLabel as yearLabelT3b, periodWords as periodWordsT3b } from './engine';
+
 describe('T3a reportingYearLabel', () => {
   const label = (y: number, m: number) => reportingYearLabel(periodFromYearAndEnd(y, m));
 
-  it('December year end: the bare year, and "reporting year {y}" in running text', () => {
-    expect(label(2024, 12)).toEqual({ label: '2024', inText: 'reporting year 2024' });
+  it('December year end: the bare year in every form, and "reporting year {y}" in running text', () => {
+    expect(label(2024, 12)).toEqual({ heading: '2024', axis: '2024', fileTag: '2024', inText: 'reporting year 2024' });
   });
 
-  it('any other year end: "the year ending {last day}", read off the window', () => {
-    expect(label(2025, 3)).toEqual({ label: 'the year ending 31 March 2025', inText: 'the year ending 31 March 2025' });
-    expect(label(2025, 6).inText).toBe('the year ending 30 June 2025');
+  it('any other year end (T3b): heading, axis, fileTag and inText, read off the window', () => {
+    expect(label(2025, 3)).toEqual({ heading: 'Apr 2024 to Mar 2025', axis: '2024\u201325', fileTag: '2024-04_to_2025-03',
+      inText: 'the year ending 31 March 2025' });
+    expect(label(2025, 6)).toEqual({ heading: 'Jul 2024 to Jun 2025', axis: '2024\u201325', fileTag: '2024-07_to_2025-06',
+      inText: 'the year ending 30 June 2025' });
+    expect(label(2025, 9)).toEqual({ heading: 'Oct 2024 to Sep 2025', axis: '2024\u201325', fileTag: '2024-10_to_2025-09',
+      inText: 'the year ending 30 September 2025' });
     expect(label(2025, 1).inText).toBe('the year ending 31 January 2025');
   });
 
   it('February year end: 29 in a leap year, 28 otherwise', () => {
     expect(label(2024, 2).inText).toBe('the year ending 29 February 2024');
     expect(label(2025, 2).inText).toBe('the year ending 28 February 2025');
+  });
+
+  it('leap-year February end (T3b): every form', () => {
+    expect(label(2024, 2)).toEqual({ heading: 'Mar 2023 to Feb 2024', axis: '2023\u201324', fileTag: '2023-03_to_2024-02',
+      inText: 'the year ending 29 February 2024' });
+  });
+
+  it('no form uses "YE" or "FY", and none has an em dash; the en dash is in the axis form only', () => {
+    for (const m of [1, 2, 3, 6, 9, 12]) for (const y of [2024, 2025]) {
+      const l = label(y, m);
+      for (const v of Object.values(l)) {
+        expect(v).not.toMatch(/\bYE\b|\bFY/);
+        expect(v).not.toContain('\u2014');
+      }
+      for (const v of [l.heading, l.fileTag, l.inText]) expect(v).not.toContain('\u2013');
+    }
+  });
+
+  it('yearLabel and periodWords read a stored year and year end; null or missing is December', () => {
+    expect(yearLabelT3b(2025, 3).heading).toBe('Apr 2024 to Mar 2025');
+    expect(yearLabelT3b(2025, null)).toEqual(label(2025, 12));
+    expect(yearLabelT3b(2025)).toEqual(label(2025, 12));
+    expect(periodWordsT3b(2025, 3)).toEqual({ period: '1 April 2024 to 31 March 2025', yearEnd: '31 March' });
+    expect(periodWordsT3b(2025, 12)).toEqual({ period: '1 January 2025 to 31 December 2025', yearEnd: '31 December' });
+    expect(periodWordsT3b(2024, 2).period).toBe('1 March 2023 to 29 February 2024');
   });
 
   it('the proration note uses it: December and March year ends, with no em dash', () => {
@@ -6371,7 +6402,7 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
     expect(steamUnitOptions('GB')[0]).toEqual(['kwh', 'kWh'])
     expect(unitOptionsShowing(steamUnitOptions('GB'), 'kwh', false).find(([v]) => v === 'kwh')).toEqual(['kwh', 'kWh'])
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
-    expect(page).toContain("<Field label={`Total purchased steam: ${inventory.reporting_year} (${unitLabel(loc.purchased_steam_unit ?? 'mmbtu')})`}>")
+    expect(page).toContain("<Field label={`Total purchased steam: ${yl.heading} (${unitLabel(loc.purchased_steam_unit ?? 'mmbtu')})`}>")
     expect(page).toContain("{unitOptionsShowing(steamUnitOptions(loc.country), loc.purchased_steam_unit ?? 'mmbtu', false).map(([val, label]) => (")
   })
 

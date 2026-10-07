@@ -285,6 +285,7 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
         company_id: r.company_id,
         company_name: r.company_name ?? "",
         reporting_year: r.reporting_year,
+        fiscal_year_end_month: r.fiscal_year_end_month,
         scope1_total: r.scope1_total,
         scope2_location_total: r.scope2_location_total,
         scope2_market_total: r.scope2_market_total,

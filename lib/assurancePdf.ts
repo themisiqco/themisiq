@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
 import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
-import { countryRefusal } from './ghg/engine'
+import { countryRefusal, yearLabel, periodWords } from './ghg/engine'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
 // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
 // TEXT: a subheading at what was line 258 and the running eyebrow in sectionTitle(). Both are now INK.
@@ -28,6 +28,8 @@ export interface PdfLocation {
 }
 export interface PdfInventory {
   company_name: string; reporting_year: number; revenue_millions: number
+  // T3b: the year end (1-12); null or absent is December. Labels the year and its window.
+  fiscal_year_end_month?: number | null
   employee_count: number; boundary_approach: string
   selected_frameworks: string[]
   locations: PdfLocation[]
@@ -114,7 +116,10 @@ export function generateAssurancePDF(
   const doc = new jsPDF({ unit: 'pt', format: 'letter', compress: true })
   const W = doc.internal.pageSize.getWidth()
   const M = 48
-  const refId = `TIQ-GHG-${inventory.reporting_year}-${Date.now().toString().slice(-6)}`
+  // T3b: the year's labels and window, from the one helper; the ref and filename use its fileTag.
+  const yl = yearLabel(inventory.reporting_year, inventory.fiscal_year_end_month)
+  const period = periodWords(inventory.reporting_year, inventory.fiscal_year_end_month).period
+  const refId = `TIQ-GHG-${yl.fileTag}-${Date.now().toString().slice(-6)}`
   const today = new Date().toLocaleDateString('en-CA')
 
   // ── PAGE 1 — COVER ──
@@ -136,7 +141,8 @@ export function generateAssurancePDF(
   doc.setTextColor(INK); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   const meta: [string, string][] = [
     ['Company', inventory.company_name || '—'],
-    ['Reporting year', String(inventory.reporting_year)],
+    ['Reporting year', yl.heading],
+    ['Reporting period', period],
     ['Frameworks', frameworks.map(f => f.name).join(', ') || '—'],
     ['Boundary approach', boundaryLabel(inventory.boundary_approach)],
     ['Locations', String(inventory.locations.length)],
@@ -258,7 +264,8 @@ export function generateAssurancePDF(
       // "GWP values (AR4)" and "(AR5)" rows were removed on 17 Sep 2026. They cited AR4 and AR5 as
       // "selectable alternate", and no inventory has ever been able to select either.
       ['GWP values (AR6)', efSources.gwp_ar6],
-      ['Reporting year', String(inventory.reporting_year)],
+      ['Reporting year', yl.heading],
+      ['Reporting period', period],
       ['Standard', 'GHG Protocol Corporate Standard'],
     ],
     theme: 'grid',
@@ -385,7 +392,7 @@ export function generateAssurancePDF(
     doc.text(`Page ${i} of ${pageCount}`, W - M, H - 24, { align: 'right' })
   }
 
-  doc.save(`ThemisIQ_Assurance_${(inventory.company_name || 'Company').replace(/\s+/g, '_')}_${inventory.reporting_year}.pdf`)
+  doc.save(`ThemisIQ_Assurance_${(inventory.company_name || 'Company').replace(/\s+/g, '_')}_${yl.fileTag}.pdf`)
 }
 
 function sectionTitle(doc: jsPDF, text: string, m: number) {

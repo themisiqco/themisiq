@@ -87,8 +87,10 @@ describe('Trends monthly view, by inventory (T12)', () => {
 
   it('the Trends page passes the selected year\'s inventory, and the series carries it', () => {
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/trends/page.tsx'), 'utf8')
-    expect(page).toContain('const selectedInventoryId = selectedSeries?.years.find((y) => y.year === selectedYear)?.inventoryId ?? null')
-    expect(page).toContain('loadMonthly(selectedInventoryId)')
+    expect(page).toContain('const selectedRow = selectedSeries?.years.find((y) => y.year === selectedYear) ?? null')
+    expect(page).toContain('const selectedInventoryId = selectedRow?.inventoryId ?? null')
+    // T3b: and its year end, so the months carry their years for a non-December year.
+    expect(page).toContain('loadMonthly(selectedInventoryId, selectedYearEnd)')
     const series = readFileSync(join(process.cwd(), 'lib/ghg/series.ts'), 'utf8')
     expect((series.match(/inventoryId: r\.inventory_id \?\? null,/g) ?? []).length, 'both kinds of year carry it').toBe(2)
     const load = readFileSync(join(process.cwd(), 'lib/ghg/loadSeries.ts'), 'utf8')
@@ -112,5 +114,27 @@ describe('delivery-based months (T10b)', () => {
     table.push(row('natural_gas', '2025-03-01', '2025-03-31'))
     expect((await loadMonthly('inv-d')).deliveryBased).toBe(false)
     expect(DELIVERY_BASED_NOTE).toBe('Delivery-based: fuel bought by delivery is counted in the month it was delivered, not the month it was used.')
+  })
+})
+
+// ── T3b: the monthly chart's month labels carry their year for a non-December year end ───────────────────────
+import { buildMonthlyBuckets } from './loadMonthly'
+
+describe('monthly labels (T3b)', () => {
+  const row = (month: string) => ({ period_month: `${month}-01`, scope: 1, fuel_type: 'natural_gas', tco2e: 1,
+    activity_value: 1, activity_unit: 'mcf', period_start: null, period_end: null })
+  const fy = ['2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03']
+
+  it('a March year end runs "Apr 2024" to "Mar 2025", so each month says its calendar year', () => {
+    const labels = buildMonthlyBuckets(fy.map(row) as never, 3).map(b => b.monthLabel)
+    expect(labels).toEqual(['Apr 2024', 'May 2024', 'Jun 2024', 'Jul 2024', 'Aug 2024', 'Sep 2024', 'Oct 2024', 'Nov 2024',
+      'Dec 2024', 'Jan 2025', 'Feb 2025', 'Mar 2025'])
+  })
+
+  it('a December year end keeps "Jan" to "Dec", and so does a call that names no year end', () => {
+    const cal = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => row(`2025-${m}`))
+    const want = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    expect(buildMonthlyBuckets(cal as never, 12).map(b => b.monthLabel)).toEqual(want)
+    expect(buildMonthlyBuckets(cal as never).map(b => b.monthLabel)).toEqual(want)
   })
 })

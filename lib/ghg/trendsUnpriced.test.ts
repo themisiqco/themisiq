@@ -11,14 +11,14 @@ vi.mock('../supabase', () => ({ supabase: {} }))
 
 import { assessCompleteness } from './loadSeries'
 import { describeYearStatus, type SeriesYear } from './series'
-import { buildWorkings, emptyLocation, type Location } from './engine'
+import { buildWorkings, emptyLocation, yearLabel, type Location } from './engine'
 
 // FI2 follow-up: a NZ site with gas in m3 (MfE prints gas per kWh only); UK gas in m3 now prices on DEFRA's own per-m3 row.
 const mill = (): Location => ({ ...emptyLocation('m1', 'Mill'), country: 'NZ', grid_region: 'NZ', electricity_kwh: 50_000,
   has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'm3' })
 const osaka = (): Location => ({ ...emptyLocation('j1', 'Osaka'), country: 'JP', electricity_kwh: 1000 })
 const year = (c: ReturnType<typeof assessCompleteness>): SeriesYear =>
-  ({ year: 2025, dataStatus: c.dataStatus, exclusions: c.exclusions, unverifiableReason: c.unverifiableReason }) as unknown as SeriesYear
+  ({ year: 2025, label: yearLabel(2025), dataStatus: c.dataStatus, exclusions: c.exclusions, unverifiableReason: c.unverifiableReason }) as unknown as SeriesYear
 
 describe('a partly unpriced year on the trends surface (FI1)', () => {
   it('a saved year with an unpriced line names the line and says the totals exclude it', () => {

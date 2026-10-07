@@ -53,7 +53,8 @@ describe('the GHG wizard after the run-through (T10c)', () => {
     expect(PAGE).toContain("{p.periodStart ? isoDateInWords(p.periodStart) : '?'} to {p.periodEnd ? isoDateInWords(p.periodEnd) : '?'}")
     expect(PAGE).toContain('· delivered {isoDateInWords(deliveryDateOf(docType, p))}')
     expect(PAGE).not.toContain('Sum of all 12 monthly bills')
-    expect((PAGE.match(/hint="Sum of the bills covering this year"/g) ?? []).length).toBe(2)
+    // T3b: the hint names the window's dates (windowWords, from periodWords).
+    expect((PAGE.match(/hint=\{`Sum of the bills covering \$\{windowWords\.period\}`\}/g) ?? []).length).toBe(2)
     expect(CODE).not.toMatch(/\bmt\b(?! Scope)/)
     expect(CODE).not.toMatch(/ mt Scope|>mt<|mtCO|mt\/\$M/)
     expect(PAGE).toContain('t CO₂e Scope 1')

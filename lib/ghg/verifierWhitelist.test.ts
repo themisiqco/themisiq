@@ -133,6 +133,15 @@ describe('the verifier whitelist is coherent across its three coupled sites', ()
     expect(labels, 'factor_editions would render as the fallback').toContain('factor_editions');
   });
 
+  it('W-7 fiscal_year_end_month is projected, because the header labels the year with it (T3b)', () => {
+    // The verifier header shows the reporting year's label and window (reportingYearLabel, periodWords). With
+    // the year end withheld, a year ending in March would be labelled as a calendar year.
+    expect(projection, 'the verifier header could not name the year end').toContain('fiscal_year_end_month');
+    const page = readFileSync(VERIFY_PAGE, 'utf8');
+    expect(page).toContain('yearLabel(inv.reporting_year, inv.fiscal_year_end_month).heading');
+    expect(page).toContain('periodWords(inv.reporting_year, inv.fiscal_year_end_month).period');
+  });
+
   it('W-6 the migration is ASCII-only — the 13 Aug paste failure', () => {
     // The factor_editions column migration did not paste cleanly into the Supabase SQL editor: only
     // its `alter table` ran, and the comment and grants had to be run separately. Non-ASCII in the

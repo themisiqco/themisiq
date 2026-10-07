@@ -23,6 +23,7 @@ import { scope3CoverageLabel, describeScope3Basis, describeScope3CoverageDrift }
 import { supabase } from '../../../../lib/supabase'
 import { computeTrajectory } from '../../../../lib/sbti'
 import { loadMonthly, DELIVERY_BASED_NOTE, type LoadMonthlyResult } from '../../../../lib/ghg/loadMonthly'
+import { yearLabel } from '../../../../lib/ghg/engine'
 
 // Shown in place of the monthly chart when the selected year's inventory cannot be identified (T12).
 const MONTHLY_NO_INVENTORY = "this year's inventory could not be identified, so its monthly detail cannot be shown"
@@ -110,7 +111,10 @@ export default function TrendsPage() {
 
   // Fetch the monthly rows of the INVENTORY behind the selected year (T12): the same inventory the annual
   // figures come from, so the chart shows exactly its months. A year ending in March shows April to March.
-  const selectedInventoryId = selectedSeries?.years.find((y) => y.year === selectedYear)?.inventoryId ?? null
+  const selectedRow = selectedSeries?.years.find((y) => y.year === selectedYear) ?? null
+  const selectedInventoryId = selectedRow?.inventoryId ?? null
+  // T3b: the selected year's year end, so a year ending in March labels its months "Apr 2024" to "Mar 2025".
+  const selectedYearEnd = selectedRow?.yearEndMonth ?? 12
   useEffect(() => {
     if (selectedYear == null || !selectedSeries) return
     if (!selectedInventoryId) {
@@ -119,11 +123,11 @@ export default function TrendsPage() {
       return
     }
     setMonthlyLoading(true)
-    loadMonthly(selectedInventoryId).then((r) => {
+    loadMonthly(selectedInventoryId, selectedYearEnd).then((r) => {
       setMonthly(r)
       setMonthlyLoading(false)
     })
-  }, [selectedSeries, selectedYear, selectedInventoryId])
+  }, [selectedSeries, selectedYear, selectedInventoryId, selectedYearEnd])
 
   // Fetch S1/S2 sbti_targets (both near_term + net_zero) for the SBTi target overlay.
   // RLS scopes to the logged-in user. On error / no rows → empty → no overlay (chart = Move 1).
@@ -216,7 +220,7 @@ export default function TrendsPage() {
   // and counts no categories yet — telling that customer to complete a Scope 3 would send them to create
   // what they already have. Each basis gets its own line, from the series' own copy.
   const missingS3Years = selected
-    ? selected.years.filter((y) => y.dataStatus === 'ok' && y.scope3Basis === 'absent').map((y) => y.year)
+    ? selected.years.filter((y) => y.dataStatus === 'ok' && y.scope3Basis === 'absent').map((y) => y.label.heading)
     : []
   const scope3BasisNotes = selected
     ? selected.years
@@ -237,6 +241,9 @@ export default function TrendsPage() {
   // Derived metrics for the cards / intensity strip (all from CompanySeries).
   const latest = selected?.years.at(-1) ?? null
   const baselineRow = selected?.years.find((y) => y.year === selected.baselineYear) ?? null
+  // T3b: every year a reader sees is that year's label (reportingYearLabel), never the bare reporting_year. A year
+  // with no inventory (an SBTi target year on the axis) is a calendar year, so it takes the December form.
+  const labelFor = (y: number) => selected?.years.find((r) => r.year === y)?.label ?? yearLabel(y)
   const intensityDelta =
     latest?.perRevenue != null && baselineRow?.perRevenue != null
       ? latest.perRevenue - baselineRow.perRevenue
@@ -289,7 +296,7 @@ export default function TrendsPage() {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: '#0d0d0d' }}>{selected.company}</div>
             <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 4 }}>
-              Baseline year {selected.baselineYear}
+              Baseline year {labelFor(selected.baselineYear).heading}
               {!selected.baselineUsable && (
                 <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>: not usable, so no year is shown as a change against it</span>
               )}
@@ -335,15 +342,15 @@ export default function TrendsPage() {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>
                   {latest.scope12Total == null
-                    ? `${latest.year} can't be shown: see below`
-                    : `tCO₂e · Scope 1+2 · ${latest.year}`}
+                    ? `${latest.label.heading} can't be shown: see below`
+                    : `tCO₂e · Scope 1+2 · ${latest.label.heading}`}
                 </div>
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: latest.vsBaselinePct == null ? 'var(--color-ink-muted)' : latest.vsBaselinePct <= 0 ? '#0F6E56' : 'var(--color-state-warn)' }}>
                   {latest.vsBaselinePct == null ? '—' : `${latest.vsBaselinePct > 0 ? '+' : ''}${latest.vsBaselinePct}%`}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>vs {selected.baselineYear}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>vs {labelFor(selected.baselineYear).heading}</div>
               </div>
               <div style={{ background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem' }}>
                 <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: '#0d0d0d' }}>{latest.perRevenue == null ? '—' : latest.perRevenue}</div>
@@ -366,7 +373,7 @@ export default function TrendsPage() {
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={mergedData} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e8e7e4" />
-                <XAxis dataKey="year" type="number" domain={xDomain} allowDecimals={false} ticks={xTicks} tickCount={chartData.length} tick={{ fontSize: 12, fill: '#555553' }} />
+                <XAxis dataKey="year" type="number" domain={xDomain} allowDecimals={false} ticks={xTicks} tickCount={chartData.length} tickFormatter={(y: number) => labelFor(y).axis} tick={{ fontSize: 12, fill: '#555553' }} />
                 <YAxis
                   tick={{ fontSize: 12, fill: '#555553' }}
                   label={{ value: 'tCO₂e', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: 'var(--color-ink-muted)' } }}
@@ -374,6 +381,7 @@ export default function TrendsPage() {
                 {/* The Scope 3 segment carries its coverage in the tooltip: a figure covering 6 of 12
                     categories and one covering 12 of 12 look identical on a stacked bar. */}
                 <Tooltip
+                  labelFormatter={(y) => labelFor(Number(y)).heading}
                   formatter={(value, name, item) => {
                     const label = (item as { payload?: ChartRow } | undefined)?.payload?.s3Label
                     return name === 'Scope 3' && label ? [`${value} · ${label}`, name] : [value as never, name]
@@ -420,7 +428,7 @@ export default function TrendsPage() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 8, paddingLeft: 8, fontSize: 12 }}>
             {selected.years.map((y) => (
               <span key={y.year} style={{ color: '#555553' }}>
-                <strong style={{ color: '#0d0d0d' }}>{y.year}</strong>{' '}
+                <strong style={{ color: '#0d0d0d' }}>{y.label.heading}</strong>{' '}
                 {y.dataStatus !== 'ok' ? (
                   <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>not shown</span>
                 ) : y.year === selected.baselineYear || y.vsBaselinePct == null ? (
@@ -455,9 +463,9 @@ export default function TrendsPage() {
               <div style={{ width: '100%', height: 96 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={selected.years.map((y) => ({ year: y.year, perRevenue: y.perRevenue }))} margin={{ top: 18, right: 24, bottom: 4, left: 8 }}>
-                    <XAxis dataKey="year" tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} />
+                    <XAxis dataKey="year" tickFormatter={(y: number) => labelFor(y).axis} tick={{ fontSize: 11, fill: 'var(--color-ink-muted)' }} />
                     <YAxis hide domain={['dataMin', 'dataMax']} />
-                    <Tooltip />
+                    <Tooltip labelFormatter={(y) => labelFor(Number(y)).heading} />
                     <Line type="monotone" dataKey="perRevenue" stroke="#7425e3" strokeWidth={2} dot={{ r: 3 }} label={{ position: 'top', fontSize: 11, fill: '#7425e3', formatter: (v) => (typeof v === 'number' ? v.toFixed(1) : v) }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -507,7 +515,7 @@ export default function TrendsPage() {
                 style={{ fontSize: 13, padding: '8px 12px', border: '0.5px solid #e8e7e4', borderRadius: 8, outline: 'none', boxSizing: 'border-box', background: '#fff' }}
               >
                 {selected.years.map((y) => (
-                  <option key={y.year} value={y.year}>{y.year}</option>
+                  <option key={y.year} value={y.year}>{y.label.heading}</option>
                 ))}
               </select>
             </div>
@@ -520,7 +528,7 @@ export default function TrendsPage() {
 
             {!monthlyLoading && monthly && !monthly.error && monthly.buckets.length === 0 && (
               <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 8, padding: '14px 16px', fontSize: 13, color: '#555' }}>
-                No monthly (utility-bill) data for {selectedYear}. Monthly detail appears
+                No monthly (utility-bill) data for {selectedYear == null ? 'this year' : labelFor(selectedYear).heading}. Monthly detail appears
                 when you upload dated utility bills with Bill Review. Manually-entered
                 annual figures show in the yearly chart above.
               </div>

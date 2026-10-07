@@ -63,7 +63,7 @@ import {
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks,
+  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -761,7 +761,7 @@ const searchParams = useSearchParams()
   // survives a reload. Both entries here are transient by design: a retry is the remedy.
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<'loading' | 'list' | 'wizard'>('loading')
-  const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
+  const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; fiscal_year_end_month: number | null; updated_at: string }>>([])
   // The customer's answer, CAPTURED AT THE MOMENT THEY GIVE IT — with the observation they were
   // looking at and the basis behind it. Not just the choice: by save time the inventory may have
   // moved, and recomputing the observation then would attribute to them an answer to a question
@@ -908,7 +908,7 @@ const searchParams = useSearchParams()
       if (!session) { setMode('wizard'); return }
       const { data } = await supabase
         .from('ghg_inventories')
-        .select('id, company_name, reporting_year, updated_at')
+        .select('id, company_name, reporting_year, fiscal_year_end_month, updated_at')
         .order('updated_at', { ascending: false })
       const view = entryView({ hasId: false, startNew: false, hasDraft: false, signedIn: true, savedInventoryCount: data?.length ?? 0, viewParam })
       if (data && view !== 'wizard') {
@@ -1782,6 +1782,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // company identity, so no query was sent" and "the query is still in flight". Neither has looked
   // at a prior year, and neither may claim to have.
   const priorYearKey = inventory.company_id ? `${inventory.company_id}:${inventory.reporting_year}` : null
+  // T3b: every reporting-year label on this page comes from the one helper (reportingYearLabel), never the bare year.
+  const yl = yearLabel(inventory.reporting_year, inventory.fiscal_year_end_month)
+  const priorYl = yearLabel(inventory.reporting_year - 1, inventory.fiscal_year_end_month)
+  const windowWords = periodWords(inventory.reporting_year, inventory.fiscal_year_end_month)
   const priorYear: PriorYearLookup =
     priorYearKey && priorYearLookup?.key === priorYearKey ? priorYearLookup.result : { status: 'skipped' }
 
@@ -2071,7 +2075,7 @@ workings: saved.workings,
     } else {
       const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
       const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
-      if (dup) { lastSaveError.current = 'An inventory for that company and year already exists.'; alert(`You already have a ${inventory.reporting_year} inventory for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
+      if (dup) { lastSaveError.current = 'An inventory for that company and year already exists.'; alert(`You already have an inventory for ${yl.inText} for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
       if (data) { savedId = data.id; setInventoryId(data.id) }
@@ -2208,7 +2212,7 @@ workings: saved.workings,
         <Field label="Reporting year">
           <select value={inventory.reporting_year} onChange={e => setInventory(i => ({...i, reporting_year: Number(e.target.value)}))} style={inputStyle}>
             {reportingYearOptions().map(yr => (
-              <option key={yr} value={yr}>{`FY${yr} · ${periodFromYearAndEnd(yr, inventory.fiscal_year_end_month).label}`}</option>
+              <option key={yr} value={yr}>{yearLabel(yr, inventory.fiscal_year_end_month).heading}</option>
             ))}
           </select>
         </Field>
@@ -2259,10 +2263,10 @@ workings: saved.workings,
           <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem' }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: '#0C447C', marginBottom: 10 }}>CDP requires prior year comparison figures</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label={`Prior year Scope 1 (${inventory.reporting_year - 1}) tCO₂e`}>
+              <Field label={`Prior year Scope 1 (${priorYl.heading}) tCO₂e`}>
                 <input type="number" value={inventory.prior_year_s1 || ''} onChange={e => setInventory(i => ({...i, prior_year_s1: Number(e.target.value)}))} placeholder="0" style={inputStyle} />
               </Field>
-              <Field label={`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`}>
+              <Field label={`Prior year Scope 2 (${priorYl.heading}) tCO₂e`}>
                 <input type="number" value={inventory.prior_year_s2 || ''} onChange={e => setInventory(i => ({...i, prior_year_s2: Number(e.target.value)}))} placeholder="0" style={inputStyle} />
               </Field>
             </div>
@@ -2518,7 +2522,7 @@ workings: saved.workings,
                       <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => changeFieldUnit(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total natural gas: ${inventory.reporting_year} (${unitLabel(loc.natural_gas_unit)})`} hint="Sum of the bills covering this year">
+                  <Field label={`Total natural gas: ${yl.heading} (${unitLabel(loc.natural_gas_unit)})`} hint={`Sum of the bills covering ${windowWords.period}`}>
                     <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'natural_gas_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'natural_gas_amount')} />
@@ -2551,7 +2555,7 @@ workings: saved.workings,
                       <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => changeFieldUnit(activeLocation, 'propane_unit', val)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total propane purchased: ${inventory.reporting_year} (${unitLabel(loc.propane_unit)})`}>
+                  <Field label={`Total propane purchased: ${yl.heading} (${unitLabel(loc.propane_unit)})`}>
                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'propane_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'propane_amount')} />
@@ -2568,7 +2572,7 @@ workings: saved.workings,
                       <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => changeFieldUnit(activeLocation, 'diesel_stationary_unit', val)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
+                  <Field label={`Total diesel in stationary equipment: ${yl.heading}`}>
                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'diesel_stationary_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'diesel_stationary_amount')} />
@@ -2598,7 +2602,7 @@ workings: saved.workings,
                       <button key={val} onClick={() => changeFieldUnit(activeLocation, 'fuel_oil_distillate_unit', val)} style={unitBtn((loc.fuel_oil_distillate_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${unitLabel(loc.fuel_oil_distillate_unit ?? 'gallons')})`}>
+                  <Field label={`Total heating oil purchased: ${yl.heading} (${unitLabel(loc.fuel_oil_distillate_unit ?? 'gallons')})`}>
                     <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_distillate_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'fuel_oil_distillate_amount')} />
@@ -2616,7 +2620,7 @@ workings: saved.workings,
                       <button key={val} onClick={() => changeFieldUnit(activeLocation, 'fuel_oil_residual_unit', val)} style={unitBtn((loc.fuel_oil_residual_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${unitLabel(loc.fuel_oil_residual_unit ?? 'gallons')})`}>
+                  <Field label={`Total heavy fuel oil purchased: ${yl.heading} (${unitLabel(loc.fuel_oil_residual_unit ?? 'gallons')})`}>
                     <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_residual_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'fuel_oil_residual_amount')} />
@@ -2683,7 +2687,7 @@ workings: saved.workings,
               <div style={{ fontSize: 14, fontWeight: 500, color: '#0d0d0d', marginBottom: 4 }}>Purchased electricity</div>
               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
-                <Field label={`Total electricity: ${inventory.reporting_year} (kWh)`} hint="Sum of the bills covering this year">
+                <Field label={`Total electricity: ${yl.heading} (kWh)`} hint={`Sum of the bills covering ${windowWords.period}`}>
                   <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
                 </Field>
                 {validateElectricity(loc.electricity_kwh) && (
@@ -2764,7 +2768,7 @@ workings: saved.workings,
                       <button key={val} onClick={() => changeFieldUnit(activeLocation, 'purchased_steam_unit', val)} style={unitBtn((loc.purchased_steam_unit ?? 'mmbtu') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total purchased steam: ${inventory.reporting_year} (${unitLabel(loc.purchased_steam_unit ?? 'mmbtu')})`}>
+                  <Field label={`Total purchased steam: ${yl.heading} (${unitLabel(loc.purchased_steam_unit ?? 'mmbtu')})`}>
                     <input id={`figure-${loc.id}-purchased_steam_mmbtu`} type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'purchased_steam_mmbtu')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'purchased_steam_mmbtu')} />
@@ -3024,7 +3028,7 @@ workings: saved.workings,
     return (
       <div>
         <h2 style={sectionHead}>Review, results & calculation workings</h2>
-        <p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}. Scope 3 required: complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${inventory.reporting_year}.`}</p>
+        <p style={sectionSub}>{inventory.selected_frameworks.includes('esrs') || inventory.selected_frameworks.includes('gri') ? `Your Scope 1 & 2 inventory for ${inventory.company_name || 'your company'}, ${yl.heading}. Scope 3 required: complete it after export.` : `Your complete GHG inventory for ${inventory.company_name || 'your company'}, ${yl.heading}.`}</p>
         {/* Scope 3 is calculated from THIS inventory's energy, so the way to it belongs where the
             customer is reading those figures. One control, one rule: lib/moduleLinks.ts. */}
         <Scope3Control />
@@ -3074,11 +3078,11 @@ workings: saved.workings,
                     {fw.id === 'cdp' && (
                       <>
                         <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 1 ({inventory.reporting_year - 1})</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 1 ({priorYl.heading})</div>
                           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s1.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                         </div>
                         <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 2 ({inventory.reporting_year - 1})</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Prior year Scope 2 ({priorYl.heading})</div>
                           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', color: fw.color }}>{inventory.prior_year_s2.toFixed(2)}<span style={{ fontSize: 11, color: 'var(--color-ink-muted)', fontFamily: 'sans-serif', marginLeft: 4 }}>t CO₂e</span></div>
                         </div>
                       </>
@@ -3418,7 +3422,7 @@ workings: saved.workings,
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: '1.5rem' }}>
                       {[
                         ['Company', inventory.company_name || '—'],
-                        ['Reporting year', String(inventory.reporting_year)],
+                        ['Reporting year', yl.heading],
                         ['GWP basis', `IPCC ${fw.gwp}`],
                         ['Scope 1 total', `${totals.s1_total.toFixed(RESULT_DP)} tCO₂e`],
                         ['Scope 2 (location)', `${totals.s2_location.toFixed(RESULT_DP)} tCO₂e`],
@@ -3568,6 +3572,9 @@ workings: saved.workings,
       ['ORGANIZATION'],
       ['Company', inventory.company_name],
       ['Reporting year', inventory.reporting_year],
+      // T3b: the window, so the year above is never read as a calendar year it is not.
+      ['Reporting period', windowWords.period],
+      ['Year end', windowWords.yearEnd],
       ['Revenue (USD millions)', rev],
       ...(emp > 0 ? [['Employees (FTE)', emp]] : []),
       ['Boundary', inventory.boundary_approach.replace(/_/g, ' ')],
@@ -3587,8 +3594,8 @@ workings: saved.workings,
       // Distinct Scope 3 (Cat 3) line — NZ electricity T&D losses. Only when present; never in S1/S2.
       ...(totals.s3_td > 0 ? [['Scope 3 Cat 3: electricity T&D (tCO₂e)', totals.s3_td.toFixed(CSV_DP)]] : []),
       ...(fw.id === 'cdp' ? [
-        [`Prior year Scope 1 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s1],
-        [`Prior year Scope 2 (${inventory.reporting_year - 1}) tCO₂e`, inventory.prior_year_s2],
+        [`Prior year Scope 1 (${priorYl.heading}) tCO₂e`, inventory.prior_year_s1],
+        [`Prior year Scope 2 (${priorYl.heading}) tCO₂e`, inventory.prior_year_s2],
       ] : []),
       ...(rev > 0 ? [['S1 intensity (tCO₂e/$M revenue)', (totals.s1_total / rev).toFixed(CSV_INTENSITY_DP)]] : []),
       // ⚠️ DIRECTLY UNDER THE FIGURES, AND IN EVERY FRAMEWORK'S FILE. The refusal appeared only in
@@ -3661,7 +3668,7 @@ workings: saved.workings,
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `ThemisIQ_${fw.id.toUpperCase()}_${inventory.company_name.replace(/\s+/g,'_')}_${inventory.reporting_year}.csv`
+    a.download = `ThemisIQ_${fw.id.toUpperCase()}_${inventory.company_name.replace(/\s+/g,'_')}_${yl.fileTag}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -3700,7 +3707,7 @@ workings: saved.workings,
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '16px 20px', marginBottom: 10, cursor: 'pointer', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 500, color: '#0d0d0d' }}>{inv.company_name || 'Untitled inventory'}</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 3 }}>Reporting year {inv.reporting_year} · Updated {new Date(inv.updated_at).toLocaleDateString()}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-ink-muted)', marginTop: 3 }}>Reporting year {yearLabel(inv.reporting_year, inv.fiscal_year_end_month).heading} · Updated {new Date(inv.updated_at).toLocaleDateString()}</div>
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-brand)' }}>Open →</span>
                 </div>

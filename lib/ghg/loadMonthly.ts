@@ -53,7 +53,7 @@ export const DELIVERY_BASED_NOTE = "Delivery-based: fuel bought by delivery is c
 /** One bar in the monthly chart: a month with stacked scope totals. */
 export interface MonthlyBucket {
   month: string;            // 'YYYY-MM' label
-  monthLabel: string;       // 'Jan', 'Feb', ... for the axis
+  monthLabel: string;       // 'Jan', 'Feb', ... for the axis; 'Apr 2024' ... for a non-December year end (T3b)
   scope1: number | null;
   scope2: number | null;
   scope3: number | null;
@@ -70,8 +70,12 @@ export interface LoadMonthlyResult {
 
 const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-/** Pure: bucket flat monthly rows into per-month stacked chart data. */
-export function buildMonthlyBuckets(rows: MonthlyRow[]): MonthlyBucket[] {
+/**
+ * Pure: bucket flat monthly rows into per-month stacked chart data. T3b: a year that does not end in December
+ * spans two calendar years, so each month is labelled with its year ("Apr 2024" ... "Mar 2025"); a December
+ * year end keeps "Jan" ... "Dec".
+ */
+export function buildMonthlyBuckets(rows: MonthlyRow[], yearEndMonth: number = 12): MonthlyBucket[] {
   const byMonth = new Map<string, { s1: number; s2: number; s3: number }>();
   for (const r of rows) {
     const key = r.period_month.slice(0, 7); // 'YYYY-MM'
@@ -87,7 +91,8 @@ export function buildMonthlyBuckets(rows: MonthlyRow[]): MonthlyBucket[] {
       const monthIdx = Number(key.slice(5, 7)) - 1;
       return {
         month: key,
-        monthLabel: MONTH_LABELS[monthIdx] ?? key,
+        monthLabel: MONTH_LABELS[monthIdx] === undefined ? key
+          : yearEndMonth === 12 ? MONTH_LABELS[monthIdx] : `${MONTH_LABELS[monthIdx]} ${key.slice(0, 4)}`,
         // null (not 0) when a scope has nothing, so recharts draws no segment
         scope1: v.s1 > 0 ? +v.s1.toFixed(4) : null,
         scope2: v.s2 > 0 ? +v.s2.toFixed(4) : null,
@@ -97,7 +102,7 @@ export function buildMonthlyBuckets(rows: MonthlyRow[]): MonthlyBucket[] {
     });
 }
 
-export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResult> {
+export async function loadMonthly(inventoryId: string, yearEndMonth: number = 12): Promise<LoadMonthlyResult> {
   const empty = (error: string | null): LoadMonthlyResult => ({
     buckets: [], measuredMonths: 0, totalTco2e: 0, error,
   });
@@ -115,7 +120,7 @@ export async function loadMonthly(inventoryId: string): Promise<LoadMonthlyResul
     if (error) return empty(error.message);
 
     const rows = (data ?? []) as MonthlyRow[];
-    const buckets = buildMonthlyBuckets(rows);
+    const buckets = buildMonthlyBuckets(rows, yearEndMonth);
     const totalTco2e = +buckets.reduce((a, b) => a + b.total, 0).toFixed(4);
 
     return { buckets, measuredMonths: buckets.length, totalTco2e, error: null, deliveryBased: rows.some(isDeliveryRow) };

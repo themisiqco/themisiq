@@ -83,7 +83,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 - **An estimated factor is always labelled as an estimate on every surface that shows the row (R14).**
 - **A fleet line is priced only with a mobile factor; a stationary factor is never used for a vehicle unless the publisher states, cited, that one factor covers both uses (FI9, R16).**
 - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
-- **Run `npx vitest run lib/ghg/engine.test.ts` (475 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (478 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
 
 ---
 

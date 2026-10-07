@@ -1,4 +1,5 @@
-import type { CountryRefusal } from './engine'
+import type { CountryRefusal, ReportingYearLabel } from './engine'
+import { yearLabel } from './engine'
 import { countryRefusalLabel } from './countryRefusalCopy'
 import { factorEditionState } from "./factorEditions";
 import type { FactorEditions, FactorEditionState } from "./factorEditions";
@@ -97,6 +98,8 @@ export interface InventoryRow {
   company_id: string | null;         // stable identity; null = unlinked (skipped)
   company_name: string;              // display label only
   reporting_year: number;
+  /** T3b: the inventory's year-end month (1-12; null or missing is December), for its labels. */
+  fiscal_year_end_month?: number | null;
   scope1_total: number;
   scope2_location_total: number;
   scope2_market_total?: number | null;
@@ -144,6 +147,10 @@ export interface InventoryRow {
 
 export interface SeriesYear {
   year: number;
+  /** T3b: this year's labels, from reportingYearLabel: never print `year` to a reader. */
+  label: ReportingYearLabel;
+  /** T3b: the year-end month (1-12), so the monthly drill-down labels its months with their years. */
+  yearEndMonth: number;
   /** The inventory this year's figures come from (T12). Null only for a row saved without one. */
   inventoryId: string | null;
   /**
@@ -343,7 +350,7 @@ export function describeYearStatus(y: SeriesYear): string | null {
     const k = lineEx.length;
     const linesSentence = k === 0 ? "" : `${k} line${k === 1 ? " is" : "s are"} not priced, and that year's totals exclude ${k === 1 ? "it" : "them"} (${lineDetail})`;
     if (ex.length === 0) {
-      return `${y.year} isn't shown: ${linesSentence}. The rest of that year was measured normally, but a total missing a line can't be compared with one that isn't.`;
+      return `${y.label.heading} isn't shown: ${linesSentence}. The rest of that year was measured normally, but a total missing a line can't be compared with one that isn't.`;
     }
     const detail = ex
       .map((e) => {
@@ -360,10 +367,10 @@ export function describeYearStatus(y: SeriesYear): string | null {
       })
       .join("; ");
     const n = ex.length;
-    return `${y.year} isn't shown: ${n} location${n === 1 ? " was" : "s were"} left out of that year's figures${detail ? ` (${detail})` : ""}${linesSentence ? `, and ${linesSentence}` : ""}. The rest of that year was measured normally, but a total missing a site can't be compared with one that isn't.`;
+    return `${y.label.heading} isn't shown: ${n} location${n === 1 ? " was" : "s were"} left out of that year's figures${detail ? ` (${detail})` : ""}${linesSentence ? `, and ${linesSentence}` : ""}. The rest of that year was measured normally, but a total missing a site can't be compared with one that isn't.`;
   }
 
-  return `${y.year} isn't shown: we can't confirm its figures are complete${y.unverifiableReason ? `: ${y.unverifiableReason}` : ""}. We'd rather leave a gap than plot a number we can't stand behind.`;
+  return `${y.label.heading} isn't shown: we can't confirm its figures are complete${y.unverifiableReason ? `: ${y.unverifiableReason}` : ""}. We'd rather leave a gap than plot a number we can't stand behind.`;
 }
 
 // ── SCOPE 3 COVERAGE, IN WORDS ──────────────────────────────────────────────────────────────────
@@ -386,9 +393,9 @@ export function scope3CoverageLabel(y: Pick<SeriesYear, "scope3InTotal" | "scope
 export function describeScope3Basis(y: SeriesYear): string | null {
   switch (y.scope3Basis) {
     case "covers_nothing":
-      return `${y.year} has a saved Scope 3 inventory that counts no categories yet: none has been answered relevant and calculated, so there is no Scope 3 figure to show for that year. It is not a missing record.`;
+      return `${y.label.heading} has a saved Scope 3 inventory that counts no categories yet: none has been answered relevant and calculated, so there is no Scope 3 figure to show for that year. It is not a missing record.`;
     case "not_recorded":
-      return `${y.year}'s Scope 3 figure is shown as it was saved. What it covers was not recorded, so it cannot be compared category by category with a later year.`;
+      return `${y.label.heading}'s Scope 3 figure is shown as it was saved. What it covers was not recorded, so it cannot be compared category by category with a later year.`;
     default:
       return null;
   }
@@ -404,7 +411,7 @@ export function describeScope3CoverageDrift(series: CompanySeries): string | nul
     .filter((y) => y.scope3 !== null)
     .map((y) => {
       const label = scope3CoverageLabel(y);
-      return label ? `${y.year} covers ${label}` : `${y.year}'s coverage was not recorded`;
+      return label ? `${y.label.heading} covers ${label}` : `${y.label.heading}'s coverage was not recorded`;
     });
   if (parts.length === 0) return null;
   return `Scope 3 coverage differs between years: ${parts.join("; ")}. A change in the Scope 3 total may be a change in what is counted rather than in emissions.`;
@@ -526,6 +533,8 @@ export function buildCompanySeries(
       if (status !== "ok") {
         return {
           year: r.reporting_year,
+          label: yearLabel(r.reporting_year, r.fiscal_year_end_month),
+          yearEndMonth: r.fiscal_year_end_month ?? 12,
           inventoryId: r.inventory_id ?? null,
           scope1: null,
           scope2Location: null,
@@ -572,6 +581,8 @@ export function buildCompanySeries(
 
       return {
         year: r.reporting_year,
+        label: yearLabel(r.reporting_year, r.fiscal_year_end_month),
+        yearEndMonth: r.fiscal_year_end_month ?? 12,
         inventoryId: r.inventory_id ?? null,
         scope1: r.scope1_total,
         scope2Location: r.scope2_location_total,

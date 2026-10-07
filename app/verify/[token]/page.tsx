@@ -6,6 +6,7 @@ import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../.
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
 import type { CountryRefusal } from '../../../lib/ghg/engine'
+import { yearLabel, periodWords } from '../../../lib/ghg/engine'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
@@ -141,6 +142,8 @@ function CountryRefusalCell({ refusal }: { refusal: CountryRefusal }) {
 // but never rendered, which made the payload look narrower than it was.
 interface InventoryData {
   company_name: string; reporting_year: number
+  // T3b: projected by get_verifier_inventory (20260814); null or absent reads as December.
+  fiscal_year_end_month?: number | null
   boundary_approach: string; selected_frameworks: string[]
   scope1_total: number; scope2_location_total: number; scope2_market_total: number
   // ISO 14064-3 7.1.4.9(b): the verifier must be able to confirm which GWP set the figures use.
@@ -747,7 +750,8 @@ export default function VerifierPage() {
             has to be visible too — a missing basis reads as "not stated", never as a silent omission.
             The workings table carries a per-row gwp_basis as well, so the two can be cross-checked. */}
         <p style={{ fontSize: 14, color: '#555553', fontWeight: 400, marginBottom: '2rem' }}>
-          Reporting year {inv.reporting_year} · {frameworks.join(', ') || 'No framework selected'} · {boundaryLabel(inv.boundary_approach)}
+          {/* T3b: the label and the window's dates, so a year ending in March is never read as a calendar year. */}
+          Reporting year {yearLabel(inv.reporting_year, inv.fiscal_year_end_month).heading} ({periodWords(inv.reporting_year, inv.fiscal_year_end_month).period}) · {frameworks.join(', ') || 'No framework selected'} · {boundaryLabel(inv.boundary_approach)}
           {' · '}
           {inv.gwp_version
             ? <>GWP basis: {inv.gwp_version}</>
