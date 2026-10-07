@@ -273,7 +273,7 @@ on the same NCV.
 | Fuel | Unit | Step used | Value | Source quote | Priced or blocked |
 |---|---|---|---|---|---|
 | Natural gas | m³ | published per m³ | provincial g CO2/m³ | ECCC v3.0 Table 1.3, e.g. "Ontario 1 921" (Marketable), page 4 | Priced, as today (province required) |
-| Natural gas | therms, MMBtu, GJ | R2 step 1, if ruled | 38.59 TJ/GL GCV (national, 2023) | NIR 1990–2023 Part 2, Table A4–2, row "Natural Gas", "Energy Content, GCV … 38.59 TJ/GL", page 236 | ⚑ Open. Unpriced until ruled; if ruled, Ontario 49.780 kg CO2 per GJ gross |
+| Natural gas | therms, MMBtu, GJ | R2 step 1, if ruled | 38.59 TJ/GL GCV (national, 2023) | NIR 1990–2023 Part 2, Table A4–2, row "Natural Gas", "Energy Content, GCV … 38.59 TJ/GL", page 236 | Priced (ruled R12, 7 Oct 2026): GJ / 0.03859 × the province's per-m³ factor; Ontario 49.780 kg CO2 per GJ gross |
 | Propane | kg | none | not found in local sources | none | Blocked |
 
 ---
@@ -360,7 +360,7 @@ page 242).
 
 - **Canadian gas in therms, MMBtu or GJ:** it **could** price under R2 step 1 on Table A4–2's 38.59 MJ/m³ (GCV).
   The value is the factor publisher's own, printed in the inventory its factors cite. But four things make it
-  weaker than an ordinary step 1 value. ⚑ Lisa to rule before any code uses it:
+  weaker than an ordinary step 1 value. Ruled 7 Oct 2026 (R12): used, with these four points recorded:
   1. it is one national value, while the factor it would divide into is provincial;
   2. it is a Reference Approach figure whose comment mentions weighting by marketable and non-marketable gas,
      and a customer buys marketable gas;
@@ -368,7 +368,7 @@ page 242).
      R6 refused the same step for the EU);
   4. the text and the table disagree about its source (ECCC weighting against Statistics Canada).
 
-  Until ruled, Canadian gas in an energy unit stays unpriced, as today.
+  Since R12, Canadian gas in GJ prices this way (FI3); therms and MMBtu convert to GJ exactly.
 
   The arithmetic if ruled, for Ontario 2026 (v3.0 Table 1.3, Marketable, 1 921 g CO2/m³), to 5 significant
   figures:
@@ -417,7 +417,11 @@ section 10).
    **Ruled 7 Oct 2026 (R11):** UK natural gas also offers m³, priced through DEFRA's own m³ factor (2.02633 kg
    CO2e/m³, factor ID 1_100_1004_1_1); kWh stays the default unit.
 8. **Canadian gas heat content (new in round 2, section C):** may Table A4–2's national 38.59 MJ/m³ (GCV) price
-   Canadian gas in therms, MMBtu or GJ against the provincial per-m³ factors? ⚑ Open.
+   Canadian gas in therms, MMBtu or GJ against the provincial per-m³ factors?
+   **Ruled 7 Oct 2026 (R12):** yes. A Canadian gas figure in GJ (gross, as billed) is converted to m³ at 38.59
+   MJ/m³ and priced on the province's own per-m³ factor; the province is still required. The Climate Registry 2025
+   and BC's 2024 Best Practices Methodology both use one national Statistics Canada heat content across provinces.
+   Lisa has asked ECCC for provincial values (ges-ghg@ec.gc.ca) and will switch if they are published.
 
 ---
 

@@ -54,7 +54,8 @@ const COMBUSTION_SITES: [string, Location][] = [
   ['US', loc({ country: 'US', grid_region: 'US_CA', has_propane: true, propane_amount: 1000, propane_unit: 'gallons' })],
   ['CA', loc({ country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
   ['UK', loc({ country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' })],
-  ['EU', loc({ country: 'FR', grid_region: 'EU_FR', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
+  // FI3: EU gas in kWh, gross (R7). EU m3 is unpriced (R6).
+  ['EU', loc({ country: 'FR', grid_region: 'EU_FR', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' })],
   ['AU', loc({ country: 'AU', grid_region: 'AU_NSW', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
   ['NZ', loc({ country: 'NZ', grid_region: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' })],
 ]
@@ -149,7 +150,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     //   US  EF.propane_gallon        5.72 + 0.00027x29.8 + 0.00005x273 = 5.741696 (EPA's printed column, FI2 diff 3)
     //   CA  EF_CA.natural_gas_m3     1.921 (ON override) + 0.000037x29.8 + 0.000035x273 = 1.9316576
     //   UK  EF_UK.natural_gas_kwh    0.18231, combined — no gas split to scale
-    //   EU  EF_EU.natural_gas_m3     2.0196 + 0.000036x29.8 + 0.0000036x273 = 2.0216556
+    //   EU  EF_EU.natural_gas_kwh    0.181764 + 0.00000324x29.8 + 0.000000324x273 = 0.181949004
     //   AU  EF_AU.natural_gas_m3     2.025129, combined (NGA's printed per-m3 figure, FI2 follow-up)
     //   NZ  EF_NZ.commercial.natural_gas_kwh  0.19543, combined
     // x 1,000 units / 1,000 kg per tonne, so the per-unit factor IS the tonnage here.
@@ -157,7 +158,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
       ['US', 5.741696],       // 1,000 gal propane, EPA
       ['CA', 1.9316576],      // 1,000 m3 gas, ECCC with the ON provincial CO2 override
       ['UK', 0.18231],        // 1,000 kWh gas, DEFRA 2026
-      ['EU', 2.0216556],      // 1,000 m3 gas, MRR Annex VI / IPCC 2006
+      ['EU', 0.181949004],    // 1,000 kWh gas (gross), MRR Annex VI x 0.90 (IPCC 2006), FI3
       ['AU', 2.025129],       // 1,000 m3 gas, DCCEEW NGA 2025
       ['NZ', 0.19543],        // 1,000 kWh gas, MfE 2026 commercial use-class
     ]

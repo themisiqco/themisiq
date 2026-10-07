@@ -22,9 +22,11 @@ describe('display polish (T10d)', () => {
   it('the documents\' unit is shown as the locked selector\'s choice when the country list lacks it', () => {
     const fr: Array<[string, string]> = [['m3', 'm³']]
     expect(unitOptionsShowing(fr, 'kwh', true)).toEqual([['m3', 'm³'], ['kwh', 'kWh']])
-    expect(unitOptionsShowing(fr, 'kwh', false), 'a typed figure: the list as it is').toEqual(fr)
+    // FI3: a typed figure's held unit is kept too, labelled as not accepted, so the selector never shows another unit.
+    expect(unitOptionsShowing(fr, 'kwh', false)).toEqual([['m3', 'm³'], ['kwh', 'kWh (not accepted here)']])
     expect(unitOptionsShowing(fr, 'm3', true), 'already offered').toEqual(fr)
-    expect((PAGE.match(/unitOptionsShowing\(/g) ?? []).length, 'gas, propane, stationary diesel, petrol, fleet diesel').toBe(5)
+    expect(unitOptionsShowing(fr, 'm3', false), 'already offered').toEqual(fr)
+    expect((PAGE.match(/unitOptionsShowing\(/g) ?? []).length, 'gas, propane, stationary diesel, heating oil, heavy fuel oil, petrol, fleet diesel, steam').toBe(8)
   })
 
   it('the live results panel says "nothing is lost" once', () => {

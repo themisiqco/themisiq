@@ -150,8 +150,9 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
     // both, and one IPCC table priced their combustion. Keying on loc.country would put two entries
     // in front of a verifier where one document exists.
     const ed = buildFactorEditions([
-      loc({ id: 'a', country: 'DE', grid_region: 'EU_DE' }),
-      loc({ id: 'b', country: 'FR', grid_region: 'EU_FR' }),
+      // FI3: EU gas in kWh (R7); the fixture's default unit is not one the EU table prices.
+      loc({ id: 'a', country: 'DE', grid_region: 'EU_DE', natural_gas_unit: 'kwh' }),
+      loc({ id: 'b', country: 'FR', grid_region: 'EU_FR', natural_gas_unit: 'kwh' }),
     ], 2026)
 
     expect(Object.keys(ed)).toEqual(['EU'])
@@ -292,7 +293,8 @@ describe('the declared edition labels cannot drift from their citations', () => 
     // a line priced through the US fallback records US EPA, so those sites would name no edition of their own.
     const country: Record<string, [string, string, Location['natural_gas_unit']]> = {
       US: ['US', 'US_FL', 'mcf'], CA: ['CA', 'ON', 'mcf'], UK: ['GB', 'UK', 'kwh'],
-      EU: ['DE', 'EU_DE', 'm3'], AU: ['AU', 'AU_NSW', 'm3'], NZ: ['NZ', 'NZ', 'kwh'],
+      // FI3: EU gas in kWh (R7); EU m3 is unpriced (R6).
+      EU: ['DE', 'EU_DE', 'kwh'], AU: ['AU', 'AU_NSW', 'm3'], NZ: ['NZ', 'NZ', 'kwh'],
     }
     for (const [j, citation] of cases) {
       const [c, region, unit] = country[j]
@@ -341,8 +343,9 @@ describe('the declared edition labels cannot drift from their citations', () => 
       .toBe('DCCEEW NGA 2025 (AR5)')
     expect(/\((\d{4})\)/.exec(EF_SOURCES.combustion_au), 'year-in-parens finds no year here').toBeNull()
     // And it DOES match the other five, which is exactly what makes it look safe.
-    for (const c of [EF_SOURCES.combustion, EF_SOURCES.combustion_ca, EF_SOURCES.combustion_uk,
-                     EF_SOURCES.combustion_eu]) {
+    // FI3: the EU citation no longer carries a parenthesised year (it names MRR, IPCC 2006 and JEC); the other three still
+    // match, which is the point: the pattern looks safe on most citations and is wrong on one.
+    for (const c of [EF_SOURCES.combustion, EF_SOURCES.combustion_ca, EF_SOURCES.combustion_uk]) {
       expect(/\((\d{4})\)/.test(c), `${c}`).toBe(true)
     }
   })
@@ -947,14 +950,15 @@ describe('a location excluded from the totals records no edition', () => {
   const UNPRICEABLE: [string, Partial<Location>][] = [
     // FI2 diff 2: US gas in m3 and kWh, and AU gas in kWh, now price (exact conversions); replaced by routes that still miss.
     // FI2 follow-up: GB gas in mcf and m3 now price on DEFRA's per-m3 row; replaced by CA gas in therms and NZ gas in mcf.
-    ['CA gas therms',    { country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'therms' }],
-    ['DE gas mmbtu',     { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mmbtu' }],
+    // FI3: CA gas in therms (R12) and EU gas in MMBtu and kWh (R7) now price; replaced by EU m3, heating oil and LPG litres.
+    ['DE gas m3',        { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['DE heating oil L', { country: 'DE', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' }],
     ['US propane kg',    { country: 'US', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['CA gas kwh',       { country: 'CA', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
     ['CA propane kg',    { country: 'CA', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['NZ gas mcf',       { country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }],
     ['GB propane kg',    { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
-    ['DE gas kwh',       { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['DE propane litres', { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'litres' }],
     ['DE propane kg',    { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['NZ propane litres', { country: 'NZ', has_propane: true, propane_amount: 1000, propane_unit: 'litres' }],
     ['AU propane kg',    { country: 'AU', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],

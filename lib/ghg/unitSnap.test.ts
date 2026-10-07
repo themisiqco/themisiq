@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   UNIT_FIELDS, snapUnitsForCountry, emptyLocation,
-  ngUnitOptions, propaneUnitOptions, liquidUnitOptions, steamUnitOptions,
+  ngUnitOptions, propaneUnitOptions, liquidUnitOptions, fuelOilUnitOptions, steamUnitOptions,
 } from './engine'
 
 // ── The unit a location STORES must be one its country actually OFFERS ──────────────────────────
@@ -132,7 +132,7 @@ describe('the registry covers every fuel that has a unit', () => {
 
   it('each registry entry points at a real option list', () => {
     const lists: Record<string, unknown> = {
-      ngUnitOptions, propaneUnitOptions, liquidUnitOptions, steamUnitOptions,
+      ngUnitOptions, propaneUnitOptions, liquidUnitOptions, fuelOilUnitOptions, steamUnitOptions,
     }
     for (const f of UNIT_FIELDS) {
       expect(lists[f.list], `UNIT_FIELDS entry "${f.field}" names list "${f.list}", which is not exported from engine.ts`).toBe(f.options)

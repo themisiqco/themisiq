@@ -367,7 +367,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   // Printed by a PDF, or stored and compared. Put back on 27 Sep 2026 after the shared-lib sweep had
   // already taken them; the reason each survives is in the header above, per file.
   'lib/ghg/comparability.ts': 1,
-  'lib/ghg/engine.ts': 61,
+  'lib/ghg/engine.ts': 59,
   'lib/materiality/boardReport.ts': 17,
   'lib/materiality/boardReportPdf.ts': 6,
   'lib/materiality/register.ts': 3,

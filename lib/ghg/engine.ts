@@ -195,7 +195,8 @@ const GWP = {
 // Stored as kg per activity unit (raw gas amounts; calcGas applies GWP). Source values are g/unit.
 // Mirrors the US EF key structure so factor selection is a clean country swap, with two exceptions:
 //   - natural_gas CO2 is per-province (see EF_CA_NG_CO2_M3), per m³; there is no table value without a province.
-//   - ECCC has no energy-basis gas factor here, so CA gas in therms, MMBtu or kWh is unpriced (FI2: no fallback).
+//   - ECCC prints no energy-basis gas factor. Since FI3 (R12) CA gas in GJ, therms, MMBtu or kWh is converted to m³ at
+//     the national gross heat content (CA_NG_GJ_PER_M3, NIR Table A4-2) and priced on the province's per-m³ factor.
 //   FI2 diff 2: every key is in ECCC's own unit (per litre, per m³). The gallon and per-Mcf keys are gone: those
 //   units convert exactly, with the conversion stated on the row.
 // CH4/N2O use the Commercial/Industrial sector rows (Tables 2.x: ~0.037 CH4; 4.x Industrial for oils).
@@ -275,6 +276,17 @@ const EF_CA_NG_CO2_M3: Record<string, number> = {
 // Canadian natural gas CH4 and N2O, ECCC Res/Comm/Institutional: 0.037 and 0.035 g/m3, per m³ only. The CO2 is never
 // here: it is the province's (FI1).
 const EF_CA_NG_CH4_N2O_M3 = { ch4: 0.000037, n2o: 0.000035 }
+// FI3 (ruling R12, 7 Oct 2026): Canada's national gross heat content for natural gas, 38.59 TJ/GL GCV, 2023 (ECCC
+// National Inventory Report 1990-2023, Part 2, Table A4-2 "Reference Approach Energy Contents and Emission Factors
+// for Canada", row Natural Gas, page 236). 1 GL = 10^6 m³, so 38.59 MJ/m³ = 0.03859 GJ/m³. ECCC publishes no provincial
+// value (its provincial energy contents are in an unpublished internal report); The Climate Registry 2025 and BC's 2024
+// Best Practices Methodology also use one national figure. A gas figure in GJ (gross, as billed) is converted to m³ at
+// this value and priced on the province's own per-m³ factor.
+const CA_NG_GJ_PER_M3 = 38.59 / 1000
+/** R12: the note on a Canadian gas row priced through the national heat content. */
+export const CA_GAS_GJ_NOTE =
+  'Converted to m³ at 38.59 MJ/m³, Canada\'s national gross heat content for natural gas (ECCC National Inventory ' +
+  'Report 1990-2023, Part 2, Table A4-2). ECCC does not publish a provincial value.'
 // FI2 diff 2 (ruling R5): the per-Mcf CH4 and N2O that sat here (0.001048 and 0.000991, rounded from per m³ × 28.3168)
 // are gone. Every Canadian gas volume other than m³ converts to the per-m³ factor exactly (1 Mcf = 28.316846592 m³).
 /** FI1: the province a Canadian location's gas is priced for, or null when it is blank or not one we hold. */
@@ -390,51 +402,36 @@ const EF_UK = {
   steam_kwh: { co2: 0.17529, ch4: 0, n2o: 0 },
 }
 
-// EU combustion factors — mass-basis emission factors and NCVs from EU MRR Annex VI Table 1, which
-// carries the IPCC 2006 Vol.2 Tier-1 defaults (fossil, full oxidation) as EU law, CONVERTED HERE to
-// per-litre / per-m3 using fuel densities NEITHER SOURCE PUBLISHES. CH4/N2O are Ch.2 stationary
-// defaults. Gas split is stored (calcGas applies AR4/AR5/AR6).
-// Metric units are the EU norm: natural gas m3, liquids litres. FI2 diff 2: no gallon or Mcf keys; those convert exactly.
+// EU combustion factors: the emission factor per TJ and the net calorific value per mass from EU MRR Annex VI
+// Table 1 (Commission Implementing Regulation (EU) 2018/2066, consolidated 27.05.2025, pages 167 and 168; its Source
+// column reads "IPCC 2006 GL"), with CH4 and N2O per TJ from IPCC 2006 Vol. 2 Ch. 2 Tables 2.2 and 2.3 (pages 2.16
+// and 2.18), which are identical for these fuels. Gas split stored (calcGas applies AR4/AR5/AR6).
 //
-// ── SOURCE TRACE ─────────────────────────────────────────────────────────────────────────────────
-// CO2 AND NCV — FULLY SOURCED as of 14 Aug 2026. Commission Implementing Regulation (EU) 2018/2066
-// (the MRR), Annex VI, Table 1 "Fuel emission factors related to net calorific value (NCV) and net
-// calorific values per mass of fuel", Source column "IPCC 2006 GL". Every value used here appears
-// verbatim, so the pair is confirmed twice over — as directly applicable EU law, and as the IPCC
-// science that law cites:
-//     Motor gasoline             69,3 t CO2/TJ    44,3 TJ/Gg
-//     Gas/Diesel oil             74,1             43,0
-//     Residual fuel oil          77,4             40,4
-//     Liquefied petroleum gases  63,1             47,3
-//     Natural gas                56,1             48,0
-//   This CLOSED the five values the 13 Aug IPCC check had not covered: CO2 56 100 / 63 100 / 69 300
-//   and NCV 47.3 / 44.3 were previously carried on the header's word "standard" alone.
-//
-// ⚠️ DENSITY — STILL NOT PUBLISHED BY EITHER SOURCE. Annex VI Table 1 is MASS BASIS, exactly like
-// IPCC Table 1.2 (TJ/Gg); it publishes no densities, and the Guidelines publish none either
-// (§1.4.1.2 and Box 1.1 cover gross-to-net calorific conversion, never mass-to-volume). So the
-// conversion to a volume basis — the basis every EU customer enters data in — rests on four numbers
-// neither cited source contains. The MRR closes the factor/NCV question and does NOT close this one.
-//
-// WHAT IS KNOWN ABOUT EACH DENSITY. A specification gives a RANGE; it BOUNDS a value, it does not
-// produce one. None of these is a citation, and the row notes must not read as though it were:
-//   0.844 gas/diesel oil  — inside EN 590 (automotive diesel under Directive 98/70/EC): 0.820–0.845
-//                           kg/L at 15 °C. Sits 1 unit below the TOP of the range, ~1.4% above the
-//                           midpoint. CONSERVATIVE: more mass per litre means more CO2 per litre.
-//   0.745 motor gasoline  — inside EN 228 (petrol): 0.720–0.775 kg/L at 15 °C. ~0.3% BELOW the
-//                           midpoint, i.e. representative rather than conservative.
-//   0.990 residual fuel oil— satisfies IPCC Table 1.1, which requires residual density above 0.90
-//                           kg/L. A bound, and the weakest of the three (one-sided, no upper limit).
-//   0.510 propane/LPG     — ⚠️ NO EUROPEAN STANDARD FOUND THAT BOUNDS IT. Unsourced AND unbounded,
-//                           the only one of the four in that state. See its key for the decision.
-//   ⚠️ THE FIRST TWO SIT ON DIFFERENT BASES — diesel at a conservative endpoint, petrol at a
-//   representative midpoint. NOBODY CHOSE THAT. It is what comes of values arriving from an
-//   unrecorded source, and it is recorded here rather than quietly harmonised: harmonising would
-//   move stored figures on an argument no source supports either.
-//
-// NATURAL GAS decomposes the same way now that the NCV is known. 36 MJ/m3 ÷ 48.0 MJ/kg (Annex VI's
-// 48,0 TJ/Gg) = 0.75 kg/m3. So "~36 MJ/m3" is a density in disguise, and the same class of gap as
-// the liquids rather than a separate mystery. Still unsourced.
+// ── FI3 (7 Oct 2026): EVERY PROPERTY IS CITED, OR THE KEY IS GONE ───────────────────────────────────────────────
+// Record: docs/review/eu-fuel-properties.md. Rulings R6 to R10 (design-derived-figures.md section 10).
+//   MRR Annex VI Table 1, rows as printed (t CO2/TJ, TJ/Gg):
+//     Motor gasoline 69,3 / 44,3   Gas/Diesel oil 74,1 / 43,0   Residual fuel oil 77,4 / 40,4
+//     Liquefied petroleum gases 63,1 / 47,3   Natural gas 56,1 / 48,0
+//   It prints no density, no volumetric energy content and no gross/net ratio. IPCC Ch. 1 and 2 print none either.
+//   - PER LITRE (R2 step 2, R9, R10): the factor x the NCV from MRR, x the density from the JEC Well-to-Tank report v5
+//     (EU JRC, EUR 30269 EN, 2020), Annexes, Appendix 2 section 4.1 "Standard properties of fuels", Liquids, page 9:
+//     Diesel 832, Gasoline 743, HFO 970 kg/m³. CO2, CH4 and N2O all use the same density. Each row's note names both
+//     documents (R10).
+//   - HEATING OIL IN LITRES: NO KEY (R8). IPCC Table 1.1 (page 1.12) puts light heating oil in Gas/Diesel Oil, so it
+//     shares diesel's NCV and factor, but no source prints a heating-oil density, and the diesel density is not used
+//     for it. Heating oil prices by mass only.
+//   - LPG IN LITRES: NO KEY. No local source prints a liquid LPG density (JEC gives LPG only in its gaseous state).
+//     Propane by mass is FI4.
+//   - NATURAL GAS IN m³: NO KEY (R6). A per-Nm³ energy content (JEC Table 37, 36.4 MJ/Nm³ at 0 °C) is never applied to
+//     a billed m³: billing reference conditions differ by country and are not printed on every bill. The 36 MJ/m³
+//     behind the old 2.0196 kg CO2/m³ was printed by no source.
+//   - NATURAL GAS IN kWh (R7): gross, as EU gas bills show it. MRR's factor is per TJ NET; net = gross x 0.90, cited to
+//     IPCC 2006 Vol. 2 Ch. 1 section 1.4.1.2 (page 1.16) and the notes under Ch. 2 Tables 2.6 to 2.8 (pages 2.25 to
+//     2.27). GJ, MJ and the other energy units convert to it exactly (GAS_CALORIFIC_BASIS.EU).
+//   - PER KG (MRR mass basis): the factor per TJ x the NCV per Gg from the one table, nothing else. Tonnes convert to kg
+//     exactly. Offered for heating oil and heavy fuel oil; held for diesel too, which offers litres only.
+// The densities this table used until FI3 (0.844, 0.745, 0.990, 0.510 kg/L and 36 MJ/m³) were printed by no source
+// and are gone; the analysis of them is in the git history of this block and in the record above.
 //
 // ── CH4/N2O: THE SECTOR CHOICE, NOW IDENTIFIED ──────────────────────────────────────────────────
 // Annex VI carries no CH4/N2O combustion factors at all (its Section 3 Table 6 gives GWPs only), so
@@ -468,8 +465,8 @@ const EF_UK = {
 //
 // ⚠️ IPCC AND EPA DISAGREE ON LPG, AND BOTH ARE FOLLOWED DELIBERATELY. IPCC keeps LPG on the gaseous
 // pair (1 / 0.1) in all four tables, distinct from the liquids; EPA gives propane/LPG the same
-// 3 / 0.6 as every other petroleum product. So EF_EU.propane_litre and EF.propane_gallon visibly
-// disagree on the same fuel. That is two publishers, not a transcription error — the matching note
+// 3 / 0.6 as every other petroleum product. So an EU LPG key (FI4) and EF.propane_gallon will
+// disagree on the same fuel's CH4 and N2O. That is two publishers, not a transcription error; the matching note
 // is on EF. DO NOT harmonise either onto the other.
 //
 // ── BASIS: WHY 100% FOSSIL IS THE RIGHT CHOICE HERE, not a caveat ───────────────────────────────
@@ -494,48 +491,34 @@ const EF_UK = {
 //     and it contradicts the deliberate design at factorEditions.ts ("DE AND FR ARE BOTH 'EU', AND
 //     THAT IS THE POINT").
 //
-// DO NOT paper over the density gap by inventing a source. Disclosure is the instrument here: every
-// density-derived row carries euDerivationNote() below, which states the arithmetic and says plainly
-// that the density is not published by the cited source.
+// DO NOT paper over a density gap by inventing a source. Every row carries euDerivationNote() below, which
+// states the arithmetic and names every document a value came from (R10).
 const EF_EU = {
-  // Natural gas, per m3 (CO2 56100 kg/TJ × ~36 MJ/m3 net): 2.0196 kg CO2/m3.
-  natural_gas_m3: { co2: 2.0196, ch4: 0.000036, n2o: 0.0000036 },
-  // Propane/LPG (CO2 63100 kg/TJ, NCV 47.3, dens 0.510): 1.52216 kg CO2/L.
-  propane_litre: { co2: 1.52216, ch4: 0.0000241, n2o: 0.0000024 },
-  // Diesel/gas oil (CO2 74100 kg/TJ, NCV 43.0, dens 0.844): 2.68924 kg CO2/L.
-  diesel_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  diesel_mobile_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  // Residual fuel oil (CO2 77400 kg/TJ, NCV 40.4, dens 0.990): 3.09569 kg CO2/L. (FI2 diff 2: no per-gallon key.)
-  // GRADE-EXPLICIT KEYS, derived by the method in this table's header (IPCC 2006 Vol.2: CO2 from
-  // Ch.1 Table 1.4, CH4/N2O stationary defaults from Ch.2, converted via NCV and density).
-  //
-  // RESIDUAL reuses the derivation already recorded above, unchanged: CO2 77400 kg/TJ, NCV 40.4,
-  // dens 0.990 -> 3.09569 kg CO2/L.
-  // DISTILLATE uses the GAS/DIESEL OIL row: CO2 74100 kg/TJ, NCV 43.0, dens 0.844 -> 2.68924 kg CO2/L
-  // — the same three inputs this table already records for diesel_litre, so the values below are
-  // byte-identical to diesel_gallon.
-  //
-  // CATEGORY MAPPING CONFIRMED — LF, 13 Aug 2026. This was flagged as a judgement of mine, because
-  // IPCC 2006 has no row headed "distillate fuel oil". It is not a judgement: Table 1.1 DEFINES
-  // Gas/Diesel Oil as including "light heating oil for industrial and commercial uses", so mapping
-  // distillate heating oil to that row is the Guidelines' own categorisation, read off the table.
-  // (DEFRA independently treats "Gas oil" and "Processed fuel oils - distillate oil" as the same
-  // figure — see the note in EF_UK. That was corroboration; Table 1.1 is the confirmation.)
-  // ── PER-LITRE KEYS — THE DERIVATION'S OWN OUTPUT, one conversion step earlier than the gallon keys.
-  // The header derives per LITRE (CO2/TJ x NCV x density) and the gallon keys convert that result; a
-  // litre-entering EU location now prices from the derivation directly, so the row's displayed factor
-  // is the number the note's arithmetic produces. DISTILLATE IS BYTE-IDENTICAL TO diesel_litre, for
-  // the reason recorded above: IPCC Table 1.1 defines Gas/Diesel Oil as including light heating oil,
-  // so both read the same row. Z7 pins that identity on the litre keys too.
-  fuel_oil_distillate_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  // RESIDUAL: the header gives CO2 3.09569 kg/L explicitly. CH4/N2O are NOT written out per litre
-  // anywhere, so they are computed by the table's OWN documented method rather than back-converted
-  // from the gallon key -- 3 kg CH4/TJ x 40.4e-6 x 0.990 = 1.19988e-4 and 0.6 x 40.4e-6 x 0.990 =
-  // 2.39976e-5, stored at this table's 4-significant-figure convention. They reproduce the stored
-  // gallon values exactly under x 3.785411784, which is the cross-check that they are the same row.
-  fuel_oil_residual_litre: { co2: 3.09569, ch4: 0.00012, n2o: 0.000024 },
-  // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
-  gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
+  // ── PER LITRE: MRR factor x MRR NCV x JEC density. kg/L = t/m³, so kg CO2/L = t CO2/TJ x TJ/Gg x t/m³ / 1000.
+  // CO2 at this table's 6 significant figures; CH4 and N2O at 4. Rates per TJ: IPCC Ch. 2 Tables 2.2/2.3.
+  // Gas/Diesel oil, JEC Diesel 832 kg/m³:
+  //   CO2 74.1 x 43.0 x 0.832 / 1000 = 2.651002 -> 2.65100   CH4 3 x 43.0e-6 x 0.832 = 1.07328e-4 -> 0.0001073
+  //   N2O 0.6 x 43.0e-6 x 0.832 = 2.14656e-5 -> 0.00002147
+  diesel_litre: { co2: 2.65100, ch4: 0.0001073, n2o: 0.00002147 },
+  diesel_mobile_litre: { co2: 2.65100, ch4: 0.0001073, n2o: 0.00002147 },
+  // Motor gasoline, JEC Gasoline 743 kg/m³:
+  //   CO2 69.3 x 44.3 x 0.743 / 1000 = 2.281003 -> 2.28100   CH4 3 x 44.3e-6 x 0.743 = 9.87447e-5 -> 0.00009874
+  //   N2O 0.6 x 44.3e-6 x 0.743 = 1.974894e-5 -> 0.00001975
+  gasoline_litre: { co2: 2.28100, ch4: 0.00009874, n2o: 0.00001975 },
+  // Residual fuel oil, JEC HFO 970 kg/m³:
+  //   CO2 77.4 x 40.4 x 0.970 / 1000 = 3.033151 -> 3.03315   CH4 3 x 40.4e-6 x 0.970 = 1.17564e-4 -> 0.0001176
+  //   N2O 0.6 x 40.4e-6 x 0.970 = 2.35128e-5 -> 0.00002351
+  fuel_oil_residual_litre: { co2: 3.03315, ch4: 0.0001176, n2o: 0.00002351 },
+  // ── PER kg: MRR mass basis, one table. kg CO2/kg = t CO2/TJ x TJ/Gg / 1000; CH4 and N2O = kg/TJ x TJ/Gg / 1e6.
+  // Gas/Diesel oil (diesel and heating oil, IPCC Table 1.1): CO2 74.1 x 43.0 = 3186.3 kg/t; CH4 3 x 43.0 = 129 g/t;
+  //   N2O 0.6 x 43.0 = 25.8 g/t.
+  diesel_kg: { co2: 3.1863, ch4: 0.000129, n2o: 0.0000258 },
+  fuel_oil_distillate_kg: { co2: 3.1863, ch4: 0.000129, n2o: 0.0000258 },
+  // Residual fuel oil: CO2 77.4 x 40.4 = 3126.96 kg/t; CH4 3 x 40.4 = 121.2 g/t; N2O 0.6 x 40.4 = 24.24 g/t.
+  fuel_oil_residual_kg: { co2: 3.12696, ch4: 0.0001212, n2o: 0.00002424 },
+  // ── NATURAL GAS PER kWh, GROSS (R7). kg/kWh = kg/TJ x 0.90 (net per gross) x 3.6e-6 TJ/kWh.
+  //   CO2 56 100 x 0.90 x 3.6e-6 = 0.181764   CH4 1 x 0.90 x 3.6e-6 = 3.24e-6   N2O 0.1 x 0.90 x 3.6e-6 = 3.24e-7
+  natural_gas_kwh: { co2: 0.181764, ch4: 0.00000324, n2o: 0.000000324 },
 }
 
 // ── THE DERIVATION, ON THE ROW ───────────────────────────────────────────────────────────────────
@@ -545,53 +528,43 @@ const EF_EU = {
 // steam both populate it; EU combustion, which needs it most, did not. The row therefore asserted
 // that its cited source had published a figure that source has never published.
 //
-// EACH NOTE MUST DO THREE THINGS and no more: state the arithmetic a verifier can retype, name the
-// density, and say plainly that the density is NOT from the cited source. Where a European
-// specification bounds the value it is named AS A BOUND — "inside the EN 590 range" — never as a
-// citation. EN 590 gives 0.820–0.845 kg/L; it cannot produce 0.844 any more than IPCC Table 1.1's
-// ">0.90" produced 0.990. Writing "density per EN 590" would replace one overstatement with another.
+// EACH NOTE MUST state the arithmetic a verifier can retype and name the document, table and row each value came
+// from (FI3, R10). A specification that only BOUNDS a value (a range, or IPCC Table 1.1's "more than 0.90 kg/l" for
+// residual oil) is never a source for it; since FI3 every density here is one JEC prints as a single value.
 //
 // KEYED ON THE FACTOR KEY, and pushFuel now takes that key and looks the factor up ITSELF, so the
 // note and the number are derived from the same key by construction. Passing both separately would
 // let a row cite one fuel's derivation beside another fuel's factor.
 const EU_DERIVATION: Partial<Record<string, string>> = {
-  natural_gas_m3:
-    'Per-m³ value DERIVED, not published: 56 100 kg CO₂/TJ × 36 MJ/m³ = 2.0196 kg CO₂/m³. The ' +
-    '36 MJ/m³ energy content is from neither cited source; against the published NCV (48.0 TJ/Gg) it ' +
-    'implies a gas density of 0.75 kg/m³, likewise uncited.',
-  propane_litre:
-    'Per-litre value DERIVED, not published: 63 100 kg CO₂/TJ × 47.3 TJ/Gg × 0.510 kg/L = 1.52216 ' +
-    'kg CO₂/L. ⚠️ The density is from neither cited source AND no European standard bounding it has ' +
-    'been found — the least supported input in this table.',
+  // FI3: each note states the arithmetic and names every document a value came from (R10). Plain sentences.
   diesel_litre:
-    'Per-litre value DERIVED, not published: 74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = 2.68924 ' +
-    'kg CO₂/L. The density is from neither cited source; 0.844 kg/L is inside EN 590 for EU ' +
-    'automotive diesel (0.820–0.845 kg/L at 15 °C), at its conservative upper end.',
-  fuel_oil_residual_litre:
-    'Per-litre value DERIVED, not published: 77 400 kg CO₂/TJ × 40.4 TJ/Gg × 0.990 kg/L = 3.09569 ' +
-    'kg CO₂/L. The density is from neither cited source; 0.990 kg/L satisfies IPCC Table 1.1 ' +
-    '(residual oil above 0.90 kg/L) — a one-sided bound, not a citation.',
+    '74.1 t CO₂/TJ × 43.0 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil) × 832 kg/m³ (JEC Well-to-Tank report v5, ' +
+    'Annexes section 4.1, Diesel) = 2.65100 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.',
   gasoline_litre:
-    'Per-litre value DERIVED, not published: 69 300 kg CO₂/TJ × 44.3 TJ/Gg × 0.745 kg/L = 2.28714 ' +
-    'kg CO₂/L. The density is from neither cited source; 0.745 kg/L is inside EN 228 for EU petrol ' +
-    '(0.720–0.775 kg/L at 15 °C), near its midpoint.',
+    '69.3 t CO₂/TJ × 44.3 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Motor gasoline) × 743 kg/m³ (JEC Well-to-Tank report v5, ' +
+    'Annexes section 4.1, Gasoline) = 2.28100 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.',
+  fuel_oil_residual_litre:
+    '77.4 t CO₂/TJ × 40.4 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Residual fuel oil) × 970 kg/m³ (JEC Well-to-Tank report v5, ' +
+    'Annexes section 4.1, HFO) = 3.03315 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.',
+  diesel_kg:
+    'Published on a mass basis: 74.1 t CO₂/TJ × 43.0 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil) = 3.1863 kg CO₂/kg. ' +
+    'CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV.',
+  fuel_oil_distillate_kg:
+    'Published on a mass basis: 74.1 t CO₂/TJ × 43.0 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil, which includes light ' +
+    'heating oil: IPCC 2006 Vol. 2 Ch. 1 Table 1.1) = 3.1863 kg CO₂/kg. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV.',
+  fuel_oil_residual_kg:
+    'Published on a mass basis: 77.4 t CO₂/TJ × 40.4 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Residual fuel oil) = 3.12696 kg CO₂/kg. ' +
+    'CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV.',
+  natural_gas_kwh:
+    '56.1 t CO₂/TJ on a net basis (EU MRR 2018/2066, Annex VI Table 1, Natural gas) × 0.90 net per gross (IPCC 2006 Vol. 2 Ch. 1 section ' +
+    '1.4.1.2, and the notes under Ch. 2 Tables 2.6 to 2.8) × 0.0036 GJ/kWh = 0.181764 kg CO₂ per kWh gross, as ' +
+    'billed. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same basis.',
 }
-// Keys that share a derivation with one already written above, mapped rather than duplicated so the
-// prose cannot drift between two rows describing the same three inputs. diesel_mobile IS diesel;
-// fuel_oil_distillate IS the gas/diesel oil row (IPCC Table 1.1 defines Gas/Diesel Oil as including
-// light heating oil, confirmed 13 Aug 2026); the _gallon forms are unit conversions of their _litre.
-// ⚠️ KEYED ON THE LIVE (PER-LITRE) KEYS, WITH THE GALLON FORMS AS ALIASES. When fuel oil moved to
-// per-litre pricing the live key became fuel_oil_*_litre, which was in NEITHER map — so the density
-// disclosure silently vanished from every EU fuel-oil row while the figures stayed correct. Group U
-// caught it. Any new fuel-oil key must appear here or its row loses the disclosure without failing
-// anything else.
-const EU_DERIVATION_ALIAS: Record<string, string> = {
-  diesel_gallon: 'diesel_litre', diesel_mobile_litre: 'diesel_litre', diesel_mobile_gallon: 'diesel_litre',
-  // Distillate IS the gas/diesel oil row — IPCC Table 1.1 — so both bases point at diesel's derivation.
-  fuel_oil_distillate_litre: 'diesel_litre', fuel_oil_distillate_gallon: 'diesel_litre',
-  fuel_oil_residual_gallon: 'fuel_oil_residual_litre', fuel_oil_gallon: 'fuel_oil_residual_litre',
-  gasoline_gallon: 'gasoline_litre', propane_gallon: 'propane_litre', natural_gas_mcf: 'natural_gas_m3',
-}
+// diesel_mobile is the same fuel as diesel_litre, so it reads that note rather than a copy. Heating oil no longer
+// aliases to diesel (R8): the two share the Gas/Diesel oil row's NCV and factor, but not a density, and heating oil has
+// no litre key. A unit entered in another unit of the same quantity (gallons, tonnes, MJ) converts exactly to the key
+// the table holds, and the note is read under that key, so no gallon or tonne alias is needed.
+const EU_DERIVATION_ALIAS: Record<string, string> = { diesel_mobile_litre: 'diesel_litre' }
 
 /** The derivation disclosure for a row, or undefined where the publisher gave us the figure directly. */
 function euDerivationNote(loc: Location, key: string): string | undefined {
@@ -834,7 +807,7 @@ const EF_SOURCES = {
   // Citing both gives the verifier the legal instrument and the underlying science.
   //   ⚠️ TWO TESTS CONSTRAIN THIS STRING. F16 requires every token of COMBUSTION_EDITION.EU
   // ('IPCC 2006') to appear in it; F17 requires a four-digit year in parentheses. Keep '(2006)'.
-  combustion_eu: 'EU MRR Reg. (EU) 2018/2066, Annex VI Table 1 — IPCC (2006) Vol.2 defaults; published mass-basis, per-volume derived',
+  combustion_eu: 'EU MRR Reg. (EU) 2018/2066 Annex VI Table 1; IPCC 2006 Vol. 2 Ch. 1 and 2; densities from the JEC Well-to-Tank report v5 (EU JRC)',
   combustion_au: 'DCCEEW NGA 2025 (AR5)',
   combustion_nz: 'NZ MfE Measuring Emissions 2026 v2 (as-published basis — factors stored verbatim, no AR re-basing)',
   // ── STEAM / DISTRICT HEAT — NAMED TO THE TABLE, UNLIKE combustion ─────────────────────────────
@@ -1713,7 +1686,7 @@ interface SourceDoc {
 
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
-  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh' | 'ccf'   // ccf: offered at US sites since FI5
+  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh' | 'ccf' | 'gj'   // ccf: US sites (FI5); gj: Canada (FI3)
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   // TWO GRADES, TWO FIELD TRIPLES — and `_amount`, NOT the retired `_gallons` misnomer.
@@ -1724,8 +1697,9 @@ interface Location {
   // uses (natural_gas_amount, propane_amount, diesel_stationary_amount), so fuel oil is now the same
   // shape as its neighbours instead of the exception that needed a comment to be read correctly.
   // Priced through pickEF, which converts the unit entered to the unit the publisher printed (FI2).
-  has_fuel_oil_distillate: boolean; fuel_oil_distillate_amount: number; fuel_oil_distillate_unit?: 'gallons' | 'litres'
-  has_fuel_oil_residual: boolean; fuel_oil_residual_amount: number; fuel_oil_residual_unit?: 'gallons' | 'litres'
+  // FI3: kg and tonnes at EU sites, where MRR publishes on a mass basis (fuelOilUnitOptions).
+  has_fuel_oil_distillate: boolean; fuel_oil_distillate_amount: number; fuel_oil_distillate_unit?: 'gallons' | 'litres' | 'kg' | 'tonnes'
+  has_fuel_oil_residual: boolean; fuel_oil_residual_amount: number; fuel_oil_residual_unit?: 'gallons' | 'litres' | 'kg' | 'tonnes'
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
   uses_ammonia: boolean; has_hfc_refrigerants: boolean; refrigerant_type: string; refrigerant_purchased_kg: number
   electricity_kwh: number; grid_region: string; renewable_electricity_kwh: number; residual_region: string
@@ -2152,12 +2126,17 @@ function ngUnitOptions(country: string): Array<[string, string]> {
   const ctry = canonicalCountryCode(country)
   // Refused: m3 first, the US trio retained behind it. US itself is unchanged, below.
   if (efJurisdiction({ country: ctry }) === null) return [['m3', 'm³'], ['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
-  if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf']]
-  if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh']]
+  // FI3 (R12): Canada also takes GJ, as Canadian gas bills print it, priced through ECCC's national heat content.
+  if (ctry === 'CA') return [['m3', 'm³'], ['mcf', 'Mcf'], ['gj', 'GJ']]
+  // FI3 (R11): UK also takes m³, priced on DEFRA's own per-m³ row; kWh stays first, the default.
+  if (ctry === 'GB' || ctry === 'UK') return [['kwh', 'kWh'], ['m3', 'm³']]
   if (ctry === 'NZ') return [['kwh', 'kWh']]
   // AU: m3, and MMBtu for energy-basis bills (MJ and GJ convert to it; T10a), priced from NGA's per-GJ factor.
   if (ctry === 'AU') return [['m3', 'm³'], ['mmbtu', 'MMBtu']]
-  if (EU_COUNTRIES.includes(ctry)) return [['m3', 'm³']]
+  // FI3 (R6, R7): kWh, as EU gas bills show it. m³ is not offered (no cited energy content applies to a billed m³).
+  // A stored m³ figure is never relabelled: nothing snaps a unit on load, and a change of unit or country converts
+  // exactly or clears it (FI5); until then it is an unpriced line with its message.
+  if (EU_COUNTRIES.includes(ctry)) return [['kwh', 'kWh']]
   // FI5: Ccf as US gas bills print it (hundred cubic feet), beside Mcf. Priced on EPA's per-Mcf value through the exact
   // conversion (1 Ccf = 0.1 Mcf), stated on the row; Mcf stays first, so the default does not move.
   return [['mcf', 'Mcf'], ['ccf', 'Ccf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
@@ -2175,6 +2154,14 @@ function liquidUnitOptions(country: string): Array<[string, string]> {
   if (efJurisdiction({ country: ctry }) === null) return [['litres', 'Litres'], ['gallons', 'US gallons']]
   const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || ctry === 'NZ' || EU_COUNTRIES.includes(ctry)
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
+}
+// FI3: heating oil and heavy fuel oil. At EU sites they are also offered in kg and tonnes, which MRR prices on a mass
+// basis (Annex VI Table 1, the factor per TJ and the NCV per Gg in one row). Litres stay first so a stored litre
+// figure does not move; EU heating oil in litres is unpriced with its message (R8). Elsewhere, as liquidUnitOptions.
+function fuelOilUnitOptions(country: string): Array<[string, string]> {
+  const ctry = canonicalCountryCode(country)
+  if (EU_COUNTRIES.includes(ctry)) return [['litres', 'Litres'], ['kg', 'kg'], ['tonnes', 'Tonnes']]
+  return liquidUnitOptions(country)
 }
 // Propane/LPG units are separate from other liquids: NZ publishes LPG per kg (MfE), so NZ offers kg
 // only; other metric countries (CA/UK/EU/AU) use litres; US/other keep gallons+litres.
@@ -2235,8 +2222,8 @@ export const UNIT_FIELDS = [
   { field: 'natural_gas_unit',       label: 'natural gas',            options: ngUnitOptions,      list: 'ngUnitOptions',      amount: 'natural_gas_amount' },
   { field: 'propane_unit',           label: 'propane / LPG',          options: propaneUnitOptions, list: 'propaneUnitOptions', amount: 'propane_amount' },
   { field: 'diesel_stationary_unit', label: 'diesel (stationary)',    options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_stationary_amount' },
-  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'fuel_oil_distillate_amount' },
-  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'fuel_oil_residual_amount' },
+  { field: 'fuel_oil_distillate_unit', label: 'heating oil',          options: fuelOilUnitOptions, list: 'fuelOilUnitOptions', amount: 'fuel_oil_distillate_amount' },
+  { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: fuelOilUnitOptions, list: 'fuelOilUnitOptions', amount: 'fuel_oil_residual_amount' },
   { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'gasoline_amount' },
   { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_mobile_amount' },
   { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions',   amount: 'purchased_steam_mmbtu' },
@@ -2498,7 +2485,7 @@ export function steamToBasis(amount: number, unit: SteamUnit | undefined, basis:
 // and pickEF converts the unit entered to it exactly, with the conversion on the row.
 /** FI2 (ruling R5): a stored unit as a factor-key unit token. Unrecognised units pass through, so the lookup misses. */
 function unitToken(unit: string): string {
-  return unit === 'gallons' ? 'gallon' : unit === 'litres' ? 'litre' : unit === 'lbs' ? 'lb' : unit
+  return unit === 'gallons' ? 'gallon' : unit === 'litres' ? 'litre' : unit === 'lbs' ? 'lb' : unit === 'tonnes' ? 'tonne' : unit
 }
 function propaneEfKey(unit: string): string {
   return `propane_${unitToken(unit)}`
@@ -2718,9 +2705,10 @@ export interface PickedFactor {
  *   US EPA: higher heating value (EPA's factors per MMBtu are HHV). DEFRA: gross CV (EF_UK natural_gas_kwh is the
  *   gross-CV row). DCCEEW NGA: gross (51.53 kg CO2e/GJ is on gross energy content). MfE: gross, by ruling R4 (7 Oct
  *   2026), citing the Measuring Emissions Guide, Appendix A (A.1): "we have used gross calorific values".
- *   ECCC and the EU table: no energy-basis gas factor is held, so no energy unit prices for gas there.
+ *   EU (FI3, R7): EF_EU.natural_gas_kwh is per kWh GROSS, as EU bills show it, from MRR's net factor x 0.90 (IPCC).
+ *   CA (FI3, R12): EF_CA's per-GJ gas key is per GJ GROSS, from ECCC's national gross heat content (NIR Table A4-2).
  */
-const GAS_CALORIFIC_BASIS: Partial<Record<EfJurisdiction, 'gross'>> = { US: 'gross', UK: 'gross', AU: 'gross', NZ: 'gross' }
+const GAS_CALORIFIC_BASIS: Partial<Record<EfJurisdiction, 'gross'>> = { US: 'gross', UK: 'gross', AU: 'gross', NZ: 'gross', EU: 'gross', CA: 'gross' }
 /** R4: the note on every NZ natural gas row, saying which calorific basis the MfE per-kWh factor is on. */
 export const NZ_GAS_BASIS_NOTE =
   'MfE natural gas factor per kWh, on a gross calorific value basis: Measuring Emissions Guide, Appendix A (A.1), "we have used gross calorific values".'
@@ -2747,7 +2735,12 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
     // sector CH4 and N2O make the table's per-m³ factor, and every other gas volume converts to it exactly.
     const prov = caGasProvince(loc)
     if (prov === null) return { factor: efMiss(String(key), ctry, 'province'), publisher: null }
-    own = { ...own, natural_gas_m3: { co2: EF_CA_NG_CO2_M3[prov], ...EF_CA_NG_CH4_N2O_M3 } }
+    const perM3 = { co2: EF_CA_NG_CO2_M3[prov], ...EF_CA_NG_CH4_N2O_M3 }
+    // FI3 (R12): per GJ gross = the province's per-m³ factor / 0.03859 GJ per m³, computed here so a factor update
+    // flows through. No per-GJ literal is stored.
+    const m3PerGj = 1 / CA_NG_GJ_PER_M3
+    own = { ...own, natural_gas_m3: perM3,
+      natural_gas_gj: { co2: perM3.co2 * m3PerGj, ch4: perM3.ch4 * m3PerGj, n2o: perM3.n2o * m3PerGj } }
   }
   return routeFactor(own, String(key), j, ctry)
 }
@@ -2981,7 +2974,7 @@ const LINE_UNITS: Partial<Record<keyof Location, string[]>> = {
   natural_gas_amount: ['m3', 'mcf', 'therms', 'mmbtu', 'kwh'],
   propane_amount: ['gallons', 'litres', 'kg'],
   diesel_stationary_amount: ['gallons', 'litres'], gasoline_amount: ['gallons', 'litres'], diesel_mobile_amount: ['gallons', 'litres'],
-  fuel_oil_distillate_amount: ['gallons', 'litres'], fuel_oil_residual_amount: ['gallons', 'litres'],
+  fuel_oil_distillate_amount: ['gallons', 'litres', 'kg', 'tonnes'], fuel_oil_residual_amount: ['gallons', 'litres', 'kg', 'tonnes'],
 }
 
 /** FI1: the GWP a refrigerant type is held at, or null. Never 0 for a type we do not hold. */
@@ -3026,6 +3019,9 @@ export const UNPRICED_MESSAGE = {
     `${fuel} at ${site} is recorded in ${unit}, and ${publisher} publishes no factor this figure can be converted to exactly, so it is not counted. ${units.length ? `Enter it in ${listInWords(units).replace(/ and ([^ ]+)$/, ' or $1')}, or reject the bill.` : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
   refrigerant_unknown: (site: string) =>
     `The refrigerant type at ${site} is not one we hold a GWP for, so it is not counted. Choose the refrigerant type. Export is blocked until it is chosen.`,
+  // FI3: an EU line in a volume unit with no cited density or energy content. No em dash.
+  eu_property: (fuel: string, site: string, unit: string, property: 'density' | 'energy content', remedy: 'mass' | 'kwh' | null) =>
+    `The EU factor for ${fuel} at ${site} is published per unit of energy, and we hold no cited ${property} to convert ${unit} to it, so this line is not counted. ${remedy === 'mass' ? 'Enter the quantity in kilograms or tonnes, or reject the bill.' : remedy === 'kwh' ? 'Enter the quantity in kWh, as shown on your gas bill, or reject the bill.' : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
   province_missing: (site: string, unrecognised: string | null) => unrecognised
     ? `The province for ${site} (${unrecognised}) is not one we hold a natural gas factor for, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.`
     : `The province for ${site} is not set, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.`,
@@ -3056,6 +3052,18 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
     // through the same line construction and lookup, so the list cannot name a unit that would also fail.
     const supported = (LINE_UNITS[line.field] ?? []).filter(u => u !== line.enteredUnit && combustionLines({ ...loc, [line.unitField]: u } as Location)
       .filter(l => l.field === line.field).every(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF).factor)))
+    // FI3: at an EU site, a volume with no cited property to reach MRR's per-energy factor says so, and offers the unit
+    // that does price: kg or tonnes where MRR's mass basis is offered for the fuel, kWh for gas.
+    const kind = EXACT_UNITS[unitToken(line.enteredUnit)]?.kind
+    if (j === 'EU' && (kind === 'liquid_volume' || kind === 'gas_volume')) {
+      const gas = line.stream === 'natural_gas'
+      const unitField = UNIT_FIELDS.find(f => f.amount === line.field)
+      const massOffered = !!unitField && unitField.options(loc.country).some(([v]) => v === 'kg')
+      out.push({ ...base, reason: 'factor_missing', supportedUnits: supported.map(u => unitLabel(u)),
+        message: UNPRICED_MESSAGE.eu_property(line.source.toLowerCase(), site, unitLabel(line.enteredUnit), gas ? 'energy content' : 'density',
+          gas ? 'kwh' : massOffered ? 'mass' : null) })
+      continue
+    }
     out.push({ ...base, reason: 'factor_missing', supportedUnits: supported.map(u => unitLabel(u)),
       message: UNPRICED_MESSAGE.factor_missing(line.source, site, unitLabel(line.enteredUnit), publisher, supported.map(u => unitLabel(u))) })
   }
@@ -4349,6 +4357,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
       fromTable === 'AU' ? auPublishedNote(loc, heldKey) : '',
       fromTable === 'US' ? US_PUBLISHED_NOTE[heldKey] : '',
+      fromTable === 'CA' && heldKey === 'natural_gas_gj' ? CA_GAS_GJ_NOTE : '',
       fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
@@ -5115,7 +5124,7 @@ export {
   detectGridRegion, gridRegionForCountry, propaneEfKey, pickEF,
   combustionSource, calcGas, calcLocation, calcInventory, fieldFor,
   buildWorkings, emptyLocation,
-  ngUnitOptions, normalizeNgUnit, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
+  ngUnitOptions, normalizeNgUnit, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   // Steam: the registry itself is deliberately NOT exported. The only ways in are steamFactorFor and
   // steamPricing, so no caller — including a test — can index it and bolt a `?? EF` onto the result.
   // The seeding tests assert through steamFactorFor, which is the path the engine actually uses.

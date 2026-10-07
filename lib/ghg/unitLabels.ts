@@ -6,7 +6,7 @@
 
 export const UNIT_LABEL: Record<string, string> = {
   kwh: 'kWh', mwh: 'MWh', gj: 'GJ', mj: 'MJ', m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', therms: 'therms', mmbtu: 'MMBtu',
-  gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb',
+  gallons: 'US gallons', litres: 'litres', kg: 'kg', lbs: 'lb', tonnes: 'tonnes',
 }
 
 /**
@@ -14,10 +14,15 @@ export const UNIT_LABEL: Record<string, string> = {
  * carries the documents' unit, which may be one the country's list does not offer (Paris gas billed in kWh,
  * where the list offers m³ only). The selector is locked then, and shows that unit as its choice rather than
  * an unselected option that reads as the unit in use.
+ *
+ * FI3: a held unit the list does not offer is ALWAYS kept, so the selector never shows a different unit from the one
+ * stored. A typed figure in such a unit (EU gas in m³, say) is labelled "{unit} (not accepted here)"; choosing an
+ * offered unit then goes through FI5's changeUnit, which converts exactly or clears and asks.
  */
+export const NOT_ACCEPTED_HERE = '(not accepted here)'
 export function unitOptionsShowing(options: Array<[string, string]>, unit: string | null | undefined, fromDocuments: boolean): Array<[string, string]> {
-  if (!fromDocuments || !unit || options.some(([v]) => v === unit)) return options
-  return [...options, [unit, unitLabel(unit)]]
+  if (!unit || options.some(([v]) => v === unit)) return options
+  return [...options, [unit, fromDocuments ? unitLabel(unit) : `${unitLabel(unit)} ${NOT_ACCEPTED_HERE}`]]
 }
 
 /** A stored unit as the customer reads it. */

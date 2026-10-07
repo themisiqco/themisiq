@@ -53,7 +53,7 @@ describe('a new location takes its country defaults on the first country choice'
     // They escaped the defect only because their lists drop gallons entirely, so the old snap fell
     // through to opts[0]. Pinned so the new path does not regress what the old one got right.
     const fresh = emptyLocation('new', 'x')
-    for (const [country, diesel, gas] of [['GB', 'litres', 'kwh'], ['FR', 'litres', 'm3'], ['AU', 'litres', 'm3']] as const) {
+    for (const [country, diesel, gas] of [['GB', 'litres', 'kwh'], ['FR', 'litres', 'kwh'], ['AU', 'litres', 'm3']] as const) {
       const after = unitsForCountryChange(country, fresh as never)
       expect(after.diesel_stationary_unit.unit, country).toBe(diesel)
       expect(after.natural_gas_unit.unit, country).toBe(gas)

@@ -23,7 +23,7 @@ import {
   efJurisdiction, steamFactorFor, findSteamFactorGaps, snapUnitsForCountry, steamToBasis,
   canonicalCountryCode, efRouting, countryRefusal, refusalIsFixable, type EfJurisdiction, type CountryRefusal,
   combustionSourcesFor, gridSourcesFor,
-  gridRegionForCountry, gridSource, ngUnitOptions, liquidUnitOptions, GRID_EF,
+  gridRegionForCountry, gridSource, ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, GRID_EF,
   changeUnit, unitsForCountryChange, applyUnitOutcomes, unitChangeMessage, convertedUnitChange, UNIT_FIELDS, type UnitOutcome,
   EU_COUNTRIES, combustionSource, propaneUnitOptions, steamUnitOptions,
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
@@ -47,6 +47,7 @@ import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEm
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
+import { unitOptionsShowing } from './unitLabels';
 import { contributionShareCell } from './workingsCells';
 import { convertToCanonical, convertibleUnits, exactConversion, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
 
@@ -418,7 +419,7 @@ describe('GROUP G — regression guards', () => {
     // gas-split tables → GWP-sensitive
     expect(same(loc({ country: 'US' }), 'natural_gas_mcf')).toBe(false);
     expect(same(loc({ country: 'CA', grid_region: 'ON', natural_gas_unit: 'm3' }), 'natural_gas_m3')).toBe(false);
-    expect(same(loc({ country: 'FR', natural_gas_unit: 'm3' }), 'natural_gas_m3')).toBe(false);
+    expect(same(loc({ country: 'FR', natural_gas_unit: 'kwh' }), 'natural_gas_kwh')).toBe(false);   // FI3: EU gas per kWh
   });
 
   it('G5 EU_AT residual mix is not applicable (full-disclosure regime), ef 0 — NOT treated as zero-emission', () => {
@@ -578,11 +579,13 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
   // so they left this list. What remains is gas in a unit no exact conversion reaches from the country's own table.
   const unpriceable: Array<{ country: string; unit: 'm3' | 'kwh' | 'mcf' | 'mmbtu' | 'therms'; key: string }> = [
     // FI2 follow-up: GB gas in mcf and m3 now price on DEFRA's per-m3 row (1_100_1004_1_1); replaced by CA therms and MMBtu.
-    { country: 'CA', unit: 'therms', key: 'natural_gas_therms' }, // ECCC publishes no energy-basis gas factor
-    { country: 'DE', unit: 'mmbtu', key: 'natural_gas_mmbtu' }, // the EU table holds no energy-basis gas factor
-    { country: 'CA', unit: 'kwh', key: 'natural_gas_kwh' },   // with a province (ON): FI1 makes a blank one its own case
-    { country: 'CA', unit: 'mmbtu', key: 'natural_gas_mmbtu' },
-    { country: 'FR', unit: 'kwh', key: 'natural_gas_kwh' },  // EU branch
+    // FI3: CA gas in energy units now prices through the national heat content (R12), and EU gas in energy units through
+    // the gross kWh key (R7); replaced by EU gas volumes, which have no cited energy content (R6).
+    { country: 'DE', unit: 'm3', key: 'natural_gas_m3' },
+    { country: 'FR', unit: 'mcf', key: 'natural_gas_mcf' },
+    { country: 'IT', unit: 'm3', key: 'natural_gas_m3' },
+    { country: 'ES', unit: 'mcf', key: 'natural_gas_mcf' },
+    { country: 'NL', unit: 'm3', key: 'natural_gas_m3' },
     { country: 'NZ', unit: 'mcf', key: 'natural_gas_mcf' },  // MfE prints gas per kWh only
     { country: 'NZ', unit: 'm3',  key: 'natural_gas_m3' },
   ];
@@ -638,7 +641,9 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
       { country: 'CA', unit: 'm3',     key: 'natural_gas_m3' },
       { country: 'CA', unit: 'mcf',    key: 'natural_gas_mcf' },
       { country: 'GB', unit: 'kwh',    key: 'natural_gas_kwh' },
-      { country: 'FR', unit: 'm3',     key: 'natural_gas_m3' },
+      { country: 'FR', unit: 'kwh',    key: 'natural_gas_kwh' },   // FI3: EU gas prices per kWh gross (R7)
+      { country: 'CA', unit: 'mmbtu',  key: 'natural_gas_mmbtu' }, // FI3: via the national heat content (R12)
+      { country: 'GB', unit: 'm3',     key: 'natural_gas_m3' },    // FI3: DEFRA's per-m3 row (R11)
       { country: 'AU', unit: 'm3',     key: 'natural_gas_m3' },
       { country: 'NZ', unit: 'kwh',    key: 'natural_gas_kwh' },
     ];
@@ -1628,7 +1633,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
   ];
   // FI2 diff 2 (ruling R5): each table holds each grade in its PUBLISHER'S unit (EPA per US gallon, everyone else per
   // litre); the other unit converts exactly at pricing. `grade` reads whichever the table holds.
-  const grade = (table: Record<string, any>, g: 'distillate' | 'residual') => table[`fuel_oil_${g}_litre`] ?? table[`fuel_oil_${g}_gallon`];
+  // FI3 (R8): EU heating oil is held per kg only (no cited heating-oil density), so `grade` falls back to the mass key.
+  const grade = (table: Record<string, any>, g: 'distillate' | 'residual') => table[`fuel_oil_${g}_litre`] ?? table[`fuel_oil_${g}_gallon`] ?? table[`fuel_oil_${g}_kg`];
 
   it('Z1 the legacy fuel_oil_gallon survives only in the US table, the one whose publisher prints per gallon (FI2)', () => {
     expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
@@ -1650,7 +1656,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
       const absent = NOT_YET_SEEDED[name] ?? [];
       for (const g of ['distillate', 'residual'] as const) {
         expect(grade(table, g) !== undefined, `${name} ${g}`).toBe(!absent.includes(g));
-        const unit = name === 'EF (US)' ? 'gallon' : 'litre';
+        const unit = name === 'EF (US)' ? 'gallon' : name === 'EF_EU' && g === 'distillate' ? 'kg' : 'litre';
         expect(table[`fuel_oil_${g}_${unit}`], `${name} ${g} is per ${unit}`).toBeDefined();
       }
     }
@@ -1665,6 +1671,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // than No.2 / light. A transposed pair fails here before anyone reads a workings row.
     for (const [name, table] of TABLES) {
       if (!grade(table, 'residual')) continue;
+      // FI3: EU heating oil has no litre key (R8), so there is no per-litre pair to compare there.
+      if (name === 'EF_EU') continue;
       expect(grade(table, 'residual').co2, `${name}: residual must exceed distillate`)
         .toBeGreaterThan(grade(table, 'distillate').co2);
     }
@@ -1698,17 +1706,21 @@ describe('Z. fuel oil grades are seeded per table', () => {
     // AU, DCCEEW NGA 2025 Table 8, GJ/kL x kgCO2e/GJ
     expect((EF_AU as any).fuel_oil_distillate_litre.co2).toBeCloseTo(37.3 * 69.73 / 1000, 6);
     expect((EF_AU as any).fuel_oil_residual_litre.co2).toBeCloseTo(39.7 * 73.84 / 1000, 6);
-    // EU, MRR Annex VI Table 1 (t CO2/TJ, TJ/Gg) x density, asserted as the expression (6 significant figures stored).
-    expect((EF_EU as any).fuel_oil_residual_litre.co2).toBeCloseTo(77400 * 40.4e-6 * 0.990, 5);
-    expect((EF_EU as any).fuel_oil_distillate_litre.co2).toBeCloseTo(74100 * 43.0e-6 * 0.844, 5);
+    // EU (FI3): MRR Annex VI Table 1 (t CO2/TJ, TJ/Gg) x JEC's HFO density 970 kg/m3, 6 significant figures stored.
+    // Heating oil has no litre key (R8); it is held per kg, MRR's mass basis.
+    expect((EF_EU as any).fuel_oil_residual_litre.co2).toBeCloseTo(77400 * 40.4e-6 * 0.970, 5);
+    expect((EF_EU as any).fuel_oil_distillate_litre).toBeUndefined();
+    expect((EF_EU as any).fuel_oil_distillate_kg.co2).toBeCloseTo(74.1 * 43.0 / 1000, 12);
     // A gallon figure prices at exactly these x 3.785411784, from the same table.
     expect(pickEF(loc({ country: 'GB' }), 'fuel_oil_residual_gallon').factor.co2).toBeCloseTo(3.17492 * G, 12);
   });
 
-  it('Z7 EU distillate equals the gas/diesel oil derivation it is taken from', () => {
-    // The three inputs are CO2 74100 kg/TJ, NCV 43.0, dens 0.844 — the same row this table already
-    // uses for diesel. Pinned as an equality so the shared provenance is a fact, not a coincidence.
-    expect((EF_EU as any).fuel_oil_distillate_litre).toEqual((EF_EU as any).diesel_litre);
+  it('Z7 EU distillate shares the Gas/Diesel oil row\'s NCV and factor, but not a density (FI3, R8)', () => {
+    // IPCC Table 1.1 puts light heating oil in Gas/Diesel Oil, so the mass keys are the same row. No source prints a
+    // heating-oil density, and the diesel density is not used for it, so there is no heating-oil litre key.
+    expect((EF_EU as any).fuel_oil_distillate_kg).toEqual((EF_EU as any).diesel_kg);
+    expect((EF_EU as any).fuel_oil_distillate_litre).toBeUndefined();
+    expect((EF_EU as any).diesel_litre).toBeDefined();
     expect((EF_EU as any).fuel_oil_gallon, 'FI2: the legacy residual gallon key is gone').toBeUndefined();
   });
 
@@ -2044,7 +2056,8 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     // different publisher; a global find-and-replace on the old figure would be caught here.
     expect((EF_CA as any).propane_litre.co2, 'ECCC (per litre; the gallon key is gone, FI2)').toBe(1.515);
     expect((EF_UK as any).propane_litre.co2, 'DEFRA').toBe(1.54358);
-    expect((EF_EU as any).propane_litre.co2, 'IPCC (per litre; the gallon key is gone, FI2)').toBe(1.52216);
+    // FI3: the EU propane litre key is gone (no cited LPG density); EU propane by mass is FI4.
+    expect((EF_EU as any).propane_litre, 'IPCC: no EU propane litre key (FI3)').toBeUndefined();
   });
 });
 
@@ -2428,7 +2441,7 @@ describe('T15 country canonicalisation', () => {
     expect(combustionSource(gr)).toBe(EF_SOURCES.combustion_eu);
     // 5. + 6. the unit option lists: metric, not American
     expect(ngUnitOptions('GR')).toEqual(ngUnitOptions('EL'));
-    expect(ngUnitOptions('GR').map(([v]) => v)).toEqual(['m3']);
+    expect(ngUnitOptions('GR').map(([v]) => v)).toEqual(['kwh']);   // FI3: EU gas is billed in kWh (R6, R7)
     expect(liquidUnitOptions('GR')).toEqual(liquidUnitOptions('EL'));
     expect(liquidUnitOptions('GR').map(([v]) => v)).toEqual(['litres']);
     // 7. and the grid region resolves, so the electricity rows are not dropped
@@ -2677,165 +2690,219 @@ describe('T16 country refusals', () => {
   });
 });
 
-// ── U. THE EU DERIVATION IS SOURCED, BOUNDED WHERE POSSIBLE, AND DISCLOSED ───────────────────────
+// ── U. EU COMBUSTION: EVERY PROPERTY CITED ON ITS ROW, OR THE LINE IS UNPRICED (FI3) ─────────────────────────────
 //
-// THE PRIMARY DEFECT THIS CLOSES was not the unsourced densities — it was that the workings row
-// asserted something false. It printed a PER-LITRE factor, cited "IPCC (2006) Guidelines Vol.2", and
-// left `note` empty. Both cited sources publish on a MASS basis and neither publishes a density, so a
-// verifier opening Vol.2 to check 2.68924 kg CO2/L found TJ/Gg and no such number, with nothing on
-// the row explaining the step between. The methodology page repeated the claim.
-//
-// These tests exist because the previous ones could not have caught any of it: Z5 asserted the table
-// against a literal copied from its own comment, and NO test anywhere referenced a density.
-describe('U. EU combustion — sourced inputs, bounded densities, disclosed derivation', () => {
-  // MRR Annex VI Table 1, "Fuel emission factors related to net calorific value (NCV) and net
-  // calorific values per mass of fuel", Source column "IPCC 2006 GL". Transcribed ONCE here and used
-  // as the expression for every assertion below, so a mis-transcription fails everywhere at once
-  // rather than being silently agreed with by a hard-coded expectation.
+// Until FI3 the EU per-litre and per-m³ keys rested on densities and an energy content no source printed (0.844, 0.745,
+// 0.990, 0.510 kg/L and 36 MJ/m³), disclosed on the row as "DERIVED, not published". Record:
+// docs/review/eu-fuel-properties.md; rulings R6 to R10. Each value now comes from a cited document, named on its row:
+// MRR Annex VI Table 1 for the factor and NCV, IPCC 2006 Vol. 2 Ch. 2 Tables 2.2/2.3 for CH4 and N2O, the JEC
+// Well-to-Tank report v5 for the three densities, IPCC Ch. 1 section 1.4.1.2 for gas's 0.90. Anything else is unpriced.
+describe('U. EU combustion: every property cited on its row, or the line is unpriced (FI3)', () => {
+  // MRR Annex VI Table 1 (t CO2/TJ, TJ/Gg), transcribed once and used as the expression for every assertion below.
   const ANNEX_VI = {
     motor_gasoline:  { co2_t_per_TJ: 69.3, ncv_TJ_per_Gg: 44.3 },
     gas_diesel_oil:  { co2_t_per_TJ: 74.1, ncv_TJ_per_Gg: 43.0 },
     residual_oil:    { co2_t_per_TJ: 77.4, ncv_TJ_per_Gg: 40.4 },
-    lpg:             { co2_t_per_TJ: 63.1, ncv_TJ_per_Gg: 47.3 },
     natural_gas:     { co2_t_per_TJ: 56.1, ncv_TJ_per_Gg: 48.0 },
   };
-  // kg CO2 per litre = (t/TJ x 1000 -> kg/TJ) x (TJ/Gg x 1e-6 -> TJ/kg) x (kg/L)
-  const perLitre = (f: { co2_t_per_TJ: number; ncv_TJ_per_Gg: number }, density: number) =>
-    f.co2_t_per_TJ * 1000 * f.ncv_TJ_per_Gg * 1e-6 * density;
-  const DENSITY = { lpg: 0.510, gas_diesel_oil: 0.844, residual_oil: 0.990, motor_gasoline: 0.745 };
-  const EU = EF_EU as any;
+  // JEC Well-to-Tank report v5, Annexes section 4.1, Liquids, page 9 (kg/m³ = g/L; /1000 for kg/L).
+  const JEC = { gas_diesel_oil: 0.832, motor_gasoline: 0.743, residual_oil: 0.970 };
+  // IPCC 2006 Vol. 2 Ch. 2 Tables 2.2/2.3, kg per TJ.
+  const RATE = { liquid: { ch4: 3, n2o: 0.6 }, gas: { ch4: 1, n2o: 0.1 } };
+  const perLitre = (f: { co2_t_per_TJ: number; ncv_TJ_per_Gg: number }, density: number) => f.co2_t_per_TJ * f.ncv_TJ_per_Gg * density / 1000;
+  const round = (x: number, sf: number) => Number(x.toPrecision(sf));
+  const EU = EF_EU as Record<string, { co2: number; ch4: number; n2o: number }>;
+  const site = (o: Partial<Location>) => loc({ country: 'DE', grid_region: 'EU_DE', ...o });
+  const rowsOf = (l: Location) => buildWorkings([l], 'AR6', 2025, [], 12);
+  const fuelRow = (l: Location) => rowsOf(l).find(r => r.scope === 1 && r.stream && r.stream !== 'refrigerants' && !r.declaration);
 
-  // ⚠️ THE STORED VALUES ARE THE EXACT DERIVATION ROUNDED TO 6 SIGNIFICANT FIGURES, and nothing in
-  // the table said so until this test. 63100 x 47.3e-6 x 0.510 is 1.5221613, stored as 1.52216; the
-  // same rule holds for all four liquids. So the right assertion is EQUALITY against round6(expression)
-  // — stronger than any toBeCloseTo, and it states the storage convention as a fact rather than
-  // absorbing it into a tolerance.
-  const round6 = (x: number) => Number(x.toPrecision(6));
-
-  it('U1 every EU CO2 factor IS the Annex VI expression, at 6 significant figures', () => {
-    // Changing ANY of the three inputs now fails. Under the old assertions, changing the density and
-    // recomputing both the litre and gallon forms consistently left the suite green.
-    expect(EU.propane_litre.co2).toBe(round6(perLitre(ANNEX_VI.lpg, DENSITY.lpg)));
-    expect(EU.diesel_litre.co2).toBe(round6(perLitre(ANNEX_VI.gas_diesel_oil, DENSITY.gas_diesel_oil)));
-    expect(EU.diesel_mobile_litre.co2).toBe(round6(perLitre(ANNEX_VI.gas_diesel_oil, DENSITY.gas_diesel_oil)));
-    expect(EU.gasoline_litre.co2).toBe(round6(perLitre(ANNEX_VI.motor_gasoline, DENSITY.motor_gasoline)));
-    // Natural gas takes the volumetric route instead of NCV x density — 56 100 kg/TJ x 36 MJ/m3 — and
-    // lands exactly, needing no rounding at all.
-    expect(EU.natural_gas_m3.co2).toBe(56100 * 36e-6);
-    // Fuel oil is stored per litre (FI2 diff 2: the per-gallon keys are gone), at the same rounded derivation.
-    expect(EU.fuel_oil_residual_litre.co2).toBe(round6(perLitre(ANNEX_VI.residual_oil, DENSITY.residual_oil)));
-    expect(EU.fuel_oil_distillate_litre.co2).toBe(round6(perLitre(ANNEX_VI.gas_diesel_oil, DENSITY.gas_diesel_oil)));
-  });
-
-  it('U2 the natural-gas volumetric figure decomposes to a density against Annex VI NCV', () => {
-    // 36 MJ/m3 / 48.0 MJ/kg = 0.75 kg/m3. Recorded so "~36 MJ/m3" is understood as a density in
-    // disguise — the same class of gap as the liquids — rather than a separate mystery.
-    const impliedDensity = 36 / (ANNEX_VI.natural_gas.ncv_TJ_per_Gg * 1000 / 1000);
-    expect(impliedDensity).toBeCloseTo(0.75, 10);
-  });
-
-  it('U3 densities fall INSIDE their European specification ranges — a bound, not a citation', () => {
-    // ⚠️ RANGE ASSERTIONS ON PURPOSE. EN 590 and EN 228 specify a range for fuel sold in the EU; they
-    // cannot produce a point value, so an equality test here would overstate what the source supports
-    // and would freeze a number no publisher actually printed. What IS assertable is that our value is
-    // one the specification admits.
-    // EN 590, automotive diesel under Directive 98/70/EC: 0.820-0.845 kg/L at 15 C.
-    expect(DENSITY.gas_diesel_oil).toBeGreaterThanOrEqual(0.820);
-    expect(DENSITY.gas_diesel_oil).toBeLessThanOrEqual(0.845);
-    // EN 228, petrol: 0.720-0.775 kg/L at 15 C.
-    expect(DENSITY.motor_gasoline).toBeGreaterThanOrEqual(0.720);
-    expect(DENSITY.motor_gasoline).toBeLessThanOrEqual(0.775);
-    // IPCC Table 1.1 bounds residual fuel oil from BELOW only. Asserted as the one-sided bound it is.
-    expect(DENSITY.residual_oil).toBeGreaterThan(0.90);
-  });
-
-  it('U4 the two liquid densities sit on DIFFERENT bases, and that is recorded not fixed', () => {
-    // Diesel at the conservative top of EN 590, petrol at the EN 228 midpoint. Nobody chose this; it
-    // is what comes of values arriving from an unrecorded source. Pinned so the inconsistency stays
-    // visible — and NOT harmonised, because harmonising would move a stored figure on an argument no
-    // source supports.
-    const dieselMid = (0.820 + 0.845) / 2, petrolMid = (0.720 + 0.775) / 2;
-    expect(DENSITY.gas_diesel_oil, 'diesel is above its midpoint (conservative)').toBeGreaterThan(dieselMid);
-    expect(DENSITY.gas_diesel_oil, 'and within 0.002 of the top of the range').toBeGreaterThan(0.845 - 0.002);
-    expect(Math.abs(DENSITY.motor_gasoline - petrolMid), 'petrol is essentially at its midpoint').toBeLessThan(0.005);
-  });
-
-  it('U5 propane 0.510 has NO bound test, and its absence is deliberate', () => {
-    // ⚠️ READ THIS BEFORE ADDING ONE. Every other density above is checked against a published range.
-    // Propane/LPG has none: no European standard bounding it was found, so it is unsourced AND
-    // unbounded — the only input in this table in that state. An invented bound here would be exactly
-    // the defect this whole change removes, one layer down: a test that manufactures the confidence
-    // it is supposed to measure. The gap is asserted as a FACT instead, so it cannot be quietly lost.
-    expect(DENSITY.lpg, 'still the stored value — if this moves, the derivation moved with it').toBe(0.510);
-    // And the row must SAY SO to the verifier rather than looking like the bounded ones.
-    const row = (buildWorkings([loc({ country: 'DE', has_propane: true, propane_amount: 500, propane_unit: 'litres' })],
-      'AR6', 2025, [], 12) as any[]).find(r => r.stream === 'propane' && !r.declaration);
-    expect(row.note).toContain('no European standard bounding it has been found');
-  });
-
-  it('U6 every density-derived EU row carries the derivation, and names the density as unpublished', () => {
-    // The empty note field WAS the defect. Each row must now state the arithmetic and disclose which
-    // input the citation does not cover.
-    const l = loc({ country: 'FR', grid_region: 'EU_FR',
-      has_natural_gas: true, natural_gas_amount: 800, natural_gas_unit: 'm3',
-      has_propane: true, propane_amount: 500, propane_unit: 'litres',
-      has_diesel_stationary: true, diesel_stationary_amount: 400, diesel_stationary_unit: 'litres',
-      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 300, fuel_oil_distillate_unit: 'litres',
-      has_fuel_oil_residual: true, fuel_oil_residual_amount: 200, fuel_oil_residual_unit: 'litres',
-      has_mobile: true, gasoline_amount: 600, gasoline_unit: 'litres', diesel_mobile_amount: 700, diesel_mobile_unit: 'litres' });
-    const priced = (buildWorkings([l], 'AR6', 2025, [], 12) as any[])
-      .filter(r => r.scope === 1 && r.result_tco2e != null && !r.declaration);
-    // Seven, not six: has_mobile emits petrol AND mobile-diesel as separate rows.
-    expect(priced.length, 'seven priced combustion rows').toBe(7);
-    for (const r of priced) {
-      expect(r.note, `${r.source}: no derivation disclosed`).toBeTruthy();
-      expect(r.note, `${r.source}: must not claim the source published this basis`).toMatch(/value DERIVED, not published/);
-      expect(r.note, `${r.source}: must disclose the unpublished input`).toContain('from neither cited source');
-      expect(r.ef_source, `${r.source}: citation must name the instrument`).toContain('2018/2066');
-      expect(r.ef_source, `${r.source}: citation must flag the derivation`).toContain('per-volume derived');
+  it('U1 every EU litre key IS MRR factor x MRR NCV x JEC density: CO2 at 6 s.f., CH4 and N2O at 4, one density for all three', () => {
+    const cases: [string, keyof typeof JEC][] = [['diesel_litre', 'gas_diesel_oil'], ['diesel_mobile_litre', 'gas_diesel_oil'],
+      ['gasoline_litre', 'motor_gasoline'], ['fuel_oil_residual_litre', 'residual_oil']];
+    for (const [key, fuel] of cases) {
+      const f = ANNEX_VI[fuel], d = JEC[fuel]
+      expect(EU[key].co2, key).toBe(round(perLitre(f, d), 6))
+      expect(EU[key].ch4, key).toBe(round(RATE.liquid.ch4 * f.ncv_TJ_per_Gg * 1e-6 * d, 4))
+      expect(EU[key].n2o, key).toBe(round(RATE.liquid.n2o * f.ncv_TJ_per_Gg * 1e-6 * d, 4))
     }
-    // ⚠️ WAS "BOTH notes must survive" — the litres->gallons half is GONE, because EU fuel oil now
-    // prices from the per-litre derivation directly. The density disclosure must NOT have gone with
-    // it: that is the half a verifier needs, and it is the one this group exists to protect.
-    const fo = priced.find(r => r.stream === 'fuel_oil_residual');
-    expect(fo.note, 'the conversion is gone').not.toContain('US gallons');
-    expect(fo.note, 'the disclosure is not').toMatch(/value DERIVED, not published/);
-  });
+    expect([EU.diesel_litre.co2, EU.gasoline_litre.co2, EU.fuel_oil_residual_litre.co2]).toEqual([2.651, 2.281, 3.03315])
+  })
 
-  it('U7 the note names the RIGHT fuel — the key drives both the factor and the prose', () => {
-    // pushFuel takes the factor KEY and looks the factor up itself, so a row cannot print one fuel's
-    // derivation beside another fuel's number. This is what that buys.
-    const rows = (buildWorkings([loc({ country: 'DE',
-      has_diesel_stationary: true, diesel_stationary_amount: 400, diesel_stationary_unit: 'litres',
-      has_mobile: true, gasoline_amount: 600, gasoline_unit: 'litres' })], 'AR6', 2025, [], 12) as any[]);
-    const diesel = rows.find(r => r.source === 'Diesel (stationary)');
-    const petrol = rows.find(r => r.source === 'Gasoline (mobile)');
-    expect(diesel.note).toContain('74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L');
-    expect(diesel.note).toContain('EN 590');
-    expect(petrol.note).toContain('69 300 kg CO₂/TJ × 44.3 TJ/Gg × 0.745 kg/L');
-    expect(petrol.note).toContain('EN 228');
-    expect(petrol.note, 'petrol must not carry the diesel bound').not.toContain('EN 590');
-  });
+  it('U2 the mass keys are MRR mass basis, one table: factor per TJ x NCV per Gg', () => {
+    for (const [key, fuel] of [['diesel_kg', 'gas_diesel_oil'], ['fuel_oil_distillate_kg', 'gas_diesel_oil'], ['fuel_oil_residual_kg', 'residual_oil']] as const) {
+      const f = ANNEX_VI[fuel]
+      expect(EU[key].co2, key).toBeCloseTo(f.co2_t_per_TJ * f.ncv_TJ_per_Gg / 1000, 12)
+      expect(EU[key].ch4, key).toBeCloseTo(RATE.liquid.ch4 * f.ncv_TJ_per_Gg / 1e6, 15)
+      expect(EU[key].n2o, key).toBeCloseTo(RATE.liquid.n2o * f.ncv_TJ_per_Gg / 1e6, 15)
+    }
+    expect(EU.gasoline_kg, 'petrol gets no mass unit, so no mass key').toBeUndefined()
+  })
 
-  it('U8 only EU rows carry the derivation note — US/CA/UK/AU/NZ are published per unit', () => {
+  it('U3 source test: no EF_EU value or EU note depends on 36, 0.844, 0.745, 0.510 or 0.990; no alias maps distillate to diesel', () => {
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8')
+    const table = src.slice(src.indexOf('const EF_EU = {'), src.indexOf('// ── THE DERIVATION, ON THE ROW'))
+    const notes = src.slice(src.indexOf('const EU_DERIVATION: Partial'), src.indexOf('function euDerivationNote('))
+    expect(table.length).toBeGreaterThan(500)
+    expect(notes.length).toBeGreaterThan(500)
+    for (const v of ['0.844', '0.745', '0.510', '0.990', '36 MJ', '2.0196', '1.52216', '2.68924', '2.28714', '3.09569']) {
+      expect(table, `EF_EU: ${v}`).not.toContain(v)
+      expect(notes, `EU_DERIVATION: ${v}`).not.toContain(v)
+    }
+    for (const v of Object.values(EF_EU as Record<string, { co2: number }>)) for (const x of [36, 0.844, 0.745, 0.51, 0.99]) {
+      expect(v.co2).not.toBeCloseTo(x, 6)
+    }
+    expect(notes).not.toMatch(/fuel_oil_distillate[_a-z]*: 'diesel/)
+    expect(notes).not.toMatch(/DERIVED/)
+    expect(notes).not.toContain('\u2014')
+    for (const k of ['natural_gas_m3', 'propane_litre', 'fuel_oil_distillate_litre']) expect(EU[k], k).toBeUndefined()
+  })
+
+  it('U4 EU diesel: 1,000 L = 2,651.00 kg CO2 plus CH4 and N2O, and the note names MRR and JEC', () => {
+    const r = fuelRow(site({ has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' }))
+    expect(r.result_tco2e).toBeCloseTo((2651.00 + 1000 * 0.0001073 * 29.8 + 1000 * 0.00002147 * 273) / 1000, 9)
+    expect(calcGas(EU.diesel_litre, 1000, 'AR6').co2).toBeCloseTo(2.651, 12)
+    expect(r.note).toBe('74.1 t CO₂/TJ × 43.0 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil) × 832 kg/m³ (JEC Well-to-Tank report v5, Annexes section 4.1, Diesel) = 2.65100 kg CO₂/L. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV and density.')
+    expect(r.ef_source).toBe('EU MRR Reg. (EU) 2018/2066 Annex VI Table 1; IPCC 2006 Vol. 2 Ch. 1 and 2; densities from the JEC Well-to-Tank report v5 (EU JRC)')
+    expect(r.ef_source).not.toContain('\u2014')
+  })
+
+  it('U5 EU heating oil in litres, EU LPG in litres and EU gas in m3 are unpriced with the exact message', () => {
+    const msg = (l: Location) => unpricedLines(l).map(u => [u.reason, u.message])
+    expect(msg(site({ has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' }))).toEqual([['factor_missing',
+      'The EU factor for heating oil at Test Site is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Enter the quantity in kilograms or tonnes, or reject the bill. Export is blocked until this is resolved.']])
+    expect(msg(site({ has_propane: true, propane_amount: 500, propane_unit: 'litres' }))).toEqual([['factor_missing',
+      'The EU factor for propane at Test Site is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Reject the bill, or remove the figure. Export is blocked until this is resolved.']])
+    expect(msg(site({ has_natural_gas: true, natural_gas_amount: 800, natural_gas_unit: 'm3' }))).toEqual([['factor_missing',
+      'The EU factor for natural gas at Test Site is published per unit of energy, and we hold no cited energy content to convert m³ to it, so this line is not counted. Enter the quantity in kWh, as shown on your gas bill, or reject the bill. Export is blocked until this is resolved.']])
+    // Gallons and Mcf are the same quantities, and the same answer.
+    expect(msg(site({ has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 100, fuel_oil_distillate_unit: 'gallons' }))[0][1]).toContain('convert US gallons to it')
+    expect(msg(site({ has_natural_gas: true, natural_gas_amount: 10, natural_gas_unit: 'mcf' }))[0][1]).toContain('convert Mcf to it')
+    // They block export, as every FI1 line does.
+    const gate = findUnresolvedCoverage([site({ has_natural_gas: true, natural_gas_amount: 800, natural_gas_unit: 'm3' })], 2025, 12, [])
+    expect(gate.map(i => i.status)).toContain('factor_missing')
+    for (const [, m] of [...msg(site({ has_propane: true, propane_amount: 5, propane_unit: 'litres' }))]) expect(m).not.toContain('\u2014')
+  })
+
+  it('U6 EU heating oil by mass: 1 t = 3,186.3 kg CO2, kg and tonnes exact, named to MRR', () => {
+    const t = fuelRow(site({ has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1, fuel_oil_distillate_unit: 'tonnes' }))
+    expect(t.factor_key).toBe('fuel_oil_distillate_kg')
+    expect(calcGas(EU.fuel_oil_distillate_kg, 1000, 'AR6').co2).toBeCloseTo(3186.3 / 1000, 12)
+    expect(t.result_tco2e).toBeCloseTo((3186.3 + 1000 * 0.000129 * 29.8 + 1000 * 0.0000258 * 273) / 1000, 9)
+    expect(t.note).toContain('1 tonne converted to 1,000 kg (1 tonne = 1000 kg, exact).')
+    expect(t.note).toContain('Published on a mass basis: 74.1 t CO₂/TJ × 43.0 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil, which includes light heating oil: IPCC 2006 Vol. 2 Ch. 1 Table 1.1)')
+    const kg = fuelRow(site({ has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'kg' }))
+    expect(kg.result_tco2e).toBeCloseTo(t.result_tco2e, 12)
+    const hfo = fuelRow(site({ has_fuel_oil_residual: true, fuel_oil_residual_amount: 2, fuel_oil_residual_unit: 'tonnes' }))
+    expect(calcGas(EU.fuel_oil_residual_kg, 2000, 'AR6').co2).toBeCloseTo(2 * 3126.96 / 1000, 12)
+    expect(hfo.note).toContain('77.4 t CO₂/TJ × 40.4 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Residual fuel oil) = 3.12696 kg CO₂/kg')
+  })
+
+  it('U7 EU gas: 10,000 kWh = 1,817.64 kg CO2, the note names IPCC and the 0.90; GJ and MJ convert exactly', () => {
+    const r = fuelRow(site({ has_natural_gas: true, natural_gas_amount: 10_000, natural_gas_unit: 'kwh' }))
+    expect(calcGas(EU.natural_gas_kwh, 10_000, 'AR6').co2).toBeCloseTo(1.81764, 12)
+    expect(EU.natural_gas_kwh.co2).toBeCloseTo(56100 * 0.90 * 3.6e-6, 15)
+    expect(r.note).toContain('× 0.90 net per gross (IPCC 2006 Vol. 2 Ch. 1 section 1.4.1.2, and the notes under Ch. 2 Tables 2.6 to 2.8)')
+    expect(r.note).toContain('EU MRR 2018/2066, Annex VI Table 1, Natural gas')
+    const gj = fuelRow(site({ has_natural_gas: true, natural_gas_amount: 36, natural_gas_unit: 'mmbtu' as never }))
+    expect(gj.factor_key).toBe('natural_gas_kwh')
+    expect(pickEF(site({}), 'natural_gas_gj').factor.co2).toBeCloseTo(0.181764 * KWH_PER_GJ, 12)
+    expect(pickEF(site({}), 'natural_gas_mj').factor.co2).toBeCloseTo(0.181764 / 3.6, 12)
+  })
+
+  it('U8 only EU rows carry the EU notes; US/CA/UK/AU/NZ cite their own', () => {
     for (const country of ['US', 'CA', 'GB', 'AU', 'NZ']) {
-      const r = (buildWorkings([loc({ country, has_diesel_stationary: true, diesel_stationary_amount: 400,
-        diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres' })], 'AR6', 2025, [], 12) as any[])
-        .find(x => x.source === 'Diesel (stationary)');
-      expect(r?.note ?? '', `${country} publishes per unit — nothing to disclose`).not.toMatch(/value DERIVED, not published/);
+      const r = fuelRow(loc({ country, has_diesel_stationary: true, diesel_stationary_amount: 400, diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres' }))
+      expect(r?.note ?? '', country).not.toMatch(/JEC Well-to-Tank|EU MRR/)
     }
-  });
+  })
 
-  it('U9 RESOLVED (FI2 diff 2): no EU _gallon or _mcf keys; those units convert EXACTLY from the _litre and _m3 forms', () => {
-    // This was an open todo: the pre-multiplied keys implied four different L_PER_GAL values and a rounded M3_PER_MCF
-    // (about 0.5 ppm off). Ruling R5 removed them; the router converts at the exact constants instead.
-    const EU = EF_EU as any;
-    for (const k of ['propane_gallon', 'diesel_gallon', 'diesel_mobile_gallon', 'fuel_oil_gallon', 'fuel_oil_distillate_gallon',
-      'fuel_oil_residual_gallon', 'gasoline_gallon', 'natural_gas_mcf']) expect(EU[k], k).toBeUndefined();
-    const de = loc({ country: 'DE' });
-    expect(pickEF(de, 'diesel_gallon').factor.co2).toBeCloseTo(EU.diesel_litre.co2 * 3.785411784, 12);
-    expect(pickEF(de, 'natural_gas_mcf').factor.co2).toBeCloseTo(EU.natural_gas_m3.co2 * 28.316846592, 12);
-  });
+  it('U9 gallons convert exactly to the EU litre key; Mcf and m3 have no EU key', () => {
+    const de = site({})
+    expect(pickEF(de, 'diesel_gallon').factor.co2).toBeCloseTo(EU.diesel_litre.co2 * 3.785411784, 12)
+    for (const k of ['natural_gas_mcf', 'natural_gas_m3', 'natural_gas_ccf', 'fuel_oil_distillate_litre', 'propane_litre']) {
+      expect((pickEF(de, k as never).factor as unknown as { __missing?: unknown }).__missing, k).toBeDefined()
+    }
+  })
+
+  it('U10 the units offered: EU gas kWh; EU heating and heavy fuel oil litres, kg, tonnes; UK gas kWh and m3; Canada gas m3, Mcf and GJ', () => {
+    expect(ngUnitOptions('DE')).toEqual([['kwh', 'kWh']])
+    expect(fuelOilUnitOptions('FR')).toEqual([['litres', 'Litres'], ['kg', 'kg'], ['tonnes', 'Tonnes']])
+    expect(liquidUnitOptions('FR')).toEqual([['litres', 'Litres']])
+    expect(fuelOilUnitOptions('GB')).toEqual(liquidUnitOptions('GB'))
+    expect(ngUnitOptions('GB')).toEqual([['kwh', 'kWh'], ['m3', 'm³']])
+    expect(ngUnitOptions('CA')).toEqual([['m3', 'm³'], ['mcf', 'Mcf'], ['gj', 'GJ']])
+    for (const f of UNIT_FIELDS.filter(x => x.field.startsWith('fuel_oil_'))) expect(f.options).toBe(fuelOilUnitOptions)
+  })
+
+  it('U12 the selector shows a stored EU m3 figure as m3 (not accepted here), and choosing kWh clears it with FI5\'s message', () => {
+    const typed = site({ name: 'Lyon depot', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })
+    const options = unitOptionsShowing(ngUnitOptions(typed.country), typed.natural_gas_unit, documentsBacking(typed, 'natural_gas_amount') > 0)
+    expect(options).toEqual([['kwh', 'kWh'], ['m3', 'm³ (not accepted here)']])
+    expect(options.find(([v]) => v === typed.natural_gas_unit), 'the selected option is the stored unit').toEqual(['m3', 'm³ (not accepted here)'])
+    // The page renders exactly this list for gas, selects the stored unit, and sends a choice through changeFieldUnit.
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain("{unitOptionsShowing(ngUnitOptions(loc.country), loc.natural_gas_unit, documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')).map(([val, label]) => (")
+    expect(page).toContain("onClick={() => changeFieldUnit(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}")
+    // Choosing kWh: m3 to kWh has no exact conversion, so the figure is cleared and asked for, never relabelled.
+    const o = changeUnit('natural_gas_amount', 1000, 'm3', 'kwh')
+    expect(o).toEqual({ unit: 'kwh', cleared: true, from: 'm3' })
+    const after = applyUnitOutcomes(typed, { natural_gas_unit: o }, '2026-10-07T12:00:00.000Z', null)
+    expect([after.natural_gas_unit, after.natural_gas_amount]).toEqual(['kwh', 0])
+    const msg = 'The natural gas figure was in m³, which cannot be converted exactly to kWh, so it has been cleared. Enter it in kWh.'
+    expect(unitChangeMessage(after.unit_changes!.at(-1)!)).toBe(msg)
+    expect(unpricedLines(after).map(u => [u.reason, u.message])).toEqual([['figure_cleared', msg]])
+    // A document-backed unit keeps its plain label (T10d), and an offered unit is not repeated.
+    expect(unitOptionsShowing(ngUnitOptions('DE'), 'm3', true)).toEqual([['kwh', 'kWh'], ['m3', 'm³']])
+    expect(unitOptionsShowing(ngUnitOptions('DE'), 'kwh', false)).toEqual([['kwh', 'kWh']])
+  })
+
+  it('U11 a stored EU m3 figure is never relabelled kWh: not on load, and a country change clears it with the record', () => {
+    const stored = site({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })
+    const derived = deriveLocations({ locations: [stored], reporting_year: 2025 })[0]
+    expect([derived.natural_gas_unit, derived.natural_gas_amount]).toEqual(['m3', 1000])
+    const moved = applyUnitOutcomes({ ...stored, country: 'FR' }, unitsForCountryChange('FR', stored as never), '2026-10-07T12:00:00.000Z', null)
+    expect([moved.natural_gas_unit, moved.natural_gas_amount]).toEqual(['kwh', 0])
+    expect(moved.unit_changes?.at(-1)).toMatchObject({ field: 'natural_gas_amount', from: 'm3', to: 'kwh', cleared: true, valueBefore: 1000 })
+    expect(changeUnit('natural_gas_amount', 1000, 'm3', 'kwh')).toEqual({ unit: 'kwh', cleared: true, from: 'm3' })
+  })
+});
+
+// ── FI3: UK gas in m³ (R11) and Canadian gas in GJ (R12) ────────────────────────────────────────────────────────
+describe('FI3. UK gas in m3 and Canadian gas in GJ', () => {
+  const rowOf = (l: Location) => buildWorkings([l], 'AR6', 2025, [], 12).find(r => r.stream === 'natural_gas' && !r.declaration)
+
+  it('FI3-1 UK gas in m3 is offered and prices at DEFRA 2.02633', () => {
+    expect(ngUnitOptions('GB').map(([v]) => v)).toContain('m3')
+    const r = rowOf(loc({ country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }))
+    expect(r.factor_key).toBe('natural_gas_m3')
+    expect(r.result_tco2e).toBeCloseTo(2.02633, 12)
+  })
+
+  it('FI3-2 Canada: Ontario 100 GJ = 4,978.0 kg CO2, computed from the province factor and the national heat content', () => {
+    const on = loc({ country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' })
+    const f = pickEF(on, 'natural_gas_gj')
+    expect(f.key).toBe('natural_gas_gj')
+    expect(f.factor.co2).toBeCloseTo(1.921 / 0.03859, 12)
+    expect(Number((calcGas(f.factor, 100, 'AR6').co2 * 1000).toPrecision(5))).toBe(4978.0)
+    expect(f.factor.ch4).toBeCloseTo(0.000037 / 0.03859, 15)
+    const r = rowOf(on)
+    expect(r.note).toBe("Converted to m³ at 38.59 MJ/m³, Canada's national gross heat content for natural gas (ECCC National Inventory Report 1990-2023, Part 2, Table A4-2). ECCC does not publish a provincial value.")
+    // Not a stored literal: another province's factor flows through.
+    const bc = pickEF({ ...on, province: 'BC', grid_region: 'BC' }, 'natural_gas_gj')
+    expect(bc.factor.co2).toBeCloseTo(1.966 / 0.03859, 12)
+    expect((EF_CA as Record<string, unknown>).natural_gas_gj).toBeUndefined()
+  })
+
+  it('FI3-3 Canada with no province is unpriced as today; a stored MMBtu figure converts exactly to GJ', () => {
+    const none = loc({ country: 'CA', province: '', grid_region: '', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' })
+    expect(unpricedLines(none).map(u => u.reason)).toEqual(['province_missing'])
+    const mmbtu = loc({ country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 10, natural_gas_unit: 'mmbtu' })
+    const r = rowOf(mmbtu)
+    expect(r.factor_key).toBe('natural_gas_gj')
+    expect(r.note).toContain('10 MMBtu converted to 10.55 GJ (1 MMBtu = 1.05505585262 GJ, exact).')
+    expect(r.result_tco2e).toBeCloseTo(calcGas(pickEF(mmbtu, 'natural_gas_gj').factor, 10 * 1.05505585262, 'AR6').total, 12)
+    expect(ngUnitOptions('CA').map(([v]) => v)).not.toContain('mmbtu')
+  })
 });
 
 // ── V. THE ACTIVITY COLUMN SHOWS WHAT THE CUSTOMER ENTERED ──────────────────────────────────────
@@ -2854,16 +2921,16 @@ describe('U. EU combustion — sourced inputs, bounded densities, disclosed deri
 // converted row (M1 CA gas, M2 steam already in mmbtu, M3 EU gas), so nothing would have caught it.
 // These tests close that hole: every case below asserts BOTH halves.
 describe('V. activity data is the entered figure, and the row still reconciles', () => {
-  const G = 3.785411784;
   const shownFactor = (r: any) => Number(String(r.emission_factor_display).match(/^[\d.]+/)![0]);
   const rowFor = (l: Location, stream: string) =>
     (buildWorkings([l], 'AR6', 2025, [], 12) as any[]).find(r => r.stream === stream && !r.declaration);
 
   // Every (jurisdiction, unit) combination the blast-radius sweep turned up, plus the two that were
   // already correct, so a regression in either direction fails.
-  const FUEL_OIL: [string, 'gallons' | 'litres'][] = [
+  // FI3: EU heating oil prices by mass only (R8), so the EU case enters kg.
+  const FUEL_OIL: [string, 'gallons' | 'litres' | 'kg'][] = [
     ['US', 'gallons'], ['US', 'litres'], ['CA', 'litres'], ['GB', 'litres'],
-    ['DE', 'litres'], ['AU', 'litres'], ['NZ', 'litres'],
+    ['DE', 'kg'], ['AU', 'litres'], ['NZ', 'litres'],
   ];
 
   it('V1 fuel oil reports the entered figure and unit in EVERY jurisdiction', () => {
@@ -2887,12 +2954,13 @@ describe('V. activity data is the entered figure, and the row still reconciles',
 
   it('V3 a litres row shows a per-LITRE factor, not the stored per-gallon one', () => {
     // The specific misreading this removes: "10.21468899 kg CO₂e/gal" printed beside 1,000 litres.
-    const eu = rowFor(loc({ country: 'DE', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
-      fuel_oil_distillate_unit: 'litres' }), 'fuel_oil_distillate');
+    // FI3: EU heavy fuel oil, the EU fuel-oil grade that keeps a litre key (R8 removed heating oil's).
+    const eu = rowFor(loc({ country: 'DE', has_fuel_oil_residual: true, fuel_oil_residual_amount: 1000,
+      fuel_oil_residual_unit: 'litres' }), 'fuel_oil_residual');
     expect(eu.emission_factor_display, 'per litre, matching the activity beside it').toContain('/L');
     // ⚠️ WAS the gallon factor divided by G — a rescale of a rescale. It is now the STORED litre value,
     // with no rescale applied at all, which is what the per-litre seeding bought.
-    expect(shownFactor(eu)).toBeCloseTo(2.69843662, 8);
+    expect(shownFactor(eu)).toBeCloseTo(3.04307271, 8);
     // A US site that entered gallons is untouched — its factor IS published per gallon.
     const us = rowFor(loc({ country: 'US', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
       fuel_oil_distillate_unit: 'gallons' }), 'fuel_oil_distillate');
@@ -2911,52 +2979,45 @@ describe('V. activity data is the entered figure, and the row still reconciles',
     }
   });
 
-  it('V5 NO PRICED FIGURE MOVED — the change is presentation only', () => {
-    // Pinned against the values measured live before the change. If any of these moves, the factor
-    // rescale has leaked into calcGas, which prices off the UNSCALED factor by design.
-    const eu = (u: 'litres') => calcLocation(loc({ country: 'FR',
-      has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: u,
-      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: u }), 'AR6', 2025);
-    const c = eu('litres');
-    // ⚠️ THE TWO TERMS ARE NOW EQUAL. They were 2.69843662 and 2.698435354636 — the same gas/diesel
-    // oil derivation differing in the ninth decimal because heating oil round-tripped through gallons.
-    // That artefact is what the per-litre seeding removes, and V8 asserts the equality directly.
-    expect(c.s1_total).toBeCloseTo(2.69843662 * 2, 9);
-    // Both rows priced 2.6984 t before this change and must still price 2.6984 t.
+  it('V5 the EU fuel figures are MRR x JEC, and a heating-oil litre is not counted (FI3)', () => {
+    // Was "NO PRICED FIGURE MOVED" across the per-litre re-basing. FI3 moves the EU figures on purpose: the densities are
+    // JEC's (R9) and heating oil in litres is unpriced (R8), so it adds nothing to the total.
+    const c = calcLocation(loc({ country: 'FR',
+      has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres',
+      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' }), 'AR6', 2025);
+    expect(c.s1_total).toBeCloseTo(2.66005885, 9);
     const diesel = rowFor(loc({ country: 'FR', has_diesel_stationary: true, diesel_stationary_amount: 1000,
       diesel_stationary_unit: 'litres' }), 'diesel_stationary');
-    const heating = rowFor(loc({ country: 'FR', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
-      fuel_oil_distillate_unit: 'litres' }), 'fuel_oil_distillate');
-    expect(diesel.result_tco2e.toFixed(4)).toBe('2.6984');
-    expect(heating.result_tco2e.toFixed(4)).toBe('2.6984');
-    // Priced per litre now. The old via-gallons figure is still what it rounds to at display
-    // precision, which is why this re-basing was safe to make.
-    expect(heating.result_tco2e).toBeCloseTo(2.69843662, 9);
-    expect(((1000 / G) * 10.21468899 / 1000).toFixed(4), 'the old path rounded the same').toBe('2.6984');
+    expect(diesel.result_tco2e).toBeCloseTo(2.66005885, 9);
+    const heating = (buildWorkings([loc({ country: 'FR', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
+      fuel_oil_distillate_unit: 'litres' })], 'AR6', 2025, [], 12) as any[]).find(r => r.stream === 'fuel_oil_distillate');
+    expect(heating.declaration).toBe('unpriced');
+    expect(heating.result_tco2e).toBeNull();
   });
 
   it('V6 the EU citation is one line, and still satisfies F16 and F17', () => {
     // F16 needs every token of COMBUSTION_EDITION.EU ('IPCC 2006'); F17 needs a (YYYY). Asserted here
     // too so a shortening pass fails in the file it is being shortened in.
+    // FI3: the citation names MRR, IPCC 2006 and JEC; it no longer carries a parenthesised year (F17 updated with it).
     const c = EF_SOURCES.combustion_eu;
     expect(c).toContain('IPCC');
     expect(c).toContain('2006');
-    expect(/\((\d{4})\)/.test(c), 'F17: a four-digit year in parentheses').toBe(true);
+    expect(c).toContain('JEC Well-to-Tank report v5');
+    expect(c).not.toContain('\u2014');
     expect(c).toContain('2018/2066');
     expect(c.length, 'one line — the derivation belongs in the note').toBeLessThan(140);
     expect(c, 'the citation must not defer to the note for its own content').not.toContain('see row note');
   });
 
-  it('V7 the EU note still carries the density and its bound', () => {
+  it('V7 the EU note carries the density and the document it came from (FI3, R10)', () => {
     const r = rowFor(loc({ country: 'DE', has_diesel_stationary: true, diesel_stationary_amount: 1000,
       diesel_stationary_unit: 'litres' }), 'diesel_stationary');
-    expect(r.note).toContain('0.844 kg/L');
-    expect(r.note).toContain('EN 590');
-    expect(r.note).toContain('0.820–0.845');
-    expect(r.note).toContain('from neither cited source');
-    // Trimmed, but not to the point of being uncheckable — the arithmetic must survive.
-    expect(r.note).toContain('74 100 kg CO₂/TJ × 43.0 TJ/Gg × 0.844 kg/L = 2.68924');
-    expect(r.note.length, 'the citation covers the instrument; the note must not restate it').toBeLessThan(280);
+    expect(r.note).toContain('832 kg/m³ (JEC Well-to-Tank report v5, Annexes section 4.1, Diesel)');
+    expect(r.note).toContain('(EU MRR 2018/2066, Annex VI Table 1, Gas/Diesel oil)');
+    // The arithmetic a verifier retypes.
+    expect(r.note).toContain('74.1 t CO₂/TJ × 43.0 TJ/Gg');
+    expect(r.note).toContain('= 2.65100 kg CO₂/L');
+    expect(r.note).not.toMatch(/EN 590|neither cited source|DERIVED/);
   });
 });
 
@@ -2971,9 +3032,10 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
   const shown = (r: any) => Number(String(r.emission_factor_display).match(/^[\d.]+/)![0]);
   const row = (l: Location, grade: 'distillate' | 'residual') =>
     (buildWorkings([l], 'AR6', 2025, [], 12) as any[]).find(r => r.stream === `fuel_oil_${grade}` && !r.declaration);
-  const site = (country: string, grade: 'distillate' | 'residual', unit: 'litres' | 'gallons' = 'litres') =>
+  // FI3 (R8): EU heating oil has no litre key, so the EU distillate site enters kg unless a unit is given.
+  const site = (country: string, grade: 'distillate' | 'residual', unit?: 'litres' | 'gallons' | 'kg') =>
     loc({ country, [`has_fuel_oil_${grade}`]: true, [`fuel_oil_${grade}_amount`]: 1000,
-          [`fuel_oil_${grade}_unit`]: unit } as Partial<Location>);
+          [`fuel_oil_${grade}_unit`]: unit ?? (country === 'DE' && grade === 'distillate' ? 'kg' : 'litres') } as Partial<Location>);
 
   it('W1 each seeded litre key IS its publisher\'s printed figure', () => {
     // EQUALITY where the publisher prints the value; an EXPRESSION where the source needs arithmetic.
@@ -2999,24 +3061,26 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
     // Asserted as the expression, like the AU lines in Z5 — DCCEEW prints neither basis directly.
     expect((EF_AU as any).fuel_oil_distillate_litre.co2).toBeCloseTo(37.3 * 69.73 / 1000, 6);
     expect((EF_AU as any).fuel_oil_residual_litre.co2).toBeCloseTo(39.7 * 73.84 / 1000, 6);
-    // EU — the header's own derivation, one step before the gallon keys. CO2/TJ x NCV x density.
-    expect((EF_EU as any).fuel_oil_distillate_litre.co2).toBe(Number((74100 * 43.0e-6 * 0.844).toPrecision(6)));
-    expect((EF_EU as any).fuel_oil_residual_litre.co2).toBe(Number((77400 * 40.4e-6 * 0.990).toPrecision(6)));
+    // EU (FI3): MRR CO2/TJ x MRR NCV x JEC density (HFO 970 kg/m³). Heating oil has no litre key (R8): MRR's mass basis.
+    expect((EF_EU as any).fuel_oil_residual_litre.co2).toBe(Number((77400 * 40.4e-6 * 0.970).toPrecision(6)));
+    expect((EF_EU as any).fuel_oil_distillate_litre).toBeUndefined();
+    expect((EF_EU as any).fuel_oil_distillate_kg.co2).toBe(Number((74.1 * 43.0 / 1000).toPrecision(6)));
   });
 
   it('W2 an EU gallon figure prices from the litre key, converted exactly (FI2: no gallon keys)', () => {
-    for (const grade of ['distillate', 'residual'] as const) {
-      const lit = (EF_EU as any)[`fuel_oil_${grade}_litre`];
-      expect((EF_EU as any)[`fuel_oil_${grade}_gallon`], `EU ${grade} gallon key`).toBeUndefined();
-      const p = pickEF(loc({ country: 'DE' }), `fuel_oil_${grade}_gallon`);
-      for (const gas of ['co2', 'ch4', 'n2o'] as const) expect(p.factor[gas], `EU ${grade} ${gas}`).toBeCloseTo(lit[gas] * G, 14);
-    }
-    // Distillate IS the gas/diesel oil row (IPCC Table 1.1), so it is byte-identical to diesel.
-    expect((EF_EU as any).fuel_oil_distillate_litre).toEqual((EF_EU as any).diesel_litre);
+    const lit = (EF_EU as any).fuel_oil_residual_litre;
+    expect((EF_EU as any).fuel_oil_residual_gallon, 'EU residual gallon key').toBeUndefined();
+    const p = pickEF(loc({ country: 'DE' }), 'fuel_oil_residual_gallon');
+    for (const gas of ['co2', 'ch4', 'n2o'] as const) expect(p.factor[gas], `EU residual ${gas}`).toBeCloseTo(lit[gas] * G, 14);
+    // FI3 (R8): heating oil has no litre key, so a gallon figure has nothing to convert to and is unpriced.
+    expect((pickEF(loc({ country: 'DE' }), 'fuel_oil_distillate_gallon').factor as any).__missing).toBeDefined();
   });
 
   it('W3 a metric row shows the STORED litre factor, with no rescale applied', () => {
-    const cases: [string, number][] = [['CA', 2.753], ['GB', 2.75541], ['DE', 2.68924], ['AU', 2.600929], ['NZ', 2.97088]];
+    // FI3: DE heating oil has no litre key (R8); its heavy fuel oil litre row is checked below instead.
+    const cases: [string, number][] = [['CA', 2.753], ['GB', 2.75541], ['AU', 2.600929], ['NZ', 2.97088]];
+    const de = row(site('DE', 'residual'), 'residual');
+    expect([de.activity_unit, de.emission_factor.includes('3.03315')]).toEqual(['litres', true]);
     for (const [country, storedCo2] of cases) {
       const r = row(site(country, 'distillate'), 'distillate');
       expect(r.activity_data, `${country}`).toBe(1000);
@@ -3038,31 +3102,30 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
     }
   });
 
-  it('W5 THE ARTEFACT IS GONE — EU diesel and EU heating oil now agree exactly', () => {
-    // The visible symptom this task existed to remove: two adjacent rows, one derivation, differing
-    // in the ninth decimal because heating oil round-tripped through gallons.
-    const l = loc({ country: 'FR',
-      has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres',
-      has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' });
-    const rows = buildWorkings([l], 'AR6', 2025, [], 12) as any[];
-    const diesel = rows.find(r => r.source === 'Diesel (stationary)');
-    const heating = rows.find(r => r.source === 'Heating oil');
-    expect(heating.emission_factor_display, 'same displayed factor').toBe(diesel.emission_factor_display);
-    expect(heating.result_tco2e, 'same tCO2e, exactly').toBe(diesel.result_tco2e);
-    expect(heating.emission_factor).toBe(diesel.emission_factor);
+  it('W5 EU diesel and EU heating oil share a row by mass, not by litre (FI3, R8)', () => {
+    // Until FI3 the two were byte-identical per litre, through one density. They share MRR's Gas/Diesel oil NCV and
+    // factor, but no source prints a heating-oil density, so heating oil in litres is unpriced and agrees with diesel
+    // only by mass.
+    const kgRow = (stream: 'diesel_stationary' | 'fuel_oil_distillate') => (buildWorkings([loc({ country: 'FR',
+      ...(stream === 'diesel_stationary' ? {} : { has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'kg' }) })],
+      'AR6', 2025, [], 12) as any[]).find(r => r.stream === stream && !r.declaration);
+    expect(pickEF(loc({ country: 'FR' }), 'fuel_oil_distillate_kg').factor).toEqual(pickEF(loc({ country: 'FR' }), 'diesel_kg').factor);
+    expect(kgRow('fuel_oil_distillate').result_tco2e).toBeCloseTo(3.1971876, 9);
+    const l = loc({ country: 'FR', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' });
+    expect(unpricedLines(l).map(u => u.field)).toEqual(['fuel_oil_distillate_amount']);
   });
 
   it('W6 the EU density disclosure SURVIVED the re-basing', () => {
     // ⚠️ IT DID NOT, at first. euDerivationNote is keyed on the factor key; the live key became
     // fuel_oil_*_litre and was in neither the map nor its alias table, so every EU fuel-oil row lost
     // its disclosure while the figures stayed correct — invisible to every other assertion.
+    // FI3: every EU fuel-oil row names its documents (R10): MRR always, JEC where a density was used.
     for (const grade of ['distillate', 'residual'] as const) {
       const r = row(site('DE', grade), grade);
-      expect(r.note, `${grade}`).toMatch(/value DERIVED, not published/);
-      expect(r.note, `${grade}`).toContain('from neither cited source');
+      expect(r.note, `${grade}`).toContain('EU MRR 2018/2066, Annex VI Table 1');
     }
-    expect(row(site('DE', 'distillate'), 'distillate').note).toContain('0.844 kg/L');
-    expect(row(site('DE', 'residual'), 'residual').note).toContain('0.990 kg/L');
+    expect(row(site('DE', 'distillate'), 'distillate').note).toContain('Published on a mass basis');
+    expect(row(site('DE', 'residual'), 'residual').note).toContain('970 kg/m³ (JEC Well-to-Tank report v5, Annexes section 4.1, HFO)');
   });
 
   it('W7 US is untouched — gallons direct, litres still converts', () => {
@@ -3084,7 +3147,7 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
     // fuelOilPricing is one chooser with three consumers; if any had been left on the gallon path the
     // location total and its own workings row would disagree.
     for (const country of ['CA', 'GB', 'DE', 'AU', 'NZ', 'US']) {
-      const unit = country === 'US' ? 'gallons' : 'litres';
+      const unit = country === 'US' ? 'gallons' : undefined;   // the site default (EU heating oil in kg, FI3)
       for (const grade of ['distillate', 'residual'] as const) {
         const l = site(country, grade, unit);
         expect(calcLocation(l, 'AR6', 2025).s1_total, `${country}/${grade}`).toBeCloseTo(row(l, grade).result_tco2e, 12);
@@ -3169,20 +3232,19 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     // indifferent to how many figures a key happens to carry.
     const near = (actual: number, expected: number, what: string) =>
       expect(Math.abs(actual / expected - 1), `${what}: within stored rounding of the T2.2/2.3 rate`).toBeLessThan(0.01);
-    near(EU.propane_litre.ch4, perLitre(IPCC_T22.lpg.ch4, 47.3, 0.510), 'propane CH4');
-    near(EU.propane_litre.n2o, perLitre(IPCC_T22.lpg.n2o, 47.3, 0.510), 'propane N2O');
-    near(EU.diesel_litre.ch4, perLitre(IPCC_T22.gas_diesel_oil.ch4, 43.0, 0.844), 'diesel CH4');
-    near(EU.diesel_litre.n2o, perLitre(IPCC_T22.gas_diesel_oil.n2o, 43.0, 0.844), 'diesel N2O');
-    near(EU.fuel_oil_residual_litre.ch4, perLitre(IPCC_T22.residual_oil.ch4, 40.4, 0.990), 'residual CH4');
-    near(EU.fuel_oil_residual_litre.n2o, perLitre(IPCC_T22.residual_oil.n2o, 40.4, 0.990), 'residual N2O');
-    near(EU.gasoline_litre.ch4, perLitre(IPCC_T22.motor_gasoline.ch4, 44.3, 0.745), 'gasoline CH4');
-    near(EU.gasoline_litre.n2o, perLitre(IPCC_T22.motor_gasoline.n2o, 44.3, 0.745), 'gasoline N2O');
-    // Natural gas takes the volumetric route: rate x 36 MJ/m3, and lands exactly.
-    expect(EU.natural_gas_m3.ch4).toBeCloseTo(IPCC_T22.natural_gas.ch4 * 36e-6, 12);
-    expect(EU.natural_gas_m3.n2o).toBeCloseTo(IPCC_T22.natural_gas.n2o * 36e-6, 12);
-    // Distillate shares the gas/diesel oil row, so it must carry diesel's rates unchanged.
-    expect(EU.fuel_oil_distillate_litre.ch4).toBe(EU.diesel_litre.ch4);
-    expect(EU.fuel_oil_distillate_litre.n2o).toBe(EU.diesel_litre.n2o);
+    // FI3: the JEC densities (R9), one density for all three gases.
+    near(EU.diesel_litre.ch4, perLitre(IPCC_T22.gas_diesel_oil.ch4, 43.0, 0.832), 'diesel CH4');
+    near(EU.diesel_litre.n2o, perLitre(IPCC_T22.gas_diesel_oil.n2o, 43.0, 0.832), 'diesel N2O');
+    near(EU.fuel_oil_residual_litre.ch4, perLitre(IPCC_T22.residual_oil.ch4, 40.4, 0.970), 'residual CH4');
+    near(EU.fuel_oil_residual_litre.n2o, perLitre(IPCC_T22.residual_oil.n2o, 40.4, 0.970), 'residual N2O');
+    near(EU.gasoline_litre.ch4, perLitre(IPCC_T22.motor_gasoline.ch4, 44.3, 0.743), 'gasoline CH4');
+    near(EU.gasoline_litre.n2o, perLitre(IPCC_T22.motor_gasoline.n2o, 44.3, 0.743), 'gasoline N2O');
+    // Natural gas per kWh gross (R7): rate x 0.90 x 3.6e-6 TJ/kWh.
+    expect(EU.natural_gas_kwh.ch4).toBeCloseTo(IPCC_T22.natural_gas.ch4 * 0.9 * 3.6e-6, 15);
+    expect(EU.natural_gas_kwh.n2o).toBeCloseTo(IPCC_T22.natural_gas.n2o * 0.9 * 3.6e-6, 15);
+    // Heating oil shares the gas/diesel oil row by mass (R8), so it carries diesel's rates unchanged.
+    expect(EU.fuel_oil_distillate_kg.ch4).toBe(EU.diesel_kg.ch4);
+    expect(EU.fuel_oil_distillate_kg.n2o).toBe(EU.diesel_kg.n2o);
   });
 
   it('AB4 EF_EU is DEFINITIVELY NOT on Table 2.4 or 2.5', () => {
@@ -3192,11 +3254,10 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     // start failing for the locations that move.
     const EU = EF_EU as any;
     const T24 = { gas_diesel_oil: 10, motor_gasoline: 10, residual_oil: 10, lpg: 5, natural_gas: 5 };
-    expect(EU.diesel_litre.ch4).not.toBeCloseTo(perLitre(T24.gas_diesel_oil, 43.0, 0.844), 8);
-    expect(EU.gasoline_litre.ch4).not.toBeCloseTo(perLitre(T24.motor_gasoline, 44.3, 0.745), 8);
-    expect(EU.fuel_oil_residual_litre.ch4).not.toBeCloseTo(perLitre(T24.residual_oil, 40.4, 0.990), 8);
-    expect(EU.propane_litre.ch4).not.toBeCloseTo(perLitre(T24.lpg, 47.3, 0.510), 8);
-    expect(EU.natural_gas_m3.ch4).not.toBeCloseTo(T24.natural_gas * 36e-6, 8);
+    expect(EU.diesel_litre.ch4).not.toBeCloseTo(perLitre(T24.gas_diesel_oil, 43.0, 0.832), 8);
+    expect(EU.gasoline_litre.ch4).not.toBeCloseTo(perLitre(T24.motor_gasoline, 44.3, 0.743), 8);
+    expect(EU.fuel_oil_residual_litre.ch4).not.toBeCloseTo(perLitre(T24.residual_oil, 40.4, 0.970), 8);
+    expect(EU.natural_gas_kwh.ch4).not.toBeCloseTo(T24.natural_gas * 0.9 * 3.6e-6, 10);
     // The switch is NOT uniform scaling — liquids 3.33x, LPG and gas 5x. Recorded so a future change
     // is not applied as one multiplier.
     expect(T24.gas_diesel_oil / IPCC_T22.gas_diesel_oil.ch4).toBeCloseTo(10 / 3, 9);
@@ -3209,8 +3270,10 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     // FI2 diff 3: from EPA's printed 0.27 g per gallon, so the rate comes back to within the printed rounding.
     const usRatePerMmbtu = (EF as any).propane_gallon.ch4 / 0.091 * 1000;   // back to g/mmBtu
     expect(Math.abs(usRatePerMmbtu - 3), 'EPA propane sits on the petroleum rate').toBeLessThan(0.06);
-    const euRatePerTJ = (EF_EU as any).propane_litre.ch4 / (47.3e-6 * 0.510);
-    expect(euRatePerTJ, 'IPCC LPG sits on the gaseous rate').toBeCloseTo(1, 2);
+    // FI3: no EU LPG key is held until FI4, so IPCC's side is read off natural gas, the same gaseous pair (1 / 0.1),
+    // which is the IPCC LPG rate too (Ch. 2 Tables 2.2/2.3).
+    const euRatePerTJ = (EF_EU as any).natural_gas_kwh.ch4 / (0.9 * 3.6e-6);
+    expect(euRatePerTJ, 'IPCC LPG sits on the gaseous rate').toBeCloseTo(1, 6);
     expect(Math.round(usRatePerMmbtu), 'the two publishers differ, deliberately').not.toBe(Math.round(euRatePerTJ));
   });
 
@@ -5524,6 +5587,9 @@ describe('FI2 exact conversions and honest provenance', () => {
         if (table === EF_CA && /^natural_gas_(m3|mcf)$/.test(r.factor_key)) {
           // Canadian gas: the province's ECCC value (EF_CA_NG_CO2_M3), per m3 or per Mcf at the exact factor.
           expected = EF_CA_NG_CO2_M3.ON * ratio;
+        } else if (table === EF_CA && r.factor_key === 'natural_gas_gj') {
+          // FI3 (R12): per GJ gross, the province's per-m3 value / 0.03859 GJ per m3 (NIR Table A4-2), computed.
+          expected = EF_CA_NG_CO2_M3.ON / 0.03859 * ratio;
         } else {
           expect(table![r.factor_key], `${label}: "${r.factor_key}" is not in the table the row cites`).toBeDefined();
           expected = table![r.factor_key].co2 * ratio;
@@ -5543,9 +5609,10 @@ describe('FI2 exact conversions and honest provenance', () => {
     // Diff 1's table of rows the US fallback priced, case by case. [country, field, unit, outcome] where the outcome is
     // the table key the value now comes from, or 'unpriced'.
     const CASES: [string, keyof Location, string, string][] = [
-      ['CA', 'natural_gas_amount', 'therms', 'unpriced'], ['CA', 'natural_gas_amount', 'mmbtu', 'unpriced'],
+      // FI3: CA gas in energy units via the national heat content (R12); EU gas in energy units via the gross kWh key (R7).
+      ['CA', 'natural_gas_amount', 'therms', 'natural_gas_gj'], ['CA', 'natural_gas_amount', 'mmbtu', 'natural_gas_gj'],
       ['GB', 'natural_gas_amount', 'mcf', 'natural_gas_m3'], ['GB', 'natural_gas_amount', 'therms', 'natural_gas_kwh'], ['GB', 'natural_gas_amount', 'mmbtu', 'natural_gas_kwh'],
-      ['DE', 'natural_gas_amount', 'therms', 'unpriced'], ['DE', 'natural_gas_amount', 'mmbtu', 'unpriced'],
+      ['DE', 'natural_gas_amount', 'therms', 'natural_gas_kwh'], ['DE', 'natural_gas_amount', 'mmbtu', 'natural_gas_kwh'],
       ['AU', 'natural_gas_amount', 'mcf', 'natural_gas_m3'], ['AU', 'natural_gas_amount', 'therms', 'natural_gas_gj'],
       ['AU', 'propane_amount', 'gallons', 'propane_litre'], ['AU', 'diesel_stationary_amount', 'gallons', 'diesel_litre'],
       ['AU', 'gasoline_amount', 'gallons', 'gasoline_litre'], ['AU', 'diesel_mobile_amount', 'gallons', 'diesel_mobile_litre'],
@@ -5574,13 +5641,15 @@ describe('FI2 exact conversions and honest provenance', () => {
     }
   });
 
-  it('calorific basis: AU kWh at 51.53 x 0.0036, EU kWh unpriced, UK therms via kWh at the DEFRA gross factor, NZ kWh with R4', () => {
+  it('calorific basis: AU kWh at 51.53 x 0.0036, EU kWh gross at MRR x 0.90 (FI3), UK therms via kWh at the DEFRA gross factor, NZ kWh with R4', () => {
     const au = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
     expect(pickEF(au, 'natural_gas_kwh').factor.co2).toBeCloseTo(51.53 * 0.0036, 14);
     expect(calcInventory([au], 'AR6', 2025).s1_total).toBeCloseTo(1000 * 51.53 * 0.0036 / 1000, 12);
     const eu = loc({ name: 'Lyon', country: 'FR', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
-    expect(unpricedLines(eu).map(u => u.reason)).toEqual(['factor_missing']);
-    expect(findUnresolvedCoverage([eu], 2025, 12, []).find(i => i.status === 'factor_missing')?.message).toContain('Natural gas at Lyon is recorded in kWh');
+    // FI3 (R7): EU gas in kWh is gross, as billed, and prices on MRR's net factor x 0.90.
+    expect(unpricedLines(eu)).toEqual([]);
+    expect(calcInventory([eu], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(eu, 'natural_gas_kwh').factor, 1000, 'AR6').total, 12);
+    expect(pickEF(eu, 'natural_gas_kwh').factor.co2).toBe(0.181764);
     const uk = buildWorkings([loc({ country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'therms' })], 'AR6', 2025).find(r => r.stream === 'natural_gas')!;
     expect(uk.factor_key).toBe('natural_gas_kwh');
     expect(uk.result_tco2e).toBeCloseTo(100 * (0.105505585262 / 0.0036) * 0.18231 / 1000, 12);
@@ -5615,12 +5684,12 @@ describe('FI2 exact conversions and honest provenance', () => {
     // The derived keys in force: EF_EU (densities and an energy content, FI3's list). A gallon or Mcf figure converts
     // exactly to one of them first, and still carries its note. FI2 follow-up: EF_AU per m3 left this list; it is NGA's
     // own printed 2.025129, and its row cites that (FI2d below).
+    // FI3: each property and its document (R10). EU gas by volume and EU LPG in litres are unpriced, so not listed.
     const cases: [string, Partial<Location>, RegExp][] = [
-      ['DE', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' }, /36 MJ\/m³/],
-      ['DE', { has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: 'gallons' }, /0\.844 kg\/L/],
-      ['FR', { has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' }, /0\.745 kg\/L/],
-      ['FR', { has_propane: true, propane_amount: 100, propane_unit: 'gallons' }, /0\.510 kg\/L/],
-      ['DE', { has_fuel_oil_residual: true, fuel_oil_residual_amount: 100, fuel_oil_residual_unit: 'litres' }, /0\.990 kg\/L/],
+      ['DE', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'kwh' }, /0\.90 net per gross \(IPCC 2006 Vol\. 2 Ch\. 1 section 1\.4\.1\.2/],
+      ['DE', { has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: 'gallons' }, /832 kg\/m³ \(JEC Well-to-Tank report v5/],
+      ['FR', { has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' }, /743 kg\/m³ \(JEC Well-to-Tank report v5/],
+      ['DE', { has_fuel_oil_residual: true, fuel_oil_residual_amount: 100, fuel_oil_residual_unit: 'litres' }, /970 kg\/m³ \(JEC Well-to-Tank report v5/],
     ];
     for (const [country, o, value] of cases) {
       const r = buildWorkings([loc({ country, ...o })], 'AR6', 2025).find(x => x.scope === 1 && x.stream && !x.declaration)!;
@@ -5835,7 +5904,7 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
     for (const r of rows.filter(x => !x.declaration && /converted to|DERIVED|÷ 3\.6|× 3\.6|kWh \(exact/.test(x.note ?? ''))) {
       expect(methods.some(m => m.startsWith(`${r.source.replace(/ \(supplier-specific factor\)$/, '')}:`)), r.source).toBe(true)
     }
-    expect(methods.some(m => m.includes('Table 1'))).toBe(false)
+    expect(methods.some(m => m.includes('US EPA GHG Emission Factors Hub')), 'a printed US value is a citation, not listed').toBe(false)
     for (const m of methods) expect(m).not.toContain('\u2014')
   })
 })
@@ -5925,8 +5994,10 @@ describe('FI5. a unit change never relabels a figure', () => {
     expect(unitChangeMessage(nz.unit_changes!.at(-1)!)).toBe('The natural gas figure was in Mcf, which cannot be converted exactly to kWh, so it has been cleared. Enter it in kWh.')
     // GB gas is billed in kWh: DEFRA's per-m3 row prices volumes, but the wizard offers kWh, and a volume never
     // becomes an energy here (no calorific value is applied to a typed figure).
+    // FI3 (R11): GB now offers m3, so a US Mcf figure converts exactly to it rather than being cleared.
     const gb = applyCountry(us, 'GB')
-    expect([gb.natural_gas_unit, gb.natural_gas_amount]).toEqual(['kwh', 0])
+    expect(gb.natural_gas_unit).toBe('m3')
+    expect(gb.natural_gas_amount).toBeCloseTo(100 * 28.316846592, 9)
   })
 
   it('FI5-6 a document-backed field is not changed by a country change (T7)', () => {

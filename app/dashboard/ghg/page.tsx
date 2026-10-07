@@ -56,7 +56,7 @@ import {
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
-  ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
+  ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
   periodFromYearAndEnd,
@@ -2523,11 +2523,11 @@ workings: saved.workings,
               {loc.has_fuel_oil_distillate && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                    {unitOptionsShowing(fuelOilUnitOptions(loc.country), loc.fuel_oil_distillate_unit ?? 'gallons', false).map(([val, label]) => (
                       <button key={val} onClick={() => changeFieldUnit(activeLocation, 'fuel_oil_distillate_unit', val)} style={unitBtn((loc.fuel_oil_distillate_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                  <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${unitLabel(loc.fuel_oil_distillate_unit ?? 'gallons')})`}>
                     <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_distillate_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'fuel_oil_distillate_amount')} />
@@ -2541,11 +2541,11 @@ workings: saved.workings,
               {loc.has_fuel_oil_residual && (
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                    {liquidUnitOptions(loc.country).map(([val, label]) => (
+                    {unitOptionsShowing(fuelOilUnitOptions(loc.country), loc.fuel_oil_residual_unit ?? 'gallons', false).map(([val, label]) => (
                       <button key={val} onClick={() => changeFieldUnit(activeLocation, 'fuel_oil_residual_unit', val)} style={unitBtn((loc.fuel_oil_residual_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
+                  <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${unitLabel(loc.fuel_oil_residual_unit ?? 'gallons')})`}>
                     <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_residual_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'fuel_oil_residual_amount')} />
@@ -2686,7 +2686,7 @@ workings: saved.workings,
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {/* Country-filtered like every other fuel — MMBtu is not a billing unit outside
                         the US, so a metric inventory should never show it. */}
-                    {steamUnitOptions(loc.country).map(([val, label]) => (
+                    {unitOptionsShowing(steamUnitOptions(loc.country), loc.purchased_steam_unit ?? 'mmbtu', false).map(([val, label]) => (
                       <button key={val} onClick={() => changeFieldUnit(activeLocation, 'purchased_steam_unit', val)} style={unitBtn((loc.purchased_steam_unit ?? 'mmbtu') === val)}>{label}</button>
                     ))}
                   </div>

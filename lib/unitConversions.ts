@@ -62,6 +62,8 @@ export const EXACT_CONVERSIONS = {
   GJ_PER_MJ: 0.001,
   /** pound (avoirdupois) = 0.45359237 kg, by the 1959 international yard and pound agreement. NIST SP 811 B.8 (exact). */
   KG_PER_LB: 0.45359237,
+  /** tonne (metric) = 1,000 kg, SI (exact). FI3: EU heating and heavy fuel oil may be entered in tonnes. */
+  KG_PER_TONNE: 1000,
 } as const
 
 // The names the rest of the code already uses, DERIVED from the table rather than retyped.
@@ -98,6 +100,7 @@ export const EXACT_UNITS: Record<string, { kind: QuantityKind; inBase: number; o
   therms: { kind: 'energy', inBase: EXACT_CONVERSIONS.GJ_PER_THERM, one: 'therm', many: 'therms' },
   kg:     { kind: 'mass', inBase: 1, one: 'kg', many: 'kg' },
   lb:     { kind: 'mass', inBase: EXACT_CONVERSIONS.KG_PER_LB, one: 'lb', many: 'lb' },
+  tonne:  { kind: 'mass', inBase: EXACT_CONVERSIONS.KG_PER_TONNE, one: 'tonne', many: 'tonnes' },
 }
 /** The base unit of each quantity, the one every inBase above is measured in. */
 const BASE_OF: Record<QuantityKind, string> = { liquid_volume: 'litre', gas_volume: 'm3', energy: 'gj', mass: 'kg' }
