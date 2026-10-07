@@ -45,6 +45,7 @@ import { unitLabel } from './unitLabels'
 //   It carries NO display name into the engine, deliberately. A name shown to a customer is copy,
 // is locale-sensitive, and belongs in the copy module where it can be pinned to ['en'] once.
 import { countryByIso2 } from '../emissionFactors/countryOptions'
+import type { EquipmentType, FleetType } from '../emissionFactors/mobile/types'
 
 // AR4/AR5 do not distinguish fossil vs biogenic methane — both keys carry the single published GWP100.
 // AR6 is the first IPCC set to split them (fossil 29.8 incl. oxidation; biogenic/non-fossil 27.0). N2O AR6 = 273.
@@ -1769,6 +1770,109 @@ interface Location {
   // T10 ruling: overrides the customer removed ("Use the bills instead"), with who and when, so the history
   // stays in the record.
   manual_overrides_removed?: (ManualOverride & { removedAt: string; removedBy: { userId: string; email: string } })[]
+  // ── FI9 (ruling R16): FLEET FUEL BY VEHICLE TYPE ──────────────────────────────────────────────────────
+  // Light (cars, vans, utes), Heavy (trucks, buses), Non-road (forklifts, plant, machinery), each with its own petrol and
+  // diesel quantity. The three ticks are saved (R16 choice 5): a type ticked with no figure yet is a real state. All
+  // optional, because locations saved before FI9 carry none of them; absent reads as not ticked and 0. Lives in
+  // locations_data (no SQL). The legacy gasoline_amount / diesel_mobile_amount above are assigned to a type by the
+  // customer (assignLegacyFleet), never moved silently (R16 choice 2).
+  fleet_light?: boolean; fleet_heavy?: boolean; fleet_nonroad?: boolean
+  light_petrol_amount?: number; light_petrol_unit?: 'gallons' | 'litres'
+  light_diesel_amount?: number; light_diesel_unit?: 'gallons' | 'litres'
+  heavy_petrol_amount?: number; heavy_petrol_unit?: 'gallons' | 'litres'
+  heavy_diesel_amount?: number; heavy_diesel_unit?: 'gallons' | 'litres'
+  nonroad_petrol_amount?: number; nonroad_petrol_unit?: 'gallons' | 'litres'
+  nonroad_diesel_amount?: number; nonroad_diesel_unit?: 'gallons' | 'litres'
+  /** Road types: the typical model year, optional (R16). */
+  light_model_year?: number; heavy_model_year?: number
+  /** US road only, optional: miles per type AND fuel (R16 choice 1), for EPA's per-mile CH4 and N2O. */
+  light_petrol_miles?: number; light_diesel_miles?: number; heavy_petrol_miles?: number; heavy_diesel_miles?: number
+  /** Non-road: the equipment type, per fuel (R16 choice 3). No default. */
+  nonroad_petrol_equipment?: EquipmentType; nonroad_diesel_equipment?: EquipmentType
+  /** Every legacy fleet figure the customer assigned to a vehicle type, with who and when (R16 choice 2). */
+  fleet_assignments?: FleetAssignment[]
+}
+
+/** FI9: one legacy fleet figure moved to a vehicle type by the customer. */
+export interface FleetAssignment {
+  from: 'gasoline_amount' | 'diesel_mobile_amount'
+  to: FleetType
+  field: string
+  value: number
+  unit: string
+  at: string
+  by: { userId: string; email: string }
+}
+
+// ── FI9 (R16): THE SIX FLEET FIELDS, IN ONE TABLE ─────────────────────────────────────────────────────────
+// Every map that names a field (units, streams, switches, names, cleared figures, combustion lines) is derived from
+// this list, so a seventh field cannot be added to one map and missed by another. `legacyKey` is the fuel token of the
+// mobile factor key the line prices through today; FI9 diff 2b replaces that with the publisher's mobile row.
+export type FleetFuel = 'petrol' | 'diesel'
+export interface FleetField {
+  type: FleetType; fuel: FleetFuel
+  amount: keyof Location; unit: keyof Location; typeSwitch: keyof Location
+  source: string; name: string; legacyKey: 'gasoline' | 'diesel_mobile'
+}
+const FLEET_TYPE_SWITCH: Record<FleetType, keyof Location> = { light: 'fleet_light', heavy: 'fleet_heavy', non_road: 'fleet_nonroad' }
+const FLEET_TYPE_WORDS: Record<FleetType, string> = { light: 'light vehicles', heavy: 'heavy vehicles', non_road: 'non-road equipment' }
+const FLEET_PREFIX: Record<FleetType, string> = { light: 'light', heavy: 'heavy', non_road: 'nonroad' }
+export const FLEET_FIELDS: readonly FleetField[] = (['light', 'heavy', 'non_road'] as const).flatMap(type =>
+  (['petrol', 'diesel'] as const).map(fuel => ({
+    type, fuel,
+    amount: `${FLEET_PREFIX[type]}_${fuel}_amount` as keyof Location,
+    unit: `${FLEET_PREFIX[type]}_${fuel}_unit` as keyof Location,
+    typeSwitch: FLEET_TYPE_SWITCH[type],
+    source: `${fuel === 'petrol' ? 'Petrol' : 'Diesel'} (${FLEET_TYPE_WORDS[type]})`,
+    name: `${fuel} in ${FLEET_TYPE_WORDS[type]}`,
+    legacyKey: fuel === 'petrol' ? 'gasoline' as const : 'diesel_mobile' as const,
+  })))
+const fleetNum = (loc: Location, f: FleetField): number => Number((loc as unknown as Record<string, unknown>)[f.amount] ?? 0) || 0
+const fleetUnit = (loc: Location, f: FleetField): string => String((loc as unknown as Record<string, unknown>)[f.unit] ?? 'gallons')
+/** FI9: the fleet field's figure counts only under the stream switch and its type tick. */
+const fleetOn = (loc: Location, f: FleetField): boolean =>
+  loc.has_mobile && (loc as unknown as Record<string, unknown>)[f.typeSwitch] === true
+
+/** FI9: the legacy fleet figures still waiting for a vehicle type, in field order. */
+export function legacyFleetFigures(loc: Location): { field: 'gasoline_amount' | 'diesel_mobile_amount'; fuel: FleetFuel; value: number; unit: string }[] {
+  const out: { field: 'gasoline_amount' | 'diesel_mobile_amount'; fuel: FleetFuel; value: number; unit: string }[] = []
+  if (loc.gasoline_amount > 0) out.push({ field: 'gasoline_amount', fuel: 'petrol', value: loc.gasoline_amount, unit: loc.gasoline_unit })
+  if (loc.diesel_mobile_amount > 0) out.push({ field: 'diesel_mobile_amount', fuel: 'diesel', value: loc.diesel_mobile_amount, unit: loc.diesel_mobile_unit })
+  return out
+}
+
+/**
+ * FI9 (R16 choice 2): the customer's button, "These were {type}". Moves one legacy figure, its unit and its unit-change
+ * history to the type's field, ticks the type, and records the move with who and when. Nothing else calls it: a legacy
+ * figure is never assigned without the customer saying which type.
+ *   Refused, with the reason, where the move would lose or merge something: the target field already holds a figure,
+ * or documents back the legacy field (they move with their proposals, FI9 diff 4).
+ */
+export function assignLegacyFleet(
+  loc: Location, from: 'gasoline_amount' | 'diesel_mobile_amount', to: FleetType, at: string, by: FleetAssignment['by'],
+): { ok: true; location: Location } | { ok: false; reason: 'nothing_to_move' | 'target_has_figure' | 'documents_back_field' } {
+  const fuel: FleetFuel = from === 'gasoline_amount' ? 'petrol' : 'diesel'
+  const target = FLEET_FIELDS.find(f => f.type === to && f.fuel === fuel)!
+  const value = loc[from]
+  if (!(value > 0)) return { ok: false, reason: 'nothing_to_move' }
+  if (fleetNum(loc, target) > 0) return { ok: false, reason: 'target_has_figure' }
+  if (documentsBacking(loc, from) > 0) return { ok: false, reason: 'documents_back_field' }
+  const fromUnit = from === 'gasoline_amount' ? loc.gasoline_unit : loc.diesel_mobile_unit
+  const fromUnitField = from === 'gasoline_amount' ? 'gasoline_unit' : 'diesel_mobile_unit'
+  const rekey = <T extends { field: string }>(xs: T[] | undefined, field: string, to2: string): T[] | undefined =>
+    xs?.map(x => (x.field === field ? { ...x, field: to2 } : x))
+  return { ok: true, location: {
+    ...loc,
+    has_mobile: true,
+    [target.typeSwitch]: true,
+    [target.amount]: value,
+    [target.unit]: fromUnit,
+    [from]: 0,
+    unit_changes: loc.unit_changes?.map(c => (c.field === from ? { ...c, field: String(target.amount) }
+      : c.field === fromUnitField ? { ...c, field: String(target.unit) } : c)),
+    manual_overrides: rekey(loc.manual_overrides, from, String(target.amount)),
+    fleet_assignments: [...(loc.fleet_assignments ?? []), { from, to, field: String(target.amount), value, unit: fromUnit, at, by }],
+  } as Location }
 }
 
 /** FI5: one unit change on a typed figure. `field` is the figure's field (natural_gas_amount, ...). */
@@ -2123,6 +2227,11 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   has_fuel_oil_distillate: false, fuel_oil_distillate_amount: 0, fuel_oil_distillate_unit: 'gallons',
   has_fuel_oil_residual: false, fuel_oil_residual_amount: 0, fuel_oil_residual_unit: 'gallons',
   has_mobile: false, gasoline_amount: 0, gasoline_unit: 'gallons', diesel_mobile_amount: 0, diesel_mobile_unit: 'gallons',
+  // FI9: the three type ticks start unticked (no default for a type-dependent choice); the six figures start at 0.
+  fleet_light: false, fleet_heavy: false, fleet_nonroad: false,
+  light_petrol_amount: 0, light_petrol_unit: 'gallons', light_diesel_amount: 0, light_diesel_unit: 'gallons',
+  heavy_petrol_amount: 0, heavy_petrol_unit: 'gallons', heavy_diesel_amount: 0, heavy_diesel_unit: 'gallons',
+  nonroad_petrol_amount: 0, nonroad_petrol_unit: 'gallons', nonroad_diesel_amount: 0, nonroad_diesel_unit: 'gallons',
   uses_ammonia: false, has_hfc_refrigerants: false, refrigerant_type: 'r410a', refrigerant_purchased_kg: 0,
   electricity_kwh: 0, grid_region: 'us_average', renewable_electricity_kwh: 0, residual_region: '',
   // Supplier fields deliberately ABSENT rather than 0: absent means "not supplied", and 0 would be a
@@ -2260,6 +2369,13 @@ export const UNIT_FIELDS = [
   { field: 'fuel_oil_residual_unit', label: 'heavy fuel oil',         options: fuelOilUnitOptions, list: 'fuelOilUnitOptions', amount: 'fuel_oil_residual_amount' },
   { field: 'gasoline_unit',          label: 'petrol (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'gasoline_amount' },
   { field: 'diesel_mobile_unit',     label: 'diesel (mobile)',        options: liquidUnitOptions,  list: 'liquidUnitOptions',  amount: 'diesel_mobile_amount' },
+  // FI9: the six fleet fields (FLEET_FIELDS), the same liquid units as the two they replace.
+  { field: 'light_petrol_unit',      label: 'petrol in light vehicles',      options: liquidUnitOptions, list: 'liquidUnitOptions', amount: 'light_petrol_amount' },
+  { field: 'light_diesel_unit',      label: 'diesel in light vehicles',      options: liquidUnitOptions, list: 'liquidUnitOptions', amount: 'light_diesel_amount' },
+  { field: 'heavy_petrol_unit',      label: 'petrol in heavy vehicles',      options: liquidUnitOptions, list: 'liquidUnitOptions', amount: 'heavy_petrol_amount' },
+  { field: 'heavy_diesel_unit',      label: 'diesel in heavy vehicles',      options: liquidUnitOptions, list: 'liquidUnitOptions', amount: 'heavy_diesel_amount' },
+  { field: 'nonroad_petrol_unit',    label: 'petrol in non-road equipment',  options: liquidUnitOptions, list: 'liquidUnitOptions', amount: 'nonroad_petrol_amount' },
+  { field: 'nonroad_diesel_unit',    label: 'diesel in non-road equipment',  options: liquidUnitOptions, list: 'liquidUnitOptions', amount: 'nonroad_diesel_amount' },
   { field: 'purchased_steam_unit',   label: 'purchased steam',        options: steamUnitOptions,   list: 'steamUnitOptions',   amount: 'purchased_steam_mmbtu' },
 ] as const
 
@@ -3052,6 +3168,14 @@ function combustionLines(loc: Location): CombustionLine[] {
     add({ field: 'gasoline_amount', stream: 'mobile', source: 'Gasoline (mobile)', mobile: true, entered: loc.gasoline_amount, enteredUnit: loc.gasoline_unit, unitField: 'gasoline_unit', efKey: `gasoline_${lit(loc.gasoline_unit)}` })
   if (loc.has_mobile && loc.diesel_mobile_amount > 0)
     add({ field: 'diesel_mobile_amount', stream: 'mobile', source: 'Diesel (mobile)', mobile: true, entered: loc.diesel_mobile_amount, enteredUnit: loc.diesel_mobile_unit, unitField: 'diesel_mobile_unit', efKey: `diesel_mobile_${lit(loc.diesel_mobile_unit)}` })
+  // FI9 (R16): one line per vehicle type and fuel, under the stream switch and the type's tick. FI9 diff 2a prices them
+  // through the same mobile keys as the two legacy fields above, so no figure moves; diff 2b gives each its publisher's
+  // mobile row.
+  for (const f of FLEET_FIELDS) {
+    if (!fleetOn(loc, f) || !(fleetNum(loc, f) > 0)) continue
+    const unit = fleetUnit(loc, f)
+    add({ field: f.amount, stream: 'mobile', source: f.source, mobile: true, entered: fleetNum(loc, f), enteredUnit: unit, unitField: f.unit, efKey: `${f.legacyKey}_${lit(unit)}` })
+  }
   return out
 }
 
@@ -3062,6 +3186,7 @@ const LINE_UNITS: Partial<Record<keyof Location, string[]>> = {
   propane_amount: ['gallons', 'litres', 'kg'],
   diesel_stationary_amount: ['gallons', 'litres'], gasoline_amount: ['gallons', 'litres'], diesel_mobile_amount: ['gallons', 'litres'],
   fuel_oil_distillate_amount: ['gallons', 'litres', 'kg', 'tonnes'], fuel_oil_residual_amount: ['gallons', 'litres', 'kg', 'tonnes'],
+  ...Object.fromEntries(FLEET_FIELDS.map(f => [f.amount, ['gallons', 'litres']])),
 }
 
 /** FI1: the GWP a refrigerant type is held at, or null. Never 0 for a type we do not hold. */
@@ -3212,6 +3337,7 @@ const CLEARED_FIELD_STREAM: Record<string, { stream: DeclarableStream; source: s
   fuel_oil_residual_amount: { stream: 'fuel_oil_residual', source: 'Heavy fuel oil' },
   gasoline_amount: { stream: 'mobile', source: 'Gasoline (mobile)' },
   diesel_mobile_amount: { stream: 'mobile', source: 'Diesel (mobile)' },
+  ...Object.fromEntries(FLEET_FIELDS.map(f => [f.amount, { stream: 'mobile' as const, source: f.source }])),
   purchased_steam_mmbtu: { stream: 'purchased_steam', source: 'Purchased steam' },
 }
 
@@ -3306,6 +3432,7 @@ function locationHasFigures(loc: Location): boolean {
   return loc.electricity_kwh > 0 || loc.natural_gas_amount > 0 || loc.propane_amount > 0
     || loc.diesel_stationary_amount > 0 || loc.fuel_oil_distillate_amount > 0
     || loc.fuel_oil_residual_amount > 0 || loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0
+    || FLEET_FIELDS.some(f => fleetNum(loc, f) > 0)
     || loc.refrigerant_purchased_kg > 0 || loc.purchased_steam_mmbtu > 0
     || loc.renewable_electricity_kwh > 0
 }
@@ -3403,6 +3530,8 @@ const FIELD_FUEL: Record<string, string> = {
   natural_gas_amount: 'natural_gas', propane_amount: 'propane', diesel_stationary_amount: 'diesel',
   diesel_mobile_amount: 'diesel', gasoline_amount: 'gasoline', electricity_kwh: 'electricity',
   fuel_oil_distillate_amount: 'fuel_oil_distillate', fuel_oil_residual_amount: 'fuel_oil_residual',
+  // FI9: by fuel, as the legacy two are, so slices and trends stay comparable across the split.
+  ...Object.fromEntries(FLEET_FIELDS.map(f => [f.amount, f.fuel === 'petrol' ? 'gasoline' : 'diesel'])),
 }
 
 /**
@@ -3646,6 +3775,7 @@ const FIELD_STREAM: Partial<Record<keyof Location, DeclarableStream>> = {
   diesel_stationary_amount: 'diesel_stationary',
   diesel_mobile_amount: 'mobile',
   gasoline_amount: 'mobile',
+  ...Object.fromEntries(FLEET_FIELDS.map(f => [f.amount, 'mobile' as const])),
   electricity_kwh: 'electricity',
   // T10 ruling on unread uploads: "used none" is offered for every field a document type supports, so these
   // streams can be answered that way too.
@@ -3676,6 +3806,7 @@ export const FIELD_NAME: Record<string, string> = {
   fuel_oil_distillate_amount: 'heating oil', fuel_oil_residual_amount: 'heavy fuel oil',
   purchased_steam_mmbtu: 'purchased steam', refrigerant_purchased_kg: 'refrigerant',
   renewable_electricity_kwh: 'renewable electricity', biogenic_co2_mt: 'biomass',
+  ...Object.fromEntries(FLEET_FIELDS.map(f => [f.amount, f.name])),
 }
 /** "a", "a and b", "a, b and c". */
 export const listInWords = (xs: string[]): string =>
@@ -3761,10 +3892,14 @@ export const COVERAGE_MESSAGE = {
 const FIELD_SWITCH: Partial<Record<keyof Location, keyof Location>> = {
   natural_gas_amount: 'has_natural_gas', propane_amount: 'has_propane', diesel_stationary_amount: 'has_diesel_stationary',
   diesel_mobile_amount: 'has_mobile', gasoline_amount: 'has_mobile',
+  ...Object.fromEntries(FLEET_FIELDS.map(f => [f.amount, 'has_mobile'])),
 }
 /** True when the field has a "uses this fuel" switch and it is off, so the annual figure omits the field. */
 export function streamSwitchOff(loc: Location, field: keyof Location | string): boolean {
   const sw = FIELD_SWITCH[field as keyof Location]
+  // FI9: a fleet field also needs its vehicle type ticked.
+  const fleet = FLEET_FIELDS.find(f => f.amount === field)
+  if (fleet && (loc as unknown as Record<string, unknown>)[fleet.typeSwitch] !== true) return true
   return sw != null && !(loc as unknown as Record<string, unknown>)[String(sw)]
 }
 
@@ -5146,7 +5281,7 @@ function streamQuantified(loc: Location, s: DeclarableStream): boolean {
     case 'diesel_stationary': return loc.diesel_stationary_amount > 0
     case 'fuel_oil_distillate': return loc.fuel_oil_distillate_amount > 0
     case 'fuel_oil_residual': return loc.fuel_oil_residual_amount > 0
-    case 'mobile': return loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0
+    case 'mobile': return loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0 || FLEET_FIELDS.some(f => fleetNum(loc, f) > 0)
     case 'refrigerants': return loc.refrigerant_purchased_kg > 0
     case 'purchased_steam': return loc.purchased_steam_mmbtu > 0
     case 'electricity': return loc.electricity_kwh > 0

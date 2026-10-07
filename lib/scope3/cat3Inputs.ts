@@ -127,8 +127,10 @@ function declaredAndQuantified(loc: Record<string, unknown>, s: DeclarableStream
     case 'diesel_stationary': return [bool(loc.has_diesel_stationary), q((num(loc.diesel_stationary_amount) ?? 0) > 0)]
     case 'fuel_oil_distillate': return [bool(loc.has_fuel_oil_distillate), q((num(loc.fuel_oil_distillate_amount) ?? 0) > 0)]
     case 'fuel_oil_residual': return [bool(loc.has_fuel_oil_residual), q((num(loc.fuel_oil_residual_amount) ?? 0) > 0)]
+    // FI9 (R16): the six fleet fields by vehicle type count too, as the engine's streamQuantified counts them.
     case 'mobile': return [bool(loc.has_mobile),
-      q((num(loc.gasoline_amount) ?? 0) > 0 || (num(loc.diesel_mobile_amount) ?? 0) > 0)]
+      q((num(loc.gasoline_amount) ?? 0) > 0 || (num(loc.diesel_mobile_amount) ?? 0) > 0
+        || FLEET_AMOUNT_FIELDS.some(f => (num(loc[f]) ?? 0) > 0))]
     // Either refrigerant answer declares the stream; ammonia is declarable though never priced.
     case 'refrigerants': return [bool(loc.has_hfc_refrigerants) || bool(loc.uses_ammonia),
       q((num(loc.refrigerant_purchased_kg) ?? 0) > 0)]
@@ -240,12 +242,21 @@ function publisherOf(efSource: string): string | null {
  * deliberately NOT matched, because matching a string the engine has never been observed to write
  * is a guess dressed as compatibility.
  */
+// FI9 (R16): the fleet split writes six more literals (engine.ts FLEET_FIELDS): "Petrol (light vehicles)", "Petrol
+// (heavy vehicles)", "Petrol (non-road equipment)" and the same three for diesel. The three petrol literals are matched
+// exactly, and only they: 'Petrol (mobile)' stays unread (C3I-13), because the engine has never written it. The type
+// does not change Category 3: the DEFRA upstream factor is per fuel, not per vehicle.
+const FLEET_PETROL_SOURCES = new Set(['petrol (light vehicles)', 'petrol (heavy vehicles)', 'petrol (non-road equipment)'])
 function mobileStream(source: string): Cat3Stream | null {
   const s = source.toLowerCase()
-  if (s.includes('gasoline')) return 'mobile_gasoline'
+  if (s.includes('gasoline') || FLEET_PETROL_SOURCES.has(s)) return 'mobile_gasoline'
   if (s.includes('diesel')) return 'mobile_diesel'
   return null
 }
+
+/** FI9: the six fleet amount fields, mirrored from engine.ts FLEET_FIELDS (this module may not import the engine). */
+const FLEET_AMOUNT_FIELDS = ['light_petrol_amount', 'light_diesel_amount', 'heavy_petrol_amount', 'heavy_diesel_amount',
+  'nonroad_petrol_amount', 'nonroad_diesel_amount'] as const
 
 const FUEL_STREAMS: Record<string, Cat3Stream> = {
   natural_gas: 'natural_gas', propane: 'propane', diesel_stationary: 'diesel_stationary',

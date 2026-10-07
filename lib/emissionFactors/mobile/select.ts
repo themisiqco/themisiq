@@ -3,7 +3,8 @@
 // FI9 diff 1b (ruling R16 as refined 7 Oct 2026). Pure selection over the transcribed tables; nothing reads it yet.
 //
 // - Road (Light, Heavy): an optional typical model year per vehicle type. Given, the publisher's row(s) for that
-//   year; where the publisher ties no row to it, the highest row. Not given, the highest row.
+//   year; a year after the publisher's latest row, the latest row (said on the row); where the publisher ties no
+//   row to it otherwise, the highest row. Not given, the highest row.
 // - Non-road: the customer's equipment type. Rows for that type only; the highest within it where the publisher splits
 //   further (engine size, stroke). A publisher with no sector split serves every type from the same rows.
 // - "Highest" is the combined CH4 and N2O in CO2-e on AR5, fixed, so a site's row does not move when the reporting
@@ -82,6 +83,16 @@ function pick(pub: MobilePublisher, rows: MobileGasRow[], q: MobileQuery): { row
       return { row, reason: `${lead}Typical model year ${y}: ${pub.publisher} ties ${tied.length} rows to it, so the highest of them is used.` }
     }
     if (pool.length === 1) return { row: pool[0], reason: `${lead}${pub.publisher} prints one row for ${what}; it is not split by model year.` }
+    // R16 (Lisa, 7 Oct 2026): a year after the publisher's latest row takes the latest row, and says so (EPA's
+    // Tables 3 and 4 end at 2022). Only where every dated row ends before the year; an open-ended row would be tied.
+    const dated = pool.filter(r => r.years)
+    if (dated.length > 0 && dated.every(r => r.years!.to !== null && r.years!.to < y)) {
+      const lastTo = Math.max(...dated.map(r => r.years!.to as number))
+      const latest = dated.filter(r => r.years!.to === lastTo)
+      const row = highestRow(latest)!
+      const last = (row.detail ?? '').replace(/^Model year /, '') || String(lastTo)
+      return { row, reason: `${lead}Model year ${y} is after the latest published row (${last}), so the ${last} row is used.` }
+    }
     return { row: highestRow(pool)!, reason: `${lead}${pub.publisher} ties no row to model year ${y}, so the highest published row for ${what} is used.` }
   }
   if (pool.length === 1) return { row: pool[0], reason: `${lead}${pub.publisher} prints one row for ${what}.` }

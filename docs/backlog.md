@@ -1958,3 +1958,11 @@ and Latin-1, so Polish, Czech and Turkish letters (Ł, č, ş) print without the
 check page names each affected field before export (`scanUndrawable` in `lib/s211/exportCheck.ts`).
 Keep the Deals report on the current subset: register the wider one under its own family name for the
 S-211 renderer only, and give it its own coverage list and test beside `lib/pdf/charisCoverage.ts`.
+
+## GHG fleet fuel: one fuel statement split across several vehicle types (FI9, R16 choice 4)
+
+Not supported now (Lisa, 7 Oct 2026). A fleet-fuel document's reading is assigned to ONE vehicle type (Light, Heavy or
+Non-road) at review (FI9 diff 4). A fuel-card statement covering several types is uploaded once per type, or the
+figures are typed per type with the documents kept as evidence (T10 override). Splitting one reading's quantity
+between types needs a ratio only the customer can give, and a split editor (who, when, the shares, and coverage per
+share) is its own design. Design note: docs/review/fi9-fleet-design.md, section 3 and open choice 4.

@@ -330,9 +330,15 @@ describe('FI9: shape and R16 selection (refined 7 Oct 2026)', () => {
     expect(y2015.reason).toBe('Typical model year 2015: US EPA ties 2 rows to it, so the highest of them is used.')
     expect(row(sel(EPA_MOBILE_2025, { type: 'heavy', fuel: 'diesel', modelYear: 2000 }))).toBe('Medium- and Heavy-Duty Vehicles | Model year 1960-2006')
     expect(row(sel(EPA_MOBILE_2025, { type: 'heavy', fuel: 'petrol', modelYear: 1979 }))).toBe('Gasoline Heavy-Duty Vehicles | Model year \u22641980')
-    // Table 3's last row is 2022: a later year reaches no row, and takes the highest (the record flags this).
+    // Table 3's last row is 2022: a later year takes the latest row and says so (R16, Lisa, 7 Oct 2026).
     const y2024 = sel(EPA_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2024 })!
-    expect(y2024.reason).toBe('US EPA ties no row to model year 2024, so the highest published row for light vehicles is used.')
+    expect(y2024.reason).toBe('Model year 2024 is after the latest published row (2022), so the 2022 row is used.')
+    expect(y2024.row.detail).toBe('Model year 2022')
+    // Diesel's latest rows are a range: the range is named.
+    const d2024 = sel(EPA_MOBILE_2025, { type: 'light', fuel: 'diesel', modelYear: 2024 })!
+    expect(row(d2024)).toBe('Light-Duty Trucks | Model year 2007-2022')
+    expect(d2024.reason).toBe('Model year 2024 is after the latest published row (2007-2022), so the 2007-2022 row is used.')
+    // A year inside the range that no row ties still takes the highest (ECCC light 2000, below).
     const eq: [string, string, string][] = [
       ['industrial_commercial', 'Industrial/Commercial Equipment | Diesel', 'Industrial/Commercial Equipment | Gasoline (4 stroke)'],
       ['construction_mining', 'Construction/Mining Equipment | Diesel Equipment', 'Construction/Mining Equipment | Gasoline (4 stroke)'],
@@ -426,10 +432,11 @@ describe('FI9: shape and R16 selection (refined 7 Oct 2026)', () => {
     expect(road.reason).toMatch(/^IPCC 2006 default for CH4 and N2O; DCCEEW National Greenhouse Accounts Factors publishes no road factor for petrol\. /)
   })
 
-  it('nothing outside this folder reads it yet (FI9 diff 1), and no file carries an em dash', () => {
+  it('the engine reads only the types from this folder until FI9 diff 2b, and no file carries an em dash', () => {
     const dir = __dirname
     for (const f of readdirSync(dir)) expect(readFileSync(join(dir, f), 'utf8'), f).not.toContain('\u2014')
     const engine = readFileSync(join(dir, '..', '..', 'ghg', 'engine.ts'), 'utf8')
-    expect(engine).not.toMatch(/emissionFactors\/mobile\//)
+    const imports = engine.match(/^import .*emissionFactors\/mobile\/.*$/gm) ?? []
+    expect(imports).toEqual(["import type { EquipmentType, FleetType } from '../emissionFactors/mobile/types'"])
   })
 })

@@ -50,6 +50,14 @@ export interface B3Location {
   gasoline_unit: "gallons" | "litres";
   diesel_mobile_amount: number;
   diesel_mobile_unit: "gallons" | "litres";
+  // FI9 (R16): fleet fuel by vehicle type. Optional: locations saved before FI9 carry none of them.
+  fleet_light?: boolean; fleet_heavy?: boolean; fleet_nonroad?: boolean;
+  light_petrol_amount?: number; light_petrol_unit?: "gallons" | "litres";
+  light_diesel_amount?: number; light_diesel_unit?: "gallons" | "litres";
+  heavy_petrol_amount?: number; heavy_petrol_unit?: "gallons" | "litres";
+  heavy_diesel_amount?: number; heavy_diesel_unit?: "gallons" | "litres";
+  nonroad_petrol_amount?: number; nonroad_petrol_unit?: "gallons" | "litres";
+  nonroad_diesel_amount?: number; nonroad_diesel_unit?: "gallons" | "litres";
   has_purchased_steam: boolean;
   purchased_steam_mmbtu: number;
   electricity_kwh: number;
@@ -93,6 +101,21 @@ function locationFuelMWh(loc: B3Location): number {
   }
   if (loc.has_mobile && loc.diesel_mobile_amount > 0) {
     mwh += fuelEnergyMWh(`diesel_mobile_${galSuffix(loc.diesel_mobile_unit)}`, loc.diesel_mobile_amount);
+  }
+  // FI9 (R16): the six fleet fields, each under the stream switch and its vehicle type's tick, as the engine prices
+  // them. Energy content is per fuel, not per vehicle type, so each takes its fuel's key.
+  const fleet: [boolean | undefined, number | undefined, "gallons" | "litres" | undefined, "gasoline" | "diesel_mobile"][] = [
+    [loc.fleet_light, loc.light_petrol_amount, loc.light_petrol_unit, "gasoline"],
+    [loc.fleet_light, loc.light_diesel_amount, loc.light_diesel_unit, "diesel_mobile"],
+    [loc.fleet_heavy, loc.heavy_petrol_amount, loc.heavy_petrol_unit, "gasoline"],
+    [loc.fleet_heavy, loc.heavy_diesel_amount, loc.heavy_diesel_unit, "diesel_mobile"],
+    [loc.fleet_nonroad, loc.nonroad_petrol_amount, loc.nonroad_petrol_unit, "gasoline"],
+    [loc.fleet_nonroad, loc.nonroad_diesel_amount, loc.nonroad_diesel_unit, "diesel_mobile"],
+  ];
+  for (const [ticked, amount, unit, fuel] of fleet) {
+    if (loc.has_mobile && ticked === true && (amount ?? 0) > 0) {
+      mwh += fuelEnergyMWh(`${fuel}_${galSuffix(unit ?? "gallons")}`, amount as number);
+    }
   }
   if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
     mwh += fuelEnergyMWh("steam_mmbtu", loc.purchased_steam_mmbtu);

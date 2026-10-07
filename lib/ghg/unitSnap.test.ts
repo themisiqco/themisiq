@@ -88,6 +88,9 @@ describe('a stored unit is always one its country offers', () => {
     expect(uk).toEqual({
       natural_gas_unit: 'kwh', propane_unit: 'litres', diesel_stationary_unit: 'litres',
       fuel_oil_distillate_unit: 'litres', fuel_oil_residual_unit: 'litres', gasoline_unit: 'litres', diesel_mobile_unit: 'litres',
+      // FI9: the six fleet unit fields snap too, to the first unit GB offers.
+      light_petrol_unit: 'litres', light_diesel_unit: 'litres', heavy_petrol_unit: 'litres', heavy_diesel_unit: 'litres',
+      nonroad_petrol_unit: 'litres', nonroad_diesel_unit: 'litres',
       // kWh, not GJ, since 14 Aug 2026: DEFRA publishes district heat per kWh and UK heat networks
       // bill in kWh by law, so kWh leads steamUnitOptions('GB') and opts[0] is what an unofferable
       // unit snaps to. GJ is still offered — see the next test, which pins that a STORED GJ figure is

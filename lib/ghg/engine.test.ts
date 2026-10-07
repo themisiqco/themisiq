@@ -6434,3 +6434,98 @@ describe('FI10. NZ use class on every row', () => {
     expect(page).not.toContain('Advanced: change use-class')
   })
 })
+
+// ── FI9 DIFF 2a (ruling R16): THE FLEET FIELDS AND MAPS ───────────────────────────────────────────────
+// The six fleet fields join every map a field passes through, and price through the same mobile keys as the legacy
+// two, so no figure moves in this diff (diff 2b gives each its publisher's mobile row). The legacy figures are moved
+// only by the customer's button (assignLegacyFleet).
+import {
+  FLEET_FIELDS, assignLegacyFleet, legacyFleetFigures, UNIT_FIELDS as FI9_UNIT_FIELDS, FIELD_NAME as FI9_FIELD_NAME,
+  streamSwitchOff as fi9StreamSwitchOff, changeUnit as fi9ChangeUnit, applyUnitOutcomes as fi9ApplyUnitOutcomes,
+} from './engine';
+import { buildB3Energy } from '../vsme/b3Energy';
+
+describe('FI9 diff 2a: fleet fields by vehicle type (R16)', () => {
+  const BY = { userId: 'u1', email: 'a@b.co' };
+  const fleet = (o: Partial<Location>): Location => loc({ country: 'GB', grid_region: 'UK', has_mobile: true, ...o });
+
+  it('six fields, one per vehicle type and fuel, each in every map', () => {
+    expect(FLEET_FIELDS.map(f => f.amount)).toEqual(['light_petrol_amount', 'light_diesel_amount', 'heavy_petrol_amount',
+      'heavy_diesel_amount', 'nonroad_petrol_amount', 'nonroad_diesel_amount']);
+    expect(FLEET_FIELDS.map(f => f.source)).toEqual(['Petrol (light vehicles)', 'Diesel (light vehicles)', 'Petrol (heavy vehicles)',
+      'Diesel (heavy vehicles)', 'Petrol (non-road equipment)', 'Diesel (non-road equipment)']);
+    const e = emptyLocation('x', 'X') as unknown as Record<string, unknown>;
+    for (const f of FLEET_FIELDS) {
+      expect(FI9_UNIT_FIELDS.some(u => u.amount === f.amount && u.field === f.unit), String(f.amount)).toBe(true);
+      expect(FI9_FIELD_NAME[String(f.amount)], String(f.amount)).toBe(f.name);
+      expect([e[f.amount], e[f.unit], e[f.typeSwitch]], String(f.amount)).toEqual([0, 'gallons', false]);
+    }
+  });
+
+  it('a fleet figure prices exactly as the legacy field did (no figure moves in 2a), only under its type tick', () => {
+    const legacy = calcLocation(fleet({ diesel_mobile_amount: 1000, diesel_mobile_unit: 'litres' }), 'AR6', 2026);
+    const split = calcLocation(fleet({ fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'AR6', 2026);
+    expect(split.s1_mobile).toBeCloseTo(legacy.s1_mobile, 12);
+    expect(split.s1_mobile).toBeGreaterThan(0);
+    // Not ticked, or the stream switched off: no line and nothing priced.
+    expect(calcLocation(fleet({ light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'AR6', 2026).s1_mobile).toBe(0);
+    expect(calcLocation(fleet({ has_mobile: false, fleet_light: true, light_diesel_amount: 1000 }), 'AR6', 2026).s1_mobile).toBe(0);
+    const rows = buildWorkings([fleet({ fleet_heavy: true, heavy_petrol_amount: 50, heavy_petrol_unit: 'litres' })], 'AR6', 2026)
+      .filter(r => r.stream === 'mobile');
+    expect(rows.map(r => [r.source, r.activity_data, r.activity_unit])).toEqual([['Petrol (heavy vehicles)', 50, 'litres']]);
+  });
+
+  it('the switch, the declarations gate and a unit change treat the fleet fields like the legacy two', () => {
+    const l = fleet({ fleet_nonroad: true, nonroad_diesel_amount: 10 });
+    expect(fi9StreamSwitchOff(l, 'nonroad_diesel_amount')).toBe(false);
+    expect(fi9StreamSwitchOff({ ...l, fleet_nonroad: false }, 'nonroad_diesel_amount')).toBe(true);
+    expect(fi9StreamSwitchOff({ ...l, has_mobile: false }, 'nonroad_diesel_amount')).toBe(true);
+    // A ticked figure answers the mobile stream: it is not reported as declared and unquantified.
+    const undeclared = findUndeclaredStreams([{ ...l, id: 'n1', stream_attestations: DECLARABLE_STREAMS.filter(s => s !== 'mobile')
+      .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })) } as Location]);
+    expect(undeclared.filter(u => u.stream === 'mobile')).toEqual([]);
+    // FI5: 100 US gallons to litres converts exactly and is recorded.
+    const o = fi9ChangeUnit('light_petrol_amount', 100, 'gallons', 'litres');
+    const next = fi9ApplyUnitOutcomes(fleet({ fleet_light: true, light_petrol_amount: 100 }), { light_petrol_unit: o }, '2026-10-07T00:00:00Z', BY);
+    expect(next.light_petrol_amount).toBeCloseTo(378.5411784, 9);
+    expect(next.unit_changes?.at(-1)).toMatchObject({ field: 'light_petrol_amount', from: 'gallons', to: 'litres', factor: 3.785411784 });
+  });
+
+  it('legacy figures are listed, and move only by the customer\'s button, with who and when', () => {
+    const before = fleet({ gasoline_amount: 200, gasoline_unit: 'litres', diesel_mobile_amount: 0 });
+    expect(legacyFleetFigures(before)).toEqual([{ field: 'gasoline_amount', fuel: 'petrol', value: 200, unit: 'litres' }]);
+    const moved = assignLegacyFleet(before, 'gasoline_amount', 'light', '2026-10-07T00:00:00Z', BY);
+    expect(moved.ok).toBe(true);
+    const after = (moved as { ok: true; location: Location }).location;
+    expect([after.gasoline_amount, after.light_petrol_amount, after.light_petrol_unit, after.fleet_light]).toEqual([0, 200, 'litres', true]);
+    expect(after.fleet_assignments).toEqual([{ from: 'gasoline_amount', to: 'light', field: 'light_petrol_amount', value: 200,
+      unit: 'litres', at: '2026-10-07T00:00:00Z', by: BY }]);
+    expect(legacyFleetFigures(after)).toEqual([]);
+    // In 2a the move does not change the figure: the same mobile key prices it.
+    expect(calcLocation(after, 'AR6', 2026).s1_mobile).toBeCloseTo(calcLocation(before, 'AR6', 2026).s1_mobile, 12);
+    // Refused, never merged: the target already holds a figure, or there is nothing to move.
+    expect(assignLegacyFleet({ ...before, light_petrol_amount: 5, fleet_light: true }, 'gasoline_amount', 'light', 't', BY))
+      .toEqual({ ok: false, reason: 'target_has_figure' });
+    expect(assignLegacyFleet(before, 'diesel_mobile_amount', 'heavy', 't', BY)).toEqual({ ok: false, reason: 'nothing_to_move' });
+    // The unit-change history moves with the figure.
+    const withChange = { ...before, unit_changes: [{ field: 'gasoline_amount', from: 'gallons', to: 'litres', factor: 3.785411784,
+      valueBefore: 52.834, valueAfter: 200, at: 't0', by: BY }] } as Location;
+    const m2 = assignLegacyFleet(withChange, 'gasoline_amount', 'heavy', 't1', BY) as { ok: true; location: Location };
+    expect(m2.location.unit_changes?.[0].field).toBe('heavy_petrol_amount');
+  });
+
+  it('Category 3 reads a fleet row as its fuel, and VSME B3 counts the fleet fields', () => {
+    const l = { ...fleet({ fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' }), id: 'c1', name: 'Depot',
+      stream_attestations: DECLARABLE_STREAMS.filter(s => s !== 'mobile').map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })) } as Location;
+    const read = cat3InputsFrom(buildWorkings([l], 'AR6', 2026, [], 12), [l]);
+    expect(read.inputs!.rows.filter(r => r.stream === 'mobile_diesel').map(r => [r.activity, r.unit])).toEqual([[1000, 'litres']]);
+    const p = { ...l, fleet_light: true, light_diesel_amount: 0, light_petrol_amount: 1000, light_petrol_unit: 'litres' as const } as Location;
+    const readP = cat3InputsFrom(buildWorkings([p], 'AR6', 2026, [], 12), [p]);
+    expect(readP.inputs!.rows.filter(r => r.stream === 'mobile_gasoline')).toHaveLength(1);
+    const asLegacy = buildB3Energy([fleet({ diesel_mobile_amount: 1000, diesel_mobile_unit: 'litres' }) as never]).totalMWh;
+    const asSplit = buildB3Energy([fleet({ fleet_heavy: true, heavy_diesel_amount: 1000, heavy_diesel_unit: 'litres' }) as never]).totalMWh;
+    expect(asSplit).toBeGreaterThan(0);
+    expect(asSplit).toBeCloseTo(asLegacy, 12);
+    expect(buildB3Energy([fleet({ heavy_diesel_amount: 1000 }) as never]).totalMWh).toBe(0);   // not ticked
+  });
+});

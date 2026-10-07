@@ -60,7 +60,7 @@ import {
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  periodFromYearAndEnd,
+  periodFromYearAndEnd, FLEET_FIELDS,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -132,6 +132,10 @@ const fuelTypesPresent = (locs: Location[]): string[] => {
     if (l.has_fuel_oil_residual) present.add('fuel_oil_residual')
     if (l.has_mobile && l.gasoline_amount > 0) present.add('gasoline')
     if (l.has_mobile && l.diesel_mobile_amount > 0) present.add('diesel_mobile')
+    // FI9: the fleet split reports by fuel, under the same two names, so trends stay comparable across it.
+    for (const f of FLEET_FIELDS) {
+      if (l.has_mobile && l[f.typeSwitch] === true && Number(l[f.amount] ?? 0) > 0) present.add(f.fuel === 'petrol' ? 'gasoline' : 'diesel_mobile')
+    }
     if (l.electricity_kwh > 0) present.add('electricity')
     if (l.has_purchased_steam) present.add('steam')
   }
@@ -500,6 +504,7 @@ function locationHasEnteredFigures(loc: Location): boolean {
   return loc.electricity_kwh > 0 || loc.natural_gas_amount > 0 || loc.propane_amount > 0
     || loc.diesel_stationary_amount > 0 || loc.fuel_oil_distillate_amount > 0
     || loc.fuel_oil_residual_amount > 0 || loc.gasoline_amount > 0 || loc.diesel_mobile_amount > 0
+    || FLEET_FIELDS.some(f => Number(loc[f.amount] ?? 0) > 0)
     || loc.refrigerant_purchased_kg > 0 || loc.purchased_steam_mmbtu > 0
     || loc.renewable_electricity_kwh > 0
 }
