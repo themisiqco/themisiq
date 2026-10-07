@@ -1,3 +1,8 @@
+// FI9 (7 Oct 2026): SUPERSEDED BY lib/emissionFactors/mobile/ (one file per publisher, keyed by edition), and still
+// read by nothing. Every value below was checked against the local sources and matches; the ECCC citation does not:
+// the edition checked is NIR 2025 (1990-2023), where Table A6.1-15 is on p. 253, not NIR 2026 p. 541 as cited below.
+// See docs/review/mobile-factors.md.
+//
 // ── CANADIAN MOBILE COMBUSTION FACTORS ───────────────────────────────────────────────────────────
 //
 // NOT WIRED. Nothing in the engine reads this file yet. It exists because lib/ghg/engine.ts carries
