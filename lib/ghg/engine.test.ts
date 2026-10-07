@@ -1359,7 +1359,7 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
     expect(row('AU', 'AR6').result_tco2e).toBeCloseTo(2.71, 9);          // 1000 L x 2.710 kg/L
     expect(row('GB', 'AR6').result_tco2e).toBeCloseTo(2.58354, 9);   // DEFRA 2026
     expect(row('NZ', 'AR6').result_tco2e).toBeCloseTo(2.6759, 9);
-    expect(row('US', 'AR6').result_tco2e).toBeCloseTo(10.2414216, 9);
+    expect(row('US', 'AR6').result_tco2e).toBeCloseTo(10.244058, 9);
   });
 
   it('X4 every table is UNIFORM in its storage style — the shape test cannot drift from the tables', () => {
@@ -1424,7 +1424,7 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
     expect(au.emission_factor, 'a zero that means "already counted" must not print as a measured zero')
       .not.toContain('CH4 0');
     // Gas-split rows keep the split verbatim — the verifier path depends on it.
-    expect(row('US', 'AR6').emission_factor).toBe('CO2 10.20648, CH4 0.000414, N2O 0.0000828 kg/gallons');
+    expect(row('US', 'AR6').emission_factor).toBe('CO2 10.21, CH4 0.00041, N2O 0.00008 kg/gallons');
   });
 });
 
@@ -1626,7 +1626,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
   const grade = (table: Record<string, any>, g: 'distillate' | 'residual') => table[`fuel_oil_${g}_litre`] ?? table[`fuel_oil_${g}_gallon`];
 
   it('Z1 the legacy fuel_oil_gallon survives only in the US table, the one whose publisher prints per gallon (FI2)', () => {
-    expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
     // FI2 diff 2 (ruling R5): the CA, UK and EU copies were pre-multiplied from per-litre figures, and are gone.
     for (const t of [EF_CA, EF_UK, EF_EU, EF_AU, (EF_NZ as any).commercial]) expect((t as any).fuel_oil_gallon).toBeUndefined();
   });
@@ -1847,23 +1847,17 @@ describe('Z. fuel oil grades are seeded per table', () => {
     }
   });
 
-  it('Z17 the US grades derive from EPA heat content x factor, at full precision', () => {
+  it('Z17 the US grades are EPA Table 1\'s printed per-gallon column (FI2 diff 3, ruling R5)', () => {
     const ef = EF as any;
-    // Distillate No.2 — 0.138 mmBtu/gal x (73.96 CO2, 3 g CH4, 0.6 g N2O). ALL THREE reproduce, which
-    // is what ESTABLISHED the legacy key's grade rather than assuming it.
-    expect(ef.fuel_oil_distillate_gallon.co2).toBeCloseTo(0.138 * 73.96, 10);
-    expect(ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.138 * 3 / 1000, 12);
-    expect(ef.fuel_oil_distillate_gallon.n2o).toBeCloseTo(0.138 * 0.6 / 1000, 12);
+    // Distillate No. 2: 10.21 kg CO2, 0.41 g CH4, 0.08 g N2O per gallon. The legacy key carries the same row.
+    expect(ef.fuel_oil_distillate_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
     expect(ef.fuel_oil_distillate_gallon, 'legacy key IS Distillate No.2').toEqual(ef.fuel_oil_gallon);
-    // Residual No.6 — 0.15 mmBtu/gal x (75.10 CO2, 3 g CH4, 0.6 g N2O).
-    expect(ef.fuel_oil_residual_gallon.co2).toBeCloseTo(0.15 * 75.10, 10);
-    expect(ef.fuel_oil_residual_gallon.ch4).toBeCloseTo(0.15 * 3 / 1000, 12);
-    expect(ef.fuel_oil_residual_gallon.n2o).toBeCloseTo(0.15 * 0.6 / 1000, 12);
-    // NOT EPA's rounded display column — 11.27 sits 0.005 kg/gal from our own stated arithmetic, and
-    // the workings table exists so a verifier can reproduce the row they are shown.
-    expect(ef.fuel_oil_residual_gallon.co2, 'carry the derivation, not the rounded column').not.toBe(11.27);
-    // EPA publishes the same CH4/N2O per mmBtu for both grades, so they differ only by heat content.
-    expect(ef.fuel_oil_residual_gallon.ch4 / ef.fuel_oil_distillate_gallon.ch4).toBeCloseTo(0.15 / 0.138, 9);
+    // Residual No. 6: 11.27 kg CO2, 0.45 g CH4, 0.09 g N2O per gallon. EPA's printed column, not 0.15 x 75.10 = 11.265.
+    expect(ef.fuel_oil_residual_gallon).toEqual({ co2: 11.27, ch4: 0.00045, n2o: 0.00009 });
+    expect(ef.fuel_oil_residual_gallon.co2, 'the printed column, not the derivation').not.toBe(11.265);
+    // Each printed value is EPA's own heat content x per-mmBtu factor, to the printed precision.
+    expect(Math.abs(ef.fuel_oil_distillate_gallon.co2 - 0.138 * 73.96)).toBeLessThanOrEqual(0.005);
+    expect(Math.abs(ef.fuel_oil_residual_gallon.co2 - 0.15 * 75.10)).toBeLessThanOrEqual(0.005 + 1e-12);
   });
 
   it('Z18 both grades price and emit rows independently, and a site can burn both', () => {
@@ -1876,10 +1870,10 @@ describe('Z. fuel oil grades are seeded per table', () => {
     const rows = (buildWorkings([both], 'AR6', 2025, [], 12) as any[]).filter(r => !r.declaration && String(r.stream).startsWith('fuel_oil'));
     expect(rows, 'two priced rows, one per grade').toHaveLength(2);
     expect(rows.map(r => r.source).sort()).toEqual(['Heating oil', 'Heavy fuel oil']);
-    // EPA distillate 10.2414216 vs residual 11.28942 per gallon at AR6.
+    // EPA Table 1 per gallon at AR6 (FI2 diff 3): distillate 10.244058, residual 11.30798.
     const dist = rows.find(r => r.stream === 'fuel_oil_distillate');
     const resid = rows.find(r => r.stream === 'fuel_oil_residual');
-    expect(dist.result_tco2e).toBeCloseTo(10.2414216, 9);
+    expect(dist.result_tco2e).toBeCloseTo(10.244058, 9);
     expect(resid.result_tco2e, 'residual is the heavier oil').toBeGreaterThan(dist.result_tco2e);
     // The location total is the sum of the two, and the per-fuel breakdown keys them apart.
     const c = calcLocation(both, 'AR6', 2025);
@@ -1927,27 +1921,29 @@ describe('Z. fuel oil grades are seeded per table', () => {
 describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it', () => {
   const L_PER_GAL = 3.785411784;
 
-  it('AA1 propane_gallon and propane_litre equal their derivations exactly', () => {
-    // 0.091 mmBtu/gal x 62.87 kg CO2/mmBtu. toBeCloseTo(10) rather than toBe, because the product is
-    // computed in floating point here and stored as a decimal literal there.
-    expect(EF.propane_gallon.co2, '0.091 x 62.87').toBeCloseTo(0.091 * 62.87, 10);
-    expect(EF.propane_gallon.co2, 'the stored literal').toBe(5.72117);
+  it('AA1 propane_gallon is EPA\'s printed Propane column, and propane_litre converts from it exactly', () => {
+    // FI2 diff 3 (ruling R5): Table 1's per-gallon column for Propane, 5.72 kg CO2, 0.27 g CH4, 0.05 g N2O, in place
+    // of the full-precision 0.091 x 62.87 = 5.72117. The printed value is that product to two decimals.
+    expect(EF.propane_gallon).toEqual({ co2: 5.72, ch4: 0.00027, n2o: 0.00005 });
+    expect(EF.propane_gallon.co2, '0.091 x 62.87, as printed').toBeCloseTo(0.091 * 62.87, 2);
     // FI2 diff 2 (ruling R5): no stored per-litre key. Litres convert exactly from EPA's per-gallon figure.
     expect((EF as any).propane_litre, 'the pre-multiplied 1.51137 is gone').toBeUndefined();
-    expect(pickEF(loc({ country: 'US' }), 'propane_litre').factor.co2, '5.72117 / L_PER_GAL, exactly').toBeCloseTo(5.72117 / L_PER_GAL, 12);
+    expect(pickEF(loc({ country: 'US' }), 'propane_litre').factor.co2, '5.72 / L_PER_GAL, exactly').toBeCloseTo(5.72 / L_PER_GAL, 12);
   });
 
   it('AA2 THE OLD AND NEW VALUES, PINNED — this moved a live customer figure', () => {
     // US propane Scope 1 rises 1.88% on unchanged consumption. Stored inventories do not move
     // (workings is a snapshot), so a customer's next inventory differs from their last by this.
-    const OLD_GALLON = 5.61561, NEW_GALLON = 5.72117;
+    // FI2 diff 3: the corrected value is now EPA's printed 5.72; the size of the 13 Aug correction is still measured
+    // against the full-precision 5.72117 it was made to.
+    const OLD_GALLON = 5.61561, NEW_GALLON = 5.72117, PRINTED = 5.72;
     const OLD_LITRE = 1.48349;
 
-    expect(EF.propane_gallon.co2).toBe(NEW_GALLON);
+    expect(EF.propane_gallon.co2).toBe(PRINTED);
     expect(EF.propane_gallon.co2, 'the LPG-derived value must not come back').not.toBe(OLD_GALLON);
     // FI2 diff 2: the per-litre figure is the exact conversion of NEW_GALLON (1.5113732…, was the stored 1.51137).
     const perLitre = pickEF(loc({ country: 'US' }), 'propane_litre').factor.co2;
-    expect(perLitre).toBeCloseTo(NEW_GALLON / L_PER_GAL, 12);
+    expect(perLitre).toBeCloseTo(PRINTED / L_PER_GAL, 12);
     expect(perLitre).not.toBeCloseTo(OLD_LITRE, 3);
 
     // The size of the correction, so a silent partial revert is visible too.
@@ -1963,16 +1959,14 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     expect(l.conversion?.statement).toBe('1 US gallon = 3.785411784 litres');
   });
 
-  it('AA4 CH4 AND N2O DID NOT MOVE, and still derive from Propane\'s own heat content', () => {
-    // The defect was one column wide. If a "fix" moves these too, it has re-read the whole row from
-    // somewhere else — including, plausibly, the LPG row's 0.092 heat content.
-    expect(EF.propane_gallon.ch4, 'unchanged').toBe(0.000273);
-    expect(EF.propane_gallon.n2o, 'unchanged').toBe(0.0000546);
-    expect(EF.propane_gallon.ch4, '0.091 x 3 g/mmBtu').toBeCloseTo(0.091 * 3 / 1000, 12);
-    expect(EF.propane_gallon.n2o, '0.091 x 0.6 g/mmBtu').toBeCloseTo(0.091 * 0.6 / 1000, 12);
-    // 0.091, NOT the LPG row's 0.092 — the heat content is what the gas factors encode.
-    expect(EF.propane_gallon.ch4 / 0.003, 'implied heat content').toBeCloseTo(0.091, 12);
-    expect(EF.propane_gallon.ch4 / 0.003).not.toBeCloseTo(0.092, 4);
+  it('AA4 CH4 AND N2O are Propane\'s own printed column, not the LPG row\'s', () => {
+    // The defect was one column wide. FI2 diff 3: these are now Table 1's printed 0.27 g and 0.05 g per gallon, which
+    // are 0.091 x 3 g and 0.091 x 0.6 g to the printed precision. The LPG row's 0.092 x 3 g would print 0.28 g.
+    expect(EF.propane_gallon.ch4, 'printed 0.27 g').toBe(0.00027);
+    expect(EF.propane_gallon.n2o, 'printed 0.05 g').toBe(0.00005);
+    expect(Math.abs(EF.propane_gallon.ch4 * 1000 - 0.091 * 3), '0.091 x 3 g/mmBtu, as printed').toBeLessThanOrEqual(0.005);
+    expect(Math.abs(EF.propane_gallon.n2o * 1000 - 0.091 * 0.6), '0.091 x 0.6 g/mmBtu, as printed').toBeLessThanOrEqual(0.005);
+    expect(EF.propane_gallon.ch4, 'not the LPG row (0.092 x 3 g = 0.276 g)').not.toBe(0.00028);
   });
 
   it('AA5 THE LPG GUARD — fails loudly if the CO2 factor is ever 61.71 again', () => {
@@ -1984,9 +1978,11 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
       'exact signature of that slip, and it under-reports every US propane customer by 1.88%. This ' +
       'is NOT an edition question — see AA6.';
 
-    const impliedCo2Factor = EF.propane_gallon.co2 / (EF.propane_gallon.ch4 / 0.003);
-    expect(impliedCo2Factor, WHY).toBeCloseTo(62.87, 9);
-    expect(impliedCo2Factor, WHY).not.toBeCloseTo(61.71, 4);
+    // FI2 diff 3: the stored value is EPA's printed 5.72, so the implied factor is 62.87 to within the printed rounding
+    // (0.005 / 0.091 = 0.055 kg/mmBtu), and still more than a whole kg/mmBtu from the LPG row's 61.71.
+    const impliedCo2Factor = EF.propane_gallon.co2 / 0.091;
+    expect(Math.abs(impliedCo2Factor - 62.87), WHY).toBeLessThan(0.06);
+    expect(Math.abs(impliedCo2Factor - 61.71), WHY).toBeGreaterThan(1);
     expect(EF.propane_gallon.co2, WHY).not.toBeCloseTo(0.091 * 61.71, 8);
     // And the LPG row's own product, in case someone seeds the whole row rather than the CO2 alone.
     expect(EF.propane_gallon.co2, WHY).not.toBeCloseTo(0.092 * 61.71, 8);
@@ -2012,26 +2008,28 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     // SCOPED TO THE CHECK-LIST LINE, not the whole file: the historical note directly below it
     // quotes 10.20608 on purpose, to say what the typo was. A file-wide ban would forbid recording
     // the fix — it failed that way on the first run here.
-    const checklist = src.split('\n').filter(l => l.includes('diesel_gallon 10.206'));
+    // FI2 diff 3: the line now carries EPA's printed 10.21, which is what the table holds.
+    const checklist = src.split('\n').filter(l => /^\/\/\s+diesel_gallon 10\.2/.test(l));
     expect(checklist, 'the check-list line moved or was renamed').toHaveLength(1);
     expect(checklist[0], 'the check-list must carry the value the table actually holds')
-      .toContain('10.20648');
+      .toContain('10.21');
     expect(checklist[0], '10.20608 prices nothing and never did — it was a typo in this list')
       .not.toContain('10.20608');
 
     // EVERY OTHER KEY, pinned. A factor-table edit that reaches a second row is the failure mode
     // this suite cannot otherwise see: each value below is independently sourced and none of them
     // has any reason to move with propane.
-    expect(EF.natural_gas_mcf).toEqual({ co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 });
+    // FI2 diff 3: the per-Mcf and per-gallon keys are EPA Table 1's printed per-scf (x 1,000) and per-gallon columns.
+    expect(EF.natural_gas_mcf).toEqual({ co2: 54.44, ch4: 0.00103, n2o: 0.0001 });
     // FI2 diff 2 (ruling R5): natural_gas_therms and the four per-litre keys are gone; those units convert exactly.
     for (const k of ['natural_gas_therms', 'diesel_litre', 'gasoline_litre', 'diesel_mobile_litre', 'propane_litre']) expect((EF as any)[k], k).toBeUndefined();
     expect(EF.natural_gas_mmbtu).toEqual({ co2: 53.06, ch4: 0.001, n2o: 0.0001 });
-    expect(EF.diesel_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
-    expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
-    expect(EF.fuel_oil_distillate_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
-    expect(EF.fuel_oil_residual_gallon).toEqual({ co2: 11.265, ch4: 0.00045, n2o: 0.00009 });
-    expect(EF.gasoline_gallon).toEqual({ co2: 8.7775, ch4: 0.000375, n2o: 0.000075 });
-    expect(EF.diesel_mobile_gallon).toEqual({ co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 });
+    expect(EF.diesel_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
+    expect((EF as any).fuel_oil_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
+    expect(EF.fuel_oil_distillate_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
+    expect(EF.fuel_oil_residual_gallon).toEqual({ co2: 11.27, ch4: 0.00045, n2o: 0.00009 });
+    expect(EF.gasoline_gallon).toEqual({ co2: 8.78, ch4: 0.00038, n2o: 0.00008 });
+    expect(EF.diesel_mobile_gallon).toEqual({ co2: 10.21, ch4: 0.00041, n2o: 0.00008 });
     expect((EF as any).ammonia).toBe(0);
     // steam_mmbtu was the bare scalar 66.33 — EPA Table 7's CO2 column alone — until 14 Aug 2026.
     // Full three-column pin and the 80%-efficiency derivation live in group S below.
@@ -2894,7 +2892,7 @@ describe('V. activity data is the entered figure, and the row still reconciles',
     const us = rowFor(loc({ country: 'US', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000,
       fuel_oil_distillate_unit: 'gallons' }), 'fuel_oil_distillate');
     expect(us.emission_factor_display).toContain('/gal');
-    expect(shownFactor(us)).toBeCloseTo(10.2414216, 7);
+    expect(shownFactor(us)).toBeCloseTo(10.244058, 7);
   });
 
   it('V4 steam reports the entered figure, in both converting jurisdictions', () => {
@@ -3067,13 +3065,13 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
     // keeps its note. No US per-litre fuel-oil factor was invented to avoid it.
     const usGal = row(site('US', 'distillate', 'gallons'), 'distillate');
     expect(usGal.activity_unit).toBe('gallons');
-    expect(usGal.result_tco2e).toBeCloseTo(10.2414216, 9);
+    expect(usGal.result_tco2e).toBeCloseTo(10.244058, 9);
     expect(usGal.note ?? '', 'no conversion for a gallons entry').not.toContain('US gallons');
     const usLit = row(site('US', 'distillate', 'litres'), 'distillate');
     expect(usLit.activity_data, 'still the entered figure').toBe(1000);
     expect(usLit.activity_unit).toBe('litres');
     expect(usLit.note, 'the conversion is real here and must be disclosed').toContain('US gallons');
-    expect(usLit.result_tco2e).toBeCloseTo(1000 / G * 10.2414216 / 1000, 9);
+    expect(usLit.result_tco2e).toBeCloseTo(1000 / G * 10.244058 / 1000, 9);
     expect((EF as any).fuel_oil_distillate_litre, 'no US per-litre factor was invented').toBeUndefined();
   });
 
@@ -3108,55 +3106,41 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
   const EPA_PETROLEUM = { ch4_g_per_mmbtu: 3, n2o_g_per_mmbtu: 0.6 };
   const EPA_NATGAS = { ch4_g_per_mmbtu: 1, n2o_g_per_mmbtu: 0.1 };
 
+  // FI2 diff 3 (ruling R5): the per-gallon and per-Mcf keys are EPA's PRINTED columns, rounded by EPA (0.01 g for CH4 and
+  // N2O per gallon). So the uniform rate is checked as EPA printed it: each key is its heat content x the one published
+  // per-mmBtu rate, to within half the last printed digit. A key moved to another rate misses by far more than that.
+  const HEAT_CONTENT: Record<string, number> = { propane_gallon: 0.091, diesel_gallon: 0.138, fuel_oil_gallon: 0.138,
+    fuel_oil_distillate_gallon: 0.138, fuel_oil_residual_gallon: 0.15, gasoline_gallon: 0.125, diesel_mobile_gallon: 0.138 };
+  const asPrinted = (stored_kg: number, derived_g: number, halfDigit_g: number) => Math.abs(stored_kg * 1000 - derived_g) <= halfDigit_g + 1e-12;
+
   it('AB1 EPA petroleum CH4/N2O are UNIFORM across the block — this is what makes "no choice" true', () => {
     // ⚠️ THE LOAD-BEARING ASSERTION FOR EF'S SECTOR COMMENT. "No end-use choice was made" is only true
-    // while EPA publishes a single 3 / 0.6 for every petroleum product. Each key stores
-    // heat-content x rate, so dividing CH4 by N2O recovers the published RATIO independent of the heat
-    // content — and it must be 3/0.6 = 5 on every petroleum key. If EPA ever splits the block by
-    // sector, the rows stop agreeing and this fails.
-    const expected = EPA_PETROLEUM.ch4_g_per_mmbtu / EPA_PETROLEUM.n2o_g_per_mmbtu;   // 5
-    // ⚠️ SPLIT BY STORED PRECISION, NOT BY TOLERANCE-SHOPPING. The per-gallon keys carry the ratio
-    // EXACTLY, because they are heat content x rate at full precision. The per-LITRE keys are those
-    // values divided by L_PER_GAL and rounded to 3 significant figures, so their ratio drifts up to
-    // 0.14% — a property of the rounding, not of the rate. Asserting both at the same tolerance would
-    // either fail on the litre keys or stop being exact on the gallon ones.
-    const fullPrecision = ['propane_gallon', 'diesel_gallon', 'fuel_oil_gallon',
-      'fuel_oil_distillate_gallon', 'fuel_oil_residual_gallon', 'gasoline_gallon', 'diesel_mobile_gallon'];
-    for (const key of fullPrecision) {
+    // while EPA publishes a single 3 / 0.6 for every petroleum product. Every petroleum key, as printed, is its own
+    // heat content x that one rate; if EPA ever splits the block by sector, a key stops matching and this fails.
+    for (const [key, hc] of Object.entries(HEAT_CONTENT)) {
       const k = (EF as any)[key];
-      expect(k.ch4 / k.n2o, `${key}: EPA petroleum ratio 3 / 0.6, exactly`).toBeCloseTo(expected, 9);
+      expect(asPrinted(k.ch4, hc * EPA_PETROLEUM.ch4_g_per_mmbtu, 0.005), `${key}: CH4 is ${hc} x 3 g, as printed`).toBe(true);
+      expect(asPrinted(k.n2o, hc * EPA_PETROLEUM.n2o_g_per_mmbtu, 0.005), `${key}: N2O is ${hc} x 0.6 g, as printed`).toBe(true);
     }
-    // FI2 diff 2: no per-litre keys any more (they were these values / L_PER_GAL, rounded); nothing to check here.
-    const rounded: string[] = [];
-    for (const key of rounded) {
-      const k = (EF as any)[key];
-      // 1% band: ~7x the worst observed rounding drift (0.14%), and ~230x tighter than the gap to any
-      // other sector rate, so it still fails instantly if a key moves off the petroleum column.
-      expect(Math.abs((k.ch4 / k.n2o) / expected - 1), `${key}: EPA petroleum ratio within rounding`).toBeLessThan(0.01);
-    }
-    // Natural gas is the OTHER published pair, 1 / 0.1 — same ratio, different level, so the ratio
-    // test above cannot tell them apart. The level is pinned directly below.
-    for (const key of ['natural_gas_mmbtu', 'natural_gas_mcf']) {
-      const k = (EF as any)[key];
-      expect(k.ch4 / k.n2o, `${key}: EPA gas ratio 1 / 0.1`)
-        .toBeCloseTo(EPA_NATGAS.ch4_g_per_mmbtu / EPA_NATGAS.n2o_g_per_mmbtu, 6);
-    }
+    // Natural gas is the OTHER published pair, 1 / 0.1, exact per mmBtu. Per scf EPA prints 0.00103 g CH4 and
+    // 0.0001 g N2O (1.026E-3 mmBtu/scf x 1 g and x 0.1 g, rounded), held here x 1,000 per Mcf.
+    expect((EF as any).natural_gas_mmbtu.ch4 / (EF as any).natural_gas_mmbtu.n2o)
+      .toBeCloseTo(EPA_NATGAS.ch4_g_per_mmbtu / EPA_NATGAS.n2o_g_per_mmbtu, 9);
+    expect(asPrinted((EF as any).natural_gas_mcf.ch4, 1.026 * EPA_NATGAS.ch4_g_per_mmbtu, 0.005), 'gas CH4 per Mcf').toBe(true);
+    expect(asPrinted((EF as any).natural_gas_mcf.n2o, 1.026 * EPA_NATGAS.n2o_g_per_mmbtu, 0.05), 'gas N2O per Mcf').toBe(true);
   });
 
-  it('AB2 EF CH4/N2O ARE heat content x the published rate', () => {
-    // The level, asserted as the expression. Heat contents are EPA's own, quoted at each key.
-    const perMmbtu = (hc: number, g: number) => hc * g / 1000;   // g/mmBtu -> kg/unit
-    const P = EPA_PETROLEUM.ch4_g_per_mmbtu, N = EPA_PETROLEUM.n2o_g_per_mmbtu;
-    expect((EF as any).natural_gas_mmbtu.ch4).toBeCloseTo(perMmbtu(1, EPA_NATGAS.ch4_g_per_mmbtu), 9);
-    expect((EF as any).natural_gas_mmbtu.n2o).toBeCloseTo(perMmbtu(1, EPA_NATGAS.n2o_g_per_mmbtu), 9);
-    expect((EF as any).propane_gallon.ch4).toBeCloseTo(perMmbtu(0.091, P), 9);       // 0.091 mmBtu/gal
-    expect((EF as any).propane_gallon.n2o).toBeCloseTo(perMmbtu(0.091, N), 9);
-    expect((EF as any).fuel_oil_distillate_gallon.ch4).toBeCloseTo(perMmbtu(0.138, P), 9);  // 0.138
-    expect((EF as any).fuel_oil_distillate_gallon.n2o).toBeCloseTo(perMmbtu(0.138, N), 9);
-    expect((EF as any).fuel_oil_residual_gallon.ch4).toBeCloseTo(perMmbtu(0.15, P), 9);     // 0.15
-    expect((EF as any).fuel_oil_residual_gallon.n2o).toBeCloseTo(perMmbtu(0.15, N), 9);
-    expect((EF as any).gasoline_gallon.ch4).toBeCloseTo(perMmbtu(0.125, P), 9);             // 0.125
-    expect((EF as any).gasoline_gallon.n2o).toBeCloseTo(perMmbtu(0.125, N), 9);
+  it('AB2 EF CH4/N2O ARE EPA\'s printed per-unit columns (FI2 diff 3)', () => {
+    const EF_ = EF as any;
+    expect((EF as any).natural_gas_mmbtu.ch4).toBeCloseTo(EPA_NATGAS.ch4_g_per_mmbtu / 1000, 9);
+    expect((EF as any).natural_gas_mmbtu.n2o).toBeCloseTo(EPA_NATGAS.n2o_g_per_mmbtu / 1000, 9);
+    // Table 1, per gallon: Propane 0.27 / 0.05 g, Distillate No. 2 0.41 / 0.08 g, Residual No. 6 0.45 / 0.09 g,
+    // Motor Gasoline 0.38 / 0.08 g; Natural Gas per scf 0.00103 / 0.0001 g, x 1,000 per Mcf.
+    expect([EF_.propane_gallon.ch4, EF_.propane_gallon.n2o]).toEqual([0.00027, 0.00005]);
+    expect([EF_.fuel_oil_distillate_gallon.ch4, EF_.fuel_oil_distillate_gallon.n2o]).toEqual([0.00041, 0.00008]);
+    expect([EF_.fuel_oil_residual_gallon.ch4, EF_.fuel_oil_residual_gallon.n2o]).toEqual([0.00045, 0.00009]);
+    expect([EF_.gasoline_gallon.ch4, EF_.gasoline_gallon.n2o]).toEqual([0.00038, 0.00008]);
+    expect([EF_.natural_gas_mcf.ch4, EF_.natural_gas_mcf.n2o]).toEqual([0.00103, 0.0001]);
   });
 
   // ── EF_EU — IPCC 2006 Vol.2 Ch.2. Values are Table 2.2/2.3 (identical for these fuels).
@@ -3217,8 +3201,9 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
   it('AB5 EPA and IPCC DISAGREE on LPG, and both are preserved', () => {
     // EPA puts propane on the petroleum 3 / 0.6; IPCC keeps LPG on the gaseous 1 / 0.1. Two
     // publishers, not a transcription error. Pinned so a "harmonising" edit fails loudly.
+    // FI2 diff 3: from EPA's printed 0.27 g per gallon, so the rate comes back to within the printed rounding.
     const usRatePerMmbtu = (EF as any).propane_gallon.ch4 / 0.091 * 1000;   // back to g/mmBtu
-    expect(usRatePerMmbtu, 'EPA propane sits on the petroleum rate').toBeCloseTo(3, 6);
+    expect(Math.abs(usRatePerMmbtu - 3), 'EPA propane sits on the petroleum rate').toBeLessThan(0.06);
     const euRatePerTJ = (EF_EU as any).propane_litre.ch4 / (47.3e-6 * 0.510);
     expect(euRatePerTJ, 'IPCC LPG sits on the gaseous rate').toBeCloseTo(1, 2);
     expect(Math.round(usRatePerMmbtu), 'the two publishers differ, deliberately').not.toBe(Math.round(euRatePerTJ));
@@ -4595,7 +4580,8 @@ describe('T10a no figure, and MJ gas', () => {
     expect(row('mmbtu', 6.581642).note).toBe(MMBTU);
     expect(row('mmbtu', 6.581642).emission_factor).toContain('54.367');
     expect(row('m3', 1000).note).toBe(M3);
-    expect(row('mcf', 10, 'US').note, 'only where we derived the figure').toBeUndefined();
+    // A US Mcf row carries EPA's Table 1 citation (FI2 diff 3), never the AU derivation.
+    expect(row('mcf', 10, 'US').note, 'only where we derived the figure').not.toContain('NGA');
     // The PDF and XLSX methods tables.
     const melb = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 6.58, natural_gas_unit: 'mmbtu' });
     expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }]), 'an exact conversion is not a derivation').toEqual([]);
@@ -5664,3 +5650,104 @@ describe('FI2 exact conversions and honest provenance', () => {
     expect(pickEF(on, 'natural_gas_m3').factor.co2).toBe(1.921);
   });
 });
+
+// ── FI2 diff 3: EPA's printed columns, and a note on every row whose value is not printed as applied ─────────────────
+describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how it was derived', () => {
+  const TABLE_1 = 'US EPA GHG Emission Factors Hub, Table 1'
+  const fuels = (o: Partial<Location>) => loc({ ...o, has_natural_gas: true, has_propane: true, has_diesel_stationary: true,
+    has_fuel_oil_distillate: true, has_fuel_oil_residual: true, has_mobile: true, natural_gas_amount: 1000, propane_amount: 1000,
+    diesel_stationary_amount: 1000, fuel_oil_distillate_amount: 1000, fuel_oil_residual_amount: 1000, gasoline_amount: 1000,
+    diesel_mobile_amount: 1000 })
+  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { declaration?: boolean; scope?: number; source: string; note?: string; result_tco2e: number }[])
+    .filter(r => !r.declaration && r.scope === 1)
+
+  it('FI2c1 each replaced US value equals the Table 1 figure (per scf x 1,000 for per Mcf)', () => {
+    // Table 1, Stationary Combustion: Natural Gas 0.05444 kg CO2, 0.00103 g CH4, 0.0001 g N2O per scf; Distillate Fuel
+    // Oil No. 2 10.21 kg, 0.41 g, 0.08 g; Motor Gasoline 8.78 kg, 0.38 g, 0.08 g; Propane 5.72 kg, 0.27 g, 0.05 g;
+    // Residual Fuel Oil No. 6 11.27 kg, 0.45 g, 0.09 g, per gallon. Stored in kg: g / 1,000.
+    const perScf = { co2: 0.05444, ch4: 0.00103 / 1000, n2o: 0.0001 / 1000 }
+    for (const g of ['co2', 'ch4', 'n2o'] as const) expect(EF.natural_gas_mcf[g], g).toBeCloseTo(perScf[g] * 1000, 12)
+    const distillate = { co2: 10.21, ch4: 0.41 / 1000, n2o: 0.08 / 1000 }
+    for (const k of ['diesel_gallon', 'fuel_oil_gallon', 'fuel_oil_distillate_gallon', 'diesel_mobile_gallon'] as const) {
+      for (const g of ['co2', 'ch4', 'n2o'] as const) expect((EF as any)[k][g], `${k} ${g}`).toBeCloseTo(distillate[g], 12)
+    }
+    const per = (co2: number, ch4_g: number, n2o_g: number) => ({ co2, ch4: ch4_g / 1000, n2o: n2o_g / 1000 })
+    const printed: [keyof typeof EF, ReturnType<typeof per>][] = [
+      ['gasoline_gallon', per(8.78, 0.38, 0.08)], ['propane_gallon', per(5.72, 0.27, 0.05)], ['fuel_oil_residual_gallon', per(11.27, 0.45, 0.09)]]
+    for (const [k, v] of printed) for (const g of ['co2', 'ch4', 'n2o'] as const) expect((EF as any)[k][g], `${k} ${g}`).toBeCloseTo(v[g], 12)
+    // The per-mmBtu key is EPA's own column and did not move.
+    expect(EF.natural_gas_mmbtu).toEqual({ co2: 53.06, ch4: 0.001, n2o: 0.0001 })
+  })
+
+  it('FI2c2 1,000 units at AR6 on the printed columns', () => {
+    const t = (k: keyof typeof EF) => calcGas(EF[k] as any, 1000, 'AR6').total
+    expect(t('natural_gas_mcf')).toBeCloseTo(54.497994, 9)
+    expect(t('propane_gallon')).toBeCloseTo(5.741696, 9)
+    expect(t('fuel_oil_distillate_gallon')).toBeCloseTo(10.244058, 9)
+    expect(t('fuel_oil_residual_gallon')).toBeCloseTo(11.30798, 9)
+    expect(t('gasoline_gallon')).toBeCloseTo(8.813164, 9)
+  })
+
+  it('FI2c3 every US row priced from a printed per-unit column cites Table 1 and the printed figures', () => {
+    const rows = rowsOf(fuels({ country: 'US', state: 'NY', natural_gas_unit: 'mcf', propane_unit: 'gallons', diesel_stationary_unit: 'gallons',
+      fuel_oil_distillate_unit: 'gallons', fuel_oil_residual_unit: 'gallons', gasoline_unit: 'gallons', diesel_mobile_unit: 'gallons' }))
+    expect(rows).toHaveLength(7)
+    const noteOf = (src: string) => rows.find(r => r.source === src)!.note ?? ''
+    expect(noteOf('Natural gas')).toBe(`${TABLE_1}, Natural Gas, per scf: 0.05444 kg CO2, 0.00103 g CH4, 0.0001 g N2O; per Mcf is per scf × 1,000`)
+    expect(noteOf('Propane')).toBe(`${TABLE_1}, Propane, per gallon: 5.72 kg CO2, 0.27 g CH4, 0.05 g N2O`)
+    for (const src of ['Diesel (stationary)', 'Heating oil', 'Diesel (mobile)']) {
+      expect(noteOf(src), src).toBe(`${TABLE_1}, Distillate Fuel Oil No. 2, per gallon: 10.21 kg CO2, 0.41 g CH4, 0.08 g N2O`)
+    }
+    expect(noteOf('Heavy fuel oil')).toBe(`${TABLE_1}, Residual Fuel Oil No. 6, per gallon: 11.27 kg CO2, 0.45 g CH4, 0.09 g N2O`)
+    expect(noteOf('Gasoline (mobile)')).toBe(`${TABLE_1}, Motor Gasoline, per gallon: 8.78 kg CO2, 0.38 g CH4, 0.08 g N2O`)
+    for (const r of rows) expect(r.note ?? '', r.source).not.toContain('\u2014')
+    // A converted entry carries the conversion AND the citation; the per-mmBtu key needs neither.
+    const m3 = rowsOf(loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }))[0]
+    expect(m3.note).toContain('converted to')
+    expect(m3.note).toContain(`${TABLE_1}, Natural Gas, per scf`)
+    const mmbtu = rowsOf(loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mmbtu' }))[0]
+    expect(mmbtu.note ?? '').not.toContain(TABLE_1)
+  })
+
+  it('FI2c4 every AU row priced from a derived per-litre value carries its derivation, in the m3 note\'s style', () => {
+    const rows = rowsOf(fuels({ country: 'AU', state: 'VIC', grid_region: 'AU_VIC', natural_gas_unit: 'm3', propane_unit: 'litres',
+      diesel_stationary_unit: 'litres', fuel_oil_distillate_unit: 'litres', fuel_oil_residual_unit: 'litres', gasoline_unit: 'litres',
+      diesel_mobile_unit: 'litres' }))
+    expect(rows).toHaveLength(7)
+    const noteOf = (src: string) => rows.find(r => r.source === src)!.note ?? ''
+    const DIESEL = '38.6 GJ/kL (DCCEEW NGA 2025 Table 4/Table 1, energy content) × 70.2 kg CO2e/GJ (Table 4/Table 1) ÷ 1,000 = 2.70972, rounded to 2.710 kg CO2e/L'
+    expect(noteOf('Diesel (stationary)')).toBe(DIESEL)
+    expect(noteOf('Diesel (mobile)')).toBe(DIESEL)
+    expect(noteOf('Gasoline (mobile)')).toBe('34.2 GJ/kL (DCCEEW NGA 2025 Table 4, energy content) × 67.8 kg CO2e/GJ (Table 4) ÷ 1,000 = 2.31876, rounded to 2.319 kg CO2e/L')
+    expect(noteOf('Propane')).toBe('25.7 GJ/kL (DCCEEW NGA 2025 Table 4, LPG energy content) × 60.6 kg CO2e/GJ (Table 4) ÷ 1,000 = 1.55742, rounded to 1.557 kg CO2e/L')
+    expect(noteOf('Heating oil')).toBe('37.3 GJ/kL (DCCEEW NGA 2025 Table 8, heating oil energy content) × 69.73 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.600929 kg CO2e/L')
+    expect(noteOf('Heavy fuel oil')).toBe('39.7 GJ/kL (DCCEEW NGA 2025 Table 8, fuel oil energy content) × 73.84 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.931448 kg CO2e/L')
+    expect(noteOf('Natural gas')).toContain('0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4')
+    // Each note's arithmetic is the stored value: energy content x factor / 1,000, to the stored precision.
+    const EA = EF_AU as any
+    const arithmetic: [string, number, number][] = [['diesel_litre', 38.6, 70.2], ['diesel_mobile_litre', 38.6, 70.2], ['gasoline_litre', 34.2, 67.8],
+      ['propane_litre', 25.7, 60.6], ['fuel_oil_distillate_litre', 37.3, 69.73], ['fuel_oil_residual_litre', 39.7, 73.84]]
+    for (const [k, gj, f] of arithmetic) expect(EA[k].co2, k).toBeCloseTo(gj * f / 1000, 3)
+    // A gallons entry converts to the same derived per-litre value, and so carries the same note after the conversion.
+    const gal = rowsOf(loc({ country: 'AU', state: 'VIC', grid_region: 'AU_VIC', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 100, fuel_oil_distillate_unit: 'gallons' }))[0]
+    expect(gal.note).toContain('converted to')
+    expect(gal.note).toContain('37.3 GJ/kL (DCCEEW NGA 2025 Table 8')
+    for (const r of rows) expect(r.note ?? '', r.source).not.toContain('\u2014')
+  })
+
+  it('FI2c5 every key of every table is either printed by its publisher or carries a derivation note', () => {
+    // The tables whose values are the publisher's own printed figure: US (FI2c), CA, UK, NZ. The derived ones carry a
+    // note per key: EU (EU_DERIVATION) and AU (AU_DERIVATION, natural_gas_gj apart, which is NGA's own per-GJ figure).
+    const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8')
+    const block = src.slice(src.indexOf('const AU_DERIVATION: Record<string, string> = {'), src.indexOf('function auDerivationNote('))
+    for (const k of Object.keys(EF_AU)) {
+      if (k === 'natural_gas_gj') continue
+      expect(block.includes(`  ${k}:`) || block.includes(`${k}: '`), `AU ${k} has a derivation note`).toBe(true)
+    }
+    const us = src.slice(src.indexOf('const US_PUBLISHED_NOTE: Record<string, string> = {'), src.indexOf('const US_PUBLISHED_NOTE') + 2000)
+    for (const k of Object.keys(EF)) {
+      if (['natural_gas_mmbtu', 'ammonia', 'steam_mmbtu'].includes(k)) continue
+      expect(us, `US ${k} cites Table 1`).toContain(`  ${k}:`)
+    }
+  })
+})

@@ -280,7 +280,7 @@ describe('Category 3 copy', () => {
     expect(ukSentences).not.toContain(CAT3_EPA_HHV_SENTENCE)
     expect(ukSentences.join(' '), 'no EPA claim on an inventory the EPA priced nothing in').not.toMatch(/EPA/)
 
-    // US, therms and MMBtu: both sentences, because that entry is where the two bases meet.
+    // US, therms and MMBtu, priced by the EPA: both sentences, because that entry is where the two bases meet.
     for (const unit of ['therms', 'mmbtu']) {
       const us = gasOnly('US', unit, 1_000)
       const usSentences = cat3Sentences(priceCat3(us.inputs!), us, GWP)
@@ -294,7 +294,32 @@ describe('Category 3 copy', () => {
     expect(mcfSentences).not.toContain(CAT3_EPA_HHV_SENTENCE)
     // Neither sentence asserts what priced THIS inventory's Scope 1 beyond the unit that was entered.
     expect(CAT3_GROSS_CV_SENTENCE).not.toMatch(/EPA/)
-    expect(CAT3_EPA_HHV_SENTENCE).toMatch(/entered in therms or million Btu/)
+    // FI2 diff 3: worded on the publisher, not the unit.
+    expect(CAT3_EPA_HHV_SENTENCE).toMatch(/^Where the Scope 1 side of a gas figure was priced by the US EPA/)
+    expect(CAT3_EPA_HHV_SENTENCE).not.toContain('\u2014')
+  })
+
+  it('C3C-11b the EPA sentence follows the row\'s recorded publisher, never the unit alone (FI2 diff 3)', () => {
+    const attest = ['propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
+      'refrigerants', 'electricity', 'purchased_steam'].map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' }))
+    const gas = (country: string, unit: string, efSource: string) => cat3InputsFrom(
+      [{ location: 'Site', stream: 'natural_gas', source: 'Natural gas', scope: 1, activity_data: 1_000,
+         activity_unit: unit, ef_source: efSource, result_tco2e: 1, entry_method: 'manual' }],
+      [{ id: 's', name: 'Site', country, has_natural_gas: true, natural_gas_amount: 1_000, natural_gas_unit: unit, stream_attestations: attest }],
+    )
+    const sentences = (r: ReturnType<typeof gas>) => cat3Sentences(priceCat3(r.inputs!), r, GWP)
+    // Therms at an Australian site: since FI2 priced by NGA (therms convert to its per-GJ factor). Gross CV, no EPA claim.
+    const au = sentences(gas('AU', 'therms', 'DCCEEW National Greenhouse Accounts Factors 2025'))
+    expect(au).toContain(CAT3_GROSS_CV_SENTENCE)
+    expect(au).not.toContain(CAT3_EPA_HHV_SENTENCE)
+    // The same unit and country with the EPA recorded as the publisher: the sentence. The publisher decides.
+    expect(sentences(gas('AU', 'therms', 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories'))).toContain(CAT3_EPA_HHV_SENTENCE)
+    // kWh at a US site priced by the EPA (kWh converts exactly to EPA's per-MMBtu factor): the sentence, whatever the unit.
+    const usKwh = sentences(gas('US', 'kwh', 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories'))
+    expect(usKwh).toContain(CAT3_GROSS_CV_SENTENCE)
+    expect(usKwh).toContain(CAT3_EPA_HHV_SENTENCE)
+    // No recorded publisher: no EPA claim.
+    expect(sentences(gas('US', 'mmbtu', ''))).not.toContain(CAT3_EPA_HHV_SENTENCE)
   })
 
   it('C3C-12 a spliced publisher name never brings a note with it, and never a second full stop', () => {

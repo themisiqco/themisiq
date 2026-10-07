@@ -136,18 +136,21 @@ export const CAT3_STAND_IN_SENTENCE =
  * customer's own figures rest on; printed where no such assumption was made it is a false claim about
  * their inventory, and it teaches them to skip the next one.
  *
- * The first sentence is true of every gross CV line. The second is true exactly where a figure was
- * entered in therms or million Btu, which engine.ts offers only on the US path, and whose Scope 1 side
- * combustionSource therefore prices from the EPA.
+ * The first sentence is true of every gross CV line. The second is true exactly where the GHG inventory
+ * recorded the US EPA as the publisher of that line's Scope 1 side (FI2 diff 3; it was keyed on therms and
+ * million Btu until then, which stopped identifying the EPA once energy units converted exactly).
  */
 export const CAT3_GROSS_CV_SENTENCE =
   `Natural gas is priced on the workbook's gross calorific value factor: it asks for the same basis on ` +
   `both sides of an entry (${cite('cv_basis_match_scope1')}), and says organisations should typically ` +
   `use gross calorific values for each kWh of energy consumed (${cite('cv_gross_typical')}).`
 
+// FI2 diff 3: shown where the GHG inventory recorded the US EPA as the publisher of a gas figure's Scope 1 side, and
+// worded on that, not on the unit: since FI2 a therm or MMBtu figure at an Australian site converts to NGA's per-GJ
+// factor, and a kWh figure at a US site converts to EPA's per-MMBtu one, so the unit no longer says who priced it.
 export const CAT3_EPA_HHV_SENTENCE =
-  `A gas figure entered in therms or million Btu is a US entry, and the Scope 1 side of it is priced on ` +
-  `the US EPA's higher heating values. That an EPA higher heating value and a DEFRA gross calorific ` +
+  `Where the Scope 1 side of a gas figure was priced by the US EPA, it rests on the EPA's higher heating ` +
+  `values. That an EPA higher heating value and a DEFRA gross calorific ` +
   `value are interchangeable is not stated by either publisher, so this line says where the two meet ` +
   `rather than assuming it away.`
 
@@ -419,11 +422,14 @@ export function cat3WorkingsSummary(r: Cat3Result, skipped: readonly Cat3Skipped
 /** A line priced on the workbook's gross calorific value natural gas row. */
 const isGrossCv = (l: Cat3PricedLine): boolean => l.factor?.key === 'natural_gas_kwh_gross_cv'
 /**
- * The two units whose Scope 1 side is EPA-priced. engine.ts ngUnitOptions offers therms and MMBtu on
- * the US path alone (CA gets mcf and m3, GB/UK and NZ kWh, AU and the EU m3), and combustionSource
- * prices a US location from the EPA, so the unit as entered is what decides this.
+ * FI2 diff 3: whether the GHG inventory recorded the US EPA as the publisher of this line's Scope 1 figure. It was
+ * the unit as entered (therms or MMBtu) until FI2, which stopped being a proxy for the publisher once energy units
+ * converted exactly into each jurisdiction's own table. The publisher is the row's recorded ef_source
+ * (cat3Inputs publisherOf), carried on the stand-in flag, which every line outside the UK has; a UK line is DEFRA's.
+ * Matched on the name and not the edition, which T3c may relabel.
  */
-const EPA_HHV_UNITS = ['therms', 'mmbtu']
+const isEpaPriced = (l: Cat3PricedLine): boolean =>
+  l.flags.some(f => f.code === 'uk_stand_in' && /^US EPA\b/.test(f.scope1_publisher ?? ''))
 
 export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[] {
   const out: string[] = [
@@ -440,8 +446,8 @@ export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[
   // Only where a gross CV factor actually priced something: a sentence about a conversion nobody's
   // figures went through is noise, and noise is what stops the rest being read.
   if (r.lines.some(isGrossCv)) out.push(CAT3_GROSS_CV_SENTENCE)
-  // And the EPA half only where a US entry made the two bases meet. See the note above the sentences.
-  if (r.lines.some(l => isGrossCv(l) && EPA_HHV_UNITS.includes(l.unit_as_entered.trim().toLowerCase()))) {
+  // And the EPA half only where the EPA priced the Scope 1 side. See the note above the sentences.
+  if (r.lines.some(l => isGrossCv(l) && isEpaPriced(l))) {
     out.push(CAT3_EPA_HHV_SENTENCE)
   }
   return out
@@ -918,6 +924,8 @@ export const CAT3_GHG_LINKS = {
   country: { label: "Set this location's country", step: 'setup' },
   /** Purchased heat or steam the GHG side could not price in its jurisdiction. */
   steamFactor: { label: 'Enter a supplier factor for this heat', step: 'energy' },
+  /** FI2 diff 3: a Scope 1 line the GHG side could not price; that page names the line and what fixes it. */
+  scope1Line: { label: 'Fix this figure in the GHG module', step: 'energy' },
 } as const satisfies Record<string, Cat3GhgLink>
 
 export type Cat3GhgLinkKey = keyof typeof CAT3_GHG_LINKS
@@ -951,6 +959,7 @@ export function cat3GhgFixes(r: Cat3Result | null, inputs: Cat3InputsResult): Ca
   const out: Cat3GhgLinkKey[] = []
   if (r?.lines.some(l => l.flags.some(f => f.code === 'country_unresolved'))) out.push('country')
   if (inputs.skipped.some(s => s.code === 'scope2_not_priced')) out.push('steamFactor')
+  if (inputs.skipped.some(s => s.code === 'scope1_not_priced')) out.push('scope1Line')
   return out
 }
 

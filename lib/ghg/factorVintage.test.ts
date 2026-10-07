@@ -146,7 +146,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     // ⚠️ EACH PIN IS THE ARITHMETIC, NOT A CAPTURED RUN. A "nothing moved" figure copied out of the
     // output of the change it is meant to police proves only that the code agrees with itself. These
     // are derived from the tables at AR6 (CH₄ fossil 29.8, N₂O 273) and each one reproduces:
-    //   US  EF.propane_gallon        5.72117 + 0.000273x29.8 + 0.0000546x273 = 5.7442112
+    //   US  EF.propane_gallon        5.72 + 0.00027x29.8 + 0.00005x273 = 5.741696 (EPA's printed column, FI2 diff 3)
     //   CA  EF_CA.natural_gas_m3     1.921 (ON override) + 0.000037x29.8 + 0.000035x273 = 1.9316576
     //   UK  EF_UK.natural_gas_kwh    0.18231, combined — no gas split to scale
     //   EU  EF_EU.natural_gas_m3     2.0196 + 0.000036x29.8 + 0.0000036x273 = 2.0216556
@@ -154,7 +154,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     //   NZ  EF_NZ.commercial.natural_gas_kwh  0.19543, combined
     // x 1,000 units / 1,000 kg per tonne, so the per-unit factor IS the tonnage here.
     const pins: [string, number][] = [
-      ['US', 5.7442112],      // 1,000 gal propane, EPA
+      ['US', 5.741696],       // 1,000 gal propane, EPA
       ['CA', 1.9316576],      // 1,000 m3 gas, ECCC with the ON provincial CO2 override
       ['UK', 0.18231],        // 1,000 kWh gas, DEFRA 2026
       ['EU', 2.0216556],      // 1,000 m3 gas, MRR Annex VI / IPCC 2006

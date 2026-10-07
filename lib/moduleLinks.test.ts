@@ -126,10 +126,10 @@ describe('the GHG and Scope 3 modules, linked', () => {
     const rendered = new Set<string>()
     for (const m of s3.matchAll(/link="(\w+)"/g)) rendered.add(m[1])
     for (const m of s3.matchAll(/link:\s*'(\w+)'/g)) rendered.add(m[1])
-    // The two row-level ones arrive through cat3GhgFixes rather than as a literal in the page.
+    // The row-level ones arrive through cat3GhgFixes rather than as a literal in the page.
     const byFixes = cat3GhgFixes(
       { lines: [{ flags: [{ code: 'country_unresolved' }] }] } as never,
-      { skipped: [{ code: 'scope2_not_priced' }] } as never,
+      { skipped: [{ code: 'scope2_not_priced' }, { code: 'scope1_not_priced' }] } as never,
     )
     byFixes.forEach(k => rendered.add(k))
     // cat3NoFigure supplies the rest: read its own body, whatever shape each branch takes.

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cat3InputsFrom, isUnitedKingdom } from './cat3Inputs'
 import { priceCat3 } from './cat3Energy'
+import { cat3GhgFixes, CAT3_GHG_LINKS } from './cat3Copy'
 // ⚠️ THE TEST MAY IMPORT THE ENGINE; THE ADAPTER MAY NOT. C3I-9 pins the adapter's mirrored
 // declaration logic against the engine's own findUndeclaredStreams, which is the only way to know the
 // copy still matches. C3I-12 asserts neither module imports it.
@@ -64,6 +65,27 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     const m = cat3InputsFrom(workingsOf([mixed]), [mixed])
     expect(m.inputs!.rows.map(x => x.stream)).toEqual(['electricity'])
     expect(m.skipped).toContainEqual({ code: 'scope1_not_priced', location: 'Odd site', stream: 'natural_gas' })
+  })
+
+  it('C3I-4b a scope1_not_priced skip offers the plain fix-it link to the GHG inventory, like the steam one (FI2 diff 3)', () => {
+    const mixed = answered({ name: 'Odd site', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000,
+      has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas', 'electricity'])
+    const m = cat3InputsFrom(workingsOf([mixed]), [mixed])
+    const priced = priceCat3(m.inputs!)
+    // The page renders the fixes block when there is a priced result, a fix and a bound inventory.
+    expect(priced.lines.length).toBeGreaterThan(0)
+    expect(cat3GhgFixes(priced, m)).toEqual(['scope1Line'])
+    expect(CAT3_GHG_LINKS.scope1Line).toEqual({ label: 'Fix this figure in the GHG module', step: 'energy' })
+    // The same step as the steam link, and no em dash in the label.
+    expect(CAT3_GHG_LINKS.scope1Line.step).toBe(CAT3_GHG_LINKS.steamFactor.step)
+    expect(CAT3_GHG_LINKS.scope1Line.label).not.toContain('\u2014')
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/scope3/page.tsx'), 'utf8')
+    expect(page).toContain('{cat3GhgFixes(cat3Priced, cat3Read).map(key => (')
+    expect(page).toContain('{CAT3_GHG_LINKS[key].label} →')
+    // Nothing unpriced, no link.
+    const ok = answered({ name: 'Fine site', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000 }, ['electricity'])
+    const o = cat3InputsFrom(workingsOf([ok]), [ok])
+    expect(cat3GhgFixes(priceCat3(o.inputs!), o)).not.toContain('scope1Line')
   })
 
   it('C3I-5 a duplicate name in two countries is unresolved, never the first one found', () => {

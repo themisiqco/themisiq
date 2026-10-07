@@ -73,13 +73,12 @@ const GWP = {
 // residual-oil factor was identical in the 2025 and 2026 workbooks, so matching on it would have
 // "proved" a 2025 table was 2026. An edition check needs rows that CHANGE.
 //   TO CHECK, in rough order of how much customer volume they price:
-//     natural_gas_mmbtu 53.06   natural_gas_mcf 54.43956   natural_gas_therms 5.306
-//     diesel_gallon 10.20648*   gasoline_gallon 8.7775
+//     natural_gas_mmbtu 53.06   natural_gas_mcf 54.44 (Table 1: 0.05444 kg per scf)
+//     diesel_gallon 10.21*   gasoline_gallon 8.78
 //   (*and with it fuel_oil_distillate_gallon and diesel_mobile_gallon, which share the row.)
-//   diesel_gallon read 10.20608 here until 13 Aug 2026 — a transposed digit in THIS LIST, never in
-//   the table, where all four keys carrying that factor have always held 10.20648. It mattered
-//   because this list is what gets typed into the workbook's search box: a no-hit on a figure that
-//   prices nothing reads as evidence the table is an edition behind.
+//   FI2 diff 3 (ruling R5): the per-gallon and per-Mcf keys are now Table 1's own published per-gallon and per-scf
+//   columns, which is what this list is typed into the workbook against. They were heat content x per-mmBtu factor
+//   (10.20648, 8.7775, 54.43956) until then. The 2025 workbook carries no change marker on any of these rows.
 //   propane_gallon has LEFT this list — checked 13 Aug 2026, and it was wrong for a different
 //   reason. See its own note at the key.
 // Whichever rows differ between the 2024 and 2025 editions are the ones to pin, the way EF_UK now pins
@@ -107,8 +106,15 @@ const GWP = {
 // from the liquids in all four of its sector tables. Neither is wrong: each table follows its own
 // publisher, and EF_EU carries the matching note. DO NOT "fix" one to agree with the other — that
 // would substitute a publisher's judgement we do not hold for the one we cited.
+// ── EPA'S OWN PUBLISHED COLUMNS (FI2 diff 3, ruling R5: a table holds the publisher's own units) ──────────────
+// Table 1 publishes every fuel below per mmBtu AND per physical unit (per scf for natural gas, per gallon for the
+// petroleum products). Each per-gallon and per-Mcf key is the per-unit column as EPA printed it, cited on the workings
+// row by US_PUBLISHED_NOTE; per Mcf is per scf x 1,000. Until 7 Oct 2026 these keys were heat content x the per-mmBtu
+// factor at full precision (for example 0.138 x 73.96 = 10.20648 against EPA's printed 10.21), which put on the row a
+// figure EPA never printed. The per-mmBtu keys are EPA's own column and are unchanged.
    const EF = {
-  natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
+  // Natural Gas, Table 1: 0.05444 kg CO2, 0.00103 g CH4, 0.0001 g N2O per scf, x 1,000 per Mcf.
+  natural_gas_mcf: { co2: 54.44, ch4: 0.00103, n2o: 0.0001 },
   natural_gas_mmbtu: { co2: 53.06, ch4: 0.001, n2o: 0.0001 },
   // ── PROPANE — EPA Table 1 Stationary Combustion, Petroleum Products, row "Propane" ─────────────
   // ⚠️ THIS CO2 FACTOR WAS WRONG UNTIL 13 AUG 2026, AND THE WRONG VALUE CAME FROM THE ADJACENT ROW.
@@ -122,9 +128,9 @@ const GWP = {
   // three gases came off the wrong line.
   //   co2 0.091 x 62.87 = 5.72117   (WAS 5.61561 = 0.091 x 61.71)
   //   ch4 0.091 x 3 g   = 0.273 g   n2o 0.091 x 0.6 g = 0.0546 g   (both UNCHANGED)
-  // Derived at full precision, like the fuel-oil grade keys below, so a verifier retyping the two
-  // source columns reaches this number rather than the workbook's rounded per-gallon column.
   // Verified in the 2025 Hub workbook (last modified 15 Jan 2025) — LF, 13 Aug 2026.
+  // FI2 diff 3: now Table 1's printed per-gallon column for Propane, 5.72 kg CO2, 0.27 g CH4, 0.05 g N2O, in place of
+  // the full-precision derivation above (ruling R5). The wrong-row correction above is unaffected: 5.72 is Propane's.
   //
   // ⚠️ NOT AN EDITION PROBLEM, and keeping the two apart is the point. No row in the Petroleum
   // Products block carries the blue-text marker the workbook uses to flag changes from the 2024
@@ -137,34 +143,24 @@ const GWP = {
   // EVERY US PROPANE CUSTOMER'S SCOPE 1 RISES 1.88% (62.87 / 61.71). Stored inventories do NOT
   // move — workings is a saved snapshot, recomputed only on re-save — so a customer's 2025 figure
   // and their next one will differ by this on unchanged consumption.
-  propane_gallon: { co2: 5.72117, ch4: 0.000273, n2o: 0.0000546 },
-  // 5.72117 / 3.785411784 = 1.51137322... -> 1.51137 (WAS 1.48349). CH4 and N2O DID NOT MOVE, and
-  // they are confirmed to be the gallon values through the same constant: 0.000273 / 3.785411784 =
-  // 0.0000721189..., 0.0000546 / 3.785411784 = 0.0000144237..., which are the stored 0.0000721 and
-  // 0.0000144 at the precision this table carries.
-  diesel_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
-  fuel_oil_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  propane_gallon: { co2: 5.72, ch4: 0.00027, n2o: 0.00005 },
+  diesel_gallon: { co2: 10.21, ch4: 0.00041, n2o: 0.00008 },
+  fuel_oil_gallon: { co2: 10.21, ch4: 0.00041, n2o: 0.00008 },
   // ── GRADE-EXPLICIT KEYS — EPA Table 1 Stationary Combustion, Petroleum Products ────────────────
-  // Both derived as HEAT CONTENT x FACTOR, at full precision, so a verifier retyping the two source
-  // columns reaches our number rather than EPA's rounded per-gallon column.
+  // Each is Table 1's printed per-gallon column (FI2 diff 3, ruling R5).
   //
-  // DISTILLATE FUEL OIL No. 2 — 0.138 mmBtu/gal x (CO2 73.96 kg/mmBtu, CH4 3 g/mmBtu, N2O 0.6 g/mmBtu):
-  //   co2 0.138 x 73.96 = 10.20648   ch4 0.138 x 3 g = 0.414 g   n2o 0.138 x 0.6 g = 0.0828 g
-  // CONFIRMATION THIS CLOSES: the legacy fuel_oil_gallon above reproduces ALL THREE GASES from that
-  // derivation exactly. The legacy US key IS Distillate No. 2 — established, not assumed. (It is also
-  // byte-identical to diesel_gallon, because EPA lists diesel and Distillate No. 2 as one fuel.)
-  fuel_oil_distillate_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
-  // RESIDUAL FUEL OIL No. 6 — 0.15 mmBtu/gal x (CO2 75.10 kg/mmBtu, CH4 3 g/mmBtu, N2O 0.6 g/mmBtu):
-  //   co2 0.15 x 75.10 = 11.265      ch4 0.15 x 3 g = 0.45 g     n2o 0.15 x 0.6 g = 0.09 g
-  // EPA'S OWN ROUNDED PER-GALLON COLUMN GIVES 11.27. We carry 11.265 deliberately: the workings table
-  // exists so a verifier can reproduce the row, and heat-content x factor is the derivation they will
-  // retype. Matching EPA's display rounding instead would put us 0.005 kg/gal away from our own stated
-  // arithmetic — the same reasoning as efDisplay's toPrecision(10) over toFixed(3).
-  // Only heat content and the CO2 factor differ between the grades; EPA publishes the same CH4 and N2O
-  // per mmBtu for both, which is why their kg/gal values differ only by the 0.138 -> 0.15 ratio.
-  fuel_oil_residual_gallon: { co2: 11.265, ch4: 0.00045, n2o: 0.00009 },
-  gasoline_gallon: { co2: 8.7775, ch4: 0.000375, n2o: 0.000075 },
-  diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
+  // DISTILLATE FUEL OIL No. 2, per gallon: 10.21 kg CO2, 0.41 g CH4, 0.08 g N2O. The legacy fuel_oil_gallon and
+  // diesel_gallon carry the same row, because EPA lists diesel and Distillate No. 2 as one fuel. (Its per-mmBtu
+  // columns, 0.138 mmBtu/gal x 73.96 kg CO2, 3 g CH4, 0.6 g N2O, give 10.20648, which is what this key held.)
+  fuel_oil_distillate_gallon: { co2: 10.21, ch4: 0.00041, n2o: 0.00008 },
+  // RESIDUAL FUEL OIL No. 6, per gallon: 11.27 kg CO2, 0.45 g CH4, 0.09 g N2O. Until FI2 diff 3 this key carried
+  // 0.15 x 75.10 = 11.265 rather than the printed 11.27, so that the row matched the derivation; ruling R5 reverses
+  // that: the row cites the value EPA printed, and nothing is derived.
+  fuel_oil_residual_gallon: { co2: 11.27, ch4: 0.00045, n2o: 0.00009 },
+  // MOTOR GASOLINE, per gallon: 8.78 kg CO2, 0.38 g CH4, 0.08 g N2O (was 0.125 x 70.22 = 8.7775).
+  gasoline_gallon: { co2: 8.78, ch4: 0.00038, n2o: 0.00008 },
+  // Mobile diesel shares the Distillate No. 2 row, as before. (EPA's mobile CO2 table prints the same 10.21 kg.)
+  diesel_mobile_gallon: { co2: 10.21, ch4: 0.00041, n2o: 0.00008 },
   ammonia: 0,
   // ── PURCHASED STEAM / DISTRICT HEAT — EPA Hub 2025 Table 7 (Steam and Heat) ────────────────────
   // ⚠️ THIS WAS THE BARE SCALAR 66.33 UNTIL 14 AUG 2026 — THE CO2 COLUMN ALONE. Table 7 publishes
@@ -606,10 +602,36 @@ const AU_DERIVATION: Record<string, string> = {
   // FI2 diff 2: no per-MMBtu entry. NGA's per-GJ figure is the table's own key now, and an MMBtu (or kWh, MJ, therm)
   // figure converts to GJ exactly, with the conversion on the row; there is no derived factor left to explain.
   natural_gas_m3: '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³',
+  // FI2 diff 3: the liquid fuels, each NGA energy content per kL × NGA's combined factor per GJ, ÷ 1,000 per litre.
+  // The values and table references are the ones recorded at the EF_AU keys. Diesel's reference reads "Table 4/Table 1"
+  // there and is carried as recorded; both it and Table 8 for the fuel oils are on Lisa's check against the workbook.
+  diesel_litre: '38.6 GJ/kL (DCCEEW NGA 2025 Table 4/Table 1, energy content) × 70.2 kg CO2e/GJ (Table 4/Table 1) ÷ 1,000 = 2.70972, rounded to 2.710 kg CO2e/L',
+  gasoline_litre: '34.2 GJ/kL (DCCEEW NGA 2025 Table 4, energy content) × 67.8 kg CO2e/GJ (Table 4) ÷ 1,000 = 2.31876, rounded to 2.319 kg CO2e/L',
+  propane_litre: '25.7 GJ/kL (DCCEEW NGA 2025 Table 4, LPG energy content) × 60.6 kg CO2e/GJ (Table 4) ÷ 1,000 = 1.55742, rounded to 1.557 kg CO2e/L',
+  fuel_oil_distillate_litre: '37.3 GJ/kL (DCCEEW NGA 2025 Table 8, heating oil energy content) × 69.73 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.600929 kg CO2e/L',
+  fuel_oil_residual_litre: '39.7 GJ/kL (DCCEEW NGA 2025 Table 8, fuel oil energy content) × 73.84 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.931448 kg CO2e/L',
 }
+// Keys that hold the same NGA value as a key above, mapped so the two rows cannot describe it differently.
+const AU_DERIVATION_ALIAS: Record<string, string> = { diesel_mobile_litre: 'diesel_litre' }
 function auDerivationNote(loc: Location, key: string): string | undefined {
   if (efJurisdiction(loc) !== 'AU') return undefined
-  return AU_DERIVATION[key]
+  return AU_DERIVATION[AU_DERIVATION_ALIAS[key] ?? key]
+}
+
+// US EPA: THE PUBLISHED COLUMN EACH PER-UNIT KEY IS (FI2 diff 3, ruling R5). Not a derivation: the row says where in
+// Table 1 the value is printed, so a verifier finds it without retyping any arithmetic. The per-mmBtu keys are EPA's
+// own column too and need no note beyond the citation.
+const EPA_TABLE_1 = 'US EPA GHG Emission Factors Hub, Table 1'
+const EPA_DISTILLATE_NOTE = `${EPA_TABLE_1}, Distillate Fuel Oil No. 2, per gallon: 10.21 kg CO2, 0.41 g CH4, 0.08 g N2O`
+const US_PUBLISHED_NOTE: Record<string, string> = {
+  natural_gas_mcf: `${EPA_TABLE_1}, Natural Gas, per scf: 0.05444 kg CO2, 0.00103 g CH4, 0.0001 g N2O; per Mcf is per scf × 1,000`,
+  propane_gallon: `${EPA_TABLE_1}, Propane, per gallon: 5.72 kg CO2, 0.27 g CH4, 0.05 g N2O`,
+  diesel_gallon: EPA_DISTILLATE_NOTE,
+  fuel_oil_gallon: EPA_DISTILLATE_NOTE,
+  fuel_oil_distillate_gallon: EPA_DISTILLATE_NOTE,
+  diesel_mobile_gallon: EPA_DISTILLATE_NOTE,
+  fuel_oil_residual_gallon: `${EPA_TABLE_1}, Residual Fuel Oil No. 6, per gallon: 11.27 kg CO2, 0.45 g CH4, 0.09 g N2O`,
+  gasoline_gallon: `${EPA_TABLE_1}, Motor Gasoline, per gallon: 8.78 kg CO2, 0.38 g CH4, 0.08 g N2O`,
 }
 
 /**
@@ -4119,15 +4141,16 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const ef = picked.factor
     const g = calcGas(ef, entered, gwpVersion)
     const efShown = ef
-    // Notes, joined: the exact conversion (FI2), the derivation of a derived table value (EU, AU), and the calorific
-    // basis of a NZ gas factor (ruling R4). Each derivation note describes a value in THAT table, read under the key the
-    // table holds, so it applies only to a value that table supplied.
+    // Notes, joined: the exact conversion (FI2), the derivation of a derived table value (EU, AU), where in EPA's Table 1
+    // a US value is printed (FI2 diff 3), and the calorific basis of a NZ gas factor (ruling R4). Each note describes a
+    // value in THAT table, read under the key the table holds, so it applies only to a value that table supplied.
     const fromTable = picked.publisher?.jurisdiction
     const heldKey = picked.key ?? efKey
     const conversion_note = picked.conversion ? conversionNote(entered, picked.conversion) : undefined
     const note = [conversion_note,
       fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
       fromTable === 'AU' ? auDerivationNote(loc, heldKey) : '',
+      fromTable === 'US' ? US_PUBLISHED_NOTE[heldKey] : '',
       fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
