@@ -1,8 +1,9 @@
 // ── CATEGORY 3: WHAT THE BOUND GHG INVENTORY'S ENERGY COSTS UPSTREAM ─────────────────────────────
 //
 // Pure calculation. No React, no Supabase, no network, and NOTHING FROM lib/ghg/engine.ts: the Scope 3
-// page loads this module, and the engine carries every factor table in the product. The two things this
-// needs from outside are the DEFRA artefact (lib/emissionFactors/defraEnergy.ts, Task 1) and the two
+// page loads this module, and the engine carries every factor table in the product. The things this needs
+// from outside are the DEFRA artefact (lib/emissionFactors/defraEnergy.ts, Task 1), the NGA 2025 Scope 3
+// transcription for Australian gas and electricity (lib/emissionFactors/ngaScope3_2025.ts, FI6), and the
 // exact energy constants in lib/unitConversions.ts, which is the repo's unit authority and is already
 // what the engine itself uses for the same conversion.
 //
@@ -21,7 +22,8 @@ import {
   DEFRA_ENERGY_META, energyFactor, energyConversion,
   type EnergyFuelFactor, type EnergyLineFactor,
 } from '../emissionFactors/defraEnergy'
-import { normalizeUnit, GJ_PER_MMBTU, KWH_PER_GJ } from '../unitConversions'
+import { normalizeUnit, GJ_PER_MMBTU, KWH_PER_GJ, EXACT_CONVERSIONS } from '../unitConversions'
+import { ngaScope3, AU_GAS_AREA_STATES, type NgaCited, type NgaElectricityRow, type NgaGasRow, type NgaGasArea } from '../emissionFactors/ngaScope3_2025'
 
 // ── WHAT COMES IN ─────────────────────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,11 @@ export interface Cat3InputRow {
   scope1_publisher?: string | null
   /** New Zealand only: the engine's own s3_td figure for this location, in TONNES, as it publishes it. */
   nz_td_result_tco2e?: number | null
+  /** FI6: Australia only. The location's state as the GHG wizard stores it (NSW, ACT, VIC, QLD, SA, WA, TAS, NT), or
+   *  null where none is recorded or the join on the location name cannot answer. */
+  au_state?: string | null
+  /** FI6 (R15): Australia only. NGA's metro or non-metro gas area for the site, or null where not chosen. */
+  au_gas_area?: NgaGasArea | null
 }
 
 export interface Cat3Inputs {
@@ -76,6 +83,7 @@ export type Cat3LineKind =
   | 'steam_wtt'                   // 3b, for purchased heat and steam
   | 'steam_distribution_loss'     // 3c
   | 'steam_distribution_wtt'      // 3b
+  | 'electricity_nga_scope3'      // FI6: Australia, NGA Table 1's one Scope 3 figure, which includes grid losses
 
 export type Cat3Flag =
   /** Priced from a UK factor at a location that is not in the UK, or whose country is unknown. */
@@ -91,13 +99,19 @@ export type Cat3Reason =
   | { code: 'market_based_row_not_used' }
   | { code: 'no_nz_td_figure'; location: string }
   | { code: 'activity_not_a_number'; unit: string }
+  /** FI6: an Australian gas or electricity row at a site with no state recorded. Never priced at NGA's National row. */
+  | { code: 'au_state_missing'; location: string }
+  /** FI6 (R15): Australian gas in NSW and the ACT, QLD, SA or WA, where NGA's factor depends on the metro or
+   *  non-metro area and none has been chosen. */
+  | { code: 'au_gas_area_missing'; location: string }
 
 export interface Cat3Conversion {
   factor: number
   from: string
   to: string
-  /** 'defra' is a conversion the workbook publishes; 'definitional' is an exact unit identity. */
-  source: 'defra' | 'definitional'
+  /** 'defra' is a conversion the workbook publishes; 'definitional' is an exact unit identity; 'nga' uses NGA's own
+   *  energy content (Table 5), which NGA's formula applies with its Table 6 gas factors (FI6). */
+  source: 'defra' | 'definitional' | 'nga'
   /** The artefact key, for a DEFRA conversion. */
   key?: string
   /** The cell, for a DEFRA conversion, or the constant's name for a definitional one. */
@@ -120,6 +134,8 @@ export interface Cat3PricedLine {
   kg_co2e: number
   entry_method: string | null
   flags: Cat3Flag[]
+  /** FI6: the line's own citation and method sentence, where it is not a DEFRA line (NGA's Australian lines). */
+  note?: string
 }
 
 export interface Cat3Unpriced {
@@ -287,6 +303,119 @@ function priced(
   }
 }
 
+// ── AUSTRALIA: NGA 2025 SCOPE 3 FOR GAS AND ELECTRICITY (FI6, ruling R15) ──────────────────────────
+//
+// An Australian site's gas and electricity are priced from DCCEEW's own Scope 3 factors, by state, not from the UK
+// stand-in. Every other Australian stream (liquids, LPG, steam) keeps the DEFRA stand-in and its flag. The NGA Table 2
+// market-based Scope 3 figure is not read: Category 3 rests on the location-based row (CAT3_LOCATION_BASED_SENTENCE).
+
+const NGA_EDITION = '2025'
+
+/** The state as the wizard stores it, to NGA's Table 1 row. WA and the NT use the grids the Scope 2 factor uses
+ *  (detectGridRegion maps WA to SWIS and the NT to DKIS); NSW and the ACT share a row. */
+const NGA_ELECTRICITY_ROW: Readonly<Record<string, NgaElectricityRow>> = {
+  NSW: 'NSW_ACT', ACT: 'NSW_ACT', VIC: 'VIC', QLD: 'QLD', SA: 'SA', WA: 'WA_SWIS', TAS: 'TAS', NT: 'NT_DKIS',
+}
+const NGA_GRID_SENTENCE: Readonly<Record<string, string>> = {
+  WA: 'Western Australia uses the South West Interconnected System (SWIS) row, the grid the Scope 2 factor for this site uses.',
+  NT: 'The Northern Territory uses the Darwin Katherine Interconnected System (DKIS) row, the grid the Scope 2 factor for this site uses.',
+}
+
+/** NGA Table 6 notes, p. 20, verbatim (R15 a). */
+export const NGA_TAS_NT_GAS_INSTRUCTION =
+  'It is suggested that for Tasmania the use of the Victorian emission factors is appropriate, while for ' +
+  'Northern Territory the use of the Western Australian emission factors is appropriate.'
+/** NGA Table 6 notes, p. 20, verbatim (R15 b). */
+export const NGA_METRO_DEFINITION =
+  'Metro is defined as located on or east of the dividing range in NSW, including Canberra and Queanbeyan, ' +
+  'Melbourne, Brisbane, Adelaide or Perth. Otherwise, the non-metro factor should be used.'
+
+/** NGA Table 5, natural gas distributed in a pipeline: the energy content NGA's own formula (p. 20) applies with Table
+ *  6. 0.0393 GJ/m3, measured at 101.325 kPa and 15.0 degrees Celsius (Table 5 notes, p. 19). */
+const NGA_GJ_PER_M3 = 0.0393
+const NGA_EC_CITE = 'NGA 2025 Table 5, natural gas distributed in a pipeline, 0.0393 GJ/m3, the energy content NGA\'s formula on p. 20 applies with Table 6'
+
+const ngaGasConversion = (unit: string): Cat3Conversion | null | undefined => {
+  switch (unit) {
+    case 'gj': return null
+    case 'm3': return { factor: NGA_GJ_PER_M3, from: 'm3', to: 'GJ', source: 'nga', cite: NGA_EC_CITE }
+    case 'mcf': return { factor: EXACT_CONVERSIONS.M3_PER_MCF * NGA_GJ_PER_M3, from: 'mcf', to: 'GJ', source: 'nga',
+      cite: `1 Mcf = ${EXACT_CONVERSIONS.M3_PER_MCF} m3 exactly (M3_PER_MCF, lib/unitConversions.ts), then ${NGA_EC_CITE}` }
+    case 'mmbtu': return definitional(GJ_PER_MMBTU, 'mmbtu', 'GJ', 'GJ_PER_MMBTU (lib/unitConversions.ts)')
+    case 'therms': return definitional(EXACT_CONVERSIONS.GJ_PER_THERM, 'therms', 'GJ', 'GJ_PER_THERM (lib/unitConversions.ts)')
+    case 'kwh': return definitional(EXACT_CONVERSIONS.GJ_PER_KWH, 'kwh', 'GJ', 'GJ_PER_KWH (lib/unitConversions.ts, 1 kWh = 3.6 MJ exactly)')
+    case 'mj': return definitional(EXACT_CONVERSIONS.GJ_PER_MJ, 'mj', 'GJ', 'GJ_PER_MJ (lib/unitConversions.ts)')
+    default: return undefined
+  }
+}
+
+const isAu = (row: Cat3InputRow): boolean => row.country_resolved && (row.country ?? '').toUpperCase().trim() === 'AU'
+const auState = (row: Cat3InputRow): string => (row.au_state ?? '').toUpperCase().trim()
+
+function ngaLine(
+  row: Cat3InputRow, line: Cat3LineKind, f: NgaCited, conversion: Cat3Conversion | null, unitPriced: string, note: string,
+): Cat3PricedLine {
+  const activityPriced = conversion ? row.activity * conversion.factor : row.activity
+  return {
+    row_id: row.id, location: row.location, stream: row.stream, line,
+    activity_as_entered: row.activity, unit_as_entered: row.unit,
+    activity_priced: activityPriced, unit_priced: unitPriced,
+    conversion,
+    factor: { key: `nga_${NGA_EDITION}_${f.table.split(' ').slice(0, 2).join('_').toLowerCase()}_${f.cell}`,
+      kg_co2e: f.value as number, unit: f.unit === 'kg CO2-e/kWh' ? 'kWh' : 'GJ',
+      sheet: `NGA ${NGA_EDITION} ${f.table.split(' ').slice(0, 2).join(' ')}`, cell: f.cell },
+    kg_co2e: activityPriced * (f.value as number),
+    entry_method: row.entry_method ?? null,
+    // No uk_stand_in: the factor is the site's own country's publisher.
+    flags: [],
+    note,
+  }
+}
+
+/** Australian electricity: one NGA Table 1 line, which includes grid losses (R15 c). Replaces DEFRA's three lines. */
+function priceAuElectricity(row: Cat3InputRow, lines: Cat3PricedLine[], reject: (r: Cat3Reason) => void): void {
+  const key = NGA_ELECTRICITY_ROW[auState(row)]
+  if (!key) { reject({ code: 'au_state_missing', location: row.location }); return }
+  const f = ngaScope3(NGA_EDITION)!.electricity[key]
+  const grid = NGA_GRID_SENTENCE[auState(row)]
+  lines.push(ngaLine(row, 'electricity_nga_scope3', f, null, 'kWh',
+    `NGA ${NGA_EDITION}, Table 1, Scope 3, ${f.row}: ${f.printed} kg CO2-e/kWh. This factor includes electricity lost ` +
+    `in the grid, so there is no separate transmission and distribution line.${grid ? ` ${grid}` : ''}`))
+}
+
+/** Australian natural gas: NGA Table 6 for the state and area, per GJ (R15 a, b). */
+function priceAuGas(row: Cat3InputRow, unit: string | null, lines: Cat3PricedLine[], reject: (r: Cat3Reason) => void): void {
+  const state = auState(row)
+  if (!NGA_ELECTRICITY_ROW[state]) { reject({ code: 'au_state_missing', location: row.location }); return }
+  const conversion = unit ? ngaGasConversion(unit) : undefined
+  if (conversion === undefined) { reject({ code: 'unit_not_published', stream: row.stream, unit: row.unit }); return }
+  const gas = ngaScope3(NGA_EDITION)!.naturalGas
+  let f: NgaCited
+  let extra = ''
+  if (state === 'TAS' || state === 'NT') {
+    // NGA prints "C" for both; its note directs Victoria's factors for Tasmania and Western Australia's for the NT.
+    // Neither names a metro area, so the non-metro factor applies (R15 b), and the area is not asked.
+    f = (state === 'TAS' ? gas.VIC : gas.WA).non_metro
+    extra = ` NGA prints no factor for ${state === 'TAS' ? 'Tasmania' : 'the Northern Territory'} (C, confidential) ` +
+      `and says: "${NGA_TAS_NT_GAS_INSTRUCTION}" (Table 6 notes, p. 20). No metro area is named there, so the ` +
+      `non-metro factor applies.`
+  } else if (state === 'VIC') {
+    // 4.0 either way, so the area is not asked; the chosen one is cited if there is one.
+    f = gas.VIC[row.au_gas_area ?? 'metro']
+    if (!row.au_gas_area) extra = ' Victoria\'s Metro and Non-metro factors are both 4.0, so the area is not asked.'
+  } else {
+    // AU_GAS_AREA_STATES: the states the wizard asks the area in, so every one of them reaches here.
+    if (!AU_GAS_AREA_STATES.includes(state) || !row.au_gas_area) { reject({ code: 'au_gas_area_missing', location: row.location }); return }
+    const r: NgaGasRow = state === 'NSW' || state === 'ACT' ? 'NSW_ACT' : state as NgaGasRow
+    f = gas[r][row.au_gas_area]
+  }
+  const area = f.column.endsWith('Non-Metro') ? 'Non-metro' : 'Metro'
+  // The conversion to GJ is not repeated here: the line's own arithmetic (cat3LineText, the CSV) states it, with its cite.
+  lines.push(ngaLine(row, 'fuel_wtt', f, conversion, 'GJ',
+    `NGA ${NGA_EDITION}, Table 6, ${f.row}, ${area}: ${f.printed} kg CO2-e/GJ. NGA's Scope 3 gas factors ` +
+    `exclude leakage from low-pressure distribution pipelines (p. 20).${extra}`))
+}
+
 function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpriced[]): void {
   const reject = (reason: Cat3Reason) =>
     unpriced.push({ row_id: row.id, location: row.location, stream: row.stream, reason })
@@ -314,6 +443,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
       reject({ code: 'unit_not_published', stream: row.stream, unit: row.unit })
       return
     }
+    if (isAu(row)) { priceAuElectricity(row, lines, reject); return }
     const isNz = (row.country ?? '').toUpperCase().trim() === 'NZ'
     for (const [line, key] of ELECTRICITY_LINES) {
       if (line === 'electricity_td_loss' && isNz) {
@@ -351,6 +481,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
     return
   }
 
+  if (row.stream === 'natural_gas' && isAu(row)) { priceAuGas(row, unit, lines, reject); return }
   const routes = FUEL_ROUTES[row.stream]
   const route = unit ? routes[unit] : undefined
   if (!route) {

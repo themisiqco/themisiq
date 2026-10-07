@@ -308,12 +308,13 @@ describe('Category 3 copy', () => {
       [{ id: 's', name: 'Site', country, has_natural_gas: true, natural_gas_amount: 1_000, natural_gas_unit: unit, stream_attestations: attest }],
     )
     const sentences = (r: ReturnType<typeof gas>) => cat3Sentences(priceCat3(r.inputs!), r, GWP)
-    // Therms at an Australian site: since FI2 priced by NGA (therms convert to its per-GJ factor). Gross CV, no EPA claim.
-    const au = sentences(gas('AU', 'therms', 'DCCEEW National Greenhouse Accounts Factors 2025'))
-    expect(au).toContain(CAT3_GROSS_CV_SENTENCE)
-    expect(au).not.toContain(CAT3_EPA_HHV_SENTENCE)
+    // Therms at a New Zealand site: priced by MfE (therms convert to its per-kWh factor). Gross CV, no EPA claim.
+    // (FI6: this used an Australian site; Australian gas is now priced from NGA, not the DEFRA gross CV row.)
+    const nz = sentences(gas('NZ', 'therms', 'NZ MfE Measuring Emissions 2026 v2'))
+    expect(nz).toContain(CAT3_GROSS_CV_SENTENCE)
+    expect(nz).not.toContain(CAT3_EPA_HHV_SENTENCE)
     // The same unit and country with the EPA recorded as the publisher: the sentence. The publisher decides.
-    expect(sentences(gas('AU', 'therms', 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories'))).toContain(CAT3_EPA_HHV_SENTENCE)
+    expect(sentences(gas('NZ', 'therms', 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories'))).toContain(CAT3_EPA_HHV_SENTENCE)
     // kWh at a US site priced by the EPA (kWh converts exactly to EPA's per-MMBtu factor): the sentence, whatever the unit.
     const usKwh = sentences(gas('US', 'kwh', 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories'))
     expect(usKwh).toContain(CAT3_GROSS_CV_SENTENCE)

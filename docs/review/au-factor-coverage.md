@@ -175,3 +175,11 @@ already gone in FI1 to FI10; the line numbers below are for the tree this record
 - lib/scope3/defraEnergy.ts:5: "NOTHING PRICES FROM IT YET". cat3Energy.ts prices from it.
 - lib/scope3/cat3Inputs.ts header: "efJurisdiction ends `return 'US'`". It now returns null for unsupported
   countries (engine.ts:1459-1462).
+
+## 7. Source discrepancy: NGA 2025 Table 25 (recorded 7 Oct 2026, FI6)
+
+NGA 2025 Table 25 (transmission and distribution losses, for network operators), Northern Territory, Darwin Katherine
+Interconnected System (DKIS): **0.05** kg CO2-e/kWh in the PDF (p. 56), **0.03** in the xlsx (sheet "Table 25", cell
+B10). Not used by ThemisIQ: Table 25 is the network operators' factor, which excludes grid losses, and Australian
+Category 3 electricity is priced from Table 1's one Scope 3 figure, which includes them (FI6, ruling R15). Every value
+ThemisIQ does transcribe (lib/emissionFactors/ngaScope3_2025.ts) agrees between the two files.

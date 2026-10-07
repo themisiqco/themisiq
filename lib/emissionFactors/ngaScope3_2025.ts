@@ -1,8 +1,8 @@
 // ── DCCEEW NATIONAL GREENHOUSE ACCOUNTS FACTORS 2025: SCOPE 3 FOR ELECTRICITY AND NATURAL GAS ──────
 //
 // FI6 diff 1. Transcribed from national-greenhouse-account-factors-2025.pdf and the matching .xlsx
-// (~/themisiq-sources/nga/), and from nothing else. NOTHING READS THIS YET: FI6 diff 2 wires it into
-// lib/scope3/cat3Energy.ts for Australian locations.
+// (~/themisiq-sources/nga/), and from nothing else. Read by lib/scope3/cat3Energy.ts (FI6 diff 2), which prices
+// Australian Category 3 gas and electricity from Tables 1 and 6. Table 2's figure is held and not read.
 //
 // R5: every value is in NGA's own unit, exactly as printed. Nothing here is converted, rounded, summed
 // or filled in. Each record carries its table, row (as printed), column, page and workbook cell, so a
@@ -19,7 +19,8 @@
 // ⚠️ TASMANIA AND THE NORTHERN TERRITORY HAVE NO GAS FACTOR. Table 6 prints "C" (confidential) for both,
 // in both columns. They are held as `value: null`, never as a number. NGA's note suggests the Victorian
 // factors for Tasmania and the Western Australian ones for the Northern Territory (p.20); whether to
-// apply that suggestion, and how to label it, is a decision for FI6 diff 2, not something this table does.
+// apply that suggestion is ruling R15 (a), and cat3Energy.ts applies it with the note quoted on the row; this table
+// still records what NGA prints.
 //
 // Keyed by edition ('2025') so T3c can add editions beside it.
 
@@ -108,3 +109,10 @@ export function ngaScope3(edition: string): NgaScope3Tables | null {
 
 /** Editions held, oldest first. */
 export const NGA_SCOPE3_EDITIONS = Object.keys(NGA_SCOPE3).sort() as NgaScope3Edition[]
+
+/**
+ * FI6 (ruling R15 b): the Australian states where NGA's metro and non-metro gas factors differ, so the GHG wizard asks
+ * the site's area. Victoria prints 4.0 in both columns, and Tasmania and the Northern Territory have no area NGA names
+ * as metro (their factors come from Victoria and Western Australia, non-metro), so none of the three is asked.
+ */
+export const AU_GAS_AREA_STATES: readonly string[] = ['NSW', 'ACT', 'QLD', 'SA', 'WA']

@@ -13,6 +13,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { cat3InputsFrom } from '../scope3/cat3Inputs';
+import { priceCat3 } from '../scope3/cat3Energy';
+import { energyFactor } from '../emissionFactors/defraEnergy';
+import { ngaScope3 } from '../emissionFactors/ngaScope3_2025';
 import {
   buildWorkings, calcLocation, calcInventory, analyzeCoverage, exclusiveEnd,
   isResolvedGridRegion, detectGridRegion, getResidualFactor, getGridFactor,
@@ -5608,6 +5612,52 @@ describe('FI2 exact conversions and honest provenance', () => {
     }
     expect(checked).toBeGreaterThan(200);
     expect(fellBack, 'FI2 diff 2: no row outside the US is priced from the US table').toBe(0);
+  });
+
+  it('FI6: Category 3 rows are priced from the publisher they cite: NGA for Australian gas and electricity, DEFRA (flagged outside the UK) for the rest', () => {
+    const STREAMS = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual',
+      'mobile', 'refrigerants', 'electricity', 'purchased_steam'];
+    const SITES: Partial<Location>[] = [
+      { name: 'US', country: 'US', state: 'CA', grid_region: 'US_CA', natural_gas_unit: 'therms', diesel_stationary_unit: 'gallons' },
+      { name: 'CA', country: 'CA', province: 'ON', grid_region: 'ON', natural_gas_unit: 'm3', diesel_stationary_unit: 'litres' },
+      { name: 'GB', country: 'GB', grid_region: 'UK', natural_gas_unit: 'kwh', diesel_stationary_unit: 'litres' },
+      { name: 'DE', country: 'DE', grid_region: 'EU_DE', natural_gas_unit: 'kwh', diesel_stationary_unit: 'litres' },
+      { name: 'AU', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', natural_gas_unit: 'm3', diesel_stationary_unit: 'litres' },
+      { name: 'NZ', country: 'NZ', grid_region: 'NZ', natural_gas_unit: 'kwh', diesel_stationary_unit: 'litres' },
+      { name: 'JP', country: 'JP', grid_region: '', natural_gas_unit: 'm3', diesel_stationary_unit: 'litres' },
+    ];
+    const locations = SITES.map((o, i) => ({
+      ...emptyLocation(`l${i}`, String(o.name)), ...o,
+      has_natural_gas: true, natural_gas_amount: 1000, has_diesel_stationary: true, diesel_stationary_amount: 1000,
+      electricity_kwh: 10000,
+      stream_attestations: STREAMS.filter(s => !['natural_gas', 'diesel_stationary', 'electricity'].includes(s))
+        .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })),
+    }) as Location);
+    const read = cat3InputsFrom(buildWorkings(locations, 'AR6', 2026, [], 12), locations);
+    const r = priceCat3(read.inputs!);
+    const nga = ngaScope3('2025')!;
+    let checked = 0;
+    for (const l of r.lines) {
+      const label = `${l.location} ${l.stream} ${l.line}`;
+      if (l.location === 'AU' && (l.stream === 'natural_gas' || l.stream === 'electricity')) {
+        expect(l.factor!.sheet, label).toMatch(/^NGA 2025 Table (1|6)$/);
+        const held = l.stream === 'electricity' ? nga.electricity.VIC : nga.naturalGas.VIC.metro;
+        expect([l.factor!.kg_co2e, l.factor!.cell], label).toEqual([held.value, held.cell]);
+        expect(l.flags, `${label}: NGA is the site's own publisher, not a stand-in`).toEqual([]);
+      } else {
+        expect(l.factor, label).not.toBeNull();
+        const d = energyFactor(l.factor!.key)!;
+        expect([l.factor!.kg_co2e, l.factor!.sheet, l.factor!.cell], `${label}: the DEFRA artefact's own value`)
+          .toEqual([d.kg_co2e, d.sheet, d.cells.kg_co2e]);
+        expect(l.flags.some(f => f.code === 'uk_stand_in'), `${label}: flagged as a stand-in outside the UK`).toBe(l.location !== 'GB');
+      }
+      checked++;
+    }
+    // AU: one electricity line, not three; the refused country prices nothing.
+    expect(r.lines.filter(l => l.location === 'AU' && l.stream === 'electricity')).toHaveLength(1);
+    expect(r.lines.filter(l => l.location === 'JP')).toEqual([]);
+    expect(new Set(r.lines.map(l => l.location))).toEqual(new Set(['US', 'CA', 'GB', 'DE', 'AU', 'NZ']));
+    expect(checked).toBeGreaterThan(15);
   });
 
   it('FI8: a country we hold no factors for prices nothing on any line, from any table, US EPA included', () => {

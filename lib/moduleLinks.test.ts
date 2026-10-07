@@ -128,7 +128,9 @@ describe('the GHG and Scope 3 modules, linked', () => {
     for (const m of s3.matchAll(/link:\s*'(\w+)'/g)) rendered.add(m[1])
     // The row-level ones arrive through cat3GhgFixes rather than as a literal in the page.
     const byFixes = cat3GhgFixes(
-      { lines: [{ flags: [{ code: 'country_unresolved' }] }] } as never,
+      // FI6: an Australian line withheld for want of a state or a gas area.
+      { lines: [{ flags: [{ code: 'country_unresolved' }] }],
+        unpriced: [{ reason: { code: 'au_state_missing' } }, { reason: { code: 'au_gas_area_missing' } }] } as never,
       { skipped: [{ code: 'scope2_not_priced' }, { code: 'scope1_not_priced' }] } as never,
     )
     byFixes.forEach(k => rendered.add(k))

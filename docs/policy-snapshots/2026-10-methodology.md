@@ -42,3 +42,24 @@ The "Before" text is reproduced exactly as it was published.
 ## Methodology changes (new section)
 
 > 7 October 2026. Emission factors are now applied only through the publisher's own units, exact conversions or cited properties; no other country's factor is used. EU litre factors use JEC densities; EU natural gas is accepted in kWh, and heating oil and LPG by mass. Canadian gas in gigajoules is accepted at ECCC's national heat content. Propane by mass uses per-mass factors only. Steam and district heat without a published factor are estimated and labelled. Lines that cannot be priced are shown as not counted and block export.
+
+---
+
+## Addendum (FI6, 7 October 2026): Australian Category 3 gas and electricity
+
+Added after the text above was recorded. Nothing above is changed. Ruling R15 (docs/review/design-derived-figures.md
+section 10). The Scope 3 module's Category 3 line is built in lib/scope3/categoryMethods.ts
+(`scope3MethodDescription('fuel_and_energy_upstream')`) and appears on the methodology page under "Calculation
+hierarchy", and as the Category 3 method in the Scope 3 export. Rendered text, word for word.
+
+### Category 3 method, before
+
+> Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0.
+
+### Category 3 method, after
+
+> Activity-based, and derived rather than entered: the fuel, electricity and purchased heat or steam already recorded for each location in the bound GHG inventory, re-priced on the upstream factor for that energy. Fuels take the well-to-tank (WTT) factor published for the fuel and the unit entered. Electricity and heat take three separate published rows, the WTT of generation, the transmission and distribution (T&D) loss, and the WTT of that loss, which is how the sheets direct they be reported. Every row excludes combustion, which stays in Scope 1 or Scope 2. Factors are UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting (full set v1, the WTT- fuels, WTT- UK electricity, Transmission and distribution and WTT- heat and steam sheets, AR5 GWPs), published for the United Kingdom: a location in another country is priced from them as a stand-in and its line says so. At an Australian location, natural gas and electricity are not priced from these: they take the DCCEEW National Greenhouse Accounts Factors 2025 Scope 3 factors for the site's state, Table 1 for electricity as one line that includes the electricity lost in the grid, with no separate transmission and distribution line, and Table 6 for natural gas, by the site's metro or non-metro gas area, converted to gigajoules at NGA's own energy content (Table 5). Other Australian fuels and purchased heat use the UK factors as a stand-in. Electricity is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance (section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a location's transmission and distribution loss on its own national factor, that figure is used and its source is named on the line. Contains public sector information licensed under the Open Government Licence v3.0.
+
+### Methodology changes, entry added (GHG Inventory: Scope 1 & 2 section, listed first)
+
+> 7 October 2026. Australian Category 3 gas and electricity use NGA 2025 Scope 3 factors by state; gas also by metro or non-metro area, asked per site. The upstream electricity factor includes grid losses, so there is no separate transmission and distribution line.

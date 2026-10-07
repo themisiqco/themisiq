@@ -101,6 +101,7 @@ const METHODOLOGIES = [
         // FI8: dated entries, newest first. Each is also recorded word for word in docs/policy-snapshots.
         title: 'Methodology changes',
         content: [
+          '7 October 2026. Australian Category 3 gas and electricity use NGA 2025 Scope 3 factors by state; gas also by metro or non-metro area, asked per site. The upstream electricity factor includes grid losses, so there is no separate transmission and distribution line.',
           '7 October 2026. Emission factors are now applied only through the publisher\'s own units, exact conversions or cited properties; no other country\'s factor is used. EU litre factors use JEC densities; EU natural gas is accepted in kWh, and heating oil and LPG by mass. Canadian gas in gigajoules is accepted at ECCC\'s national heat content. Propane by mass uses per-mass factors only. Steam and district heat without a published factor are estimated and labelled. Lines that cannot be priced are shown as not counted and block export.',
         ],
       },

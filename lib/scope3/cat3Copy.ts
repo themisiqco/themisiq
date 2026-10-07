@@ -154,6 +154,21 @@ export const CAT3_EPA_HHV_SENTENCE =
   `value are interchangeable is not stated by either publisher, so this line says where the two meet ` +
   `rather than assuming it away.`
 
+/**
+ * FI6 (R15): Australian gas and electricity are the one place this category is not priced from DEFRA. Shown only where
+ * an NGA line priced something, like the gross CV sentence above.
+ */
+export const CAT3_NGA_SENTENCE =
+  'At Australian locations, natural gas and electricity are priced from DCCEEW\'s National Greenhouse Accounts ' +
+  'Factors 2025 Scope 3 factors for the site\'s state: Table 1 for electricity, as one line that includes the ' +
+  'electricity lost in the grid, so there is no separate transmission and distribution line; and Table 6 for natural ' +
+  'gas, by metro or non-metro area, converted to GJ at NGA\'s own energy content (Table 5). NGA\'s factors are on ' +
+  'IPCC AR5 100-year GWPs. Other Australian fuels and purchased heat use the UK factors as a stand-in, flagged on ' +
+  'each line.'
+
+/** A line priced from NGA rather than the DEFRA artefact. */
+const isNga = (l: Cat3PricedLine): boolean => l.factor?.sheet.startsWith('NGA ') === true
+
 /** The licence the factors are published under, and the acknowledgement it requires. */
 export const CAT3_ATTRIBUTION = m.attribution_required
 export const CAT3_LICENCE_LINE = `Licence: ${m.licence}, ${m.licence_url}`
@@ -183,6 +198,7 @@ export const CAT3_LINE_LABEL: Readonly<Record<Cat3LineKind, string>> = {
   steam_wtt: 'upstream of the fuels burned to produce it (well-to-tank)',
   steam_distribution_loss: 'production of the heat lost in distribution',
   steam_distribution_wtt: 'upstream of the fuels behind that lost heat',
+  electricity_nga_scope3: 'upstream of generating it, including the electricity lost in the grid (NGA Scope 3)',
 }
 
 /** The GHG module's stream names, for the sentence that says which were not answered. */
@@ -259,8 +275,23 @@ export function cat3ReasonText(r: Cat3Reason): string {
       return `the GHG inventory holds no New Zealand transmission and distribution figure for ${r.location}, and a DEFRA one would not describe that grid`
     case 'activity_not_a_number':
       return `the figure recorded for it is not a number, in ${r.unit}`
+    case 'au_state_missing':
+      return `no Australian state is recorded for ${r.location}, and NGA's Scope 3 factor depends on the state, so it is not counted yet; it is not priced at NGA's national figure`
+    case 'au_gas_area_missing':
+      return `whether ${r.location} is in a metro gas area is not recorded, and NGA's Scope 3 gas factor depends on it, so it is not counted yet`
   }
 }
+
+/** FI6 (R15 b): the withheld gas line's own message, word for word, wherever the line is listed. */
+export const cat3AuGasAreaMissingText = (site: string): string =>
+  `The upstream natural gas figure for ${site} depends on whether the site is in a metro gas area, so it is not ` +
+  `counted yet. Choose Metro or Non-metro for this site.`
+
+/** FI6: the withheld line for a site with no state, in the same shape. */
+export const cat3AuStateMissingText = (site: string, stream: Cat3Stream): string =>
+  `The upstream ${CAT3_STREAM_LABEL[stream]} figure for ${site} depends on which Australian state the site is in, ` +
+  `and none is recorded, so it is not counted yet. It is not priced at NGA's national figure. Choose the state for ` +
+  `this site.`
 
 /** A workings row the adapter deliberately did not pass on. Same voice as cat3ReasonText. */
 export function cat3SkippedText(s: Cat3Skipped): string {
@@ -368,7 +399,7 @@ export function cat3LineText(l: Cat3PricedLine): string {
   // "per therms" is what the other phrasing produces, on the line a verifier reads most closely.
   const conv = l.conversion
     ? ` converted to ${l.conversion.to} at ${nFac(l.conversion.factor)} ` +
-      `(${l.conversion.source === 'defra' ? l.conversion.cite : `an exact identity, ${l.conversion.cite}`})` +
+      `(${l.conversion.source === 'definitional' ? `an exact identity, ${l.conversion.cite}` : l.conversion.cite})` +
       ` = ${nAct(l.activity_priced)} ${l.unit_priced}`
     : ''
   const priced = l.factor
@@ -380,11 +411,13 @@ export function cat3LineText(l: Cat3PricedLine): string {
   const flags = statements.length > 0
     ? ` ${statements.map(t => endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`)).join(' ')}`
     : ''
-  return `${head}: ${entered}${priced} = ${n2(l.kg_co2e)} kg CO2e.${flags}`
+  return `${head}: ${entered}${priced} = ${n2(l.kg_co2e)} kg CO2e.${l.note ? ` ${l.note}` : ''}${flags}`
 }
 
 /** One row that was not priced, in the same voice. */
 export function cat3UnpricedText(u: Cat3Unpriced): string {
+  if (u.reason.code === 'au_gas_area_missing') return cat3AuGasAreaMissingText(u.location)
+  if (u.reason.code === 'au_state_missing') return cat3AuStateMissingText(u.location, u.stream)
   return endSentence(`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}: not priced, ${cat3ReasonText(u.reason)}`)
 }
 
@@ -411,7 +444,8 @@ export function cat3WorkingsSummary(r: Cat3Result, skipped: readonly Cat3Skipped
   return (
     `${r.lines.length} ${r.lines.length === 1 ? 'line' : 'lines'} at ${locations} ` +
     `${locations === 1 ? 'location' : 'locations'}, priced from the DEFRA/DESNZ ${m.year} upstream energy ` +
-    `factors on the bound GHG inventory${note}`
+    `factors${r.lines.some(isNga) ? ' and, for Australian gas and electricity, the NGA 2025 Scope 3 factors,' : ''} ` +
+    `on the bound GHG inventory${note}`
   )
 }
 
@@ -450,6 +484,7 @@ export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[
   if (r.lines.some(l => isGrossCv(l) && isEpaPriced(l))) {
     out.push(CAT3_EPA_HHV_SENTENCE)
   }
+  if (r.lines.some(isNga)) out.push(CAT3_NGA_SENTENCE)
   return out
 }
 
@@ -790,7 +825,7 @@ export function cat3Basis(
   }
   const locations = new Set(r.lines.map(l => l.location)).size
   return {
-    basis: `${m.source}, upstream energy factors per line, on the bound GHG inventory`,
+    basis: `${m.source}, upstream energy factors per line${r.lines.some(isNga) ? '; DCCEEW NGA 2025 Scope 3 for Australian gas and electricity' : ''}, on the bound GHG inventory`,
     detail:
       `${scope3MethodDescription('fuel_and_energy_upstream')} ${r.lines.length} ` +
       `${r.lines.length === 1 ? 'line' : 'lines'} priced at ${locations} ` +
@@ -848,10 +883,11 @@ export function cat3CsvRows(
       ? `${n2(l.kg_co2e)} kg CO2e, taken from the GHG inventory's own New Zealand transmission and ` +
         `distribution figure (${nz.source}). No DEFRA factor was applied to this line.`
       : `${l.conversion ? `Converted to ${l.conversion.to} at ${nFac(l.conversion.factor)} ` +
-          `(${l.conversion.source === 'defra' ? l.conversion.cite : `an exact identity, ${l.conversion.cite}`})` +
+          `(${l.conversion.source === 'definitional' ? `an exact identity, ${l.conversion.cite}` : l.conversion.cite})` +
           ` = ${nAct(l.activity_priced)} ${l.unit_priced}. ` : ''}` +
         `${nAct(l.activity_priced)} ${l.unit_priced} x ${nFac(l.factor!.kg_co2e)} kg CO2e per ` +
-        `${l.factor!.unit} (${l.factor!.sheet} ${l.factor!.cell}) = ${n2(l.kg_co2e)} kg CO2e.`
+        `${l.factor!.unit} (${l.factor!.sheet} ${l.factor!.cell}) = ${n2(l.kg_co2e)} kg CO2e.` +
+        `${l.note ? ` ${l.note}` : ''}`
     const flags = cat3FlagStatements(l.flags.filter(f => f.code !== 'nz_mfe_3c'))
     out.push([label, entered,
       `${arithmetic}${flags.length ? ` ${flags.map(t => endSentence(`${t.charAt(0).toUpperCase()}${t.slice(1)}`)).join(' ')}` : ''}`])
@@ -859,7 +895,9 @@ export function cat3CsvRows(
   if (r.status === 'priced' && r.lines.length === 0) out.push(['Lines', '', 'None priced.'])
   for (const u of r.unpriced) {
     const why = cat3ReasonText(u.reason)
-    out.push([`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}`, 'Not priced', endSentence(`${why.charAt(0).toUpperCase()}${why.slice(1)}`)])
+    const own = u.reason.code === 'au_gas_area_missing' || u.reason.code === 'au_state_missing'
+    out.push([`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}`, 'Not priced',
+      own ? cat3UnpricedText(u) : endSentence(`${why.charAt(0).toUpperCase()}${why.slice(1)}`)])
   }
   for (const s of inputs.skipped) {
     const t = cat3SkippedText(s)
@@ -926,6 +964,10 @@ export const CAT3_GHG_LINKS = {
   steamFactor: { label: 'Enter a supplier factor for this heat', step: 'energy' },
   /** FI2 diff 3: a Scope 1 line the GHG side could not price; that page names the line and what fixes it. */
   scope1Line: { label: 'Fix this figure in the GHG module', step: 'energy' },
+  /** FI6: an Australian gas or electricity line withheld because the site has no state. */
+  auState: { label: "Choose this site's state", step: 'setup' },
+  /** FI6 (R15 b): an Australian gas line withheld until the site's metro or non-metro area is chosen. */
+  auGasArea: { label: "Choose this site's gas area", step: 'energy' },
 } as const satisfies Record<string, Cat3GhgLink>
 
 export type Cat3GhgLinkKey = keyof typeof CAT3_GHG_LINKS
@@ -960,6 +1002,8 @@ export function cat3GhgFixes(r: Cat3Result | null, inputs: Cat3InputsResult): Ca
   if (r?.lines.some(l => l.flags.some(f => f.code === 'country_unresolved'))) out.push('country')
   if (inputs.skipped.some(s => s.code === 'scope2_not_priced')) out.push('steamFactor')
   if (inputs.skipped.some(s => s.code === 'scope1_not_priced')) out.push('scope1Line')
+  if (r?.unpriced.some(u => u.reason.code === 'au_state_missing')) out.push('auState')
+  if (r?.unpriced.some(u => u.reason.code === 'au_gas_area_missing')) out.push('auGasArea')
   return out
 }
 

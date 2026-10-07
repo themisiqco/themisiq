@@ -1084,7 +1084,7 @@ function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
 // line. These Australian and New Zealand primary-source values are captured so they are not lost: AU Category 3 is
 // FI6, and they are transcribed into a real line there before being used.
 //   Australia: DCCEEW NGA Factors 2025 Scope 3 is transcribed, with citations, in
-//     lib/emissionFactors/ngaScope3_2025.ts (FI6 diff 1), and wired in FI6 diff 2.
+//     lib/emissionFactors/ngaScope3_2025.ts (FI6 diff 1), and priced in lib/scope3/cat3Energy.ts (FI6 diff 2).
 //   New Zealand — MfE "Measuring Emissions" 2026 Scope 3 electricity table: transcribe the exact
 //     value(s) from the workbook when wiring (deliberately not reproduced here to avoid inventing figures).
 // ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
@@ -1161,7 +1161,8 @@ const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
 //
 // SCOPE 3 IS NOT HELD HERE. Table 2's Scope 3 figure, with NGA's Scope 3 electricity by state (Table 1)
 // and natural gas by state (Table 6), is transcribed in lib/emissionFactors/ngaScope3_2025.ts (FI6 diff 1).
-// Nothing reads it yet; it is wired into Australian Category 3 in FI6 diff 2. This table stays Scope 2.
+// lib/scope3/cat3Energy.ts reads Tables 1 and 6 for Australian Category 3 (FI6 diff 2); Table 2's Scope 3 figure is
+// held there and not read. This table stays Scope 2.
 //
 // Year key = the WORKBOOK EDITION already cited by EF_SOURCES.electricity_au, so the location-based
 // and market-based figures on one AU inventory name the same document.
@@ -1749,6 +1750,10 @@ interface Location {
   // Industrial — no Residential in MfE data); nz_td_losses toggles the optional Scope 3 Cat 3 T&D line.
   nz_use_class?: 'commercial' | 'industrial'
   nz_td_losses?: boolean
+  // FI6 (R15 b): Australia only, and asked only in NSW/ACT, QLD, SA and WA where the site has gas. NGA's Scope 3 gas
+  // factor (Table 6) differs by metro and non-metro area; Category 3 withholds the gas line until it is chosen. No
+  // default. Not read by the engine: Scope 1 gas does not depend on it. Lives in locations_data (no SQL).
+  au_gas_area?: 'metro' | 'non_metro'
   source_docs: SourceDoc[]
   // Per-stream "this site has no such supply" attestations. Absent (undefined/missing entry) means
   // NOBODY has answered → the stream is UNDECLARED and blocks export. See findUndeclaredStreams.

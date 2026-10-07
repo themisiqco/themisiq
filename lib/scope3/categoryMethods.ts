@@ -339,7 +339,15 @@ export function scope3MethodDescription(method: Scope3Method): string {
         `Factors are ${e.source} (${e.factor_set.toLowerCase()} v${e.file_version}, the ` +
         `${listSheets(Object.keys(e.scope_cells))} sheets, ${e.gwp_basis} GWPs), published for the ` +
         `United Kingdom: a ` +
-        `location in another country is priced from them as a stand-in and its line says so. Electricity ` +
+        `location in another country is priced from them as a stand-in and its line says so. ` +
+        // FI6 (ruling R15, 7 Oct 2026): Australian gas and electricity are priced from the site's own publisher. Every
+        // claim here is what lib/scope3/cat3Energy.ts priceAuGas and priceAuElectricity do.
+        `At an Australian location, natural gas and electricity are not priced from these: they take the ` +
+        `DCCEEW National Greenhouse Accounts Factors 2025 Scope 3 factors for the site's state, Table 1 for ` +
+        `electricity as one line that includes the electricity lost in the grid, with no separate transmission ` +
+        `and distribution line, and Table 6 for natural gas, by the site's metro or non-metro gas area, converted ` +
+        `to gigajoules at NGA's own energy content (Table 5). Other Australian fuels and purchased heat use the ` +
+        `UK factors as a stand-in. Electricity ` +
         `is taken on the location-based Scope 2 figure, which the GHG Protocol Scope 2 Guidance ` +
         `(section 1.10, p. 10) requires a company to disclose. Where the GHG inventory already prices a ` +
         `location's transmission and distribution loss on its own national factor, that figure is used ` +

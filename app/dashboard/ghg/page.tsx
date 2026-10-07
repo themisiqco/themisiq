@@ -27,6 +27,7 @@ import { figuresForSave } from '../../../lib/ghg/savePayload'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
 import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
 import { unitLabel, unitOptionsShowing } from '../../../lib/ghg/unitLabels'
+import { AU_GAS_AREA_STATES } from '../../../lib/emissionFactors/ngaScope3_2025'
 import { CONFIRM_HELP_ID } from '../../climate-ghg/faq'
 import { CoverageStrip, type CurrentUser } from './_components/CoverageStrip'
 import { PeriodEditor, UnitEditor, ProposalNotes, unitEditable } from './_components/ProposalEdits'
@@ -1166,6 +1167,10 @@ const searchParams = useSearchParams()
       // The engine canonicalises again on read, for values that arrive from anywhere but here.
       if (field === 'country') value = canonicalCountryCode(value)
       locs[idx] = { ...locs[idx], [field]: value }
+      // FI6 (R15 b): the metro or non-metro gas area belongs to one place. A change of country or state clears it, so
+      // an answer given for one state is never carried to another.
+      // (undefined, not deleted: JSON.stringify drops it, so the saved location carries no key.)
+      if (field === 'country' || field === 'state') locs[idx].au_gas_area = undefined
      if (field === 'state') locs[idx].grid_region = detectGridRegion(value, locs[idx].country) // US states → US_<ST>; AU states → AU_<region>
 if (field === 'province') locs[idx].grid_region = value // Canadian provinces map directly
       if (field === 'country') {
@@ -2477,6 +2482,17 @@ workings: saved.workings,
                       </div>
                     )}
                   </Field>
+                  {/* FI6 (R15 b): NGA's Scope 3 gas factor differs by metro and non-metro area in these states. No default:
+                      Category 3 withholds the gas line until it is chosen. Scope 1 gas does not depend on it. */}
+                  {loc.country === 'AU' && AU_GAS_AREA_STATES.includes((loc.state || '').toUpperCase()) && (
+                    <Field label="Gas area for upstream emissions" hint="NGA counts as metro: NSW on or east of the dividing range (including Canberra and Queanbeyan), Melbourne, Brisbane, Adelaide and Perth. Anywhere else is non-metro.">
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {(['metro', 'non_metro'] as const).map(a => (
+                          <button key={a} onClick={() => updateLocation(activeLocation, 'au_gas_area', a)} style={unitBtn(loc.au_gas_area === a)}>{a === 'metro' ? 'Metro' : 'Non-metro'}</button>
+                        ))}
+                      </div>
+                    </Field>
+                  )}
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload gas bills" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="utility_bill_gas" docs={loc.source_docs.filter(d => d.document_type === 'utility_bill_gas')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:utility_bill_gas`]} /> : <LockedDocUpload label="Upload gas bills" />}
                 </div>
               )}

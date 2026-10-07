@@ -187,6 +187,26 @@ function countryByName(locations: Record<string, unknown>[]): Map<string, string
   return out
 }
 
+/**
+ * FI6: one field of a location, by name, the way countryByName joins the country: the value where every location of
+ * that name agrees on it, null where they disagree or none is recorded. Never the first one found.
+ */
+function fieldByName(locations: Record<string, unknown>[], field: string): Map<string, string | null> {
+  const seen = new Map<string, Set<string>>()
+  for (const loc of locations) {
+    const key = str(loc.name).trim() || 'Location'
+    const set = seen.get(key) ?? new Set<string>()
+    set.add(str(loc[field]).trim())
+    seen.set(key, set)
+  }
+  const out = new Map<string, string | null>()
+  for (const [name, values] of seen) {
+    const only = values.size === 1 ? [...values][0] : ''
+    out.set(name, only === '' ? null : only)
+  }
+  return out
+}
+
 // ── THE WORKINGS ROWS CATEGORY 3 READS ────────────────────────────────────────────────────────────
 
 /**
@@ -254,6 +274,9 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
   if (readable.length === 0) return empty({ code: 'workings_shape_unreadable', rows: rows.length })
 
   const countries = countryByName(locations)
+  // FI6: Australian Category 3 gas and electricity are priced by state, and gas by NGA's metro or non-metro area.
+  const auStates = fieldByName(locations, 'state')
+  const auGasAreas = fieldByName(locations, 'au_gas_area')
   // Priced rows by location name and stream: the engine's own verdict at save, from derived figures (T7).
   const priced = new Set(readable
     .filter(r => typeof r.stream === 'string' && !('declaration' in r) && num(r.result_tco2e) !== null)
@@ -385,6 +408,15 @@ export function cat3InputsFrom(workings: unknown, locationsData: unknown): Cat3I
       // Scope 1 and 2 figures are priced from ...", and its trailing full stop met the one this module
       // adds. The note belongs on the GHG side, where it describes the row it was written for.
       scope1_publisher: publisherOf(str(r.ef_source)),
+      ...(country === 'AU' && (cat3Stream === 'electricity' || cat3Stream === 'natural_gas')
+        ? {
+            au_state: auStates.get(location) ?? null,
+            au_gas_area: (() => {
+              const a = auGasAreas.get(location)
+              return a === 'metro' || a === 'non_metro' ? a : null
+            })(),
+          }
+        : {}),
     })
   }
 

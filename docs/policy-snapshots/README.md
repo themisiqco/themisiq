@@ -14,7 +14,7 @@ convention: each file records the sections that changed, word for word, before a
 | `2026-10-privacy-v2.3.md` | Privacy Policy v2.3: what changed from v2.2, word for word (LEAD1 L10, the free account) |
 | `2026-10-privacy-v2.4.md` | Privacy Policy v2.4 (current): what changed from v2.3, word for word (RET1, rate-limit records and held calculations deleted on a schedule) |
 | `2026-10-terms.md` | Terms of Service effective October 6, 2026 (current): what changed, word for word |
-| `2026-10-methodology.md` | Methodology page, GHG "Emission factors" and "Scope 2 accounting", changed October 7, 2026: before and after, word for word (factor integrity, FI8) |
+| `2026-10-methodology.md` | Methodology page, GHG "Emission factors" and "Scope 2 accounting", changed October 7, 2026: before and after, word for word (factor integrity, FI8), with an addendum for the Scope 3 Category 3 method and its change entry (FI6, Australian gas and electricity from NGA 2025) |
 
 ## Checkout consent versions
 
