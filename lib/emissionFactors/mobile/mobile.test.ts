@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { r16Highest, type MobileGasRow, type MobilePublisher } from './types'
+import type { MobileGasRow, MobilePublisher } from './types'
+import { selectMobileRow, highestRow, R16_RANKING_GWP } from './select'
 import { EPA_MOBILE_2025 } from './epa2025'
 import { ECCC_MOBILE_2025 } from './eccc2025'
 import { DEFRA_MOBILE_2026 } from './defra2026'
@@ -17,9 +18,6 @@ import { IPCC_MOBILE_2006 } from './ipcc2006'
 // other value is typed from the document and page named beside it.
 
 const ALL: MobilePublisher[] = [EPA_MOBILE_2025, ECCC_MOBILE_2025, DEFRA_MOBILE_2026, NGA_MOBILE_2025, MFE_MOBILE_2026, IPCC_MOBILE_2006]
-const AR5 = { ch4: 28, n2o: 265 }
-const AR4 = { ch4: 25, n2o: 298 }
-const AR6 = { ch4: 29.8, n2o: 273 }
 
 // EPA Hub 2025, sheet "Emission Factors Hub": [CH4 cell, CH4, N2O cell, N2O]. Table 3 rows 127 to 238 (gasoline on-road,
 // g/vehicle-mile; motorcycles 239 to 241 not an R16 type), Table 4 rows 249 to 256 (diesel on-road, g/vehicle-mile),
@@ -231,10 +229,21 @@ describe('FI9: mobile combustion factors as published', () => {
       ['light', 'diesel', 'manufactured 2004 or later', 0.01, 0.5, '26'], ['light', 'diesel', 'manufactured prior to 2004', 0.1, 0.4, '28'],
       ['heavy', 'diesel', 'Euro iv or higher', 0.07, 0.4, '27'], ['heavy', 'diesel', 'Euro iii', 0.1, 0.4, '27'],
       ['heavy', 'diesel', 'Euro i', 0.2, 0.4, '27'],
+      // FI9 diff 1b: heavy petrol from the NGER Determination, Schedule 1 Part 4 (items 53, p. 407, and 64, p. 409).
+      ['heavy', 'petrol', 'Division 4.1 (any vehicle; manufactured 2004 or earlier)', 0.6, 1.6, '407'],
+      ['heavy', 'petrol', 'Division 4.2 (manufactured after 2004)', 0.02, 0.2, '409'],
+      // FI9 diff 1b: non-road is stationary energy under Determination s 2.41(2), so NGA Table 8 (p. 23).
+      ['non_road', 'petrol', null, 0.2, 0.2, '23'],
+      ['non_road', 'diesel', null, 0.1, 0.2, '23'],
     ])
+    expect(NGA_MOBILE_2025.rows.filter(r => r.type === 'non_road').map(r => r.cite.cell)).toEqual(["'Table 8'!D9, E9", "'Table 8'!D14, E14"])
+    for (const r of NGA_MOBILE_2025.rows.filter(x => x.type === 'non_road')) expect(r.cite.basis).toContain('registered for road use')
+    for (const r of NGA_MOBILE_2025.rows.filter(x => x.type === 'heavy' && x.fuel === 'petrol')) {
+      expect(r.cite.document).toContain('Compilation No. 21 (compilation date 1 July 2026)')
+    }
     expect(NGA_MOBILE_2025.co2.map(c => [c.fuel, c.value])).toEqual([['petrol', 67.4], ['diesel', 69.9]])
     expect([NGA_MOBILE_ENERGY_CONTENT_2025.petrol.value, NGA_MOBILE_ENERGY_CONTENT_2025.diesel.value]).toEqual([34.2, 38.6])
-    expect(NGA_MOBILE_2025.absent.map(a => `${a.type} ${a.fuel}`)).toEqual(['heavy petrol', 'non_road petrol', 'non_road diesel'])
+    expect(NGA_MOBILE_2025.absent).toEqual([])
   })
 
   it('MfE 2026 v2 Transport Fuel (data!J1438 to J1461), kg CO2-e/litre, no vehicle split', () => {
@@ -242,11 +251,18 @@ describe('FI9: mobile combustion factors as published', () => {
     expect(MFE_MOBILE_2026.rows.map(r => [r.type, r.fuel, r.ch4, r.n2o, r.cite.cell])).toEqual([
       ['light', 'diesel', 0.00394905, 0.0373749, 'data!J1438, data!J1440'], ['heavy', 'diesel', 0.00394905, 0.0373749, 'data!J1438, data!J1440'],
       ['light', 'petrol', 0.0302118, 0.0693172, 'data!J1458, data!J1460'], ['heavy', 'petrol', 0.0302118, 0.0693172, 'data!J1458, data!J1460'],
+      // FI9 diff 1b: non-road from the same rows, classified by the 2024 guide (section 3.3, p. 29).
+      ['non_road', 'diesel', 0.00394905, 0.0373749, 'data!J1438, data!J1440'], ['non_road', 'petrol', 0.0302118, 0.0693172, 'data!J1458, data!J1460'],
     ])
+    for (const r of MFE_MOBILE_2026.rows) {
+      expect(r.cite.basis).toContain('2024 detailed guide (ME1829)')
+      expect(r.cite.basis).toContain('Transport fuels are used in an engine to move a vehicle')
+      expect(r.cite.basis).toContain('Factor: the 2026 v2 workbook')
+    }
     // The parts add to MfE's printed totals: Diesel 2.67177 (J1441), Regular Petrol 2.36143 (J1461).
     expect(2.63045 + 0.00394905 + 0.0373749).toBeCloseTo(2.67177, 5)
     expect(2.2619 + 0.0302118 + 0.0693172).toBeCloseTo(2.36143, 5)
-    expect(MFE_MOBILE_2026.absent.map(a => `${a.type} ${a.fuel}`)).toEqual(['non_road diesel', 'non_road petrol'])
+    expect(MFE_MOBILE_2026.absent).toEqual([])
   })
 
   it('IPCC 2006 Vol. 2 Ch. 3: Tables 3.2.1 (p. 3.16), 3.2.2 (p. 3.21) and 3.3.1 (p. 3.36), kg/TJ', () => {
@@ -255,7 +271,8 @@ describe('FI9: mobile combustion factors as published', () => {
     expect(light).toEqual([
       ['Motor Gasoline - Uncontrolled', 33, 3.2], ['Motor Gasoline - Oxidation Catalyst', 25, 8.0],
       ['Motor Gasoline - Low Mileage Light Duty Vehicle Vintage 1995 or Later', 3.8, 5.7], ['Gas / Diesel Oil', 3.9, 3.9]])
-    expect(IPCC_MOBILE_2006.rows.filter(r => r.type === 'heavy').map(r => [r.vehicle, r.ch4, r.n2o])).toEqual(light)
+    // The vintage row names light duty vehicles, so Heavy has the other three (FI9 diff 1b).
+    expect(IPCC_MOBILE_2006.rows.filter(r => r.type === 'heavy').map(r => [r.vehicle, r.ch4, r.n2o])).toEqual(light.filter(x => !String(x[0]).includes('Light Duty')))
     expect(IPCC_MOBILE_2006.rows.filter(r => r.type === 'non_road').map(r => [r.vehicle, r.detail, r.ch4, r.n2o])).toEqual([
       ['Diesel', 'Agriculture', 4.15, 28.6], ['Diesel', 'Forestry', 4.15, 28.6], ['Diesel', 'Industry', 4.15, 28.6], ['Diesel', 'Household', 4.15, 28.6],
       ['Motor Gasoline 4-stroke', 'Agriculture', 80, 2], ['Motor Gasoline 4-stroke', 'Industry', 50, 2], ['Motor Gasoline 4-stroke', 'Household', 120, 2],
@@ -267,7 +284,10 @@ describe('FI9: mobile combustion factors as published', () => {
   })
 })
 
-describe('FI9: shape and R16 selection', () => {
+describe('FI9: shape and R16 selection (refined 7 Oct 2026)', () => {
+  const sel = selectMobileRow
+  const row = (r: ReturnType<typeof selectMobileRow>) => r ? `${r.row.vehicle} | ${r.row.detail ?? ''}` : null
+
   it('every row and every CO2 figure carries a table, a row and a page or a cell', () => {
     for (const p of ALL) {
       for (const r of [...p.rows.map(x => x.cite), ...p.co2.map(x => x.cite)]) {
@@ -279,47 +299,131 @@ describe('FI9: shape and R16 selection', () => {
     }
   })
 
-  it('a type with no published row is listed as absent, and has no row', () => {
-    for (const p of ALL) for (const a of p.absent) {
-      expect(p.rows.some(r => r.type === a.type && r.fuel === a.fuel), `${p.publisher} ${a.type} ${a.fuel}`).toBe(false)
-      expect(r16Highest(p.rows, a.type, a.fuel, AR5)).toBeNull()
+  it('after FI9 diff 1b no publisher has a type and fuel with no row, so nothing is blocked and nothing needs the fallback', () => {
+    for (const p of ALL) {
+      expect(p.absent, p.publisher).toEqual([])
+      for (const type of ['light', 'heavy', 'non_road'] as const) for (const fuel of ['diesel', 'petrol'] as const) {
+        const s = sel(p, { type, fuel, ...(type === 'non_road' ? { equipmentType: 'industrial_commercial' as const } : {}) })
+        expect(s, `${p.publisher} ${type} ${fuel}`).not.toBeNull()
+        expect(s!.fallback, `${p.publisher} ${type} ${fuel}`).toBe(false)
+      }
     }
   })
 
-  it('R16 highest row per type, as the record states it (AR5)', () => {
-    const pick = (p: MobilePublisher, t: MobileGasRow['type'], f: MobileGasRow['fuel']) => {
-      const r = r16Highest(p.rows, t, f, AR5)
-      return r ? `${r.vehicle} | ${r.detail ?? ''}` : null
-    }
-    expect(pick(EPA_MOBILE_2025, 'light', 'petrol')).toBe('Gasoline Light-Duty Trucks | Model year 1987-1993')
-    expect(pick(EPA_MOBILE_2025, 'light', 'diesel')).toBe('Light-Duty Trucks | Model year 2007-2022')
-    expect(pick(EPA_MOBILE_2025, 'heavy', 'petrol')).toBe('Gasoline Heavy-Duty Vehicles | Model year 1997')
-    expect(pick(EPA_MOBILE_2025, 'heavy', 'diesel')).toBe('Medium- and Heavy-Duty Vehicles | Model year 2007-2022')
-    expect(pick(EPA_MOBILE_2025, 'non_road', 'petrol')).toBe('Logging Equipment | Gasoline (4 stroke)')
-    expect(pick(EPA_MOBILE_2025, 'non_road', 'diesel')).toBe('Airport Equipment | Diesel')
-    expect(pick(ECCC_MOBILE_2025, 'light', 'petrol')).toBe('Light-duty Gasoline Vehicles (LDGVs) | Tier 0')
-    expect(pick(ECCC_MOBILE_2025, 'light', 'diesel')).toBe('Light-duty Diesel Trucks (LDDTs) | Advanced Control')
-    expect(pick(ECCC_MOBILE_2025, 'heavy', 'petrol')).toBe('Heavy-duty Gasoline Vehicles (HDGVs) | Three-way Catalyst')
-    expect(pick(ECCC_MOBILE_2025, 'heavy', 'diesel')).toBe('Heavy-duty Diesel Vehicles (HDDVs) | Advanced Control')
-    expect(pick(ECCC_MOBILE_2025, 'non_road', 'petrol')).toBe('Off-road Gasoline | 2-stroke')
-    expect(pick(ECCC_MOBILE_2025, 'non_road', 'diesel')).toBe('Off-road Diesel | \u2265 19kW, Tier 4')
-    expect(pick(NGA_MOBILE_2025, 'light', 'petrol')).toBe('Cars and light commercial vehicles | manufactured prior to 2004')
-    expect(pick(NGA_MOBILE_2025, 'light', 'diesel')).toBe('Cars and light commercial vehicles | manufactured 2004 or later')
-    expect(pick(NGA_MOBILE_2025, 'heavy', 'diesel')).toBe('Heavy duty vehicles | Euro i')
-    expect(pick(IPCC_MOBILE_2006, 'light', 'petrol')).toBe('Motor Gasoline - Oxidation Catalyst | ')
-    expect(pick(IPCC_MOBILE_2006, 'non_road', 'petrol')).toBe('Motor Gasoline 2-Stroke | Household')
-    expect(pick(IPCC_MOBILE_2006, 'non_road', 'diesel')).toBe('Diesel | Agriculture')
+  it('ranks on CO2-e at AR5, fixed', () => {
+    expect(R16_RANKING_GWP).toEqual({ ch4: 28, n2o: 265 })
+    // US heavy petrol: 1997 (0.0924, 0.1726) over 1998 (0.0655, 0.175) at AR5; AR4 would have picked 1998.
+    expect(row(sel(EPA_MOBILE_2025, { type: 'heavy', fuel: 'petrol' }))).toBe('Gasoline Heavy-Duty Vehicles | Model year 1997')
+    // IPCC road petrol: Oxidation Catalyst (25, 8.0) over Uncontrolled (33, 3.2) in CO2-e, though not by mass.
+    expect(row(sel(IPCC_MOBILE_2006, { type: 'light', fuel: 'petrol' }))).toBe('Motor Gasoline - Oxidation Catalyst | ')
+    const a: MobileGasRow = { ...IPCC_MOBILE_2006.rows[0], ch4: 1, n2o: 1 }
+    expect(highestRow([a, { ...a, ch4: 1 }])).toBe(a)   // a tie goes to the first row
   })
 
-  it('the US heavy petrol pick depends on the GWP set, which the record flags for a decision', () => {
-    const at = (g: { ch4: number; n2o: number }) => r16Highest(EPA_MOBILE_2025.rows, 'heavy', 'petrol', g)!.detail
-    expect([at(AR4), at(AR5), at(AR6)]).toEqual(['Model year 1998', 'Model year 1997', 'Model year 1997'])
-    // Every other pick is the same under all three sets.
-    for (const p of ALL) for (const t of ['light', 'heavy', 'non_road'] as const) for (const f of ['diesel', 'petrol'] as const) {
-      if (p === EPA_MOBILE_2025 && t === 'heavy' && f === 'petrol') continue
-      expect(r16Highest(p.rows, t, f, AR4), `${p.publisher} ${t} ${f}`).toBe(r16Highest(p.rows, t, f, AR5))
-      expect(r16Highest(p.rows, t, f, AR6), `${p.publisher} ${t} ${f}`).toBe(r16Highest(p.rows, t, f, AR5))
+  it('US EPA: model-year picks, the no-year pick, and each equipment type', () => {
+    expect(sel(EPA_MOBILE_2025, { type: 'light', fuel: 'petrol' })!.reason)
+      .toBe('Model year not given, so the highest published row for light vehicles is used.')
+    expect(row(sel(EPA_MOBILE_2025, { type: 'light', fuel: 'petrol' }))).toBe('Gasoline Light-Duty Trucks | Model year 1987-1993')
+    // 2015 ties a car row and a truck row; the car row is higher in CO2-e.
+    const y2015 = sel(EPA_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2015 })!
+    expect(row(y2015)).toBe('Gasoline Passenger Cars | Model year 2015')
+    expect(y2015.reason).toBe('Typical model year 2015: US EPA ties 2 rows to it, so the highest of them is used.')
+    expect(row(sel(EPA_MOBILE_2025, { type: 'heavy', fuel: 'diesel', modelYear: 2000 }))).toBe('Medium- and Heavy-Duty Vehicles | Model year 1960-2006')
+    expect(row(sel(EPA_MOBILE_2025, { type: 'heavy', fuel: 'petrol', modelYear: 1979 }))).toBe('Gasoline Heavy-Duty Vehicles | Model year \u22641980')
+    // Table 3's last row is 2022: a later year reaches no row, and takes the highest (the record flags this).
+    const y2024 = sel(EPA_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2024 })!
+    expect(y2024.reason).toBe('US EPA ties no row to model year 2024, so the highest published row for light vehicles is used.')
+    const eq: [string, string, string][] = [
+      ['industrial_commercial', 'Industrial/Commercial Equipment | Diesel', 'Industrial/Commercial Equipment | Gasoline (4 stroke)'],
+      ['construction_mining', 'Construction/Mining Equipment | Diesel Equipment', 'Construction/Mining Equipment | Gasoline (4 stroke)'],
+      ['agriculture', 'Agricultural Equipment | Diesel Equipment', 'Agricultural Equipment | Gasoline (4 stroke)'],
+      ['forestry', 'Logging Equipment | Diesel', 'Logging Equipment | Gasoline (4 stroke)'],
+      ['lawn_garden', 'Lawn and Garden Equipment | Diesel', 'Lawn and Garden Equipment | Gasoline (4 stroke)'],
+    ]
+    for (const [e, d, p] of eq) {
+      expect(row(sel(EPA_MOBILE_2025, { type: 'non_road', fuel: 'diesel', equipmentType: e as never })), e).toBe(d)
+      expect(row(sel(EPA_MOBILE_2025, { type: 'non_road', fuel: 'petrol', equipmentType: e as never })), e).toBe(p)
     }
+  })
+
+  it('ECCC: years only where the NIR ties them; no sector split off road', () => {
+    expect(row(sel(ECCC_MOBILE_2025, { type: 'light', fuel: 'petrol' }))).toBe('Light-duty Gasoline Vehicles (LDGVs) | Tier 0')
+    expect(row(sel(ECCC_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2018 }))).toBe('Light-duty Gasoline Vehicles (LDGVs) | Tier 2')
+    expect(row(sel(ECCC_MOBILE_2025, { type: 'light', fuel: 'diesel', modelYear: 1990 }))).toBe('Light-duty Diesel Vehicles (LDDVs) | Moderate Control')
+    expect(row(sel(ECCC_MOBILE_2025, { type: 'heavy', fuel: 'diesel', modelYear: 2000 }))).toBe('Heavy-duty Diesel Vehicles (HDDVs) | Advanced Control')
+    // 1996 to 2003 light, and every heavy gasoline year, reach no tied row: the highest row.
+    expect(sel(ECCC_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2000 })!.reason)
+      .toBe('Environment and Climate Change Canada ties no row to model year 2000, so the highest published row for light vehicles is used.')
+    expect(row(sel(ECCC_MOBILE_2025, { type: 'heavy', fuel: 'petrol', modelYear: 2018 }))).toBe('Heavy-duty Gasoline Vehicles (HDGVs) | Three-way Catalyst')
+    for (const e of ['industrial_commercial', 'construction_mining', 'agriculture', 'forestry', 'lawn_garden'] as const) {
+      const d = sel(ECCC_MOBILE_2025, { type: 'non_road', fuel: 'diesel', equipmentType: e })!
+      expect(row(d), e).toBe('Off-road Diesel | \u2265 19kW, Tier 4')
+      expect(d.reason, e).toMatch(/^Environment and Climate Change Canada does not split non-road equipment by type\. Engine power and emission tier not given/)
+      expect(row(sel(ECCC_MOBILE_2025, { type: 'non_road', fuel: 'petrol', equipmentType: e })), e).toBe('Off-road Gasoline | 2-stroke')
+    }
+  })
+
+  it('DEFRA and MfE: one row per fuel for every type, every year and every equipment type', () => {
+    for (const [p, d, pe] of [[DEFRA_MOBILE_2026, 0.0329, 0.00587], [MFE_MOBILE_2026, 0.0373749, 0.0693172]] as const) {
+      for (const type of ['light', 'heavy'] as const) {
+        expect(sel(p, { type, fuel: 'diesel', modelYear: 2010 })!.row.n2o, p.publisher).toBe(d)
+        expect(sel(p, { type, fuel: 'diesel', modelYear: 2010 })!.reason).toBe(`${p.publisher} prints one row for ${type} vehicles; it is not split by model year.`)
+        expect(sel(p, { type, fuel: 'petrol' })!.row.n2o).toBe(pe)
+      }
+      for (const e of ['industrial_commercial', 'construction_mining', 'agriculture', 'forestry', 'lawn_garden'] as const) {
+        const s = sel(p, { type: 'non_road', fuel: 'diesel', equipmentType: e })!
+        expect(s.row.n2o, `${p.publisher} ${e}`).toBe(d)
+        expect(s.reason).toBe(`${p.publisher} prints one non-road row for diesel, not split by equipment type.`)
+      }
+    }
+  })
+
+  it('NGA: model years from the p. 28 note and the Determination; Euro standard has no year; non-road from Table 8', () => {
+    expect(row(sel(NGA_MOBILE_2025, { type: 'light', fuel: 'petrol' }))).toBe('Cars and light commercial vehicles | manufactured prior to 2004')
+    expect(row(sel(NGA_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2003 }))).toBe('Cars and light commercial vehicles | manufactured prior to 2004')
+    expect(row(sel(NGA_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2004 }))).toBe('Cars and light commercial vehicles | manufactured 2004 or later')
+    expect(sel(NGA_MOBILE_2025, { type: 'light', fuel: 'petrol', modelYear: 2010 })!.reason)
+      .toBe('Typical model year 2010: DCCEEW National Greenhouse Accounts Factors, manufactured 2004 or later.')
+    expect(row(sel(NGA_MOBILE_2025, { type: 'heavy', fuel: 'petrol' }))).toMatch(/Division 4\.1/)
+    expect(row(sel(NGA_MOBILE_2025, { type: 'heavy', fuel: 'petrol', modelYear: 2004 }))).toMatch(/Division 4\.1/)
+    expect(row(sel(NGA_MOBILE_2025, { type: 'heavy', fuel: 'petrol', modelYear: 2005 }))).toMatch(/Division 4\.2/)
+    expect(sel(NGA_MOBILE_2025, { type: 'heavy', fuel: 'diesel' })!.reason)
+      .toBe('Euro standard not given, so the highest published row for heavy vehicles is used.')
+    expect(row(sel(NGA_MOBILE_2025, { type: 'heavy', fuel: 'diesel', modelYear: 2015 }))).toBe('Heavy duty vehicles | Euro i')
+    for (const e of ['industrial_commercial', 'construction_mining', 'agriculture', 'forestry', 'lawn_garden'] as const) {
+      const s = sel(NGA_MOBILE_2025, { type: 'non_road', fuel: 'diesel', equipmentType: e })!
+      expect([s.row.ch4, s.row.n2o, s.fallback], e).toEqual([0.1, 0.2, false])
+    }
+  })
+
+  it('IPCC: the vintage row from 1995 for light petrol; Table 3.3.1 sectors for each equipment type', () => {
+    expect(row(sel(IPCC_MOBILE_2006, { type: 'light', fuel: 'petrol', modelYear: 2010 })))
+      .toBe('Motor Gasoline - Low Mileage Light Duty Vehicle Vintage 1995 or Later | ')
+    expect(row(sel(IPCC_MOBILE_2006, { type: 'light', fuel: 'petrol', modelYear: 1990 }))).toBe('Motor Gasoline - Oxidation Catalyst | ')
+    expect(row(sel(IPCC_MOBILE_2006, { type: 'heavy', fuel: 'petrol', modelYear: 2010 }))).toBe('Motor Gasoline - Oxidation Catalyst | ')
+    const eq: [string, string, string][] = [
+      ['industrial_commercial', 'Diesel | Industry', 'Motor Gasoline 2-Stroke | Industry'],
+      ['construction_mining', 'Diesel | Industry', 'Motor Gasoline 2-Stroke | Industry'],
+      ['agriculture', 'Diesel | Agriculture', 'Motor Gasoline 2-Stroke | Agriculture'],
+      ['forestry', 'Diesel | Forestry', 'Motor Gasoline 2-Stroke | Forestry'],
+      ['lawn_garden', 'Diesel | Household', 'Motor Gasoline 2-Stroke | Household'],
+    ]
+    for (const [e, d, p] of eq) {
+      expect(row(sel(IPCC_MOBILE_2006, { type: 'non_road', fuel: 'diesel', equipmentType: e as never })), e).toBe(d)
+      expect(row(sel(IPCC_MOBILE_2006, { type: 'non_road', fuel: 'petrol', equipmentType: e as never })), e).toBe(p)
+    }
+  })
+
+  it('the IPCC fallback: CH4 and N2O from IPCC where a publisher prints no row, with the R16 note', () => {
+    const none: MobilePublisher = { ...NGA_MOBILE_2025, rows: [] }
+    const off = sel(none, { type: 'non_road', fuel: 'diesel', equipmentType: 'construction_mining' })!
+    expect(off.fallback).toBe(true)
+    expect(row(off)).toBe('Diesel | Industry')
+    expect(off.reason).toBe('IPCC 2006 default for CH4 and N2O; DCCEEW National Greenhouse Accounts Factors publishes no off-road ' +
+      'factor for diesel. IPCC prints one row for non-road construction and mining equipment.')
+    const road = sel(none, { type: 'heavy', fuel: 'petrol', modelYear: 2010 })!
+    expect(road.fallback).toBe(true)
+    expect(road.reason).toMatch(/^IPCC 2006 default for CH4 and N2O; DCCEEW National Greenhouse Accounts Factors publishes no road factor for petrol\. /)
   })
 
   it('nothing outside this folder reads it yet (FI9 diff 1), and no file carries an em dash', () => {

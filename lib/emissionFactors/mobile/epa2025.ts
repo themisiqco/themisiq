@@ -14,7 +14,25 @@
 // Boats, Locomotives and Aircraft, which are not R16 types and are not transcribed. Gasoline Motorcycles (Table 3)
 // are not an R16 type either and are not transcribed. Alternative-fuel rows in Table 4 are not diesel or petrol.
 
-import type { MobileCite, MobileGasRow, MobilePublisher } from './types'
+import type { EquipmentType, MobileCite, MobileGasRow, MobilePublisher, YearRange } from './types'
+
+/** EPA's model-year label as a range: "2005", "1984-1993", "≤1980". The label is printed; the range is its reading. */
+export function epaYears(label: string): YearRange {
+  const t = label.trim()
+  if (t.startsWith('≤')) return { from: null, to: Number(t.slice(1)) }
+  const [a, b] = t.split('-').map(Number)
+  return { from: a, to: b ?? a }
+}
+
+/** R16's equipment types to Table 5's equipment rows. Airport, Railroad and Recreational Equipment are no R16 type. */
+const EPA_EQUIPMENT: Readonly<Record<string, EquipmentType[]>> = {
+  'Agricultural Equipment': ['agriculture'],
+  'Construction/Mining Equipment': ['construction_mining'],
+  'Lawn and Garden Equipment': ['lawn_garden'],
+  'Industrial/Commercial Equipment': ['industrial_commercial'],
+  'Logging Equipment': ['forestry'],
+  'Airport Equipment': [], 'Railroad Equipment': [], 'Recreational Equipment': [],
+}
 
 const SHEET = 'Emission Factors Hub'
 const cell = (c: string) => `${SHEET}!${c}`
@@ -22,19 +40,21 @@ const cell = (c: string) => `${SHEET}!${c}`
 const t3 = (vehicle: string, type: 'light' | 'heavy', year: string, ch4: number, n2o: number,
   vc: string, yc: string, ch4c: string, n2oc: string): MobileGasRow => ({
   fuel: 'petrol', type, vehicle, detail: `Model year ${year}`, ch4, n2o, unit: 'g/vehicle-mile', gas: 'mass',
+  years: epaYears(year),
   cite: { table: 'Table 3 Mobile Combustion CH4 and N2O for On-Road Gasoline Vehicles', row: `${vehicle}, ${year}`,
     column: 'CH4 Factor (g CH4 / vehicle-mile); N2O Factor (g N2O / vehicle-mile)', page: '2',
     cell: `${cell(ch4c)}, ${cell(n2oc)} (vehicle ${vc}, model year ${yc})` },
 })
 const t4 = (vehicle: string, type: 'light' | 'heavy', year: string, ch4: number, n2o: number, r: number): MobileGasRow => ({
   fuel: 'diesel', type, vehicle, detail: `Model year ${year}`, ch4, n2o, unit: 'g/vehicle-mile', gas: 'mass',
+  years: epaYears(year),
   cite: { table: 'Table 4 Mobile Combustion CH4 and N2O for On-Road Diesel and Alternative Fuel Vehicles',
     row: `${vehicle}, Diesel, ${year}`, column: 'CH4 Factor (g CH4 / vehicle-mile); N2O Factor (g N2O / vehicle-mile)',
     page: '3', cell: `${cell(`F${r}`)}, ${cell(`G${r}`)}` },
 })
 const t5 = (vehicle: string, fuelType: string, ch4: number, n2o: number, r: number): MobileGasRow => ({
   fuel: /^Diesel/.test(fuelType) ? 'diesel' : 'petrol', type: 'non_road', vehicle, detail: fuelType, ch4, n2o,
-  unit: 'g/gallon', gas: 'mass',
+  unit: 'g/gallon', gas: 'mass', equipment: EPA_EQUIPMENT[vehicle],
   cite: { table: 'Table 5 Mobile Combustion CH4 and N2O for Non-Road Vehicles', row: `${vehicle}, ${fuelType}`,
     column: 'CH4 Factor (g CH4 / gallon); N2O Factor (g N2O / gallon)', page: '3', cell: `${cell(`E${r}`)}, ${cell(`F${r}`)}` },
 })
@@ -202,4 +222,8 @@ export const EPA_MOBILE_2025: MobilePublisher = {
   ],
   // Every R16 type has diesel and petrol rows.
   absent: [],
+  splitBy: {
+    'light:petrol': 'Model year', 'light:diesel': 'Model year', 'heavy:petrol': 'Model year', 'heavy:diesel': 'Model year',
+    'non_road:petrol': 'Engine type', 'non_road:diesel': 'Equipment or off-road truck',
+  },
 }

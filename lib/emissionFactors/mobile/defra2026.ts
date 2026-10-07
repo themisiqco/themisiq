@@ -27,7 +27,10 @@ const row = (fuel: 'diesel' | 'petrol', label: string, ch4: number, n2o: number,
     fuel, type, vehicle: 'Any vehicle or asset (Fuels sheet)', detail: null, ch4, n2o,
     unit: 'kg CO2e/litre', gas: 'co2e_ar5' as const,
     cite: { table: 'Fuels', row: `${label}, litres`, column: 'kg CO2e of CH4 per unit; kg CO2e of N2O per unit',
-      cell: `Fuels!F${r}, Fuels!G${r}` },
+      cell: `Fuels!F${r}, Fuels!G${r}`,
+      basis: type === 'non_road'
+        ? 'Fuels!A8: "Fuels conversion factors should be used for primary fuel sources combusted at a site or in an asset owned or controlled by the reporting organisation."'
+        : 'Passenger vehicles!A11 and Delivery vehicles!A11: where an organisation has data in litres of fuel, "the \'fuels\' ... conversion factors should be applied".' },
   }))
 
 export const DEFRA_MOBILE_2026: MobilePublisher = {
@@ -46,4 +49,6 @@ export const DEFRA_MOBILE_2026: MobilePublisher = {
     ...row('petrol', 'Petrol (average biofuel blend)', 0.00806, 0.00587, 96),
   ],
   absent: [],
+  // One row per fuel: nothing to split by.
+  splitBy: {},
 }

@@ -1,7 +1,9 @@
-# Mobile (vehicle) combustion factors: research record (FI9 diff 1)
+# Mobile (vehicle) combustion factors: research record (FI9 diffs 1 and 1b)
 
 **Status.** Record and transcription only, 7 Oct 2026. Nothing in the engine reads these values yet. FI9 diff 2 adds
-the fleet split by vehicle type (ruling R16); diff 3 wires pricing.
+the fleet split by vehicle type (ruling R16); diff 3 wires pricing. Diff 1b (sections 7 to 10 below) settled the three
+cases diff 1 left blocked and recorded the R16 refinement; **nothing is blocked now**, and no case uses the IPCC
+fallback.
 
 **Sources.** Only files in `~/themisiq-sources`, each named where it is quoted:
 
@@ -13,11 +15,13 @@ the fleet split by vehicle type (ruling R16); diff 3 wires pricing.
 | DCCEEW | `nga/national-greenhouse-account-factors-2025.pdf` and `.xlsx` | NGA Factors 2025 |
 | MfE | `mfe/NZ_emission_factors_2026_v2.xlsx` | 2026 v2 (release 2026.2, published 2026-05-29) |
 | IPCC (EU) | `ipcc/V2_3_Ch3_Mobile_Combustion.pdf` | 2006 Guidelines, Vol. 2 Ch. 3 |
+| DCCEEW (law) | `nga/F2026C00720.pdf` | NGER (Measurement) Determination 2008, Compilation No. 21, "Compilation date: 1 July 2026", "Authorised Version F2026C00720 registered 29/07/2026" |
+| MfE (guide) | `mfe/Measuring-emissions_Detailed-guide_2024_ME1829.pdf` | "Measuring emissions: A guide for organisations: 2024 detailed guide" (ME1829) |
 | EU MRR, JEC | as recorded in [eu-fuel-properties.md](eu-fuel-properties.md) | Reg. (EU) 2018/2066 Annex VI; JEC WTT v5 |
 
 **Data files.** One per publisher in `lib/emissionFactors/mobile/` (`epa2025.ts`, `eccc2025.ts`, `defra2026.ts`,
-`nga2025.ts`, `mfe2026.ts`, `ipcc2006.ts`), with a shared shape and the R16 selection helper in `types.ts`, and every
-value spot-tested in `mobile.test.ts`. Why a new folder and not `lib/ghg/mobile.ts`: that file mixes two publishers in
+`nga2025.ts`, `mfe2026.ts`, `ipcc2006.ts`), with a shared shape in `types.ts`, the R16 selection in `select.ts`
+(`selectMobileRow`, diff 1b), and every value and every selection rule tested in `mobile.test.ts`. Why a new folder and not `lib/ghg/mobile.ts`: that file mixes two publishers in
 one module with its own shape, and cites an ECCC edition the local sources do not hold (see "lib/ghg/mobile.ts
 checked" below). Per-publisher files keyed by edition are the shape FI6 set (`ngaScope3_2025.ts`) and the shape T3c
 re-keys.
@@ -25,8 +29,9 @@ re-keys.
 **R16, as applied here.** Types: Light (cars, vans, utes), Heavy (trucks, buses), Non-road (forklifts, plant,
 machinery). "The publisher's row with the highest combined CH4 and N2O within that type" is read as the highest
 **CO2-e** of the two gases, because that is what reaches the total: a row printed in CO2-e is summed as printed, and a
-row printed in gas mass is weighted by GWP. Ties go to the first row in the publisher's order. ⚑ One pick (US heavy
-petrol) changes with the GWP set; see Decisions.
+row printed in gas mass is weighted by GWP. Ties go to the first row in the publisher's order. The GWP set is **AR5,
+fixed** (R16 as refined, section 10), which settles the one pick that moved with it (US heavy petrol: 1997 at AR5,
+1998 at AR4).
 
 ---
 
@@ -224,9 +229,150 @@ each 1.39526e-4 kg/L, off-road CH4 1.48470e-4 and N2O 1.02319e-3 kg/L; petrol CO
 
 ---
 
+## 7. Australia: the NGER (Measurement) Determination (diff 1b)
+
+Source: `nga/F2026C00720.pdf`, "National Greenhouse and Energy Reporting (Measurement) Determination 2008 ...
+Compilation No. 21, Compilation date: 1 July 2026, Includes amendments: F2024L00823 and F2026L00855" (cover).
+
+**a. Stationary and transport energy purposes.** Section 2.41(2), p. 78 (liquid fuels; section 2.20(2), p. 58, for gaseous
+fuels uses the same words):
+
+> stationary energy purposes means purposes for which fuel is combusted that do not involve transport energy purposes.
+> transport energy purposes includes purposes for which fuel is combusted that consist of any of the following:
+> (a) transport by vehicles registered for road use; (b) rail transport; (c) waterborne transport; (d) air transport.
+
+Section 2.41(1), p. 78, sends each to its table: "(a) for stationary energy purposes—Part 3 of Schedule 1; and (b) for
+transport energy purposes—Division 4.1 of Schedule 1." Schedule 1 Part 3 is "Fuel combustion—liquid fuels and certain
+petroleum-based products for stationary energy purposes" (p. 405); Part 4 is "Fuel combustion—fuels for transport
+energy purposes" (pp. 407 to 410). No definition of either term was found in Chapter 1.
+
+**b. Off-road machinery and site vehicles.** The Determination does not name forklifts, mining or construction plant
+or agricultural machinery. By the definition above, fuel burned in equipment **not registered for road use** is in none
+of (a) to (d), so it is stationary energy, and takes Part 3 (NGA Table 8). A site vehicle that **is** registered for
+road use is transport (a), so it is Light or Heavy. ⚑ The definition reads "includes", so the list in (a) to (d) is not
+stated to be closed; no other transport purpose is named anywhere in the document. R16's exception applies (the
+publisher states which factor applies), so **Australian non-road prices from NGA Table 8**, cited to both:
+
+| Fuel | NGA 2025 Table 8 (p. 23) | Determination Sch. 1 Part 3 (p. 405) | EC (GJ/kL) | CO2 | CH4 | N2O (kg CO2-e/GJ) |
+|---|---|---|---|---|---|---|
+| petrol | "Automotive gasoline/petrol (other than for use as fuel in an aircraft)", cells B9 to E9 | item 35 "Gasoline (other than for use as fuel in an aircraft)" | 34.2 | 67.4 | 0.2 | 0.2 |
+| diesel | "Diesel oil", cells B14 to E14 | item 40 "Diesel oil" | 38.6 | 69.9 | 0.1 | 0.2 |
+
+**c. Petrol in heavy vehicles.** Division 4.3 ("liquid fuels for transport energy purposes for certain trucks", pp. 409
+to 410) is **diesel only** (items 68 to 70B: diesel oil, renewable diesel, co-processed diesel). But petrol in a heavy
+vehicle is still transport, and Division 4.1 (p. 407) gives the transport factor for any vehicle: item 53 "Gasoline
+(other than for use as fuel in an aircraft)", 34.2 GJ/kL, CO2 67.4, CH4 0.6, N2O 1.6. Division 4.2 (p. 409), item 64,
+same fuel, CH4 0.02, N2O 0.2, applies by section 2.48(2)(a), p. 87: "for combustion of fuel by vehicles manufactured
+after 2004". Neither is limited to light vehicles. **Australian heavy petrol prices from these two items** (no model
+year: item 53, the higher; a model year after 2004: item 64).
+
+**d. Do the Determination's values match NGA 2025?**
+- Part 3 items 35 and 40 equal NGA Table 8's two rows used here. Division 4.1 items 53 and 54 equal NGA Table 9's
+  pre-2004 note (p. 28). Division 4.2 items 64 and 65 equal Table 9's "Cars and light commercial vehicles" rows.
+  Division 4.3 items 69, 69AA and 70 (Euro IV, III, I: 0.07/0.4, 0.1/0.4, 0.2/0.4) equal Table 9's heavy diesel rows.
+- **Difference 1: Euro V and VI.** Division 4.3 also prints item 68 "Diesel oil, Euro VI or higher" and item 68AA
+  "Diesel oil, Euro V", both CH4 0.01, N2O 0.8 (pp. 409 to 410). NGA 2025 Table 9 has no Euro V or VI row; its top row
+  is "Diesel oil - Euro iv or higher" (0.07, 0.4). At 0.81 combined, the Euro V/VI rows are above NGA's highest (Euro i,
+  0.6). The endnotes list Schedule 1 as amended by, among others, F2025L00671 and F2026L00855, without saying which item
+  each changed, so which amendment added these rows is not found in local sources. NGA 2025 says (p. 7) it "coincides
+  with the release of the NGER (Measurement) Amendment (2025 Update) Determination 2025"; this compilation is later.
+  ⚑ Not transcribed: the file is NGA 2025, and the Euro V/VI rows belong to a later edition (T3c).
+- **Difference 2: the 2004 boundary.** NGA's note says "manufactured prior to 2004"; the Determination says Division 4.2
+  is for vehicles "manufactured after 2004". For a 2004 vehicle the two disagree. The data follow each document for the
+  rows it prints: light rows (NGA's) switch at 2004, heavy petrol rows (the Determination's) after 2004.
+
+## 8. New Zealand: MfE's 2024 detailed guide (diff 1b)
+
+Source: `mfe/Measuring-emissions_Detailed-guide_2024_ME1829.pdf`, "Measuring emissions: A guide for organisations:
+2024 detailed guide". PDF page numbers equal the printed ones.
+
+**a. Machinery and off-road equipment.** The guide names no machinery or off-road class. It divides fuel by end use:
+- Section 3, p. 26: "Fuel can be categorised by its end-use, that is, either stationary combustion or transport."
+- Section 3.2, p. 26: "Stationary combustion fuels are burnt in a fixed unit or asset, such as a boiler."
+- Section 3.3, p. 29: "Transport fuels are used in an engine to move a vehicle. Table 4 lists the emission factors."
+
+Equipment that moves under its own engine (a forklift, a loader, a tractor) is "an engine to move a vehicle", not "a
+fixed unit or asset", so **New Zealand non-road takes the Transport Fuel rows**. ⚑ This rests on the guide's definition,
+not on a sentence naming machinery; a fixed engine (a generator, a pump) is stationary combustion and is not fleet fuel.
+
+**b. One row for every vehicle type?** Not stated in those words. Table 4 "Transport fuel emission factors" (p. 29) has
+columns for fuel type and unit only, no vehicle; section 3.3.1 (p. 29) says to "multiply this by the appropriate
+emission factor from the table", by fuel; the worked example (p. 30) prices "15 petrol vehicles" from Regular petrol
+alone. The per-vehicle tables the guide does print (Tables 46 to 57, sections 7 and 8) are per kilometre, for use when
+"you do not have information on fuel use" (section 3.3.2, p. 30).
+
+**c. Row note.** Each MfE row carries both: the 2024 guide as the classification source (the section and page above)
+and the 2026 v2 workbook as the factor source (`mfe2026.ts`, `cite.basis`). The guide's own Table 4 values are the 2024
+edition (Diesel 2.68 total, 2.64 CO2) and are not used.
+
+## 9. The fallback: IPCC where a publisher has nothing (R16, diff 1b)
+
+Where a publisher gives no mobile or off-road factor and no instruction, CH4 and N2O come from IPCC 2006 Vol. 2 Ch. 3
+(Table 3.2.2 road, Table 3.3.1 off-road) and CO2 from the country's own fuel factor. Row note: "IPCC 2006 default for
+CH4 and N2O; {publisher} publishes no {road|off-road} factor for {fuel}." Litres reach TJ with the publisher's own
+energy content where it prints one (NGA Table 9 or 8; MfE prints none per litre for these fuels, so FI3's route), and
+otherwise as FI3 does (MRR NCV with the JEC density).
+
+**After sections 7 and 8, no case uses it**: AU heavy petrol, AU non-road and NZ non-road are each settled from the
+publisher's own documents. `select.ts` implements it and `mobile.test.ts` exercises it on a publisher with its rows
+removed. **Nothing is blocked**; no case was found where even the fallback could not compute.
+
+## 10. R16 as refined (Lisa, 7 Oct 2026)
+
+**Road (Light, Heavy).** An optional typical model year per vehicle type. Given, the publisher's row for that year;
+not given, the highest row in CO2-e on AR5 (fixed), labelled. What each publisher ties to a year:
+
+| Publisher | Rows tied to model years | Not tied (a year reaching none of them takes the highest row) |
+|---|---|---|
+| US EPA | Every Table 3 and Table 4 row, by its "Model Year" label ("≤1980", "1984-1993", "2005"). Light has a car row and a truck row for most years; the higher is used | Years after 2022: Table 3 ends at 2022 and Table 4 at "2007-2022" ⚑ |
+| ECCC | NIR 2025 Part 2, Annex 3.1, p. 25: "Tier 2 and Tier 3 regulatory standards, approximately representing model years 2004 and onwards"; "heavy-duty gasoline vehicles, heavy-duty diesel vehicles and motorcycles have advanced emission controls starting with the 1996 model year"; "Emission factors for vehicles without emission controls and/or moderate controls are used for 1995 and older model years"; and Table A6.1–15's note "Advanced control diesel emission factors are used for Tier 2 diesel vehicle populations". So: light Tier 2 and Tier 3, and light diesel Advanced Control, from 2004; heavy diesel Advanced Control from 1996; diesel Uncontrolled and Moderate Control to 1995 | Light gasoline Tier 1, Tier 0, Oxidation Catalyst and Non-catalytic Controlled; light 1996 to 2003; every heavy gasoline row (the passage's "advanced" and "moderate" are not HDGV row labels) |
+| NGA | Light: the p. 28 note, before 2004; Table 9, from 2004. Heavy petrol: Determination Division 4.1 to 2004, Division 4.2 after (s 2.48(2)(a)) | Heavy diesel: split by Euro standard, not year |
+| IPCC | Light petrol "Low Mileage Light Duty Vehicle Vintage 1995 or Later": from 1995 (Light only, since it names light duty) | Uncontrolled and Oxidation Catalyst; diesel (one row) |
+| DEFRA, MfE | (one row per fuel) | |
+
+**Non-road.** The customer chooses the equipment type; the highest row applies only within it, where the publisher
+splits further.
+
+| Equipment type | US EPA Table 5 | IPCC Table 3.3.1 | ECCC, DEFRA, NGA, MfE |
+|---|---|---|---|
+| Industrial and commercial (including forklifts) | Industrial/Commercial Equipment | Industry | No sector split: the same rows for every type |
+| Construction and mining | Construction/Mining Equipment | Industry (no construction sector) | as above |
+| Agriculture | Agricultural Equipment | Agriculture | as above |
+| Forestry | Logging Equipment | Forestry (2-stroke only; 4-stroke blank) | as above |
+| Lawn and garden | Lawn and Garden Equipment | Household | as above |
+
+EPA's Airport, Railroad and Recreational Equipment rows map to no R16 equipment type and are not selected.
+
+**Rows selected, non-road** (CH4, N2O in each publisher's unit; engine or row "not given", so the highest within the
+type):
+
+| Equipment type | US diesel (g/gal) | US petrol (g/gal) | EU diesel (kg/TJ) | EU petrol (kg/TJ) |
+|---|---|---|---|---|
+| Industrial and commercial | Diesel 0.43, 0.62 | 4-stroke 2.81, 1.57 | Industry 4.15, 28.6 | 2-Stroke Industry 130, 0.4 |
+| Construction and mining | Diesel Equipment 1.01, 0.94 | 4-stroke 2.86, 1.48 | Industry 4.15, 28.6 | 2-Stroke Industry 130, 0.4 |
+| Agriculture | Diesel Equipment 1.26, 1.07 | 4-stroke 1.93, 1.2 | Agriculture 4.15, 28.6 | 2-Stroke Agriculture 140, 0.4 |
+| Forestry | Diesel 0.49, 1.26 | 4-stroke 3.22, 2.05 | Forestry 4.15, 28.6 | 2-Stroke Forestry 170, 0.4 |
+| Lawn and garden | Diesel 0.67, 0.49 | 4-stroke 3.02, 1.5 | Household 4.15, 28.6 | 2-Stroke Household 180, 0.4 |
+
+CA every type: diesel ≥ 19kW Tier 4 (0.073, 0.227 g/L), petrol 2-stroke (10.56, 0.013 g/L). UK, AU and NZ: the one
+row per fuel in the summary.
+
+**Ranking.** CO2-e on AR5 (CH4 28, N2O 265), fixed.
+
+**Row notes** (`select.ts`, as rendered): "Model year not given, so the highest published row for light vehicles is
+used."; "Typical model year 2015: US EPA ties 2 rows to it, so the highest of them is used."; "Typical model year 2010:
+DCCEEW National Greenhouse Accounts Factors, manufactured 2004 or later."; "US EPA ties no row to model year 2024, so
+the highest published row for light vehicles is used."; "Euro standard not given, so the highest published row for
+heavy vehicles is used."; "Environment and Climate Change Canada does not split non-road equipment by type. Engine
+power and emission tier not given, so the highest published row for non-road construction and mining equipment is
+used."; "UK DEFRA/DESNZ prints one non-road row for diesel, not split by equipment type."
+
+---
+
 ## Summary
 
-CO2, CH4 and N2O in each publisher's own unit. "Highest row" means R16's rule chose among several published rows.
+CO2, CH4 and N2O in each publisher's own unit, with no model year given. "Highest row" means R16's rule chose among
+several published rows. Non-road shows the Industrial and commercial pick; every equipment type is in section 10.
 
 | Country | Type | Fuel | CO2 | CH4 | N2O | Unit | Source | Highest row? | Priced or blocked |
 |---|---|---|---|---|---|---|---|---|---|
@@ -234,8 +380,8 @@ CO2, CH4 and N2O in each publisher's own unit. "Highest row" means R16's rule ch
 | US | Light | diesel | 10.21 kg/gal | 0.029 | 0.0214 | g/vehicle-mile | EPA Hub 2025 T2, T4 | Yes (LDT 2007-2022) | Priced (CO2); CH4, N2O with miles |
 | US | Heavy | petrol | 8.78 kg/gal | 0.0924 | 0.1726 | g/vehicle-mile | EPA Hub 2025 T2, T3 | Yes (1997; ⚑ AR4 1998) | Priced (CO2); CH4, N2O with miles |
 | US | Heavy | diesel | 10.21 kg/gal | 0.0095 | 0.0431 | g/vehicle-mile | EPA Hub 2025 T2, T4 | Yes (2007-2022) | Priced (CO2); CH4, N2O with miles |
-| US | Non-road | petrol | 8.78 kg/gal | 3.22 | 2.05 | g/gallon | EPA Hub 2025 T2, T5 | Yes (Logging, 4 stroke) | Priced |
-| US | Non-road | diesel | 10.21 kg/gal | 1.98 | 1.21 | g/gallon | EPA Hub 2025 T2, T5 | Yes (Airport Equipment) | Priced |
+| US | Non-road | petrol | 8.78 kg/gal | 2.81 | 1.57 | g/gallon | EPA Hub 2025 T2, T5 | Yes (Industrial/Commercial, 4 stroke) | Priced |
+| US | Non-road | diesel | 10.21 kg/gal | 0.43 | 0.62 | g/gallon | EPA Hub 2025 T2, T5 | No (Industrial/Commercial, one row) | Priced |
 | CA | Light | petrol | 2307.3 | 0.32 | 0.66 | g/L | NIR 2025 A6.1–15 | Yes (LDGV Tier 0) | Priced |
 | CA | Light | diesel | 2680.50 | 0.068 | 0.22 | g/L | NIR 2025 A6.1–15 | Yes (LDDT Advanced) | Priced |
 | CA | Heavy | petrol | 2307.3 | 0.068 | 0.20 | g/L | NIR 2025 A6.1–15 | Yes (HDGV Three-way) | Priced |
@@ -246,16 +392,20 @@ CO2, CH4 and N2O in each publisher's own unit. "Highest row" means R16's rule ch
 | UK | All three | diesel | 2.55035 | 0.00029 | 0.0329 | kg CO2e/L | DEFRA 2026 Fuels row 72 | No (one row) | Priced |
 | AU | Light | petrol | 67.4 | 0.6 | 1.6 | kg CO2-e/GJ | NGA 2025 T9, note p. 28 | Yes (pre-2004) | Priced |
 | AU | Light | diesel | 69.9 | 0.01 | 0.5 | kg CO2-e/GJ | NGA 2025 T9 | Yes (2004 or later) | Priced |
-| AU | Heavy | petrol | | | | | none published | | **Blocked** |
+| AU | Heavy | petrol | 67.4 | 0.6 | 1.6 | kg CO2-e/GJ | NGER Determination Sch. 1 Div 4.1 item 53 | Yes (to 2004; item 64 after) | Priced |
 | AU | Heavy | diesel | 69.9 | 0.2 | 0.4 | kg CO2-e/GJ | NGA 2025 T9 | Yes (Euro i) | Priced |
-| AU | Non-road | either | | | | | none published | | **Blocked** |
+| AU | Non-road | petrol | 67.4 | 0.2 | 0.2 | kg CO2-e/GJ | NGA 2025 T8 (stationary, s 2.41(2)) | No (one row) | Priced |
+| AU | Non-road | diesel | 69.9 | 0.1 | 0.2 | kg CO2-e/GJ | NGA 2025 T8 (stationary, s 2.41(2)) | No (one row) | Priced |
 | NZ | Light, Heavy | petrol | 2.2619 | 0.0302118 | 0.0693172 | kg CO2-e/L | MfE 2026 v2 Transport Fuel | No (one row) | Priced |
 | NZ | Light, Heavy | diesel | 2.63045 | 0.00394905 | 0.0373749 | kg CO2-e/L | MfE 2026 v2 Transport Fuel | No (one row) | Priced |
-| NZ | Non-road | either | | | | | not found in local sources | | **Blocked** (pending MfE's guide) |
+| NZ | Non-road | petrol | 2.2619 | 0.0302118 | 0.0693172 | kg CO2-e/L | MfE 2026 v2 Transport Fuel (guide 2024 s 3.3) | No (one row) | Priced |
+| NZ | Non-road | diesel | 2.63045 | 0.00394905 | 0.0373749 | kg CO2-e/L | MfE 2026 v2 Transport Fuel (guide 2024 s 3.3) | No (one row) | Priced |
 | EU | Light, Heavy | petrol | 69 300 | 25 | 8.0 | kg/TJ | IPCC 2006 T3.2.1, T3.2.2 | Yes (Oxidation Catalyst) | Priced |
 | EU | Light, Heavy | diesel | 74 100 | 3.9 | 3.9 | kg/TJ | IPCC 2006 T3.2.1, T3.2.2 | No (one row) | Priced |
-| EU | Non-road | petrol | 69 300 | 180 | 0.4 | kg/TJ | IPCC 2006 T3.3.1 | Yes (2-Stroke, Household) | Priced |
-| EU | Non-road | diesel | 74 100 | 4.15 | 28.6 | kg/TJ | IPCC 2006 T3.3.1 | Yes (all sectors equal) | Priced |
+| EU | Non-road | petrol | 69 300 | 130 | 0.4 | kg/TJ | IPCC 2006 T3.3.1 | Yes (2-Stroke, Industry) | Priced |
+| EU | Non-road | diesel | 74 100 | 4.15 | 28.6 | kg/TJ | IPCC 2006 T3.3.1 | No (Industry, one row) | Priced |
+
+Nothing is blocked, and nothing uses the IPCC fallback (section 9).
 
 ## Magnitude check: diesel, CH4 + N2O as a share of the type's total (AR5 for gas-mass rows)
 
@@ -289,22 +439,28 @@ total without a fuel economy, which the Hub does not give.
 
 ## Not found in local sources
 
-- Whether MfE's "Transport Fuel" rows cover non-road machinery: MfE, "Measuring emissions: a guide for organisations"
-  (2026).
-- What NGA directs for off-road equipment, or for heavy-duty gasoline vehicles: the NGER (Measurement) Determination
-  2008.
+- (Settled in diff 1b: MfE's classification of machinery, section 8; the Determination on off-road equipment and heavy
+  petrol, section 7.)
+- Which amendment added the Determination's Euro V and VI diesel rows (section 7d): the amending instruments
+  F2025L00671 and F2026L00855.
+- Whether the Determination's transport list ("includes ... (a) to (d)") is meant to be closed: not stated in the
+  compilation.
 - Whether ECCC's 2026 NIR prints Table A6.1–15 on p. 541 with the same values (the citation in `lib/ghg/mobile.ts`):
   NIR 2026, Part 2.
 
 ## ⚑ Decisions for Lisa
 
-1. **"Highest combined CH4 and N2O" read as highest CO2-e.** By mass the IPCC road petrol pick would be Uncontrolled
-   (33 + 3.2) rather than Oxidation Catalyst (25 + 8.0); in CO2-e it is the Oxidation Catalyst row. Confirm CO2-e.
-2. **Which GWP set ranks the rows.** Only US heavy petrol changes (AR4 1998, AR5 and AR6 1997). Options: the inventory's
-   own GWP set, or AR5 fixed (the basis every publisher here prints its CO2-e on). Recommend AR5 fixed, so the row a
-   site uses does not move when the reporting framework changes.
-3. **AU heavy petrol and AU non-road, NZ non-road:** blocked under R16 as recorded, until the guides named above are
-   added to the sources.
+1. **"Highest combined CH4 and N2O" as CO2-e on AR5, fixed:** ruled 7 Oct 2026 (section 10).
+2. (Settled with 1.)
+3. **AU heavy petrol and AU non-road, NZ non-road** (settled in diff 1b, sections 7 and 8). Both rest on a definition
+   rather than a sentence naming machinery: the Determination's "transport energy purposes includes ..." and MfE's
+   "used in an engine to move a vehicle". Confirm that reading.
+6. **US model years after 2022.** EPA's Tables 3 and 4 end at 2022, so a 2023 or later fleet reaches no tied row and
+   takes the highest row (for light petrol, model year 1987-1993: 29.7 g CO2-e per mile, against 0.51 for a 2022 car and 0.54 for a 2022 light truck, about 55 to 58 times).
+   R16 as worded gives that. The alternative is to use the latest published row for later years, said on the row.
+7. **The NGER Euro V and VI rows** (section 7d) are in the 2026 compilation and not in NGA 2025; heavy diesel keeps
+   NGA 2025's rows until T3c loads a later edition.
+8. **The 2004 boundary** (section 7d): NGA "prior to 2004", the Determination "after 2004". Kept per document.
 4. **IPCC road rows mapped to both Light and Heavy.** IPCC prints them by fuel with a representative vehicle (US car for
    petrol, European heavy truck for diesel). The alternative is to block EU Heavy petrol and EU Light diesel.
 5. **US non-road scope.** Table 5's Ships and Boats, Locomotives and Aircraft are left out of Non-road; Recreational and

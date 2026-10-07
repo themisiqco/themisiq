@@ -3,7 +3,8 @@
 // FI9 diff 1. One file per publisher in this folder (epa2025, eccc2025, defra2026, nga2025, mfe2026,
 // ipcc2006), each transcribed from ~/themisiq-sources and nothing else, in the publisher's own unit (R5),
 // keyed by edition for T3c. NOTHING READS THESE YET: FI9 diff 2 adds the fleet split by vehicle type
-// (ruling R16) and diff 3 wires pricing. The research record is docs/review/mobile-factors.md.
+// (ruling R16) and diff 3 wires pricing. The research record is docs/review/mobile-factors.md. Which row applies
+// to a site is decided in select.ts (R16 as refined on 7 Oct 2026).
 //
 // WHY A NEW FOLDER AND NOT lib/ghg/mobile.ts. That file mixes two publishers in one module, carries its
 // own shape, and cites an ECCC edition the local sources do not hold (NIR 2026, p. 541; the local copy is
@@ -20,8 +21,23 @@ export const FLEET_TYPE_LABEL: Readonly<Record<FleetType, string>> = {
 
 export type MobileFuel = 'diesel' | 'petrol'
 
+/** R16 (refined 7 Oct 2026): the non-road equipment type the customer chooses. */
+export type EquipmentType = 'industrial_commercial' | 'construction_mining' | 'agriculture' | 'forestry' | 'lawn_garden'
+export const EQUIPMENT_TYPE_LABEL: Readonly<Record<EquipmentType, string>> = {
+  industrial_commercial: 'Industrial and commercial (including forklifts)',
+  construction_mining: 'Construction and mining',
+  agriculture: 'Agriculture',
+  forestry: 'Forestry',
+  lawn_garden: 'Lawn and garden',
+}
+
+/** A model-year range a publisher ties a row to; null is open-ended. */
+export interface YearRange { from: number | null; to: number | null }
+
 /** Where a value is printed. `row` and `column` are as the publisher prints them. */
 export interface MobileCite {
+  /** The document, where it is not the publisher file's own `document` (FI9 diff 1b: the NGER Determination). */
+  document?: string
   table: string
   row: string
   column?: string
@@ -29,6 +45,9 @@ export interface MobileCite {
   page?: string
   /** Sheet and cell, where the source is a workbook. */
   cell?: string
+  /** Why this row applies to this vehicle type, where the table alone does not say (a definition or an instruction
+   *  elsewhere in the publisher's documents), quoted with its place. */
+  basis?: string
 }
 
 /** CO2 per unit of fuel (or per unit of energy, with the energy content beside it). */
@@ -54,6 +73,11 @@ export interface MobileGasRow {
   /** 'mass': grams or kilograms of the gas itself. 'co2e_ar5': the publisher prints CO2-e on AR5 GWPs. */
   gas: 'mass' | 'co2e_ar5'
   cite: MobileCite
+  /** The model years the publisher ties this row to, where it does (R16: "typical model year"). */
+  years?: YearRange
+  /** Non-road only: the equipment types this row is for. Absent where the publisher has no sector split, so the row
+   *  serves every equipment type; an empty list where the row is for equipment no R16 type covers. */
+  equipment?: EquipmentType[]
 }
 
 /** A type and fuel the publisher prints no mobile row for, with what it says instead (quoted), if anything. */
@@ -70,23 +94,7 @@ export interface MobilePublisher {
   co2: MobileCo2[]
   rows: MobileGasRow[]
   absent: MobileAbsent[]
-}
-
-/**
- * Ruling R16: where the publisher splits a type further and the customer has not said which applies, the row with
- * the highest combined CH4 and N2O within that type is used. Combined means CO2-e, because that is the quantity that
- * reaches the total: a row the publisher prints in CO2-e is summed as printed, and a row in gas mass is weighted by
- * `gwp`. Ties go to the first row in the publisher's own order. Null where the publisher prints no row for the type.
- */
-export function r16Highest(
-  rows: readonly MobileGasRow[], type: FleetType, fuel: MobileFuel, gwp: { ch4: number; n2o: number },
-): MobileGasRow | null {
-  let best: MobileGasRow | null = null
-  let bestScore = -Infinity
-  for (const r of rows) {
-    if (r.type !== type || r.fuel !== fuel) continue
-    const score = r.gas === 'co2e_ar5' ? r.ch4 + r.n2o : r.ch4 * gwp.ch4 + r.n2o * gwp.n2o
-    if (score > bestScore) { best = r; bestScore = score }
-  }
-  return best
+  /** What the publisher splits a type and fuel by, for the row note ("{splitBy} not given, ..."), keyed
+   *  `${type}:${fuel}`. Only where it prints more than one row. */
+  splitBy: Partial<Record<`${FleetType}:${MobileFuel}`, string>>
 }
