@@ -198,7 +198,8 @@ const GWP = {
 //     the national gross heat content (CA_NG_GJ_PER_M3, NIR Table A4-2) and priced on the province's per-m³ factor.
 //   FI2 diff 2: every key is in ECCC's own unit (per litre, per m³). The gallon and per-Mcf keys are gone: those
 //   units convert exactly, with the conversion stated on the row.
-// CH4/N2O use the Commercial/Industrial sector rows (Tables 2.x: ~0.037 CH4; 4.x Industrial for oils).
+// CH4/N2O: natural gas uses ECCC's "Residential, Construction, Commercial/Institutional, Agriculture" row (Table 2.3,
+// 0.037 / 0.035 g/m³; see EF_CA_NG_CH4_N2O_M3); the oils use the Table 4.x Industrial rows.
 //
 // ── END-USE SECTOR: A CHOICE WAS MADE, PER KEY, AND HERE IS WHY ─────────────────────────────────
 // ECCC splits stationary combustion by END USE and publishes several variants of the same fuel. For
@@ -697,11 +698,8 @@ const EF_AU = {
   gasoline_litre: { co2: 2.31876, ch4: 0, n2o: 0 },
   // Liquefied petroleum gas (LPG) (Table 8): 25.7 GJ/kL × 60.6 kg CO2-e/GJ, printed 1,557.42 kg CO2-e/kL (was 1.557, cited Table 4).
   propane_litre: { co2: 1.55742, ch4: 0, n2o: 0 },
-  // GRADE-EXPLICIT KEYS — DCCEEW NGA 2025 Table 8, energy content x combined Scope 1 EF per GJ, the
-  // same pre-computation every other key in this table uses. Stored per US GALLON (not per litre like
-  // the keys above) because the engine's fuel-oil path converts to gallons before pricing.
-  // Heating oil: 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L x 3.785411784 = 9.845587.
-  // Fuel oil:    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L x 3.785411784 = 11.096738.
+  // GRADE-EXPLICIT KEYS: DCCEEW NGA 2025 Table 8. Held per litre like the keys above (FI2: a US-gallon figure converts
+  // to litres exactly at pricing; the per-gallon keys that once sat here are gone).
   // ── PER-LITRE KEYS: NGA's printed per-kL figures (Heating oil 2,600.929, Fuel oil 2,931.448) ÷ 1,000. These were
   // already at full precision, so they do not move; they equal the product NGA prints:
   //   heating oil 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L
@@ -1081,9 +1079,10 @@ function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
   }
 }
 // ── DEFERRED: Scope 3 Category 3 (upstream / T&D) ELECTRICITY factors — AU + NZ ──────────────
-// NOT WIRED. The engine has no Scope 3 Category 3 electricity line today; only the NZ T&D losses
-// above (nz_td_losses opt-in) are surfaced. These primary-source values are captured here so they
-// aren't lost — transcribe into a real Cat 3 electricity line in a future step before using them.
+// NOT WIRED HERE. Category 3 electricity is priced in lib/scope3/cat3Energy.ts from DEFRA's upstream factors (a UK
+// stand-in outside the UK, flagged on each line), and the NZ T&D losses above (nz_td_losses opt-in) are the engine's own
+// line. These Australian and New Zealand primary-source values are captured so they are not lost: AU Category 3 is
+// FI6, and they are transcribed into a real line there before being used.
 //   Australia — DCCEEW NGA Factors 2025, Scope 3 (kg CO2e/kWh, AR5):
 //     NSW+ACT 0.03, VIC 0.09, QLD 0.09, SA 0.04, WA (SWIS) 0.06, TAS 0.03, NT 0.09, National 0.07
 //   New Zealand — MfE "Measuring Emissions" 2026 Scope 3 electricity table: transcribe the exact
@@ -1248,7 +1247,9 @@ export function residualRegionFor(loc: Pick<Location, 'residual_region' | 'grid_
 function getResidualFactor(
   region: string,
   year: number,
-  gwpVersion: GwpVersion
+  gwpVersion: GwpVersion,
+  // FI8: the location's country, so the note can say which country has no residual mix loaded.
+  country?: string,
 ): { ef: number; applicable: boolean; source: string; vintage: string; usedRegion: string; note: string } {
   // EU: published combined CO2e in gCO2/kWh. region is the EU_XX grid key.
   if (region.startsWith('EU_')) {
@@ -1311,8 +1312,16 @@ function getResidualFactor(
     return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage, usedRegion: region,
       note: vintageNote(factorName, y, year) }
   }
-  return { ef: 0, applicable: false, source: EF_SOURCES.residual_us, vintage: 'n/a', usedRegion: region,
-    note: 'No published residual mix for this subregion; market-based falls back to location factor.' }
+  // FI8: say WHY there is no residual mix. A blank region outside the US means none is loaded for that country (the
+  // UK, Canada and New Zealand today); a blank US region means no eGRID subregion has been chosen. Not "no published
+  // residual mix": whether one is published was never checked for every country, so the note does not claim it.
+  const ctry = canonicalCountryCode(country)
+  const fallback = 'so the market-based figure uses the location-based grid average for the electricity not covered by contractual instruments.'
+  const note = region === '' && ctry && ctry !== 'US'
+    ? `No residual mix is loaded for ${countryNameEn(ctry === 'EL' ? 'GR' : ctry)}, ${fallback}`
+    : region === '' ? `No eGRID subregion is selected for this location, ${fallback}`
+    : 'No published residual mix for this subregion; market-based falls back to location factor.'
+  return { ef: 0, applicable: false, source: EF_SOURCES.residual_us, vintage: 'n/a', usedRegion: region, note }
 }
 
 // ⚠️ THE ORDER IS PRESENTATION, AND IT IS DELIBERATE — DO NOT "RESTORE" THE STANDARD ONE.
@@ -1358,9 +1367,8 @@ const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL
 
 // ── THE ONE COUNTRY ROUTER FOR FACTOR SELECTION ──────────────────────────────────────────────────
 //
-// Which FACTOR TABLE a location resolves to — not its country. DE and FR are both 'EU'; an unlisted
-// country is 'US', because that is pickEF's documented fallback and recording it truthfully beats
-// pretending a Japanese location has a table of its own.
+// Which FACTOR TABLE a location resolves to, not its country. DE and FR are both 'EU'. An unlisted country resolves to
+// null (efJurisdiction below): the location is refused, and no table, the US one included, prices it.
 //
 // EXTRACTED FROM pickEF, WHICH NOW SWITCHES ON IT, so steam can dispatch on the same answer instead
 // of carrying a second copy of the branching. lib/vsme/b3Energy.ts once held exactly that second copy
@@ -1410,9 +1418,8 @@ export function canonicalCountryCode(country?: string): string {
 // the list could not express, and a real ISO code is a coverage limit of this platform. One state
 // would give all three the same sentence, and two of them would then be wrong.
 //
-// PROBE ONLY IN THIS CHANGE. Nothing consumes it yet: efJurisdiction still returns 'US' for an
-// unsupported country, exactly as before. Exported and tested ahead of its consumer on the same
-// footing as reconcile(), so the decision and its tests land before the behaviour does.
+// CONSUMED: efJurisdiction returns null for an unsupported country (since 21 Sep 2026), and countryRefusal says which
+// of the three states that location is in, for every surface that names the exclusion.
 export type CountryRefusal =
   /** Never answered. Stored as ''. */
   | { state: 'country_not_set' }
@@ -2122,9 +2129,9 @@ const emptyLocation = (id: string, name: string, state = ''): Location => ({
   source_docs: [],
 })
 
-// Natural gas units offered per country. CA uses mcf/m3 only (ECCC has no energy-basis
-// factor for therms/mmbtu). UK uses kWh only (DEFRA's billing basis — how UK gas bills read).
-// US keeps all three. Returned as [value, label] pairs.
+// Natural gas units offered per country, as [value, label] pairs: US Mcf, Ccf, therms and MMBtu; CA m³, Mcf and GJ (GJ
+// through the national heat content, R12); UK kWh and m³ (R11); AU m³ and MMBtu; NZ kWh; EU kWh (R6, R7). A bill may
+// still deliver another unit; it prices only through an exact conversion to a unit the publisher prints (FI2).
 // ── ORDER IS THE DEFAULT, AND RETENTION IS WHAT KEEPS A STORED FIGURE HONEST ─────────────────────
 //
 // snapUnitsForCountry keeps a held unit when the list still offers it, and otherwise takes opts[0].
@@ -2165,8 +2172,9 @@ function normalizeNgUnit(country: string, unit: string): string {
   const valid = ngUnitOptions(country).map(([v]) => v)
   return valid.includes(unit) ? unit : valid[0]
 }
-// Liquid-fuel units offered per country. Metric countries (CA, UK, EU) get litres only —
-// gallons is never offered, so a verifier can't find US units on a metric inventory.
+// Liquid-fuel units offered per country. Metric countries (CA, UK, AU, NZ, EU) are offered litres only, so a verifier
+// does not find a US unit chosen on a metric inventory. A gallons figure that arrives from a bill converts to litres
+// exactly at pricing (FI2), with the conversion stated on the row.
 function liquidUnitOptions(country: string): Array<[string, string]> {
   const ctry = canonicalCountryCode(country)
   // Refused: litres first, gallons retained. See the note above ngUnitOptions.
@@ -2182,8 +2190,6 @@ function fuelOilUnitOptions(country: string): Array<[string, string]> {
   if (EU_COUNTRIES.includes(ctry)) return [['litres', 'Litres'], ['kg', 'kg'], ['tonnes', 'Tonnes']]
   return liquidUnitOptions(country)
 }
-// Propane/LPG units are separate from other liquids: NZ publishes LPG per kg (MfE), so NZ offers kg
-// only; other metric countries (CA/UK/EU/AU) use litres; US/other keep gallons+litres.
 // District-heating / steam units offered per country. Same principle as liquidUnitOptions: never
 // show a unit a customer in that country would not see on a bill.
 //   US/default — MMBtu, the US district-steam convention. GJ also offered; some US campus systems
@@ -2208,12 +2214,15 @@ function steamUnitOptions(country: string): Array<[string, string]> {
     case 'UK': return [['kwh', 'kWh'], ['gj', 'GJ']]
     // EPA Table 7 publishes per mmBtu. Unchanged.
     case 'US': return [['mmbtu', 'MMBtu'], ['gj', 'GJ']]
-    // CA/EU/AU/NZ have no published factor at all — the customer supplies their provider's figure,
-    // and GJ is the basis district energy is metered in across these markets. Unchanged.
+    // CA/EU/AU/NZ publish no steam factor: the line prices on the labelled gas-boiler estimate (R14), per GJ, until
+    // the customer enters their provider's figure. GJ is the basis district energy is metered in across these markets.
     default: return [['gj', 'GJ']]
   }
 }
 
+// Propane/LPG units are separate from other liquids (FI4, R13): mass is offered only where the publisher prints a
+// per-mass factor. NZ kg only (MfE per kg); UK litres then kg (DEFRA per tonne); EU kg and tonnes (MRR mass basis);
+// CA and AU litres; US and refused countries gallons and litres.
 function propaneUnitOptions(country: string): Array<[string, string]> {
   const ctry = canonicalCountryCode(country)
   // Refused: litres first, gallons retained. See the note above ngUnitOptions.
@@ -2440,12 +2449,10 @@ function validateCompleteness(loc: Location): string[] {
   return warnings
 }
 
-// Country-aware combustion factor selection.
-// US -> EPA EF[key] (unchanged). CA -> ECCC EF_CA[key], with per-province NG CO2 override.
-// GB/UK -> DEFRA EF_UK[key] (national). EU member -> IPCC EF_EU[key] (national Tier-1 defaults).
-// Falls back to EF[key] if a country key is missing, so a location can never silently zero out.
-// Build the propane/LPG EF key from the stored unit. NZ adds a per-kg path (propane_kg); all other
-// jurisdictions use gallon/litre. Kept in one place so calc + workings + review stay in lock-step.
+// Country-aware combustion factor selection is pickEF (below): US EPA (EF), ECCC (EF_CA, with the province's gas CO2),
+// DEFRA (EF_UK), MRR/IPCC (EF_EU), NGA (EF_AU) or MfE (EF_NZ, by use class). There is no fallback (FI2): a key the
+// location's own table does not hold, directly or by an exact conversion, is a miss (efMiss), which FI1 turns into an
+// unpriced line rather than a zero. The propane key is built from the stored unit by propaneEfKey.
 // ── Fuel oil and purchased steam: CONVERT-THEN-APPLY ────────────────────────────────────────────
 // DELIBERATELY DIFFERENT from every other multi-unit fuel here. Natural gas and propane each carry a
 // PUBLISHED EMISSION FACTOR PER UNIT (natural_gas_mcf / _therms / _m3 …, propane_gallon / _litre /
@@ -2698,7 +2705,8 @@ function steamTonnes(loc: Location, gwpVersion: GwpVersion): number {
   return calcGas(p.ef, steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, p.basis).amount, gwpVersion).total
 }
 
-// What pickEF returns when NEITHER the country's own table NOR the US fallback carries the key.
+// What pickEF returns when the location's own table does not carry the key, directly or by an exact conversion (there
+// is no US fallback since FI2).
 // It deliberately carries no gases — a blank must not be priced as zero — and instead records what
 // was looked up, so calcGas can name the fuel, unit and country it refused rather than guess.
 //
@@ -2974,8 +2982,8 @@ export function combustionSourcesFor(locations: readonly { country?: string }[])
   // the assurance PDF and in the export's source list, naming a publisher for a location nothing
   // priced. factor_editions was fixed by returning null; this list has no null to return, so it
   // filters instead.
-  //   A gate is not a guard: pricingReady already blocks both surfaces while a refused location
-  // exists. That is a reason to expect this never to render, not a reason for it to be wrong.
+  //   pricingReady blocks export while a FIXABLE refusal exists (no country set); a country we do not support is
+  // excluded from every total and stated, and does not block. Either way this list must not name a publisher for it.
   // FI2: the publishers of the tables that priced each location's combustion lines; a location with none keeps its
   // country's citation, as before. A line whose value came from another table (the US fallback, until FI2 diff 2)
   // therefore adds that table's citation instead of hiding behind the location's.
@@ -3261,7 +3269,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // not yet selected), fall back to the location grid factor for uncovered load and flag it.
   const uncovered_kwh = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
   const resRegion = residualRegionFor(loc)
-  const res = getResidualFactor(resRegion, year, gwpVersion)
+  const res = getResidualFactor(resRegion, year, gwpVersion, loc.country)
   const market_elec_ef = res.applicable ? res.ef : grid_ef
   // steam_t is the SAME term in both figures, unchanged: no market instrument applies to steam today,
   // so location- and market-based carry an identical steam contribution. Recovering CH4/N2O above
@@ -4596,7 +4604,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       else rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
     }
     // Grid-region gate: unresolved grid_region → OMIT the electricity Scope 2 rows entirely (no
-    // getGridFactor call, no US_AVG row). NZ (T&D row below) is always resolved, so no real T&D is lost.
+    // getGridFactor call, no US_AVG row). The NZ T&D row below sits inside this gate too, so it needs grid_region 'NZ',
+    // which gridRegionForCountry sets for an NZ location.
     if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
       const gf = getGridFactor(loc.grid_region, year)
       // ONE note, appended wherever the grid factor priced the row. factor_vintage below is UNCHANGED —
@@ -4605,7 +4614,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: `${gridSource(loc)}${gridNote}`, factor_vintage: String(gf.usedYear), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
       const resRegion = residualRegionFor(loc)
-      const res = getResidualFactor(resRegion, year, gwpVersion)
+      const res = getResidualFactor(resRegion, year, gwpVersion, loc.country)
       const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
       const mktEf = res.applicable ? res.ef : gf.ef
       // ⚠️ THE ROW MUST CITE WHAT PRICED IT. When no residual mix applies, mktEf IS gf.ef — the location
@@ -5206,7 +5215,8 @@ export function findSteamFactorGaps(
     // location whose country resolves to no jurisdiction is excluded WHOLE, so no figure it carries
     // will be priced whatever they enter: asking would be busy-work that cannot clear the block,
     // and it would put two different remedies on one location at once. The country refusal states
-    // the reason on its own, and pricingReady already blocks the export.
+    // the reason on its own. An unsupported country is out of every total and named as excluded; a location
+    // with no country set is the fixable refusal, and that one blocks the export through pricingReady.
     if (entry === null) return []
     if (entry.kind === 'published') return []   // unreachable; steamPricing would have returned it
     const j = efJurisdiction(loc)

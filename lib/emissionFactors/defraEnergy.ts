@@ -2,8 +2,8 @@
 //
 // The typed reader for lib/emissionFactors/defraEnergy2026.json, which
 // scripts/generate-defra-energy.py extracts from the committed workbook by A1 cell reference. Task 1
-// of the Category 3 build (~/themisiq-sources/findings/cat3-design.md): NOTHING PRICES FROM IT YET.
-// The only importer today is defraEnergy.test.ts, which checks every record against the cell it cites.
+// of the Category 3 build (~/themisiq-sources/findings/cat3-design.md). lib/scope3/cat3Energy.ts prices Category 3
+// from it, and defraEnergy.test.ts checks every record against the cell it cites.
 //
 // ⚠️ EVERY ROW IS UPSTREAM ONLY, EXCLUDING COMBUSTION. That is what Category 3 may use (Scope 3
 // Standard, p. 70) and what these four sheets say they are; DEFRA_ENERGY_META.sheet_descriptions holds

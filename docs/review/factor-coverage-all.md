@@ -297,6 +297,9 @@ change (1495); all 27 members and `EU_AVG` have an EEA row (966-973). Residual: 
 
 ## 6. Stale or contradictory comments found (no action taken)
 
+**Status (FI8, 7 Oct 2026):** none of the comments below remains in the tree. Each was rewritten in FI8 or had
+already gone in FI1 to FI10; the line numbers below are for the tree this record was written against.
+
 - engine.ts:193-196 and 2475-2477: steam "still applied to every country" by the US row. Steam now routes through
   `STEAM_EF` with no US fallback (2318-2397).
 - engine.ts:203-204, 2020-2021, 2056-2057: CA gas "mcf/m3 only", "gallons is never offered". The bill path

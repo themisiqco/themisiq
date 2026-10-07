@@ -277,7 +277,7 @@ export function generateAssurancePDF(
     doc.text('Market-based Scope 2 — Residual Mix', M, afterMethods + 30)
     doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
     doc.text(
-      doc.splitTextToSize('Residual-mix factor applied to uncovered load; contractual (covered) kWh counted at zero. Per-location source and vintage below.', W - 2 * M),
+      doc.splitTextToSize('Residual-mix factor applied to uncovered load, or, where no residual mix is loaded, the location-based grid average (named per location below); contractual (covered) kWh counted at zero. Per-location source and vintage below.', W - 2 * M),
       M, afterMethods + 44
     )
     autoTable(doc, {

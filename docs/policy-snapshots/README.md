@@ -3,6 +3,8 @@
 Three customer-facing policies (the Privacy Policy, the Terms of Service and the Refund Policy) exist
 only as React components in `app/` and are edited in place. Each file in this directory is the record of
 one published version, so that editing the live page does not erase the wording a customer agreed to.
+Changes to the public methodology page (`app/methodology/page.tsx`) are recorded here too, by the same
+convention: each file records the sections that changed, word for word, before and after, with the date.
 
 | File | Records |
 |---|---|
@@ -12,6 +14,7 @@ one published version, so that editing the live page does not erase the wording 
 | `2026-10-privacy-v2.3.md` | Privacy Policy v2.3: what changed from v2.2, word for word (LEAD1 L10, the free account) |
 | `2026-10-privacy-v2.4.md` | Privacy Policy v2.4 (current): what changed from v2.3, word for word (RET1, rate-limit records and held calculations deleted on a schedule) |
 | `2026-10-terms.md` | Terms of Service effective October 6, 2026 (current): what changed, word for word |
+| `2026-10-methodology.md` | Methodology page, GHG "Emission factors" and "Scope 2 accounting", changed October 7, 2026: before and after, word for word (factor integrity, FI8) |
 
 ## Checkout consent versions
 

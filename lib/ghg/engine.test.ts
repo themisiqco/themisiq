@@ -1104,6 +1104,10 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
 //
 // These tests also pin all five getResidualFactor note strings, which had NO test coverage of any
 // kind before this section — the style the grid note was modelled on was itself unguarded.
+// FI8: the residual note says why there is no residual mix: no eGRID subregion chosen, or none loaded for the country.
+const FALLBACK_TAIL = 'so the market-based figure uses the location-based grid average for the electricity not covered by contractual instruments.'
+const NO_SUBREGION_NOTE = `No eGRID subregion is selected for this location, ${FALLBACK_TAIL}`
+
 describe('P. electricity rows: citation and fallback disclosure', () => {
   const elec = (l: Location, y: number) =>
     (buildWorkings([l], 'AR6', y, [], 12) as any[]).filter(r => r.stream === 'electricity' && !r.declaration);
@@ -1153,7 +1157,7 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
     expect(mb.factor_vintage).not.toBeUndefined();
     expect(mb.factor_vintage).not.toBeNull();
     // The residual helper's own fallback note survives — it is why the grid factor is here at all.
-    expect(mb.ef_source).toContain('market-based falls back to location factor.');
+    expect(mb.ef_source).toContain(NO_SUBREGION_NOTE);
     // And the two rows now agree on the factor they share.
     expect(mb.emission_factor).toBe(lb.emission_factor);
   });
@@ -1186,6 +1190,13 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
       .toBe('Green-e 2025 [2023 data] residual mix applied to 2026 inventory (latest vintage held).');
     expect(getResidualFactor('CAMX', 2023, 'AR6').note, 'exact year → silence').toBe('');
     expect(getResidualFactor('', 2026, 'AR6').note)
+      .toBe(NO_SUBREGION_NOTE);
+    // FI8: a country with no residual mix loaded is named; a non-blank US key that is not held keeps its own note.
+    expect(getResidualFactor('', 2026, 'AR6', 'GB').note).toBe(`No residual mix is loaded for United Kingdom, ${FALLBACK_TAIL}`);
+    expect(getResidualFactor('', 2026, 'AR6', 'CA').note).toBe(`No residual mix is loaded for Canada, ${FALLBACK_TAIL}`);
+    expect(getResidualFactor('', 2026, 'AR6', 'NZ').note).toBe(`No residual mix is loaded for New Zealand, ${FALLBACK_TAIL}`);
+    expect(getResidualFactor('', 2026, 'AR6', 'US').note).toBe(NO_SUBREGION_NOTE);
+    expect(getResidualFactor('ZZZZ', 2026, 'AR6', 'US').note)
       .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
     // AT is applicable:false but NOT a coverage gap — it must never read as a zero-emission mix.
     expect(getResidualFactor('EU_AT', 2024, 'AR6').applicable).toBe(false);
@@ -1300,7 +1311,7 @@ describe('P9. residual fallback discloses its direction', () => {
     expect(getResidualFactor('EU_ZZ', 2024, 'AR6').note)
       .toBe('No published residual mix for this region; market-based falls back to location factor.');
     expect(getResidualFactor('', 2026, 'AR6').note)
-      .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
+      .toBe(NO_SUBREGION_NOTE);
   });
 });
 
@@ -1510,7 +1521,7 @@ describe('Y. Australia has a published residual mix', () => {
     expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
       .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
     expect(getResidualFactor('', 2026, 'AR6').note)
-      .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
+      .toBe(NO_SUBREGION_NOTE);
   });
 
   // ── residualRegionFor: ONE derivation, four call sites ────────────────────────────────────────
@@ -5597,6 +5608,19 @@ describe('FI2 exact conversions and honest provenance', () => {
     }
     expect(checked).toBeGreaterThan(200);
     expect(fellBack, 'FI2 diff 2: no row outside the US is priced from the US table').toBe(0);
+  });
+
+  it('FI8: a country we hold no factors for prices nothing on any line, from any table, US EPA included', () => {
+    let checked = 0;
+    for (const [field, unitField, on, units] of LINES) for (const unit of units) {
+      const l = loc({ country: 'JP', grid_region: '', ...on, [field]: 1000, [unitField]: unit } as Partial<Location>);
+      const label = `JP ${String(field)} in ${unit}`;
+      const priced = buildWorkings([l], 'AR6', 2025).filter(r => r.scope === 1 && r.declaration === undefined && r.factor_key);
+      expect(priced.map(r => r.factor_key), `${label}: a refused country prices nothing`).toEqual([]);
+      expect(calcLocation(l, 'AR6', 2025).s1_total, label).toBe(0);
+      checked++;
+    }
+    expect(checked).toBe(LINES.reduce((n, [, , , units]) => n + units.length, 0));
   });
 
   it('every former fallback case now prices from its own table through an exact conversion, or is unpriced (FI2 diff 2)', () => {

@@ -1618,7 +1618,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   const uploadCoverageIssues = unresolvedCoverage.filter(i => !UNPRICED_STATUSES.has(i.status))
   const conciergeReady = conciergePending.length === 0 && unresolvedCoverage.length === 0
   // Grid-region gate: locations whose grid_region isn't a real GRID_EF key (us_average default, '',
-  // or an unmapped country) — these silently fall back to US_AVG in getGridFactor. Consumed by the
+  // or an unmapped country). The engine omits their electricity rows (buildWorkings and calcLocation gate on
+  // isResolvedGridRegion), so nothing is priced from US_AVG; this list is what asks for the region. Consumed by the
   // step-2 advance + export gates and the UI prompt (sub-steps D/E). Pure derivation, no behaviour here.
   //
   // ⚠️ A REFUSED LOCATION IS NEVER ASKED FOR A GRID REGION, AND WITHOUT THIS IT COULD NOT ANSWER.
@@ -3475,7 +3476,7 @@ workings: saved.workings,
     const residualRows: string[][] = needsMkt
       ? derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
           const resRegion = residualRegionFor(l)
-          const res = getResidualFactor(resRegion, inventory.reporting_year, 'AR6')
+          const res = getResidualFactor(resRegion, inventory.reporting_year, 'AR6', l.country)
           return [
             l.name || 'Location',
             res.applicable ? res.source : 'Location-factor fallback',
@@ -3550,10 +3551,10 @@ workings: saved.workings,
       ['GWP values', EF_SOURCES.gwp_ar6],
       ...((fw.id === 'esrs' || fw.id === 'gri')
         ? [
-            ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load; covered (contractual) kWh counted at zero'],
+            ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load, or, where no residual mix is loaded, the location-based grid average (named per location below); covered (contractual) kWh counted at zero'],
             ...derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
               const resRegion = residualRegionFor(l)
-              const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion)
+              const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion, l.country)
               return [`Residual factor: ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
             }),
           ]

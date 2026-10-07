@@ -280,7 +280,7 @@ on the same NCV.
 
 ## B. Propane (FI4)
 
-**FI4 done (7 Oct 2026, ruling R13), commit: ____ (Lisa to fill in).** Propane by mass now prices only on the per-mass
+**FI4 done (7 Oct 2026, ruling R13), commit a6dc519.** Propane by mass now prices only on the per-mass
 factors below (DEFRA per tonne, MRR mass basis, MfE per kg); US, CA and AU propane in kg is unpriced; the 4.24 lb/gal
 density is removed.
 

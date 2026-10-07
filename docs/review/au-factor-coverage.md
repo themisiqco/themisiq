@@ -168,6 +168,9 @@ or a factor key in engine.ts; the only matches are comments (engine.ts:89, 684).
 
 ## 6. Stale comments found (no action taken)
 
+**Status (FI8, 7 Oct 2026):** none of the comments below remains in the tree. Each was rewritten in FI8 or had
+already gone in FI1 to FI10; the line numbers below are for the tree this record was written against.
+
 - engine.ts:677-678: "nothing reads the two keys above yet". `fuelOilPricing` (engine.ts:2297) reads them.
 - lib/scope3/defraEnergy.ts:5: "NOTHING PRICES FROM IT YET". cat3Energy.ts prices from it.
 - lib/scope3/cat3Inputs.ts header: "efJurisdiction ends `return 'US'`". It now returns null for unsupported

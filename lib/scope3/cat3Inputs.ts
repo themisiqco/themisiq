@@ -91,9 +91,8 @@ const bool = (v: unknown): boolean => v === true
  * (lib/ghg/engine.ts:1269-1270, efJurisdiction). The country select stores 'GB'
  * (app/dashboard/ghg/page.tsx:1571); 'UK' is accepted because the engine accepts it.
  *
- * ⚠️ AND NO FALLBACK TO THE US. efJurisdiction ends `return 'US'` for anything it does not recognise
- * (engine.ts:1276), which is right for picking a factor table and wrong here: an unrecognised country
- * is NOT-UK, and Category 3 says so rather than calling it American. This module never maps a country
+ * ⚠️ AND NO FALLBACK TO THE US. efJurisdiction returns null for a country it does not recognise (the location is
+ * refused), and an unrecognised country is NOT-UK here, which Category 3 says rather than calling it anything else. This module never maps a country
  * to a jurisdiction at all; it answers one question, "is this the UK", and hands the rest on.
  */
 const isUk = (country: string): boolean => {

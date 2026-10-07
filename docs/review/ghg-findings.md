@@ -8,6 +8,14 @@ context and the full register are in [ghg-register.md](ghg-register.md).
 
 ## F-01. Missing factor keys silently fall back to US EPA values
 
+**Status: FIXED** (recorded 7 Oct 2026, FI8) on the `factor-integrity` branch. `pickEF` reads only the location's
+own table; a key it does not hold is priced through an exact conversion to a unit that table does hold, or is an
+unpriced line with an export-blocking issue. No `?? EF` remains. Commits, oldest first (`git log 06a0809..1b40725`):
+58bb697 and 5fb2190 (FI1), 796df43, 51a9014, a4bf4f4 and bc094eb (FI2), 198415d (FI5), efe25a7 and ff9e961
+(FI3), a6dc519 (FI4), 18fce56 and 8b8af7b (FI7, FI7b), 1b40725 (FI10); 0f8c605 (RM1) and 1417dde (location row)
+are on the same range but unrelated. The cross-publisher test in lib/ghg/engine.test.ts fails on the old code.
+The text below is the finding as recorded on 1 Oct 2026; its line numbers are for that tree.
+
 **What the code does.** For every non-US combustion table, `pickEF` reads the country table and, when the key
 is absent, takes the US table's value with `??`:
 

@@ -43,9 +43,8 @@ import type { Location } from './engine'
  * one document priced both. Their GRID_EF *values* differ (EU_DE and EU_FR are separate rows), but a
  * value is not an edition: both rows come from the same EEA publication.
  *
- * By the same rule an unlisted country is 'US' and not a key of its own: pickEF falls back to the US
- * EPA table for Japan, so a Japanese location IS priced by US EPA factors and recording that is the
- * truthful answer, not a rounding of it.
+ * An unlisted country is not a key at all: efJurisdiction returns null for it, the location is refused and excluded
+ * whole, nothing prices it, and so nothing is recorded for it (there is no US fallback since FI2).
  */
 export type FactorJurisdiction = 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ'
 

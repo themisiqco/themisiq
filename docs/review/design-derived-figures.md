@@ -1151,6 +1151,7 @@ block, and some will price differently:
 - **Price differently:** every row that today carries a US EPA value under another publisher's citation.
 
 ### FI1. Engine: an unpriceable input is a blocking line, never a dropped site
+- **Status:** done on `factor-integrity`, commits 58bb697 (diff 1) and 5fb2190 (diff 2).
 - **Estimate:** L, 2 diffs:
   - the engine line-level unpriced row, issues, refrigerant and province;
   - consumers: page, monthly and Category 3.
@@ -1211,6 +1212,7 @@ block, and some will price differently:
 - **Done:** no input in a supported country can leave the totals without an export-blocking issue that names it.
 
 ### FI2. Engine: no cross-country fallback; exact conversions; provenance from the value
+- **Status:** done on `factor-integrity`, commits 796df43, 51a9014 and a4bf4f4 (diffs 1 to 3), with the follow-up bc094eb.
 - **Estimate:** L, 3 diffs:
   - the exact conversion table and publisher-tagged factor tables;
   - removal of the fallback and routing by quantity type;
@@ -1295,6 +1297,7 @@ block, and some will price differently:
   a property that is cited and shown on the row. Nothing else prices.
 
 ### FI3. EU: no factor through an uncited property; mass units only where the source is mass-based
+- **Status:** done on `factor-integrity`, commits efe25a7 (research record, rulings R6 to R11) and ff9e961.
 - **Estimate:** M, 2 diffs:
   - a research record, a document only: per fuel, what each candidate source publishes;
   - the `EF_EU` restructure and the units offered.
@@ -1355,6 +1358,7 @@ block, and some will price differently:
 - **Done:** no EU line is priced through a property that is not cited and shown on its row.
 
 ### FI4. Propane by mass: cited density or per-mass factor, or block
+- **Status:** done on `factor-integrity` (ruling R13), commit a6dc519.
 - **Estimate:** M, 1 diff, plus a research record per publisher.
 - **Depends on:** FI2.
 - **Files:**
@@ -1387,6 +1391,7 @@ block, and some will price differently:
 - **Done:** no propane figure passes through a density that is not cited and shown on its row.
 
 ### FI5. Unit selector and country change: convert exactly or clear and ask
+- **Status:** done on `factor-integrity`, commit 198415d.
 - **Estimate:** M, 2 diffs:
   - the engine `changeUnit`, `unitsForCountryChange` and the residual-region guard;
   - the page handlers and messages.
@@ -1433,6 +1438,7 @@ block, and some will price differently:
 - **Done:** no unit or country change can relabel a figure.
 
 ### FI6. Australia Category 3: NGA Scope 3 for gas and electricity, by state
+- **Status:** open. Not on `factor-integrity`; see section 12.2.
 - **Estimate:** M, 2 diffs:
   - the transcribed NGA Scope 3 file with spot tests;
   - the Category 3 wiring and copy.
@@ -1474,6 +1480,7 @@ block, and some will price differently:
   Australian Category 3 changes.
 
 ### FI7. Steam with no published factor: plain supplier-figure message
+- **Status:** done on `factor-integrity`, commit 18fce56. FI7b (ruling R14, the labelled estimate at own-country gas / 0.80), commit 8b8af7b.
 - **Estimate:** S, 1 diff.
 - **Files:**
   - **lib/ghg/engine.ts** (`STEAM_EF` CA, AU, NZ, EU guidance, 2364-2396) and **app/dashboard/ghg/page.tsx**
@@ -1497,6 +1504,7 @@ block, and some will price differently:
 - **Done:** a customer with no published steam factor is told plainly what to enter and why export waits for it.
 
 ### FI8. Close-out
+- **Status:** done on `factor-integrity` (7 Oct 2026), patch docs/review/patches/fi8.patch; commit: ____ (Lisa to fill in).
 - **Estimate:** S, 1 diff.
 - **Files:**
   - **Stale comments** listed in factor-coverage-all.md section 6 and au-factor-coverage.md section 6.
@@ -1534,6 +1542,7 @@ block, and some will price differently:
 - **Done:** F-01 is closed by a test that fails on the old code, and the methodology page states the rule.
 
 ### FI9. Fleet fuel: each country's published mobile factors, or block
+- **Status:** open. Not on `factor-integrity`; see section 12.2.
 - **Estimate:** L, 3 diffs:
   - a research and transcription record per publisher, with a data file of transcribed values;
   - the data model and wizard input that selects the publisher's vehicle class;
@@ -1582,6 +1591,7 @@ block, and some will price differently:
 - **Done:** no vehicle fuel is priced with a stationary factor.
 
 ### FI10. New Zealand use class on every row
+- **Status:** done on `factor-integrity`, commit 1b40725.
 - **Estimate:** S, 1 diff.
 - **Ruling (section 10):** the use class that selected the `EF_NZ` table (`nz_use_class`, commercial or
   industrial, engine.ts:2539) is shown on every NZ combustion row.

@@ -6,7 +6,7 @@ after about line 1665 move down by 16.
 
 ## 1. The problem
 
-`reporting_year` is the calendar year in which the reporting window ends (lib/ghg/engine.ts:1659,
+`reporting_year` is the calendar year in which the reporting window ends (lib/ghg/engine.ts:1810,
 `new Date(reportingYear, m, 0)`). Every year-keyed factor is chosen from the bare `reporting_year`, never from
 the window. The fiscal year-end month reaches only the coverage window (`buildWorkings` and
 `findUnresolvedCoverage`), never a factor selector. So reporting year 2025 with a March year end
@@ -17,9 +17,9 @@ forward to the earliest key and say so in a note:
 
 | Selector | Location |
 |---|---|
-| `getGridFactor` | engine.ts:1120-1135 (rule at 1128-1130) |
-| `getResidualFactor` | engine.ts:1170-1238 (rule at 1180, 1200, 1214) |
-| `nzTdLoss` | engine.ts:993-1006 (rule at 995) |
+| `getGridFactor` | engine.ts:1195-1210 (rule at 1204-1205) |
+| `getResidualFactor` | engine.ts:1247-1325 (rule at 1259, 1279, 1293) |
+| `nzTdLoss` | engine.ts:1067-1080 (rule at 1069) |
 
 ## 2. Ruling recorded (1 Oct 2026)
 
@@ -116,12 +116,12 @@ but introduced for April to March. September uses the fallback, which gives Y ei
 fallback (Y-1, by 184 to 181 days). DESNZ guidance is followed, as the task specifies.
 
 **What changes against today.**
-- UK grid keys held: 2025 and 2026 (engine.ts:934; meaning stated at 926-931: the key is the workbook edition).
+- UK grid keys held: 2025 and 2026 (engine.ts:1008; meaning stated at 998-1007: the key is the workbook edition).
   - Today, every UK reporting year 2025 gets the 2025 key, whatever the year end.
   - Under the proposal, a March 2025 year end needs the 2024 edition, which is **not held**.
   - Today's forward fill would give 2025, an edition first published on 10 Jun 2025, after that window had ended.
-- UK combustion (`EF_UK`, engine.ts:324) and steam have **no year dimension**: one 2026 edition prices every
-  reporting year (engine.ts:298-299). DESNZ's guidance applies to all its factors, so for any year other than
+- UK combustion (`EF_UK`, engine.ts:335) and steam have **no year dimension**: one 2026 edition prices every
+  reporting year (engine.ts:309-310). DESNZ's guidance applies to all its factors, so for any year other than
   2026 the edition used is already not the one DESNZ directs, whatever the year end. Listed here; not part of
   the non-calendar question.
 
@@ -161,7 +161,7 @@ completing past years would get different factors from one reporting the current
 ThemisIQ applies, or whether it depends on when the inventory is prepared. The table shows both. In historical
 mode, the data year is chosen by the majority fallback.
 
-⚑ **FLAG E3: which revision date counts.** The code cites Revision 2 (engine.ts:1232). If availability is the
+⚑ **FLAG E3: which revision date counts.** The code cites Revision 2 (engine.ts:1311). If availability is the
 Revision 2 date (12 Jun 2025), a window ending before that date may not select eGRID2023 Rev2.
 
 | Year end (Y = 2025) | Window end | Ongoing (ruling, first-release dates) | Historical (majority data year) |
@@ -172,7 +172,7 @@ Revision 2 date (12 Jun 2025), a window ending before that date may not select e
 | September | 30 Sep 2025 | eGRID2023 | 2025 → as December |
 
 For Y = 2024 in ongoing mode, a December 2024 window ends before eGRID2023 was released, so the rule selects
-**eGRID2022**, which is not held. Only eGRID2023 is held (`GRID_EF` US keys 2023 only, engine.ts:909-923).
+**eGRID2022**, which is not held. Only eGRID2023 is held (`GRID_EF` US keys 2023 only, engine.ts:983-997).
 
 ### 4.3 US EPA GHG Emission Factors Hub: US combustion and steam
 
@@ -189,7 +189,7 @@ publication year. Whether the majority calendar year should map to the edition y
 Confirm.
 
 **What changes:** nothing today. US combustion (`EF`) has no year key; one edition prices every year
-(engine.ts:755, edition flagged unverified at 65-71). The rule takes effect only if more than one Hub edition is
+(engine.ts:115, edition flagged unverified at 68-71). The rule takes effect only if more than one Hub edition is
 held.
 
 ### 4.4 ECCC (Canada): provincial grid electricity, combustion
@@ -217,8 +217,8 @@ and governs which version of the document to use, not which year's table. Applyi
 newest version published on or before the window end. I have **not** applied it, because the publisher limits
 the guidance to the offset system. Confirm.
 
-⚑ **FLAG C2: what the keys mean.** The code holds keys 2024, 2025 and 2026 (engine.ts:896-908). Its comments
-name ECCC "applicability sets (2023/24, 2025, 2026)" (engine.ts:226, 276), so key 2024 probably stands for
+⚑ **FLAG C2: what the keys mean.** The code holds keys 2024, 2025 and 2026 (engine.ts:969-982). Its comments
+name ECCC "applicability sets (2023/24, 2025, 2026)" (engine.ts:223, 265), so key 2024 probably stands for
 the 2023/24 set. The code never states this.
 
 | Year end (Y = 2025) | Factor year | Held? | Today |
@@ -228,8 +228,8 @@ the 2023/24 set. The code never states this.
 | June | 2024 | yes | 2025 |
 | September | 2025 | yes | 2025 |
 
-ECCC combustion (`EF_CA`, engine.ts:241) holds factors that are the same across the three applicability sets
-(engine.ts:226-228), so it is unaffected.
+ECCC combustion (`EF_CA`, engine.ts:238) holds factors that are the same across the three applicability sets
+(engine.ts:223-225), so it is unaffected.
 
 ### 4.5 AIB European Residual Mixes: EU market-based (EEA for location-based)
 
@@ -247,12 +247,12 @@ Publication dates (summarising fetcher only, not verified verbatim): 2024 editio
 28 May 2026. They are not needed under the ruling, because AIB uses no "available" wording.
 
 **EEA (EU location-based grid):** EEA's own pages were not searched separately. **No guidance found** is
-recorded on that basis, with the gap stated. The code key (2023, engine.ts:935) is not stated to be a data or
+recorded on that basis, with the gap stated. The code key (2023, engine.ts:1011-1018) is not stated to be a data or
 an edition year.
 
 **Proposed rule:** majority fallback on the calendar year the edition describes.
 
-| Year end (Y = 2025) | AIB factor year | Held? (`RESIDUAL_EU` 2024 only, engine.ts:1028-1039) | Today |
+| Year end (Y = 2025) | AIB factor year | Held? (`RESIDUAL_EU` 2024 only, engine.ts:1103-1114) | Today |
 |---|---|---|---|
 | December | 2025 | no | 2024, "latest vintage held" |
 | March | 2024 | yes | 2024, "latest vintage held" |
@@ -281,8 +281,8 @@ year an edition is for. A search result claiming users are "not expected to upda
 users should select, so the ruling is **not** applied. Confirm.
 
 ⚑ **FLAG G2: what "factor year" means for Green-e.** It could be the edition year (2025) or the data year
-(2023). The code keys by data year (`RESIDUAL_US` 2023 only, engine.ts:1045-1073; engine.ts:1221 "2023 is the
-DATA year, and the edition is 2025") and builds the label with a hard-coded +2 (engine.ts:1231). Under the
+(2023). The code keys by data year (`RESIDUAL_US` 2023 only, engine.ts:1120-1148; engine.ts:1300 "2023 is the
+DATA year, and the edition is 2025") and builds the label with a hard-coded +2 (engine.ts:1310). Under the
 majority rule, a March 2025 year end gives 2024, which means either edition 2024 (2022 data) or data year 2024
 (edition 2026). These are different tables. Decide before implementing.
 
@@ -314,7 +314,7 @@ how to map before implementing.
 ⚑ **FLAG A2: "This issue supersedes previous issues"** (landing page, summarising fetcher). This is not
 "available", "latest" or "most recent" wording, so the ruling is not applied.
 
-Only 2025 is held for grid (engine.ts:950-952), for the residual mix factor (`RESIDUAL_AU`, engine.ts:1094,
+Only 2025 is held for grid (engine.ts:1024-1026), for the residual mix factor (`RESIDUAL_AU`, engine.ts:1169,
 keyed by edition per 1092) and for combustion. So nothing resolves differently today; only the note changes.
 
 ### 4.8 MfE (New Zealand): grid electricity, T&D losses, combustion
@@ -337,14 +337,14 @@ so the ruling is **not** applied. Confirm.
 
 **Proposed rule:** majority fallback on the year of the annual series.
 
-| Year end (Y = 2025) | Factor year | Held? (`NZ` 2023, 2024, 2025, engine.ts:955) | Today |
+| Year end (Y = 2025) | Factor year | Held? (`NZ` 2023, 2024, 2025, engine.ts:1029) | Today |
 |---|---|---|---|
 | December | 2025 | yes | 2025 |
 | March | 2024 | yes | 2025 |
 | June | 2024 | yes | 2025 |
 | September | 2025 | yes | 2025 |
 
-**T&D losses:** `NZ_TD_LOSS` holds 2025 only (engine.ts:961, keyed by applicability year per 999). A March or
+**T&D losses:** `NZ_TD_LOSS` holds 2025 only (engine.ts:1035, keyed by applicability year per 1072-1073). A March or
 June 2025 year end would need 2024, which is not held.
 
 ## 5. Decisions this research cannot settle
@@ -363,44 +363,44 @@ June 2025 year end would need 2024, which is not held.
 
 ## 6. Code locations involved
 
-Line numbers are at HEAD de782a6.
+Line numbers are at HEAD 1b40725 plus the FI8 patch (refreshed 7 Oct 2026; they were at de782a6).
 
 **Selectors (need the window, or a factor year derived from it, in place of `year`):**
-- engine.ts:1120-1135 `getGridFactor`; the unknown-region fallback at 1126 has no year.
-- engine.ts:1170-1238 `getResidualFactor` (EU 1176-1194, AU 1198-1209, US 1211-1237).
-- engine.ts:993-1006 `nzTdLoss`.
+- engine.ts:1195-1210 `getGridFactor`; the unknown-region fallback at 1201 has no year.
+- engine.ts:1247-1325 `getResidualFactor` (EU 1255-1274, AU 1277-1288, US 1290-1314, no-residual note 1315-1324).
+- engine.ts:1067-1080 `nzTdLoss`.
 
 **Tables whose key meaning must be stated per publisher:**
-- `GRID_EF` engine.ts:894-956: ECCC 896-908, eGRID 909-923, UK 934, EEA 937-944, AU 950-952, NZ 955.
-- `RESIDUAL_EU` 1028-1039, `RESIDUAL_US` 1045-1073, `RESIDUAL_AU` 1094; `NZ_TD_LOSS` 961.
+- `GRID_EF` engine.ts:968-1030: ECCC 969-982, eGRID 983-997, UK 1008, EEA 1009-1018, AU 1024-1026, NZ 1029.
+- `RESIDUAL_EU` 1103-1114, `RESIDUAL_US` 1120-1148, `RESIDUAL_AU` 1169; `NZ_TD_LOSS` 1035.
 - **New:** a table of edition publication dates with source URLs, needed by the ruling for DESNZ and, if E1 is
   confirmed, eGRID.
 
 **Callers that pass `reporting_year` today and would pass the window:**
 - engine.ts:
-  - `calcLocation` 2603 (calls at 2652, 2667, 2676)
-  - `calcInventory` 2769
-  - `fuelEmissionsByType` 2796 (call at 2822)
-  - `pctEstimated` 2836
-  - `publishersForLocation` 2515 (call at 2526; it calls `buildWorkings` at 2521 with no fiscal month)
-  - `findUnpriceableLocations` 2756
-  - `buildWorkings` 3320 (window already built at 3322; selector calls at 3537, 3544, 3566)
-- lib/ghg/factorEditions.ts: `buildFactorEditions` 223 (call at 288).
-- lib/ghg/monthlyEmissions.ts:217: `deps.getGridFactor(..., reportingYear)`, no fiscal month.
-- lib/ghg/loadSeries.ts:133: `findUnpriceableLocations(locationsData)` with no year, so it defaults to 2024.
-- app/dashboard/ghg/page.tsx call sites: 1348, 1370, 1430, 1634, 1647, 1656, 1676-1679, 2068, 2668, 2676, 3089,
-  3163, 3195. `inventory.fiscal_year_end_month` is in scope at all of them.
+  - `calcLocation` 3236 (calls at 3257, 3272, 3281)
+  - `calcInventory` 3355
+  - `fuelEmissionsByType` 3380 (call at 3392)
+  - `pctEstimated` 3463
+  - `publishersForLocation` 2919 (call at 2931; it calls `buildWorkings` at 2925 with no fiscal month)
+  - `findUnpriceableLocations` 3344
+  - `buildWorkings` 4364 (window already built at 4366; selector calls at 4610, 4617, 4639)
+- lib/ghg/factorEditions.ts: `buildFactorEditions` 230 (call at 304).
+- lib/ghg/monthlyEmissions.ts:265: `deps.getGridFactor(..., reportingYear)`, no fiscal month.
+- lib/ghg/loadSeries.ts:142: `findUnpriceableLocations(locationsData, "AR6", reportingYear)`; it now passes the year, still with no fiscal month.
+- app/dashboard/ghg/page.tsx call sites: 1615, 1662, 1689, 1749, 2390, 2428, 2636-2647, 2845, 3055, 3063, 3479,
+  3557, 3587. `inventory.fiscal_year_end_month` is in scope at all of them.
 
 **Display strings that would state the wrong year:**
-- page.tsx:2022, 2283-2284: grid factor shown in the wizard.
-- page.tsx:2271-2278: hard-coded edition labels. "NZ MfE 2026" never matches the NZ key actually used.
+- page.tsx:2390, 2636-2647: grid factor shown in the wizard.
+- page.tsx:2645: hard-coded edition labels. "NZ MfE 2026" never matches the NZ key actually used.
 
 **Notes and disclosures:**
-- engine.ts:1003-1004, 1133-1134, 1148-1149: the "applied to {year} inventory" notes.
-- app/methodology/page.tsx:67, 71.
-- lib/ghg/factorEditions.ts:444-465 `FACTOR_EDITION_DISCLOSURE`.
-- lib/assurancePdf.ts:278, 283.
-- page.tsx:3164 (XLSX).
+- engine.ts:1077-1078, 1208-1209, 1223-1224: the "applied to {year} inventory" notes.
+- app/methodology/page.tsx:77, 82 (Emission factors P5 and Scope 2 accounting, as rewritten by FI8).
+- lib/ghg/factorEditions.ts:479-501 `FACTOR_EDITION_DISCLOSURE`.
+- lib/assurancePdf.ts:261, 277-281.
+- page.tsx:3554 (XLSX).
 
 ## 7. Disclosure text needed
 
@@ -416,7 +416,7 @@ and any other year reads "the year ending 31 March 2025".
 > the earlier calendar year for a year ending in March or June, and the later one for a year ending in
 > September or December. Each workings row states the factor year used and why.
 
-**Workings and verifier notes** (replacing engine.ts:1133-1134, 1148-1149 and 1003-1004 where the rule
+**Workings and verifier notes** (replacing engine.ts:1208-1209, 1223-1224 and 1077-1078 where the rule
 applies):
 - Majority: "Grid factor for 2024 applied to the year ending 31 March 2025: 2024 contains 275 of its 365 days."
 - DESNZ March: "DESNZ 2024 factors applied to the year ending 31 March 2025, following DESNZ guidance for April
@@ -428,7 +428,7 @@ applies):
 - Not held (wording depends on decision 1): the note must name the factor year the rule selected, the year
   actually used, and why.
 
-**Assurance PDF:** the methods table (lib/assurancePdf.ts:259) would need the window and the factor-year rule,
+**Assurance PDF:** the methods table (lib/assurancePdf.ts:261) would need the window and the factor-year rule,
 not only "Reporting year 2025" (F-12).
 
 ## 8. Rulings, second set (1 Oct 2026)
@@ -491,25 +491,25 @@ M1).
 
 | Dataset | Code | Class | Fits cleanly? |
 |---|---|---|---|
-| DESNZ grid electricity | `GRID_EF.UK` engine.ts:934 | (a), DESNZ rule | Yes |
-| DESNZ combustion | `EF_UK` engine.ts:324 | (a), DESNZ rule | Yes |
-| DESNZ steam | `STEAM_EDITION` UK, engine.ts:877-880 | (a), DESNZ rule | Yes |
-| EPA Hub combustion | `EF` (engine.ts:755) | (a), majority | Yes. Held edition uncertain: label "US EPA 2024", values read from the 2025 workbook (engine.ts:65-71). |
+| DESNZ grid electricity | `GRID_EF.UK` engine.ts:1008 | (a), DESNZ rule | Yes |
+| DESNZ combustion | `EF_UK` engine.ts:335 | (a), DESNZ rule | Yes |
+| DESNZ steam | `STEAM_EDITION` UK, engine.ts:951-954 | (a), DESNZ rule | Yes |
+| EPA Hub combustion | `EF` (engine.ts:115) | (a), majority | Yes. Held edition uncertain: label "US EPA 2024", values read from the 2025 workbook (engine.ts:68-71). |
 | EPA Hub steam (Table 7) | `STEAM_EDITION` US | (a), majority | Yes |
-| NGA grid electricity | `GRID_EF.AU_*` engine.ts:950-952 | (a), majority on activity year (8.2) | Yes, with the 8.2 mapping |
-| NGA residual mix factor | `RESIDUAL_AU` engine.ts:1094 | (a), as NGA grid | Yes |
-| NGA combustion | `EF_AU` engine.ts:622 | (a), as NGA grid | Yes |
-| MfE combustion | `EF_NZ` engine.ts:672 | (a), majority | Yes |
-| eGRID grid electricity | `GRID_EF` US states, engine.ts:909-923 | (b) | Yes |
-| Green-e residual mix | `RESIDUAL_US` engine.ts:1045-1073 | (b), data year | Yes |
-| AIB residual mix | `RESIDUAL_EU` engine.ts:1028-1039 | (b) | Yes |
-| ECCC grid intensities | `GRID_EF` CA provinces, engine.ts:896-908 | (b) | **No.** See below. |
-| EEA grid electricity (EU, location-based) | `GRID_EF.EU_*` engine.ts:937-944 | (b) by analogy | **No.** See below. |
-| MfE grid electricity | `GRID_EF.NZ` engine.ts:955 | not named in the ruling | **No.** See below. |
-| MfE T&D losses | `NZ_TD_LOSS` engine.ts:961 | not named in the ruling | **No.** See below. |
-| ECCC combustion | `EF_CA` engine.ts:241, `EF_CA_NG_CO2_M3` 281 | not named in the ruling | **No.** See below. |
+| NGA grid electricity | `GRID_EF.AU_*` engine.ts:1024-1026 | (a), majority on activity year (8.2) | Yes, with the 8.2 mapping |
+| NGA residual mix factor | `RESIDUAL_AU` engine.ts:1169 | (a), as NGA grid | Yes |
+| NGA combustion | `EF_AU` engine.ts:680 | (a), as NGA grid | Yes |
+| MfE combustion | `EF_NZ` engine.ts:734 | (a), majority | Yes |
+| eGRID grid electricity | `GRID_EF` US states, engine.ts:983-997 | (b) | Yes |
+| Green-e residual mix | `RESIDUAL_US` engine.ts:1120-1148 | (b), data year | Yes |
+| AIB residual mix | `RESIDUAL_EU` engine.ts:1103-1114 | (b) | Yes |
+| ECCC grid intensities | `GRID_EF` CA provinces, engine.ts:969-982 | (b) | **No.** See below. |
+| EEA grid electricity (EU, location-based) | `GRID_EF.EU_*` engine.ts:1009-1018 | (b) by analogy | **No.** See below. |
+| MfE grid electricity | `GRID_EF.NZ` engine.ts:1029 | not named in the ruling | **No.** See below. |
+| MfE T&D losses | `NZ_TD_LOSS` engine.ts:1035 | not named in the ruling | **No.** See below. |
+| ECCC combustion | `EF_CA` engine.ts:238, `EF_CA_NG_CO2_M3` 270 | not named in the ruling | **No.** See below. |
 | ECCC mobile | lib/ghg/mobile.ts:72 `EDITION = 'NIR 2026 (1990-2024)'` | not named in the ruling | **No.** See below. |
-| IPCC 2006 defaults (EU combustion) | `EF_EU` engine.ts:503 | neither | **No.** See below. |
+| IPCC 2006 defaults (EU combustion) | `EF_EU` engine.ts:501 | neither | **No.** See below. |
 
 **The ones that do not fit cleanly, with a recommendation each:**
 - **ECCC grid intensities.**
@@ -523,12 +523,12 @@ M1).
   - *Recommend:* class (b).
 - **MfE grid and T&D losses.**
   - Both are published inside MfE's annual edition, which is class (a) in form.
-  - The values are a dated series by year (Table 5.2; T&D keyed by applicability year at engine.ts:999), which
+  - The values are a dated series by year (Table 5.2; T&D keyed by applicability year at engine.ts:1072-1073), which
     is class (b) in substance.
   - *Recommend:* class (b), keyed by the year of the series row, with the edition recorded. Each year's row is
     then used for that year.
 - **ECCC combustion.**
-  - The seeded values are identical across the three applicability sets (engine.ts:226-228), so either class
+  - The seeded values are identical across the three applicability sets (engine.ts:223-225), so either class
     gives the same numbers.
   - *Recommend:* class (a), majority on applicability year, so the edition recorded is right.
 - **ECCC mobile.**
