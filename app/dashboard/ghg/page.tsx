@@ -2303,8 +2303,10 @@ workings: saved.workings,
         <Field label="List your locations" hint="One location = one site with its own electricity supply; all of that site's energy goes in together. Enter name and state: we'll collect energy data for each one.">
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
             {inventory.locations.map((loc, i) => (
-              <div key={loc.id} style={{ display: 'flex', gap: 8 }}>
-               <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Chicago Warehouse" style={{ ...inputStyle, flex: 1 }} />
+              // The row wraps rather than squeezing the name: with a state or province select beside the country one, the
+              // name input had no minimum and shrank to a few characters inside this 560px column.
+              <div key={loc.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+               <input value={loc.name} onChange={e => updateLocation(i, 'name', e.target.value)} placeholder="e.g. Chicago Warehouse" style={{ ...inputStyle, flex: 1, minWidth: 180 }} />
 {/* ⚠️ THE VALUE IS THE CANONICAL FORM, AND NOTHING IS WRITTEN TO GET IT. A location saved as
     'UK' or 'GR' before canonicalCountryCode existed holds a value no option carries, and a
     select that cannot match its value does not show it. selectedCountryValue matches on the
@@ -2374,13 +2376,16 @@ workings: saved.workings,
       ⚠️ getGridFactor(region, inventory.reporting_year), never a year-blind constant — see
     lib/ghg/gridDisplay.test.ts, where a dropdown reading GRID_REGIONS_CA's `.ef` offered Ontario at
     0.059 while the engine priced it at 0.03. */}
+{loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && !gridRegionForCountry(loc.country) && (
+  <input value={loc.region || ''} onChange={e => updateLocation(i, 'region', e.target.value)} placeholder="State/Region" style={{ ...inputStyle, width: 120 }} />
+)}
+{/* The grid label and the remove button wrap TOGETHER, so neither is left alone on a line: the label on the left, the
+    button pushed to the right of whatever line they land on. minHeight matches an input so the button keeps its size. */}
+<div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flex: '1 0 auto', justifyContent: 'space-between', minHeight: 38 }}>
 {isResolvedGridRegion(loc.grid_region) && (
   <span style={{ fontSize: 12, color: '#0F6E56', alignSelf: 'center', whiteSpace: 'nowrap' }}>
     Grid: {loc.grid_region} ({getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg/kWh)
   </span>
-)}
-{loc.country && loc.country !== 'US' && loc.country !== 'CA' && loc.country !== 'AU' && !gridRegionForCountry(loc.country) && (
-  <input value={loc.region || ''} onChange={e => updateLocation(i, 'region', e.target.value)} placeholder="State/Region" style={{ ...inputStyle, width: 120 }} />
 )}
 {/* ⚠️ NO CONTROL AT ALL WHEN ONE LOCATION REMAINS, RATHER THAN A DISABLED ONE.
     A disabled button with its reason in a title attribute has no reason on a touch device, and a
@@ -2395,9 +2400,10 @@ workings: saved.workings,
     onClick={() => removeLocation(loc.id)}
     disabled={removing.has(`location:${loc.id}`)}
     aria-label={`Remove ${loc.name?.trim() || 'this unnamed location'}`}
-    style={{ fontSize: 16, lineHeight: 1, padding: '0 10px', background: 'none', border: '0.5px solid #e8e7e4', borderRadius: 8, color: 'var(--color-ink-muted)', cursor: 'pointer', flexShrink: 0 }}
+    style={{ fontSize: 16, lineHeight: 1, padding: '0 10px', background: 'none', border: '0.5px solid #e8e7e4', borderRadius: 8, color: 'var(--color-ink-muted)', cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }}
   >&times;</button>
 )}
+</div>
               </div>
             ))}
             <button onClick={addLocation} style={{ fontSize: 13, padding: '8px 16px', borderRadius: 8, background: 'none', border: '0.5px solid var(--color-brand)', color: 'var(--color-brand)', cursor: 'pointer', alignSelf: 'flex-start' }}>+ Add location</button>
