@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-  publishersForLocation, emptyLocation, unitsForCountryChange, snapUnitsForCountry, buildWorkings, countryRefusal,
+  publishersForLocation, emptyLocation, unitsForCountryChange, applyUnitOutcomes, snapUnitsForCountry, buildWorkings, countryRefusal,
   gridRegionForCountry, isResolvedGridRegion, type Location,
 } from './engine'
 import { refusalResultsHeading, refusalBannerHeading, refusalBannerTrailer, countryRefusalText, countryRefusalLabel, type RefusalSurface } from './countryRefusalCopy'
@@ -31,6 +31,7 @@ import { priceCat3 } from '../scope3/cat3Energy'
 import { cat3WorkingsSummary, cat3SkippedText } from '../scope3/cat3Copy'
 
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o })
+const AT = '2026-10-07T12:00:00.000Z'
 
 // ── A NEW LOCATION'S UNITS FOLLOW ITS COUNTRY ────────────────────────────────────────────────
 describe('a new location takes its country defaults on the first country choice', () => {
@@ -41,7 +42,8 @@ describe('a new location takes its country defaults on the first country choice'
     // kept it, and the site set to Not listed defaulted to a United States billing unit.
     const fresh = emptyLocation('new', 'other')
     expect(fresh.diesel_stationary_unit, 'the template seeds US units before a country exists').toBe('gallons')
-    const after = { ...fresh, country: 'OTHER', ...unitsForCountryChange('OTHER', fresh as never) }
+    // FI5: unitsForCountryChange returns an outcome per field; applyUnitOutcomes writes it, as the page does.
+    const after = applyUnitOutcomes({ ...fresh, country: 'OTHER' }, unitsForCountryChange('OTHER', fresh as never), AT, null)
     expect(after.diesel_stationary_unit).toBe('litres')
     expect(after.natural_gas_unit).toBe('m3')
     expect(after.purchased_steam_unit).toBe('gj')
@@ -53,8 +55,8 @@ describe('a new location takes its country defaults on the first country choice'
     const fresh = emptyLocation('new', 'x')
     for (const [country, diesel, gas] of [['GB', 'litres', 'kwh'], ['FR', 'litres', 'm3'], ['AU', 'litres', 'm3']] as const) {
       const after = unitsForCountryChange(country, fresh as never)
-      expect(after.diesel_stationary_unit, country).toBe(diesel)
-      expect(after.natural_gas_unit, country).toBe(gas)
+      expect(after.diesel_stationary_unit.unit, country).toBe(diesel)
+      expect(after.natural_gas_unit.unit, country).toBe(gas)
     }
   })
 
@@ -62,9 +64,10 @@ describe('a new location takes its country defaults on the first country choice'
     // The whole safety property. A stream carrying a figure keeps its unit, because a figure is the
     // one honest evidence that the unit was chosen rather than seeded.
     const entered = loc({ country: 'US', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'gallons' })
-    const after = { ...entered, country: 'OTHER', ...unitsForCountryChange('OTHER', entered as never) }
+    const after = applyUnitOutcomes({ ...entered, country: 'OTHER' }, unitsForCountryChange('OTHER', entered as never), AT, null)
     expect(after.diesel_stationary_unit, '1,000 gallons must not become 1,000 litres').toBe('gallons')
     expect(after.diesel_stationary_amount).toBe(1000)
+    expect(after.unit_changes, 'a unit the new country still offers stays, and nothing is recorded').toBeUndefined()
   })
 
   it('leaves snapUnitsForCountry alone, because other callers rely on its contract', () => {

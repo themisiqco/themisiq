@@ -1245,7 +1245,9 @@ const vintageNote = (label: string, resolved: number, year: number): string =>
 // fallback. 'AU' is a COUNTRY token, not a grid region, because the Australian RMF is national (see
 // RESIDUAL_AU); every other value here is a real region key.
 export function residualRegionFor(loc: Pick<Location, 'residual_region' | 'grid_region' | 'country'>): string {
-  if (loc.residual_region) return loc.residual_region
+  // FI5: residual_region is chosen only at US sites (the eGRID subregion select), so it belongs to the US. A value left
+  // over from before a country change is ignored rather than pricing a GB site's market-based row from Green-e.
+  if (loc.residual_region && canonicalCountryCode(loc.country) === 'US') return loc.residual_region
   if ((loc.grid_region || '').startsWith('EU_')) return loc.grid_region
   if ((loc.country || '').toUpperCase().trim() === 'AU') return 'AU'
   return ''
@@ -1711,7 +1713,7 @@ interface SourceDoc {
 
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
-  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh' | 'ccf'   // ccf: stored only; the wizard does not offer it yet (FI5)
+  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh' | 'ccf'   // ccf: offered at US sites since FI5
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   // TWO GRADES, TWO FIELD TRIPLES — and `_amount`, NOT the retired `_gallons` misnomer.
@@ -1756,9 +1758,27 @@ interface Location {
   // with a required reason, who and when. While one is active, the field's documents stay as evidence but are
   // not counted (contribution reason manual_override), and the typed value on the field is the figure.
   manual_overrides?: ManualOverride[]
+  // FI5: every unit change that moved a typed figure, in order: an exact conversion (factor, before and after), or a
+  // clear where no exact conversion joins the two units (factor null, valueAfter 0, cleared). Who and when on each.
+  // Lives in locations_data (no SQL). The workings row for the field cites the conversion that produced its figure.
+  unit_changes?: UnitChange[]
   // T10 ruling: overrides the customer removed ("Use the bills instead"), with who and when, so the history
   // stays in the record.
   manual_overrides_removed?: (ManualOverride & { removedAt: string; removedBy: { userId: string; email: string } })[]
+}
+
+/** FI5: one unit change on a typed figure. `field` is the figure's field (natural_gas_amount, ...). */
+export interface UnitChange {
+  field: string
+  from: string
+  to: string
+  /** Units of `to` per unit of `from`, exact (lib/unitConversions EXACT_UNITS); null when the figure was cleared. */
+  factor: number | null
+  valueBefore: number
+  valueAfter: number
+  at: string
+  by: { userId: string; email: string } | null
+  cleared?: true
 }
 
 interface ManualOverride {
@@ -2138,7 +2158,9 @@ function ngUnitOptions(country: string): Array<[string, string]> {
   // AU: m3, and MMBtu for energy-basis bills (MJ and GJ convert to it; T10a), priced from NGA's per-GJ factor.
   if (ctry === 'AU') return [['m3', 'm³'], ['mmbtu', 'MMBtu']]
   if (EU_COUNTRIES.includes(ctry)) return [['m3', 'm³']]
-  return [['mcf', 'Mcf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
+  // FI5: Ccf as US gas bills print it (hundred cubic feet), beside Mcf. Priced on EPA's per-Mcf value through the exact
+  // conversion (1 Ccf = 0.1 Mcf), stated on the row; Mcf stays first, so the default does not move.
+  return [['mcf', 'Mcf'], ['ccf', 'Ccf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']]
 }
 // Snap a natural gas unit to a valid one for the given country (used when country changes).
 function normalizeNgUnit(country: string, unit: string): string {
@@ -2242,7 +2264,7 @@ export function snapUnitsForCountry(
 }
 
 /**
- * The units to store when a location's COUNTRY changes.
+ * The units to store when a location's COUNTRY changes, and what happens to each figure (FI5).
  *
  * ⚠️ snapUnitsForCountry CANNOT ANSWER THIS, AND THE DIFFERENCE IS A UNIT NOBODY CHOSE.
  * That function keeps any unit the new country still offers, which is right for a stream carrying a
@@ -2250,31 +2272,148 @@ export function snapUnitsForCountry(
  * seeds every unit US-first (mcf, gallons, mmbtu) before a country is picked at all, so a BRAND NEW
  * location arrives already "holding" gallons. Picking a country whose list still offers gallons then
  * kept them, and a site set to "Not listed" defaulted to a United States billing unit it had never
- * been offered. GB, FR and AU escaped it only because their lists drop gallons entirely, so the snap
- * fell through to opts[0]; the states that RETAIN US units for safety were the ones it bit.
+ * been offered.
  *
  * ⚠️ THE TEST IS `amount > 0`, AND IT IS THE SMALLEST THING THE DATA CAN ACTUALLY DISTINGUISH.
  * Nothing records whether a customer opened a unit selector, so "chose gallons and entered nothing"
- * and "never touched it" are the same row today. A figure is the one honest evidence of a choice:
- * if a stream carries one, its unit is treated as chosen and is preserved exactly as before, which
- * is what keeps this from relabelling anything. If it carries none, there is no figure to relabel
- * and the country's own default is the better answer.
- *   The remaining gap is a customer who picks a unit, enters nothing, and changes country: their
- * pick is discarded. Recording an explicit choice would close it and is not worth a schema column.
+ * and "never touched it" are the same row today. A figure is the one honest evidence of a choice.
+ * With no figure there is nothing to relabel, and the country's own default is the better answer.
+ *
+ * FI5: WITH A FIGURE, IT IS CONVERTED EXACTLY OR CLEARED, NEVER RELABELLED. A held unit the new country still offers
+ * stays, figure and all. Otherwise the figure moves to the first unit the country offers that an exact conversion
+ * reaches from it (US gallons to litres, MMBtu to kWh), or, where none does (gallons of propane at a site that buys it
+ * by the kg, Mcf of gas at a site that bills kWh), it is cleared and the customer is asked. A figure from documents
+ * keeps its locked unit (T7): its unit is corrected on the bill, never by a country change.
  */
 export function unitsForCountryChange(
   country: string,
   loc: Partial<Record<string, unknown>>,
-): Record<UnitFieldName, string> {
-  const out = {} as Record<UnitFieldName, string>
+): Record<UnitFieldName, UnitOutcome> {
+  const out = {} as Record<UnitFieldName, UnitOutcome>
   for (const f of UNIT_FIELDS) {
     const opts = f.options(country).map(([v]) => v)
-    const amount = loc[f.amount]
-    const entered = typeof amount === 'number' && amount > 0
-    const held = loc[f.field]
-    out[f.field] = entered && typeof held === 'string' && opts.includes(held) ? held : opts[0]
+    const amount = typeof loc[f.amount] === 'number' ? loc[f.amount] as number : 0
+    const held = heldUnit(loc, f.field)
+    if (fieldLocked(loc, f.amount)) { out[f.field] = { unit: held ?? opts[0], value: amount, conversion: null, locked: true }; continue }
+    if (!(amount > 0)) { out[f.field] = { unit: opts[0], value: amount, conversion: null }; continue }
+    if (held && opts.includes(held)) { out[f.field] = { unit: held, value: amount, conversion: null }; continue }
+    const reachable = held ? opts.find(o => exactConversion(unitToken(held), unitToken(o))) : undefined
+    out[f.field] = changeUnit(f.amount, amount, held ?? '', reachable ?? opts[0])
   }
   return out
+}
+
+// ── FI5: A UNIT CHANGE CONVERTS EXACTLY OR CLEARS AND ASKS ────────────────────────────────────────────────────────
+//
+// The defect this closes (CLAUDE.md, found 5 Aug 2026): switching the unit selector on a figure relabelled it, so
+// 332 m³ became 332 Mcf, about 28 times the gas, with no flag. The rule (design FI5): convert ONLY where both units
+// measure the same quantity and EXACT_CONVERSIONS joins them (gallons and litres, m³ and Mcf or Ccf per the 7 Oct
+// reference-conditions ruling, MMBtu, therms, GJ and kWh); otherwise clear the figure and ask. A density, an energy
+// content or a gross/net ratio is never applied to a figure the customer typed.
+
+/** What a unit change does to one figure: kept or converted (conversion null when nothing moved), cleared, or locked. */
+export type UnitOutcome =
+  | { unit: string; value: number; conversion: { factor: number; statement: string } | null; locked?: true }
+  | { unit: string; cleared: true; from: string }
+
+/** The unit a field holds, with the defaults the engine reads when it is absent (fuel oil gallons, steam MMBtu). */
+function heldUnit(loc: Partial<Record<string, unknown>>, field: UnitFieldName): string | undefined {
+  const v = loc[field]
+  if (typeof v === 'string' && v) return v
+  if (field === 'fuel_oil_distillate_unit' || field === 'fuel_oil_residual_unit') return 'gallons'
+  if (field === 'purchased_steam_unit') return 'mmbtu'
+  return undefined
+}
+
+/** T7: a figure worked out from documents (and not overridden by hand) has a locked unit. */
+function fieldLocked(loc: Partial<Record<string, unknown>>, amountField: string): boolean {
+  if (!Array.isArray(loc.source_docs)) return false
+  const l = loc as unknown as Location
+  return documentsBacking(l, amountField as keyof Location) > 0 && !activeOverride(l, amountField)
+}
+
+/**
+ * The unit selector (FI5): a figure in `from` changed to `to`. Pure. Converts exactly, or clears and asks; a field
+ * with no figure just takes the new unit. `field` is the figure's field, carried for the record the caller writes.
+ */
+export function changeUnit(field: string, value: number, from: string, to: string): UnitOutcome {
+  void field
+  if (from === to || !(value > 0)) return { unit: to, value, conversion: null }
+  const c = exactConversion(unitToken(from), unitToken(to))
+  if (!c) return { unit: to, cleared: true, from }
+  return { unit: to, value: value * c.toPerFrom, conversion: { factor: c.toPerFrom, statement: c.statement } }
+}
+
+/**
+ * Applies unit outcomes to a location: the units, the converted or cleared figures, and one unit_changes entry per
+ * figure that moved. A locked field, or one whose figure did not move, records nothing.
+ */
+export function applyUnitOutcomes(
+  loc: Location, outcomes: Partial<Record<UnitFieldName, UnitOutcome>>, at: string, by: { userId: string; email: string } | null,
+): Location {
+  const next = { ...loc } as unknown as Record<string, unknown>
+  const changes: UnitChange[] = [...(loc.unit_changes ?? [])]
+  for (const f of UNIT_FIELDS) {
+    const o = outcomes[f.field]
+    if (!o) continue
+    const before = typeof next[f.amount] === 'number' ? next[f.amount] as number : 0
+    const fromUnit = heldUnit(next, f.field) ?? ''
+    next[f.field] = o.unit
+    if ('cleared' in o) {
+      next[f.amount] = 0
+      changes.push({ field: f.amount, from: o.from, to: o.unit, factor: null, valueBefore: before, valueAfter: 0, at, by, cleared: true })
+    } else if (o.conversion) {
+      next[f.amount] = o.value
+      changes.push({ field: f.amount, from: fromUnit, to: o.unit, factor: o.conversion.factor, valueBefore: before, valueAfter: o.value, at, by })
+    }
+  }
+  return { ...(next as unknown as Location), ...(changes.length ? { unit_changes: changes } : {}) }
+}
+
+const unitWords = (unit: string, n: number) => {
+  const u = EXACT_UNITS[unitToken(unit)]
+  return u ? (n === 1 ? u.one : u.many) : unitLabel(unit)
+}
+const figureWords = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: Math.abs(x) < 10 ? 4 : 2 })
+
+/** The fuel a unit field's figure is, in the words UNIT_FIELDS gives it. */
+function unitFieldFuel(amountField: string): string {
+  return UNIT_FIELDS.find(f => f.amount === amountField)?.label ?? amountField
+}
+
+/** FI5: the sentence beside a field after its unit changed, exactly as the design gives it. No em dash. */
+export function unitChangeMessage(c: UnitChange): string {
+  if (c.cleared) {
+    return `The ${unitFieldFuel(c.field)} figure was in ${unitWords(c.from, 2)}, which cannot be converted exactly to ${unitWords(c.to, 2)}, so it has been cleared. Enter it in ${unitWords(c.to, 2)}.`
+  }
+  const statement = exactConversion(unitToken(c.from), unitToken(c.to))?.statement ?? ''
+  return `Converted from ${figureWords(c.valueBefore)} ${unitWords(c.from, c.valueBefore)} to ${figureWords(c.valueAfter)} ${unitWords(c.to, c.valueAfter)} (${statement}).`
+}
+
+/** The latest unit change recorded for a figure, if any. */
+export function latestUnitChange(loc: Pick<Location, 'unit_changes'>, amountField: string): UnitChange | undefined {
+  return (loc.unit_changes ?? []).filter(c => c.field === amountField).at(-1)
+}
+
+/**
+ * The conversion that produced a field's current figure, for its workings row: the latest change, when it was a
+ * conversion into the unit the field holds and the figure is still the converted value. A figure typed again since,
+ * or one from documents, did not come from it, and the row does not claim it.
+ */
+function unitChangeBehind(loc: Location, amountField: keyof Location, entered: number, unit: string): UnitChange | undefined {
+  const c = latestUnitChange(loc, String(amountField))
+  if (!c || c.cleared || c.to !== unit || c.valueAfter !== entered || fieldLocked(loc as never, String(amountField))) return undefined
+  return c
+}
+/** FI5: the conversion to show beside a typed field: the one that produced the figure it holds now, if any. */
+export function convertedUnitChange(loc: Location, amountField: string): UnitChange | undefined {
+  const f = UNIT_FIELDS.find(x => x.amount === amountField)
+  if (!f) return undefined
+  const amount = Number((loc as unknown as Record<string, unknown>)[amountField] ?? 0)
+  return unitChangeBehind(loc, amountField as keyof Location, amount, heldUnit(loc as never, f.field) ?? '')
+}
+function unitChangeNote(c: UnitChange): string {
+  return `${unitChangeMessage(c)} Unit changed${c.by ? ` by ${c.by.email}` : ''} on ${dateInWords(new Date(c.at))}.`
 }
 
 function validateElectricity(kwh: number): string | null {
@@ -2861,9 +3000,9 @@ const hasRefrigerantLine = (loc: Location): boolean =>
  *   `reason` is open: T3c adds 'edition_missing' to the same shape. `factor` is the lookup that failed, in the
  * `{ publisher, edition?, value }` shape FI2 and T3c extend; `value` is null because no factor applied.
  */
-export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing'
+export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing' | 'figure_cleared'
 /** The coverage-issue statuses an unpriced line raises (FI1): the reason, used as the status. */
-export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing'])
+export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing', 'figure_cleared'])
 export interface UnpricedLine {
   reason: UnpricedReason
   locId: string
@@ -2927,7 +3066,29 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
       factor: { publisher: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], value: null }, supportedUnits: [],
       message: UNPRICED_MESSAGE.refrigerant_unknown(site) })
   }
+  // FI5: a figure a unit change cleared (no exact conversion joined the units) is a line with no figure until it is
+  // entered again, or the stream is answered as not used here. Its message is the one shown when it was cleared.
+  for (const f of UNIT_FIELDS) {
+    const c = latestUnitChange(loc, f.amount)
+    const stream = CLEARED_FIELD_STREAM[f.amount]
+    if (!c?.cleared || !stream || !streamDeclared(loc, stream.stream)) continue
+    if (Number((loc as unknown as Record<string, unknown>)[f.amount] ?? 0) > 0) continue
+    out.push({ reason: 'figure_cleared', locId: loc.id, site, field: f.amount as keyof Location, stream: stream.stream, source: stream.source,
+      amount: 0, unit: heldUnit(loc as never, f.field) ?? c.to, country: canonicalCountryCode(loc.country), factorKey: '',
+      factor: { publisher, value: null }, supportedUnits: [], message: unitChangeMessage(c) })
+  }
   return out
+}
+/** FI5: the stream and line name of each unit field's figure, for a cleared figure's line. */
+const CLEARED_FIELD_STREAM: Record<string, { stream: DeclarableStream; source: string }> = {
+  natural_gas_amount: { stream: 'natural_gas', source: 'Natural gas' },
+  propane_amount: { stream: 'propane', source: 'Propane' },
+  diesel_stationary_amount: { stream: 'diesel_stationary', source: 'Diesel (stationary)' },
+  fuel_oil_distillate_amount: { stream: 'fuel_oil_distillate', source: 'Heating oil' },
+  fuel_oil_residual_amount: { stream: 'fuel_oil_residual', source: 'Heavy fuel oil' },
+  gasoline_amount: { stream: 'mobile', source: 'Gasoline (mobile)' },
+  diesel_mobile_amount: { stream: 'mobile', source: 'Diesel (mobile)' },
+  purchased_steam_mmbtu: { stream: 'purchased_steam', source: 'Purchased steam' },
 }
 
 /**
@@ -4166,7 +4327,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // amount, so no figure moves — this is presentation, and the note carries the conversion.
   //   Section M asserts that reconciliation, but note that its fixtures never exercised a converted
   // row (M1 CA gas, M2 steam already in mmbtu, M3 EU gas), which is why the old shape survived.
-  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, entered: number, enteredUnit: string, efKey: string, prov?: Provenance) => {
+  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, entered: number, enteredUnit: string, efKey: string, prov?: Provenance, field?: keyof Location) => {
     // FI2: the value AND the table that supplied it. The row cites that table, never the location's country.
     // `picked.factor` is per unit ENTERED: where the table prints another unit of the same quantity, pickEF has already
     // converted exactly, so the displayed factor × the entered activity is the result, and the note states the step.
@@ -4179,7 +4340,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // value in THAT table, read under the key the table holds, so it applies only to a value that table supplied.
     const fromTable = picked.publisher?.jurisdiction
     const heldKey = picked.key ?? efKey
-    const conversion_note = picked.conversion ? conversionNote(entered, picked.conversion) : undefined
+    // FI5: the unit change that produced a typed figure is the first step on its row, then any conversion to the
+    // publisher's unit. Both are the row's conversion_note.
+    const unitChange = field ? unitChangeBehind(loc, field, entered, enteredUnit) : undefined
+    const conversion_note = [unitChange ? unitChangeNote(unitChange) : '', picked.conversion ? conversionNote(entered, picked.conversion) : '']
+      .filter(Boolean).join(' ') || undefined
     const note = [conversion_note,
       fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
       fromTable === 'AU' ? auPublishedNote(loc, heldKey) : '',
@@ -4207,7 +4372,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // FI2: the key the value was read under, in the table ef_source names, so a verifier can find the figure; and,
       // where the unit entered differs, the exact conversion to it (conversion_factor = held units per unit entered).
       factor_key: heldKey,
-      ...(picked.conversion ? { conversion_note, conversion_factor: picked.conversion.toPerFrom } : {}),
+      ...(conversion_note ? { conversion_note } : {}),
+      ...(picked.conversion ? { conversion_factor: picked.conversion.toPerFrom } : {}),
+      ...(unitChange ? { unit_change: unitChange } : {}),
       ...(picked.publisher?.edition ? { factor_vintage: picked.publisher.edition } : vintageOf(COMBUSTION_EDITION, loc)),
       result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
@@ -4304,7 +4471,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     for (const line of combustionLines(loc)) {
       const u = unpriced.get(String(line.field))
       if (u) { pushUnpriced(u, provOf(line.field)); continue }
-      pushFuel(loc, line.stream, line.source, 1, figure(line.field), line.enteredUnit, line.efKey, provOf(line.field))
+      pushFuel(loc, line.stream, line.source, 1, figure(line.field), line.enteredUnit, line.efKey, provOf(line.field), line.field)
     }
     if (hasRefrigerantLine(loc)) {
       const ref_gwp = refrigerantGwp(loc.refrigerant_type, gwpVersion)
@@ -4376,6 +4543,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
           ...(absent?.searched ? { quantification_method: `Checked: ${absent.searched}` } : {}) })
       } else {
       const st = steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, priced.basis)
+      // FI5: a unit change that produced the typed figure comes first on the row, as on a fuel row.
+      const steamChange = unitChangeBehind(loc, 'purchased_steam_mmbtu', loc.purchased_steam_mmbtu, loc.purchased_steam_unit ?? 'mmbtu')
+      const steamNote = [steamChange ? unitChangeNote(steamChange) : '', st.note ?? ''].filter(Boolean).join(' · ')
       // ⚠️ SHARES factorCells AND calcGas, BUT DELIBERATELY NOT pushFuel. pushFuel stamps
       // `ef_source: combustionSource(loc)` — the COMBUSTION citation for the country, which would name
       // DEFRA's fuels table on a Scope 2 district-heat row. Steam cites its own table (STEAM_EF entries
@@ -4396,7 +4566,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // on a private number. The column renders '—' there, which is what "no published edition" looks
       // like, and ef_source already names the supplier route. Same gate buildFactorEditions applies.
       const steamVintage = priced.supplier ? undefined : vintageOf(STEAM_EDITION, loc).factor_vintage
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(st.note ? { note: st.note } : {}) })
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
       }
     }
     // ── All-excluded fields: a zero row carrying the contributions (T5 ruling) ─────────────────────
@@ -4669,6 +4839,8 @@ export function findUnresolvedCoverage(
     // Judged on the DERIVED location, as the totals are: a figure from bills is the figure that would price.
     // status is the reason: factor_missing, refrigerant_unknown or province_missing.
     for (const u of unpricedLines(derivedHere)) {
+      // FI5: a cleared figure confirmed as none (an accepted used_none for the field) is answered.
+      if (u.reason === 'figure_cleared' && resolutions.some(r => r.kind === 'used_none' && r.field === String(u.field))) continue
       out.push({ locId: loc.id, fuelType: FIELD_FUEL[String(u.field)] ?? String(u.field), status: u.reason, field: String(u.field), message: u.message })
     }
 

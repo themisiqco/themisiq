@@ -77,8 +77,9 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 - **Monthly = evidenced only. Annual = evidenced + estimated. They are SUPPOSED to diverge on extrapolated inventories.** Never gross up monthly slices — a dated slice must not assert consumption no bill supports. `reconcile()` models the expected gap; a non-zero `unexplained_delta` is a real defect. (`reconcile` is exported + tested but not yet surfaced in the UI — separate design.)
 - **Coverage gate is keyed per `(document_type, fuelType, meter_label)` and returns every issue, not a single status.** Overlap compares full bill periods, not their in-year days, so two copies of a bill outside the year still raise an overlap. An overlap is resolved only as `same_bill` (one document counts, the others are retained as evidence) or `different_meters` (both count, the second meter named); no resolution may leave two counted bills over the same days. Only accepted resolutions (passing `validateResolution`) affect figures, issues or audit rows; legacy `duplicate` and `straddle` are never accepted. A straddle is not an issue: it is prorated by its own days. No silent zero: an undated, invalid-period or mixed-units bill, or a field whose documents were all rejected with no figure entered, raises an export-blocking issue naming the document. Only `outside_year` and `same_bill_as` may leave a bill uncounted without one; a `used_none` confirmation records who confirmed it and when. A fleet_fuel doc's gasoline and diesel are separate groups; a gap masked by an overlap must still block. A month-only billing period cannot be confirmed until the customer confirms its dates (`acceptanceProblem`). Every confirmation passes `guardConfirm`, one proposal at a time; there is no batch accept. If one is ever built, it calls `guardConfirm` per bill and records who accepted each bill, when, and the reading as it was shown. An exact duplicate across document types (two documents at one site, for one fuel, with the same `sha256` or the same canonical value, unit and dates) blocks export until the customer chooses "Same document, count once" or "Not the same", so it is never counted twice without the customer saying so, and the copy left out reads `exact_duplicate_of`, the one other reason besides `outside_year` and `same_bill_as` a bill may go uncounted without an issue.
 - **No input without a factor is ever dropped silently or takes a site out of the totals.** It is an unpriced line with an export-blocking issue naming the site, the fuel and the unit. The only whole-location exclusion is an unsupported country, which is stated on every surface.
+- **A unit change never relabels a figure: it converts exactly, with the conversion shown and recorded, or it clears the figure and asks.** `changeUnit` (the unit selector) and `unitsForCountryChange` (a country change) decide; `applyUnitOutcomes` writes the figure and appends to the location's `unit_changes`, and the field's workings row carries the conversion as its `conversion_note`. A cleared figure is an FI1 line (`figure_cleared`) until it is entered or confirmed as none. A document-backed field keeps its locked unit (T7). No density, energy content or gross/net ratio is ever applied to a typed figure.
 - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
-- **Run `npx vitest run lib/ghg/engine.test.ts` (413 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (422 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
 
 ---
 
@@ -188,26 +189,13 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 
 ## Known defects (OPEN)
 
-### Unit switch relabels without converting (OPEN — live in production)
+None open.
 
-Changing the unit selector on a location that already holds a figure
-relabels the number rather than converting it. 332 m3 becomes 332 Mcf —
-roughly 28x the actual gas — with a confirmed source document underneath
-still reading "332m3". No error, no flag, no review state.
-
-Worse than an ordinary defect for three reasons: the customer performs
-the action believing they are fixing something (the unpriceable-location
-message tells them to check the unit); it presents as clean and
-high-confidence; and the provenance chain actively contradicts the
-stored figure.
-
-Decision needed before fixing: does the figure convert, or clear and
-ask? unitConversions.ts already converts as an audited step, and m3 to
-Mcf is fixed geometry rather than an estimate — but it silently changes
-a number the customer typed. Clearing invents nothing but destroys
-entered data.
-
-Found 5 Aug 2026 while testing the unpriceable-location isolation.
+**Fixed: "Unit switch relabels without converting"** (found 5 Aug 2026), fixed by FI5 on the
+`factor-integrity` branch. Changing the unit selector, or a location's country, used to relabel a
+figure: 332 m3 became 332 Mcf, about 28 times the gas, with no flag. A unit change now converts the
+figure exactly (FI2's exact table; m3, Mcf and Ccf are one quantity under the 7 Oct 2026
+reference-conditions ruling) or clears it and asks; see the invariant under GHG engine invariants.
 
 ---
 

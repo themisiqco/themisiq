@@ -24,6 +24,7 @@ import {
   canonicalCountryCode, efRouting, countryRefusal, refusalIsFixable, type EfJurisdiction, type CountryRefusal,
   combustionSourcesFor, gridSourcesFor,
   gridRegionForCountry, gridSource, ngUnitOptions, liquidUnitOptions, GRID_EF,
+  changeUnit, unitsForCountryChange, applyUnitOutcomes, unitChangeMessage, convertedUnitChange, UNIT_FIELDS, type UnitOutcome,
   EU_COUNTRIES, combustionSource, propaneUnitOptions, steamUnitOptions,
   EF, EF_CA, EF_UK, EF_EU, EF_AU, EF_NZ,
   type Location, type CoverageResolution, type CoveragePeriod, type SourceDoc, type ExtractedProposal, type StreamAttestation,
@@ -47,7 +48,7 @@ import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { contributionShareCell } from './workingsCells';
-import { convertToCanonical, convertibleUnits, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
+import { convertToCanonical, convertibleUnits, exactConversion, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -1527,10 +1528,13 @@ describe('Y. Australia has a published residual mix', () => {
     for (const l of spread) {
       expect(residualRegionFor(l), `${l.country || '(blank)'} / ${l.grid_region || '(blank)'}`).toBe(old(l));
     }
-    // AU is the one intended divergence, and an explicit residual_region still wins over it.
+    // AU is the one intended divergence.
     expect(residualRegionFor(anyLoc({ country: 'AU', grid_region: 'AU_NSW' }))).toBe('AU');
     expect(old(anyLoc({ country: 'AU', grid_region: 'AU_NSW' })), 'what it used to return').toBe('');
-    expect(residualRegionFor(anyLoc({ country: 'AU', grid_region: 'AU_NSW', residual_region: 'ERCT' }))).toBe('ERCT');
+    // FI5: an eGRID subregion left on a site outside the US no longer wins. It priced an AU (or GB) site's market-based
+    // row from Green-e; it is ignored, and the country's own answer stands.
+    expect(residualRegionFor(anyLoc({ country: 'AU', grid_region: 'AU_NSW', residual_region: 'ERCT' }))).toBe('AU');
+    expect(residualRegionFor(anyLoc({ country: 'GB', grid_region: 'UK', residual_region: 'NWPP' }))).toBe('');
   });
 
   it('Y9 all four call sites call residualRegionFor — read from source, not inferred from values', () => {
@@ -5833,5 +5837,174 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
     }
     expect(methods.some(m => m.includes('Table 1'))).toBe(false)
     for (const m of methods) expect(m).not.toContain('\u2014')
+  })
+})
+
+// ── FI5: a unit or country change converts exactly, with the conversion shown and recorded, or clears and asks ──────
+// docs/review/design-derived-figures.md "FI5". Closes the CLAUDE.md defect "Unit switch relabels without converting".
+describe('FI5. a unit change never relabels a figure', () => {
+  const AT = '2026-10-07T12:00:00.000Z'
+  const BY = { userId: 'u1', email: 'lisa@example.com' }
+  const applyCountry = (l: Location, country: string) => applyUnitOutcomes({ ...l, country }, unitsForCountryChange(country, l as never), AT, BY)
+  const applyUnit = (l: Location, unitField: (typeof UNIT_FIELDS)[number]['field'], to: string) => {
+    const f = UNIT_FIELDS.find(x => x.field === unitField)!
+    const from = String((l as unknown as Record<string, unknown>)[unitField] ?? '')
+    return applyUnitOutcomes(l, { [unitField]: changeUnit(f.amount, Number((l as unknown as Record<string, unknown>)[f.amount]), from, to) }, AT, BY)
+  }
+  const rowsOf = (l: Location) => buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; source: string; declaration?: string; note?: string; conversion_note?: string; ef_source?: string; scope2_method?: string; result_tco2e: number | null; activity_data?: number; activity_unit?: string }[]
+
+  it('FI5-1 the CLAUDE.md case: 332 m3 switched to Mcf becomes 11.72447 Mcf, never 332 Mcf, and is recorded', () => {
+    const gas = loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 332, natural_gas_unit: 'm3' })
+    const o = changeUnit('natural_gas_amount', 332, 'm3', 'mcf') as Extract<UnitOutcome, { value: number }>
+    expect(o.value).toBeCloseTo(332 / 28.316846592, 12)
+    expect(o.value.toFixed(5)).toBe('11.72447')
+    const after = applyUnit(gas, 'natural_gas_unit', 'mcf')
+    expect(after.natural_gas_unit).toBe('mcf')
+    expect(after.natural_gas_amount).not.toBe(332)
+    expect(after.natural_gas_amount).toBeCloseTo(11.72447, 5)
+    expect(after.unit_changes).toEqual([{ field: 'natural_gas_amount', from: 'm3', to: 'mcf', factor: 1 / 28.316846592, valueBefore: 332, valueAfter: o.value, at: AT, by: BY }])
+    // The workings row carries the conversion as its conversion_note, and the figure prices as the same gas.
+    const [row] = rowsOf(after).filter(r => r.stream === 'natural_gas')
+    expect(row.conversion_note).toBe('Converted from 332 m³ to 11.72 Mcf (1 Mcf = 28.316846592 m³). Unit changed by lisa@example.com on 7 October 2026.')
+    expect(row.result_tco2e).toBeCloseTo(rowsOf(gas).find(r => r.stream === 'natural_gas')!.result_tco2e!, 12)
+  })
+
+  it('FI5-2 US to GB with 1,000 gallons of diesel gives 3,785.41 litres with a note', () => {
+    const us = loc({ country: 'US', state: 'NY', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'gallons' })
+    const gb = applyCountry(us, 'GB')
+    expect(gb.diesel_stationary_unit).toBe('litres')
+    expect(gb.diesel_stationary_amount).toBeCloseTo(3785.411784, 9)
+    const c = gb.unit_changes!.at(-1)!
+    expect(unitChangeMessage(c)).toBe('Converted from 1,000 US gallons to 3,785.41 litres (1 US gallon = 3.785411784 litres).')
+    expect(convertedUnitChange(gb, 'diesel_stationary_amount')).toEqual(c)
+    const row = rowsOf({ ...gb, grid_region: 'UK' }).find(r => r.stream === 'diesel_stationary')!
+    expect(row.conversion_note).toContain('Converted from 1,000 US gallons to 3,785.41 litres (1 US gallon = 3.785411784 litres).')
+    expect(row.activity_data).toBeCloseTo(3785.411784, 9)
+    expect(row.activity_unit).toBe('litres')
+  })
+
+  it('FI5-3 US to GB steam in MMBtu converts to kWh exactly', () => {
+    const us = loc({ country: 'US', state: 'NY', has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
+    const gb = applyCountry(us, 'GB')
+    expect(gb.purchased_steam_unit).toBe('kwh')
+    expect(gb.purchased_steam_mmbtu).toBeCloseTo(100 * GJ_PER_MMBTU * KWH_PER_GJ, 9)
+    expect(unitChangeMessage(gb.unit_changes!.at(-1)!)).toBe('Converted from 100 MMBtu to 29,307.11 kWh (1 MMBtu = 1.05505585262 GJ and 1 kWh = 0.0036 GJ).')
+    const row = rowsOf({ ...gb, grid_region: 'UK' }).find(r => r.stream === 'purchased_steam')!
+    expect(row.conversion_note).toContain('Converted from 100 MMBtu to 29,307.11 kWh')
+  })
+
+  it('FI5-4 US to NZ propane in gallons is cleared (volume to mass), with the message, and blocks until entered or confirmed none', () => {
+    const us = loc({ country: 'US', state: 'NY', has_propane: true, propane_amount: 500, propane_unit: 'gallons' })
+    const out = unitsForCountryChange('NZ', us as never)
+    expect(out.propane_unit).toEqual({ unit: 'kg', cleared: true, from: 'gallons' })
+    const nz = applyCountry(us, 'NZ')
+    expect(nz.propane_amount).toBe(0)
+    expect(nz.propane_unit).toBe('kg')
+    const c = nz.unit_changes!.at(-1)!
+    expect(c).toMatchObject({ field: 'propane_amount', from: 'gallons', to: 'kg', factor: null, valueBefore: 500, valueAfter: 0, cleared: true })
+    const MSG = 'The propane / LPG figure was in US gallons, which cannot be converted exactly to kg, so it has been cleared. Enter it in kg.'
+    expect(unitChangeMessage(c)).toBe(MSG)
+    // FI1's issue: an unpriced line beside the field, and an export-blocking coverage issue, until it is entered.
+    const site = { ...nz, grid_region: 'NZ' }
+    expect(unpricedLines(site).map(u => [u.reason, u.field, u.message])).toEqual([['figure_cleared', 'propane_amount', MSG]])
+    expect(findUnresolvedCoverage([site], 2025, 12, []).filter(i => i.status === 'figure_cleared').map(i => i.message)).toEqual([MSG])
+    expect(unpricedLines({ ...site, propane_amount: 200 })).toEqual([])
+    // Confirmed as none: an accepted used_none for the field, or the stream answered as not used here.
+    const none: CoverageResolution = { locId: site.id, fuelType: 'propane', kind: 'used_none', field: 'propane_amount', acknowledged: true,
+      acknowledgedAt: AT, by: BY } as unknown as CoverageResolution
+    expect(findUnresolvedCoverage([site], 2025, 12, [none]).filter(i => i.status === 'figure_cleared')).toEqual([])
+    expect(unpricedLines({ ...site, has_propane: false })).toEqual([])
+    expect(MSG).not.toContain('\u2014')
+  })
+
+  it('FI5-5 gas in Mcf to kWh is cleared, by the selector and by a country change', () => {
+    expect(changeUnit('natural_gas_amount', 100, 'mcf', 'kwh')).toEqual({ unit: 'kwh', cleared: true, from: 'mcf' })
+    const us = loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' })
+    const nz = applyCountry(us, 'NZ')
+    expect([nz.natural_gas_unit, nz.natural_gas_amount]).toEqual(['kwh', 0])
+    expect(unitChangeMessage(nz.unit_changes!.at(-1)!)).toBe('The natural gas figure was in Mcf, which cannot be converted exactly to kWh, so it has been cleared. Enter it in kWh.')
+    // GB gas is billed in kWh: DEFRA's per-m3 row prices volumes, but the wizard offers kWh, and a volume never
+    // becomes an energy here (no calorific value is applied to a typed figure).
+    const gb = applyCountry(us, 'GB')
+    expect([gb.natural_gas_unit, gb.natural_gas_amount]).toEqual(['kwh', 0])
+  })
+
+  it('FI5-6 a document-backed field is not changed by a country change (T7)', () => {
+    const backed = loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf',
+      source_docs: [doc('utility_bill_gas', [prop({ value: 100, unit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-12-31' })])] })
+    const out = unitsForCountryChange('NZ', backed as never)
+    expect(out.natural_gas_unit).toEqual({ unit: 'mcf', value: 100, conversion: null, locked: true })
+    const nz = applyCountry(backed, 'NZ')
+    expect([nz.natural_gas_unit, nz.natural_gas_amount, nz.unit_changes]).toEqual(['mcf', 100, undefined])
+    expect(unpricedLines(nz).some(u => u.reason === 'figure_cleared')).toBe(false)
+  })
+
+  it('FI5-7 a US site with a residual subregion switched to GB has no residual_region, and its market row does not cite Green-e', () => {
+    const us = loc({ country: 'US', state: 'WA', grid_region: 'US_WA', residual_region: 'NWPP', electricity_kwh: 100_000 })
+    const usMarket = rowsOf(us).find(r => r.scope2_method === 'market-based')!
+    expect(usMarket.ef_source).toContain('Green-e')
+    // The page's country handler clears it.
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain("locs[idx].residual_region = ''")
+    const gbCleared = { ...applyCountry(us, 'GB'), grid_region: 'UK', residual_region: '' }
+    expect(gbCleared.residual_region).toBe('')
+    // And the engine ignores one left behind, so even a stale record cannot cite Green-e outside the US.
+    const gbStale = { ...applyCountry(us, 'GB'), grid_region: 'UK' }
+    expect(gbStale.residual_region).toBe('NWPP')
+    for (const l of [gbCleared, gbStale]) {
+      const market = rowsOf(l).find(r => r.scope2_method === 'market-based')
+      expect(market?.ef_source ?? '').not.toContain('Green-e')
+    }
+    expect(residualRegionFor(gbStale)).toBe('')
+  })
+
+  it('FI5-8 property: every country pair, every stream with a figure: converted exactly or cleared, never relabelled', () => {
+    const COUNTRIES = ['US', 'CA', 'GB', 'DE', 'FR', 'AU', 'NZ', 'OTHER', 'JP', '']
+    const optsFor = (field: (typeof UNIT_FIELDS)[number]['field'], country: string) => UNIT_FIELDS.find(f => f.field === field)!.options(country).map(([v]) => v)
+    let checked = 0, converted = 0, cleared = 0
+    for (const from of COUNTRIES) for (const to of COUNTRIES) for (const f of UNIT_FIELDS) for (const unit of optsFor(f.field, from)) {
+      const before = loc({ country: from, [f.field]: unit, [f.amount]: 1234.5 } as Partial<Location>)
+      const after = applyCountry(before, to) as unknown as Record<string, unknown>
+      const u = after[f.field] as string, v = after[f.amount] as number
+      checked++
+      if (u === unit) { expect(v, `${from}->${to} ${f.field} ${unit}: kept`).toBe(1234.5); continue }
+      expect(v, `${from}->${to} ${f.field}: ${unit} -> ${u} must not keep the number`).not.toBe(1234.5)
+      const tok = (x: string) => x === 'gallons' ? 'gallon' : x === 'litres' ? 'litre' : x
+      const c = exactConversion(tok(unit), tok(u))
+      if (v === 0) {
+        cleared++
+        expect(optsFor(f.field, to).some(o => exactConversion(tok(unit), tok(o))), `${from}->${to} ${f.field}: ${unit} cleared only when no unit offered there is exactly reachable`).toBe(false)
+        continue
+      }
+      converted++
+      expect(c, `${from}->${to} ${f.field}: ${unit} -> ${u}`).not.toBeNull()
+      expect(v).toBeCloseTo(1234.5 * c!.toPerFrom, 9)
+    }
+    expect(checked).toBeGreaterThan(500)
+    expect(converted).toBeGreaterThan(0)
+    expect(cleared).toBeGreaterThan(0)
+    // And the selector alone: every pair of units each field is offered anywhere.
+    for (const f of UNIT_FIELDS) {
+      const units = [...new Set(COUNTRIES.flatMap(c => optsFor(f.field, c)))]
+      for (const a of units) for (const b of units) {
+        const o = changeUnit(f.amount, 50, a, b)
+        if (a === b) { expect(o).toEqual({ unit: b, value: 50, conversion: null }); continue }
+        if ('cleared' in o) continue
+        expect(o.value, `${f.field} ${a} -> ${b}`).not.toBe(50)
+      }
+    }
+  })
+
+  it('FI5-9 ccf: offered at US sites as US bills print it, 100 Ccf prices as 10 Mcf, and switching Ccf to Mcf converts with the note', () => {
+    expect(ngUnitOptions('US')).toEqual([['mcf', 'Mcf'], ['ccf', 'Ccf'], ['therms', 'Therms'], ['mmbtu', 'MMBtu']])
+    const ccf = loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'ccf' })
+    const mcf = loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 10, natural_gas_unit: 'mcf' })
+    const g = (l: Location) => rowsOf(l).find(r => r.stream === 'natural_gas')!
+    expect(g(ccf).result_tco2e).toBeCloseTo(g(mcf).result_tco2e!, 12)
+    expect(g(ccf).note).toContain('100 Ccf converted to 10 Mcf')
+    const switched = applyUnit(ccf, 'natural_gas_unit', 'mcf')
+    expect(switched.natural_gas_amount).toBeCloseTo(10, 12)
+    expect(unitChangeMessage(switched.unit_changes!.at(-1)!)).toBe('Converted from 100 Ccf to 10 Mcf (1 Ccf = 2.8316846592 m³ and 1 Mcf = 28.316846592 m³).')
+    expect(g(switched).conversion_note).toContain('Converted from 100 Ccf to 10 Mcf')
   })
 })

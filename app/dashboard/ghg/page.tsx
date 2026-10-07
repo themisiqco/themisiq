@@ -57,7 +57,7 @@ import {
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor,
   ngUnitOptions, liquidUnitOptions, propaneUnitOptions, steamUnitOptions,
-  snapUnitsForCountry,
+  snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
   periodFromYearAndEnd,
 } from '../../../lib/ghg/engine'
@@ -74,7 +74,7 @@ import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, wo
 import SourceAttributions from '../../components/SourceAttributions'
 import type {
   GwpVersion, Location, Inventory, SourceDoc, ExtractedProposal,
-  ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation, UnpricedLine,
+  ConciergeStatus, CoverageResolution, DeclarableStream, UnpriceableLocation, UnpricedLine, UnitChange,
 } from '../../../lib/ghg/engine'
 import { SITE_ORIGIN } from '../../../lib/siteOrigin'
 
@@ -560,6 +560,12 @@ function exclusionBannerTrailer(u: UnpriceableLocation, hasFigures: boolean): st
  * fuel, the refrigerant type select, the province select). Renders nothing when the line is priced, so it
  * clears the moment the input is fixed: unpricedLines runs on the derived locations on every render.
  */
+/** FI5: beside a typed figure, the exact conversion that produced it (the record is the location's unit_changes). */
+function UnitChangeNote({ change }: { change?: UnitChange }) {
+  if (!change) return null
+  return <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 4, lineHeight: 1.5 }}>{unitChangeMessage(change)}</div>
+}
+
 function UnpricedNote({ line }: { line?: UnpricedLine }) {
   if (!line) return null
   return <div style={{ fontSize: 11, color: 'var(--color-state-warn)', marginTop: 4, lineHeight: 1.5 }}>⚠ {line.message}</div>
@@ -1166,7 +1172,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // unitsForCountryChange, not snapUnitsForCountry: a unit on a stream with no figure is a
         // template default, not the customer's choice, and must follow the new country rather than
         // survive as a United States unit on a site that is not in the United States.
-        Object.assign(locs[idx], unitsForCountryChange(value, locs[idx] as never))
+        // FI5: each figure is converted exactly or cleared and asked for, never relabelled; a figure from documents
+        // keeps its locked unit. Every conversion and clear is recorded on the location (unit_changes).
+        locs[idx] = applyUnitOutcomes(locs[idx], unitsForCountryChange(value, locs[idx] as never), new Date().toISOString(), currentUser)
+        // FI5: the eGRID subregion belongs to a US site. A country change clears it, so a stale one cannot price a
+        // market-based row in another country (residualRegionFor also ignores one off a US site).
+        locs[idx].residual_region = ''
         // UK, EU and NZ grids are national — set grid_region directly from the country.
         // (AU returns '' here and resolves on the state pick; US resolves on the state pick.)
         const gr = gridRegionForCountry(value)
@@ -1175,6 +1186,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         if (gr) locs[idx].grid_region = gr
         else locs[idx].grid_region = ''
       }
+      return { ...inv, locations: locs }
+    })
+  }
+
+  // FI5: the unit selector. The figure is converted exactly to the new unit, with the conversion shown beside the
+  // field and recorded, or cleared and asked for where no exact conversion joins the two units. Never relabelled.
+  const changeFieldUnit = (idx: number, unitField: UnitFieldName, to: string) => {
+    setInventory(inv => {
+      const locs = [...inv.locations]
+      const loc = locs[idx]
+      const f = UNIT_FIELDS.find(x => x.field === unitField)!
+      const from = (loc[unitField] as string | undefined) ?? (unitField === 'purchased_steam_unit' ? 'mmbtu' : unitField.startsWith('fuel_oil_') ? 'gallons' : '')
+      const amount = Number(loc[f.amount as keyof Location] ?? 0)
+      locs[idx] = applyUnitOutcomes(loc, { [unitField]: changeUnit(f.amount, amount, from, to) }, new Date().toISOString(), currentUser)
       return { ...inv, locations: locs }
     })
   }
@@ -2430,12 +2455,13 @@ workings: saved.workings,
                   <p style={qHint}>What unit does your gas supplier show on bills?</p>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {unitOptionsShowing(ngUnitOptions(loc.country), loc.natural_gas_unit, documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')).map(([val, label]) => (
-                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => updateLocation(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
+                      <button key={val} disabled={documentsBacking(loc, 'natural_gas_amount') > 0 && !activeOverride(loc, 'natural_gas_amount')} onClick={() => changeFieldUnit(activeLocation, 'natural_gas_unit', val)} style={unitBtn(loc.natural_gas_unit === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total natural gas: ${inventory.reporting_year} (${unitLabel(loc.natural_gas_unit)})`} hint="Sum of the bills covering this year">
                     <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'natural_gas_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'natural_gas_amount')} />
                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
                       <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
                         {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit)}
@@ -2451,12 +2477,13 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {unitOptionsShowing(propaneUnitOptions(loc.country), loc.propane_unit, documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')).map(([val, label]) => (
-                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => updateLocation(activeLocation, 'propane_unit', val as any)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
+                      <button key={val} disabled={documentsBacking(loc, 'propane_amount') > 0 && !activeOverride(loc, 'propane_amount')} onClick={() => changeFieldUnit(activeLocation, 'propane_unit', val)} style={unitBtn(loc.propane_unit === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total propane purchased: ${inventory.reporting_year} (${unitLabel(loc.propane_unit)})`}>
                     <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'propane_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'propane_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload propane delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_propane" docs={loc.source_docs.filter(d => d.document_type === 'fuel_propane')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_propane`]} /> : <LockedDocUpload label="Upload propane delivery records" />}
                 </div>
@@ -2467,12 +2494,13 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_stationary_unit, documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')).map(([val, label]) => (
-                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => updateLocation(activeLocation, 'diesel_stationary_unit', val as any)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
+                      <button key={val} disabled={documentsBacking(loc, 'diesel_stationary_amount') > 0 && !activeOverride(loc, 'diesel_stationary_amount')} onClick={() => changeFieldUnit(activeLocation, 'diesel_stationary_unit', val)} style={unitBtn(loc.diesel_stationary_unit === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total diesel in stationary equipment: ${inventory.reporting_year}`}>
                     <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'diesel_stationary_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'diesel_stationary_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload diesel purchase records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_diesel" docs={loc.source_docs.filter(d => d.document_type === 'fuel_diesel')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fuel_diesel`]} /> : <LockedDocUpload label="Upload diesel purchase records" />}
                 </div>
@@ -2496,12 +2524,13 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {liquidUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_distillate_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_distillate_unit ?? 'gallons') === val)}>{label}</button>
+                      <button key={val} onClick={() => changeFieldUnit(activeLocation, 'fuel_oil_distillate_unit', val)} style={unitBtn((loc.fuel_oil_distillate_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total heating oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_distillate_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input id={`figure-${loc.id}-fuel_oil_distillate_amount`} type="number" value={loc.fuel_oil_distillate_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_distillate_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_distillate_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'fuel_oil_distillate_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
@@ -2513,12 +2542,13 @@ workings: saved.workings,
                 <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 12 }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                     {liquidUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} onClick={() => updateLocation(activeLocation, 'fuel_oil_residual_unit', val as 'gallons' | 'litres')} style={unitBtn((loc.fuel_oil_residual_unit ?? 'gallons') === val)}>{label}</button>
+                      <button key={val} onClick={() => changeFieldUnit(activeLocation, 'fuel_oil_residual_unit', val)} style={unitBtn((loc.fuel_oil_residual_unit ?? 'gallons') === val)}>{label}</button>
                     ))}
                   </div>
                   <Field label={`Total heavy fuel oil purchased: ${inventory.reporting_year} (${(loc.fuel_oil_residual_unit ?? 'gallons') === 'gallons' ? 'US gallons' : 'litres'})`}>
                     <input id={`figure-${loc.id}-fuel_oil_residual_amount`} type="number" value={loc.fuel_oil_residual_amount || ''} onChange={e => updateLocation(activeLocation, 'fuel_oil_residual_amount', Number(e.target.value))} placeholder="0" style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'fuel_oil_residual_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'fuel_oil_residual_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fuel oil delivery records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fuel_oil" docs={loc.source_docs.filter(d => d.document_type === 'fuel_oil')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []} uploadError={uploadErrors[`${activeLocation}:fuel_oil`]} /> : <LockedDocUpload label="Upload fuel oil delivery records" />}
                 </div>
@@ -2531,24 +2561,26 @@ workings: saved.workings,
                   <Field label={`Gasoline for company vehicles: ${inventory.reporting_year}`} hint="Cars, light trucks, vans">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <FigureInput loc={loc} field="gasoline_amount" onChange={v => updateLocation(activeLocation, 'gasoline_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'gasoline_amount', r)} onUseBills={() => switchToBills(activeLocation, 'gasoline_amount')} style={{ ...inputStyle, flex: 1 }} />
-                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => updateLocation(activeLocation, 'gasoline_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                      <select value={loc.gasoline_unit} disabled={documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')} onChange={e => changeFieldUnit(activeLocation, 'gasoline_unit', e.target.value)} style={{ ...inputStyle, width: 130 }}>
                         {unitOptionsShowing(liquidUnitOptions(loc.country), loc.gasoline_unit, documentsBacking(loc, 'gasoline_amount') > 0 && !activeOverride(loc, 'gasoline_amount')).map(([val, label]) => (
                           <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
                     </div>
                     <UnpricedNote line={unpricedFor(loc.id, 'gasoline_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'gasoline_amount')} />
                   </Field>
                   <Field label={`Diesel for company vehicles: ${inventory.reporting_year}`} hint="Trucks, heavy equipment, forklifts">
                     <div style={{ display: 'flex', gap: 8 }}>
                       <FigureInput loc={loc} field="diesel_mobile_amount" onChange={v => updateLocation(activeLocation, 'diesel_mobile_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_mobile_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_mobile_amount')} style={{ ...inputStyle, flex: 1 }} />
-                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => updateLocation(activeLocation, 'diesel_mobile_unit', e.target.value as any)} style={{ ...inputStyle, width: 130 }}>
+                      <select value={loc.diesel_mobile_unit} disabled={documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')} onChange={e => changeFieldUnit(activeLocation, 'diesel_mobile_unit', e.target.value)} style={{ ...inputStyle, width: 130 }}>
                         {unitOptionsShowing(liquidUnitOptions(loc.country), loc.diesel_mobile_unit, documentsBacking(loc, 'diesel_mobile_amount') > 0 && !activeOverride(loc, 'diesel_mobile_amount')).map(([val, label]) => (
                           <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
                     </div>
                     <UnpricedNote line={unpricedFor(loc.id, 'diesel_mobile_amount')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'diesel_mobile_amount')} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label="Upload fleet fuel records" locIdx={activeLocation} location={inventory.locations[activeLocation]} docType="fleet_fuel" docs={loc.source_docs.filter(d => d.document_type === 'fleet_fuel')} onUpload={handleFileUpload} onRemove={removeDoc} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${activeLocation}:fleet_fuel`]} /> : <LockedDocUpload label="Upload fleet fuel records" />}
                 </div>
@@ -2655,11 +2687,13 @@ workings: saved.workings,
                     {/* Country-filtered like every other fuel — MMBtu is not a billing unit outside
                         the US, so a metric inventory should never show it. */}
                     {steamUnitOptions(loc.country).map(([val, label]) => (
-                      <button key={val} onClick={() => updateLocation(activeLocation, 'purchased_steam_unit', val as 'mmbtu' | 'gj')} style={unitBtn((loc.purchased_steam_unit ?? 'mmbtu') === val)}>{label}</button>
+                      <button key={val} onClick={() => changeFieldUnit(activeLocation, 'purchased_steam_unit', val)} style={unitBtn((loc.purchased_steam_unit ?? 'mmbtu') === val)}>{label}</button>
                     ))}
                   </div>
-                  <Field label={`Total purchased steam: ${inventory.reporting_year} (${(loc.purchased_steam_unit ?? 'mmbtu') === 'gj' ? 'GJ' : 'MMBtu'})`}>
+                  <Field label={`Total purchased steam: ${inventory.reporting_year} (${unitLabel(loc.purchased_steam_unit ?? 'mmbtu')})`}>
                     <input id={`figure-${loc.id}-purchased_steam_mmbtu`} type="number" value={loc.purchased_steam_mmbtu || ''} onChange={e => updateLocation(activeLocation, 'purchased_steam_mmbtu', Number(e.target.value))} placeholder="0" style={inputStyle} />
+                    <UnpricedNote line={unpricedFor(loc.id, 'purchased_steam_mmbtu')} />
+                    <UnitChangeNote change={convertedUnitChange(loc, 'purchased_steam_mmbtu')} />
                   </Field>
                   {/* ── WHAT WE CAN AND CANNOT PRICE HERE, PER JURISDICTION ────────────────────
                       Replaces a blanket "we apply one published factor whatever network supplies it",
