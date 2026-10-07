@@ -35,15 +35,48 @@ export const SELECTOR_UNITS: Record<FuelType, readonly string[]> = {
 // ---------------------------------------------------------------------------
 // Anchor constants (documented). Everything below is derived from these.
 // ---------------------------------------------------------------------------
-export const L_PER_GAL = 3.785411784;        // US liquid gallon → litres (exact, NIST)
-const LB_PER_KG = 1 / 0.45359237;     // kg → lb (exact, NIST avoirdupois)
-export const GJ_PER_MMBTU = 1.05505585262;   // 1 MMBtu = 1.05505585262 GJ (IEA)
-const MJ_PER_KWH = 3.6;               // 1 kWh = 3.6 MJ (exact, SI)
-// Derived from MJ_PER_KWH, not retyped: 1 GJ = 1000 MJ, so 1 GJ = 1000/3.6 kWh = 277.777… kWh.
-// Exported because the GHG engine prices UK district heat from a DEFRA factor published per kWh and
-// must convert a GJ-entered figure onto that basis. It is EXACT — the kilowatt-hour is defined as
-// 3.6 MJ — so applying it is arithmetic, not an estimate, exactly like GJ_PER_MMBTU above.
-export const KWH_PER_GJ = 1000 / MJ_PER_KWH;
+// ── THE EXACT CONVERSIONS (FI2) ───────────────────────────────────────────────────────────────────
+// The ONLY conversions the engine applies at pricing. Every one is exact: a definition, not a measurement, so
+// applying it changes the unit and never the quantity. Nothing here depends on a fuel's properties (a density or an
+// energy content is not a conversion, and is not in this table). Sources: NIST Special Publication 811 (2008 ed.),
+// Appendix B.8 "Factors for units listed alphabetically", which marks each of these as exact, or the SI definition.
+//   Gas volume (ruling, 7 Oct 2026): m³ and ft³ (mcf, ccf) are the same physical quantity; the conversion is exact
+// by definition and is applied without adjusting for differing reference temperature or pressure. It is stated on
+// the row.
+export const EXACT_CONVERSIONS = {
+  /** US liquid gallon = 231 in³ = 3.785411784 L. NIST SP 811 B.8 (exact). */
+  L_PER_US_GALLON: 3.785411784,
+  /** ft³ = 0.3048³ m³ (the international foot is 0.3048 m exactly). NIST SP 811 B.8 (exact). */
+  M3_PER_FT3: 0.028316846592,
+  /** Mcf = 1,000 ft³. */
+  M3_PER_MCF: 28.316846592,
+  /** Ccf = 100 ft³. */
+  M3_PER_CCF: 2.8316846592,
+  /** therm = 100,000 Btu (International Table); 1 Btu_IT = 1,055.05585262 J exactly. NIST SP 811 B.8 (exact). */
+  GJ_PER_THERM: 0.105505585262,
+  /** MMBtu = 1,000,000 Btu (International Table). NIST SP 811 B.8 (exact). */
+  GJ_PER_MMBTU: 1.05505585262,
+  /** kWh = 3.6 MJ, by the SI definitions of the watt and the hour (exact). */
+  GJ_PER_KWH: 0.0036,
+  /** MJ = 0.001 GJ, SI prefixes (exact). */
+  GJ_PER_MJ: 0.001,
+  /** pound (avoirdupois) = 0.45359237 kg, by the 1959 international yard and pound agreement. NIST SP 811 B.8 (exact). */
+  KG_PER_LB: 0.45359237,
+} as const
+
+// The names the rest of the code already uses, DERIVED from the table rather than retyped.
+export const L_PER_GAL = EXACT_CONVERSIONS.L_PER_US_GALLON
+const LB_PER_KG = 1 / EXACT_CONVERSIONS.KG_PER_LB
+// Was labelled "(IEA)": the value is the International Table Btu, an exact definition (NIST SP 811), not an IEA figure.
+export const GJ_PER_MMBTU = EXACT_CONVERSIONS.GJ_PER_MMBTU
+// 3.6, written as the definition. Computing it as GJ_PER_KWH / GJ_PER_MJ gives 3.5999999999999996 in floating point,
+// which would move every GJ-to-kWh figure in its last digit; the test pins that the two agree to full precision.
+const MJ_PER_KWH = 3.6
+// 1 GJ = 1000 MJ, so 1 GJ = 1000/3.6 kWh = 277.777… kWh. Exported because the GHG engine prices UK district heat from
+// a DEFRA factor published per kWh and must convert a GJ-entered figure onto that basis.
+export const KWH_PER_GJ = 1000 / MJ_PER_KWH
+/** FI2: the exact Mcf → m³ factor. Replaces the engine's rounded 1000/35.3147. */
+export const M3_PER_MCF = EXACT_CONVERSIONS.M3_PER_MCF
 
 // PROPANE density anchor — VERIFY PROVENANCE before this goes near a real
 // inventory. Nominal liquid propane ≈ 4.24 lb/US-gal at 60°F (EIA / NPGA).

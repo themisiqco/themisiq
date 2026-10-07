@@ -45,7 +45,10 @@ const loc = (over: Partial<Location>): Location => ({
   electricity_kwh: 50_000,
   ...over,
 })
-const uk = (over: Partial<Location> = {}) => loc({ country: 'GB', grid_region: 'UK', ...over })
+// FI2: gas in kWh, DEFRA's own unit. This fixture used to hold gas in Mcf, which EF_UK does not publish: the line was
+// priced on the US EPA value through the fallback while the record named DEFRA. Since FI2 the row and the record name
+// US EPA for that line, so a UK fixture meant to test DEFRA has to hold a figure DEFRA prices.
+const uk = (over: Partial<Location> = {}) => loc({ country: 'GB', grid_region: 'UK', natural_gas_unit: 'kwh', ...over })
 
 describe('a single-jurisdiction inventory records one entry with both families', () => {
   it('F1 UK 2026 — one key, combustion and electricity, each with source and edition', () => {
@@ -285,13 +288,15 @@ describe('the declared edition labels cannot drift from their citations', () => 
       ['US', EF_SOURCES.combustion], ['CA', EF_SOURCES.combustion_ca], ['UK', EF_SOURCES.combustion_uk],
       ['EU', EF_SOURCES.combustion_eu], ['AU', EF_SOURCES.combustion_au], ['NZ', EF_SOURCES.combustion_nz],
     ]
-    const country: Record<string, [string, string]> = {
-      US: ['US', 'US_FL'], CA: ['CA', 'ON'], UK: ['GB', 'UK'],
-      EU: ['DE', 'EU_DE'], AU: ['AU', 'AU_NSW'], NZ: ['NZ', 'NZ'],
+    // FI2: each with gas in a unit its OWN publisher prices. The default Mcf is in no UK, AU or NZ table, and since FI2
+    // a line priced through the US fallback records US EPA, so those sites would name no edition of their own.
+    const country: Record<string, [string, string, Location['natural_gas_unit']]> = {
+      US: ['US', 'US_FL', 'mcf'], CA: ['CA', 'ON', 'mcf'], UK: ['GB', 'UK', 'kwh'],
+      EU: ['DE', 'EU_DE', 'm3'], AU: ['AU', 'AU_NSW', 'm3'], NZ: ['NZ', 'NZ', 'kwh'],
     }
     for (const [j, citation] of cases) {
-      const [c, region] = country[j]
-      const ed = buildFactorEditions([loc({ country: c, grid_region: region })], 2026)[j as 'UK']!
+      const [c, region, unit] = country[j]
+      const ed = buildFactorEditions([loc({ country: c, grid_region: region, natural_gas_unit: unit })], 2026)[j as 'UK']!
       expect(ed.combustion!.source, `${j} citation`).toBe(citation)
       for (const token of ed.combustion!.edition.split(/\s+/)) {
         expect(citation, `${WHY}\n  ${j}: label token "${token}" is absent from "${citation}"`).toContain(token)
@@ -1036,5 +1041,21 @@ describe('a location excluded from the totals records no edition', () => {
     // Steam too — a published-factor US steam location still names its edition.
     const steam = bare({ country: 'US', has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
     expect(buildFactorEditions([steam], 2025).US?.steam?.edition).toBe('US EPA 2025 Table 7')
+  })
+})
+
+// FI2 diff 1: an edition is recorded for each TABLE that priced a line, never assumed from the location's country.
+describe('the editions name the tables that priced (FI2)', () => {
+  it('a NZ site with petrol in litres (MfE) and fleet diesel in gallons (US fallback) records both tables', () => {
+    const nz = { ...emptyLocation('n1', 'Auckland'), country: 'NZ', grid_region: 'NZ', has_mobile: true,
+      gasoline_amount: 100, gasoline_unit: 'litres' as const, diesel_mobile_amount: 50, diesel_mobile_unit: 'gallons' as const }
+    const ed = buildFactorEditions([nz], 2026)
+    expect(ed.NZ?.combustion).toEqual({ source: EF_SOURCES.combustion_nz, edition: 'MfE 2026 v2' })
+    expect(ed.US?.combustion).toEqual({ source: EF_SOURCES.combustion, edition: 'US EPA 2024' })
+  })
+
+  it('a site priced only through the fallback names only the table that priced it', () => {
+    const au = { ...emptyLocation('a1', 'Perth'), country: 'AU', has_propane: true, propane_amount: 100, propane_unit: 'gallons' as const }
+    expect(buildFactorEditions([au], 2026)).toEqual({ US: { combustion: { source: EF_SOURCES.combustion, edition: 'US EPA 2024' } } })
   })
 })

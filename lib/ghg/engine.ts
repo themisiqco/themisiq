@@ -18,7 +18,7 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
-import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, convertToCanonical, type FuelType } from '../unitConversions'
+import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF, convertToCanonical, type FuelType } from '../unitConversions'
 import { dateInWords, isoDateInWords } from './dateWords'
 // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
 // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
@@ -285,7 +285,8 @@ const EF_CA_NG_CO2_M3: Record<string, number> = {
   BC: 1.966, AB: 1.962, SK: 1.920, MB: 1.915, ON: 1.921, QC: 1.926,
   NB: 1.919, NS: 1.919, PE: 1.919, NL: 1.919, YT: 1.966, NT: 1.966, NU: 1.966,
 }
-const M3_PER_MCF = 1000 / 35.3147 // 28.3168
+// FI2: M3_PER_MCF is the EXACT value (28.316846592, NIST SP 811), from lib/unitConversions.ts. It was 1000/35.3147,
+// a rounded reciprocal (28.316819…), which moved every Canadian per-Mcf figure by about one part in a million.
 // Canadian natural gas CH4 and N2O, ECCC Res/Comm/Institutional: 0.037 and 0.035 g/m3. Per mcf = per m3 x
 // 28.3168 (rounded as the table always stored it). The CO2 is never here: it is the province's (FI1).
 const EF_CA_NG_CH4_N2O: Record<'natural_gas_m3' | 'natural_gas_mcf', { ch4: number; n2o: number }> = {
@@ -905,6 +906,22 @@ const COMBUSTION_EDITION: Record<EfJurisdiction, string> = {
   EU: 'IPCC 2006',
   AU: 'DCCEEW NGA 2025',
   NZ: 'MfE 2026 v2',
+}
+
+/**
+ * FI2: THE TABLE A COMBUSTION FACTOR CAME FROM, carried with the value. `publisher` is the citation a workings row
+ * prints, `edition` its factor_vintage, `jurisdiction` the table. The shape leaves room for T3c, which keys these
+ * tables by edition (`{ publisher, edition?, value }`): a value is always reported with the source that supplied it,
+ * never with the location's country.
+ */
+export interface FactorSource { jurisdiction: EfJurisdiction; publisher: string; edition?: string }
+const COMBUSTION_TABLE_SOURCE: Record<EfJurisdiction, FactorSource> = {
+  US: { jurisdiction: 'US', publisher: EF_SOURCES.combustion, edition: COMBUSTION_EDITION.US },
+  CA: { jurisdiction: 'CA', publisher: EF_SOURCES.combustion_ca, edition: COMBUSTION_EDITION.CA },
+  UK: { jurisdiction: 'UK', publisher: EF_SOURCES.combustion_uk, edition: COMBUSTION_EDITION.UK },
+  EU: { jurisdiction: 'EU', publisher: EF_SOURCES.combustion_eu, edition: COMBUSTION_EDITION.EU },
+  AU: { jurisdiction: 'AU', publisher: EF_SOURCES.combustion_au, edition: COMBUSTION_EDITION.AU },
+  NZ: { jurisdiction: 'NZ', publisher: EF_SOURCES.combustion_nz, edition: COMBUSTION_EDITION.NZ },
 }
 
 // PARTIAL, and the four absences are the honest shape: only the US and UK publish a purchased-steam
@@ -2345,7 +2362,7 @@ type FuelOilGrade = 'distillate' | 'residual'
 function fuelOilPricing(loc: Location, grade: FuelOilGrade, amount: number): { key: string; priced: number; note?: string } {
   const unit = grade === 'distillate' ? loc.fuel_oil_distillate_unit : loc.fuel_oil_residual_unit
   const litreKey = `fuel_oil_${grade}_litre`
-  if ((unit ?? 'gallons') === 'litres' && isPriceableEF(pickEF(loc, litreKey as keyof typeof EF))) {
+  if ((unit ?? 'gallons') === 'litres' && isPriceableEF(pickEF(loc, litreKey as keyof typeof EF).factor)) {
     // Priced where the publisher priced it: no conversion, so no conversion note either.
     return { key: litreKey, priced: amount }
   }
@@ -2521,15 +2538,8 @@ interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missi
 const efMiss = (key: string, country: string, cause?: 'province'): CombustionEF =>
   ({ __missing: { key, country: country || '(unset)', ...(cause ? { cause } : {}) } } as unknown as CombustionEF)
 
-// The ONE resolution step every branch below shares: take the table hit if there is one, else the
-// uniform miss. Scalar table entries — EF.ammonia, which is deliberately never priced because it has
-// no GWP — are not factors and count as a miss: spreading a number yields `{}`, which would
-// otherwise read as a complete factor of zero.
-//   EF.steam_mmbtu was the other such entry until 14 Aug 2026 and is now a real triple. Steam still
-// does not route through pickEF, but that is now a routing decision (the US factor is applied to
-// every country, and ef_source says so) rather than something the factor's shape forbids.
-const efOr = (base: unknown, key: string, ctry: string): CombustionEF =>
-  base && typeof base === 'object' ? { ...(base as CombustionEF) } : efMiss(key, ctry)
+// FI2: the shared resolution step that lived here (efOr) is tableLookup, below pickEF, which also returns the table
+// that supplied the value. Scalar entries such as EF.ammonia (never priced: no GWP) are still a miss there.
 
 // Thrown when an activity figure cannot be priced. Carries the fuel, unit and country as fields
 // (not just prose) so a customer-facing message can be composed from it without re-parsing text.
@@ -2565,50 +2575,59 @@ function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asser
   throw new MissingEmissionFactorError(fuel, unit, miss?.country ?? '(unknown country)', miss?.key ?? '(unknown key)')
 }
 
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): CombustionEF {
+/**
+ * FI2: what pickEF returns. `factor` is the value (or the uniform miss); `publisher` is the table that supplied it,
+ * null on a miss; `conversion` is the exact conversion applied to reach it, which arrives with FI2's routing by
+ * quantity type (diff 2) and is absent until then.
+ */
+export interface PickedFactor {
+  factor: CombustionEF
+  publisher: FactorSource | null
+  conversion?: { from: string; to: string; statement: string }
+}
+
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): PickedFactor {
   const ctry = canonicalCountryCode(loc.country)
-  // Switches on the shared router rather than re-branching on country. Behaviour is unchanged: the
-  // arms below are the same six, in the same order of precedence, with the same US fallbacks.
-  // ⚠️ STEAM DOES NOT COME THROUGH HERE, precisely because of those `?? (EF as any)[key]` fallbacks.
-  // See STEAM_EF.
+  // Switches on the shared router rather than re-branching on country.
+  // ⚠️ STEAM DOES NOT COME THROUGH HERE, because of the US fallback below. See STEAM_EF.
   const j = efJurisdiction(loc)
-  // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS, NOT A US LOOKUP, AND THAT IS THE WHOLE CHANGE.
-  // efMiss is the same uniform marker a missing table row produces, so calcGas's assertPriceable
-  // refuses it by the path that already exists, and unpriceableReason turns that refusal into a
-  // whole location exclusion. Nothing new throws; the set of things that throw is larger by one.
-  if (j === null) return efMiss(String(key), loc.country || '')
-  if (j === 'UK') {
-    return efOr((EF_UK as any)[key] ?? (EF as any)[key], String(key), ctry)
-  }
-  if (j === 'EU') {
-    return efOr((EF_EU as any)[key] ?? (EF as any)[key], String(key), ctry)
-  }
-  // Australia: EF_AU per-unit table; missing keys (e.g. fuel oil) fall back to US EF (UK/EU parity).
-  if (j === 'AU') {
-    return efOr((EF_AU as any)[key] ?? (EF as any)[key], String(key), ctry)
-  }
-  // New Zealand: EF_NZ is use-class keyed (commercial default / industrial); missing keys fall back to US EF.
-  if (j === 'NZ') {
-    const nzTable = (EF_NZ as any)[loc.nz_use_class ?? 'commercial']
-    return efOr(nzTable?.[key] ?? (EF as any)[key], String(key), ctry)
-  }
-  // US / default / any unlisted country. Structurally identical to the five above — it used to be
-  // the odd one out, returning the raw table value, and that asymmetry WAS the crash.
-  if (j !== 'CA') {
-    return efOr((EF as any)[key], String(key), ctry)
-  }
-  // ⚠️ CANADIAN GAS, ANY UNIT, NEEDS THE PROVINCE (FI1). ECCC publishes natural gas CO2 by province; with no
-  // province there is no factor to apply, so the line is a miss with cause 'province', never the Ontario
-  // value it used to fall back to. m3 and mcf are assembled from the province's CO2 and the sector CH4 and N2O.
-  if (String(key).startsWith('natural_gas_')) {
-    const prov = caGasProvince(loc)
-    if (prov === null) return efMiss(String(key), ctry, 'province')
-    if (key === 'natural_gas_mcf' || key === 'natural_gas_m3') {
-      const co2M3 = EF_CA_NG_CO2_M3[prov]
-      return { co2: key === 'natural_gas_mcf' ? co2M3 * M3_PER_MCF : co2M3, ...EF_CA_NG_CH4_N2O[key] }
+  // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS, NOT A US LOOKUP. efMiss is the same uniform marker a missing table row
+  // produces, so calcGas's assertPriceable refuses it, and the country refusal excludes the location.
+  if (j === null) return { factor: efMiss(String(key), loc.country || ''), publisher: null }
+  if (j === 'CA') {
+    // ⚠️ CANADIAN GAS, ANY UNIT, NEEDS THE PROVINCE (FI1). ECCC publishes natural gas CO2 by province; with no
+    // province there is no factor to apply, so the line is a miss with cause 'province', never the Ontario
+    // value it used to fall back to. m3 and mcf are assembled from the province's CO2 and the sector CH4 and N2O.
+    if (String(key).startsWith('natural_gas_')) {
+      const prov = caGasProvince(loc)
+      if (prov === null) return { factor: efMiss(String(key), ctry, 'province'), publisher: null }
+      if (key === 'natural_gas_mcf' || key === 'natural_gas_m3') {
+        const co2M3 = EF_CA_NG_CO2_M3[prov]
+        return { factor: { co2: key === 'natural_gas_mcf' ? co2M3 * M3_PER_MCF : co2M3, ...EF_CA_NG_CH4_N2O[key] }, publisher: COMBUSTION_TABLE_SOURCE.CA }
+      }
     }
   }
-  return efOr((EF_CA as any)[key] ?? (EF as any)[key], String(key), ctry)
+  const own: Record<string, unknown> | undefined =
+    j === 'US' ? EF : j === 'CA' ? EF_CA : j === 'UK' ? EF_UK : j === 'EU' ? EF_EU : j === 'AU' ? EF_AU
+      : (EF_NZ as any)[loc.nz_use_class ?? 'commercial']   // NZ is use-class keyed: commercial default, or industrial
+  return tableLookup(own?.[String(key)], String(key), j, ctry)
+}
+
+/**
+ * ONE lookup, shared by every branch of pickEF: the location's own table, else the US table, else the uniform miss.
+ * A scalar entry (EF.ammonia, never priced: no GWP) is not a factor and is a miss, not a reason to look elsewhere.
+ *   ⚠️ THE US FALLBACK IS STILL HERE, AND ITS VALUE IS NOW CITED AS WHAT IT IS (FI2 diff 1). A key the location's own
+ * table lacks is taken from the US EPA table, and the row says US EPA, with US EPA's edition. Removing the fallback,
+ * so that such a line is unpriced instead, is FI2's second diff.
+ */
+function tableLookup(own: unknown, key: string, j: EfJurisdiction, ctry: string): PickedFactor {
+  if (own !== undefined && own !== null) {
+    return typeof own === 'object' ? { factor: { ...(own as CombustionEF) }, publisher: COMBUSTION_TABLE_SOURCE[j] } : { factor: efMiss(key, ctry), publisher: null }
+  }
+  const us = j === 'US' ? undefined : (EF as Record<string, unknown>)[key]
+  return us && typeof us === 'object'
+    ? { factor: { ...(us as CombustionEF) }, publisher: COMBUSTION_TABLE_SOURCE.US }
+    : { factor: efMiss(key, ctry), publisher: null }
 }
 
 // Source citation for an ELECTRICITY row, country-aware — the same shape as combustionSource below.
@@ -2666,7 +2685,8 @@ export function publishersForLocation(loc: Location, gwpVersion: GwpVersion = 'A
     if (r.result_tco2e == null) continue
     if (r.scope2_method === 'market-based') continue
     const stream = String(r.stream ?? '')
-    if (COMBUSTION_STREAMS.has(stream)) add(COMBUSTION_EDITION[j])
+    // FI2: the edition the row itself records, which is the table that supplied its value.
+    if (COMBUSTION_STREAMS.has(stream)) add(r.factor_vintage ?? COMBUSTION_EDITION[j])
     else if (stream === 'electricity') add(`${GRID_PUBLISHER[j]} ${getGridFactor(loc.grid_region, year).usedYear}`)
     else if (stream === 'purchased_steam') add(STEAM_EDITION[j])
     if (r.gwp_basis === gwpVersion) usedOurGwp = true
@@ -2723,7 +2743,13 @@ export function combustionSourcesFor(locations: readonly { country?: string }[])
   // filters instead.
   //   A gate is not a guard: pricingReady already blocks both surfaces while a refused location
   // exists. That is a reason to expect this never to render, not a reason for it to be wrong.
-  return [...new Set(locations.filter(l => !countryRefusal(l)).map(l => combustionSource(l as Location)))]
+  // FI2: the publishers of the tables that priced each location's combustion lines; a location with none keeps its
+  // country's citation, as before. A line whose value came from another table (the US fallback, until FI2 diff 2)
+  // therefore adds that table's citation instead of hiding behind the location's.
+  return [...new Set(locations.filter(l => !countryRefusal(l)).flatMap(l => {
+    const priced = combustionLinePublishers(l as Location).map(p => p.publisher)
+    return priced.length > 0 ? priced : [combustionSource(l as Location)]
+  }))]
 }
 
 type GwpVersion = 'AR4' | 'AR5' | 'AR6'
@@ -2853,7 +2879,7 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
   const publisher = COMBUSTION_EDITION[j]
   const out: UnpricedLine[] = []
   for (const line of combustionLines(loc)) {
-    const ef = pickEF(loc, line.efKey as keyof typeof EF)
+    const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
     if (isPriceableEF(ef)) continue
     const miss = (ef as unknown as MissingEF).__missing
     const base = { locId: loc.id, site, field: line.field, stream: line.stream, source: line.source, amount: line.entered,
@@ -2866,7 +2892,7 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
     // The units the same publisher DOES price this fuel in at this location: each candidate unit is put
     // through the same line construction and lookup, so the list cannot name a unit that would also fail.
     const supported = (LINE_UNITS[line.field] ?? []).filter(u => u !== line.enteredUnit && combustionLines({ ...loc, [line.unitField]: u } as Location)
-      .filter(l => l.field === line.field).every(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF))))
+      .filter(l => l.field === line.field).every(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF).factor)))
     out.push({ ...base, reason: 'factor_missing', supportedUnits: supported.map(u => unitLabel(u)),
       message: UNPRICED_MESSAGE.factor_missing(line.source, site, unitLabel(line.enteredUnit), publisher, supported.map(u => unitLabel(u))) })
   }
@@ -2885,7 +2911,21 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
  * fuel line is unpriced burned nothing the table priced, so it names no combustion edition (factorEditions).
  */
 export function hasPricedCombustionLine(loc: Location): boolean {
-  return combustionLines(loc).some(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF)))
+  return combustionLinePublishers(loc).length > 0
+}
+
+/**
+ * FI2: the tables that priced this location's combustion lines, each once, in line order. Read by every list that
+ * names a combustion publisher for a location (factorEditions, combustionSourcesFor), so a list can only name a
+ * table that supplied a value. Usually one; two where a line's key came from the US fallback (until FI2 diff 2).
+ */
+export function combustionLinePublishers(loc: Location): FactorSource[] {
+  const out: FactorSource[] = []
+  for (const l of combustionLines(loc)) {
+    const p = pickEF(loc, l.efKey as keyof typeof EF)
+    if (isPriceableEF(p.factor) && p.publisher && !out.some(o => o.jurisdiction === p.publisher!.jurisdiction)) out.push(p.publisher)
+  }
+  return out
 }
 
 function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
@@ -2894,7 +2934,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // FI1: a line with no factor is skipped, never priced as zero and never taking the location with it.
   // unpricedLines names it; findUnresolvedCoverage blocks export on it; buildWorkings writes its row.
   for (const line of combustionLines(loc)) {
-    const ef = pickEF(loc, line.efKey as keyof typeof EF)
+    const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
     if (!isPriceableEF(ef)) continue
     const g = calcGas(ef, line.priced, gwpVersion)
     if (line.mobile) s1_mobile += g.total; else s1_stationary += g.total
@@ -3038,7 +3078,7 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
   // The same lines calcLocation prices, skipping the same unpriced ones (FI1), so a field's share here
   // reconciles with the inventory total.
   for (const line of combustionLines(loc)) {
-    const ef = pickEF(loc, line.efKey as keyof typeof EF)
+    const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
     if (isPriceableEF(ef)) add(String(line.field), calcGas(ef, line.priced, gwpVersion).total)
   }
   // Electricity = Scope 2 location-based (the series' headline basis). Same grid gate as calcLocation:
@@ -4103,7 +4143,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   //   Section M asserts that reconciliation, but note that its fixtures never exercised a converted
   // row (M1 CA gas, M2 steam already in mmbtu, M3 EU gas), which is why the old shape survived.
   const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, entered: number, enteredUnit: string, efKey: string, prov?: Provenance, convNote?: string, pricedIn?: number) => {
-    const ef = pickEF(loc, efKey as keyof typeof EF)
+    // FI2: the value AND the table that supplied it. The row cites that table, never the location's country.
+    const picked = pickEF(loc, efKey as keyof typeof EF)
+    const ef = picked.factor
     const priced = pricedIn ?? entered
     const g = calcGas(ef, priced, gwpVersion)
     // ratio 1 when no conversion happened, which is every row outside fuel oil — those keep the
@@ -4112,7 +4154,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const efShown = ratio === 1 ? ef : { co2: ef.co2 * ratio, ch4: ef.ch4 * ratio, n2o: ef.n2o * ratio }
     // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
     // priced by a density-derived factor. Joined rather than one overwriting the other.
-    const note = [convNote, euDerivationNote(loc, efKey), auDerivationNote(loc, efKey)].filter(Boolean).join(' · ')
+    // The EU and AU derivation notes describe values in THOSE tables, so they apply only to a value one supplied.
+    const fromTable = picked.publisher?.jurisdiction
+    const note = [convNote, fromTable === 'EU' ? euDerivationNote(loc, efKey) : '', fromTable === 'AU' ? auDerivationNote(loc, efKey) : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
     // table has no year dimension: EF_UK is DEFRA 2026 whichever year is being reported, so the vintage
@@ -4129,7 +4173,12 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // price, so the null arm is unreachable. It is spelled out rather than asserted because a
       // factor_vintage of 'US EPA 2024' on a site that is not American is exactly the false claim
       // this change removes, and `!` would let a future edit reintroduce it silently.
-      ef_source: combustionSource(loc), ...vintageOf(COMBUSTION_EDITION, loc),
+      // FI2: cited from the table that supplied the value. Where the US fallback supplied it (removed in FI2's second
+      // diff), the row now says US EPA rather than the location's own publisher.
+      ef_source: picked.publisher?.publisher ?? combustionSource(loc),
+      // FI2: the key the value was read under, in the table ef_source names, so a verifier can find the figure.
+      factor_key: efKey,
+      ...(picked.publisher?.edition ? { factor_vintage: picked.publisher.edition } : vintageOf(COMBUSTION_EDITION, loc)),
       result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
   // NO STALE-FIELD FALLBACK (T5). Workings are built from derived locations, so every document-backed

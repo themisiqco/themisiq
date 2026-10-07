@@ -38,6 +38,7 @@ import {
   findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
   notCountedLines, FIX_DATES, FIX_REVERSED, FIX_UNITS,
   unpricedLines, UNPRICED_MESSAGE, UNPRICED_STATUSES,
+  M3_PER_MCF, EF_CA_NG_CO2_M3,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
 import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
@@ -46,7 +47,7 @@ import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { contributionShareCell } from './workingsCells';
-import { convertToCanonical, convertibleUnits } from '../unitConversions';
+import { convertToCanonical, convertibleUnits, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -397,8 +398,8 @@ describe('GROUP G — regression guards', () => {
   });
 
   it('G3 CA natural-gas CO2 is per-province (ON ≠ AB)', () => {
-    const on = pickEF(loc({ country: 'CA', grid_region: 'ON', natural_gas_unit: 'm3' }), 'natural_gas_m3');
-    const ab = pickEF(loc({ country: 'CA', grid_region: 'AB', natural_gas_unit: 'm3' }), 'natural_gas_m3');
+    const on = pickEF(loc({ country: 'CA', grid_region: 'ON', natural_gas_unit: 'm3' }), 'natural_gas_m3').factor;
+    const ab = pickEF(loc({ country: 'CA', grid_region: 'AB', natural_gas_unit: 'm3' }), 'natural_gas_m3').factor;
     expect(on.co2).not.toBe(ab.co2);
     expect(on.co2).toBeCloseTo(1.921, 3);
     expect(ab.co2).toBeCloseTo(1.962, 3);
@@ -406,7 +407,7 @@ describe('GROUP G — regression guards', () => {
 
   it('G4 UK/AU/NZ fuels do NOT respond to the AR toggle; US/CA/EU DO', () => {
     const same = (l: Location, key: any) => {
-      const ef = pickEF(l, key);
+      const ef = pickEF(l, key).factor;
       return calcGas(ef, 1000, 'AR4').total === calcGas(ef, 1000, 'AR6').total;
     };
     // published-basis (CO2e baked into co2, ch4/n2o = 0) → GWP-invariant
@@ -586,11 +587,11 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
     it(`K ${country} + ${unit} throws MissingEmissionFactorError naming fuel, unit and country`, () => {
       const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
 
-      expect(() => calcGas(pickEF(l, key as any), 1000, 'AR6')).toThrow(MissingEmissionFactorError);
+      expect(() => calcGas(pickEF(l, key as any).factor, 1000, 'AR6')).toThrow(MissingEmissionFactorError);
 
       // The message must carry enough for a customer-facing string to be built from it later.
       try {
-        calcGas(pickEF(l, key as any), 1000, 'AR6');
+        calcGas(pickEF(l, key as any).factor, 1000, 'AR6');
         throw new Error('expected a throw');
       } catch (e) {
         const err = e as MissingEmissionFactorError;
@@ -622,7 +623,7 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
     // rather than printing 'undefined'. T16 covers the refusal path for the same blank country.
     const l = loc({ country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
     // FI1: calcLocation no longer throws; the factor lookup itself still names the blank country.
-    expect(() => calcGas(pickEF(l, 'natural_gas_m3'), 1000, 'AR6')).toThrow(/\(unset\)/);
+    expect(() => calcGas(pickEF(l, 'natural_gas_m3').factor, 1000, 'AR6')).toThrow(/\(unset\)/);
   });
 
   it('K every priceable (country, unit) pair still prices — the guard refuses absence, not everything', () => {
@@ -639,7 +640,7 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
     ];
     for (const { country, unit, key } of priceable) {
       const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
-      const total = calcGas(pickEF(l, key as any), 1000, 'AR6').total;
+      const total = calcGas(pickEF(l, key as any).factor, 1000, 'AR6').total;
       expect(Number.isFinite(total), `${country} + ${unit} should price`).toBe(true);
       expect(total).toBeGreaterThan(0);
     }
@@ -2415,11 +2416,11 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
       expect(efJurisdiction({ country }), country).toBe(expected);
     }
     // A supported jurisdiction is untouched: a GB diesel litre is still DEFRA's.
-    expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).co2).toBe(2.58354);
+    expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).factor.co2).toBe(2.58354);
     // ⚠️ AND THE JAPANESE ONE IS NOW A REFUSAL, NOT A NUMBER. pickEF returns the same uniform miss
     // marker a missing table row produces, so calcGas declines to price it by the path that already
     // existed. The figure it used to return, 10.20648, was the US EPA diesel factor.
-    expect(() => calcGas(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any), 100, 'AR6')).toThrow(MissingEmissionFactorError);
+    expect(() => calcGas(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any).factor, 100, 'AR6')).toThrow(MissingEmissionFactorError);
   });
 });
 
@@ -5378,7 +5379,7 @@ describe('FI1 unpriced lines', () => {
       expect(unpricedLines(l).map(u => u.reason)).toEqual(['province_missing']);
       expect(gate(l).map(i => i.message)).toEqual(['The province for Moncton is not set, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.']);
       expect(calcInventory([l], 'AR6', 2025).s1_total).toBe(0);
-      expect(() => calcGas(pickEF(l, 'natural_gas_m3'), 1000, 'AR6')).toThrow(MissingEmissionFactorError);
+      expect(() => calcGas(pickEF(l, 'natural_gas_m3').factor, 1000, 'AR6')).toThrow(MissingEmissionFactorError);
       // Every unit, not just m3: the province selects the factor whatever the gas is billed in.
       for (const unit of ['mcf', 'kwh', 'therms', 'mmbtu'] as const)
         expect(unpricedLines(ca({ natural_gas_unit: unit })).map(u => u.reason), unit).toEqual(['province_missing']);
@@ -5389,10 +5390,11 @@ describe('FI1 unpriced lines', () => {
     it("choosing ON prices at Ontario's value, AB at Alberta's, and clears the issue", () => {
       const on = ca({ grid_region: 'ON', province: 'ON' }), ab = ca({ grid_region: 'AB', province: 'AB' });
       expect(gate(on)).toEqual([]);
-      expect(pickEF(on, 'natural_gas_m3')).toEqual({ co2: 1.921, ch4: 0.000037, n2o: 0.000035 });
-      expect(pickEF(ab, 'natural_gas_m3')).toEqual({ co2: 1.962, ch4: 0.000037, n2o: 0.000035 });
-      expect(pickEF(on, 'natural_gas_mcf').co2).toBeCloseTo(1.921 * 1000 / 35.3147, 9);
-      expect(calcInventory([on], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(on, 'natural_gas_m3'), 1000, 'AR6').total, 12);
+      expect(pickEF(on, 'natural_gas_m3').factor).toEqual({ co2: 1.921, ch4: 0.000037, n2o: 0.000035 });
+      expect(pickEF(ab, 'natural_gas_m3').factor).toEqual({ co2: 1.962, ch4: 0.000037, n2o: 0.000035 });
+      // FI2: per Mcf at the EXACT 28.316846592 m3/Mcf (NIST SP 811), not the rounded 1000/35.3147 it used to be.
+      expect(pickEF(on, 'natural_gas_mcf').factor.co2).toBeCloseTo(1.921 * 28.316846592, 12);
+      expect(calcInventory([on], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(on, 'natural_gas_m3').factor, 1000, 'AR6').total, 12);
     });
     it('source: the Ontario fallback value is gone from EF_CA', () => {
       const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
@@ -5497,5 +5499,136 @@ describe('FI1 consumers', () => {
     expect(unpricedLines(deriveLocations({ locations: [fromBill], reporting_year: 2025 })[0]).map(u => u.reason)).toEqual(['factor_missing']);
     const fixed = { ...fromBill, source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'mcf')] };
     expect(unpricedLines(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0])).toEqual([]);
+  });
+});
+
+// ── FI2 diff 1: the exact conversion table, and every priced value cited by the table that supplied it ─────────────
+// docs/review/design-derived-figures.md "FI2". The US fallback in pickEF is still here (diff 2 removes it); what this
+// diff guarantees is that a row never cites one publisher while its value came from another's table.
+describe('FI2 exact conversions and honest provenance', () => {
+  const close = (a: number, b: number) => Math.abs(a - b) <= Number.EPSILON * Math.max(Math.abs(a), Math.abs(b))
+
+  it('each exact constant equals its definition to full precision, written as published', () => {
+    const X = EXACT_CONVERSIONS;
+    expect(String(X.L_PER_US_GALLON)).toBe('3.785411784');
+    expect(String(X.M3_PER_FT3)).toBe('0.028316846592');
+    expect(String(X.M3_PER_MCF)).toBe('28.316846592');
+    expect(String(X.M3_PER_CCF)).toBe('2.8316846592');
+    expect(String(X.GJ_PER_THERM)).toBe('0.105505585262');
+    expect(String(X.GJ_PER_MMBTU)).toBe('1.05505585262');
+    expect(String(X.GJ_PER_KWH)).toBe('0.0036');
+    expect(String(X.GJ_PER_MJ)).toBe('0.001');
+    expect(String(X.KG_PER_LB)).toBe('0.45359237');
+    // And each from the definition it states.
+    expect(close(X.L_PER_US_GALLON, 231 * 0.0254 ** 3 * 1000)).toBe(true);     // 231 in³, inch = 0.0254 m
+    expect(close(X.M3_PER_FT3, 0.3048 ** 3)).toBe(true);                         // foot = 0.3048 m
+    expect(close(X.M3_PER_MCF, 1000 * X.M3_PER_FT3)).toBe(true);
+    expect(close(X.M3_PER_CCF, 100 * X.M3_PER_FT3)).toBe(true);
+    expect(close(X.GJ_PER_MMBTU, 1e6 * 1055.05585262 / 1e9)).toBe(true);         // Btu_IT = 1,055.05585262 J
+    expect(close(X.GJ_PER_THERM, 1e5 * 1055.05585262 / 1e9)).toBe(true);
+    expect(close(X.GJ_PER_KWH, 3.6e6 / 1e9)).toBe(true);                         // kWh = 3.6 MJ
+    expect(close(KWH_PER_GJ, 1 / X.GJ_PER_KWH)).toBe(true);
+    // The names the engine already used are the table's, not second copies.
+    expect(L_PER_GAL).toBe(X.L_PER_US_GALLON);
+    expect(GJ_PER_MMBTU).toBe(X.GJ_PER_MMBTU);
+    expect(M3_PER_MCF_EXACT).toBe(X.M3_PER_MCF);
+    expect(M3_PER_MCF, 'the engine uses the exact value').toBe(X.M3_PER_MCF);
+  });
+
+  it('mcf and ccf round-trip with m3', () => {
+    for (const x of [1, 3.7, 1234.5678, 1e6]) {
+      expect(close((x * EXACT_CONVERSIONS.M3_PER_MCF) / EXACT_CONVERSIONS.M3_PER_MCF, x)).toBe(true);
+      expect(close((x * EXACT_CONVERSIONS.M3_PER_CCF) / EXACT_CONVERSIONS.M3_PER_CCF, x)).toBe(true);
+      expect(close(x * EXACT_CONVERSIONS.M3_PER_CCF * 10, x * EXACT_CONVERSIONS.M3_PER_MCF)).toBe(true);
+    }
+  });
+
+  it('source: the rounded Mcf factor and the "(IEA)" label are gone', () => {
+    expect(stripTsComments(readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8'))).not.toContain('35.3147');
+    expect(readFileSync(join(process.cwd(), 'lib/unitConversions.ts'), 'utf8')).not.toMatch(/GJ_PER_MMBTU = 1\.05505585262;\s*\/\/.*\(IEA\)/);
+  });
+
+  // Every country, fuel and unit a location can store (the Location type's unions); CA with a province.
+  const TABLE_BY_SOURCE = new Map<string, Record<string, any>>([
+    [EF_SOURCES.combustion, EF], [EF_SOURCES.combustion_ca, EF_CA], [EF_SOURCES.combustion_uk, EF_UK],
+    [EF_SOURCES.combustion_eu, EF_EU], [EF_SOURCES.combustion_au, EF_AU], [EF_SOURCES.combustion_nz, EF_NZ.commercial],
+  ]);
+  const LINES: [keyof Location, keyof Location, Partial<Location>, string[]][] = [
+    ['natural_gas_amount', 'natural_gas_unit', { has_natural_gas: true }, ['mcf', 'therms', 'mmbtu', 'm3', 'kwh']],
+    ['propane_amount', 'propane_unit', { has_propane: true }, ['gallons', 'litres', 'kg']],
+    ['diesel_stationary_amount', 'diesel_stationary_unit', { has_diesel_stationary: true }, ['gallons', 'litres']],
+    ['fuel_oil_distillate_amount', 'fuel_oil_distillate_unit', { has_fuel_oil_distillate: true }, ['gallons', 'litres']],
+    ['fuel_oil_residual_amount', 'fuel_oil_residual_unit', { has_fuel_oil_residual: true }, ['gallons', 'litres']],
+    ['gasoline_amount', 'gasoline_unit', { has_mobile: true }, ['gallons', 'litres']],
+    ['diesel_mobile_amount', 'diesel_mobile_unit', { has_mobile: true }, ['gallons', 'litres']],
+  ];
+  const COUNTRIES = ['US', 'CA', 'GB', ...EU_COUNTRIES, 'AU', 'NZ'];
+
+  it('publisher matches value: every priced row is found in the table its ef_source names, under the key it records', () => {
+    let checked = 0, fellBack = 0;
+    for (const country of COUNTRIES) for (const [field, unitField, on, units] of LINES) for (const unit of units) {
+      const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', ...on, [field]: 1000, [unitField]: unit } as Partial<Location>);
+      for (const r of buildWorkings([l], 'AR6', 2025).filter(r => r.scope === 1 && r.declaration === undefined && r.factor_key)) {
+        const label = `${country} ${String(field)} in ${unit}`;
+        const table = TABLE_BY_SOURCE.get(r.ef_source);
+        expect(table, `${label}: cites "${r.ef_source}", which is no combustion table`).toBeDefined();
+        // The value applied, after the recorded exact conversion: fuel oil in litres priced per US gallon divides by
+        // L_PER_GAL (its note says so); every other row is per the unit entered.
+        const ratio = /÷ 3\.785411784/.test(r.note ?? '') ? 1 / L_PER_GAL : 1;
+        const shownCo2 = Number(String(r.emission_factor).match(/(?:CO2|CO₂e) ([\d.e-]+)/)![1]);
+        let expected: number;
+        if (table === EF_CA && /^natural_gas_(m3|mcf)$/.test(r.factor_key)) {
+          // Canadian gas: the province's ECCC value (EF_CA_NG_CO2_M3), per m3 or per Mcf at the exact factor.
+          expected = EF_CA_NG_CO2_M3.ON * (r.factor_key === 'natural_gas_mcf' ? EXACT_CONVERSIONS.M3_PER_MCF : 1);
+        } else {
+          expect(table![r.factor_key], `${label}: "${r.factor_key}" is not in the table the row cites`).toBeDefined();
+          expected = table![r.factor_key].co2 * ratio;
+        }
+        expect(Math.abs(shownCo2 - expected) / expected, `${label}: value ${shownCo2} is not ${r.ef_source}'s ${r.factor_key}`).toBeLessThan(1e-9);
+        // The edition is the same table's.
+        expect(r.factor_vintage, label).toBe(pickEF(l, r.factor_key).publisher?.edition);
+        if (country !== 'US' && table === EF) fellBack++;
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+    expect(fellBack, 'the US fallback is still reachable in this diff, and every such row cites US EPA').toBeGreaterThan(0);
+  });
+
+  it('a value from the US fallback is cited as US EPA, with US EPA\'s edition, never the location\'s publisher', () => {
+    const cases: [string, Partial<Location>, string][] = [
+      ['AU', { has_propane: true, propane_amount: 100, propane_unit: 'gallons' }, 'Propane'],
+      ['NZ', { has_mobile: true, gasoline_amount: 100, gasoline_unit: 'gallons' }, 'Gasoline (mobile)'],
+      ['GB', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'therms' }, 'Natural gas'],
+      ['CA', { grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mmbtu' }, 'Natural gas'],
+      ['DE', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mmbtu' }, 'Natural gas'],
+    ];
+    for (const [country, o, source] of cases) {
+      const r = buildWorkings([loc({ country, ...o })], 'AR6', 2025).find(x => x.source === source)!;
+      expect(r.ef_source, country).toBe(EF_SOURCES.combustion);
+      expect(r.factor_vintage, country).toBe('US EPA 2024');
+    }
+    // And the location's own value still cites its own publisher.
+    const own = buildWorkings([loc({ country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' })], 'AR6', 2025).find(x => x.source === 'Gasoline (mobile)')!;
+    expect(own.ef_source).toBe(EF_SOURCES.combustion_nz);
+  });
+
+  it('the export source list names the table that priced each line', () => {
+    const nzGallons = loc({ country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'gallons' });
+    const nzLitres = loc({ id: 'L2', country: 'NZ', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' });
+    expect(combustionSourcesFor([nzGallons])).toEqual([EF_SOURCES.combustion]);
+    expect(combustionSourcesFor([nzLitres, nzGallons])).toEqual([EF_SOURCES.combustion_nz, EF_SOURCES.combustion]);
+    // A location with no combustion keeps its country's citation, as before.
+    expect(combustionSourcesFor([loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100 })])).toEqual([EF_SOURCES.combustion_nz]);
+  });
+
+  it('the only priced value that moves is Canadian gas per Mcf, by the exact factor', () => {
+    const on = loc({ country: 'CA', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' });
+    const was = 1.921 * (1000 / 35.3147);
+    const now = 1.921 * 28.316846592;
+    expect(pickEF(on, 'natural_gas_mcf').factor.co2).toBeCloseTo(now, 12);
+    expect(now - was).toBeCloseTo(0.0000512602, 9);
+    // Everything else at a Canadian site is unchanged: per m3 is the province's value as published.
+    expect(pickEF(on, 'natural_gas_m3').factor.co2).toBe(1.921);
   });
 });

@@ -57,7 +57,8 @@ export interface EFFactor { co2: number; ch4: number; n2o: number }
 /** Live factor functions, passed in from the page so we reuse the real tables. */
 export interface MonthlyDeps {
   calcGas: (ef: EFFactor, amount: number, gwp: GwpVersion, biogenic?: boolean) => { total: number };
-  pickEF: (loc: any, key: any) => EFFactor;        // accept caller's Location + literal-union key
+  // FI2: the engine's pickEF, which returns the value with the table that supplied it; this module prices the value.
+  pickEF: (loc: any, key: any) => { factor: EFFactor };   // accept caller's Location + literal-union key
   getGridFactor: (region: string, year: number) => { ef: number; usedRegion: string; usedYear: number };
   // True iff region is a real GRID_EF key. Unresolved grid regions OMIT electricity monthly rows
   // (no getGridFactor call, no US_AVG fallback), mirroring the annual calc/workings guard.
@@ -270,7 +271,7 @@ export function buildMonthlyEmissions(
         // sit inside the try, so an unpriceable bill lands in `skipped` where the caller already
         // reads it, rather than taking the whole monthly write down.
         try {
-          const ef: EFFactor = deps.pickEF(loc, resolved.efKey);
+          const ef: EFFactor = deps.pickEF(loc, resolved.efKey).factor;
           billTotal = deps.calcGas(ef, c.value, gwp).total;
         } catch (e) {
           skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });

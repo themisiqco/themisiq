@@ -33,17 +33,18 @@
  *   assumptions for the same litres. Handled below via FUEL_OIL_GRADE_BY_JUR.
  *
  * ⚠️ ONE THING TO RESOLVE BEFORE WIRING:
- *   Anchor consolidation: the anchors below mirror lib/unitConversions.ts and
- *   page.tsx (M3_PER_MCF). Before merge, export them from ONE source and import
- *   here, rather than re-declaring (single source of truth). Also confirm the
+ *   Anchor consolidation: DONE in FI2. L_PER_GAL, GJ_PER_MMBTU and M3_PER_MCF are
+ *   imported from lib/unitConversions.ts's exact table. Also confirm the
  *   jurisdiction codes in FUEL_OIL_GRADE_BY_JUR match the engine's table keys.
  */
 
-// --- Anchors (mirror the canonical constants; consolidate before merge) -----
-const L_PER_GAL = 3.785411784;        // unitConversions.ts — US gallon → litres (NIST)
-const GJ_PER_MMBTU = 1.05505585262;   // unitConversions.ts — 1 MMBtu = 1.05505585262 GJ (IEA)
-const MJ_PER_KWH = 3.6;               // unitConversions.ts — 1 kWh = 3.6 MJ (exact, SI)
-const M3_PER_MCF = 1000 / 35.3147;    // page.tsx — 1 mcf (1000 ft³) → m³ (= 28.3168)
+import { L_PER_GAL, GJ_PER_MMBTU, M3_PER_MCF } from '../unitConversions';
+
+// --- Anchors: imported from the exact conversion table (FI2), not re-declared -----------------------------
+// L_PER_GAL, GJ_PER_MMBTU and M3_PER_MCF are lib/unitConversions.ts's exact values (NIST SP 811). M3_PER_MCF was a
+// local 1000/35.3147, a rounded reciprocal; the exact 28.316846592 moves the per-m³ energy figure by about one part
+// in a million. MJ_PER_KWH is the SI definition, written as such.
+const MJ_PER_KWH = 3.6;
 
 /** Btu per MWh, derived from the existing anchors (no magic number).
  *  1 MMBtu = GJ_PER_MMBTU GJ = GJ_PER_MMBTU*1000 MJ ; ÷ MJ_PER_KWH → kWh.

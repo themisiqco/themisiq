@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, hasPricedCombustionLine,
+  efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, combustionLinePublishers,
   COMBUSTION_EDITION, STEAM_EDITION,
 } from './engine'
 import type { Location } from './engine'
@@ -81,7 +81,9 @@ export type FactorEdition = {
 export type FactorEditions = Partial<Record<FactorJurisdiction, Partial<Record<FactorFamily, FactorEdition>>>>
 
 // ── WHAT COUNTS AS COMBUSTION ────────────────────────────────────────────────────────────────────
-// The six Scope 1 streams priced through pickEF, i.e. the ones combustionSource() actually cites.
+// The six Scope 1 streams priced through pickEF (natural gas, propane, stationary diesel, both fuel-oil grades and
+// mobile). FI2: the list that named them here is gone; the engine's combustionLinePublishers enumerates the same
+// lines and says which TABLE priced each, which is what the record now keys on.
 //
 // THREE STREAMS ARE ABSENT FROM THIS LIST, and none of the omissions is an oversight:
 //   refrigerants    — priced from REFRIGERANT_GWP, a GWP table, not a combustion factor. Its edition
@@ -94,9 +96,6 @@ export type FactorEditions = Partial<Record<FactorJurisdiction, Partial<Record<F
 //                     list, because combustionSource() would cite the wrong TABLE for it. See the
 //                     note on FactorFamily.
 //   electricity     — its own family, resolved by year rather than by table.
-const COMBUSTION_STREAMS = [
-  'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
-] as const
 
 /** Recorded here so the omissions above are greppable from the consuming code, not just commented. */
 export const FAMILIES_NOT_COVERED = ['refrigerants'] as const
@@ -281,9 +280,10 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     //   FI1: and at least one of those lines must actually price. A missing factor no longer excludes the
     // location (it is an unpriced line), so a site whose only fuel line is unpriced burned nothing the
     // table priced and names no combustion edition, while its priced electricity and steam still do.
-    if (COMBUSTION_STREAMS.some(s => streamState(loc, s) === 'quantified') && hasPricedCombustionLine(loc)) {
-      const j = factorJurisdiction(loc, 'combustion')
-      if (j) (out[j] ??= {}).combustion = { source: combustionSource(loc), edition: COMBUSTION_EDITION[j] }
+    //   FI2: recorded for each TABLE that priced a line, from the line itself, never from the location's country. A
+    // line whose key came from the US fallback (until FI2 diff 2) records the US edition, because that is what priced it.
+    for (const src of combustionLinePublishers(loc)) {
+      (out[src.jurisdiction] ??= {}).combustion = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction] }
     }
 
     // ── ELECTRICITY — the SAME gate calcLocation applies, deliberately mirrored.
