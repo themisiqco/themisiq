@@ -1083,8 +1083,8 @@ function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
 // stand-in outside the UK, flagged on each line), and the NZ T&D losses above (nz_td_losses opt-in) are the engine's own
 // line. These Australian and New Zealand primary-source values are captured so they are not lost: AU Category 3 is
 // FI6, and they are transcribed into a real line there before being used.
-//   Australia — DCCEEW NGA Factors 2025, Scope 3 (kg CO2e/kWh, AR5):
-//     NSW+ACT 0.03, VIC 0.09, QLD 0.09, SA 0.04, WA (SWIS) 0.06, TAS 0.03, NT 0.09, National 0.07
+//   Australia: DCCEEW NGA Factors 2025 Scope 3 is transcribed, with citations, in
+//     lib/emissionFactors/ngaScope3_2025.ts (FI6 diff 1), and wired in FI6 diff 2.
 //   New Zealand — MfE "Measuring Emissions" 2026 Scope 3 electricity table: transcribe the exact
 //     value(s) from the workbook when wiring (deliberately not reproduced here to avoid inventing figures).
 // ── RESIDUAL MIX (market-based Scope 2) ──────────────────────────────────────
@@ -1159,10 +1159,9 @@ const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
 // them, and inventing state splits would attribute to DCCEEW figures it does not produce. The
 // absent region key is why the type is Record<number, number> and not the nested shape.
 //
-// SCOPE 3 (0.11 kg CO2-e/kWh in the same table) IS DELIBERATELY NOT SEEDED. The engine has no
-// Scope 3 Category 3 electricity line — only the NZ T&D opt-in — so a Scope 3 residual figure would
-// sit here unreachable, and the first person to wire it would have to re-derive which of the two
-// numbers belongs on which line. Same rule as the DEFERRED block above NZ_TD_LOSS.
+// SCOPE 3 IS NOT HELD HERE. Table 2's Scope 3 figure, with NGA's Scope 3 electricity by state (Table 1)
+// and natural gas by state (Table 6), is transcribed in lib/emissionFactors/ngaScope3_2025.ts (FI6 diff 1).
+// Nothing reads it yet; it is wired into Australian Category 3 in FI6 diff 2. This table stays Scope 2.
 //
 // Year key = the WORKBOOK EDITION already cited by EF_SOURCES.electricity_au, so the location-based
 // and market-based figures on one AU inventory name the same document.
