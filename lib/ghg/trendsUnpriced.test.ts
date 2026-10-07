@@ -13,7 +13,8 @@ import { assessCompleteness } from './loadSeries'
 import { describeYearStatus, type SeriesYear } from './series'
 import { buildWorkings, emptyLocation, type Location } from './engine'
 
-const mill = (): Location => ({ ...emptyLocation('m1', 'Mill'), country: 'US', grid_region: 'US_CA', electricity_kwh: 50_000,
+// FI2 diff 2: a UK site with gas in m3 (DEFRA prints per kWh only); US gas in m3 now prices through the exact Mcf conversion.
+const mill = (): Location => ({ ...emptyLocation('m1', 'Mill'), country: 'GB', grid_region: 'UK', electricity_kwh: 50_000,
   has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'm3' })
 const osaka = (): Location => ({ ...emptyLocation('j1', 'Osaka'), country: 'JP', electricity_kwh: 1000 })
 const year = (c: ReturnType<typeof assessCompleteness>): SeriesYear =>

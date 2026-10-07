@@ -810,7 +810,8 @@ describe('the states a verifier and a customer each see', () => {
       ['electricity unmapped country', bare({ country: 'JP', grid_region: '', electricity_kwh: 100_000 })],
       ['refrigerants only', bare({ country: 'US', has_hfc_refrigerants: true, refrigerant_purchased_kg: 40 })],
       ['biogenic only', bare({ country: 'US', biogenic_co2_mt: 10 })],
-      ['every location excluded', bare({ country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
+      // FI2 diff 2: a UK site with gas in m3 (DEFRA prints per kWh only). US gas in m3 now prices via the exact Mcf conversion.
+      ['every location excluded', bare({ country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
     ]
     expect(NOTHING_RECORDABLE.length, 'all fourteen routes').toBe(14)
     for (const [name, l] of NOTHING_RECORDABLE) {
@@ -944,8 +945,9 @@ describe('a location excluded from the totals records no edition', () => {
   // engine rather than hand-listed — 18 of them. Kept as the fixture list so the fix is asserted
   // against ALL routes to exclusion, not just the US m3 gas case that surfaced it.
   const UNPRICEABLE: [string, Partial<Location>][] = [
-    ['US gas m3',        { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
-    ['US gas kwh',       { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    // FI2 diff 2: US gas in m3 and kWh, and AU gas in kWh, now price (exact conversions); replaced by routes that still miss.
+    ['GB gas mcf',       { country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }],
+    ['DE gas mmbtu',     { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mmbtu' }],
     ['US propane kg',    { country: 'US', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['CA gas kwh',       { country: 'CA', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
     ['CA propane kg',    { country: 'CA', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
@@ -953,7 +955,7 @@ describe('a location excluded from the totals records no edition', () => {
     ['GB propane kg',    { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['DE gas kwh',       { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
     ['DE propane kg',    { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
-    ['AU gas kwh',       { country: 'AU', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
+    ['NZ propane litres', { country: 'NZ', has_propane: true, propane_amount: 1000, propane_unit: 'litres' }],
     ['AU propane kg',    { country: 'AU', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['NZ gas m3',        { country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
     ['JP gas m3',        { country: 'JP', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
@@ -982,18 +984,19 @@ describe('a location excluded from the totals records no edition', () => {
     // WAS: all three families recorded nothing, because a missing factor excluded the whole location and its
     // electricity and steam with it. FI1 ends that exclusion: the gas line is unpriced, the electricity and
     // steam are in the totals, so their editions are recorded exactly as for the same site with no gas.
-    const base = { country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
+    // FI2 diff 2: a UK site (DEFRA has no per-m3 gas factor); US gas in m3 now prices through the exact Mcf conversion.
+    const base = { country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
     const noGas = (l: Location): Location => ({ ...l, has_natural_gas: false, natural_gas_amount: 0 })
-    const withElec = bare({ ...base, grid_region: 'US_CA', electricity_kwh: 100_000 })
+    const withElec = bare({ ...base, grid_region: 'UK', electricity_kwh: 100_000 })
     expect(findUnpriceableLocations([withElec], 'AR6', 2025)).toEqual([])
     expect(unpricedLines(withElec).map(u => u.reason)).toEqual(['factor_missing'])
     expect(buildFactorEditions([withElec], 2025)).toEqual(buildFactorEditions([noGas(withElec)], 2025))
-    expect(buildFactorEditions([withElec], 2025).US?.combustion, 'no combustion line priced').toBeUndefined()
-    expect(buildFactorEditions([withElec], 2025).US?.electricity, 'the priced electricity names its edition').toBeDefined()
+    expect(buildFactorEditions([withElec], 2025).UK?.combustion, 'no combustion line priced').toBeUndefined()
+    expect(buildFactorEditions([withElec], 2025).UK?.electricity, 'the priced electricity names its edition').toBeDefined()
     const withSteam = bare({ ...base, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
     expect(buildFactorEditions([withSteam], 2025)).toEqual(buildFactorEditions([noGas(withSteam)], 2025))
-    expect(buildFactorEditions([withSteam], 2025).US?.combustion).toBeUndefined()
-    const all = bare({ ...base, grid_region: 'US_CA', electricity_kwh: 100_000,
+    expect(buildFactorEditions([withSteam], 2025).UK?.combustion).toBeUndefined()
+    const all = bare({ ...base, grid_region: 'UK', electricity_kwh: 100_000,
       has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'mmbtu' })
     expect(buildFactorEditions([all], 2025)).toEqual(buildFactorEditions([noGas(all)], 2025))
   })
@@ -1008,8 +1011,9 @@ describe('a location excluded from the totals records no edition', () => {
     const good = { ...emptyLocation('good', 'Priceable'), country: 'US', grid_region: 'US_CA',
       has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' as const,
       electricity_kwh: 50_000 }
+    // FI2 diff 2: propane in kg (no EPA mass factor); US gas in m3 now prices through the exact Mcf conversion.
     const bad = { ...emptyLocation('bad', 'Excluded'), country: 'US',
-      has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
+      has_propane: true, propane_amount: 1000, propane_unit: 'kg' as const }
     expect(findUnpriceableLocations([good], 'AR6', 2025).length, 'good must be priceable').toBe(0)
     // FI1: bad is no longer excluded; its one line is unpriced, and it prices nothing else.
     expect(unpricedLines(bad).length, 'bad must hold an unpriced line').toBe(1)
@@ -1046,16 +1050,16 @@ describe('a location excluded from the totals records no edition', () => {
 
 // FI2 diff 1: an edition is recorded for each TABLE that priced a line, never assumed from the location's country.
 describe('the editions name the tables that priced (FI2)', () => {
-  it('a NZ site with petrol in litres (MfE) and fleet diesel in gallons (US fallback) records both tables', () => {
+  it('a NZ site with petrol in litres and fleet diesel in gallons records MfE only (FI2 diff 2: gallons convert to MfE litres)', () => {
     const nz = { ...emptyLocation('n1', 'Auckland'), country: 'NZ', grid_region: 'NZ', has_mobile: true,
       gasoline_amount: 100, gasoline_unit: 'litres' as const, diesel_mobile_amount: 50, diesel_mobile_unit: 'gallons' as const }
     const ed = buildFactorEditions([nz], 2026)
     expect(ed.NZ?.combustion).toEqual({ source: EF_SOURCES.combustion_nz, edition: 'MfE 2026 v2' })
-    expect(ed.US?.combustion).toEqual({ source: EF_SOURCES.combustion, edition: 'US EPA 2024' })
+    expect(ed.US, 'no US table priced anything').toBeUndefined()
   })
 
-  it('a site priced only through the fallback names only the table that priced it', () => {
+  it('an AU site with propane in gallons names NGA, which now prices it through the exact litre conversion', () => {
     const au = { ...emptyLocation('a1', 'Perth'), country: 'AU', has_propane: true, propane_amount: 100, propane_unit: 'gallons' as const }
-    expect(buildFactorEditions([au], 2026)).toEqual({ US: { combustion: { source: EF_SOURCES.combustion, edition: 'US EPA 2024' } } })
+    expect(buildFactorEditions([au], 2026)).toEqual({ AU: { combustion: { source: EF_SOURCES.combustion_au, edition: 'DCCEEW NGA 2025' } } })
   })
 })

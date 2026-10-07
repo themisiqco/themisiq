@@ -342,7 +342,8 @@ describe('L5 amendment 2', () => {
 // FI1 diff 2: a free calculation can hold a figure the engine cannot price (here US gas in m3, which the EPA does not
 // publish per m3). The saved totals leave it out, and the email must say so rather than present a total as whole.
 describe('the results email with an unpriced line (FI1)', () => {
-  const site = { id: 'm1', name: 'Mill', country: 'US', grid_region: 'US_CA', electricity_kwh: 50000,
+  // FI2 diff 2: a UK site with gas in m3 (DEFRA prints per kWh only); US gas in m3 now prices through the exact Mcf conversion.
+  const site = { id: 'm1', name: 'Mill', country: 'GB', grid_region: 'UK', electricity_kwh: 50000,
     has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'm3' }
   const invU = inventoryFromDraft({ company_name: 'FI1 Co', reporting_year: 2025, locations: [site] } as never, 'FI1 Co', NOW)
   const rowU = ({ ...inventoryRow(invU, 'user-1', 'co-1', true, NOW), id: 'inv-u' }) as unknown as SavedInventoryRow

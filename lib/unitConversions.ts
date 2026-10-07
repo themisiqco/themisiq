@@ -78,6 +78,44 @@ export const KWH_PER_GJ = 1000 / MJ_PER_KWH
 /** FI2: the exact Mcf → m³ factor. Replaces the engine's rounded 1000/35.3147. */
 export const M3_PER_MCF = EXACT_CONVERSIONS.M3_PER_MCF
 
+// ── FI2 diff 2: THE UNITS A FACTOR KEY MAY BE CONVERTED BETWEEN ─────────────────────────────────────
+// Each factor-key unit token, the QUANTITY it measures and its size in that quantity's base unit, from
+// EXACT_CONVERSIONS alone. The engine converts only within one quantity: liquid volume to liquid volume, gas volume to
+// gas volume, energy to energy, mass to mass. Crossing quantities (a volume to an energy, a mass to a volume) needs a
+// density or energy content, which is never a conversion and never in this table. A token not listed here is
+// unrecognised: the line is unpriced, never read as litres.
+export type QuantityKind = 'liquid_volume' | 'gas_volume' | 'energy' | 'mass'
+export const EXACT_UNITS: Record<string, { kind: QuantityKind; inBase: number; one: string; many: string }> = {
+  litre:  { kind: 'liquid_volume', inBase: 1, one: 'litre', many: 'litres' },
+  gallon: { kind: 'liquid_volume', inBase: EXACT_CONVERSIONS.L_PER_US_GALLON, one: 'US gallon', many: 'US gallons' },
+  m3:     { kind: 'gas_volume', inBase: 1, one: 'm³', many: 'm³' },
+  mcf:    { kind: 'gas_volume', inBase: EXACT_CONVERSIONS.M3_PER_MCF, one: 'Mcf', many: 'Mcf' },
+  ccf:    { kind: 'gas_volume', inBase: EXACT_CONVERSIONS.M3_PER_CCF, one: 'Ccf', many: 'Ccf' },
+  gj:     { kind: 'energy', inBase: 1, one: 'GJ', many: 'GJ' },
+  mj:     { kind: 'energy', inBase: EXACT_CONVERSIONS.GJ_PER_MJ, one: 'MJ', many: 'MJ' },
+  kwh:    { kind: 'energy', inBase: EXACT_CONVERSIONS.GJ_PER_KWH, one: 'kWh', many: 'kWh' },
+  mmbtu:  { kind: 'energy', inBase: EXACT_CONVERSIONS.GJ_PER_MMBTU, one: 'MMBtu', many: 'MMBtu' },
+  therms: { kind: 'energy', inBase: EXACT_CONVERSIONS.GJ_PER_THERM, one: 'therm', many: 'therms' },
+  kg:     { kind: 'mass', inBase: 1, one: 'kg', many: 'kg' },
+  lb:     { kind: 'mass', inBase: EXACT_CONVERSIONS.KG_PER_LB, one: 'lb', many: 'lb' },
+}
+/** The base unit of each quantity, the one every inBase above is measured in. */
+const BASE_OF: Record<QuantityKind, string> = { liquid_volume: 'litre', gas_volume: 'm3', energy: 'gj', mass: 'kg' }
+
+/**
+ * The exact conversion from one unit token to another of the SAME quantity: `toPerFrom` units of `to` in one unit of
+ * `from`, and the definition stated in words ("1 US gallon = 3.785411784 litres"). Null across quantities, or for an
+ * unrecognised token.
+ */
+export function exactConversion(from: string, to: string): { toPerFrom: number; statement: string } | null {
+  const a = EXACT_UNITS[from], b = EXACT_UNITS[to]
+  if (!a || !b || a.kind !== b.kind || from === to) return null
+  const base = EXACT_UNITS[BASE_OF[a.kind]]
+  const def = (u: { inBase: number; one: string }) => `1 ${u.one} = ${String(u.inBase)} ${base.many}`
+  const statement = to === BASE_OF[a.kind] ? def(a) : from === BASE_OF[a.kind] ? def(b) : `${def(a)} and ${def(b)}`
+  return { toPerFrom: a.inBase / b.inBase, statement }
+}
+
 // PROPANE density anchor — VERIFY PROVENANCE before this goes near a real
 // inventory. Nominal liquid propane ≈ 4.24 lb/US-gal at 60°F (EIA / NPGA).
 // It is temperature-dependent; for assurance, confirm this matches the source

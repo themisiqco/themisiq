@@ -18,7 +18,7 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
-import { L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF, convertToCanonical, type FuelType } from '../unitConversions'
+import { GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF, EXACT_UNITS, exactConversion, convertToCanonical, type FuelType } from '../unitConversions'
 import { dateInWords, isoDateInWords } from './dateWords'
 // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
 // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
@@ -109,7 +109,6 @@ const GWP = {
 // would substitute a publisher's judgement we do not hold for the one we cited.
    const EF = {
   natural_gas_mcf: { co2: 54.43956, ch4: 0.001026, n2o: 0.0001026 },
-  natural_gas_therms: { co2: 5.306, ch4: 0.0001, n2o: 0.00001 },
   natural_gas_mmbtu: { co2: 53.06, ch4: 0.001, n2o: 0.0001 },
   // ── PROPANE — EPA Table 1 Stationary Combustion, Petroleum Products, row "Propane" ─────────────
   // ⚠️ THIS CO2 FACTOR WAS WRONG UNTIL 13 AUG 2026, AND THE WRONG VALUE CAME FROM THE ADJACENT ROW.
@@ -143,9 +142,7 @@ const GWP = {
   // they are confirmed to be the gallon values through the same constant: 0.000273 / 3.785411784 =
   // 0.0000721189..., 0.0000546 / 3.785411784 = 0.0000144237..., which are the stored 0.0000721 and
   // 0.0000144 at the precision this table carries.
-  propane_litre: { co2: 1.51137, ch4: 0.0000721, n2o: 0.0000144 },
   diesel_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
-  diesel_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   fuel_oil_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
   // ── GRADE-EXPLICIT KEYS — EPA Table 1 Stationary Combustion, Petroleum Products ────────────────
   // Both derived as HEAT CONTENT x FACTOR, at full precision, so a verifier retyping the two source
@@ -167,9 +164,7 @@ const GWP = {
   // per mmBtu for both, which is why their kg/gal values differ only by the 0.138 -> 0.15 ratio.
   fuel_oil_residual_gallon: { co2: 11.265, ch4: 0.00045, n2o: 0.00009 },
   gasoline_gallon: { co2: 8.7775, ch4: 0.000375, n2o: 0.000075 },
-  gasoline_litre: { co2: 2.31877, ch4: 0.0000991, n2o: 0.0000198 },
   diesel_mobile_gallon: { co2: 10.20648, ch4: 0.000414, n2o: 0.0000828 },
-  diesel_mobile_litre: { co2: 2.69627, ch4: 0.0001094, n2o: 0.0000219 },
   ammonia: 0,
   // ── PURCHASED STEAM / DISTRICT HEAT — EPA Hub 2025 Table 7 (Steam and Heat) ────────────────────
   // ⚠️ THIS WAS THE BARE SCALAR 66.33 UNTIL 14 AUG 2026 — THE CO2 COLUMN ALONE. Table 7 publishes
@@ -203,8 +198,10 @@ const GWP = {
 // Canadian combustion factors — ECCC "Emission factors and reference values" v3.0 (Oct 2025).
 // Stored as kg per activity unit (raw gas amounts; calcGas applies GWP). Source values are g/unit.
 // Mirrors the US EF key structure so factor selection is a clean country swap, with two exceptions:
-//   - natural_gas CO2 is per-province (see EF_CA_NG_CO2); the value below is a fallback only.
-//   - therms/mmbtu have no ECCC energy-basis factor — CA natural gas uses mcf/m3 only (handled in UI).
+//   - natural_gas CO2 is per-province (see EF_CA_NG_CO2_M3), per m³; there is no table value without a province.
+//   - ECCC has no energy-basis gas factor here, so CA gas in therms, MMBtu or kWh is unpriced (FI2: no fallback).
+//   FI2 diff 2: every key is in ECCC's own unit (per litre, per m³). The gallon and per-Mcf keys are gone: those
+//   units convert exactly, with the conversion stated on the row.
 // CH4/N2O use the Commercial/Industrial sector rows (Tables 2.x: ~0.037 CH4; 4.x Industrial for oils).
 //
 // ── END-USE SECTOR: A CHOICE WAS MADE, PER KEY, AND HERE IS WHY ─────────────────────────────────
@@ -248,30 +245,22 @@ const EF_CA = {
   // export-blocking issue asking for the province (ruling, design doc section 10).
   // Propane "All Other Uses" (Table 3.x): 1515 / 0.024 / 0.108 g/L. gallon = litre × 3.78541.
   propane_litre: { co2: 1.515, ch4: 0.000024, n2o: 0.000108 },
-  propane_gallon: { co2: 5.734896, ch4: 0.000091, n2o: 0.000409 },
   // Diesel "Refineries and Others" (Table 4.x): 2681 / 0.078 / 0.022 g/L.
   diesel_litre: { co2: 2.681, ch4: 0.000078, n2o: 0.000022 },
-  diesel_gallon: { co2: 10.148684, ch4: 0.000295, n2o: 0.000083 },
   // Light fuel oil "Industrial" (Table 4.x): 2753 / 0.006 / 0.031 g/L.
-  fuel_oil_gallon: { co2: 10.421234, ch4: 0.000023, n2o: 0.000117 },
   // GRADE-EXPLICIT KEYS — ECCC v3.0 Table 4.3 (2026 set), Industrial rows, g/L x 3.785411784.
   // The legacy key above is CONFIRMED to be the Light/Industrial row: 2753 g/L -> 10.421239 kg/gal
   // against its stored 10.421234, a 4.6e-6 rounding difference matching every other key in this table.
   // Light Fuel Oil - Industrial:  2753 / 0.006 / 0.031 g/L.
-  fuel_oil_distillate_gallon: { co2: 10.421239, ch4: 0.000023, n2o: 0.000117 },
   // Heavy Fuel Oil - Industrial: 3156 / 0.12 / 0.064 g/L.
-  fuel_oil_residual_gallon: { co2: 11.946760, ch4: 0.000454, n2o: 0.000242 },
   // ── PER-LITRE KEYS — ECCC's OWN PUBLISHED BASIS, and the ones a CA location now prices from.
-  // ECCC v3.0 Table 4.3 (2026 set), INDUSTRIAL rows — the same rows the gallon keys above were
-  // converted from, so this is a de-conversion back to source, not a new transcription. g/L -> kg/L.
-  // The gallon keys stay as US-entry fallbacks; CA offers litres only, so they are unreachable here.
+  // ECCC v3.0 Table 4.3 (2026 set), INDUSTRIAL rows, g/L -> kg/L. FI2 diff 2: the gallon keys converted from these are
+  // gone; a figure in US gallons converts to litres exactly at pricing.
   fuel_oil_distillate_litre: { co2: 2.753, ch4: 0.000006, n2o: 0.000031 },
   fuel_oil_residual_litre: { co2: 3.156, ch4: 0.00012, n2o: 0.000064 },
   // Motor gasoline (Table 4.x): 2307 / 0.100 / 0.02 g/L.
   gasoline_litre: { co2: 2.307, ch4: 0.0001, n2o: 0.00002 },
-  gasoline_gallon: { co2: 8.732941, ch4: 0.000379, n2o: 0.000076 },
   diesel_mobile_litre: { co2: 2.681, ch4: 0.000078, n2o: 0.000022 },
-  diesel_mobile_gallon: { co2: 10.148684, ch4: 0.000295, n2o: 0.000083 },
 }
 
 // Per-province natural gas CO2 (kg/m3) — ECCC Tables 1.1-1.3, "MARKETABLE" column.
@@ -287,12 +276,11 @@ const EF_CA_NG_CO2_M3: Record<string, number> = {
 }
 // FI2: M3_PER_MCF is the EXACT value (28.316846592, NIST SP 811), from lib/unitConversions.ts. It was 1000/35.3147,
 // a rounded reciprocal (28.316819…), which moved every Canadian per-Mcf figure by about one part in a million.
-// Canadian natural gas CH4 and N2O, ECCC Res/Comm/Institutional: 0.037 and 0.035 g/m3. Per mcf = per m3 x
-// 28.3168 (rounded as the table always stored it). The CO2 is never here: it is the province's (FI1).
-const EF_CA_NG_CH4_N2O: Record<'natural_gas_m3' | 'natural_gas_mcf', { ch4: number; n2o: number }> = {
-  natural_gas_m3: { ch4: 0.000037, n2o: 0.000035 },
-  natural_gas_mcf: { ch4: 0.001048, n2o: 0.000991 },
-}
+// Canadian natural gas CH4 and N2O, ECCC Res/Comm/Institutional: 0.037 and 0.035 g/m3, per m³ only. The CO2 is never
+// here: it is the province's (FI1).
+const EF_CA_NG_CH4_N2O_M3 = { ch4: 0.000037, n2o: 0.000035 }
+// FI2 diff 2 (ruling R5): the per-Mcf CH4 and N2O that sat here (0.001048 and 0.000991, rounded from per m³ × 28.3168)
+// are gone. Every Canadian gas volume other than m³ converts to the per-m³ factor exactly (1 Mcf = 28.316846592 m³).
 /** FI1: the province a Canadian location's gas is priced for, or null when it is blank or not one we hold. */
 function caGasProvince(loc: Pick<Location, 'grid_region' | 'province'>): string | null {
   const prov = (loc.grid_region || loc.province || '').toUpperCase().trim()
@@ -305,8 +293,8 @@ function caGasProvince(loc: Pick<Location, 'grid_region' | 'province'>): string 
 // reproduces DEFRA's PUBLISHED figure exactly (Option 2 — exact match for verifier reconciliation).
 // DEFRA bakes in its own GWP basis, so UK fuels intentionally do NOT respond to the AR4/AR5 toggle.
 // Per DEFRA guidance: natural gas uses the "Natural gas" row (kWh, gross CV — billing basis);
-// diesel/petrol use the "average biofuel blend" rows (forecourt fuel). gallon values are a
-// non-breaking fallback only (US gallon × litre value); UK wizard defaults to kWh/litres.
+// diesel/petrol use the "average biofuel blend" rows (forecourt fuel). FI2 diff 2: no gallon keys; a figure in US
+// gallons converts to litres exactly, and gas in therms or MMBtu converts to kWh exactly (DEFRA's kWh is gross CV).
 //
 // ── EDITION HISTORY: 2025 → 2026, REFRESHED WHOLE ───────────────────────────────────────────────
 // This table WAS DEFRA/DESNZ 2025. Refreshed to the 2026 workbook in full — LF, 13 Aug 2026.
@@ -343,21 +331,16 @@ const EF_UK = {
   // Propane, litres: 1.54358 kgCO2e/L (CO2 1.5414, CH4 0.00133, N2O 0.00084 — components sum to
   // 1.54357, DEFRA's own rounding against its stated 1.54358). UNCHANGED from the 2025 edition.
   propane_litre: { co2: 1.54358, ch4: 0, n2o: 0 },
-  propane_gallon: { co2: 5.843086, ch4: 0, n2o: 0 },
   // Diesel (average biofuel blend), litres: 2.58354 kgCO2e/L (CO2 2.55035, CH4 0.00029, N2O 0.0329).
   diesel_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
-  diesel_gallon: { co2: 9.779763, ch4: 0, n2o: 0 },
   diesel_mobile_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
-  diesel_mobile_gallon: { co2: 9.779763, ch4: 0, n2o: 0 },
-  // Fuel oil, litres 3.17492 (DEFRA "Processed fuel oils - residual oil") → per US-gallon fallback.
+  // Fuel oil, litres 3.17492 (DEFRA "Processed fuel oils - residual oil"). (FI2 diff 2: the per-gallon keys are gone.)
   // The FACTOR is unchanged from 2025; only the gallon conversion is corrected (see the header).
-  fuel_oil_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
   // ── GRADE-EXPLICIT KEYS — DEFRA/DESNZ 2026 full set, Fuels tab, kg CO2e per litre ──────────────
   // Seedable now the whole table is 2026; seeding them while it was 2025 would have mixed editions.
   //
   // "Processed fuel oils - distillate oil" 2.75541 (CO2 2.72417, CH4 0.00315, N2O 0.02809 — sums
   //   exactly): 2.75541 x 3.785411784 = 10.430361484 -> 10.430361.
-  fuel_oil_distillate_gallon: { co2: 10.430361, ch4: 0, n2o: 0 },
   // "Processed fuel oils - residual oil" 3.17492 (CO2 3.16262, CH4 0.0053, N2O 0.00701 — sums to
   //   3.17493, DEFRA's own rounding against its stated 3.17492):
   //   3.17492 x 3.785411784 = 12.018379581 -> 12.018380.
@@ -366,7 +349,6 @@ const EF_UK = {
   // WAS the residual row — its comment has said so since it was seeded — so both keys are the same
   // published figure converted the same way. They must move together or one of them is wrong;
   // engine.test.ts Z15 pins the identity so a lone edit fails.
-  fuel_oil_residual_gallon: { co2: 12.018380, ch4: 0, n2o: 0 },
   // ── PER-LITRE KEYS — DEFRA'S OWN PRINTED FIGURES, verbatim, no arithmetic at all.
   // "Processed fuel oils - distillate oil" 2.75541 and "- residual oil" 3.17492 kg CO2e/L, exactly as
   // the two comments above quote them. The gallon keys are these numbers x 3.785411784; these are the
@@ -383,7 +365,6 @@ const EF_UK = {
   // EF_EU — so this note stands as a second publisher agreeing, not as the evidence it was.
   // Petrol (average biofuel blend), litres: 2.075 kgCO2e/L (CO2 2.06107, CH4 0.00806, N2O 0.00587).
   gasoline_litre: { co2: 2.075, ch4: 0, n2o: 0 },
-  gasoline_gallon: { co2: 7.854729, ch4: 0, n2o: 0 },
   // ── DISTRICT HEAT AND STEAM — Scope 2, PER kWh ────────────────────────────────────────────────
   // DESNZ/DEFRA 2026 conversion factors, flat file v1.2 (updated 2026-07-10), Scope 2 sheet,
   // "Heat and steam" > "District heat and steam". Published columns, per kWh:
@@ -412,7 +393,7 @@ const EF_UK = {
 // carries the IPCC 2006 Vol.2 Tier-1 defaults (fossil, full oxidation) as EU law, CONVERTED HERE to
 // per-litre / per-m3 using fuel densities NEITHER SOURCE PUBLISHES. CH4/N2O are Ch.2 stationary
 // defaults. Gas split is stored (calcGas applies AR4/AR5/AR6).
-// Metric units are the EU norm: natural gas m3, liquids litres. gallon/mcf are non-breaking fallbacks.
+// Metric units are the EU norm: natural gas m3, liquids litres. FI2 diff 2: no gallon or Mcf keys; those convert exactly.
 //
 // ── SOURCE TRACE ─────────────────────────────────────────────────────────────────────────────────
 // CO2 AND NCV — FULLY SOURCED as of 14 Aug 2026. Commission Implementing Regulation (EU) 2018/2066
@@ -518,23 +499,17 @@ const EF_UK = {
 const EF_EU = {
   // Natural gas, per m3 (CO2 56100 kg/TJ × ~36 MJ/m3 net): 2.0196 kg CO2/m3.
   natural_gas_m3: { co2: 2.0196, ch4: 0.000036, n2o: 0.0000036 },
-  natural_gas_mcf: { co2: 57.188649, ch4: 0.001019406, n2o: 0.000101941 },
   // Propane/LPG (CO2 63100 kg/TJ, NCV 47.3, dens 0.510): 1.52216 kg CO2/L.
   propane_litre: { co2: 1.52216, ch4: 0.0000241, n2o: 0.0000024 },
-  propane_gallon: { co2: 5.762, ch4: 0.000091228, n2o: 0.000009085 },
   // Diesel/gas oil (CO2 74100 kg/TJ, NCV 43.0, dens 0.844): 2.68924 kg CO2/L.
   diesel_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  diesel_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
   diesel_mobile_litre: { co2: 2.68924, ch4: 0.0001089, n2o: 0.0000218 },
-  diesel_mobile_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
-  // Residual fuel oil (CO2 77400 kg/TJ, NCV 40.4, dens 0.990): 3.09569 kg CO2/L → per US-gallon fallback.
-  fuel_oil_gallon: { co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 },
+  // Residual fuel oil (CO2 77400 kg/TJ, NCV 40.4, dens 0.990): 3.09569 kg CO2/L. (FI2 diff 2: no per-gallon key.)
   // GRADE-EXPLICIT KEYS, derived by the method in this table's header (IPCC 2006 Vol.2: CO2 from
   // Ch.1 Table 1.4, CH4/N2O stationary defaults from Ch.2, converted via NCV and density).
   //
   // RESIDUAL reuses the derivation already recorded above, unchanged: CO2 77400 kg/TJ, NCV 40.4,
   // dens 0.990 -> 3.09569 kg CO2/L.
-  fuel_oil_residual_gallon: { co2: 11.718456, ch4: 0.000454249, n2o: 0.00009085 },
   // DISTILLATE uses the GAS/DIESEL OIL row: CO2 74100 kg/TJ, NCV 43.0, dens 0.844 -> 2.68924 kg CO2/L
   // — the same three inputs this table already records for diesel_litre, so the values below are
   // byte-identical to diesel_gallon.
@@ -545,7 +520,6 @@ const EF_EU = {
   // distillate heating oil to that row is the Guidelines' own categorisation, read off the table.
   // (DEFRA independently treats "Gas oil" and "Processed fuel oils - distillate oil" as the same
   // figure — see the note in EF_UK. That was corroboration; Table 1.1 is the confirmation.)
-  fuel_oil_distillate_gallon: { co2: 10.179876, ch4: 0.000412231, n2o: 0.000082522 },
   // ── PER-LITRE KEYS — THE DERIVATION'S OWN OUTPUT, one conversion step earlier than the gallon keys.
   // The header derives per LITRE (CO2/TJ x NCV x density) and the gallon keys convert that result; a
   // litre-entering EU location now prices from the derivation directly, so the row's displayed factor
@@ -561,7 +535,6 @@ const EF_EU = {
   fuel_oil_residual_litre: { co2: 3.09569, ch4: 0.00012, n2o: 0.000024 },
   // Motor gasoline (CO2 69300 kg/TJ, NCV 44.3, dens 0.745): 2.28714 kg CO2/L.
   gasoline_litre: { co2: 2.28714, ch4: 0.000099, n2o: 0.0000198 },
-  gasoline_gallon: { co2: 8.657763, ch4: 0.000374756, n2o: 0.000074951 },
 }
 
 // ── THE DERIVATION, ON THE ROW ───────────────────────────────────────────────────────────────────
@@ -630,7 +603,8 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
 // stores per-unit figures. Without this a verifier reads "54.367 kg/mmbtu" cited to NGA, a number NGA never
 // printed. The note goes on the workings row (and so the verifier page) and the PDF/XLSX methods tables.
 const AU_DERIVATION: Record<string, string> = {
-  natural_gas_mmbtu: `51.53 kg CO2e/GJ (DCCEEW NGA 2025 Table 4) × ${GJ_PER_MMBTU} GJ/MMBtu = 54.367 kg CO2e/MMBtu`,
+  // FI2 diff 2: no per-MMBtu entry. NGA's per-GJ figure is the table's own key now, and an MMBtu (or kWh, MJ, therm)
+  // figure converts to GJ exactly, with the conversion on the row; there is no derived factor left to explain.
   natural_gas_m3: '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³',
 }
 function auDerivationNote(loc: Location, key: string): string | undefined {
@@ -665,7 +639,9 @@ const EF_AU = {
   // T10a: the same NGA factor on an ENERGY basis, for bills that print energy (MJ or GJ) rather than volume.
   // NGA publishes it per GJ, so no energy content is assumed: 51.53 kgCO2e/GJ × 1.05505585262 GJ/MMBtu
   // = 54.3670 → 54.367 kg/MMBtu (MMBtu is the canonical energy unit lib/unitConversions converts GJ and MJ to).
-  natural_gas_mmbtu: { co2: 54.367, ch4: 0, n2o: 0 },
+  // FI2 diff 2: NGA's OWN figure, per GJ (Table 4, gross basis). Every other energy unit (kWh, MJ, MMBtu, therms)
+  // converts to it exactly; the derived per-MMBtu 54.367 that sat here is gone.
+  natural_gas_gj: { co2: 51.53, ch4: 0, n2o: 0 },
   // Diesel oil (NGA Table 4/Table 1): 38.6 GJ/kL × 70.2 kgCO2e/GJ ÷ 1000 = 2.70972 → 2.710 kg/L.
   diesel_litre: { co2: 2.710, ch4: 0, n2o: 0 },
   diesel_mobile_litre: { co2: 2.710, ch4: 0, n2o: 0 },
@@ -677,9 +653,7 @@ const EF_AU = {
   // same pre-computation every other key in this table uses. Stored per US GALLON (not per litre like
   // the keys above) because the engine's fuel-oil path converts to gallons before pricing.
   // Heating oil: 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L x 3.785411784 = 9.845587.
-  fuel_oil_distillate_gallon: { co2: 9.845587, ch4: 0, n2o: 0 },
   // Fuel oil:    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L x 3.785411784 = 11.096738.
-  fuel_oil_residual_gallon: { co2: 11.096738, ch4: 0, n2o: 0 },
   // ── PER-LITRE KEYS — the energy-content x EF/GJ product itself, before the gallon conversion.
   // DCCEEW publishes per kL and per GJ, never per litre or per gallon, so BOTH bases are derived
   // here; these are simply the earlier of the two steps and match the arithmetic quoted above:
@@ -689,8 +663,7 @@ const EF_AU = {
   // gallon keys were built from — rounding here would move the figure instead of re-basing it.
   fuel_oil_distillate_litre: { co2: 2.600929, ch4: 0, n2o: 0 },
   fuel_oil_residual_litre: { co2: 2.931448, ch4: 0, n2o: 0 },
-  // NOTE: AU has no legacy fuel_oil_gallon — it falls through to the US table today. That fallthrough
-  // is UNCHANGED by this commit; nothing reads the two keys above yet.
+  // FI2 diff 2: no gallon keys and no US fallthrough. A fuel-oil figure in US gallons converts to litres exactly.
 }
 
 // New Zealand combustion factors — MfE "Measuring Emissions" 2026 (v2). Published per-unit directly, so
@@ -723,9 +696,7 @@ const EF_NZ = {
     // MfE Measuring Emissions Catalogue 2026 Table 3.2, per-gas columns already AR5-multiplied, so the
     // combined kgCO2e/L goes in `co2` like every other NZ key. Per US GALLON: the fuel-oil path
     // converts before pricing. Light 2.97088 x 3.785411784 = 11.246004; Heavy 3.05359 -> 11.559096.
-    fuel_oil_distillate_gallon: { co2: 11.246004, ch4: 0, n2o: 0 },
-    fuel_oil_residual_gallon: { co2: 11.559096, ch4: 0, n2o: 0 },
-    // PER-LITRE — MfE's own printed kg CO2-e/L, the figures the two gallon keys above were built from.
+    // PER-LITRE, MfE's own printed kg CO2-e/L. (FI2 diff 2: the per-gallon keys built from these are gone.)
     fuel_oil_distillate_litre: { co2: 2.97088, ch4: 0, n2o: 0 },
     fuel_oil_residual_litre: { co2: 3.05359, ch4: 0, n2o: 0 },
   },
@@ -736,8 +707,6 @@ const EF_NZ = {
     propane_kg: { co2: 2.96632, ch4: 0, n2o: 0 },
     gasoline_litre: { co2: 2.36143, ch4: 0, n2o: 0 },    // no Industrial petrol → Regular transport fallback
     // MfE 2026 Table 3.2, Industrial. Light 2.96335 x 3.785411784 = 11.217500; Heavy 3.04601 -> 11.530402.
-    fuel_oil_distillate_gallon: { co2: 11.217500, ch4: 0, n2o: 0 },
-    fuel_oil_residual_gallon: { co2: 11.530402, ch4: 0, n2o: 0 },
     // PER-LITRE — MfE 2026 Table 3.2 Industrial, printed values.
     fuel_oil_distillate_litre: { co2: 2.96335, ch4: 0, n2o: 0 },
     fuel_oil_residual_litre: { co2: 3.04601, ch4: 0, n2o: 0 },
@@ -1687,7 +1656,7 @@ interface SourceDoc {
 
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
-  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh'
+  has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh' | 'ccf'   // ccf: stored only; the wizard does not offer it yet (FI5)
   has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   // TWO GRADES, TWO FIELD TRIPLES — and `_amount`, NOT the retired `_gallons` misnomer.
@@ -1697,7 +1666,7 @@ interface Location {
   // inheriting a bad name would be indefensible. `_amount` is what every other multi-unit fuel here
   // uses (natural_gas_amount, propane_amount, diesel_stationary_amount), so fuel oil is now the same
   // shape as its neighbours instead of the exception that needed a comment to be read correctly.
-  // Read via fuelOilPricing(loc, grade, amount), which picks the basis the publisher printed.
+  // Priced through pickEF, which converts the unit entered to the unit the publisher printed (FI2).
   has_fuel_oil_distillate: boolean; fuel_oil_distillate_amount: number; fuel_oil_distillate_unit?: 'gallons' | 'litres'
   has_fuel_oil_residual: boolean; fuel_oil_residual_amount: number; fuel_oil_residual_unit?: 'gallons' | 'litres'
   has_mobile: boolean; gasoline_amount: number; gasoline_unit: 'gallons' | 'litres'; diesel_mobile_amount: number; diesel_mobile_unit: 'gallons' | 'litres'
@@ -2295,11 +2264,8 @@ function validateCompleteness(loc: Location): string[] {
 // Take (amount, unit) rather than the Location so the WORKINGS can convert the
 // resolution-applied figure rather than the raw stored one — otherwise a coverage-estimated
 // litres figure would be scaled and then converted from the wrong base.
-export function fuelOilToGallons(amount: number, unit?: 'gallons' | 'litres'): { gallons: number; note?: string } {
-  if ((unit ?? 'gallons') === 'gallons') return { gallons: amount }
-  const gallons = amount / L_PER_GAL
-  return { gallons, note: `${amount} litres ÷ ${L_PER_GAL} = ${gallons.toFixed(4)} US gallons (exact, NIST) — the published factor is per gallon` }
-}
+// FI2 diff 2: fuelOilToGallons is gone. A fuel-oil figure in litres priced on a per-gallon table (EPA) is converted by
+// pickEF's exact router, and the row's conversion_note states the step.
 
 // ── STEAM: CONVERT TO THE BASIS THIS JURISDICTION'S FACTOR IS PUBLISHED IN ──────────────────────
 // The unit a customer enters and the unit a factor is published in are two different facts, and
@@ -2333,50 +2299,15 @@ export function steamToBasis(amount: number, unit: SteamUnit | undefined, basis:
     : `${amount} MMBtu × ${GJ_PER_MMBTU} × ${KWH_PER_GJ} = ${out.toFixed(4)} kWh (exact: International Table Btu, 1 kWh ≡ 3.6 MJ) — the published factor is per kWh` }
 }
 
-// Grade-parameterised. fuelOilToGallons itself is unchanged — it takes (amount, unit) rather than a
-// Location precisely so the workings can convert the resolution-applied figure; this wrapper is only
-// the raw-value convenience calcLocation and calcInventory use.
-type FuelOilGrade = 'distillate' | 'residual'
-// ── WHICH BASIS PRICES A FUEL-OIL FIGURE ─────────────────────────────────────────────────────────
-//
-// ONE DECISION, THREE CONSUMERS — calcLocation, fuelEmissionsByType and buildWorkings — so the total,
-// the per-fuel breakdown and the workings row cannot disagree about what priced the same litres.
-// Same shape and same reasoning as steamPricing.
-//
-// WHY IT EXISTS. Fuel oil was stored per US GALLON in every table and every location converted onto
-// that basis. Only EPA publishes per gallon; ECCC (g/L), DEFRA (kg/L), DCCEEW (per kL) and MfE (kg/L)
-// all publish per litre, so five of six jurisdictions carried a conversion WE imposed, and their
-// displayed factor was a rescale of a rescale rather than the publisher's own printed number. A
-// French site showed 2.698435355 kg CO₂e/L for heating oil beside 2.69843662 for diesel — the same
-// gas/diesel oil derivation, differing in the ninth decimal purely from the round trip.
-//
-// ⚠️ THE PROBE IS STRUCTURAL, NOT A JURISDICTION LIST. It asks pickEF for the litre key and uses it
-// if the answer is a complete factor. pickEF falls back to EF, and EF carries NO fuel-oil litre key,
-// so a hit is only ever possible when the location's OWN table publishes per litre. A hand-kept list
-// of "metric jurisdictions" here would be a second copy of the seeding, and would silently misroute
-// the day a table gains or loses a key — the drift factorEditions.ts already documents.
-//
-// US-IN-LITRES DELIBERATELY STILL CONVERTS, and that is correct rather than an omission: EPA's basis
-// genuinely IS the gallon, so the conversion is a real convert-then-apply step and the note says so.
-// No US per-litre fuel-oil factor is invented to avoid it.
-function fuelOilPricing(loc: Location, grade: FuelOilGrade, amount: number): { key: string; priced: number; note?: string } {
-  const unit = grade === 'distillate' ? loc.fuel_oil_distillate_unit : loc.fuel_oil_residual_unit
-  const litreKey = `fuel_oil_${grade}_litre`
-  if ((unit ?? 'gallons') === 'litres' && isPriceableEF(pickEF(loc, litreKey as keyof typeof EF).factor)) {
-    // Priced where the publisher priced it: no conversion, so no conversion note either.
-    return { key: litreKey, priced: amount }
-  }
-  const fo = fuelOilToGallons(amount, unit)
-  return { key: `fuel_oil_${grade}_gallon`, priced: fo.gallons, note: fo.note }
+// FI2 diff 2: fuelOilPricing, the chooser between a fuel-oil grade's litre and gallon keys, is gone. Every table now
+// holds each grade in the unit its publisher prints (per litre for ECCC, DEFRA, DCCEEW and MfE; per US gallon for EPA),
+// and pickEF converts the unit entered to it exactly, with the conversion on the row.
+/** FI2 (ruling R5): a stored unit as a factor-key unit token. Unrecognised units pass through, so the lookup misses. */
+function unitToken(unit: string): string {
+  return unit === 'gallons' ? 'gallon' : unit === 'litres' ? 'litre' : unit === 'lbs' ? 'lb' : unit
 }
-
-// REMOVED 14 Aug 2026: fuelOilInGallons(loc, grade). It was the raw-value convenience calcLocation and
-// fuelEmissionsByType used, and both now go through fuelOilPricing, which decides the BASIS as well as
-// the amount. Keeping it would have left a helper that always converts to gallons sitting beside a
-// chooser that usually does not — the next caller to reach for it would silently re-impose the round
-// trip this change removed. fuelOilToGallons (the (amount, unit) form) is still used, inside the chooser.
-function propaneEfKey(unit: string): 'propane_gallon' | 'propane_litre' | 'propane_kg' {
-  return unit === 'gallons' ? 'propane_gallon' : unit === 'kg' ? 'propane_kg' : 'propane_litre'
+function propaneEfKey(unit: string): string {
+  return `propane_${unitToken(unit)}`
 }
 // A complete published factor: the three gases calcGas needs to price an activity figure.
 type CombustionEF = { co2: number; ch4: number; n2o: number }
@@ -2576,58 +2507,99 @@ function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asser
 }
 
 /**
- * FI2: what pickEF returns. `factor` is the value (or the uniform miss); `publisher` is the table that supplied it,
- * null on a miss; `conversion` is the exact conversion applied to reach it, which arrives with FI2's routing by
- * quantity type (diff 2) and is absent until then.
+ * FI2: what pickEF returns. `factor` is per unit of the key ASKED FOR (or the uniform miss); `publisher` is the table
+ * that supplied it, null on a miss; `key` is the key that table holds and was read; `conversion` is the exact
+ * conversion from the unit asked for to that key's unit, when one was applied.
  */
 export interface PickedFactor {
   factor: CombustionEF
   publisher: FactorSource | null
-  conversion?: { from: string; to: string; statement: string }
-}
-
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial']): PickedFactor {
-  const ctry = canonicalCountryCode(loc.country)
-  // Switches on the shared router rather than re-branching on country.
-  // ⚠️ STEAM DOES NOT COME THROUGH HERE, because of the US fallback below. See STEAM_EF.
-  const j = efJurisdiction(loc)
-  // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS, NOT A US LOOKUP. efMiss is the same uniform marker a missing table row
-  // produces, so calcGas's assertPriceable refuses it, and the country refusal excludes the location.
-  if (j === null) return { factor: efMiss(String(key), loc.country || ''), publisher: null }
-  if (j === 'CA') {
-    // ⚠️ CANADIAN GAS, ANY UNIT, NEEDS THE PROVINCE (FI1). ECCC publishes natural gas CO2 by province; with no
-    // province there is no factor to apply, so the line is a miss with cause 'province', never the Ontario
-    // value it used to fall back to. m3 and mcf are assembled from the province's CO2 and the sector CH4 and N2O.
-    if (String(key).startsWith('natural_gas_')) {
-      const prov = caGasProvince(loc)
-      if (prov === null) return { factor: efMiss(String(key), ctry, 'province'), publisher: null }
-      if (key === 'natural_gas_mcf' || key === 'natural_gas_m3') {
-        const co2M3 = EF_CA_NG_CO2_M3[prov]
-        return { factor: { co2: key === 'natural_gas_mcf' ? co2M3 * M3_PER_MCF : co2M3, ...EF_CA_NG_CH4_N2O[key] }, publisher: COMBUSTION_TABLE_SOURCE.CA }
-      }
-    }
-  }
-  const own: Record<string, unknown> | undefined =
-    j === 'US' ? EF : j === 'CA' ? EF_CA : j === 'UK' ? EF_UK : j === 'EU' ? EF_EU : j === 'AU' ? EF_AU
-      : (EF_NZ as any)[loc.nz_use_class ?? 'commercial']   // NZ is use-class keyed: commercial default, or industrial
-  return tableLookup(own?.[String(key)], String(key), j, ctry)
+  key?: string
+  conversion?: { from: string; to: string; toPerFrom: number; statement: string }
 }
 
 /**
- * ONE lookup, shared by every branch of pickEF: the location's own table, else the US table, else the uniform miss.
- * A scalar entry (EF.ammonia, never priced: no GWP) is not a factor and is a miss, not a reason to look elsewhere.
- *   ⚠️ THE US FALLBACK IS STILL HERE, AND ITS VALUE IS NOW CITED AS WHAT IT IS (FI2 diff 1). A key the location's own
- * table lacks is taken from the US EPA table, and the row says US EPA, with US EPA's edition. Removing the fallback,
- * so that such a line is unpriced instead, is FI2's second diff.
+ * FI2 rulings: the calorific basis each table's gas factor per unit of energy is on, as its publisher states it. A gas
+ * quantity in an energy unit is converted to another energy unit (exactly) only where the table states its basis.
+ *   US EPA: higher heating value (EPA's factors per MMBtu are HHV). DEFRA: gross CV (EF_UK natural_gas_kwh is the
+ *   gross-CV row). DCCEEW NGA: gross (51.53 kg CO2e/GJ is on gross energy content). MfE: gross, by ruling R4 (7 Oct
+ *   2026), citing the Measuring Emissions Guide, Appendix A (A.1): "we have used gross calorific values".
+ *   ECCC and the EU table: no energy-basis gas factor is held, so no energy unit prices for gas there.
  */
-function tableLookup(own: unknown, key: string, j: EfJurisdiction, ctry: string): PickedFactor {
-  if (own !== undefined && own !== null) {
-    return typeof own === 'object' ? { factor: { ...(own as CombustionEF) }, publisher: COMBUSTION_TABLE_SOURCE[j] } : { factor: efMiss(key, ctry), publisher: null }
+const GAS_CALORIFIC_BASIS: Partial<Record<EfJurisdiction, 'gross'>> = { US: 'gross', UK: 'gross', AU: 'gross', NZ: 'gross' }
+/** R4: the note on every NZ natural gas row, saying which calorific basis the MfE per-kWh factor is on. */
+export const NZ_GAS_BASIS_NOTE =
+  'MfE natural gas factor per kWh, on a gross calorific value basis: Measuring Emissions Guide, Appendix A (A.1), "we have used gross calorific values".'
+
+/** "natural_gas_m3" to ["natural_gas", "m3"]: the unit is the segment after the LAST underscore. */
+const splitKey = (key: string): [string, string] => {
+  const i = key.lastIndexOf('_')
+  return i < 0 ? [key, ''] : [key.slice(0, i), key.slice(i + 1)]
+}
+
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial'] | string): PickedFactor {
+  const ctry = canonicalCountryCode(loc.country)
+  // ⚠️ STEAM DOES NOT COME THROUGH HERE. See STEAM_EF.
+  const j = efJurisdiction(loc)
+  // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS. efMiss is the uniform marker a missing factor produces, so calcGas's
+  // assertPriceable refuses it, and the country refusal excludes the location.
+  if (j === null) return { factor: efMiss(String(key), loc.country || ''), publisher: null }
+  let own: Record<string, unknown> =
+    j === 'US' ? EF : j === 'CA' ? EF_CA : j === 'UK' ? EF_UK : j === 'EU' ? EF_EU : j === 'AU' ? EF_AU
+      : (EF_NZ as Record<string, Record<string, unknown>>)[loc.nz_use_class ?? 'commercial']   // NZ is use-class keyed
+  if (j === 'CA' && String(key).startsWith('natural_gas_')) {
+    // ⚠️ CANADIAN GAS, ANY UNIT, NEEDS THE PROVINCE (FI1). ECCC publishes natural gas CO2 by province, per m³; with no
+    // province there is no factor, so the line is a miss with cause 'province'. With one, the province's CO2 and the
+    // sector CH4 and N2O make the table's per-m³ factor, and every other gas volume converts to it exactly.
+    const prov = caGasProvince(loc)
+    if (prov === null) return { factor: efMiss(String(key), ctry, 'province'), publisher: null }
+    own = { ...own, natural_gas_m3: { co2: EF_CA_NG_CO2_M3[prov], ...EF_CA_NG_CH4_N2O_M3 } }
   }
-  const us = j === 'US' ? undefined : (EF as Record<string, unknown>)[key]
-  return us && typeof us === 'object'
-    ? { factor: { ...(us as CombustionEF) }, publisher: COMBUSTION_TABLE_SOURCE.US }
-    : { factor: efMiss(key, ctry), publisher: null }
+  return routeFactor(own, String(key), j, ctry)
+}
+
+/**
+ * FI2: THE ONE LOOKUP, AND THERE IS NO FALLBACK. A key resolves in the location's own table only:
+ *   1. the key itself, in the unit its publisher prints; else
+ *   2. an EXACT conversion (lib/unitConversions.ts) from the unit asked for to a unit that table holds for the same
+ *      fuel and the same quantity: liquid volume, gas volume, energy or mass. A gas in an energy unit converts only
+ *      where the table states its calorific basis (GAS_CALORIFIC_BASIS); else
+ *   3. the uniform miss, which FI1 turns into an unpriced line with an export-blocking issue.
+ * Another country's table is never read. A density or energy content is never a conversion here: a table that prices a
+ * fuel through one carries the derived key itself, with its derivation note. An unrecognised unit misses, never prices
+ * as litres. A scalar entry (EF.ammonia, never priced: no GWP) is a miss.
+ */
+function routeFactor(own: Record<string, unknown>, key: string, j: EfJurisdiction, ctry: string): PickedFactor {
+  const isFactor = (v: unknown): v is CombustionEF => !!v && typeof v === 'object'
+  const direct = own[key]
+  if (direct !== undefined && direct !== null) {
+    return isFactor(direct) ? { factor: { ...direct }, publisher: COMBUSTION_TABLE_SOURCE[j], key } : { factor: efMiss(key, ctry), publisher: null }
+  }
+  const [fuel, unit] = splitKey(key)
+  const wanted = EXACT_UNITS[unit]
+  if (!wanted) return { factor: efMiss(key, ctry), publisher: null }
+  if (fuel === 'natural_gas' && wanted.kind === 'energy' && !GAS_CALORIFIC_BASIS[j]) return { factor: efMiss(key, ctry), publisher: null }
+  for (const [heldKey, held] of Object.entries(own)) {
+    const [heldFuel, heldUnit] = splitKey(heldKey)
+    if (heldFuel !== fuel || !isFactor(held)) continue
+    const c = exactConversion(unit, heldUnit)
+    if (!c) continue
+    const k = c.toPerFrom   // held units in one unit asked for
+    return {
+      factor: { co2: held.co2 * k, ch4: held.ch4 * k, n2o: held.n2o * k },
+      publisher: COMBUSTION_TABLE_SOURCE[j], key: heldKey,
+      conversion: { from: unit, to: heldUnit, toPerFrom: k, statement: c.statement },
+    }
+  }
+  return { factor: efMiss(key, ctry), publisher: null }
+}
+
+/** FI2: "1,000 US gallons converted to 3,785.41 litres (1 US gallon = 3.785411784 litres, exact)." */
+export function conversionNote(amount: number, c: NonNullable<PickedFactor['conversion']>): string {
+  const n = (x: number) => x.toLocaleString('en-US', { maximumFractionDigits: Math.abs(x) < 10 ? 4 : 2 })
+  const words = (u: string, x: number) => (x === 1 ? EXACT_UNITS[u].one : EXACT_UNITS[u].many)
+  const converted = amount * c.toPerFrom
+  return `${n(amount)} ${words(c.from, amount)} converted to ${n(converted)} ${words(c.to, converted)} (${c.statement}, exact).`
 }
 
 // Source citation for an ELECTRICITY row, country-aware — the same shape as combustionSource below.
@@ -2783,28 +2755,25 @@ interface CombustionLine {
   enteredUnit: string
   unitField: keyof Location
   efKey: string
-  priced: number          // `entered` converted to the unit the factor is per (fuel oil only differs)
-  note?: string           // the conversion note, when `priced` differs from `entered`
 }
 function combustionLines(loc: Location): CombustionLine[] {
   const out: CombustionLine[] = []
-  const add = (l: Omit<CombustionLine, 'priced'> & { priced?: number }) => out.push({ ...l, priced: l.priced ?? l.entered })
-  const lit = (u: string) => (u === 'gallons' ? 'gallon' : 'litre')
+  const add = (l: CombustionLine) => out.push(l)
+  // FI2 (ruling R5): the stored unit names the key's unit token. An unrecognised unit passes through as itself, so the
+  // lookup misses and the line is unpriced (FI1), instead of being priced as litres as it used to be.
+  const lit = unitToken
   if (loc.has_natural_gas && loc.natural_gas_amount > 0)
     add({ field: 'natural_gas_amount', stream: 'natural_gas', source: 'Natural gas', mobile: false, entered: loc.natural_gas_amount, enteredUnit: loc.natural_gas_unit, unitField: 'natural_gas_unit', efKey: `natural_gas_${loc.natural_gas_unit}` })
   if (loc.has_propane && loc.propane_amount > 0)
     add({ field: 'propane_amount', stream: 'propane', source: 'Propane', mobile: false, entered: loc.propane_amount, enteredUnit: loc.propane_unit, unitField: 'propane_unit', efKey: propaneEfKey(loc.propane_unit) })
   if (loc.has_diesel_stationary && loc.diesel_stationary_amount > 0)
     add({ field: 'diesel_stationary_amount', stream: 'diesel_stationary', source: 'Diesel (stationary)', mobile: false, entered: loc.diesel_stationary_amount, enteredUnit: loc.diesel_stationary_unit, unitField: 'diesel_stationary_unit', efKey: `diesel_${lit(loc.diesel_stationary_unit)}` })
-  // TWO GRADES, PRICED SEPARATELY, each converted to the unit its factor is per (fuelOilPricing).
-  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0) {
-    const fo = fuelOilPricing(loc, 'distillate', loc.fuel_oil_distillate_amount)
-    add({ field: 'fuel_oil_distillate_amount', stream: 'fuel_oil_distillate', source: 'Heating oil', mobile: false, entered: loc.fuel_oil_distillate_amount, enteredUnit: loc.fuel_oil_distillate_unit ?? 'gallons', unitField: 'fuel_oil_distillate_unit', efKey: fo.key, priced: fo.priced, note: fo.note })
-  }
-  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0) {
-    const fo = fuelOilPricing(loc, 'residual', loc.fuel_oil_residual_amount)
-    add({ field: 'fuel_oil_residual_amount', stream: 'fuel_oil_residual', source: 'Heavy fuel oil', mobile: false, entered: loc.fuel_oil_residual_amount, enteredUnit: loc.fuel_oil_residual_unit ?? 'gallons', unitField: 'fuel_oil_residual_unit', efKey: fo.key, priced: fo.priced, note: fo.note })
-  }
+  // TWO GRADES, PRICED SEPARATELY. FI2 diff 2: the key is the grade in the unit entered; pickEF converts exactly to the
+  // unit the publisher prints (fuelOilPricing, which made that choice here, is gone).
+  if (loc.has_fuel_oil_distillate && loc.fuel_oil_distillate_amount > 0)
+    add({ field: 'fuel_oil_distillate_amount', stream: 'fuel_oil_distillate', source: 'Heating oil', mobile: false, entered: loc.fuel_oil_distillate_amount, enteredUnit: loc.fuel_oil_distillate_unit ?? 'gallons', unitField: 'fuel_oil_distillate_unit', efKey: `fuel_oil_distillate_${lit(loc.fuel_oil_distillate_unit ?? 'gallons')}` })
+  if (loc.has_fuel_oil_residual && loc.fuel_oil_residual_amount > 0)
+    add({ field: 'fuel_oil_residual_amount', stream: 'fuel_oil_residual', source: 'Heavy fuel oil', mobile: false, entered: loc.fuel_oil_residual_amount, enteredUnit: loc.fuel_oil_residual_unit ?? 'gallons', unitField: 'fuel_oil_residual_unit', efKey: `fuel_oil_residual_${lit(loc.fuel_oil_residual_unit ?? 'gallons')}` })
   if (loc.has_mobile && loc.gasoline_amount > 0)
     add({ field: 'gasoline_amount', stream: 'mobile', source: 'Gasoline (mobile)', mobile: true, entered: loc.gasoline_amount, enteredUnit: loc.gasoline_unit, unitField: 'gasoline_unit', efKey: `gasoline_${lit(loc.gasoline_unit)}` })
   if (loc.has_mobile && loc.diesel_mobile_amount > 0)
@@ -2936,7 +2905,7 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   for (const line of combustionLines(loc)) {
     const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
     if (!isPriceableEF(ef)) continue
-    const g = calcGas(ef, line.priced, gwpVersion)
+    const g = calcGas(ef, line.entered, gwpVersion)   // the factor is per unit entered (pickEF converts exactly)
     if (line.mobile) s1_mobile += g.total; else s1_stationary += g.total
     gases.co2 += g.co2; gases.ch4 += g.ch4; gases.n2o += g.n2o
   }
@@ -3079,7 +3048,7 @@ function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number
   // reconciles with the inventory total.
   for (const line of combustionLines(loc)) {
     const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
-    if (isPriceableEF(ef)) add(String(line.field), calcGas(ef, line.priced, gwpVersion).total)
+    if (isPriceableEF(ef)) add(String(line.field), calcGas(ef, line.entered, gwpVersion).total)
   }
   // Electricity = Scope 2 location-based (the series' headline basis). Same grid gate as calcLocation:
   // an unresolved grid_region contributes 0 there, so it must contribute 0 here too.
@@ -4142,21 +4111,24 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // amount, so no figure moves — this is presentation, and the note carries the conversion.
   //   Section M asserts that reconciliation, but note that its fixtures never exercised a converted
   // row (M1 CA gas, M2 steam already in mmbtu, M3 EU gas), which is why the old shape survived.
-  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, entered: number, enteredUnit: string, efKey: string, prov?: Provenance, convNote?: string, pricedIn?: number) => {
+  const pushFuel = (loc: Location, stream: DeclarableStream, source: string, scope: number, entered: number, enteredUnit: string, efKey: string, prov?: Provenance) => {
     // FI2: the value AND the table that supplied it. The row cites that table, never the location's country.
+    // `picked.factor` is per unit ENTERED: where the table prints another unit of the same quantity, pickEF has already
+    // converted exactly, so the displayed factor × the entered activity is the result, and the note states the step.
     const picked = pickEF(loc, efKey as keyof typeof EF)
     const ef = picked.factor
-    const priced = pricedIn ?? entered
-    const g = calcGas(ef, priced, gwpVersion)
-    // ratio 1 when no conversion happened, which is every row outside fuel oil — those keep the
-    // published factor object untouched rather than passing it through a multiply by 1.
-    const ratio = entered === 0 ? 1 : priced / entered
-    const efShown = ratio === 1 ? ef : { co2: ef.co2 * ratio, ch4: ef.ch4 * ratio, n2o: ef.n2o * ratio }
-    // Two notes can both apply — a fuel-oil row in an EU country converts litres→gallons AND is
-    // priced by a density-derived factor. Joined rather than one overwriting the other.
-    // The EU and AU derivation notes describe values in THOSE tables, so they apply only to a value one supplied.
+    const g = calcGas(ef, entered, gwpVersion)
+    const efShown = ef
+    // Notes, joined: the exact conversion (FI2), the derivation of a derived table value (EU, AU), and the calorific
+    // basis of a NZ gas factor (ruling R4). Each derivation note describes a value in THAT table, read under the key the
+    // table holds, so it applies only to a value that table supplied.
     const fromTable = picked.publisher?.jurisdiction
-    const note = [convNote, fromTable === 'EU' ? euDerivationNote(loc, efKey) : '', fromTable === 'AU' ? auDerivationNote(loc, efKey) : ''].filter(Boolean).join(' · ')
+    const heldKey = picked.key ?? efKey
+    const conversion_note = picked.conversion ? conversionNote(entered, picked.conversion) : undefined
+    const note = [conversion_note,
+      fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
+      fromTable === 'AU' ? auDerivationNote(loc, heldKey) : '',
+      fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
     // table has no year dimension: EF_UK is DEFRA 2026 whichever year is being reported, so the vintage
@@ -4176,8 +4148,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // FI2: cited from the table that supplied the value. Where the US fallback supplied it (removed in FI2's second
       // diff), the row now says US EPA rather than the location's own publisher.
       ef_source: picked.publisher?.publisher ?? combustionSource(loc),
-      // FI2: the key the value was read under, in the table ef_source names, so a verifier can find the figure.
-      factor_key: efKey,
+      // FI2: the key the value was read under, in the table ef_source names, so a verifier can find the figure; and,
+      // where the unit entered differs, the exact conversion to it (conversion_factor = held units per unit entered).
+      factor_key: heldKey,
+      ...(picked.conversion ? { conversion_note, conversion_factor: picked.conversion.toPerFrom } : {}),
       ...(picked.publisher?.edition ? { factor_vintage: picked.publisher.edition } : vintageOf(COMBUSTION_EDITION, loc)),
       result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
   }
@@ -4263,7 +4237,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // message, and its stream tag, so the declaration loop below does not also call the stream unanswered.
     // The entered figure is the derived one (T5): figure() and line.entered read the same derived location.
     // Fuel oil reports the figure AS ENTERED with its own unit, and the conversion to the factor's unit as
-    // the note, so all three steps are on one row (fuelOilPricing decides the basis).
+    // the note, so all three steps are on one row (pickEF converts to the publisher's unit, FI2).
     const unpriced = new Map(unpricedLines(loc, gwpVersion).map(u => [String(u.field), u]))
     const pushUnpriced = (u: UnpricedLine, prov?: Provenance) => rows.push({ location: loc.name || 'Location', stream: u.stream,
       source: u.source, scope: 1, activity_data: u.amount, activity_unit: u.unit, emission_factor: NOT_PROVIDED,
@@ -4274,7 +4248,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     for (const line of combustionLines(loc)) {
       const u = unpriced.get(String(line.field))
       if (u) { pushUnpriced(u, provOf(line.field)); continue }
-      pushFuel(loc, line.stream, line.source, 1, figure(line.field), line.enteredUnit, line.efKey, provOf(line.field), line.note, line.priced)
+      pushFuel(loc, line.stream, line.source, 1, figure(line.field), line.enteredUnit, line.efKey, provOf(line.field))
     }
     if (hasRefrigerantLine(loc)) {
       const ref_gwp = refrigerantGwp(loc.refrigerant_type, gwpVersion)
