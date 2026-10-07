@@ -27,7 +27,8 @@ export type FuelType = 'electricity' | 'natural_gas' | 'propane' | 'diesel' | 'g
 export const SELECTOR_UNITS: Record<FuelType, readonly string[]> = {
   electricity: ['kwh'],                              // fixed, no selector
   natural_gas: ['mcf', 'therms', 'mmbtu', 'm3', 'kwh'],
-  propane: ['gallons', 'litres'],
+  // FI4: kg as well. A propane bill by weight is stored as kg (lb and tonnes convert to it exactly), never as a volume.
+  propane: ['gallons', 'litres', 'kg'],
   diesel: ['gallons', 'litres'],
   gasoline: ['gallons', 'litres'],
 };
@@ -68,7 +69,6 @@ export const EXACT_CONVERSIONS = {
 
 // The names the rest of the code already uses, DERIVED from the table rather than retyped.
 export const L_PER_GAL = EXACT_CONVERSIONS.L_PER_US_GALLON
-const LB_PER_KG = 1 / EXACT_CONVERSIONS.KG_PER_LB
 // Was labelled "(IEA)": the value is the International Table Btu, an exact definition (NIST SP 811), not an IEA figure.
 export const GJ_PER_MMBTU = EXACT_CONVERSIONS.GJ_PER_MMBTU
 // 3.6, written as the definition. Computing it as GJ_PER_KWH / GJ_PER_MJ gives 3.5999999999999996 in floating point,
@@ -119,11 +119,10 @@ export function exactConversion(from: string, to: string): { toPerFrom: number; 
   return { toPerFrom: a.inBase / b.inBase, statement }
 }
 
-// PROPANE density anchor — VERIFY PROVENANCE before this goes near a real
-// inventory. Nominal liquid propane ≈ 4.24 lb/US-gal at 60°F (EIA / NPGA).
-// It is temperature-dependent; for assurance, confirm this matches the source
-// your combustion/emission factors assume, and cite it.
-const PROPANE_LB_PER_GAL = 4.24;
+// FI4 (ruling R13, 7 Oct 2026): NO PROPANE DENSITY. The nominal lb-per-gallon figure that stood here was attributed to
+// "EIA / NPGA" and never verified, and NPGA is a trade association. Propane by mass is priced only on a publisher's own
+// per-mass factor (lib/ghg/engine.ts); a mass is never converted to a volume, nor a volume to a mass. A density returns
+// only if an official source stating it is cited (docs/review/eu-fuel-properties.md, section B).
 
 // ---------------------------------------------------------------------------
 // Conservative unit normalization. We map only spelling/casing variants of
@@ -148,6 +147,7 @@ const UNIT_ALIASES: Record<string, string> = {
   // mass (propane only)
   lb: 'lbs', lbs: 'lbs', pound: 'lbs', pounds: 'lbs',
   kg: 'kg', kgs: 'kg', kilogram: 'kg', kilograms: 'kg',
+  tonne: 'tonnes', tonnes: 'tonnes', 'metric ton': 'tonnes', 'metric tons': 'tonnes',
 };
 
 export function normalizeUnit(raw: string | null | undefined): string | null {
@@ -212,17 +212,22 @@ const TIER2: Record<string, Tier2Fn> = {
     return { value, unit: 'kwh', conversionNote: `${fmt(v)} GJ × ${round(kwhPerGj, 4)} = ${fmt(value)} kWh` };
   },
 
-  // Propane — delivery records often by weight (spec §4: main real conversion case)
-  'propane:lbs': (v) => {
-    const value = round(v / PROPANE_LB_PER_GAL);
-    return { value, unit: 'gallons', conversionNote: `${fmt(v)} lb ÷ ${PROPANE_LB_PER_GAL} lb/gal = ${fmt(value)} gal (propane @60°F)` };
-  },
-  'propane:kg': (v) => {
-    const litresPerKg = (LB_PER_KG / PROPANE_LB_PER_GAL) * L_PER_GAL;
-    const value = round(v * litresPerKg);
-    return { value, unit: 'litres', conversionNote: `${fmt(v)} kg × ${round(litresPerKg, 4)} = ${fmt(value)} L (propane @60°F)` };
-  },
 };
+
+// FI4: a MASS unit that converts EXACTLY to one of the fuel's selector units (EXACT_UNITS) takes that path: lb and tonnes
+// to kg for propane. No property of the fuel is involved, so there is no fuel-specific rule, and a mass never becomes a
+// volume (or the reverse) here. Limited to mass so other fuels' bill reading is unchanged.
+const EXACT_TOKEN: Record<string, string> = { gallons: 'gallon', litres: 'litre', lbs: 'lb', tonnes: 'tonne' }
+const tokenOf = (u: string) => EXACT_TOKEN[u] ?? u
+function exactToSelector(fuelType: FuelType, unit: string): { to: string; toPerFrom: number; statement: string } | null {
+  if (EXACT_UNITS[tokenOf(unit)]?.kind !== 'mass') return null
+  for (const sel of SELECTOR_UNITS[fuelType]) {
+    const c = exactConversion(tokenOf(unit), tokenOf(sel))
+    if (c) return { to: sel, ...c }
+  }
+  return null
+}
+const unitWord = (u: string, n: number) => { const e = EXACT_UNITS[tokenOf(u)]; return e ? (n === 1 ? e.one : e.many) : u }
 
 // ---------------------------------------------------------------------------
 // Main entry point.
@@ -234,7 +239,9 @@ const TIER2: Record<string, Tier2Fn> = {
  */
 export function convertibleUnits(fuelType: FuelType): string[] {
   const tier2 = Object.keys(TIER2).filter(k => k.startsWith(`${fuelType}:`)).map(k => k.slice(fuelType.length + 1))
-  return [...SELECTOR_UNITS[fuelType], ...tier2.filter(u => !SELECTOR_UNITS[fuelType].includes(u))]
+  // FI4: and every unit an exact conversion takes to a selector unit (lb and tonnes for propane).
+  const exact = [...new Set(Object.values(UNIT_ALIASES))].filter(u => !SELECTOR_UNITS[fuelType].includes(u) && exactToSelector(fuelType, u))
+  return [...new Set([...SELECTOR_UNITS[fuelType], ...tier2, ...exact])]
 }
 
 export function convertToCanonical(
@@ -264,6 +271,13 @@ export function convertToCanonical(
   if (conv) {
     const { value, unit: toUnit, conversionNote } = conv(rawValue);
     return { tier: 2, value, unit: toUnit, conversionNote };
+  }
+
+  // Tier 2 (FI4): an exact conversion to a selector unit of the same quantity
+  const ex = exactToSelector(fuelType, unit);
+  if (ex) {
+    const value = round(rawValue * ex.toPerFrom);
+    return { tier: 2, value, unit: ex.to, conversionNote: `${fmt(rawValue)} ${unitWord(unit, rawValue)} converted to ${fmt(value)} ${unitWord(ex.to, value)} (${ex.statement}, exact)` };
   }
 
   // Tier 3 — known unit, but no confident path for this fuel

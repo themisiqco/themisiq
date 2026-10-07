@@ -957,9 +957,11 @@ describe('a location excluded from the totals records no edition', () => {
     ['CA gas kwh',       { country: 'CA', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
     ['CA propane kg',    { country: 'CA', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['NZ gas mcf',       { country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }],
-    ['GB propane kg',    { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    // FI4: GB propane in kg now prices on DEFRA's per-tonne row; replaced by NZ propane in gallons (MfE prints per kg).
+    ['NZ propane gallons', { country: 'NZ', has_propane: true, propane_amount: 1000, propane_unit: 'gallons' }],
     ['DE propane litres', { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'litres' }],
-    ['DE propane kg',    { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
+    // FI4: EU propane in kg now prices (MRR mass basis); replaced by EU propane in gallons (no cited density).
+    ['FR propane gallons', { country: 'FR', has_propane: true, propane_amount: 1000, propane_unit: 'gallons' }],
     ['NZ propane litres', { country: 'NZ', has_propane: true, propane_amount: 1000, propane_unit: 'litres' }],
     ['AU propane kg',    { country: 'AU', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['NZ gas m3',        { country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
@@ -991,8 +993,10 @@ describe('a location excluded from the totals records no edition', () => {
     // steam are in the totals, so their editions are recorded exactly as for the same site with no gas.
     // FI2 follow-up: a UK site with propane in kg (DEFRA prints propane per litre; a mass does not convert to a volume).
     // UK gas in m3 now prices on DEFRA's per-m3 row.
-    const base = { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' as const }
-    const noGas = (l: Location): Location => ({ ...l, has_propane: false, propane_amount: 0 })
+    // FI4: UK propane in kg now prices (DEFRA per tonne); the unpriced line is UK heating oil in kg (DEFRA prints it per
+    // litre only, and a mass does not convert to a volume).
+    const base = { country: 'GB', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'kg' as const }
+    const noGas = (l: Location): Location => ({ ...l, has_fuel_oil_distillate: false, fuel_oil_distillate_amount: 0 })
     const withElec = bare({ ...base, grid_region: 'UK', electricity_kwh: 100_000 })
     expect(findUnpriceableLocations([withElec], 'AR6', 2025)).toEqual([])
     expect(unpricedLines(withElec).map(u => u.reason)).toEqual(['factor_missing'])

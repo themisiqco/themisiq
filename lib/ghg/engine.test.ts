@@ -49,7 +49,7 @@ import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { unitOptionsShowing } from './unitLabels';
 import { contributionShareCell } from './workingsCells';
-import { convertToCanonical, convertibleUnits, exactConversion, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
+import { convertToCanonical, convertibleUnits, exactConversion, SELECTOR_UNITS, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
 
 // ── fixture builders ─────────────────────────────────────────────────────────
 const loc = (o: Partial<Location> = {}): Location => ({ ...emptyLocation('L1', 'Test Site'), ...o });
@@ -2771,7 +2771,7 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
     expect(msg(site({ has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' }))).toEqual([['factor_missing',
       'The EU factor for heating oil at Test Site is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Enter the quantity in kilograms or tonnes, or reject the bill. Export is blocked until this is resolved.']])
     expect(msg(site({ has_propane: true, propane_amount: 500, propane_unit: 'litres' }))).toEqual([['factor_missing',
-      'The EU factor for propane at Test Site is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Reject the bill, or remove the figure. Export is blocked until this is resolved.']])
+      'The EU factor for propane at Test Site is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Enter the quantity in kilograms or tonnes, or reject the bill. Export is blocked until this is resolved.']])
     expect(msg(site({ has_natural_gas: true, natural_gas_amount: 800, natural_gas_unit: 'm3' }))).toEqual([['factor_missing',
       'The EU factor for natural gas at Test Site is published per unit of energy, and we hold no cited energy content to convert m³ to it, so this line is not counted. Enter the quantity in kWh, as shown on your gas bill, or reject the bill. Export is blocked until this is resolved.']])
     // Gallons and Mcf are the same quantities, and the same answer.
@@ -6040,7 +6040,7 @@ describe('FI5. a unit change never relabels a figure', () => {
       checked++
       if (u === unit) { expect(v, `${from}->${to} ${f.field} ${unit}: kept`).toBe(1234.5); continue }
       expect(v, `${from}->${to} ${f.field}: ${unit} -> ${u} must not keep the number`).not.toBe(1234.5)
-      const tok = (x: string) => x === 'gallons' ? 'gallon' : x === 'litres' ? 'litre' : x
+      const tok = (x: string) => x === 'gallons' ? 'gallon' : x === 'litres' ? 'litre' : x === 'tonnes' ? 'tonne' : x
       const c = exactConversion(tok(unit), tok(u))
       if (v === 0) {
         cleared++
@@ -6079,3 +6079,108 @@ describe('FI5. a unit change never relabels a figure', () => {
     expect(g(switched).conversion_note).toContain('Converted from 100 Ccf to 10 Mcf')
   })
 })
+
+// ── FI4: propane by mass, only through a publisher's own per-mass factor; no density anywhere (R13) ─────────────
+// docs/review/eu-fuel-properties.md section B. DEFRA prints Propane per tonne, MRR prints LPG on a mass basis, MfE prints
+// LPG per kg; EPA, ECCC and NGA print no per-mass factor and no density, so kg or lb is unpriced there.
+describe('FI4. propane by mass', () => {
+  const AT = '2026-10-07T12:00:00.000Z'
+  const propaneRow = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; factor_key?: string }[])
+    .find(r => r.stream === 'propane' && !r.declaration)
+  const site = (country: string, amount: number, unit: Location['propane_unit'], name = 'Depot') =>
+    loc({ name, country, grid_region: country === 'GB' ? 'UK' : '', has_propane: true, propane_amount: amount, propane_unit: unit })
+
+  it('FI4-1 source: no PROPANE_LB_PER_GAL, no 4.24, no propane:kg or propane:lbs rule, no propane density', () => {
+    const uc = stripTsComments(readFileSync(join(process.cwd(), 'lib/unitConversions.ts'), 'utf8'))
+    const eng = stripTsComments(readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8'))
+    for (const src of [uc, eng]) {
+      expect(src).not.toContain('PROPANE_LB_PER_GAL')
+      expect(src).not.toContain('4.24')
+      expect(src).not.toContain("'propane:kg'")
+      expect(src).not.toContain("'propane:lbs'")
+      expect(src).not.toMatch(/lb\/gal/)
+    }
+    // No propane density value either: DEFRA's 514.933 kg/m3, LPG's 529.749, or the old EU 0.510 kg/L.
+    for (const v of ['514.933', '529.749', '0.510', '0.51,']) expect(eng, v).not.toContain(v)
+  })
+
+  it('FI4-2 UK 1,000 kg propane = 2,997.63 kg CO2e on DEFRA\'s Propane per-tonne row, and the note names it', () => {
+    expect((EF_UK as Record<string, unknown>).propane_kg).toEqual({ co2: 2.99763233, ch4: 0, n2o: 0 })
+    // propane_litre is DEFRA's Propane row too (1_100_1007_8_1), so litres and kg are the same fuel.
+    expect((EF_UK as Record<string, { co2: number }>).propane_litre.co2).toBe(1.54358)
+    const r = propaneRow(site('GB', 1000, 'kg'))!
+    expect(r.result_tco2e).toBeCloseTo(2.99763233, 12)
+    expect(r.note).toBe('DEFRA/DESNZ 2026, Propane, tonnes: 2,997.63233 kg CO2e (factor ID 1_100_1007_15_1); per kg is per tonne ÷ 1,000.')
+  })
+
+  it('FI4-3 UK 2 tonnes prices the same as 2,000 kg, through the exact conversion', () => {
+    const t = propaneRow(site('GB', 2, 'tonnes'))!
+    expect(t.result_tco2e).toBeCloseTo(propaneRow(site('GB', 2000, 'kg'))!.result_tco2e!, 12)
+    expect(t.note).toContain('2 tonnes converted to 2,000 kg (1 tonne = 1000 kg, exact).')
+  })
+
+  it('FI4-4 EU 1,000 kg LPG = 2,984.63 kg CO2 plus CH4 and N2O, and the note names MRR', () => {
+    const r = propaneRow(site('DE', 1000, 'kg'))!
+    expect(calcGas((EF_EU as Record<string, { co2: number; ch4: number; n2o: number }>).propane_kg, 1000, 'AR6').co2).toBeCloseTo(2.98463, 12)
+    expect(r.result_tco2e).toBeCloseTo((2984.63 + 1000 * 0.0000473 * 29.8 + 1000 * 0.00000473 * 273) / 1000, 9)
+    expect(r.note).toBe('Published on a mass basis: 63.1 t CO₂/TJ × 47.3 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Liquefied petroleum gases) = 2.98463 kg CO₂/kg. IPCC 2006 Table 1.1 defines LPG as propane, butane or a mix of the two. CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3 (LPG), per TJ, on the same NCV.')
+    expect(r.note).not.toContain('\u2014')
+  })
+
+  it('FI4-5 EU LPG in litres is unpriced with the FI3 message and the mass sentence', () => {
+    expect(unpricedLines(site('FR', 500, 'litres', 'Lyon')).map(u => u.message)).toEqual([
+      'The EU factor for propane at Lyon is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Enter the quantity in kilograms or tonnes, or reject the bill. Export is blocked until this is resolved.'])
+  })
+
+  it('FI4-6 NZ 1,000 kg is unchanged (MfE per kg); NZ litres stay unpriced', () => {
+    expect(propaneRow(site('NZ', 1000, 'kg'))!.result_tco2e).toBeCloseTo(2.97164, 12)
+    expect(unpricedLines(site('NZ', 1000, 'litres')).map(u => u.reason)).toEqual(['factor_missing'])
+  })
+
+  it('FI4-7 a bill in lb is stored as kg exactly; US, CA and AU kg is unpriced with the blocking message naming the site', () => {
+    const read = convertToCanonical('propane', 500, 'lb')
+    expect(read.unit).toBe('kg')
+    expect(read.value).toBeCloseTo(500 * 0.45359237, 9)
+    expect(read.value!.toFixed(3)).toBe('226.796')
+    expect(read.conversionNote).toBe('500 lb converted to 226.7962 kg (1 lb = 0.45359237 kg, exact)')
+    for (const [country, name] of [['US', 'Tulsa yard'], ['CA', 'Regina yard'], ['AU', 'Perth yard']] as const) {
+      const l = loc({ name, country, grid_region: country === 'CA' ? 'SK' : '', province: country === 'CA' ? 'SK' : undefined,
+        has_propane: true, propane_amount: read.value!, propane_unit: 'kg' })
+      const u = unpricedLines(l)
+      expect(u.map(x => [x.field, x.reason]), country).toEqual([['propane_amount', 'factor_missing']])
+      expect(u[0].message, country).toContain(`Propane at ${name} is recorded in kg`)
+      expect(u[0].message, country).toContain('publishes no factor this figure can be converted to exactly')
+      expect(propaneRow(l)?.result_tco2e ?? null, `${country}: never converted to a volume and priced`).toBeNull()
+    }
+  })
+
+  it('FI4-8 a UK litres-to-kg change clears and asks; EU kg to tonnes converts exactly', () => {
+    expect(changeUnit('propane_amount', 1000, 'litres', 'kg')).toEqual({ unit: 'kg', cleared: true, from: 'litres' })
+    const uk = applyUnitOutcomes(site('GB', 1000, 'litres'), { propane_unit: changeUnit('propane_amount', 1000, 'litres', 'kg') }, AT, null)
+    expect([uk.propane_unit, uk.propane_amount]).toEqual(['kg', 0])
+    expect(unitChangeMessage(uk.unit_changes!.at(-1)!)).toBe('The propane / LPG figure was in litres, which cannot be converted exactly to kg, so it has been cleared. Enter it in kg.')
+    const eu = changeUnit('propane_amount', 1500, 'kg', 'tonnes') as Extract<UnitOutcome, { value: number }>
+    expect(eu.value).toBeCloseTo(1.5, 12)
+    expect(eu.conversion?.statement).toBe('1 tonne = 1000 kg')
+  })
+
+  it('FI4-9 units offered: UK litres then kg, EU kg and tonnes, NZ kg; US, CA and AU unchanged, no kg', () => {
+    expect(propaneUnitOptions('GB')).toEqual([['litres', 'Litres'], ['kg', 'kg']])
+    expect(propaneUnitOptions('DE')).toEqual([['kg', 'kg'], ['tonnes', 'Tonnes']])
+    expect(propaneUnitOptions('NZ')).toEqual([['kg', 'kg']])
+    expect(propaneUnitOptions('US')).toEqual([['gallons', 'US gallons'], ['litres', 'Litres']])
+    for (const c of ['CA', 'AU']) expect(propaneUnitOptions(c), c).toEqual([['litres', 'Litres']])
+    // A stored EU litre figure is shown as it is, not accepted here (FI3's selector rule).
+    expect(unitOptionsShowing(propaneUnitOptions('DE'), 'litres', false)).toEqual([['kg', 'kg'], ['tonnes', 'Tonnes'], ['litres', 'litres (not accepted here)']])
+  })
+
+  it('FI4-10 bill reading: kg is a propane selector unit; lb and tonnes convert to kg; nothing becomes a volume', () => {
+    expect(SELECTOR_UNITS.propane).toEqual(['gallons', 'litres', 'kg'])
+    expect(convertToCanonical('propane', 120, 'kg')).toEqual({ tier: 1, value: 120, unit: 'kg' })
+    expect(convertToCanonical('propane', 2, 'tonnes')).toMatchObject({ tier: 2, value: 2000, unit: 'kg' })
+    expect(convertibleUnits('propane')).toEqual(expect.arrayContaining(['gallons', 'litres', 'kg', 'lbs', 'tonnes']))
+    // Mass reading is propane's alone: diesel in kg has no path.
+    expect(convertToCanonical('diesel', 100, 'kg').tier).toBe(3)
+    expect(convertToCanonical('electricity', 100, 'mj').tier).toBe(3)
+  })
+});

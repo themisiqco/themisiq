@@ -280,6 +280,10 @@ on the same NCV.
 
 ## B. Propane (FI4)
 
+**FI4 done (7 Oct 2026, ruling R13), commit: ____ (Lisa to fill in).** Propane by mass now prices only on the per-mass
+factors below (DEFRA per tonne, MRR mass basis, MfE per kg); US, CA and AU propane in kg is unpriced; the 4.24 lb/gal
+density is removed.
+
 | Publisher | Per-mass factor | Propane or LPG density | Quote |
 |---|---|---|---|
 | US EPA (Hub 2025) | None. Table 1 prints Propane per gallon (0.091 mmBtu/gal; 5.72 kg CO2/gal) and "Propane Gas" per scf (0.002516 mmBtu/scf; 0.15463 kg CO2/scf), page 1 | Not found in local sources | Table 1, rows "Propane" and "Propane Gas", page 1 |

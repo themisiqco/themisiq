@@ -344,6 +344,11 @@ const EF_UK = {
   // Propane, litres: 1.54358 kgCO2e/L (CO2 1.5414, CH4 0.00133, N2O 0.00084 — components sum to
   // 1.54357, DEFRA's own rounding against its stated 1.54358). UNCHANGED from the 2025 edition.
   propane_litre: { co2: 1.54358, ch4: 0, n2o: 0 },
+  // FI4 (R13): propane by mass, on DEFRA's own per-tonne row for the SAME fuel as propane_litre (both are the "Propane"
+  // rows, not LPG). DEFRA/DESNZ 2026 flat file, "Factors by Category", Scope 1 > Fuels > Gaseous fuels > Propane,
+  // unit tonnes, factor ID 1_100_1007_15_1 (row 119): 2,997.63233 kg CO2e per tonne. Per kg is per tonne / 1,000,
+  // exact: 2.99763233. Combined CO2e in `co2`, GWP as published, like every key here.
+  propane_kg: { co2: 2.99763233, ch4: 0, n2o: 0 },
   // Diesel (average biofuel blend), litres: 2.58354 kgCO2e/L (CO2 2.55035, CH4 0.00029, N2O 0.0329).
   diesel_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
   diesel_mobile_litre: { co2: 2.58354, ch4: 0, n2o: 0 },
@@ -516,6 +521,11 @@ const EF_EU = {
   fuel_oil_distillate_kg: { co2: 3.1863, ch4: 0.000129, n2o: 0.0000258 },
   // Residual fuel oil: CO2 77.4 x 40.4 = 3126.96 kg/t; CH4 3 x 40.4 = 121.2 g/t; N2O 0.6 x 40.4 = 24.24 g/t.
   fuel_oil_residual_kg: { co2: 3.12696, ch4: 0.0001212, n2o: 0.00002424 },
+  // ── LPG PER kg (FI4, R13): MRR mass basis, "Liquefied petroleum gases" 63,1 t CO2/TJ x 47,3 TJ/Gg (Annex VI Table 1,
+  // page 167). IPCC 2006 Table 1.1 (page 1.12) defines LPG as propane, butane or a combination of the two.
+  //   CO2 63.1 x 47.3 / 1000 = 2.98463   CH4 1 x 47.3 / 1e6 = 0.0000473   N2O 0.1 x 47.3 / 1e6 = 0.00000473
+  //   (CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2 Tables 2.2 and 2.3, LPG, 1 and 0.1 kg/TJ.)
+  propane_kg: { co2: 2.98463, ch4: 0.0000473, n2o: 0.00000473 },
   // ── NATURAL GAS PER kWh, GROSS (R7). kg/kWh = kg/TJ x 0.90 (net per gross) x 3.6e-6 TJ/kWh.
   //   CO2 56 100 x 0.90 x 3.6e-6 = 0.181764   CH4 1 x 0.90 x 3.6e-6 = 3.24e-6   N2O 0.1 x 0.90 x 3.6e-6 = 3.24e-7
   natural_gas_kwh: { co2: 0.181764, ch4: 0.00000324, n2o: 0.000000324 },
@@ -555,6 +565,10 @@ const EU_DERIVATION: Partial<Record<string, string>> = {
   fuel_oil_residual_kg:
     'Published on a mass basis: 77.4 t CO₂/TJ × 40.4 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Residual fuel oil) = 3.12696 kg CO₂/kg. ' +
     'CH4 and N2O: IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3, per TJ, on the same NCV.',
+  propane_kg:
+    'Published on a mass basis: 63.1 t CO₂/TJ × 47.3 TJ/Gg (EU MRR 2018/2066, Annex VI Table 1, Liquefied petroleum ' +
+    'gases) = 2.98463 kg CO₂/kg. IPCC 2006 Table 1.1 defines LPG as propane, butane or a mix of the two. CH4 and N2O: ' +
+    'IPCC 2006 Vol. 2 Ch. 2, Tables 2.2 and 2.3 (LPG), per TJ, on the same NCV.',
   natural_gas_kwh:
     '56.1 t CO₂/TJ on a net basis (EU MRR 2018/2066, Annex VI Table 1, Natural gas) × 0.90 net per gross (IPCC 2006 Vol. 2 Ch. 1 section ' +
     '1.4.1.2, and the notes under Ch. 2 Tables 2.6 to 2.8) × 0.0036 GJ/kWh = 0.181764 kg CO₂ per kWh gross, as ' +
@@ -601,6 +615,10 @@ function auPublishedNote(loc: Location, key: string): string | undefined {
 // US EPA: THE PUBLISHED COLUMN EACH PER-UNIT KEY IS (FI2 diff 3, ruling R5). Not a derivation: the row says where in
 // Table 1 the value is printed, so a verifier finds it without retyping any arithmetic. The per-mmBtu keys are EPA's
 // own column too and need no note beyond the citation.
+// UK (FI4): where DEFRA prints a value per tonne and the table holds it per kg, the row says so.
+const UK_PUBLISHED_NOTE: Record<string, string> = {
+  propane_kg: 'DEFRA/DESNZ 2026, Propane, tonnes: 2,997.63233 kg CO2e (factor ID 1_100_1007_15_1); per kg is per tonne ÷ 1,000.',
+}
 const EPA_TABLE_1 = 'US EPA GHG Emission Factors Hub, Table 1'
 const EPA_DISTILLATE_NOTE = `${EPA_TABLE_1}, Distillate Fuel Oil No. 2, per gallon: 10.21 kg CO2, 0.41 g CH4, 0.08 g N2O`
 const US_PUBLISHED_NOTE: Record<string, string> = {
@@ -1687,7 +1705,7 @@ interface SourceDoc {
 interface Location {
  id: string; name: string; country: string; state?: string; province?: string; region?: string
   has_natural_gas: boolean; natural_gas_amount: number; natural_gas_unit: 'mcf' | 'therms' | 'mmbtu' | 'm3' | 'kwh' | 'ccf' | 'gj'   // ccf: US sites (FI5); gj: Canada (FI3)
-  has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg'
+  has_propane: boolean; propane_amount: number; propane_unit: 'gallons' | 'litres' | 'kg' | 'tonnes'   // FI4: kg at UK, EU, NZ; tonnes at EU
   has_diesel_stationary: boolean; diesel_stationary_amount: number; diesel_stationary_unit: 'gallons' | 'litres'
   // TWO GRADES, TWO FIELD TRIPLES — and `_amount`, NOT the retired `_gallons` misnomer.
   // The single key this replaces was `fuel_oil_gallons`, a name that lied about its unit and was kept
@@ -2202,7 +2220,11 @@ function propaneUnitOptions(country: string): Array<[string, string]> {
   // Refused: litres first, gallons retained. See the note above ngUnitOptions.
   if (efJurisdiction({ country: ctry }) === null) return [['litres', 'Litres'], ['gallons', 'US gallons']]
   if (ctry === 'NZ') return [['kg', 'kg']]
-  const metric = ctry === 'CA' || ctry === 'GB' || ctry === 'UK' || ctry === 'AU' || EU_COUNTRIES.includes(ctry)
+  // FI4 (R13): mass only where the publisher prints a per-mass factor. UK: DEFRA's per-tonne Propane row, litres first so
+  // the default does not move. EU: MRR's mass basis; EU litres have no cited density (FI3), so mass only.
+  if (ctry === 'GB' || ctry === 'UK') return [['litres', 'Litres'], ['kg', 'kg']]
+  if (EU_COUNTRIES.includes(ctry)) return [['kg', 'kg'], ['tonnes', 'Tonnes']]
+  const metric = ctry === 'CA' || ctry === 'AU'
   return metric ? [['litres', 'Litres']] : [['gallons', 'US gallons'], ['litres', 'Litres']]
 }
 
@@ -4357,6 +4379,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
       fromTable === 'AU' ? auPublishedNote(loc, heldKey) : '',
       fromTable === 'US' ? US_PUBLISHED_NOTE[heldKey] : '',
+      fromTable === 'UK' ? UK_PUBLISHED_NOTE[heldKey] : '',
       fromTable === 'CA' && heldKey === 'natural_gas_gj' ? CA_GAS_GJ_NOTE : '',
       fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
