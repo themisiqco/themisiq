@@ -42,7 +42,7 @@ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
-import { SB253_SCOPE3_FROM } from '../../../lib/sb253'
+import { SB253_SCOPE3_FROM, SB253_WINDOW_STATUS_WORDS, SB253_ELECTION_BANNER, sb253FirstReportBanner } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ghgStepIndex, scope3LinkState, inventoryNotOpenedGhg } from '../../../lib/moduleLinks'
@@ -63,7 +63,7 @@ import {
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords,
+  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords, reportingWindowIso,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -3343,11 +3343,12 @@ workings: saved.workings,
         <h2 style={sectionHead}>Export your reports</h2>
         {(() => {
           const fw = inventory.selected_frameworks
-          const year = inventory.reporting_year
           const needsScope3Now = fw.includes('esrs') || fw.includes('csrd') || fw.includes('gri')
           const scope3Encouraged = fw.includes('cdp') || fw.includes('ecovadis')
           const sb253Only = fw.includes('sb253') && fw.length === 1
-          const sb253FirstYear = sb253Only && year <= 2024
+          // T3b: decided from the window's end date against section 96076(c), not from the year number
+          // (lib/sb253.ts, sb253FirstReportBanner). 'election' is the optional first report under (c)(2).
+          const sb253Banner = sb253Only ? sb253FirstReportBanner(reportingWindowIso(inventory.reporting_year, inventory.fiscal_year_end_month).end) : null
 
           if (needsScope3Now) return (
             <div style={{ background: '#FCEBEB', border: '0.5px solid rgba(185,28,28,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
@@ -3359,10 +3360,10 @@ workings: saved.workings,
             </div>
           )
 
-          if (sb253FirstYear) return (
+          if (sb253Banner) return (
             <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.2)', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>SB 253: Scope 3 not required for your first reporting year</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#0C447C', marginBottom: 4 }}>{sb253Banner === 'first_report' ? 'SB 253: Scope 3 not required for your first reporting year' : SB253_ELECTION_BANNER} {SB253_WINDOW_STATUS_WORDS}</div>
                 <div style={{ fontSize: 12, color: '#555553' }}>Scope 3 is expected from {SB253_SCOPE3_FROM}, under a separate CARB rulemaking that is still in workshops: the final regulation is expected by the end of 2026, so the requirement is not settled. Starting now puts the data in place either way.</div>
               </div>
               <Scope3Control compact />

@@ -101,3 +101,68 @@ export const SB253_POSTURE = 'first report proposed for 10 November 2026, not ye
 // beside computed totals under the label "Deadline". Short by necessity, but it must still carry the
 // posture: this was the only sibling naming a specific day, and it named it as settled.
 export const SB253_FRAMEWORK_DEADLINE = '10 Nov 2026: proposed, not final'
+
+// ── T3b: WHICH REPORTING WINDOW IS THE FIRST SB 253 REPORT (Scope 3 not required in it) ──────────────
+//
+// THE TEST IS THE WINDOW'S END DATE, NOT THE YEAR NUMBER. The banner used to show for `year <= 2024`, which
+// was wrong: under section 96076(c) the first report covers a 2025 inventory (or one ending January 2026),
+// and for those it did not show. A window is the first-report window when its end date is AFTER
+// SB253_FIRST_REPORT_WINDOW_END_AFTER and ON OR BEFORE SB253_FIRST_REPORT_WINDOW_END_ON_OR_BEFORE. Every
+// window in the app ends on a month end, so this is a January year end in reporting year 2026, or any other
+// year end in reporting year 2025.
+//
+// Optional election, section 96076(c)(2): an entity whose fiscal year ends after 1 February may instead report
+// its most recent preceding fiscal year where that data is available. So a window ending after 1 February 2026
+// and on or before the first-report date (SB253_FIRST_REPORT_DATE_ISO) can also be a first report, by choice.
+//
+// STATUS. 'proposed' until OAL approves; promoting it to 'final' needs the OAL approval date recorded beside it.
+// Checked 7 Oct 2026: OAL approval not found.
+//
+// Citations, all from CARB's rulemaking page
+// (https://ww2.arb.ca.gov/rulemaking/2025/california-corporate-greenhouse-gas-reporting-and-climate-related-financial-risk):
+//
+// | Source and section | Quote (verbatim, under 15 words) |
+// |---|---|
+// | Final Regulation Order, September 2026, §96076(c)(1) [1] | "If the reporting entity’s fiscal year ends on or before February 1" |
+// | Same, (c)(1), continued | "the fiscal year ending in the current calendar year" |
+// | Same, (c)(2) | "the fiscal year ending in the previous calendar year" |
+// | Same, (c)(2), option | "their most recent preceding fiscal year" ... "where that data is available" |
+// | Same, §96076(a) | "on or before November 10, 2026" |
+// | Same, §96076(a) | "Scope 3 emissions reporting is not required for 2026 reporting." |
+// | Board-approved order, February 2026, §96076(b)(1) [2] | "ends on or before February 1 in a calendar year" (same cutoff; deadline "August 10, 2026") |
+// | 15-Day Proposed Regulation Text, Appendix A-1, July 2026, §96076(c) [3] | the same cutoff; the deadline struck from August to November 10 |
+// | Executive Order R-26-006 [4] | sections 96070 to 96077 "are adopted as set forth in the “Final Regulation Order”" |
+// | Same | "Executed this 18th day of September, 2026" (the file is named "signed 9.21.26") |
+// | Rulemaking page | "The Final Package was resubmitted to OAL on September 21, 2026." |
+// | Rulemaking page, Final Approval / OAL Action | "This stage has not yet been reached." |
+//
+// The documents:
+// - [1] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/Final%20Regulation%20Order_Final.pdf
+// - [2] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/final%20regulation%20order_draft.pdf
+// - [3] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/15-Day%20Change%20Reg%20Text%20SB%20253-261.pdf
+// - [4] https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2026/sb%20253-261/24.%20Executive%20Order_cs%20signed%209.21.26.pdf
+//
+// All fetched 2 Oct 2026. The 1 February cutoff is identical in the 45-day proposed text (December 2025),
+// the February order, the 15-day text and the September order. Only the deadline moved.
+export const SB253_FIRST_REPORT_WINDOW_END_AFTER = '2025-02-01'
+export const SB253_FIRST_REPORT_WINDOW_END_ON_OR_BEFORE = '2026-02-01'
+export const SB253_FIRST_REPORT_WINDOW_STATUS: 'proposed' | 'final' = 'proposed'
+
+// SB253_FIRST_REPORT_DATE as a yyyy-mm-dd date, for comparison. lib/sb253.test.ts holds the two together.
+export const SB253_FIRST_REPORT_DATE_ISO = '2026-11-10'
+
+/** The status in plain words, for the banner: "(proposed regulation, not yet final)". */
+export const SB253_WINDOW_STATUS_WORDS = SB253_FIRST_REPORT_WINDOW_STATUS === 'proposed' ? '(proposed regulation, not yet final)' : ''
+
+export const SB253_ELECTION_BANNER = "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it."
+
+/**
+ * Which SB 253 Scope 3 banner a reporting window takes, from its inclusive end date (yyyy-mm-dd):
+ * 'first_report' for the first-report window, 'election' for a later window that may be filed first by
+ * choice under section 96076(c)(2), and null otherwise.
+ */
+export function sb253FirstReportBanner(windowEnd: string): 'first_report' | 'election' | null {
+  if (windowEnd > SB253_FIRST_REPORT_WINDOW_END_AFTER && windowEnd <= SB253_FIRST_REPORT_WINDOW_END_ON_OR_BEFORE) return 'first_report'
+  if (windowEnd > SB253_FIRST_REPORT_WINDOW_END_ON_OR_BEFORE && windowEnd <= SB253_FIRST_REPORT_DATE_ISO) return 'election'
+  return null
+}

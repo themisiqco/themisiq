@@ -265,6 +265,12 @@ export interface SpendFactorQuery {
   reporting_currency: string
   /** The inventory year the caller is pricing. */
   reporting_year: number
+  /**
+   * T3b: the reporting window, inclusive yyyy-mm-dd dates. A year that does not end in December spans two
+   * calendar years, so price_year_mismatch compares the WINDOW with the price year, not the year number.
+   * Omitted, the window is the calendar year `reporting_year`.
+   */
+  window?: { start: string; end: string }
   /** The basis the caller's spend figure is on. Required for the same reason price_basis is
    *  required on the factor: without it the mismatch cannot be detected, only assumed away. */
   spend_price_basis: PriceBasis
@@ -291,7 +297,7 @@ export type SpendFallbackReason = 'no_factor_for_region'
 export interface SpendFactorCaveats {
   /** factor.currency !== query.reporting_currency. This module performs NO FX conversion. */
   currency_mismatch: boolean
-  /** factor.price_year !== query.reporting_year. This module performs NO DEFLATION. */
+  /** T3b: the query's window is not wholly inside factor.price_year. This module performs NO DEFLATION. */
   price_year_mismatch: boolean
   /** factor.price_basis !== query.spend_price_basis. This module performs NO BASIS CONVERSION. */
   price_basis_mismatch: boolean
@@ -479,3 +485,8 @@ export type SpendFactorResult =
 // app/dashboard/supply-chain/page.tsx and app/api/campaigns/[id]/scope3-cat1/route.ts. They stay
 // until this module holds verified data for the regions those callers serve, because a resolver
 // that returns null for every query would take the product from a wrong number to no number.
+
+/** T3b: true when an inclusive window (yyyy-mm-dd dates) lies wholly inside calendar year `year`. */
+export function windowInsideYear(win: { start: string; end: string }, year: number): boolean {
+  return win.start >= `${year}-01-01` && win.end <= `${year}-12-31`
+}

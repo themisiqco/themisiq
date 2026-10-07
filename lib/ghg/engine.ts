@@ -1986,6 +1986,13 @@ export function reportingYearLabel(win: { start: Date; end: Date }): ReportingYe
 export function reportingPeriodWords(win: { start: Date; end: Date }): { period: string; yearEnd: string } {
   return { period: `${dateInWords(win.start)} to ${dateInWords(win.end)}`, yearEnd: `${win.end.getDate()} ${MONTH_NAMES[win.end.getMonth()]}` }
 }
+/** T3b diff b: the window as inclusive yyyy-mm-dd dates, in local time, for a request that carries it (the Scope 3
+ *  spend-factor route). Built from periodFromYearAndEnd, so the window has one definition. */
+export function reportingWindowIso(reportingYear: number, fiscalYearEndMonth?: number | null): { start: string; end: string } {
+  const w = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth ?? 12)
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return { start: iso(w.start), end: iso(w.end) }
+}
 /** T3b: the window in words for a stored reporting_year and fiscal_year_end_month (null or missing is December). */
 export const periodWords = (reportingYear: number, fiscalYearEndMonth?: number | null) =>
   reportingPeriodWords(periodFromYearAndEnd(reportingYear, fiscalYearEndMonth ?? 12))

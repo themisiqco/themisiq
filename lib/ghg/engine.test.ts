@@ -3943,7 +3943,7 @@ describe('T3 coverage, resolutions and the no-silent-zero rule', () => {
 // ── T3a: the reporting-year label, built in one place from the window ─────────────────────────────────
 // reporting_year is the calendar year in which the window ENDS (periodFromYearAndEnd: end = last day of the
 // year-end month IN reporting_year), so FY2025 with a March year end is 1 Apr 2024 to 31 Mar 2025.
-import { yearLabel as yearLabelT3b, periodWords as periodWordsT3b } from './engine';
+import { yearLabel as yearLabelT3b, periodWords as periodWordsT3b, reportingWindowIso as reportingWindowIsoT3b } from './engine';
 
 describe('T3a reportingYearLabel', () => {
   const label = (y: number, m: number) => reportingYearLabel(periodFromYearAndEnd(y, m));
@@ -3981,6 +3981,13 @@ describe('T3a reportingYearLabel', () => {
       }
       for (const v of [l.heading, l.fileTag, l.inText]) expect(v).not.toContain('\u2013');
     }
+  });
+
+  it('reportingWindowIso (T3b diff b): the window as yyyy-mm-dd, from the same periodFromYearAndEnd', () => {
+    expect(reportingWindowIsoT3b(2025, 3)).toEqual({ start: '2024-04-01', end: '2025-03-31' });
+    expect(reportingWindowIsoT3b(2025, null)).toEqual({ start: '2025-01-01', end: '2025-12-31' });
+    expect(reportingWindowIsoT3b(2024, 2)).toEqual({ start: '2023-03-01', end: '2024-02-29' });
+    expect(reportingWindowIsoT3b(2025, 2)).toEqual({ start: '2024-03-01', end: '2025-02-28' });
   });
 
   it('yearLabel and periodWords read a stored year and year end; null or missing is December', () => {

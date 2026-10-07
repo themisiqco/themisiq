@@ -35,6 +35,7 @@ import {
   type SpendFactorResult,
   type SpendFactorSource,
   type SpendFactorType,
+  windowInsideYear,
 } from './spend'
 
 // ── ABSENCE THAT CARRIES A REASON ────────────────────────────────────────────────────────────────
@@ -256,7 +257,9 @@ function caveatsFor(
 ): SpendFactorCaveats {
   return {
     currency_mismatch: factor.currency !== query.reporting_currency,
-    price_year_mismatch: factor.price_year !== query.reporting_year,
+    // T3b: the window, not the year number, against the price year: a year ending 31 March 2025 is not wholly in 2025.
+    price_year_mismatch: !windowInsideYear(
+      query.window ?? { start: `${query.reporting_year}-01-01`, end: `${query.reporting_year}-12-31` }, factor.price_year),
     price_basis_mismatch: factor.price_basis !== query.spend_price_basis,
     ...position,
   }

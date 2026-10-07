@@ -21,6 +21,11 @@ const FILES = [
   'app/verify/[token]/page.tsx',
   'lib/assurancePdf.ts',
   'lib/ghg/engine.ts',
+  // T3b diff b: Scope 3, the spend-factor route and its resolver, and lib/sb253.ts (the banner's decision).
+  'app/dashboard/scope3/page.tsx',
+  'app/api/scope3/spend-factor/route.ts',
+  'lib/emissionFactors/spendResolver.server.ts',
+  'lib/sb253.ts',
 ]
 
 // Code uses, not labels: each is a key, a path or a comparison, never shown to a reader.
@@ -29,14 +34,16 @@ const ALLOWED = [
   'const priorYearKey = inventory.company_id ? `${inventory.company_id}:${inventory.reporting_year}` : null',
   'const path = `${session.user.id}/${inventory.reporting_year}/',                                   // storage path
   "gwp: 'AR6', deadline: 'FY2024 (large EU companies)',",                                           // EU deadline, not a label
+  'query.window ?? { start: `${query.reporting_year}-01-01`, end: `${query.reporting_year}-12-31` }',  // resolver default window
+  'priced from the DEFRA/DESNZ ${DEFRA_WASTE_META.year}',                                            // a factor edition's year (T3c), not a reporting year
 ]
 
 const RULES: [string, RegExp][] = [
   ['FY${', /FY\s?\$\{/],
   ['"YE "', /\bYE\s/],
   ['reporting year ${', /reporting year \$\{/i],
-  ['a reporting year interpolated into a template', /\$\{[\w.]*reporting_year(\s*-\s*1)?\}/],
-  ['a reporting year rendered as JSX text', /(?<![=\w])\{[\w.]*(reporting_year|selectedYear|baselineYear)(\s*-\s*1)?\}/],
+  ['a reporting year interpolated into a template', /\$\{[\w.]*(reporting_year|reportingYear)(\s*-\s*1)?\}/],
+  ['a reporting year rendered as JSX text', /(?<![=\w])\{[\w.]*(reporting_year|reportingYear|selectedYear|baselineYear)(\s*-\s*1)?\}/],
   ['a series year rendered as JSX text or a template', /(?<![=\w])\$?\{[\w]*\.year\}/],
 ]
 
@@ -68,7 +75,7 @@ describe('T3b source guard: reporting-year labels come from the helper', () => {
 
   it('the guard bites: each rule catches the form it names', () => {
     const bad = ['`FY${yr}`', 'YE Mar 2025', '`reporting year ${y}`', '`_${inventory.reporting_year}.csv`',
-      '<div>Reporting year {inv.reporting_year}</div>', '<b>{y.year}</b>']
+      '<div>Reporting year {inv.reporting_year}</div>', '<b>{y.year}</b>', '`${company}_Scope3_${reportingYear}.csv`', '<span>{reportingYear}</span>']
     for (const b of bad) expect(RULES.some(([, re]) => re.test(b)), b).toBe(true)
     for (const ok of ['key={y.year}', 'value={inventory.reporting_year}', 'reportingYear={inventory.reporting_year}'])
       expect(RULES.some(([, re]) => re.test(ok)), ok).toBe(false)

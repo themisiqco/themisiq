@@ -78,9 +78,11 @@ const line = (over: Partial<Line> = {}): Line => ({
   spend: 1, spend_price_basis: 'basic', ...over,
 })
 
-const body = (over: Record<string, unknown> = {}) => ({
-  reporting_year: 2024, reporting_currency: 'EUR', lines: [line()], ...over,
-})
+// T3b: the request carries the reporting window. A calendar window for the year unless a test sends its own.
+const body = (over: Record<string, unknown> = {}) => {
+  const y = Number.isInteger(over.reporting_year) ? over.reporting_year as number : 2024
+  return { reporting_year: 2024, window_start: `${y}-01-01`, window_end: `${y}-12-31`, reporting_currency: 'EUR', lines: [line()], ...over }
+}
 
 async function post(payload: unknown) {
   const req = new Request('http://localhost/api/scope3/spend-factor', {
@@ -229,8 +231,8 @@ describe('a priced line', () => {
     const r = await post(body({ reporting_year: 2025 }))
     expect(r.json.lines[0].outcome).toBe('priced')
     expect(r.json.disclosures).toContain(
-      'The reporting year is 2025 but this edition\'s price data ends at 2024. Spend is treated as ' +
-      'being at 2024 prices, so price changes between 2024 and 2025 are not reflected.',
+      'Your reporting year runs from 1 January 2025 to 31 December 2025, but this edition\'s price data ends at 2024. ' +
+      'Spend is treated as being at 2024 prices, so price changes after 2024 are not reflected.',
     )
   })
 })
@@ -258,7 +260,7 @@ describe('response-level statements', () => {
     expect(r.json.disclosures[2]).toBe(
       `Spend was restated to 2019 euros using factor edition ${EDITION_ID}, whose price data runs to 2024.`,
     )
-    expect(r.json.disclosures[3]).toMatch(/^The reporting year is 2025 but this edition's price data ends at 2024\./)
+    expect(r.json.disclosures[3]).toMatch(/^Your reporting year runs from 1 January 2025 to 31 December 2025, but this edition's price data ends at 2024\./)
     // No disclosure is a count.
     for (const d of r.json.disclosures) expect(d).not.toMatch(/\b\d+ lines?\b/)
 
@@ -562,6 +564,41 @@ describe('error wording', () => {
       expect(r.json.operator_detail.length, `${code} operator_detail`).toBeGreaterThan(0)
       expect(r.json.operator_detail, code).not.toBe(r.json.message)
       expect(logged().some(l => l.includes(code) && l.includes(r.json.operator_detail)), `${code} logged`).toBe(true)
+    }
+  })
+})
+
+// ── T3b: the reporting window, against the price year ─────────────────────────────────────────────
+describe('the reporting window (T3b)', () => {
+  it('W1 a year ending 31 March 2025 is disclosed against the 2024 price vintage with its own dates', async () => {
+    const r = await post(body({ reporting_year: 2025, window_start: '2024-04-01', window_end: '2025-03-31' }))
+    expect(r.status).toBe(200)
+    expect([r.json.window_start, r.json.window_end]).toEqual(['2024-04-01', '2025-03-31'])
+    expect(r.json.disclosures).toContain(
+      'Your reporting year runs from 1 April 2024 to 31 March 2025, but this edition\'s price data ends at 2024. ' +
+      'Spend is treated as being at 2024 prices, so price changes after 2024 are not reflected.',
+    )
+  })
+
+  it('W2 calendar 2024 against the 2024 vintage: wholly inside, no disclosure', async () => {
+    const r = await post(body({ reporting_year: 2024 }))
+    expect(r.json.disclosures.some((d: string) => /price data ends at/.test(d))).toBe(false)
+  })
+
+  it('W3 a missing, malformed or inconsistent window is rejected, and nothing is priced', async () => {
+    for (const over of [
+      { window_start: undefined, window_end: undefined },
+      { window_start: '2024-4-1', window_end: '2025-03-31' },
+      { window_start: '2024-02-30', window_end: '2025-01-31' },
+      { window_start: '2025-03-31', window_end: '2024-04-01' },
+      { window_start: '2024-04-01', window_end: '2025-03-30' },         // not a month end
+      { window_start: '2024-05-01', window_end: '2025-03-31' },         // not twelve months
+      { window_start: '2023-04-01', window_end: '2024-03-31' },         // a window for 2024, sent as 2025
+    ]) {
+      const r = await post(body({ reporting_year: 2025, ...over }))
+      expect(r.status, JSON.stringify(over)).toBe(400)
+      expect(r.json.code, JSON.stringify(over)).toBe('invalid_reporting_window')
+      expect(r.json.message).toBe('The reporting period is missing or not valid, so nothing was calculated.')
     }
   })
 })

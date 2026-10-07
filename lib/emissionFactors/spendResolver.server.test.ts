@@ -317,3 +317,24 @@ describe('intensity position', () => {
     expect(found).toEqual([])
   })
 })
+
+// ── T3b: price_year_mismatch is "the window is not wholly inside the price year" ──────────────────
+import { windowInsideYear } from './spend'
+
+describe('price_year_mismatch against the reporting window (T3b)', () => {
+  it('a window spanning two calendar years is not inside either; a calendar window is inside its own year', () => {
+    expect(windowInsideYear({ start: '2024-04-01', end: '2025-03-31' }, 2024)).toBe(false)
+    expect(windowInsideYear({ start: '2024-04-01', end: '2025-03-31' }, 2025)).toBe(false)
+    expect(windowInsideYear({ start: '2024-01-01', end: '2024-12-31' }, 2024)).toBe(true)
+  })
+
+  it('the resolver reads the window: 1 Apr 2018 to 31 Mar 2019 against 2019 prices is a mismatch; calendar 2019 is not', () => {
+    // The factors are at 2019 prices, so 2019 plays the part of the price year here.
+    const fy = asResult(resolveSpendFactor(q({ reporting_year: 2019, window: { start: '2018-04-01', end: '2019-03-31' } })))
+    expect(fy.caveats.price_year_mismatch).toBe(true)
+    const cal = asResult(resolveSpendFactor(q({ reporting_year: 2019, window: { start: '2019-01-01', end: '2019-12-31' } })))
+    expect(cal.caveats.price_year_mismatch).toBe(false)
+    // No window: the calendar year, as before.
+    expect(asResult(resolveSpendFactor(q({ reporting_year: 2019 }))).caveats.price_year_mismatch).toBe(false)
+  })
+})

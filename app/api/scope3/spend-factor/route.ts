@@ -45,6 +45,7 @@ import {
 } from '../../../../lib/emissionFactors/spendAdjustment'
 import {
   intensityPositionSentences,
+  windowInsideYear,
   type PriceBasis,
   type SpendFactor,
   type SpendFactorCaveats,
@@ -56,6 +57,8 @@ import ixiFile from '../../../../lib/emissionFactors/exiobaseFactors2019ixi.json
 import sectorsFile from '../../../../lib/emissionFactors/exiobaseSectors.json'
 import countryRegionsFile from '../../../../lib/emissionFactors/countryRegions.json'
 import { regionLabel, countryLabel } from '../../../../lib/emissionFactors/regionNames'
+import { reportingWindowIso } from '../../../../lib/ghg/engine'
+import { isoDateInWords } from '../../../../lib/ghg/dateWords'
 
 // Explicit, not the default by accident: this route imports the factor JSON through the resolver
 // and is not an Edge candidate.
@@ -259,22 +262,24 @@ export async function POST(req: NextRequest) {
     }
     const parsed = parseRequest(body)
     if ('error' in parsed) return parsed.error
-    const { reporting_year, reporting_currency, lines } = parsed
+    const { reporting_year, window, reporting_currency, lines } = parsed
 
     // ── 3. The active edition, from the database.
     const edition = await readActiveEdition(supabase)
     if ('error' in edition) return edition.error
 
     // ── 4. Price each line.
-    const results: LineResult[] = lines.map(line => priceLine(line, reporting_year, reporting_currency, edition.id))
+    const results: LineResult[] = lines.map(line => priceLine(line, reporting_year, window, reporting_currency, edition.id))
 
     return NextResponse.json({
       edition_id: edition.id,
       price_vintage_year: edition.price_vintage_year,
       reporting_year,
+      window_start: window.start,
+      window_end: window.end,
       reporting_currency,
       caveats_addressed_by_conversion: ['currency_mismatch', 'price_year_mismatch'],
-      ...responseStatements(results, reporting_year, edition),
+      ...responseStatements(results, window, edition),
       lines: results,
     })
   } catch (e) {
@@ -305,7 +310,7 @@ export async function POST(req: NextRequest) {
 
 type ErrorCode =
   | 'unauthenticated' | 'internal_error' | 'invalid_json' | 'invalid_body'
-  | 'invalid_reporting_year' | 'invalid_reporting_currency' | 'invalid_lines' | 'too_many_lines'
+  | 'invalid_reporting_year' | 'invalid_reporting_window' | 'invalid_reporting_currency' | 'invalid_lines' | 'too_many_lines'
   | 'invalid_line' | 'invalid_line_id' | 'duplicate_line_id' | 'invalid_country_iso2'
   | 'unsupported_country' | 'invalid_sector_key' | 'invalid_factor_type' | 'invalid_spend'
   | 'invalid_spend_price_basis' | 'edition_read_failed' | 'no_active_edition' | 'edition_artefact_mismatch'
@@ -318,6 +323,7 @@ const CUSTOMER_MESSAGE: Record<ErrorCode, string> = {
   invalid_json: LINES_UNREADABLE,
   invalid_body: LINES_UNREADABLE,
   invalid_reporting_year: 'The reporting year is missing or not valid, so nothing was calculated.',
+  invalid_reporting_window: 'The reporting period is missing or not valid, so nothing was calculated.',
   invalid_reporting_currency: 'Spend in this currency cannot be estimated. Supported currencies are USD, EUR, GBP, CAD and AUD.',
   invalid_lines: 'There was no spend to estimate.',
   too_many_lines: `Too much spend was sent at once to estimate. Send at most ${MAX_LINES} entries at a time.`,
@@ -347,7 +353,7 @@ function bad(code: ErrorCode, operator_detail: string, status = 400, headers?: R
 // ── VALIDATION ───────────────────────────────────────────────────────────────────────────────────
 
 type Parsed =
-  | { reporting_year: number; reporting_currency: ReportingCurrency; lines: RequestLine[] }
+  | { reporting_year: number; window: { start: string; end: string }; reporting_currency: ReportingCurrency; lines: RequestLine[] }
   | { error: NextResponse }
 
 function parseRequest(body: unknown): Parsed {
@@ -359,6 +365,10 @@ function parseRequest(body: unknown): Parsed {
   if (!Number.isInteger(b.reporting_year)) {
     return { error: bad('invalid_reporting_year', 'reporting_year must be an integer year.') }
   }
+  // T3b: the reporting window travels with the year, so a year that does not end in December is priced against
+  // its own dates. It must be exactly the window that year and its year end make (reportingWindowIso).
+  const windowIssue = reportingWindowProblem(b.reporting_year as number, b.window_start, b.window_end)
+  if (windowIssue) return { error: bad('invalid_reporting_window', windowIssue) }
   if (!REPORTING_CURRENCIES.includes(b.reporting_currency as ReportingCurrency)) {
     return {
       error: bad('invalid_reporting_currency', `reporting_currency must be one of ${REPORTING_CURRENCIES.join(', ')}.`),
@@ -441,9 +451,26 @@ function parseRequest(body: unknown): Parsed {
 
   return {
     reporting_year: b.reporting_year as number,
+    window: { start: b.window_start as string, end: b.window_end as string },
     reporting_currency: b.reporting_currency as ReportingCurrency,
     lines: out,
   }
+}
+
+/** T3b: why window_start and window_end are not the reporting window for `year`, or null when they are. */
+function reportingWindowProblem(year: number, start: unknown, end: unknown): string | null {
+  const ISO = /^\d{4}-\d{2}-\d{2}$/
+  const real = (s: string) => { const [y, m, d] = s.split('-').map(Number); const t = new Date(y, m - 1, d)
+    return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d }
+  if (typeof start !== 'string' || typeof end !== 'string' || !ISO.test(start) || !ISO.test(end) || !real(start) || !real(end)) {
+    return 'window_start and window_end must be real yyyy-mm-dd dates.'
+  }
+  if (end <= start) return `window_end ${end} must be after window_start ${start}.`
+  const expected = reportingWindowIso(year, Number(end.slice(5, 7)))
+  if (expected.start !== start || expected.end !== end) {
+    return `window ${start} to ${end} is not the reporting window for ${year} with that year end (${expected.start} to ${expected.end}).`
+  }
+  return null
 }
 
 // ── EDITION ──────────────────────────────────────────────────────────────────────────────────────
@@ -532,6 +559,7 @@ async function readActiveEdition(supabase: SupabaseLike): Promise<ActiveEdition 
 function priceLine(
   line: RequestLine,
   reporting_year: number,
+  window: { start: string; end: string },
   reporting_currency: ReportingCurrency,
   edition_id: string,
 ): LineResult {
@@ -543,6 +571,7 @@ function priceLine(
     factor_type: line.factor_type,
     reporting_currency,
     reporting_year,
+    window,
     spend_price_basis: line.spend_price_basis,
   })
 
@@ -677,7 +706,7 @@ function lineDisclosures(
  */
 function responseStatements(
   results: LineResult[],
-  reporting_year: number,
+  window: { start: string; end: string },
   edition: ActiveEdition,
 ): { disclosures: string[]; batch_summary: string[] } {
   const priced = results.filter((r): r is PricedLine => r.outcome === 'priced')
@@ -705,12 +734,14 @@ function responseStatements(
       `Spend was restated to ${priced[0].factor.price_year} euros using factor edition ${edition.id}, ` +
       `whose price data runs to ${edition.price_vintage_year}.`,
     )
-    if (reporting_year !== edition.price_vintage_year) {
+    // T3b: stated when the reporting window is not wholly inside the price vintage year, so a year ending
+    // 31 March 2025 is named by its dates. The vintage is a year (price_vintage_year), and reads as one.
+    if (!windowInsideYear(window, edition.price_vintage_year)) {
+      const pv = edition.price_vintage_year
       disclosures.push(
-        `The reporting year is ${reporting_year} but this edition's price data ends at ` +
-        `${edition.price_vintage_year}. Spend is treated as being at ${edition.price_vintage_year} ` +
-        `prices, so price changes between ${edition.price_vintage_year} and ${reporting_year} are not ` +
-        `reflected.`,
+        `Your reporting year runs from ${isoDateInWords(window.start)} to ${isoDateInWords(window.end)}, but this ` +
+        `edition's price data ends at ${pv}. Spend is treated as being at ${pv} prices, so price changes after ` +
+        `${pv} are not reflected.`,
       )
     }
     const basisMismatch = priced.filter(p => p.caveats.price_basis_mismatch).length

@@ -92,6 +92,7 @@ import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
+import { yearLabel, periodWords, reportingWindowIso } from '../../../lib/ghg/engine'
 
 // Floor 2023, the same as GHG's. This wizard's year selector is disabled and inherited whenever
 // the inventory is bound to a GHG inventory (`disabled={!!boundInventoryId}`), so a year no GHG
@@ -233,8 +234,9 @@ const SPEND_PRICED_IDS: readonly string[] = SPEND_PRICED_CATEGORIES.map(c => c.i
  * box changed, so editing Cat 2 would blank a priced Cat 4 and re-request it. The category id is part of
  * the key because two categories can hold the same sector and spend and still be different questions.
  */
-const spendLineKey = (catId: string, sectorKey: string, countryIso2: string, currency: string, reportingYear: number, spend: number) =>
-  JSON.stringify([catId, sectorKey, countryIso2, currency, reportingYear, spend])
+// T3b: the year end is part of the question (it moves the window the price year is checked against).
+const spendLineKey = (catId: string, sectorKey: string, countryIso2: string, currency: string, reportingYear: number, yearEndMonth: number, spend: number) =>
+  JSON.stringify([catId, sectorKey, countryIso2, currency, reportingYear, yearEndMonth, spend])
 
 /**
  * ⚠️ 400 ms. Long enough that typing a figure fires ONE request rather than one per keystroke —
@@ -1121,6 +1123,10 @@ export default function Scope3Dashboard() {
   const [company, setCompany] = useState('')
   const [sector, setSector] = useState('')
   const [reportingYear, setReportingYear] = useState(defaultReportingYear(new Date(), YEAR_FLOOR))
+  // T3b: the year end comes from the bound GHG inventory (scope3_inventories has no year columns); unbound, December.
+  const [yearEndMonth, setYearEndMonth] = useState(12)
+  const yl = yearLabel(reportingYear, yearEndMonth)
+  const windowWords = periodWords(reportingYear, yearEndMonth)
   const [currency, setCurrency] = useState('USD')
   const [revenue, setRevenue] = useState(0)
   // Primary country of supply. countryIso2 is the persisted value; the other four are presentation
@@ -1156,7 +1162,7 @@ export default function Scope3Dashboard() {
   // case it answers with a reason, not a crash.
   const [boundWorkings, setBoundWorkings] = useState<unknown>(null)
   const [boundLocations, setBoundLocations] = useState<unknown>(null)
-  const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; updated_at: string }>>([])
+  const [inventoryList, setInventoryList] = useState<Array<{ id: string; company_name: string; reporting_year: number; fiscal_year_end_month: number | null; updated_at: string }>>([])
   const [bindChecked, setBindChecked] = useState(false) // have we resolved bind status yet?
   const [cameFromGhg, setCameFromGhg] = useState(false) // arrived via ?from=ghg (unsaved GHG wizard)
   const [saving, setSaving] = useState(false)
@@ -1342,13 +1348,13 @@ export default function Scope3Dashboard() {
    *  was made for exactly this; otherwise the figure is pending, never the previous one. */
   const spendLiveKey = (catId: string): string | null =>
     spendInputsComplete(catId)
-      ? spendLineKey(catId, spendSectorOf(catId), countryIso2, currency, reportingYear, spendAmountOf(catId))
+      ? spendLineKey(catId, spendSectorOf(catId), countryIso2, currency, reportingYear, yearEndMonth, spendAmountOf(catId))
       : null
   /** The key of the question that may be SENT — the same, with the debounced spend. */
   const spendRequestKey = (catId: string): string | null => {
     const settled = spendDebounced[catId] ?? 0
     if (!spendNeedsPricing(catId) || !spendSectorOf(catId) || !countryIso2 || settled === 0) return null
-    return spendLineKey(catId, spendSectorOf(catId), countryIso2, currency, reportingYear, settled)
+    return spendLineKey(catId, spendSectorOf(catId), countryIso2, currency, reportingYear, yearEndMonth, settled)
   }
 
   /**
@@ -1407,6 +1413,9 @@ export default function Scope3Dashboard() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             reporting_year: reportingYear,
+            // T3b: the window, so the route checks the price year against these dates, not the year number.
+            window_start: reportingWindowIso(reportingYear, yearEndMonth).start,
+            window_end: reportingWindowIso(reportingYear, yearEndMonth).end,
             reporting_currency: currency,
             // The line id IS the category id: the route echoes ids back and requires them unique, and a
             // category can hold only one spend line.
@@ -1452,7 +1461,7 @@ export default function Scope3Dashboard() {
       }
     })()
     return () => controller.abort()
-  }, [spendRequestSig, countryIso2, currency, reportingYear])
+  }, [spendRequestSig, countryIso2, currency, reportingYear, yearEndMonth])
 
   /** Every category whose figure is still being priced. Read by the save gate, which must not write a
    *  total that is about to change. */
@@ -1519,6 +1528,7 @@ export default function Scope3Dashboard() {
     setBoundLocations(row.locations_data ?? null)
     setCompany(row.company_name)
     setReportingYear(row.reporting_year)
+    setYearEndMonth(row.fiscal_year_end_month ?? 12)
     setRevenue((row.revenue_millions ?? 0) * 1_000_000) // millions -> raw
     // Restore any previously saved Scope 3 work for this inventory.
     const { data: s3 } = await supabase
@@ -1573,7 +1583,7 @@ export default function Scope3Dashboard() {
         if (!session) return
         const { data } = await supabase
           .from('ghg_inventories')
-          .select('id, company_name, reporting_year, updated_at')
+          .select('id, company_name, reporting_year, fiscal_year_end_month, updated_at')
           .order('updated_at', { ascending: false })
         if (data) setInventoryList(data)
       })()
@@ -2966,6 +2976,9 @@ export default function Scope3Dashboard() {
       // sector the figures came from, which it has not been since the Cat 1 fallback was removed.
       ['Company sector', sectorLabel(sector)],
       ['Reporting year', reportingYear],
+      // T3b: the window, so the year above is never read as a calendar year it is not.
+      ['Reporting period', windowWords.period],
+      ['Year end', windowWords.yearEnd],
       // ⚠️ CSV_DP (six decimals, one gram), AND THE SAME PRECISION ON EVERY CATEGORY ROW BELOW. At 2
       // decimals a verifier adding up the categories reached a different total from the one stated here;
       // at raw float precision the cells carry IEEE-754 artefacts. The screen rounds for reading instead.
@@ -3038,7 +3051,7 @@ export default function Scope3Dashboard() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${company}_Scope3_${reportingYear}.csv`
+    a.download = `${company}_Scope3_${yl.fileTag}.csv`
     a.click()
   }
 
@@ -3123,7 +3136,7 @@ export default function Scope3Dashboard() {
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Company name</label>
           <input style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' } : inputStyle} value={company} onChange={e => setCompany(e.target.value)} placeholder="Acme Corporation" readOnly={!!boundInventoryId} />
-          {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {reportingYear} GHG inventory. Company and year are set there.</div>}
+          {boundInventoryId && <div style={{ fontSize: 11, color: '#0F6E56', marginTop: 6 }}>🔗 Linked to your {company || 'GHG'} {yl.heading} GHG inventory. Company and year are set there.</div>}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           {/* ⚠️ THIS SECTOR PRICES NOTHING AND SUGGESTS NOTHING, AND THE LABEL SAYS ONLY WHAT IS TRUE.
@@ -3144,7 +3157,7 @@ export default function Scope3Dashboard() {
         <div>
           <label style={labelStyle}>Reporting year</label>
           <select style={boundInventoryId ? { ...inputStyle, background: '#f8f7f5', color: 'var(--color-ink-muted)', cursor: 'not-allowed' } : inputStyle} value={reportingYear} onChange={e => setReportingYear(Number(e.target.value))} disabled={!!boundInventoryId}>
-            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{y}</option>)}
+            {reportingYearOptions(new Date(), YEAR_FLOOR).map(y => <option key={y} value={y}>{yearLabel(y, yearEndMonth).heading}</option>)}
           </select>
         </div>
         <div>
@@ -4177,7 +4190,7 @@ export default function Scope3Dashboard() {
               {medCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#E6F1FB', color: '#0C447C', fontWeight: 600 }}>{medCount} activity data</span>}
               {lowCount > 0 && <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: '#FEF3E2', color: 'var(--color-state-warn)', fontWeight: 600 }}>{lowCount} not calculated</span>}
             </div>
-            <div className="tq-summary-sub">{company} · {reportingYear} · GHG Protocol Scope 3 Standard</div>
+            <div className="tq-summary-sub">{company} · {yl.heading} · GHG Protocol Scope 3 Standard</div>
           </div>
           {/* The figure moves to the right, which is where .tq-summary-figure puts it. Its colour
               is var(--tq-mod) from the class — it was '#64fe3e', a retired-gradient lime that
@@ -4380,7 +4393,7 @@ export default function Scope3Dashboard() {
             { label: 'Categories in scope', val: categoriesInScope.length },
             { label: 'Categories in total', val: categoriesInTotal.length },
             { label: 'Total Scope 3', val: totalScope3Label },
-            { label: 'Reporting year', val: reportingYear },
+            { label: 'Reporting year', val: yl.heading },
           ].map(({ label, val }) => (
             <div key={label}>
               <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginBottom: 4 }}>{label}</div>
@@ -4470,7 +4483,7 @@ export default function Scope3Dashboard() {
                 <select style={inputStyle} defaultValue="" onChange={e => { if (e.target.value) bindToInventory(e.target.value) }}>
                   <option value="" disabled>Select an inventory…</option>
                   {inventoryList.map(inv => (
-                    <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')}, {inv.reporting_year}</option>
+                    <option key={inv.id} value={inv.id}>{(inv.company_name || 'Untitled')}, {yearLabel(inv.reporting_year, inv.fiscal_year_end_month).heading}</option>
                   ))}
                 </select>
               </>
