@@ -55,7 +55,7 @@ import {
   deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
-  findSteamFactorGaps, steamFactorFor,
+  findSteamFactorGaps, steamFactorFor, steamPricing, STEAM_ESTIMATE_SHORT,
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
@@ -2731,11 +2731,15 @@ workings: saved.workings,
                           is more accurate than ours and will be used instead, worth giving your verifier where
                           steam is a material part of your footprint.
                         </div>
+                      ) : entry.kind === 'estimated' && !hasSupplier && steamPricing(loc) ? (
+                        // R14: no publisher prints a factor here, so the line prices on a labelled estimate. The full
+                        // note is on the workings row; this is its short form, beside the figure.
+                        <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.5 }}>{STEAM_ESTIMATE_SHORT}</div>
                       ) : null}
-                      {/* FI7: with no published factor, the message is the FI1 line's, shown beside the figure above
-                          (UnpricedNote), so it is said once. It clears when a supplier figure is entered below. */}
-                      <Field label={`Supplier emission factor: kg CO₂e per ${basisLabel(supBasis)}${entry?.kind === 'published' ? ' (optional)' : ' (required)'}`}>
-                        <input type="number" step="any" value={loc.purchased_steam_supplier_ef ?? ''} placeholder={entry?.kind === 'published' ? 'Leave blank to use the published factor' : 'e.g. 0.198'}
+                      {/* FI7: where even the estimate cannot be computed (a Canadian site with no province), the message is
+                          the FI1 line's, shown beside the figure above (UnpricedNote), so it is said once. */}
+                      <Field label={`Supplier emission factor: kg CO₂e per ${basisLabel(supBasis)}${entry?.kind === 'published' || entry?.kind === 'estimated' ? ' (optional)' : ' (required)'}`}>
+                        <input type="number" step="any" value={loc.purchased_steam_supplier_ef ?? ''} placeholder={entry?.kind === 'published' ? 'Leave blank to use the published factor' : entry?.kind === 'estimated' ? 'Leave blank to use the estimate' : 'e.g. 0.198'}
                           onChange={e => {
                             const v = e.target.value === '' ? undefined : Number(e.target.value)
                             updateLocation(activeLocation, 'purchased_steam_supplier_ef', v as never)

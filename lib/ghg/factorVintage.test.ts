@@ -113,17 +113,18 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     expect(buildFactorEditions([supplied], 2026).US?.steam, 'and the stored map agrees').toBeUndefined()
   })
 
-  it('G5 a jurisdiction with NO published steam factor carries none either', () => {
-    // Canada publishes no purchased-steam factor; buildWorkings emits a no_published_factor row.
-    // Nothing priced it, so there is no edition — and the row must not borrow the US one.
+  it('G5 a jurisdiction with NO published steam factor carries its gas table\'s edition, never a steam one (R14)', () => {
+    // Canada publishes no purchased-steam factor. Since R14 the row is a labelled estimate from ECCC's own natural gas
+    // factor / 0.80, so it carries that table's edition, and never borrows the US steam one.
     const ca = loc({
       country: 'CA', province: 'ON', grid_region: 'ON',
       has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'mmbtu',
     })
     const row = rowsFor(ca).find(r => r.stream === 'purchased_steam')
-    expect(row.declaration).toBe('no_published_factor')
-    expect(row.factor_vintage, 'no factor applied, so no edition').toBeUndefined()
-    expect(STEAM_EDITION.CA, 'and no label is declared for it').toBeUndefined()
+    expect(row.declaration).toBeUndefined()
+    expect(row.estimated).toBe('steam_gas_boiler_80')
+    expect(row.factor_vintage, 'the gas table that priced the estimate').toBe('ECCC 2025 v3.0')
+    expect(STEAM_EDITION.CA, 'and no steam label is declared for it').toBeUndefined()
   })
 
   it('G6 a combustion vintage does NOT move with the reporting year', () => {

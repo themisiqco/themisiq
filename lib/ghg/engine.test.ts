@@ -38,7 +38,7 @@ import {
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
   findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
   notCountedLines, FIX_DATES, FIX_REVERSED, FIX_UNITS,
-  unpricedLines, UNPRICED_MESSAGE, UNPRICED_STATUSES, SUPPLIER_SPECIFIC_ENTRY_METHOD,
+  unpricedLines, UNPRICED_MESSAGE, UNPRICED_STATUSES, SUPPLIER_SPECIFIC_ENTRY_METHOD, STEAM_BOILER_EFFICIENCY, steamEstimateNote, STEAM_ESTIMATE_SHORT,
   M3_PER_MCF, EF_CA_NG_CO2_M3, NZ_GAS_BASIS_NOTE,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
@@ -2218,33 +2218,30 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     expect(row.ef_source).toBe(EF_SOURCES.steam_us);
   });
 
-  it('T4 CA/AU/NZ/EU produce NO NUMBER and NO borrowed factor', () => {
-    // ⚠️ ASSERTS THE ABSENCE POSITIVELY. A test that only checked "the total did not change" would
-    // pass just as happily if the factor silently became 0 — the failure mode this must catch.
+  it('T4 CA/AU/NZ/EU price on their OWN gas factor / 0.80, labelled as an estimate, never a borrowed steam factor (R14)', () => {
+    // Was "produce NO NUMBER". R14 prices these on a labelled estimate. What must still hold: no other country's factor,
+    // and the row says it is an estimate.
     for (const country of UNSEEDED) {
-      const l = steamLoc({ country });
+      const l = steamLoc({ country, ...(country === 'CA' ? { province: 'ON', grid_region: 'ON' } : {}) });
       const row = steamRow(l);
-      expect(row.declaration, `${country}`).toBe('no_published_factor');
-      expect(row.result_tco2e, `${country}: null, never 0 — 0 is a claim of no emissions`).toBeNull();
-      expect(row.emission_factor, `${country}: no factor may be shown`).toBe(NOT_PROVIDED);
-      expect(row.ef_source, `${country}: no citation, because nothing priced it`).toBe(NOT_PROVIDED);
-      // The reported quantity IS carried — "you told us 1000 GJ and we could not price it".
+      expect(row.estimated, `${country}`).toBe('steam_gas_boiler_80');
+      const gas = pickEF(l, 'natural_gas_gj');
+      expect(gas.publisher?.jurisdiction, `${country}: its own gas table`).toBe(country === 'DE' ? 'EU' : country);
+      expect(row.result_tco2e, `${country}`).toBeCloseTo(calcGas({ co2: gas.factor.co2 / 0.8, ch4: gas.factor.ch4 / 0.8, n2o: gas.factor.n2o / 0.8 }, 1000, 'AR6').total, 9);
+      expect(row.ef_source, `${country}`).toContain(`Estimate: ${gas.publisher!.publisher} natural gas / 0.80`);
       expect(row.activity_data, `${country}`).toBe(1000);
       expect(row.activity_unit, `${country}`).toBe('gj');
-      // And nothing reached the totals.
-      expect(calcLocation(l, 'AR6', 2025).s2_location, `${country}`).toBe(0);
-      expect(calcLocation(l, 'AR6', 2025).s2_market, `${country}`).toBe(0);
     }
   });
-
   it('T5 no unseeded jurisdiction lands on the US figure, at any AR set', () => {
     // The specific regression: a `?? EF` reappearing in the steam path. 1000 GJ under the US factor
     // is 62.9364 t; if any of these ever equals that, the fallback is back.
     for (const country of UNSEEDED) {
       for (const g of ['AR4', 'AR5', 'AR6'] as const) {
-        const t = calcLocation(steamLoc({ country }), g, 2025).s2_location;
+        const t = calcLocation(steamLoc({ country, ...(country === 'CA' ? { province: 'ON', grid_region: 'ON' } : {}) }), g, 2025).s2_location;
         expect(t, `${country} ${g} must not be the US factor`).not.toBeCloseTo(62.9364, 2);
-        expect(t, `${country} ${g}`).toBe(0);
+        // R14: the estimate, from the country's own gas table (T4); never 0, never the US figure.
+        expect(t, `${country} ${g}`).toBeGreaterThan(0);
       }
     }
   });
@@ -2275,21 +2272,16 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     ).toEqual(['EF.steam_mmbtu', 'EF_UK.steam_kwh']);
   });
 
-  it('T7 the two absence kinds are distinguishable in code, not just in prose', () => {
-    // CONFIRMED-UNPUBLISHED (searched, none exists) vs NOT-INVESTIGATED (no primary source consulted)
-    // license different actions, and a comment cannot be read by a caller.
+  it('T7 the estimated entries keep the record of what was checked, and the EU does not claim a search (R14)', () => {
+    // Was "the two absence kinds". R14 makes CA, AU, NZ and EU an 'estimated' kind; `searched` stays as the record.
     for (const country of ['CA', 'AU', 'NZ']) {
       const e = steamFactorFor({ country }) as any;
-      expect(e.kind, `${country} was searched`).toBe('unpublished');
+      expect(e.kind, `${country}`).toBe('estimated');
       expect(e.searched.length, `${country} must record WHAT was searched`).toBeGreaterThan(40);
     }
     const eu = steamFactorFor({ country: 'DE' }) as any;
-    expect(eu.kind, 'no EU primary source was consulted').toBe('not_searched');
-    expect(eu.searched, 'must not claim a search').toBe('');
-    // And the customer-facing wording must not assert one either.
-    expect(eu.guidance.toLowerCase()).not.toContain('no published');
-    expect(steamRow(steamLoc({ country: 'DE' })).quantification_method, 'no "Checked:" line for the EU').toBeUndefined();
-    expect(steamRow(steamLoc({ country: 'CA' })).quantification_method).toContain('Checked:');
+    expect(eu.kind).toBe('estimated');
+    expect(eu.searched, 'says no source was searched, rather than claiming one').toMatch(/^No primary source searched/);
   });
 
   it('T8 a supplier-specific factor prices the stream and outranks a published default', () => {
@@ -2314,11 +2306,11 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     // The reason this is NOT MissingEF/assertPriceable: that throws, and unpriceableReason turns a
     // throw into a whole-location exclusion. A Canadian plant must not report nothing because of one
     // district-heat line.
-    const l = steamLoc({ country: 'CA', grid_region: 'ON', electricity_kwh: 100_000,
-                         has_natural_gas: true, natural_gas_amount: 500, natural_gas_unit: 'm3' });
+    // R14: steam is unpriceable only where the estimate cannot be computed: a Canadian site with no province.
+    const l = steamLoc({ country: 'CA', grid_region: '', province: '',
+                         has_diesel_stationary: true, diesel_stationary_amount: 500, diesel_stationary_unit: 'litres' });
     const c = calcLocation(l, 'AR6', 2025);
-    expect(c.s1_total, 'gas still priced').toBeGreaterThan(0);
-    expect(c.s2_location, 'electricity still priced').toBeGreaterThan(0);
+    expect(c.s1_total, 'diesel still priced').toBeGreaterThan(0);
     expect(findUnpriceableLocations([l], 'AR6', 2025), 'the location is NOT excluded').toEqual([]);
     // And the steam gap is reported by its own probe rather than by silence.
     expect(findSteamFactorGaps([l]).map(g => g.jurisdiction)).toEqual(['CA']);
@@ -6187,42 +6179,79 @@ describe('FI4. propane by mass', () => {
 
 // ── FI7: purchased steam with no published factor is a plain, unpriced FI1 line ─────────────────────────────────
 // docs/review/design-derived-figures.md "FI7". CA, AU and NZ publish no steam factor (searched); the EU is not searched.
-describe('FI7. steam or district heat with no published factor', () => {
+describe('FI7. steam or district heat with no published factor (FI7b: priced on a labelled estimate, R14)', () => {
   const steam = (country: string, name: string, o: Partial<Location> = {}) => loc({ name, country, grid_region: gridRegionForCountry(country) || (country === 'CA' ? 'ON' : ''),
     province: country === 'CA' ? 'ON' : undefined, has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'gj', ...o })
   const steamRow = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; unpriced?: { reason: string }; entry_method?: string }[])
     .find(r => r.stream === 'purchased_steam')!
 
-  it('FI7-1 each kind shows its exact message, naming the country as the selector shows it and the site', () => {
-    const msg = (l: Location) => unpricedLines(l).map(u => [u.reason, u.message])
-    expect(msg(steam('CA', 'Toronto plant'))).toEqual([['steam_factor_missing',
-      'There is no published factor in Canada for purchased steam or district heat, so this line at Toronto plant is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.']])
-    expect(msg(steam('AU', 'Perth depot'))[0][1]).toBe('There is no published factor in Australia for purchased steam or district heat, so this line at Perth depot is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.')
-    expect(msg(steam('NZ', 'Auckland office'))[0][1]).toContain('There is no published factor in New Zealand for purchased steam')
-    expect(msg(steam('DE', 'Berlin office'))).toEqual([['steam_factor_missing',
-      'We hold no factor for purchased steam or district heat in Germany, so this line at Berlin office is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.']])
-    // Greece is stored as EL (Eurostat) and named from GR, as the selector names it.
-    expect(msg(steam('EL', 'Athens'))[0][1]).toContain('in Greece, so this line at Athens')
-    for (const c of ['CA', 'AU', 'NZ', 'DE']) expect(msg(steam(c, 'X'))[0][1]).not.toContain('\u2014')
+  // FI7b (R14): CA, AU, NZ and EU now price on a labelled estimate; FI7's "not counted" message is left for the case the
+  // estimate cannot be computed (a Canadian site with no province).
+  it('FI7-1 EPA check: Table 7 steam CO2 is Table 1 natural gas per mmBtu / 0.80, to the published precision', () => {
+    expect(EF.steam_mmbtu.co2).toBe(Number((EF.natural_gas_mmbtu.co2 / STEAM_BOILER_EFFICIENCY).toFixed(2)))
+    expect(EF.steam_mmbtu.ch4).toBeCloseTo(EF.natural_gas_mmbtu.ch4 / 0.8, 12)
+    expect(STEAM_BOILER_EFFICIENCY).toBe(0.8)
   })
 
-  it('FI7-2 the row is unpriced (null, not 0) and the export gate lists it', () => {
-    const l = steam('CA', 'Toronto plant', { electricity_kwh: 10_000 })
-    const r = steamRow(l)
+  it('FI7-2 Ontario 100 GJ = 6,222.5 kg CO2 plus CH4 and N2O, flagged, with the note', () => {
+    const on = steam('CA', 'Toronto plant', { purchased_steam_mmbtu: 100 })
+    const r = steamRow(on) as ReturnType<typeof steamRow> & { estimated?: string; ef_source?: string }
+    const perGj = 1.921 / 0.03859 / 0.8
+    expect(Number((perGj * 100).toPrecision(5))).toBe(6222.5)
+    const co2 = calcGas({ co2: perGj, ch4: 0.000037 / 0.03859 / 0.8, n2o: 0.000035 / 0.03859 / 0.8 }, 100, 'AR6')
+    expect(r.result_tco2e).toBeCloseTo(co2.total, 9)
+    expect(co2.co2 * 1000).toBeCloseTo(6222.47, 2)
+    expect(r.estimated).toBe('steam_gas_boiler_80')
+    expect(r.note).toBe(steamEstimateNote('Canada', '49.78 kg CO2 (with CH4 and N2O on the same basis) per GJ gross natural gas',
+      `${EF_SOURCES.combustion_ca}, ON marketable natural gas per m³, at Canada's national gross heat content of 38.59 MJ/m³ (ECCC National Inventory Report 1990-2023, Part 2, Table A4-2)`))
+    expect(r.note).toContain('Estimated: no published factor for purchased steam or district heat in Canada. Calculated as if generated from natural gas at 80% efficiency:')
+    expect(r.note).toContain('/ 0.80 (method: GHG Protocol Scope 2 Guidance, Appendix A; 80% assumption: US EPA GHG Emission Factors Hub 2025, Table 7). It excludes distribution losses and may overstate a network that uses low-carbon heat. Enter your provider\'s emission intensity to replace it.')
+    expect(r.note).not.toContain('\u2014')
+    expect(unpricedLines(on)).toEqual([])
+  })
+
+  it('FI7-2b AU, NZ commercial and DE, 100 GJ each, from their own gas factor / 0.80', () => {
+    const co2kg = (l: Location) => (steamRow(l).result_tco2e ?? 0) * 1000
+    expect(co2kg(steam('AU', 'Perth depot', { purchased_steam_mmbtu: 100 }))).toBeCloseTo(6441.25, 6)
+    expect(Number(co2kg(steam('NZ', 'Auckland office', { purchased_steam_mmbtu: 100 })).toPrecision(5))).toBe(6785.8)
+    const de = steam('DE', 'Berlin office', { purchased_steam_mmbtu: 100 })
+    const deF = pickEF(de, 'natural_gas_gj').factor
+    expect(deF.co2 / 0.8 * 100).toBeCloseTo(6311.25, 6)
+    expect(co2kg(de)).toBeCloseTo(calcGas({ co2: deF.co2 / 0.8, ch4: deF.ch4 / 0.8, n2o: deF.n2o / 0.8 }, 100, 'AR6').total * 1000, 6)
+    expect(steamRow(de).note).toContain('in Germany. Calculated as if generated from natural gas at 80% efficiency: 50.49 kg CO2')
+    // A figure in another energy unit converts exactly to GJ first.
+    const nzKwh = steam('NZ', 'Auckland office', { purchased_steam_mmbtu: 27777.777777777777, purchased_steam_unit: 'kwh' })
+    expect(steamRow(nzKwh).result_tco2e).toBeCloseTo(steamRow(steam('NZ', 'Auckland office', { purchased_steam_mmbtu: 100 })).result_tco2e!, 9)
+  })
+
+  it('FI7-2c CA with no province is unpriced with the province message, and the gate lists it', () => {
+    const l = steam('CA', 'Regina plant', { province: '', grid_region: '' })
+    expect(unpricedLines(l).map(u => [u.reason, u.message])).toEqual([['province_missing',
+      'The province for Regina plant is not set, so its purchased steam is not counted. Choose the province. Export is blocked until it is chosen.']])
+    const r = steamRow(l) as ReturnType<typeof steamRow> & { emission_factor?: string; ef_source?: string }
     expect(r.result_tco2e).toBeNull()
     expect(r.declaration).toBe('no_published_factor')
-    expect(r.unpriced?.reason).toBe('steam_factor_missing')
-    expect(r.note).toBe(`NOT PRICED: ${unpricedLines(l)[0].message} Nothing from this stream is included in any total on this report.`)
-    const gate = findUnresolvedCoverage([l], 2025, 12, []).filter(i => i.status === 'steam_factor_missing')
-    expect(gate.map(i => [i.field, i.message])).toEqual([['purchased_steam_mmbtu', unpricedLines(l)[0].message]])
-    expect(UNPRICED_STATUSES.has('steam_factor_missing')).toBe(true)
-    // The rest of the location prices, and the steam adds nothing.
-    expect(calcInventory([l], 'AR6', 2025)).toEqual(calcInventory([{ ...l, has_purchased_steam: false, purchased_steam_mmbtu: 0 }], 'AR6', 2025))
-    // The page lists every unpriced line in the gate, and no longer has a separate steam line.
+    // Nothing priced it: no factor and no citation are shown (was T4's assertion, before R14).
+    expect(r.emission_factor).toBe(NOT_PROVIDED)
+    expect(r.ef_source).toBe(NOT_PROVIDED)
+    expect(findUnresolvedCoverage([l], 2025, 12, []).some(i => i.status === 'province_missing' && i.field === 'purchased_steam_mmbtu')).toBe(true)
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
     expect(page).toContain('{unpricedAll.map(u => (')
-    expect(page).not.toContain('report{steamFactorGaps.length > 1')
-    expect(page).not.toContain('<strong>No published factor for this jurisdiction.</strong>')
+  })
+
+  it('FI7-2d the estimate note reaches every surface: workings row, review table, verifier page, PDF and XLSX methods', () => {
+    const l = steam('AU', 'Perth depot')
+    const note = steamRow(l).note!
+    expect(note.startsWith('Estimated: no published factor')).toBe(true)
+    expect(factorDerivationsFor([l])).toContain(`Purchased steam: ${note}`)
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain("{r.note && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3")
+    expect(page).toContain("...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),")
+    expect(page).toContain('{STEAM_ESTIMATE_SHORT}')
+    expect(STEAM_ESTIMATE_SHORT).toBe("Estimated from natural gas at 80% efficiency. Enter your provider's figure below to replace it.")
+    const verify = readFileSync(join(process.cwd(), 'app/verify/[token]/page.tsx'), 'utf8')
+    expect(verify).toContain('{rowNoteOf(w) && (')
+    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),")
   })
 
   it('FI7-3 a supplier figure clears the issue and prices, unchanged', () => {
@@ -6232,6 +6261,9 @@ describe('FI7. steam or district heat with no published factor', () => {
     const r = steamRow(l)
     expect(r.entry_method).toBe(SUPPLIER_SPECIFIC_ENTRY_METHOD)
     expect(r.result_tco2e).toBeCloseTo(500 * KWH_PER_GJ * 0.198 / 1000, 9)
+    // R14: the supplier figure replaces the estimate, and the flag and note go.
+    expect((r as { estimated?: string }).estimated).toBeUndefined()
+    expect(r.note ?? '').not.toContain('Estimated')
   })
 
   it('FI7-4 the selected steam unit is labelled from the unit: a UK location in kWh reads kWh', () => {
@@ -6242,8 +6274,17 @@ describe('FI7. steam or district heat with no published factor', () => {
     expect(page).toContain("{unitOptionsShowing(steamUnitOptions(loc.country), loc.purchased_steam_unit ?? 'mmbtu', false).map(([val, label]) => (")
   })
 
-  it('FI7-5 no US steam fallback: every jurisdiction without a factor is unpriced, and the US still prices from EPA', () => {
-    for (const c of ['CA', 'AU', 'NZ', 'FR']) expect(steamRow(steam(c, 'Site')).result_tco2e, c).toBeNull()
-    expect(steamRow(steam('US', 'Site', { purchased_steam_unit: 'mmbtu' })).result_tco2e).toBeGreaterThan(0)
+  it('FI7-5 US and UK steam unchanged; no country uses another country\'s gas factor', () => {
+    expect(steamRow(steam('US', 'Site', { purchased_steam_mmbtu: 1000, purchased_steam_unit: 'mmbtu' })).result_tco2e)
+      .toBeCloseTo(calcGas(EF.steam_mmbtu, 1000, 'AR6').total, 12)
+    const uk = steamRow(steam('GB', 'Site', { purchased_steam_mmbtu: 1000, purchased_steam_unit: 'kwh' }))
+    expect(uk.result_tco2e).toBeCloseTo(calcGas((steamFactorFor({ country: 'GB' }) as { ef: { co2: number; ch4: number; n2o: number } }).ef, 1000, 'AR6').total, 12)
+    expect((uk as { estimated?: string }).estimated).toBeUndefined()
+    for (const c of ['CA', 'AU', 'NZ', 'FR']) {
+      const l = steam(c, 'Site')
+      expect(pickEF(l, 'natural_gas_gj').publisher?.jurisdiction, c).toBe(c === 'FR' ? 'EU' : c)
+      expect(steamRow(l).result_tco2e, c).not.toBeCloseTo(calcGas(EF.steam_mmbtu, 500 / 1.05505585262, 'AR6').total, 6)
+    }
   })
+
 });

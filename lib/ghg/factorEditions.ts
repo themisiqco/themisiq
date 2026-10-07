@@ -28,7 +28,7 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, combustionLinePublishers,
+  efJurisdiction, steamFactorFor, steamPricing, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, combustionLinePublishers,
   COMBUSTION_EDITION, STEAM_EDITION,
 } from './engine'
 import type { Location } from './engine'
@@ -314,6 +314,14 @@ export function buildFactorEditions(locations: readonly Location[], year: number
       const j = factorJurisdiction(loc, 'steam')
       const edition = j ? STEAM_EDITION[j] : undefined
       if (j && edition) (out[j] ??= {}).steam = { source: CITATIONS[j].steam!, edition }
+    } else if (streamState(loc, 'purchased_steam') === 'quantified'
+        && !(typeof loc.purchased_steam_supplier_ef === 'number' && loc.purchased_steam_supplier_ef > 0)
+        && steamFactorFor(loc)?.kind === 'estimated' && steamPricing(loc)) {
+      // R14: an estimated steam factor is the jurisdiction's own natural gas table / 0.80, so that table's edition is
+      // what priced it, and it is recorded as such, marked as the estimate. No estimate (a Canadian site with no
+      // province) priced nothing and records nothing.
+      const j = efJurisdiction(loc) as FactorJurisdiction | null
+      if (j) (out[j] ??= {}).steam = { source: `${CITATIONS[j].combustion}: natural gas / 0.80 (steam estimate, R14)`, edition: COMBUSTION_EDITION[j] }
     }
   }
 

@@ -8,7 +8,7 @@ import {
 import type { FactorEditions } from './factorEditions'
 import { buildCompanySeries } from './series'
 import type { InventoryRow } from './series'
-import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, unpricedLines, buildWorkings } from './engine'
+import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, unpricedLines, buildWorkings, COMBUSTION_EDITION } from './engine'
 import type { Location } from './engine'
 
 // THE COLUMN EXISTS BECAUSE A 26% FALL LOOKED LIKE PERFORMANCE.
@@ -255,15 +255,23 @@ describe('no edition is invented for a family that priced nothing', () => {
     expect(ed.UK?.combustion, 'steam must NOT be filed under combustion').toBeUndefined()
   })
 
-  it('F15b a jurisdiction with no published steam factor names no steam edition', () => {
-    // CA/AU/NZ/EU publish nothing for purchased steam. An edition here would invent a publication.
-    for (const country of ['CA', 'AU', 'NZ', 'DE']) {
+  it('F15b a jurisdiction with no published steam factor names its GAS table as the estimate\'s edition, never a steam one (R14)', () => {
+    // CA/AU/NZ/EU publish nothing for purchased steam. Since R14 the line prices on the jurisdiction's own natural gas
+    // factor / 0.80, so the gas table's edition is what priced it, recorded as the estimate. No steam publication is
+    // invented, and a Canadian site with no province (no gas factor, no estimate) records nothing.
+    for (const [country, extra] of [['AU', {}], ['NZ', {}], ['DE', {}], ['CA', { province: 'ON', grid_region: 'ON' }]] as const) {
       const ed = buildFactorEditions([
         loc({ country, grid_region: '', has_natural_gas: false, natural_gas_amount: 0, electricity_kwh: 0,
-              has_purchased_steam: true, purchased_steam_mmbtu: 500 }),
-      ], 2026)
-      expect(ed, `${country}: no published steam factor, so no steam edition`).toEqual({})
+              has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'gj', ...extra }),
+      ], 2026) as Record<string, { steam?: { source: string; edition: string } }>
+      const j = country === 'DE' ? 'EU' : country
+      expect(Object.keys(ed), country).toEqual([j])
+      expect(ed[j].steam!.source, country).toContain('natural gas / 0.80 (steam estimate, R14)')
+      expect(ed[j].steam!.edition, country).toBe(COMBUSTION_EDITION[j as keyof typeof COMBUSTION_EDITION])
     }
+    const noProvince = buildFactorEditions([loc({ country: 'CA', grid_region: '', province: '', has_natural_gas: false, natural_gas_amount: 0,
+      electricity_kwh: 0, has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'gj' })], 2026)
+    expect(noProvince, 'CA with no province: no estimate, no edition').toEqual({})
   })
 
   it('F15c a SUPPLIER-specific factor records no edition, even in a seeded jurisdiction', () => {
@@ -804,9 +812,11 @@ describe('the states a verifier and a customer each see', () => {
       ['no locations', null],
       ['declared-unquantified', bare({ country: 'US', has_natural_gas: true, natural_gas_amount: 0 })],
       ['steam CA', bare({ country: 'CA', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
-      ['steam AU', bare({ country: 'AU', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
-      ['steam NZ', bare({ country: 'NZ', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
-      ['steam EU', bare({ country: 'DE', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj' })],
+      // R14: AU, NZ and EU steam now price on the labelled gas-boiler estimate, which records its gas table's edition;
+      // CA steam with no province (above) still cannot. Replaced by EU lines with no cited property (FI3, FI4).
+      ['EU gas m3', bare({ country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
+      ['EU heating oil litres', bare({ country: 'DE', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' })],
+      ['EU LPG litres', bare({ country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'litres' })],
       ['steam SUPPLIER-specific', bare({ country: 'GB', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj', purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh' })],
       ['electricity us_average', bare({ country: 'US', electricity_kwh: 100_000 })],
       ['electricity region ""', bare({ country: 'US', grid_region: '', electricity_kwh: 100_000 })],

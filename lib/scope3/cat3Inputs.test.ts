@@ -394,3 +394,21 @@ describe('Category 3 passes over a zero row (every bill outside the year) silent
     expect(r.undeclared_detail).toContainEqual({ location: 'Site', stream: 'natural_gas', state: 'declared_unquantified' })
   })
 })
+
+describe('R14: an estimated steam row reaches Category 3 as purchased heat (Scope 2), never as Scope 1', () => {
+  it('C3I-R14 a Canadian site with an estimated steam figure gives a purchased_steam input, and no Scope 1 skip', () => {
+    const l = answered({ name: 'Toronto plant', country: 'CA', province: 'ON', grid_region: 'ON',
+      has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' }, ['purchased_steam'])
+    const rows = workingsOf([l])
+    const steamRow = rows.find(r => r.stream === 'purchased_steam')!
+    expect((steamRow as { estimated?: string }).estimated).toBe('steam_gas_boiler_80')
+    expect(steamRow.scope).toBe(2)
+    const r = cat3InputsFrom(rows, [l])
+    expect(r.inputs!.rows.map(x => x.stream)).toEqual(['purchased_steam'])
+    expect(r.skipped.filter(s => s.code === 'scope1_not_priced' || s.code === 'scope2_not_priced')).toEqual([])
+    // With no province there is no estimate, and the skip is the Scope 2 one, as before.
+    const none = answered({ name: 'Regina plant', country: 'CA', province: '', grid_region: '',
+      has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' }, ['purchased_steam'])
+    expect(cat3InputsFrom(workingsOf([none]), [none]).skipped).toContainEqual({ code: 'scope2_not_priced', location: 'Regina plant', stream: 'purchased_steam' })
+  })
+})

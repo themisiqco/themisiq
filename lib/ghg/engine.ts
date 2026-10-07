@@ -660,6 +660,8 @@ export function factorDerivationsFor(locations: readonly { country?: string }[])
       const from = loc.purchased_steam_unit ?? 'mmbtu'
       const c = priced && from !== priced.basis ? exactConversion(from, priced.basis) : null
       if (c) out.push(`Purchased steam: ${words(from)} converted to ${words(priced!.basis)} (${c.statement}, exact).`)
+      // R14: an estimated steam factor is a derivation, so the PDF and XLSX methods tables carry its note too.
+      if (priced?.estimated) out.push(`Purchased steam: ${priced.estimated.note}`)
     }
   }
   return [...new Set(out)]
@@ -2477,12 +2479,18 @@ function validateCompleteness(loc: Location): string[] {
 // `basis`), never chosen here. A factor and the unit it is per are one thing; this is what keeps
 // them from separating.
 export type SteamUnit = 'mmbtu' | 'gj' | 'kwh'
-/** The units a steam factor can be published in. A subset of SteamUnit: nobody publishes per GJ. */
-export type SteamBasis = 'mmbtu' | 'kwh'
+/** The units a steam factor is held in: EPA per MMBtu, DEFRA per kWh, and (R14) the gas-boiler estimate per GJ. */
+export type SteamBasis = 'mmbtu' | 'kwh' | 'gj'
 
 export function steamToBasis(amount: number, unit: SteamUnit | undefined, basis: SteamBasis): { amount: number; note?: string } {
   const from = unit ?? 'mmbtu'
   if (from === basis) return { amount }
+  // R14: the estimate is per GJ. Any other energy unit converts to it exactly, with the conversion stated.
+  if (basis === 'gj') {
+    const c = exactConversion(from, 'gj')!
+    const out = amount * c.toPerFrom
+    return { amount: out, note: `${amount} ${EXACT_UNITS[from].many} converted to ${out.toFixed(4)} GJ (${c.statement}, exact)` }
+  }
   // Each note names the DEFINING constant, not just the arithmetic — a verifier retyping the row has
   // to be able to see which Btu (there are several) or which kWh is meant. Same standard as the
   // fuel-oil note's "(exact, NIST)".
@@ -2546,7 +2554,15 @@ type SteamAbsent = {
   /** Customer-facing remedy. Must not assert a search that did not happen. */
   guidance: string
 }
-export type SteamEntry = SteamPublished | SteamAbsent
+/**
+ * R14 (7 Oct 2026): no publisher prints a factor, so the line prices on a LABELLED ESTIMATE: the country's own
+ * natural gas factor per unit of energy (gross) / 0.80. Method: GHG Protocol Scope 2 Guidance, Appendix A, endnote 1
+ * (page 92). The 0.80 is US EPA GHG Emission Factors Hub 2025, Table 7 note ("These factors assume natural gas fuel is
+ * used to generate steam or heat at 80 percent thermal efficiency"); the emission factor is always the site's own
+ * country's (R2). `searched` keeps the record of what was checked for a published factor.
+ */
+type SteamEstimated = { kind: 'estimated'; searched: string }
+export type SteamEntry = SteamPublished | SteamAbsent | SteamEstimated
 
 const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
   // EPA Hub 2025 Table 7 — a real gas split, so calcGas applies OUR selected GWP set and the row
@@ -2559,18 +2575,16 @@ const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
   // factor_editions records EF_SOURCES.steam_uk, the bare citation, via factorEditions.ts.
   UK: { kind: 'published', ef: EF_UK.steam_kwh, basis: 'kwh', source: citeWithLocator('steam_uk') },
   CA: {
-    kind: 'unpublished',
+    kind: 'estimated',
     searched: 'ECCC "Emission factors and reference values" v3.0 (Oct 2025), full document. Sections cover fossil fuel combustion, grid electricity and biogas. The only occurrence of "steam" is "Steam-flaked corn" — a beef-cattle diet parameter in Table 9.',
     // The B.C. Best Practices Methodology (2025) prescribes the supplier-specific route explicitly:
     // an organisation buying heat or cooling determines emissions from the fuels the district energy
     // plant consumed, its generation, and its distribution and heat-transfer efficiencies. So this is
     // not us declining to guess — it is the published Canadian method.
-    guidance: 'No published Canadian factor exists for purchased steam or district heat. Canadian practice (B.C. Best Practices Methodology, 2025) is to use a supplier-specific factor derived from the district energy system\'s own fuels, generation and distribution efficiencies. Ask your provider for their emission intensity and enter it below.',
   },
   AU: {
-    kind: 'unpublished',
+    kind: 'estimated',
     searched: 'DCCEEW National Greenhouse Accounts Factors 2025, all 27 sheets. Tables 1 and 2 are the only Scope 2 tables and both are scoped explicitly to "purchased or acquired electricity".',
-    guidance: 'No published Australian factor exists for purchased steam or district heat. Ask your district energy provider for their emission intensity and enter it below.',
   },
   NZ: {
     // ⚠️ THE TABLE OF CONTENTS LIES, AND THAT IS WHY THIS IS WRITTEN OUT. The catalogue has a page
@@ -2578,18 +2592,15 @@ const STEAM_EF: Record<EfJurisdiction, SteamEntry> = {
     // a steam factor exists. It contains two sections, Purchased Electricity and Transmission and
     // distribution losses, and NOT ONE factor label in the entire catalogue contains "steam". The
     // heading names a category MfE does not populate.
-    kind: 'unpublished',
+    kind: 'estimated',
     searched: 'MfE Measuring Emissions Catalogue 2026 v2, all 3,252 rows of the flat file. No factor label contains "steam". The page titled "Purchased Electricity, Heat, and Steam" holds only Purchased Electricity and T&D losses.',
-    guidance: 'No published New Zealand factor exists for purchased steam or district heat. Ask your district energy provider for their emission intensity and enter it below.',
   },
   EU: {
-    // ⚠️ NOT THE SAME CLAIM AS CA/AU/NZ. No primary source was searched. There is no single EU-wide
-    // publisher across 27 member states, so "we looked and there is none" is a statement nobody here
-    // is entitled to make. If a member-state publisher is ever seeded, this becomes 'published' for
-    // that state and this entry stops covering it.
-    kind: 'not_searched',
-    searched: '',
-    guidance: 'No EU-wide factor for purchased steam or district heat is applied by this platform. District heating in the EU is supplied by local networks whose fuel mix and efficiency vary widely. Ask your district energy provider for their emission intensity and enter it below.',
+    // ⚠️ NOT THE SAME RECORD AS CA/AU/NZ. No primary source was searched (there is no single EU-wide publisher), so
+    // `searched` says so rather than claiming a search. If a member-state publisher is ever seeded, that state becomes
+    // 'published'. Priced on the R14 estimate from EF_EU's gross kWh gas factor.
+    kind: 'estimated',
+    searched: 'No primary source searched: there is no single EU-wide publisher across 27 member states.',
   },
 }
 
@@ -2622,7 +2633,30 @@ export function steamFactorFor(loc: { country?: string }): SteamEntry | null {
  * heat is primary data. This is the same precedence Scope 3 Category 1 already applies — supplier-
  * specific first, default second — and the B.C. methodology prescribes it for exactly this stream.
  */
-export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBasis; source: string; supplier: boolean } | null {
+/** R14: the thermal efficiency the estimate assumes, from US EPA GHG Emission Factors Hub 2025, Table 7 note. */
+export const STEAM_BOILER_EFFICIENCY = 0.80
+/** R14: the flag an estimated steam row carries. */
+export const STEAM_ESTIMATE_FLAG = 'steam_gas_boiler_80'
+/** R14: the short label beside the steam figure in the wizard. */
+export const STEAM_ESTIMATE_SHORT = "Estimated from natural gas at 80% efficiency. Enter your provider's figure below to replace it."
+
+/** R14: where the gas factor behind a steam estimate comes from, in words, per jurisdiction. */
+function steamGasSource(loc: Location, j: EfJurisdiction): string {
+  switch (j) {
+    case 'CA': return `${EF_SOURCES.combustion_ca}, ${caGasProvince(loc)} marketable natural gas per m³, at Canada's national gross heat content of 38.59 MJ/m³ (ECCC National Inventory Report 1990-2023, Part 2, Table A4-2)`
+    case 'AU': return `${EF_SOURCES.combustion_au}, natural gas per GJ (Table 5, gross basis)`
+    case 'NZ': return `${EF_SOURCES.combustion_nz}, natural gas per kWh, ${loc.nz_use_class ?? 'commercial'} use class (gross basis, Measuring Emissions Guide Appendix A), converted exactly to per GJ`
+    case 'EU': return 'EU MRR 2018/2066 Annex VI Table 1, natural gas, x 0.90 net per gross (IPCC 2006 Vol. 2 Ch. 1 section 1.4.1.2), converted exactly to per GJ'
+    default: return ''
+  }
+}
+
+/** R14: the note on an estimated steam row, on every surface that shows the row. No em dash. */
+export function steamEstimateNote(country: string, gasFactor: string, gasSource: string): string {
+  return `Estimated: no published factor for purchased steam or district heat in ${country}. Calculated as if generated from natural gas at 80% efficiency: ${gasFactor} (${gasSource}) / 0.80 (method: GHG Protocol Scope 2 Guidance, Appendix A; 80% assumption: US EPA GHG Emission Factors Hub 2025, Table 7). It excludes distribution losses and may overstate a network that uses low-carbon heat. Enter your provider's emission intensity to replace it.`
+}
+
+export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBasis; source: string; supplier: boolean; estimated?: { note: string; vintage?: string } } | null {
   const sup = loc.purchased_steam_supplier_ef
   if (typeof sup === 'number' && sup > 0) {
     // A supplier states ONE kg CO2e per unit with its own GWP set baked in — the same shape as DEFRA,
@@ -2636,11 +2670,24 @@ export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBas
     }
   }
   const entry = steamFactorFor(loc)
-  // null entry = the country resolves to no jurisdiction, so there is no table to ask. Same answer
-  // as an unpublished one: not priced. The location is excluded whole before this is reached.
-  return entry?.kind === 'published'
-    ? { ef: entry.ef, basis: entry.basis, source: entry.source, supplier: false }
-    : null
+  // null entry = the country resolves to no jurisdiction, so there is no table to ask: not priced. The location is
+  // excluded whole before this is reached.
+  if (entry?.kind === 'published') return { ef: entry.ef, basis: entry.basis, source: entry.source, supplier: false }
+  if (entry?.kind !== 'estimated') return null
+  // R14: the site's OWN country's natural gas factor per GJ gross (pickEF reads that table only: never another
+  // country's, R2), each gas divided by the efficiency. CA needs its province (R12); with none, there is no gas factor
+  // and the line is unpriced with the province message.
+  const j = efJurisdiction(loc)!
+  const gas = pickEF(loc, 'natural_gas_gj')
+  if (!isPriceableEF(gas.factor) || !gas.publisher) return null
+  const e = STEAM_BOILER_EFFICIENCY
+  const ef = { co2: gas.factor.co2 / e, ch4: gas.factor.ch4 / e, n2o: gas.factor.n2o / e }
+  const combined = gas.factor.ch4 === 0 && gas.factor.n2o === 0
+  const gasFactor = `${Number(gas.factor.co2.toPrecision(5))} kg ${combined ? 'CO2e' : 'CO2 (with CH4 and N2O on the same basis)'} per GJ gross natural gas`
+  const ctry = canonicalCountryCode(loc.country)
+  const note = steamEstimateNote(countryNameEn(ctry === 'EL' ? 'GR' : ctry), gasFactor, steamGasSource(loc, j))
+  return { ef, basis: 'gj', supplier: false, estimated: { note, vintage: gas.publisher.edition },
+    source: `Estimate: ${gas.publisher.publisher} natural gas / 0.80 (GHG Protocol Scope 2 Guidance, Appendix A; US EPA GHG Emission Factors Hub 2025, Table 7)` }
 }
 
 /** The priced steam figure in tonnes, or 0 when the stream cannot be priced. Shared by both callers. */
@@ -2864,7 +2911,7 @@ export function publishersForLocation(loc: Location, gwpVersion: GwpVersion = 'A
     // FI2: the edition the row itself records, which is the table that supplied its value.
     if (COMBUSTION_STREAMS.has(stream)) add(r.factor_vintage ?? COMBUSTION_EDITION[j])
     else if (stream === 'electricity') add(`${GRID_PUBLISHER[j]} ${getGridFactor(loc.grid_region, year).usedYear}`)
-    else if (stream === 'purchased_steam') add(STEAM_EDITION[j])
+    else if (stream === 'purchased_steam') add(r.factor_vintage ?? STEAM_EDITION[j])   // R14: an estimate names its gas table
     if (r.gwp_basis === gwpVersion) usedOurGwp = true
   }
   // ⚠️ THE GWP SET IS NAMED ONLY WHEN A ROW APPLIED IT. Most grid and steam factors arrive already
@@ -3046,9 +3093,10 @@ export const UNPRICED_MESSAGE = {
   // FI3: an EU line in a volume unit with no cited density or energy content. No em dash.
   eu_property: (fuel: string, site: string, unit: string, property: 'density' | 'energy content', remedy: 'mass' | 'kwh' | null) =>
     `The EU factor for ${fuel} at ${site} is published per unit of energy, and we hold no cited ${property} to convert ${unit} to it, so this line is not counted. ${remedy === 'mass' ? 'Enter the quantity in kilograms or tonnes, or reject the bill.' : remedy === 'kwh' ? 'Enter the quantity in kWh, as shown on your gas bill, or reject the bill.' : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
-  province_missing: (site: string, unrecognised: string | null) => unrecognised
-    ? `The province for ${site} (${unrecognised}) is not one we hold a natural gas factor for, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.`
-    : `The province for ${site} is not set, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.`,
+  // R14: also for purchased steam, whose estimate is priced from the province's natural gas factor.
+  province_missing: (site: string, unrecognised: string | null, what: 'natural gas' | 'purchased steam' = 'natural gas') => unrecognised
+    ? `The province for ${site} (${unrecognised}) is not one we hold a natural gas factor for, so its ${what} is not counted. Choose the province. Export is blocked until it is chosen.`
+    : `The province for ${site} is not set, so its ${what} is not counted. Choose the province. Export is blocked until it is chosen.`,
 }
 
 /**
@@ -3106,10 +3154,17 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
       const ctry = canonicalCountryCode(loc.country)
       // The selector names a country from its ISO code; EL is Eurostat's code for Greece, so it is named from GR.
       const country = countryNameEn(ctry === 'EL' ? 'GR' : ctry)
-      out.push({ reason: 'steam_factor_missing', locId: loc.id, site, field: 'purchased_steam_mmbtu', stream: 'purchased_steam',
+      const base = { locId: loc.id, site, field: 'purchased_steam_mmbtu' as const, stream: 'purchased_steam' as const,
         source: 'Purchased steam', amount: loc.purchased_steam_mmbtu, unit: loc.purchased_steam_unit ?? 'mmbtu', country: ctry,
-        factorKey: 'steam', factor: { publisher: '', value: null }, supportedUnits: [],
-        message: entry.kind === 'unpublished' ? UNPRICED_MESSAGE.steam_unpublished(country, site) : UNPRICED_MESSAGE.steam_not_searched(country, site) })
+        factorKey: 'steam', factor: { publisher: '', value: null }, supportedUnits: [] }
+      // R14: the estimate needs the site's gas factor. A Canadian site with no province has none, so the province message.
+      if (entry.kind === 'estimated' && j === 'CA' && caGasProvince(loc) === null) {
+        const typed = (loc.grid_region || loc.province || '').trim()
+        out.push({ ...base, reason: 'province_missing', message: UNPRICED_MESSAGE.province_missing(site, typed || null, 'purchased steam') })
+      } else {
+        out.push({ ...base, reason: 'steam_factor_missing',
+          message: entry.kind === 'unpublished' || (entry.kind === 'estimated' && j !== 'EU') ? UNPRICED_MESSAGE.steam_unpublished(country, site) : UNPRICED_MESSAGE.steam_not_searched(country, site) })
+      }
     }
   }
   // FI5: a figure a unit change cleared (no exact conversion joined the units) is a line with no figure until it is
@@ -4594,7 +4649,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const st = steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, priced.basis)
       // FI5: a unit change that produced the typed figure comes first on the row, as on a fuel row.
       const steamChange = unitChangeBehind(loc, 'purchased_steam_mmbtu', loc.purchased_steam_mmbtu, loc.purchased_steam_unit ?? 'mmbtu')
-      const steamNote = [steamChange ? unitChangeNote(steamChange) : '', st.note ?? ''].filter(Boolean).join(' · ')
+      const steamNote = [steamChange ? unitChangeNote(steamChange) : '', st.note ?? '', priced.estimated?.note ?? ''].filter(Boolean).join(' · ')
       // ⚠️ SHARES factorCells AND calcGas, BUT DELIBERATELY NOT pushFuel. pushFuel stamps
       // `ef_source: combustionSource(loc)` — the COMBUSTION citation for the country, which would name
       // DEFRA's fuels table on a Scope 2 district-heat row. Steam cites its own table (STEAM_EF entries
@@ -4614,8 +4669,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // 'US EPA 2025 Table 7' because the site happens to be American would put a publication's name
       // on a private number. The column renders '—' there, which is what "no published edition" looks
       // like, and ef_source already names the supplier route. Same gate buildFactorEditions applies.
-      const steamVintage = priced.supplier ? undefined : vintageOf(STEAM_EDITION, loc).factor_vintage
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
+      // R14: an estimated row records the edition of the gas table it was computed from.
+      const steamVintage = priced.supplier ? undefined : priced.estimated ? priced.estimated.vintage : vintageOf(STEAM_EDITION, loc).factor_vintage
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
       }
     }
     // ── All-excluded fields: a zero row carrying the contributions (T5 ruling) ─────────────────────
@@ -5127,7 +5183,7 @@ export function findUndeclaredStreams(
 // blocking without that field would strand them with no way out.
 export function findSteamFactorGaps(
   locations: Location[],
-): { locId: string; locName: string; jurisdiction: EfJurisdiction; kind: 'unpublished' | 'not_searched'; guidance: string }[] {
+): { locId: string; locName: string; jurisdiction: EfJurisdiction; kind: 'unpublished' | 'not_searched' | 'estimated'; guidance: string }[] {
   return locations.flatMap(loc => {
     if (!loc.has_purchased_steam || loc.purchased_steam_mmbtu <= 0) return []
     if (steamPricing(loc)) return []
@@ -5142,7 +5198,9 @@ export function findSteamFactorGaps(
     if (entry.kind === 'published') return []   // unreachable; steamPricing would have returned it
     const j = efJurisdiction(loc)
     if (j === null) return []                   // unreachable: a null entry above implies a null j
-    return [{ locId: loc.id, locName: loc.name || 'Location', jurisdiction: j, kind: entry.kind, guidance: entry.guidance }]
+    // R14: an estimate that could not be computed (a Canadian site with no province) is reported with its line's message.
+    const guidance = entry.kind === 'estimated' ? (unpricedLines(loc).find(u => u.field === 'purchased_steam_mmbtu')?.message ?? '') : entry.guidance
+    return [{ locId: loc.id, locName: loc.name || 'Location', jurisdiction: j, kind: entry.kind, guidance }]
   })
 }
 
