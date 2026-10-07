@@ -810,8 +810,8 @@ describe('the states a verifier and a customer each see', () => {
       ['electricity unmapped country', bare({ country: 'JP', grid_region: '', electricity_kwh: 100_000 })],
       ['refrigerants only', bare({ country: 'US', has_hfc_refrigerants: true, refrigerant_purchased_kg: 40 })],
       ['biogenic only', bare({ country: 'US', biogenic_co2_mt: 10 })],
-      // FI2 diff 2: a UK site with gas in m3 (DEFRA prints per kWh only). US gas in m3 now prices via the exact Mcf conversion.
-      ['every location excluded', bare({ country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
+      // FI2 follow-up: a NZ site with gas in m3 (MfE prints gas per kWh only); UK gas in m3 now prices on DEFRA's own per-m3 row.
+      ['every location excluded', bare({ country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' })],
     ]
     expect(NOTHING_RECORDABLE.length, 'all fourteen routes').toBe(14)
     for (const [name, l] of NOTHING_RECORDABLE) {
@@ -946,12 +946,13 @@ describe('a location excluded from the totals records no edition', () => {
   // against ALL routes to exclusion, not just the US m3 gas case that surfaced it.
   const UNPRICEABLE: [string, Partial<Location>][] = [
     // FI2 diff 2: US gas in m3 and kWh, and AU gas in kWh, now price (exact conversions); replaced by routes that still miss.
-    ['GB gas mcf',       { country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }],
+    // FI2 follow-up: GB gas in mcf and m3 now price on DEFRA's per-m3 row; replaced by CA gas in therms and NZ gas in mcf.
+    ['CA gas therms',    { country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'therms' }],
     ['DE gas mmbtu',     { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mmbtu' }],
     ['US propane kg',    { country: 'US', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['CA gas kwh',       { country: 'CA', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
     ['CA propane kg',    { country: 'CA', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
-    ['GB gas m3',        { country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' }],
+    ['NZ gas mcf',       { country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }],
     ['GB propane kg',    { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
     ['DE gas kwh',       { country: 'DE', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }],
     ['DE propane kg',    { country: 'DE', has_propane: true, propane_amount: 1000, propane_unit: 'kg' }],
@@ -984,9 +985,10 @@ describe('a location excluded from the totals records no edition', () => {
     // WAS: all three families recorded nothing, because a missing factor excluded the whole location and its
     // electricity and steam with it. FI1 ends that exclusion: the gas line is unpriced, the electricity and
     // steam are in the totals, so their editions are recorded exactly as for the same site with no gas.
-    // FI2 diff 2: a UK site (DEFRA has no per-m3 gas factor); US gas in m3 now prices through the exact Mcf conversion.
-    const base = { country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' as const }
-    const noGas = (l: Location): Location => ({ ...l, has_natural_gas: false, natural_gas_amount: 0 })
+    // FI2 follow-up: a UK site with propane in kg (DEFRA prints propane per litre; a mass does not convert to a volume).
+    // UK gas in m3 now prices on DEFRA's per-m3 row.
+    const base = { country: 'GB', has_propane: true, propane_amount: 1000, propane_unit: 'kg' as const }
+    const noGas = (l: Location): Location => ({ ...l, has_propane: false, propane_amount: 0 })
     const withElec = bare({ ...base, grid_region: 'UK', electricity_kwh: 100_000 })
     expect(findUnpriceableLocations([withElec], 'AR6', 2025)).toEqual([])
     expect(unpricedLines(withElec).map(u => u.reason)).toEqual(['factor_missing'])

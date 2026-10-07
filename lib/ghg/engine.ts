@@ -324,6 +324,11 @@ const EF_UK = {
   // Natural gas, kWh (Gross CV): 0.18231 kgCO2e/kWh (DEFRA 2026 Fuels row "Natural gas";
   // CO2 0.18194, CH4 0.00028, N2O 0.00009 — components sum to the total exactly).
   natural_gas_kwh: { co2: 0.18231, ch4: 0, n2o: 0 },
+  // FI2 follow-up (7 Oct 2026): DEFRA's own per-cubic-metre row. "Factors by Category", Scope 1 > Fuels > Gaseous fuels >
+  // Natural gas, unit "cubic metres", factor ID 1_100_1004_1_1: kg CO2e 2.02633 (CO2 2.02231, CH4 0.00307, N2O 0.00095).
+  // Stored combined, GWP as published, like every key here. UK gas in m³ prices on it directly; Mcf and Ccf convert to
+  // m³ exactly (1 Mcf = 28.316846592 m³, 1 Ccf = 2.8316846592 m³), stated on the row.
+  natural_gas_m3: { co2: 2.02633, ch4: 0, n2o: 0 },
   // Propane, litres: 1.54358 kgCO2e/L (CO2 1.5414, CH4 0.00133, N2O 0.00084 — components sum to
   // 1.54357, DEFRA's own rounding against its stated 1.54358). UNCHANGED from the 2025 edition.
   propane_litre: { co2: 1.54358, ch4: 0, n2o: 0 },
@@ -594,28 +599,30 @@ function euDerivationNote(loc: Location, key: string): string | undefined {
   return EU_DERIVATION[EU_DERIVATION_ALIAS[key] ?? key]
 }
 
-// AUSTRALIAN GAS: THE ARITHMETIC FROM NGA'S PUBLISHED FIGURES TO THE PER-UNIT FACTOR WE APPLY (T10a).
-// NGA publishes natural gas per GJ (a combined Scope 1 factor) with an energy content per m³; the engine
-// stores per-unit figures. Without this a verifier reads "54.367 kg/mmbtu" cited to NGA, a number NGA never
-// printed. The note goes on the workings row (and so the verifier page) and the PDF/XLSX methods tables.
-const AU_DERIVATION: Record<string, string> = {
-  // FI2 diff 2: no per-MMBtu entry. NGA's per-GJ figure is the table's own key now, and an MMBtu (or kWh, MJ, therm)
-  // figure converts to GJ exactly, with the conversion on the row; there is no derived factor left to explain.
-  natural_gas_m3: '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³',
-  // FI2 diff 3: the liquid fuels, each NGA energy content per kL × NGA's combined factor per GJ, ÷ 1,000 per litre.
-  // The values and table references are the ones recorded at the EF_AU keys. Diesel's reference reads "Table 4/Table 1"
-  // there and is carried as recorded; both it and Table 8 for the fuel oils are on Lisa's check against the workbook.
-  diesel_litre: '38.6 GJ/kL (DCCEEW NGA 2025 Table 4/Table 1, energy content) × 70.2 kg CO2e/GJ (Table 4/Table 1) ÷ 1,000 = 2.70972, rounded to 2.710 kg CO2e/L',
-  gasoline_litre: '34.2 GJ/kL (DCCEEW NGA 2025 Table 4, energy content) × 67.8 kg CO2e/GJ (Table 4) ÷ 1,000 = 2.31876, rounded to 2.319 kg CO2e/L',
-  propane_litre: '25.7 GJ/kL (DCCEEW NGA 2025 Table 4, LPG energy content) × 60.6 kg CO2e/GJ (Table 4) ÷ 1,000 = 1.55742, rounded to 1.557 kg CO2e/L',
-  fuel_oil_distillate_litre: '37.3 GJ/kL (DCCEEW NGA 2025 Table 8, heating oil energy content) × 69.73 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.600929 kg CO2e/L',
-  fuel_oil_residual_litre: '39.7 GJ/kL (DCCEEW NGA 2025 Table 8, fuel oil energy content) × 73.84 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.931448 kg CO2e/L',
+// AUSTRALIA: WHERE NGA PRINTS EACH VALUE (FI2 follow-up, 7 Oct 2026, ruling R5). NGA's "Energy - Scope 1" sheet prints a
+// combined Scope 1 factor per kL for each liquid fuel and per m³ for each gaseous fuel, beside the energy content and
+// per-GJ factor it is built from. Every EF_AU per-unit key is now that printed figure (per kL ÷ 1,000 per litre), so
+// the row cites it rather than showing arithmetic. Until then these keys were energy content × per-GJ factor rounded
+// to 3 decimal places (2.025, 2.710, 2.319, 1.557), and fi2c's notes showed that arithmetic; they are superseded.
+// natural_gas_gj is NGA's own per-GJ figure and, like EPA's per-mmBtu keys, needs no note beyond the citation.
+const NGA_SCOPE_1 = 'DCCEEW NGA 2025, Energy - Scope 1 sheet'
+const NGA_PER_KL = (fuel: string, perKl: string, table: number) =>
+  `${NGA_SCOPE_1} (Table ${table}), ${fuel}: ${perKl} kg CO2-e/kL; per litre is per kL ÷ 1,000`
+const AU_PUBLISHED_NOTE: Record<string, string> = {
+  natural_gas_m3: `${NGA_SCOPE_1} (Table 5), Natural gas distributed in a pipeline: 2.025129 kg CO2-e/m³`,
+  diesel_litre: NGA_PER_KL('Diesel oil', '2,709.72', 8),
+  gasoline_litre: NGA_PER_KL('Automotive gasoline/petrol', '2,318.76', 8),
+  propane_litre: NGA_PER_KL('Liquefied petroleum gas (LPG)', '1,557.42', 8),
+  fuel_oil_distillate_litre: NGA_PER_KL('Heating oil', '2,600.929', 8),
+  fuel_oil_residual_litre: NGA_PER_KL('Fuel oil', '2,931.448', 8),
 }
 // Keys that hold the same NGA value as a key above, mapped so the two rows cannot describe it differently.
-const AU_DERIVATION_ALIAS: Record<string, string> = { diesel_mobile_litre: 'diesel_litre' }
-function auDerivationNote(loc: Location, key: string): string | undefined {
+// ⚠️ diesel_mobile_litre IS THE STATIONARY Diesel oil row (Table 8). NGA's transport table (Table 9) differs; moving
+// fleet fuel onto it is FI9, not this change.
+const AU_PUBLISHED_ALIAS: Record<string, string> = { diesel_mobile_litre: 'diesel_litre' }
+function auPublishedNote(loc: Location, key: string): string | undefined {
   if (efJurisdiction(loc) !== 'AU') return undefined
-  return AU_DERIVATION[AU_DERIVATION_ALIAS[key] ?? key]
+  return AU_PUBLISHED_NOTE[AU_PUBLISHED_ALIAS[key] ?? key]
 }
 
 // US EPA: THE PUBLISHED COLUMN EACH PER-UNIT KEY IS (FI2 diff 3, ruling R5). Not a derivation: the row says where in
@@ -635,15 +642,37 @@ const US_PUBLISHED_NOTE: Record<string, string> = {
 }
 
 /**
- * The factor derivations behind the figures these locations price (T10a): one line per distinct derivation,
- * for the PDF and XLSX methods tables. Australian natural gas today. Refused locations are dropped, as in
+ * The factor derivations and unit conversions behind the figures these locations price, for the PDF and XLSX methods
+ * tables: one line per distinct step, named by the line it prices. FI2 follow-up (7 Oct 2026): built from the same
+ * line list, factor pick and steam basis the workings rows use, so the methods tables list every conversion and
+ * every derivation a row notes, and nothing a row does not. It listed Australian gas alone until then.
+ *   Listed: an exact unit conversion (the entered unit to the unit the publisher prints), and a derived table value
+ * (EU_DERIVATION). Not listed: where a published value is printed (US Table 1, NGA), which is a citation, and the NZ
+ * gas basis note, which states a basis; both stay on the row. Refused locations and unpriced lines are dropped, as in
  * combustionSourcesFor.
  */
-export function factorDerivationsFor(locations: readonly { country?: string; has_natural_gas?: boolean; natural_gas_amount?: number; natural_gas_unit?: string }[]): string[] {
-  return [...new Set(locations
-    .filter(l => !countryRefusal(l) && l.has_natural_gas && (l.natural_gas_amount ?? 0) > 0)
-    .map(l => auDerivationNote(l as Location, `natural_gas_${l.natural_gas_unit}`))
-    .filter((d): d is string => !!d))]
+export function factorDerivationsFor(locations: readonly { country?: string }[]): string[] {
+  const out: string[] = []
+  const words = (u: string) => EXACT_UNITS[u]?.many ?? u
+  // The PDF passes its own location shape (the derived locations, typed loosely); read as a Location, as before.
+  for (const loc of locations as readonly Location[]) {
+    if (countryRefusal(loc)) continue
+    for (const line of combustionLines(loc)) {
+      const picked = pickEF(loc, line.efKey as keyof typeof EF)
+      if (!picked.publisher) continue
+      const c = picked.conversion
+      if (c) out.push(`${line.source}: ${words(c.from)} converted to ${words(c.to)} (${c.statement}, exact).`)
+      const derived = picked.publisher.jurisdiction === 'EU' ? euDerivationNote(loc, picked.key ?? line.efKey) : undefined
+      if (derived) out.push(`${line.source}: ${derived}`)
+    }
+    if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
+      const priced = steamPricing(loc)
+      const from = loc.purchased_steam_unit ?? 'mmbtu'
+      const c = priced && from !== priced.basis ? exactConversion(from, priced.basis) : null
+      if (c) out.push(`Purchased steam: ${words(from)} converted to ${words(priced!.basis)} (${c.statement}, exact).`)
+    }
+  }
+  return [...new Set(out)]
 }
 
 // Australia combustion factors — DCCEEW National Greenhouse Accounts (NGA) Factors 2025 (AR5 basis).
@@ -656,29 +685,33 @@ export function factorDerivationsFor(locations: readonly { country?: string; has
 // (ch4/n2o at 0), so no sector-varying gas split is being collapsed. Recorded so the absence of a
 // sector note here reads as "the publisher offers none" rather than "nobody looked".
 const EF_AU = {
-  // Natural gas (NGA Table 4, ex-Table 39 energy content): 0.0393 GJ/m³ × 51.53 kgCO2e/GJ = 2.0251 → 2.025 kg/m³.
-  natural_gas_m3: { co2: 2.025, ch4: 0, n2o: 0 },
+  // FI2 follow-up (7 Oct 2026): every per-unit key below is NGA's own printed figure from the "Energy - Scope 1" sheet,
+  // per m³ as printed and per litre as the printed per-kL ÷ 1,000 (exact), cited on the row by AU_PUBLISHED_NOTE. They
+  // were the same products rounded to 3 decimal places, and natural gas was cited to Table 4: it is Table 5, and the
+  // liquids are Table 8. (The sheet's per-unit column is NGA's own G × F formula; it is the figure NGA publishes.)
+  // Natural gas distributed in a pipeline (Table 5): 0.0393 GJ/m³ × 51.53 kg CO2-e/GJ, printed 2.025129 kg CO2-e/m³.
+  natural_gas_m3: { co2: 2.025129, ch4: 0, n2o: 0 },
   // T10a: the same NGA factor on an ENERGY basis, for bills that print energy (MJ or GJ) rather than volume.
   // NGA publishes it per GJ, so no energy content is assumed: 51.53 kgCO2e/GJ × 1.05505585262 GJ/MMBtu
   // = 54.3670 → 54.367 kg/MMBtu (MMBtu is the canonical energy unit lib/unitConversions converts GJ and MJ to).
-  // FI2 diff 2: NGA's OWN figure, per GJ (Table 4, gross basis). Every other energy unit (kWh, MJ, MMBtu, therms)
+  // FI2 diff 2: NGA's OWN figure, per GJ (Table 5, gross basis; this said Table 4 until 7 Oct 2026). Every other energy unit (kWh, MJ, MMBtu, therms)
   // converts to it exactly; the derived per-MMBtu 54.367 that sat here is gone.
   natural_gas_gj: { co2: 51.53, ch4: 0, n2o: 0 },
-  // Diesel oil (NGA Table 4/Table 1): 38.6 GJ/kL × 70.2 kgCO2e/GJ ÷ 1000 = 2.70972 → 2.710 kg/L.
-  diesel_litre: { co2: 2.710, ch4: 0, n2o: 0 },
-  diesel_mobile_litre: { co2: 2.710, ch4: 0, n2o: 0 },
-  // Petrol / gasoline (NGA Table 4): 34.2 GJ/kL × 67.8 kgCO2e/GJ ÷ 1000 = 2.31876 → 2.319 kg/L.
-  gasoline_litre: { co2: 2.319, ch4: 0, n2o: 0 },
-  // LPG (NGA Table 4): 25.7 GJ/kL × 60.6 kgCO2e/GJ ÷ 1000 = 1.55742 → 1.557 kg/L (per-litre, matches engine input).
-  propane_litre: { co2: 1.557, ch4: 0, n2o: 0 },
+  // Diesel oil (Table 8): 38.6 GJ/kL × 70.2 kg CO2-e/GJ, printed 2,709.72 kg CO2-e/kL (was 2.710 per litre, cited "Table 4/Table 1").
+  diesel_litre: { co2: 2.70972, ch4: 0, n2o: 0 },
+  // ⚠️ THE STATIONARY Diesel oil row, as before. NGA's transport table (Table 9) differs; that is FI9.
+  diesel_mobile_litre: { co2: 2.70972, ch4: 0, n2o: 0 },
+  // Automotive gasoline/petrol (Table 8): 34.2 GJ/kL × 67.8 kg CO2-e/GJ, printed 2,318.76 kg CO2-e/kL (was 2.319, cited Table 4).
+  gasoline_litre: { co2: 2.31876, ch4: 0, n2o: 0 },
+  // Liquefied petroleum gas (LPG) (Table 8): 25.7 GJ/kL × 60.6 kg CO2-e/GJ, printed 1,557.42 kg CO2-e/kL (was 1.557, cited Table 4).
+  propane_litre: { co2: 1.55742, ch4: 0, n2o: 0 },
   // GRADE-EXPLICIT KEYS — DCCEEW NGA 2025 Table 8, energy content x combined Scope 1 EF per GJ, the
   // same pre-computation every other key in this table uses. Stored per US GALLON (not per litre like
   // the keys above) because the engine's fuel-oil path converts to gallons before pricing.
   // Heating oil: 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L x 3.785411784 = 9.845587.
   // Fuel oil:    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L x 3.785411784 = 11.096738.
-  // ── PER-LITRE KEYS — the energy-content x EF/GJ product itself, before the gallon conversion.
-  // DCCEEW publishes per kL and per GJ, never per litre or per gallon, so BOTH bases are derived
-  // here; these are simply the earlier of the two steps and match the arithmetic quoted above:
+  // ── PER-LITRE KEYS: NGA's printed per-kL figures (Heating oil 2,600.929, Fuel oil 2,931.448) ÷ 1,000. These were
+  // already at full precision, so they do not move; they equal the product NGA prints:
   //   heating oil 37.3 GJ/kL x 69.73 kgCO2e/GJ / 1000 = 2.600929 kg/L
   //   fuel oil    39.7 GJ/kL x 73.84 kgCO2e/GJ / 1000 = 2.931448 kg/L
   // Carried at full precision rather than this table's usual 3dp rounding, matching what the
@@ -4141,15 +4174,15 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const ef = picked.factor
     const g = calcGas(ef, entered, gwpVersion)
     const efShown = ef
-    // Notes, joined: the exact conversion (FI2), the derivation of a derived table value (EU, AU), where in EPA's Table 1
-    // a US value is printed (FI2 diff 3), and the calorific basis of a NZ gas factor (ruling R4). Each note describes a
+    // Notes, joined: the exact conversion (FI2), the derivation of a derived table value (EU), where in EPA's Table 1 or
+    // NGA's Energy - Scope 1 sheet a US or AU value is printed (FI2 diff 3 and follow-up), and the calorific basis of a NZ gas factor (ruling R4). Each note describes a
     // value in THAT table, read under the key the table holds, so it applies only to a value that table supplied.
     const fromTable = picked.publisher?.jurisdiction
     const heldKey = picked.key ?? efKey
     const conversion_note = picked.conversion ? conversionNote(entered, picked.conversion) : undefined
     const note = [conversion_note,
       fromTable === 'EU' ? euDerivationNote(loc, heldKey) : '',
-      fromTable === 'AU' ? auDerivationNote(loc, heldKey) : '',
+      fromTable === 'AU' ? auPublishedNote(loc, heldKey) : '',
       fromTable === 'US' ? US_PUBLISHED_NOTE[heldKey] : '',
       fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O

@@ -150,7 +150,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     //   CA  EF_CA.natural_gas_m3     1.921 (ON override) + 0.000037x29.8 + 0.000035x273 = 1.9316576
     //   UK  EF_UK.natural_gas_kwh    0.18231, combined — no gas split to scale
     //   EU  EF_EU.natural_gas_m3     2.0196 + 0.000036x29.8 + 0.0000036x273 = 2.0216556
-    //   AU  EF_AU.natural_gas_m3     2.025, combined
+    //   AU  EF_AU.natural_gas_m3     2.025129, combined (NGA's printed per-m3 figure, FI2 follow-up)
     //   NZ  EF_NZ.commercial.natural_gas_kwh  0.19543, combined
     // x 1,000 units / 1,000 kg per tonne, so the per-unit factor IS the tonnage here.
     const pins: [string, number][] = [
@@ -158,7 +158,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
       ['CA', 1.9316576],      // 1,000 m3 gas, ECCC with the ON provincial CO2 override
       ['UK', 0.18231],        // 1,000 kWh gas, DEFRA 2026
       ['EU', 2.0216556],      // 1,000 m3 gas, MRR Annex VI / IPCC 2006
-      ['AU', 2.025],          // 1,000 m3 gas, DCCEEW NGA 2025
+      ['AU', 2.025129],       // 1,000 m3 gas, DCCEEW NGA 2025
       ['NZ', 0.19543],        // 1,000 kWh gas, MfE 2026 commercial use-class
     ]
     const actual = COMBUSTION_SITES.map(([j, site]) =>

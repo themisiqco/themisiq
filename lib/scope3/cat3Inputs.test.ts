@@ -53,14 +53,15 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
   })
 
   it('C3I-4 an unpriced line contributes nothing and is named; the location\'s priced streams still arrive (FI1)', () => {
-    // A US location holding a gas figure in m3: no factor for that unit there. Before FI1 the engine
+    // FI2 follow-up: a NZ site with gas in m3 (MfE prints gas per kWh only); UK gas in m3 now prices on DEFRA's own per-m3 row.
+    // A location holding a gas figure in m3: no factor for that unit there. Before FI1 the engine
     // excluded the whole location ('location_excluded'); now that ONE line is unpriced and named per stream.
-    const l = answered({ name: 'Odd site', country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas'])
+    const l = answered({ name: 'Odd site', country: 'NZ', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas'])
     const r = cat3InputsFrom(workingsOf([l]), [l])
     expect(r.inputs!.rows).toEqual([])
     expect(r.skipped).toEqual([{ code: 'scope1_not_priced', location: 'Odd site', stream: 'natural_gas' }])
     // With priced electricity beside it, the electricity reaches Category 3.
-    const mixed = answered({ name: 'Odd site', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000,
+    const mixed = answered({ name: 'Odd site', country: 'NZ', grid_region: 'NZ', electricity_kwh: 10_000,
       has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas', 'electricity'])
     const m = cat3InputsFrom(workingsOf([mixed]), [mixed])
     expect(m.inputs!.rows.map(x => x.stream)).toEqual(['electricity'])
@@ -68,7 +69,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
   })
 
   it('C3I-4b a scope1_not_priced skip offers the plain fix-it link to the GHG inventory, like the steam one (FI2 diff 3)', () => {
-    const mixed = answered({ name: 'Odd site', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000,
+    const mixed = answered({ name: 'Odd site', country: 'NZ', grid_region: 'NZ', electricity_kwh: 10_000,
       has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas', 'electricity'])
     const m = cat3InputsFrom(workingsOf([mixed]), [mixed])
     const priced = priceCat3(m.inputs!)
@@ -299,7 +300,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     // Scope 1: natural gas in m3 has no US factor (engine.test.ts GROUP K/L). The engine does NOT
     // mark the row 'no_published_factor'. Since FI1 it marks the LINE 'unpriced' (it used to exclude the
     // whole location as 'unpriceable').
-    const fuel = answered({ id: 'f', name: 'US plant', country: 'GB',
+    const fuel = answered({ id: 'f', name: 'US plant', country: 'NZ',
                             has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' },
                           ['natural_gas'])
     const fuelRows = workingsOf([fuel])

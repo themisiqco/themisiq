@@ -575,11 +575,12 @@ describe('GROUP J — pctEstimated', () => {
 describe('GROUP K — a factor the tables do not carry is refused, not priced', () => {
   // FI2 diff 2: US gas in m3 and kWh, and AU gas in kWh, now PRICE through an exact conversion (to Mcf, MMBtu and GJ),
   // so they left this list. What remains is gas in a unit no exact conversion reaches from the country's own table.
-  const unpriceable: Array<{ country: string; unit: 'm3' | 'kwh' | 'mcf' | 'mmbtu'; key: string }> = [
-    { country: 'GB', unit: 'mcf', key: 'natural_gas_mcf' },  // DEFRA prints gas per kWh only: no volume key
+  const unpriceable: Array<{ country: string; unit: 'm3' | 'kwh' | 'mcf' | 'mmbtu' | 'therms'; key: string }> = [
+    // FI2 follow-up: GB gas in mcf and m3 now price on DEFRA's per-m3 row (1_100_1004_1_1); replaced by CA therms and MMBtu.
+    { country: 'CA', unit: 'therms', key: 'natural_gas_therms' }, // ECCC publishes no energy-basis gas factor
     { country: 'DE', unit: 'mmbtu', key: 'natural_gas_mmbtu' }, // the EU table holds no energy-basis gas factor
     { country: 'CA', unit: 'kwh', key: 'natural_gas_kwh' },   // with a province (ON): FI1 makes a blank one its own case
-    { country: 'GB', unit: 'm3',  key: 'natural_gas_m3' },
+    { country: 'CA', unit: 'mmbtu', key: 'natural_gas_mmbtu' },
     { country: 'FR', unit: 'kwh', key: 'natural_gas_kwh' },  // EU branch
     { country: 'NZ', unit: 'mcf', key: 'natural_gas_mcf' },  // MfE prints gas per kWh only
     { country: 'NZ', unit: 'm3',  key: 'natural_gas_m3' },
@@ -658,8 +659,8 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
 // silent), the location stays in every total with its other lines, and export blocks on the line.
 describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the location is not excluded (FI1)', () => {
   const good = () => loc({ id: 'GOOD', name: 'Priceable Site', country: 'US', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' });
-  // FI2 diff 2: a UK site with gas in m3 (DEFRA prints gas per kWh only). US gas in m3 now prices through the exact Mcf conversion.
-  const bad = () => loc({ id: 'BAD', name: 'Blocked Site', country: 'GB', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
+  // FI2 follow-up: a NZ site with gas in m3 (MfE prints gas per kWh only); UK gas in m3 now prices on DEFRA's per-m3 row.
+  const bad = () => loc({ id: 'BAD', name: 'Blocked Site', country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
 
   it('L1 a mixed inventory still totals, and the priceable location keeps its exact figure', () => {
     const aloneTotal = calcInventory([good()], 'AR6', 2024).s1_total;
@@ -676,7 +677,7 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
   });
 
   it('L3 WAS "every scope is excluded": now the location\'s priceable electricity IS in every total', () => {
-    const badWithPower = loc({ ...bad(), grid_region: 'UK', electricity_kwh: 50_000 });
+    const badWithPower = loc({ ...bad(), grid_region: 'NZ', electricity_kwh: 50_000 });
     const powerOnly = loc({ ...badWithPower, has_natural_gas: false, natural_gas_amount: 0 });
     const inv = calcInventory([badWithPower], 'AR6', 2024);
     expect(inv.s1_total).toBe(0);
@@ -685,7 +686,7 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
   });
 
   it('L4 buildWorkings writes ONE unpriced row for the line, with null result and the message, beside its priced rows', () => {
-    const rows = buildWorkings([good(), loc({ ...bad(), grid_region: 'UK', electricity_kwh: 50_000 })], 'AR6', 2024, [], 12);
+    const rows = buildWorkings([good(), loc({ ...bad(), grid_region: 'NZ', electricity_kwh: 50_000 })], 'AR6', 2024, [], 12);
     const badRows = rows.filter(r => r.location === 'Blocked Site');
     const gas = badRows.filter(r => r.stream === 'natural_gas');
     expect(gas).toHaveLength(1);
@@ -1356,7 +1357,7 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
       expect(new Set(vals).size, `${c}: a gas split must respond to the toggle`).toBeGreaterThan(1);
     }
     // Absolute pins, so "nothing moved" is measured and not merely self-consistent.
-    expect(row('AU', 'AR6').result_tco2e).toBeCloseTo(2.71, 9);          // 1000 L x 2.710 kg/L
+    expect(row('AU', 'AR6').result_tco2e).toBeCloseTo(2.70972, 9);      // 1000 L x NGA's printed 2,709.72 kg/kL (FI2 follow-up)
     expect(row('GB', 'AR6').result_tco2e).toBeCloseTo(2.58354, 9);   // DEFRA 2026
     expect(row('NZ', 'AR6').result_tco2e).toBeCloseTo(2.6759, 9);
     expect(row('US', 'AR6').result_tco2e).toBeCloseTo(10.244058, 9);
@@ -1420,7 +1421,7 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
   it('X5 the factor cell says the publisher combined the gases, not that they are zero', () => {
     // "CO2 2.71, CH4 0, N2O 0" reads as a measurement — this fuel emits no methane. It is not one.
     const au = row('AU', 'AR6');
-    expect(au.emission_factor).toBe('CO₂e 2.71 kg/litres — CH₄/N₂O included');
+    expect(au.emission_factor).toBe('CO₂e 2.70972 kg/litres — CH₄/N₂O included');
     expect(au.emission_factor, 'a zero that means "already counted" must not print as a measured zero')
       .not.toContain('CH4 0');
     // Gas-split rows keep the split verbatim — the verifier path depends on it.
@@ -4066,9 +4067,9 @@ describe('T4 deriveLocations', () => {
   });
 
   it('unpriced lines are judged on the derived figure: a stale stored figure no document supports is not priced', () => {
-    // An unpriceable unit on a stale field: stored says 100 m3-on-a-UK-site, but the only bill is pending.
+    // An unpriceable unit on a stale field: stored says 100 m3-on-a-NZ-site, but the only bill is pending.
     // FI1: the judgement is now per line (unpricedLines), not a whole-location exclusion; the property holds.
-    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'GB', natural_gas_unit: 'm3' });
+    const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'NZ', natural_gas_unit: 'm3' });
     expect(unpricedLines(site), 'stored: an unpriced line on a figure nothing supports').toHaveLength(1);
     expect(unpricedLines(deriveLocations(inv([site]))[0])).toEqual([]);
     // findUnresolvedCoverage derives first, so it does not block on the stale figure either.
@@ -4316,7 +4317,7 @@ describe('T6 monthly split', () => {
   it('an unpriced line writes no monthly row, and the bill is skipped by name (FI1)', () => {
     // WAS "a location the totals exclude as unpriceable writes no monthly row". FI1 keeps the location;
     // the unpriced bill still writes nothing, and lands in skipped with the line's own reason (FI1 diff 2).
-    const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'GB' });
+    const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'NZ' });
     const r = buildMonthlyEmissions(inv([blocked], 2025), deps, 'AR6');
     expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toEqual([]);
     expect(unpricedLines(deriveLocations(inv([blocked], 2025))[0]).map(u => u.reason)).toEqual(['factor_missing']);
@@ -4569,10 +4570,11 @@ describe('T10a no figure, and MJ gas', () => {
     expect(row.ef_source).toContain('NGA');
   });
 
-  it('every surface carries the AU gas derivation, not just the derived figure', () => {
+  it('every surface carries the AU gas source, and the methods tables list the conversion the row notes', () => {
     // FI2 diff 2: an MMBtu figure is no longer priced on a derived per-MMBtu factor; it converts to NGA's own GJ exactly.
+    // FI2 follow-up: per m3 is NGA's printed 2.025129 (Table 5), cited on the row; it was 0.0393 x 51.53 rounded to 2.025.
     const MMBTU = '6.5816 MMBtu converted to 6.944 GJ (1 MMBtu = 1.05505585262 GJ, exact).';
-    const M3 = '0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4, energy content) × 51.53 kg CO2e/GJ (Table 4) = 2.025 kg CO2e/m³';
+    const M3 = 'DCCEEW NGA 2025, Energy - Scope 1 sheet (Table 5), Natural gas distributed in a pipeline: 2.025129 kg CO2-e/m³';
     const row = (unit: Location['natural_gas_unit'], amount: number, country = 'AU') => (buildWorkings([loc({ name: 'Melbourne', country, state: 'VIC', grid_region: 'AU_VIC',
       has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: unit })], 'AR6', 2025, [], 12) as { stream?: string; note?: string; emission_factor?: string }[])
       .find(r => r.stream === 'natural_gas')!;
@@ -4582,10 +4584,12 @@ describe('T10a no figure, and MJ gas', () => {
     expect(row('m3', 1000).note).toBe(M3);
     // A US Mcf row carries EPA's Table 1 citation (FI2 diff 3), never the AU derivation.
     expect(row('mcf', 10, 'US').note, 'only where we derived the figure').not.toContain('NGA');
-    // The PDF and XLSX methods tables.
+    // The PDF and XLSX methods tables (FI2 follow-up): the conversion the row notes, once however many rows use it, and
+    // nothing for a value NGA prints in the unit entered.
     const melb = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 6.58, natural_gas_unit: 'mmbtu' });
-    expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }]), 'an exact conversion is not a derivation').toEqual([]);
-    expect(factorDerivationsFor([{ ...melb, natural_gas_unit: 'm3' }])).toEqual([M3]);
+    expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }])).toEqual(['Natural gas: MMBtu converted to GJ (1 MMBtu = 1.05505585262 GJ, exact).']);
+    const melbM3: Location = { ...melb, natural_gas_unit: 'm3' };
+    expect(factorDerivationsFor([melbM3]), 'a printed value is a citation, not a derivation').toEqual([]);
     expect(factorDerivationsFor([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })])).toEqual([]);
     const root = join(__dirname, '..', '..');
     expect(readFileSync(join(root, 'app/verify/[token]/page.tsx'), 'utf8')).toContain('{rowNoteOf(w) && (');
@@ -5248,8 +5252,8 @@ describe('FI1 unpriced lines', () => {
   });
 
   it('a location with one unpriceable line still has its other lines priced and in every total', () => {
-    // FI2 diff 2: a UK site. DEFRA prints gas per kWh only, so m3 has no exact route (US m3 now prices via Mcf).
-    const mixed = loc({ id: 'M', name: 'Mixed', country: 'GB', grid_region: 'UK', electricity_kwh: 40_000,
+    // FI2 follow-up: a NZ site. MfE prints gas per kWh only, so m3 has no exact route (UK m3 now prices on DEFRA's per-m3 row).
+    const mixed = loc({ id: 'M', name: 'Mixed', country: 'NZ', grid_region: 'NZ', electricity_kwh: 40_000,
       has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3',
       has_diesel_stationary: true, diesel_stationary_amount: 500, diesel_stationary_unit: 'gallons' });
     const without = loc({ ...mixed, has_natural_gas: false, natural_gas_amount: 0 });
@@ -5262,7 +5266,7 @@ describe('FI1 unpriced lines', () => {
     expect(pctEstimated({ locations: [mixed], reporting_year: 2025 }, 'AR6')).toBe(pctEstimated({ locations: [without], reporting_year: 2025 }, 'AR6'));
     // The message names the fuel, the site, the unit, the publisher and the units it does price.
     expect(gate(mixed)).toEqual([{ locId: 'M', fuelType: 'natural_gas', status: 'factor_missing', field: 'natural_gas_amount',
-      message: 'Natural gas at Mixed is recorded in m³, and DEFRA 2026 publishes no factor this figure can be converted to exactly, so it is not counted. Enter it in therms, MMBtu or kWh, or reject the bill. Export is blocked until this is resolved.' }]);
+      message: 'Natural gas at Mixed is recorded in m³, and MfE 2026 v2 publishes no factor this figure can be converted to exactly, so it is not counted. Enter it in therms, MMBtu or kWh, or reject the bill. Export is blocked until this is resolved.' }]);
   });
 
   describe('refrigerants', () => {
@@ -5362,7 +5366,7 @@ describe('FI1 unpriced lines', () => {
   it('monthly and annual agree with an unpriced line present: reconcile reports zero unexplained', () => {
     const b = (id: string, value: number, unit: string, fuelType: string, document_type: string) =>
       ({ ...doc(document_type, [prop({ fuelType, value, unit, periodStart: '2025-01-01', periodEnd: '2025-12-31' })], id), file_name: `${id}.pdf` });
-    const l = loc({ name: 'Mixed', country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_unit: 'm3',
+    const l = loc({ name: 'Mixed', country: 'NZ', grid_region: 'NZ', has_natural_gas: true, natural_gas_unit: 'm3',
       source_docs: [b('gas', 1000, 'm3', 'natural_gas', 'utility_bill_gas'), b('power', 20_000, 'kwh', 'electricity', 'utility_electricity')] });
     const inv = { locations: [l], reporting_year: 2025 };
     expect(unpricedLines(deriveLocations(inv)[0]).map(u => u.field)).toEqual(['natural_gas_amount']);
@@ -5386,7 +5390,7 @@ describe('FI1 consumers', () => {
     ({ ...doc(document_type, [prop({ fuelType, value, unit, periodStart: '2025-01-01', periodEnd: '2025-06-30' })], id), file_name: `${id}.pdf` });
 
   it('monthly: an unpriced bill is skipped with factor_missing, and reconcile reports zero unexplained', () => {
-    const l = loc({ name: 'Leeds', country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_unit: 'm3',
+    const l = loc({ name: 'Leeds', country: 'NZ', grid_region: 'NZ', has_natural_gas: true, natural_gas_unit: 'm3',
       source_docs: [bill('gas', 'utility_bill_gas', 'natural_gas', 900, 'm3'), bill('power', 'utility_electricity', 'electricity', 20_000, 'kwh')] });
     const inv = { locations: [l], reporting_year: 2025 };
     const m = buildMonthlyEmissions(inv, deps, 'AR6');
@@ -5420,7 +5424,7 @@ describe('FI1 consumers', () => {
   it('each issue clears the moment its input is fixed: unit, refrigerant type, province', () => {
     // The page derives on every render (deriveLocations of the live inventory), so these are what it shows.
     const issues = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => UNPRICED_STATUSES.has(i.status)).map(i => i.status);
-    const gas = loc({ name: 'A', country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' });
+    const gas = loc({ name: 'A', country: 'NZ', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' });
     expect(issues(gas)).toEqual(['factor_missing']);
     expect(issues({ ...gas, natural_gas_unit: 'kwh' })).toEqual([]);
     const ref = loc({ name: 'A', country: 'US', has_hfc_refrigerants: true, refrigerant_type: 'r999x', refrigerant_purchased_kg: 50 });
@@ -5431,7 +5435,7 @@ describe('FI1 consumers', () => {
     // The page writes the province into grid_region as well (page.tsx updateLocation), so both are set.
     expect(issues({ ...ca, province: 'QC', grid_region: 'QC' })).toEqual([]);
     // From bills too: the figure is derived, so fixing the bill's unit clears it with no save.
-    const fromBill = loc({ name: 'A', country: 'GB', has_natural_gas: true, natural_gas_unit: 'kwh', source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'm3')] });
+    const fromBill = loc({ name: 'A', country: 'NZ', has_natural_gas: true, natural_gas_unit: 'kwh', source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'm3')] });
     expect(unpricedLines(deriveLocations({ locations: [fromBill], reporting_year: 2025 })[0]).map(u => u.reason)).toEqual(['factor_missing']);
     const fixed = { ...fromBill, source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'kwh')] };
     expect(unpricedLines(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0])).toEqual([]);
@@ -5536,7 +5540,7 @@ describe('FI2 exact conversions and honest provenance', () => {
     // the table key the value now comes from, or 'unpriced'.
     const CASES: [string, keyof Location, string, string][] = [
       ['CA', 'natural_gas_amount', 'therms', 'unpriced'], ['CA', 'natural_gas_amount', 'mmbtu', 'unpriced'],
-      ['GB', 'natural_gas_amount', 'mcf', 'unpriced'], ['GB', 'natural_gas_amount', 'therms', 'natural_gas_kwh'], ['GB', 'natural_gas_amount', 'mmbtu', 'natural_gas_kwh'],
+      ['GB', 'natural_gas_amount', 'mcf', 'natural_gas_m3'], ['GB', 'natural_gas_amount', 'therms', 'natural_gas_kwh'], ['GB', 'natural_gas_amount', 'mmbtu', 'natural_gas_kwh'],
       ['DE', 'natural_gas_amount', 'therms', 'unpriced'], ['DE', 'natural_gas_amount', 'mmbtu', 'unpriced'],
       ['AU', 'natural_gas_amount', 'mcf', 'natural_gas_m3'], ['AU', 'natural_gas_amount', 'therms', 'natural_gas_gj'],
       ['AU', 'propane_amount', 'gallons', 'propane_litre'], ['AU', 'diesel_stationary_amount', 'gallons', 'diesel_litre'],
@@ -5604,20 +5608,20 @@ describe('FI2 exact conversions and honest provenance', () => {
   });
 
   it('every row priced through a property carries a derivation note naming the value and source, from its own table', () => {
-    // The derived keys in force: EF_EU (densities and an energy content, FI3's list) and EF_AU per m3 (NGA's own 0.0393
-    // GJ/m3). A gallon or Mcf figure converts exactly to one of them first, and still carries its note.
+    // The derived keys in force: EF_EU (densities and an energy content, FI3's list). A gallon or Mcf figure converts
+    // exactly to one of them first, and still carries its note. FI2 follow-up: EF_AU per m3 left this list; it is NGA's
+    // own printed 2.025129, and its row cites that (FI2d below).
     const cases: [string, Partial<Location>, RegExp][] = [
       ['DE', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' }, /36 MJ\/m³/],
       ['DE', { has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: 'gallons' }, /0\.844 kg\/L/],
       ['FR', { has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' }, /0\.745 kg\/L/],
       ['FR', { has_propane: true, propane_amount: 100, propane_unit: 'gallons' }, /0\.510 kg\/L/],
       ['DE', { has_fuel_oil_residual: true, fuel_oil_residual_amount: 100, fuel_oil_residual_unit: 'litres' }, /0\.990 kg\/L/],
-      ['AU', { has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' }, /0\.0393 GJ\/m³ \(DCCEEW NGA 2025 Table 4/],
     ];
     for (const [country, o, value] of cases) {
       const r = buildWorkings([loc({ country, ...o })], 'AR6', 2025).find(x => x.scope === 1 && x.stream && !x.declaration)!;
       expect(r.note, `${country} ${r.factor_key}`).toMatch(value);
-      expect(TABLE_BY_SOURCE.get(r.ef_source), `${country}: the property is the publisher's own table, never another country's`).toBe(country === 'AU' ? EF_AU : EF_EU);
+      expect(TABLE_BY_SOURCE.get(r.ef_source), `${country}: the property is the publisher's own table, never another country's`).toBe(EF_EU);
     }
   });
 
@@ -5709,45 +5713,125 @@ describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how i
     expect(mmbtu.note ?? '').not.toContain(TABLE_1)
   })
 
-  it('FI2c4 every AU row priced from a derived per-litre value carries its derivation, in the m3 note\'s style', () => {
+  it('FI2c4 every AU row cites NGA\'s printed per-unit figure (FI2 follow-up supersedes fi2c\'s derivation notes)', () => {
     const rows = rowsOf(fuels({ country: 'AU', state: 'VIC', grid_region: 'AU_VIC', natural_gas_unit: 'm3', propane_unit: 'litres',
       diesel_stationary_unit: 'litres', fuel_oil_distillate_unit: 'litres', fuel_oil_residual_unit: 'litres', gasoline_unit: 'litres',
       diesel_mobile_unit: 'litres' }))
     expect(rows).toHaveLength(7)
     const noteOf = (src: string) => rows.find(r => r.source === src)!.note ?? ''
-    const DIESEL = '38.6 GJ/kL (DCCEEW NGA 2025 Table 4/Table 1, energy content) × 70.2 kg CO2e/GJ (Table 4/Table 1) ÷ 1,000 = 2.70972, rounded to 2.710 kg CO2e/L'
+    const NGA = 'DCCEEW NGA 2025, Energy - Scope 1 sheet'
+    const DIESEL = `${NGA} (Table 8), Diesel oil: 2,709.72 kg CO2-e/kL; per litre is per kL ÷ 1,000`
     expect(noteOf('Diesel (stationary)')).toBe(DIESEL)
-    expect(noteOf('Diesel (mobile)')).toBe(DIESEL)
-    expect(noteOf('Gasoline (mobile)')).toBe('34.2 GJ/kL (DCCEEW NGA 2025 Table 4, energy content) × 67.8 kg CO2e/GJ (Table 4) ÷ 1,000 = 2.31876, rounded to 2.319 kg CO2e/L')
-    expect(noteOf('Propane')).toBe('25.7 GJ/kL (DCCEEW NGA 2025 Table 4, LPG energy content) × 60.6 kg CO2e/GJ (Table 4) ÷ 1,000 = 1.55742, rounded to 1.557 kg CO2e/L')
-    expect(noteOf('Heating oil')).toBe('37.3 GJ/kL (DCCEEW NGA 2025 Table 8, heating oil energy content) × 69.73 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.600929 kg CO2e/L')
-    expect(noteOf('Heavy fuel oil')).toBe('39.7 GJ/kL (DCCEEW NGA 2025 Table 8, fuel oil energy content) × 73.84 kg CO2e/GJ (Table 8) ÷ 1,000 = 2.931448 kg CO2e/L')
-    expect(noteOf('Natural gas')).toContain('0.0393 GJ/m³ (DCCEEW NGA 2025 Table 4')
-    // Each note's arithmetic is the stored value: energy content x factor / 1,000, to the stored precision.
-    const EA = EF_AU as any
-    const arithmetic: [string, number, number][] = [['diesel_litre', 38.6, 70.2], ['diesel_mobile_litre', 38.6, 70.2], ['gasoline_litre', 34.2, 67.8],
-      ['propane_litre', 25.7, 60.6], ['fuel_oil_distillate_litre', 37.3, 69.73], ['fuel_oil_residual_litre', 39.7, 73.84]]
-    for (const [k, gj, f] of arithmetic) expect(EA[k].co2, k).toBeCloseTo(gj * f / 1000, 3)
-    // A gallons entry converts to the same derived per-litre value, and so carries the same note after the conversion.
+    expect(noteOf('Diesel (mobile)'), 'the stationary row, as before (FI9)').toBe(DIESEL)
+    expect(noteOf('Gasoline (mobile)')).toBe(`${NGA} (Table 8), Automotive gasoline/petrol: 2,318.76 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
+    expect(noteOf('Propane')).toBe(`${NGA} (Table 8), Liquefied petroleum gas (LPG): 1,557.42 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
+    expect(noteOf('Heating oil')).toBe(`${NGA} (Table 8), Heating oil: 2,600.929 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
+    expect(noteOf('Heavy fuel oil')).toBe(`${NGA} (Table 8), Fuel oil: 2,931.448 kg CO2-e/kL; per litre is per kL ÷ 1,000`)
+    expect(noteOf('Natural gas')).toBe(`${NGA} (Table 5), Natural gas distributed in a pipeline: 2.025129 kg CO2-e/m³`)
+    // No row still shows fi2c's arithmetic or its table references.
+    for (const r of rows) {
+      expect(r.note ?? '', r.source).not.toMatch(/rounded to|Table 4|Table 1\b/)
+      expect(r.note ?? '', r.source).not.toContain('\u2014')
+    }
+    // A gallons entry converts exactly to the per-litre value, and carries the conversion and the citation.
     const gal = rowsOf(loc({ country: 'AU', state: 'VIC', grid_region: 'AU_VIC', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 100, fuel_oil_distillate_unit: 'gallons' }))[0]
     expect(gal.note).toContain('converted to')
-    expect(gal.note).toContain('37.3 GJ/kL (DCCEEW NGA 2025 Table 8')
-    for (const r of rows) expect(r.note ?? '', r.source).not.toContain('\u2014')
+    expect(gal.note).toContain(`${NGA} (Table 8), Heating oil`)
   })
 
   it('FI2c5 every key of every table is either printed by its publisher or carries a derivation note', () => {
-    // The tables whose values are the publisher's own printed figure: US (FI2c), CA, UK, NZ. The derived ones carry a
-    // note per key: EU (EU_DERIVATION) and AU (AU_DERIVATION, natural_gas_gj apart, which is NGA's own per-GJ figure).
+    // The tables whose values are the publisher's own printed figure: US (FI2c) and AU (FI2 follow-up) cite where it is
+    // printed, per key; CA, UK and NZ cite the table. The derived one, EU, carries EU_DERIVATION. natural_gas_gj is NGA's
+    // own per-GJ figure and, like EPA's per-mmBtu keys, carries no note beyond the citation.
     const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8')
-    const block = src.slice(src.indexOf('const AU_DERIVATION: Record<string, string> = {'), src.indexOf('function auDerivationNote('))
+    const block = src.slice(src.indexOf('const AU_PUBLISHED_NOTE: Record<string, string> = {'), src.indexOf('function auPublishedNote('))
+    expect(block.length).toBeGreaterThan(200)
     for (const k of Object.keys(EF_AU)) {
       if (k === 'natural_gas_gj') continue
-      expect(block.includes(`  ${k}:`) || block.includes(`${k}: '`), `AU ${k} has a derivation note`).toBe(true)
+      expect(block.includes(`  ${k}:`) || block.includes(`${k}: 'diesel_litre'`), `AU ${k} cites NGA`).toBe(true)
     }
     const us = src.slice(src.indexOf('const US_PUBLISHED_NOTE: Record<string, string> = {'), src.indexOf('const US_PUBLISHED_NOTE') + 2000)
     for (const k of Object.keys(EF)) {
       if (['natural_gas_mmbtu', 'ammonia', 'steam_mmbtu'].includes(k)) continue
       expect(us, `US ${k} cites Table 1`).toContain(`  ${k}:`)
     }
+  })
+})
+
+// ── FI2 follow-up (7 Oct 2026): DEFRA's per-m3 gas row, NGA's printed per-unit figures, and the methods tables ─────
+describe('FI2d. publishers\' own per-unit values, and methods tables that agree with the rows', () => {
+  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { declaration?: boolean; scope?: number; stream?: string; source: string; note?: string; factor_key?: string; result_tco2e: number | null }[])
+    .filter(r => !r.declaration && r.scope === 1)
+  const ukGas = (unit: Location['natural_gas_unit'], amount: number) =>
+    loc({ country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: unit })
+
+  it('FI2d1 EF_UK.natural_gas_m3 is DEFRA 2026 row 1_100_1004_1_1, combined, and 1,000 m3 prices at 2.02633 t CO2e', () => {
+    expect(EF_UK.natural_gas_m3).toEqual({ co2: 2.02633, ch4: 0, n2o: 0 })
+    // The gas split DEFRA prints beside it sums to the combined figure.
+    expect(2.02231 + 0.00307 + 0.00095).toBeCloseTo(2.02633, 10)
+    const [r] = rowsOf(ukGas('m3', 1000))
+    expect(r.factor_key).toBe('natural_gas_m3')
+    expect(r.result_tco2e).toBeCloseTo(2.02633, 12)
+    expect(r.note ?? '', 'priced in the unit DEFRA prints: no conversion').not.toContain('converted')
+    // GWP as published: the figure does not move with the AR set.
+    for (const g of ['AR4', 'AR5'] as const) expect(calcInventory([ukGas('m3', 1000)], g, 2025).s1_total).toBeCloseTo(2.02633, 12)
+  })
+
+  it('FI2d2 UK gas in Mcf and Ccf prices on the m3 row through the exact conversion, stated on the row', () => {
+    const [mcf] = rowsOf(ukGas('mcf', 10))
+    expect(mcf.factor_key).toBe('natural_gas_m3')
+    expect(mcf.result_tco2e).toBeCloseTo(10 * M3_PER_MCF_EXACT * 2.02633 / 1000, 12)
+    expect(mcf.note).toBe('10 Mcf converted to 283.17 m³ (1 Mcf = 28.316846592 m³, exact).')
+    const [ccf] = rowsOf(ukGas('ccf', 100))
+    expect(ccf.factor_key).toBe('natural_gas_m3')
+    expect(ccf.result_tco2e).toBeCloseTo(100 * 2.8316846592 * 2.02633 / 1000, 12)
+    expect(ccf.note).toBe('100 Ccf converted to 283.17 m³ (1 Ccf = 2.8316846592 m³, exact).')
+    expect(unpricedLines(ukGas('ccf', 100))).toEqual([])
+    // ccf is a stored unit (FI2 diff 2) the wizard does not offer yet (FI5): a US ccf figure also prices, on EPA's Mcf.
+    const [us] = rowsOf(loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'ccf' }))
+    expect(us.factor_key).toBe('natural_gas_mcf')
+    expect(us.note).toContain('100 Ccf converted to 10 Mcf')
+  })
+
+  it('FI2d3 each AU value is NGA\'s printed Energy - Scope 1 figure, per kL / 1,000 (per m3 as printed)', () => {
+    const EA: Record<string, { co2: number; ch4: number; n2o: number }> = EF_AU
+    const printed: [string, number][] = [['diesel_litre', 2709.72], ['diesel_mobile_litre', 2709.72], ['gasoline_litre', 2318.76],
+      ['propane_litre', 1557.42], ['fuel_oil_distillate_litre', 2600.929], ['fuel_oil_residual_litre', 2931.448]]
+    for (const [k, perKl] of printed) {
+      expect(EA[k], k).toEqual({ co2: EA[k].co2, ch4: 0, n2o: 0 })
+      expect(EA[k].co2, k).toBeCloseTo(perKl / 1000, 12)
+    }
+    expect(EA.natural_gas_m3).toEqual({ co2: 2.025129, ch4: 0, n2o: 0 })
+    expect(EA.natural_gas_gj, 'the per-GJ key is unchanged').toEqual({ co2: 51.53, ch4: 0, n2o: 0 })
+    // Each printed figure is NGA's own energy content x per-GJ factor, which is how the sheet computes it.
+    expect(0.0393 * 51.53).toBeCloseTo(2.025129, 12)
+    expect(34.2 * 67.8).toBeCloseTo(2318.76, 9)
+    // 1,000 units: the old 3dp values against the printed ones.
+    const t = (k: string) => 1000 * EA[k].co2 / 1000
+    expect([t('natural_gas_m3'), t('diesel_litre'), t('gasoline_litre'), t('propane_litre')]).toEqual([2.025129, 2.70972, 2.31876, 1.55742])
+  })
+
+  it('FI2d4 the methods tables list every conversion and derivation a row notes, and nothing else', () => {
+    const locs: Location[] = [
+      ukGas('mcf', 10),
+      loc({ id: 'L2', name: 'Lyon', country: 'FR', has_mobile: true, gasoline_amount: 100, gasoline_unit: 'litres' }),
+      loc({ id: 'L3', name: 'Perth', country: 'AU', state: 'WA', grid_region: 'AU_WA', has_diesel_stationary: true, diesel_stationary_amount: 50, diesel_stationary_unit: 'gallons' }),
+      loc({ id: 'L4', name: 'Austin', country: 'US', state: 'TX', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }),
+      loc({ id: 'L5', name: 'Leeds', country: 'GB', grid_region: 'UK', has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' }),
+    ]
+    const methods = factorDerivationsFor(locs)
+    expect(methods).toEqual([
+      'Natural gas: Mcf converted to m³ (1 Mcf = 28.316846592 m³, exact).',
+      `Gasoline (mobile): ${(buildWorkings([locs[1]], 'AR6', 2025) as { note?: string; stream?: string }[]).find(r => r.stream === 'mobile')!.note}`,
+      'Diesel (stationary): US gallons converted to litres (1 US gallon = 3.785411784 litres, exact).',
+      'Purchased steam: GJ converted to kWh (1 kWh = 0.0036 GJ, exact).',
+    ])
+    // Agreement: every row note that converts or derives has its methods line, and a printed value (US Mcf) has none.
+    const rows = buildWorkings(locs, 'AR6', 2025, [], 12) as { note?: string; source: string; declaration?: string }[]
+    for (const r of rows.filter(x => !x.declaration && /converted to|DERIVED|÷ 3\.6|× 3\.6|kWh \(exact/.test(x.note ?? ''))) {
+      expect(methods.some(m => m.startsWith(`${r.source.replace(/ \(supplier-specific factor\)$/, '')}:`)), r.source).toBe(true)
+    }
+    expect(methods.some(m => m.includes('Table 1'))).toBe(false)
+    for (const m of methods) expect(m).not.toContain('\u2014')
   })
 })

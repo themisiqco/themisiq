@@ -240,14 +240,12 @@ describe('Category 3 pricing', () => {
     // ⚠️ CHECKED AGAINST THE GHG SIDE, JURISDICTION BY JURISDICTION, before this module was applied.
     // Scope 1 reads a gallons entry as a US gallon everywhere:
     //   the form only offers it outside the metric countries, and labels it "US gallons"
-    //     (lib/ghg/engine.ts:1773-1777, liquidUnitOptions; CA, GB/UK, AU, NZ and the EU-27 get litres)
-    //   every jurisdiction table's _gallon value is its own per-litre factor x 3.785411784, the exact
-    //     NIST US gallon: EF 5.72117 (line 122), EF_CA 5.734896 (232), EF_UK 5.843086 (315),
-    //     EF_EU 5.762 (493) for propane; EF_AU 9.845587 (620) and EF_NZ 11.246004 (666) for distillate
-    //   fuelOilToGallons converts litres with L_PER_GAL and says "US gallons (exact, NIST)"
-    //     (engine.ts:1902-1905)
-    //   and pickEF falls back to the US table for any key a jurisdiction lacks (engine.ts:2187-2208),
-    //     so no location is unpriceable for gallons and none reads an imperial gallon.
+    //     (lib/ghg/engine.ts liquidUnitOptions; CA, GB/UK, AU, NZ and the EU-27 get litres)
+    //   since FI2 every table holds each fuel in its publisher's own unit (per US gallon for EPA, per litre for
+    //     everyone else), and pickEF converts a gallons entry exactly, 1 US gallon = 3.785411784 litres
+    //     (EXACT_UNITS in lib/unitConversions.ts), with the conversion stated on the row
+    //   and there is no fallback to the US table: a unit no exact conversion reaches is an unpriced line,
+    //     so none reads an imperial gallon.
     // DEFRA's Conversions sheet does publish an Imperial gallon column, and this module needs none.
     const GAL_L_CELL = 3.7854118034613733   // Conversions!C40, DEFRA's own US gallon in litres
     const perGallon = GAL_L_CELL * DIESEL_L

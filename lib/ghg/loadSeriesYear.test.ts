@@ -41,7 +41,7 @@ describe('assessCompleteness uses the row\'s own reporting year', () => {
   })
 
   it('an unpriceable location is still caught, with the year passed through', () => {
-    const locs = [{ ...emptyLocation('L1', 'Site A'), country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }]
+    const locs = [{ ...emptyLocation('L1', 'Site A'), country: 'NZ', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }]
     calls.length = 0
     expect(assessCompleteness([], locs, 2025).dataStatus).toBe('unverifiable')
     expect(calls[0][2]).toBe(2025)
