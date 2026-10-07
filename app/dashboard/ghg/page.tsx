@@ -2731,13 +2731,9 @@ workings: saved.workings,
                           is more accurate than ours and will be used instead, worth giving your verifier where
                           steam is a material part of your footprint.
                         </div>
-                      ) : (
-                        <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.5, background: '#FEF3E2', border: '1px solid #f0d9b5', borderRadius: 6, padding: '10px 12px' }}>
-                          <strong>No published factor for this jurisdiction.</strong> {entry.guidance}
-                          {' '}Until you enter one, this stream is reported as unquantified and export stays locked.
-                          We will not price it with another country&rsquo;s factor.
-                        </div>
-                      )}
+                      ) : null}
+                      {/* FI7: with no published factor, the message is the FI1 line's, shown beside the figure above
+                          (UnpricedNote), so it is said once. It clears when a supplier figure is entered below. */}
                       <Field label={`Supplier emission factor: kg CO₂e per ${basisLabel(supBasis)}${entry?.kind === 'published' ? ' (optional)' : ' (required)'}`}>
                         <input type="number" step="any" value={loc.purchased_steam_supplier_ef ?? ''} placeholder={entry?.kind === 'published' ? 'Leave blank to use the published factor' : 'e.g. 0.198'}
                           onChange={e => {
@@ -3395,13 +3391,8 @@ workings: saved.workings,
                         {streamsWithoutFigure.length > 0 && (
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {streamsWithoutFigure.length} stream{streamsWithoutFigure.length > 1 ? 's' : ''} declared with no figure: enter the amount on the Energy &amp; fuel step. You have said {streamsWithoutFigure.length > 1 ? 'these streams are' : 'this stream is'} present here, so attesting absent is not the fix: {streamsWithoutFigure.map(u => `${u.locName}: ${STREAM_META[u.stream].name}`).join('; ')}</div>
                         )}
-                        {/* Names the ACTION, not just the problem. Unlike every other gate here the
-                            remedy is not "enter a number you already have" — the customer has to go
-                            and ask their provider for one, so the message has to say that plainly or
-                            it reads as an unexplained lock. */}
-                        {steamFactorGaps.length > 0 && (
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)', marginBottom: 2 }}>⚠ {steamFactorGaps.length} location{steamFactorGaps.length > 1 ? 's' : ''} report{steamFactorGaps.length > 1 ? '' : 's'} purchased steam with no published factor for {steamFactorGaps.length > 1 ? 'their jurisdictions' : 'that jurisdiction'}: ask your district energy provider for their emission intensity and enter it on the Energy &amp; fuel step: {steamFactorGaps.map(g => `${g.locName} (${g.jurisdiction})`).join('; ')}</div>
-                        )}
+                        {/* FI7: steam with no published factor is an FI1 unpriced line, listed above with its own message
+                            (which names the site and says to ask the provider), so it has no separate line here. */}
                         <div style={{ fontSize: 12, color: '#555553', lineHeight: 1.5 }}>Export is locked until every figure read from your bills is confirmed, every coverage gap or overlap is resolved, every document that appears under two kinds of upload is answered as the same or not, every figure can be calculated, and every emission stream is either entered or attested absent. Check the Energy &amp; fuel data step.</div>
                       </div>
                     )}

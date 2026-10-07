@@ -38,7 +38,7 @@ import {
   acceptanceProblem, periodOriginOf, BILLING_MONTH_CONFIRM_MESSAGE,
   findExactDuplicates, twoCopies, EXACT_DUPLICATE_NOT_COUNTED,
   notCountedLines, FIX_DATES, FIX_REVERSED, FIX_UNITS,
-  unpricedLines, UNPRICED_MESSAGE, UNPRICED_STATUSES,
+  unpricedLines, UNPRICED_MESSAGE, UNPRICED_STATUSES, SUPPLIER_SPECIFIC_ENTRY_METHOD,
   M3_PER_MCF, EF_CA_NG_CO2_M3, NZ_GAS_BASIS_NOTE,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
@@ -6182,5 +6182,68 @@ describe('FI4. propane by mass', () => {
     // Mass reading is propane's alone: diesel in kg has no path.
     expect(convertToCanonical('diesel', 100, 'kg').tier).toBe(3)
     expect(convertToCanonical('electricity', 100, 'mj').tier).toBe(3)
+  })
+});
+
+// ── FI7: purchased steam with no published factor is a plain, unpriced FI1 line ─────────────────────────────────
+// docs/review/design-derived-figures.md "FI7". CA, AU and NZ publish no steam factor (searched); the EU is not searched.
+describe('FI7. steam or district heat with no published factor', () => {
+  const steam = (country: string, name: string, o: Partial<Location> = {}) => loc({ name, country, grid_region: gridRegionForCountry(country) || (country === 'CA' ? 'ON' : ''),
+    province: country === 'CA' ? 'ON' : undefined, has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'gj', ...o })
+  const steamRow = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; unpriced?: { reason: string }; entry_method?: string }[])
+    .find(r => r.stream === 'purchased_steam')!
+
+  it('FI7-1 each kind shows its exact message, naming the country as the selector shows it and the site', () => {
+    const msg = (l: Location) => unpricedLines(l).map(u => [u.reason, u.message])
+    expect(msg(steam('CA', 'Toronto plant'))).toEqual([['steam_factor_missing',
+      'There is no published factor in Canada for purchased steam or district heat, so this line at Toronto plant is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.']])
+    expect(msg(steam('AU', 'Perth depot'))[0][1]).toBe('There is no published factor in Australia for purchased steam or district heat, so this line at Perth depot is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.')
+    expect(msg(steam('NZ', 'Auckland office'))[0][1]).toContain('There is no published factor in New Zealand for purchased steam')
+    expect(msg(steam('DE', 'Berlin office'))).toEqual([['steam_factor_missing',
+      'We hold no factor for purchased steam or district heat in Germany, so this line at Berlin office is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.']])
+    // Greece is stored as EL (Eurostat) and named from GR, as the selector names it.
+    expect(msg(steam('EL', 'Athens'))[0][1]).toContain('in Greece, so this line at Athens')
+    for (const c of ['CA', 'AU', 'NZ', 'DE']) expect(msg(steam(c, 'X'))[0][1]).not.toContain('\u2014')
+  })
+
+  it('FI7-2 the row is unpriced (null, not 0) and the export gate lists it', () => {
+    const l = steam('CA', 'Toronto plant', { electricity_kwh: 10_000 })
+    const r = steamRow(l)
+    expect(r.result_tco2e).toBeNull()
+    expect(r.declaration).toBe('no_published_factor')
+    expect(r.unpriced?.reason).toBe('steam_factor_missing')
+    expect(r.note).toBe(`NOT PRICED: ${unpricedLines(l)[0].message} Nothing from this stream is included in any total on this report.`)
+    const gate = findUnresolvedCoverage([l], 2025, 12, []).filter(i => i.status === 'steam_factor_missing')
+    expect(gate.map(i => [i.field, i.message])).toEqual([['purchased_steam_mmbtu', unpricedLines(l)[0].message]])
+    expect(UNPRICED_STATUSES.has('steam_factor_missing')).toBe(true)
+    // The rest of the location prices, and the steam adds nothing.
+    expect(calcInventory([l], 'AR6', 2025)).toEqual(calcInventory([{ ...l, has_purchased_steam: false, purchased_steam_mmbtu: 0 }], 'AR6', 2025))
+    // The page lists every unpriced line in the gate, and no longer has a separate steam line.
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain('{unpricedAll.map(u => (')
+    expect(page).not.toContain('report{steamFactorGaps.length > 1')
+    expect(page).not.toContain('<strong>No published factor for this jurisdiction.</strong>')
+  })
+
+  it('FI7-3 a supplier figure clears the issue and prices, unchanged', () => {
+    const l = steam('DE', 'Berlin office', { purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh', purchased_steam_supplier_source: 'Provider statement 2025' })
+    expect(unpricedLines(l)).toEqual([])
+    expect(findSteamFactorGaps([l])).toEqual([])
+    const r = steamRow(l)
+    expect(r.entry_method).toBe(SUPPLIER_SPECIFIC_ENTRY_METHOD)
+    expect(r.result_tco2e).toBeCloseTo(500 * KWH_PER_GJ * 0.198 / 1000, 9)
+  })
+
+  it('FI7-4 the selected steam unit is labelled from the unit: a UK location in kWh reads kWh', () => {
+    expect(steamUnitOptions('GB')[0]).toEqual(['kwh', 'kWh'])
+    expect(unitOptionsShowing(steamUnitOptions('GB'), 'kwh', false).find(([v]) => v === 'kwh')).toEqual(['kwh', 'kWh'])
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain("<Field label={`Total purchased steam: ${inventory.reporting_year} (${unitLabel(loc.purchased_steam_unit ?? 'mmbtu')})`}>")
+    expect(page).toContain("{unitOptionsShowing(steamUnitOptions(loc.country), loc.purchased_steam_unit ?? 'mmbtu', false).map(([val, label]) => (")
+  })
+
+  it('FI7-5 no US steam fallback: every jurisdiction without a factor is unpriced, and the US still prices from EPA', () => {
+    for (const c of ['CA', 'AU', 'NZ', 'FR']) expect(steamRow(steam(c, 'Site')).result_tco2e, c).toBeNull()
+    expect(steamRow(steam('US', 'Site', { purchased_steam_unit: 'mmbtu' })).result_tco2e).toBeGreaterThan(0)
   })
 });

@@ -80,7 +80,7 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 - **A unit change never relabels a figure: it converts exactly, with the conversion shown and recorded, or it clears the figure and asks.** `changeUnit` (the unit selector) and `unitsForCountryChange` (a country change) decide; `applyUnitOutcomes` writes the figure and appends to the location's `unit_changes`, and the field's workings row carries the conversion as its `conversion_note`. A cleared figure is an FI1 line (`figure_cleared`) until it is entered or confirmed as none. A document-backed field keeps its locked unit (T7). No density, energy content or gross/net ratio is ever applied to a typed figure.
 - **No factor is priced through a density, energy content or gross/net ratio that is not cited on its row (FI3).**
 - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
-- **Run `npx vitest run lib/ghg/engine.test.ts` (438 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (443 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
 
 ---
 

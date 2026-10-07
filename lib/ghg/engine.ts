@@ -34,7 +34,7 @@ import type { FactorEditions } from './factorEditions'
 // The engine composes the refusal note it stores in the workings row, so the sentence a verifier
 // reads in an export and the sentence the customer reads on screen come from ONE module and cannot
 // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
-import { countryRefusalText } from './countryRefusalCopy'
+import { countryRefusalText, countryNameEn } from './countryRefusalCopy'
 import { DELIVERY_DOC_TYPES, docTypeLabel } from './conciergeDocTypes'
 import { unitLabel } from './unitLabels'
 // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
@@ -184,10 +184,9 @@ const GWP = {
   // table above represent combustion emissions only (tank-to-wheel) and do not represent upstream
   // emissions or well-to-wheel emissions."
   //
-  // ⚠️ STILL APPLIED TO EVERY COUNTRY. pickEF is not consulted for steam — see both read sites — so
-  // a UK district-heating location is priced by this US EPA row. That is a known limitation,
-  // disclosed to the customer in the wizard, and ef_source stays EF_SOURCES.combustion so the
-  // citation names what actually priced the row. Per-jurisdiction routing is separate work.
+  // US SITES ONLY. Steam routes per jurisdiction through STEAM_EF (no fallback): this row prices a US location; the
+  // UK prices on DEFRA's district heat factor; CA, AU, NZ and the EU have no published factor and take a supplier
+  // figure or are an unpriced line (FI7).
   steam_mmbtu: { co2: 66.33, ch4: 0.00125, n2o: 0.000125 },
 }
 
@@ -2187,13 +2186,11 @@ function fuelOilUnitOptions(country: string): Array<[string, string]> {
 // show a unit a customer in that country would not see on a bill.
 //   US/default — MMBtu, the US district-steam convention. GJ also offered; some US campus systems
 //     bill metric and neither unit is ambiguous, so offering both costs nothing.
-//   Metric countries — GJ only. MMBtu is not a billing unit anywhere outside the US.
+//   UK: kWh first (how UK heat networks bill, and DEFRA's basis), GJ kept.
+//   Other metric countries: GJ only. MMBtu is not a billing unit anywhere outside the US.
 //
-// ⚠️ KNOWN GAP, not an oversight: the ACTUAL billing unit for UK heat networks is kWh (Heat Network
-// (Metering and Billing) Regulations) and for much of Germany it is MWh. Neither is offered here, so
-// those customers must convert by hand. Adding them means a third unit plus an energy conversion —
-// deliberately out of scope of this change, and recorded so it is not mistaken for a decision that
-// kWh is wrong.
+// KNOWN GAP: much of Germany bills district heat in MWh, which is not offered; the customer converts by hand. (The UK
+// kWh gap this note used to record is closed: kWh is offered and is the UK default.)
 // ⚠️ ORDER IS THE DEFAULT, AND THAT IS WHY GB LISTS kWh FIRST AND STILL LISTS GJ.
 // snapUnitsForCountry keeps a held unit when the list still offers it and otherwise takes opts[0].
 // So:
@@ -2517,11 +2514,9 @@ type CombustionEF = { co2: number; ch4: number; n2o: number }
 
 // ── PURCHASED STEAM / DISTRICT HEAT, BY JURISDICTION ─────────────────────────────────────────────
 //
-// ⚠️ THIS TABLE HAS NO US FALLBACK, AND ITS ABSENCE IS THE WHOLE DESIGN. Every pickEF branch ends
-// `?? (EF as any)[key]`, so a country missing a key silently gets the US EPA figure while the row
-// cites that country's own publisher. For combustion that fallback is a documented trade; for steam
-// it would be indefensible, because the US steam factor is not a measurement at all — it is EPA
-// ASSUMING a natural-gas boiler at 80% thermal efficiency. Serving that to a Canadian customer under
+// ⚠️ THIS TABLE HAS NO US FALLBACK, AND ITS ABSENCE IS THE WHOLE DESIGN. Since FI2 combustion has none either (pickEF
+// reads the location's own table only). For steam a fallback would be worse still, because the US steam factor is not a
+// measurement at all: it is EPA ASSUMING a natural-gas boiler at 80% thermal efficiency. Serving that to a Canadian customer under
 // an ECCC citation invents a boiler that may not exist. (It is also exactly what the commercial data
 // vendors do: "District steam, Canada" factors trace back to Energy Star Portfolio Manager, i.e. EPA.)
 //
@@ -3015,9 +3010,9 @@ const hasRefrigerantLine = (loc: Location): boolean =>
  *   `reason` is open: T3c adds 'edition_missing' to the same shape. `factor` is the lookup that failed, in the
  * `{ publisher, edition?, value }` shape FI2 and T3c extend; `value` is null because no factor applied.
  */
-export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing' | 'figure_cleared'
+export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing' | 'figure_cleared' | 'steam_factor_missing'
 /** The coverage-issue statuses an unpriced line raises (FI1): the reason, used as the status. */
-export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing', 'figure_cleared'])
+export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing', 'figure_cleared', 'steam_factor_missing'])
 export interface UnpricedLine {
   reason: UnpricedReason
   locId: string
@@ -3041,6 +3036,13 @@ export const UNPRICED_MESSAGE = {
     `${fuel} at ${site} is recorded in ${unit}, and ${publisher} publishes no factor this figure can be converted to exactly, so it is not counted. ${units.length ? `Enter it in ${listInWords(units).replace(/ and ([^ ]+)$/, ' or $1')}, or reject the bill.` : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
   refrigerant_unknown: (site: string) =>
     `The refrigerant type at ${site} is not one we hold a GWP for, so it is not counted. Choose the refrigerant type. Export is blocked until it is chosen.`,
+  // FI7: purchased steam or district heat with no published factor and no supplier figure. One message per kind of
+  // absence, naming the country as the wizard's selector shows it and the site. 'unpublished' (CA, AU, NZ): the
+  // publisher was searched and prints none. 'not_searched' (EU): no source was searched, so it says only what we hold.
+  steam_unpublished: (country: string, site: string) =>
+    `There is no published factor in ${country} for purchased steam or district heat, so this line at ${site} is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.`,
+  steam_not_searched: (country: string, site: string) =>
+    `We hold no factor for purchased steam or district heat in ${country}, so this line at ${site} is not counted. Ask your provider for their emission intensity and enter it below. Export is blocked until it is entered.`,
   // FI3: an EU line in a volume unit with no cited density or energy content. No em dash.
   eu_property: (fuel: string, site: string, unit: string, property: 'density' | 'energy content', remedy: 'mass' | 'kwh' | null) =>
     `The EU factor for ${fuel} at ${site} is published per unit of energy, and we hold no cited ${property} to convert ${unit} to it, so this line is not counted. ${remedy === 'mass' ? 'Enter the quantity in kilograms or tonnes, or reject the bill.' : remedy === 'kwh' ? 'Enter the quantity in kWh, as shown on your gas bill, or reject the bill.' : 'Reject the bill, or remove the figure.'} Export is blocked until this is resolved.`,
@@ -3095,6 +3097,20 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
       country: canonicalCountryCode(loc.country), factorKey: `refrigerant_${loc.refrigerant_type || ''}`,
       factor: { publisher: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], value: null }, supportedUnits: [],
       message: UNPRICED_MESSAGE.refrigerant_unknown(site) })
+  }
+  // FI7: steam with no published factor and no supplier figure is an unpriced line, like any other (FI1). A supplier
+  // figure prices it (steamPricing), and the line goes.
+  if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0 && !steamPricing(loc)) {
+    const entry = steamFactorFor(loc)
+    if (entry && entry.kind !== 'published') {
+      const ctry = canonicalCountryCode(loc.country)
+      // The selector names a country from its ISO code; EL is Eurostat's code for Greece, so it is named from GR.
+      const country = countryNameEn(ctry === 'EL' ? 'GR' : ctry)
+      out.push({ reason: 'steam_factor_missing', locId: loc.id, site, field: 'purchased_steam_mmbtu', stream: 'purchased_steam',
+        source: 'Purchased steam', amount: loc.purchased_steam_mmbtu, unit: loc.purchased_steam_unit ?? 'mmbtu', country: ctry,
+        factorKey: 'steam', factor: { publisher: '', value: null }, supportedUnits: [],
+        message: entry.kind === 'unpublished' ? UNPRICED_MESSAGE.steam_unpublished(country, site) : UNPRICED_MESSAGE.steam_not_searched(country, site) })
+    }
   }
   // FI5: a figure a unit change cleared (no exact conversion joined the units) is a line with no figure until it is
   // entered again, or the stream is answered as not used here. Its message is the one shown when it was cleared.
@@ -4553,16 +4569,16 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const priced = steamPricing(loc)
       if (!priced) {
         // ── NO PUBLISHED FACTOR, AND NO SUPPLIER FIGURE ──────────────────────────────────────────
-        // NOT MissingEF/assertPriceable, deliberately. That path throws, and unpriceableReason turns a
-        // throw into a WHOLE-LOCATION exclusion — a Canadian plant with gas, diesel and electricity
-        // would report nothing at all because of one district-heat line. Disproportionate, and it
-        // reads as a bug. So the other streams price normally and this one row carries the gap.
+        // FI7: an FI1 unpriced line (unpricedLines, reason steam_factor_missing): result null, never 0, listed by the
+        // export gate with its message, and the rest of the location prices normally. The row keeps its own
+        // declaration marker, no_published_factor, which Category 3, the review table and the verifier page read.
         //   activity_data IS THE ENTERED FIGURE, unlike the declared_unquantified rows below which
         // carry 0 because no figure exists. Here one does, and showing it is the honest record: "you
         // told us 500 GJ and we could not price it" is a different, more useful statement to a
         // verifier than "no figure".
         const entry = steamFactorFor(loc)
         const absent = entry === null || entry.kind === 'published' ? null : entry
+        const steamLine = unpriced.get('purchased_steam_mmbtu')
         rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2,
           activity_data: loc.purchased_steam_mmbtu, activity_unit: loc.purchased_steam_unit ?? 'mmbtu',
           emission_factor: NOT_PROVIDED, emission_factor_display: NOT_PROVIDED, ef_source: NOT_PROVIDED, scope2_method: NOT_PROVIDED,
@@ -4571,7 +4587,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
           // The two absence kinds produce DIFFERENT prose. 'unpublished' may say a search was done and
           // name it; 'not_searched' must not, and says only what this platform applies.
           steam_absence: absent?.kind ?? 'not_searched',
-          note: `NOT QUANTIFIED — NO EMISSION FACTOR. ${absent?.guidance ?? ''} Nothing from this stream is included in any total on this report.`,
+          ...(steamLine ? { unpriced: { reason: steamLine.reason, field: String(steamLine.field), factor_key: steamLine.factorKey, publisher: steamLine.factor.publisher, value: null } } : {}),
+          note: `NOT PRICED: ${steamLine?.message ?? ''} Nothing from this stream is included in any total on this report.`,
           ...(absent?.searched ? { quantification_method: `Checked: ${absent.searched}` } : {}) })
       } else {
       const st = steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, priced.basis)
