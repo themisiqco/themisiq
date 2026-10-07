@@ -29,6 +29,12 @@ export function removedAll(requested: number, removed: unknown[] | null | undefi
   return (removed?.length ?? 0) >= requested
 }
 
+/**
+ * RM1: a document removal storage refused while the document is still listed. Unchanged wording, moved here from the
+ * page so the test and the page read one sentence.
+ */
+export const REMOVE_DOC_REFUSED = 'That document couldn’t be deleted. It is still attached to this location.'
+
 /** True for the refusal ENF1's policy produces: Postgres row-level security, which Storage reports as a 403. */
 export function isPolicyRefusal(error: { message?: string; statusCode?: string | number } | null | undefined): boolean {
   if (!error) return false

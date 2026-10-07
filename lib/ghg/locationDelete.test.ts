@@ -284,8 +284,11 @@ describe('the handler', () => {
     expect(fn, 'the resolutions are filtered inside the updater, from inv')
       .toContain('(inv.coverage_resolutions ?? []).filter(r => r.locId !== locId)')
     expect(fn, 'storage is deleted before the row').toMatch(/storage[\s\S]*remove\(paths\)[\s\S]*editRows/)
-    expect(fn, 'a storage failure returns before anything else is touched')
-      .toMatch(/locationDeleteStorageFailed[\s\S]{0,80}return/)
+    // RM1: the storage call goes through removeStored, which reports a failure through onError/onRefused; the
+    // handler then returns on anything but 'removed', before the row or the resolutions are touched.
+    expect(fn, 'a storage failure is reported').toContain('alert(locationDeleteStorageFailed(facts, message))')
+    expect(fn, 'and returns before anything else is touched')
+      .toMatch(/if \(outcome !== 'removed'\) return[\s\S]*editRows/)
   })
 
   it('sets the selected location explicitly rather than leaving it to the clamp', () => {

@@ -58,14 +58,16 @@ describe('the wizard upload control', () => {
   })
 
   it('UR5b: no Remove control without an active plan, one plain line instead, and both delete paths are guarded', () => {
-    expect(PAGE).toContain("{!uploadsOff && <button onClick={() => onRemove(locId, doc.id, doc.file_path, `${locIdx}:${docType}`)}")
+    // RM1: the control is also disabled while its own delete is in flight.
+    expect(PAGE).toContain("{!uploadsOff && <button disabled={removingDocIds.has(doc.id)} onClick={() => onRemove(locId, doc.id, doc.file_path, `${locIdx}:${docType}`)}")
     expect(PAGE).toContain('{uploadsOff && docs.length > 0 && (')
-    // removeDoc: refuses without a plan, and treats an empty remove as not deleted
+    // removeDoc: refuses without a plan, and treats an empty remove as not deleted while the document is still
+    // listed (RM1: lib/ghg/removeStored.ts, which compares what was asked for with what Storage reports removing).
     expect(PAGE).toContain("setUploadErrors(prev => ({ ...prev, [errorKey]: DOCUMENTS_KEPT_INACTIVE }))")
-    expect(PAGE).toContain('if (!removedAll(1, removed)) {')
+    expect(PAGE).toContain("setUploadErrors(prev => ({ ...prev, [errorKey]: REMOVE_DOC_REFUSED }))")
     // removeLocation: the same for a location's documents
     expect(PAGE).toContain('alert(`This location has documents. ${DOCUMENTS_KEPT_INACTIVE}`)')
-    expect(PAGE).toContain('if (!removedAll(paths.length, removed)) {')
+    expect(PAGE).toContain('alert(locationDeleteStorageFailed(facts, `storage removed ${removedCount} of ${paths.length} documents`))')
   })
 })
 
