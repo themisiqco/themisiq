@@ -276,7 +276,7 @@ export function renderedDashes(file: string): number {
  *         change, and show a verifier the "what was shown / what it says now" divergence block for a
  *         comma. docs/item-3-comparability-disclosure.md quotes the sentence, and comparability.test.ts
  *         asserts it eight times; all three move together or not at all.
- *   · lib/ghg/engine.ts (64), lib/assurancePdf.ts (3), lib/auditTrailNotice.ts (3),
+ *   · lib/ghg/engine.ts (64), lib/assurancePdf.ts (3),
  *     lib/materiality/boardReport.ts (17), lib/materiality/boardReportPdf.ts (6),
  *     lib/cbam/report/build.ts (7), lib/cbam/sefa.ts (4), lib/cbam/sefaCompute.ts (1) all feed a PDF or
  *     an XLSX, where a line break is a layout decision. They are the exports group.
@@ -357,7 +357,6 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/verify-cbam/[token]/page.tsx': 19,
   'app/verify/[token]/page.tsx': 14,
   'lib/assurancePdf.ts': 3,
-  'lib/auditTrailNotice.ts': 3,
   'lib/cbam/boundaries.ts': 17,
   'lib/cbam/readiness.ts': 20,
   'lib/cbam/report/build.ts': 7,

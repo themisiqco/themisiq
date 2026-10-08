@@ -177,7 +177,7 @@ export default function EditAssessmentPage() {
     <Shell>
       <div style={{ marginBottom: 16, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <Link href="/dashboard/materiality/worksheet" style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>← All worksheets</Link>
-        <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Assign and chase</Link>
+        <Link href={`/dashboard/materiality/worksheet/${assessmentId}`} style={{ fontSize: 12, color: BRAND, textDecoration: 'none' }}>Assign and follow up</Link>
       </div>
       <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.7rem', color: INK }}>
         Edit this assessment

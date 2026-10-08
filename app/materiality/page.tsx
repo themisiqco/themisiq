@@ -389,7 +389,7 @@ export default function Page() {
             <div style={hairlineCell}>
               <div style={cellTitle}>Stakeholder engagement, handled.</div>
               <p style={cellBody}>
-                You decide who to ask; ThemisIQ distributes the questionnaire, chases non-responders and analyses the results. It tells you when your invitation list has a gap: if no group you invited can speak to a topic, that shows with the reason stated rather than as silence you discover at assurance. Responses stay anonymous by a printed rule. Where stakeholders split sharply, it&rsquo;s flagged rather than averaged away, and where your own workforce describes their conditions differently from workers in your supply chain, the two are shown side by side.
+                You decide who to ask; ThemisIQ sends the questionnaire, reminds the people who have not replied and analyses the results. It tells you when your invitation list has a gap: if no group you invited can speak to a topic, that shows with the reason stated rather than as silence you discover at assurance. Responses stay anonymous by a printed rule. Where stakeholders split sharply, it&rsquo;s flagged rather than averaged away, and where your own workforce describes their conditions differently from workers in your supply chain, the two are shown side by side.
               </p>
             </div>
           </div>
