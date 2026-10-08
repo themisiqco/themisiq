@@ -22,9 +22,9 @@
 // apply that suggestion is ruling R15 (a), and cat3Energy.ts applies it with the note quoted on the row; this table
 // still records what NGA prints.
 //
-// Keyed by edition. T3d adds '2023' and '2024' beside '2025', from their PDFs (no workbook cell).
+// Keyed by edition. T3d adds '2023' and '2024' beside '2025', from their PDFs (no workbook cell), and '2026' from its workbook.
 
-export type NgaScope3Edition = '2023' | '2024' | '2025'
+export type NgaScope3Edition = '2023' | '2024' | '2025' | '2026'
 
 /** Table 1 rows, in NGA's order. NSW and the ACT are one row; WA and the NT are listed by grid. */
 export type NgaElectricityRow = 'NSW_ACT' | 'VIC' | 'QLD' | 'SA' | 'WA_SWIS' | 'WA_NWIS' | 'TAS' | 'NT_DKIS' | 'NATIONAL'
@@ -73,6 +73,31 @@ export interface NgaScope3Tables {
 }
 
 const NGA_SCOPE3: Record<NgaScope3Edition, NgaScope3Tables> = {
+  // T3d 2026: the 2026 edition, from national-greenhouse-accounts-factors-2026.xlsx (cells in the sheet named `table`)
+  // and checked against the PDF: Table 1 p. 10; Table 2 p. 11; Table 6 p. 20 (notes p. 21). Values as printed.
+  '2026': {
+    electricity: {
+      NSW_ACT: { value: 0.07, printed: "0.07", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "New South Wales and Australian Capital Territory", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C4" },
+      VIC: { value: 0.11, printed: "0.11", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "Victoria", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C5" },
+      QLD: { value: 0.11, printed: "0.11", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "Queensland", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C6" },
+      SA: { value: 0.03, printed: "0.03", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "South Australia", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C7" },
+      WA_SWIS: { value: 0.1, printed: "0.10", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "Western Australia - South West Interconnected System (SWIS)", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C8" },
+      WA_NWIS: { value: 0.09, printed: "0.09", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "Western Australia - North Western Interconnected System (NWIS)", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C9" },
+      TAS: { value: 0.03, printed: "0.03", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "Tasmania", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C10" },
+      NT_DKIS: { value: 0.13, printed: "0.13", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "Northern territory - Darwin Katherine Interconnected System (DKIS)", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C11" },
+      NATIONAL: { value: 0.1, printed: "0.10", unit: "kg CO2-e/kWh", table: "Table 1 Indirect (scope 2 and scope 3) location-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "National", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 10, cell: "C12" },
+    },
+    electricityResidualMix: { value: 0.11, printed: "0.11", unit: "kg CO2-e/kWh", table: "Table 2 Indirect (scope 2 and scope 3) market-based emission factors associated with the consumption and losses of purchased or acquired electricity", row: "National", column: "Scope 3 Emission Factors (kg CO2-e/kWh)", page: 11, cell: "C4" },
+    naturalGas: {
+      NSW_ACT: { metro: { value: 13.1, printed: "13.1", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "New South Wales and ACT", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B4" }, non_metro: { value: 14, printed: "14.0", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "New South Wales and ACT", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C4" } },
+      VIC: { metro: { value: 4, printed: "4.0", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Victoria", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B5" }, non_metro: { value: 4, printed: "4.0", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Victoria", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C5" } },
+      QLD: { metro: { value: 8.8, printed: "8.8", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Queensland", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B6" }, non_metro: { value: 7.9, printed: "7.9", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Queensland", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C6" } },
+      SA: { metro: { value: 10.7, printed: "10.7", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "South Australia", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B7" }, non_metro: { value: 10.6, printed: "10.6", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "South Australia", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C7" } },
+      WA: { metro: { value: 4.1, printed: "4.1", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Western Australia", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B8" }, non_metro: { value: 4, printed: "4.0", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Western Australia", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C8" } },
+      TAS: { metro: { value: null, printed: "C", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Tasmania", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B9" }, non_metro: { value: null, printed: "C", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Tasmania", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C9" } },
+      NT: { metro: { value: null, printed: "C", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Northern Territory", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Metro", page: 20, cell: "B10" }, non_metro: { value: null, printed: "C", unit: "kg CO2-e/GJ", table: "Table 6 Indirect (Scope 3) emission factors for the consumption of natural gas", row: "Northern Territory", column: "Scope 3 Emission Factors for Natural Gas (kg CO2-e/GJ), Non-Metro", page: 20, cell: "C10" } },
+    },
+  },
   // T3d 2024: the 2023 edition, from national-greenhouse-account-factors-2023.pdf (a PDF only, so no workbook cell). Printed
   // pages, one less than the PDF page: Table 1 p. 7; Table 2a p. 8; Table 6 p. 17. Values as printed.
   '2023': {

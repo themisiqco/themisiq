@@ -322,6 +322,7 @@ const NGA_PAGES: Readonly<Record<string, { instruction: number; metro: number; l
   '2023': { instruction: 18, metro: 17, leakage: 18, formula: 18, ecNotes: 17 },   // printed pages (one less than the PDF's)
   '2024': { instruction: 19, metro: 18, leakage: 19, formula: 19, ecNotes: 18 },
   '2025': { instruction: 20, metro: 20, leakage: 20, formula: 20, ecNotes: 19 },
+  '2026': { instruction: 21, metro: 21, leakage: 21, formula: 21, ecNotes: 20 },
 }
 
 /** The state as the wizard stores it, to NGA's Table 1 row. WA and the NT use the grids the Scope 2 factor uses

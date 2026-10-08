@@ -1492,13 +1492,16 @@ describe('Y. Australia has a published residual mix', () => {
   });
 
   // T3c: the NGA edition the window's activity year needs, never another held one.
-  it('Y2 AU calendar 2026 needs NGA 2026 (published, not held): MissingEditionError, not the 2025 RMF', () => {
-    expect(() => getResidualFactor('AU', testSel(2026), 'AR6')).toThrow('DCCEEW NGA 2026 residual mix factors are needed for reporting year 2026 and are not loaded');
+  it('Y2 AU calendar 2026 needs NGA 2026 (held since T3d 2026), not the 2025 RMF; calendar 2027 needs NGA 2027 (not published): provisional on 2026', () => {
+    expect(getResidualFactor('AU', testSel(2026), 'AR6').ef).toBe(0.79);
     // A year ending June 2026 is the 2025-26 activity year: NGA 2025, held.
     expect(getResidualFactor('AU', testSel(2026, 6), 'AR6').ef).toBe(0.81);
+    // Calendar 2027 needs NGA 2027, not yet published (R19): priced on NGA 2026, provisional, never MissingEditionError.
+    const y27 = getResidualFactor('AU', testSel(2027), 'AR6');
+    expect([y27.ef, y27.edition?.label, y27.edition?.provisional]).toEqual([0.79, 'DCCEEW NGA 2026', true]);
   });
 
-  it('Y3 AU calendar 2022 needs NGA 2022 (not held; T3d holds 2023 to 2025): MissingEditionError, never a forward resolution', () => {
+  it('Y3 AU calendar 2022 needs NGA 2022 (not held; T3d holds 2023 to 2026): MissingEditionError, never a forward resolution', () => {
     expect(() => getResidualFactor('AU', testSel(2022), 'AR6')).toThrow('DCCEEW NGA 2022 residual mix factors are needed for reporting year 2022');
   });
 
@@ -7155,9 +7158,12 @@ describe('T3c diff 2b: fleet, R12 heat content, R14 steam estimate and Category 
     const steam: Partial<Location> = { has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' };
     const au = rows(loc({ name: 'Plant', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', ...steam }), 2025).find(r => r.stream === 'purchased_steam' && !r.declaration)!;
     expect([au.estimated, au.factor_edition, au.selection_rule]).toEqual(['steam_gas_boiler_80', 'DCCEEW NGA 2025', 'nga_activity_year']);
-    // AU calendar 2026 needs NGA 2026 (activity year 2026-27 straddles it): not held, so the estimate is not made either.
-    const au26 = rows(loc({ name: 'Plant', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', ...steam }), 2026).find(r => r.stream === 'purchased_steam')!;
-    expect([au26.result_tco2e, au26.unpriced?.reason]).toEqual([null, 'edition_missing']);
+    // AU calendar 2026 needs NGA 2026 (activity year 2026-27 straddles it), held since T3d 2026: the estimate carries it.
+    const au26 = rows(loc({ name: 'Plant', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', ...steam }), 2026).find(r => r.stream === 'purchased_steam' && !r.declaration)!;
+    expect([au26.estimated, au26.factor_edition, au26.unpriced]).toEqual(['steam_gas_boiler_80', 'DCCEEW NGA 2026', undefined]);
+    // AU calendar 2022 needs NGA 2022, published and not held: not priced, so the estimate is not made either.
+    const au22 = rows(loc({ name: 'Plant', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', ...steam }), 2022).find(r => r.stream === 'purchased_steam')!;
+    expect([au22.result_tco2e, au22.unpriced?.reason]).toEqual([null, 'edition_missing']);
   });
 
   it('Category 3: the window selects DEFRA and NGA Scope 3 editions; a missing one is an unpriced line, never another year', () => {

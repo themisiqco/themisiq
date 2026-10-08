@@ -85,8 +85,8 @@ describe('NGA 2025 Scope 3 (FI6 diff 1)', () => {
     expect(T.naturalGas.NT.non_metro.value).toBeNull()
   })
 
-  it('is keyed by edition: 2023 and 2024 (T3d) and 2025 held, any other edition is null', () => {
-    expect(NGA_SCOPE3_EDITIONS).toEqual(['2023', '2024', '2025'])
+  it('is keyed by edition: 2023, 2024 and 2026 (T3d) and 2025 held, any other edition is null', () => {
+    expect(NGA_SCOPE3_EDITIONS).toEqual(['2023', '2024', '2025', '2026'])
     expect(ngaScope3('2022')).toBeNull()
     expect(ngaScope3('toString')).toBeNull()
   })

@@ -31,7 +31,7 @@
 
 import { reportingYearLabel } from './reportingYear'
 import { dateInWords } from './dateWords'
-import { EPA_EGRID_DETAILED_DATA_URL, EPA_EGRID_HISTORICAL_URL, EEA_GRID_INTENSITY_URL, EEA_GRID_INTENSITY_2024_URL } from '../sources'
+import { EPA_EGRID_DETAILED_DATA_URL, EPA_EGRID_HISTORICAL_URL, EEA_GRID_INTENSITY_URL, EEA_GRID_INTENSITY_2024_URL, EPA_GHG_HUB_URL, GREENE_RESIDUAL_MIX_URL } from '../sources'
 
 export type EditionClass = 'a' | 'b' | 'exempt'
 export type DatasetRule = 'desnz' | 'majority' | 'nga_activity_year' | 'data_year' | 'exempt'
@@ -67,8 +67,8 @@ export const DATASETS: Readonly<Record<DatasetId, DatasetMeta>> = {
   desnz_steam: { publisher: 'DESNZ', family: 'heat and steam', class: 'a', rule: 'desnz', short: 'DEFRA' },
   desnz_mobile: { publisher: 'DESNZ', family: 'vehicle fuel', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R17: the Fuels rows DESNZ states apply to vehicles (FI9).' },
   desnz_scope3_energy: { publisher: 'DESNZ', family: 'well-to-tank and transmission and distribution', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R17, R18: Category 3 energy, selected with the DESNZ rule beside the GHG factor.' },
-  desnz_travel: { publisher: 'DESNZ', family: 'business travel', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions.' },
-  desnz_waste: { publisher: 'DESNZ', family: 'waste disposal', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions.' },
+  desnz_travel: { publisher: 'DESNZ', family: 'business travel', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions. T3e MUST LOAD DEFRA 2023, 2024 AND 2025 for this dataset before wiring selection (T3d 2026, Lisa, 8 Oct 2026): a year ending March 2026 needs DEFRA 2025, and reporting years 2024 and 2025 need 2023 and 2024 (their March and June year ends). Only 2026 is held.' },
+  desnz_waste: { publisher: 'DESNZ', family: 'waste disposal', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions. T3e MUST LOAD DEFRA 2023, 2024 AND 2025 for this dataset before wiring selection (T3d 2026, Lisa, 8 Oct 2026): a year ending March 2026 needs DEFRA 2025, and reporting years 2024 and 2025 need 2023 and 2024 (their March and June year ends). Only 2026 is held.' },
   epa_hub_combustion: { publisher: 'US EPA', family: 'combustion', class: 'a', rule: 'majority', short: 'US EPA', note: 'H1 (8.5): Hub edition N is read as intended for activity year N; EPA does not state it.' },
   epa_hub_steam: { publisher: 'US EPA', family: 'steam and heat', class: 'a', rule: 'majority', short: 'US EPA' },
   epa_hub_mobile: { publisher: 'US EPA', family: 'vehicle fuel', class: 'a', rule: 'majority', short: 'US EPA', note: 'R17: Tables 2 to 5.' },
@@ -276,13 +276,13 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
   ...epa('epa_hub_combustion', [2023, 2024, 2025], 'Held values were read from the 2025 workbook. The engine labelled them "US EPA 2024" until T3c, which reads this registry and labels them US EPA 2025.'),
   ...epa('epa_hub_steam', [2023, 2024, 2025], undefined, ' Table 7'),   // labelled as the engine has always named the steam table
   ...epa('epa_hub_mobile', [2023, 2024, 2025]),
-  // NGA (class (a), activity years). Held 2023 and 2024 (T3d: lib/ghg/factors/nga-{2023,2024}.ts, mobile/nga{2023,2024}.ts,
-  // ngaScope3_2025.ts '2023' and '2024') and 2025.
-  ...nga('nga_grid', [2023, 2024, 2025]),
-  ...nga('nga_residual', [2023, 2024, 2025]),
-  ...nga('nga_combustion', [2023, 2024, 2025]),
-  ...nga('nga_mobile', [2023, 2024, 2025]),
-  ...nga('nga_scope3', [2023, 2024, 2025]),
+  // NGA (class (a), activity years). Held 2023 to 2026 (T3d: lib/ghg/factors/nga-{2023,2024,2026}.ts,
+  // mobile/nga{2023,2024,2026}.ts, ngaScope3_2025.ts '2023', '2024' and '2026'; 2025 as before).
+  ...nga('nga_grid', [2023, 2024, 2025, 2026]),
+  ...nga('nga_residual', [2023, 2024, 2025, 2026]),
+  ...nga('nga_combustion', [2023, 2024, 2025, 2026]),
+  ...nga('nga_mobile', [2023, 2024, 2025, 2026]),
+  ...nga('nga_scope3', [2023, 2024, 2025, 2026]),
   // MfE (class (a), majority). Held 2023 (T3d 2024: lib/ghg/factors/mfe-2023.ts, mobile/mfe2023.ts), 2024 and 2025 v3 (T3d: lib/ghg/factors/mfe-2024.ts and -2025.ts, mobile/mfe2024.ts and
   // -2025.ts) and 2026 v2.
   ...mfe('mfe_combustion', [2023, 2024, 2025, 2026]),
@@ -395,6 +395,21 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
   { dataset: 'eu_mrr', label: 'EU MRR 2018/2066 Annex VI', class: 'exempt', published: { date: '2025-05-27', source: 'eu/CELEX_02018R2066-20250527_EN_TXT.pdf, consolidated text of 27.05.2025' }, corrections: [], held: true, sourceFile: 'eu/CELEX_02018R2066-20250527_EN_TXT.pdf' },
   { dataset: 'jec_wtt', label: 'JEC Well-to-Tank v5', class: 'exempt', published: { source: 'JRC119036, EUR 30269 EN, 2020' }, corrections: [], held: true, sourceFile: 'jrc/JRC119036_01.pdf' },
   { dataset: 'exiobase', label: 'EXIOBASE 3.8.2 (2019 prices)', class: 'exempt', published: { source: 'doi:10.5281/zenodo.5589597' }, corrections: [], held: true },
+]
+
+// ── T3d 2026: EDITIONS A RULE AWAITS THAT ARE NOT YET PUBLISHED, WITH THE PAGE CHECKED ─────────────────────────────
+// selectEdition treats an edition year above the newest registered one as not yet published (R19). That is an inference
+// from the registry; these records are the evidence for it: the publisher's page, checked on the date given, listed
+// nothing newer. Selection does not read them (no rule changes); the test holds every awaited edition to a record, so
+// "not yet published" is evidenced, not assumed. When an edition appears, register it above and delete its record here.
+export interface NotYetPublished { dataset: DatasetId[]; edition: string; checked: { date: string; source: string; found: string } }
+export const NOT_YET_PUBLISHED: readonly NotYetPublished[] = [
+  { dataset: ['epa_hub_combustion', 'epa_hub_steam', 'epa_hub_mobile'], edition: 'US EPA 2026',
+    checked: { date: '2026-10-08', source: EPA_GHG_HUB_URL, found: 'The Hub page lists the 2025 edition (January 2025) as current; no 2026 edition is listed (Lisa, 8 Oct 2026).' } },
+  { dataset: ['egrid'], edition: 'eGRID2024',
+    checked: { date: '2026-10-08', source: EPA_EGRID_DETAILED_DATA_URL, found: 'The detailed-data page lists eGRID2023 revision 2 as the newest; no eGRID2024 is listed (Lisa, 8 Oct 2026).' } },
+  { dataset: ['greene'], edition: 'Green-e 2026',
+    checked: { date: '2026-10-08', source: GREENE_RESIDUAL_MIX_URL, found: 'The newest residual mix listed is the 2025 edition (2023 data); no 2026 edition is listed (Lisa, 8 Oct 2026).' } },
 ]
 
 /** Every entry whose publication date is still needed, by label. A held one among them is never selected until dated. */

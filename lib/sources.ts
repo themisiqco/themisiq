@@ -140,6 +140,18 @@ export const EPA_EGRID_DETAILED_DATA_URL = 'https://www.epa.gov/egrid/detailed-d
 // @source-status: unverified
 export const EPA_EGRID_HISTORICAL_URL = 'https://www.epa.gov/egrid/historical-egrid-data'
 
+// Intent: the EPA GHG Emission Factors Hub page, which lists the current Hub edition. Cited by the registry's
+// NOT_YET_PUBLISHED record for EPA Hub 2026: Lisa checked it on 8 Oct 2026 and it listed the 2025 edition (January 2025)
+// as current. UNVERIFIED here: not opened in a Claude Code session.
+// @source-status: unverified
+export const EPA_GHG_HUB_URL = 'https://www.epa.gov/climateleadership/ghg-emission-factors-hub'
+
+// Intent: the Green-e (Center for Resource Solutions) residual mix page. Cited by the registry's NOT_YET_PUBLISHED record
+// for Green-e 2026: Lisa checked it on 8 Oct 2026 and the newest edition listed was the 2025 residual mix (2023 data).
+// UNVERIFIED here: not opened in a Claude Code session.
+// @source-status: unverified
+export const GREENE_RESIDUAL_MIX_URL = 'https://resource-solutions.org/residual-mix'
+
 // Intent: the EEA indicator "Greenhouse gas emission intensity of electricity generation", country level, from
 // which eea/EEA-ghg-intensity-electricity-generation-country-level.csv was downloaded. Cited by the registry for EEA
 // 2023's dates ("Published" 25 Oct 2024, "Modified" 27 Jun 2025), which Lisa read from this page on 8 Oct 2026.
