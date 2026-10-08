@@ -38,6 +38,7 @@ import type { FactorEditions } from './factorEditions'
 // reads in an export and the sentence the customer reads on screen come from ONE module and cannot
 // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
 import { countryRefusalText, countryNameEn } from './countryRefusalCopy'
+import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES } from './gridRegionWords'
 import { DELIVERY_DOC_TYPES, docTypeLabel } from './conciergeDocTypes'
 import { unitLabel } from './unitLabels'
 // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
@@ -55,11 +56,22 @@ import { ECCC_MOBILE_2025 } from '../emissionFactors/mobile/eccc2025'
 import { DEFRA_MOBILE_2026 } from '../emissionFactors/mobile/defra2026'
 import { DEFRA_MOBILE_2025 } from '../emissionFactors/mobile/defra2025'
 import { DEFRA_MOBILE_2024 } from '../emissionFactors/mobile/defra2024'
+import { DEFRA_MOBILE_2023 } from '../emissionFactors/mobile/defra2023'
 import { DESNZ_2024 } from './factors/desnz-2024'
+import { DESNZ_2023 } from './factors/desnz-2023'
 import { DESNZ_2025 } from './factors/desnz-2025'
 import type { CitedValue } from './factors/types'
 import { NGA_MOBILE_2025, NGA_MOBILE_ENERGY_CONTENT_2025 } from '../emissionFactors/mobile/nga2025'
 import { NGA_MOBILE_2024, NGA_MOBILE_ENERGY_CONTENT_2024 } from '../emissionFactors/mobile/nga2024'
+import { NGA_MOBILE_2023, NGA_MOBILE_ENERGY_CONTENT_2023 } from '../emissionFactors/mobile/nga2023'
+import { EPA_MOBILE_2023 } from '../emissionFactors/mobile/epa2023'
+import { MFE_MOBILE_2023 } from '../emissionFactors/mobile/mfe2023'
+import { EPA_2023 } from './factors/epa-2023'
+import { NGA_2023 } from './factors/nga-2023'
+import { MFE_2023 } from './factors/mfe-2023'
+import { MFE_GRID_2026V2 } from './factors/mfe-2026v2-grid'
+import { AIB_2023 } from './factors/aib-2023'
+import { EEA_2023_REVISED } from './factors/eea-2023'
 import { EPA_MOBILE_2024 } from '../emissionFactors/mobile/epa2024'
 import { MFE_MOBILE_2024 } from '../emissionFactors/mobile/mfe2024'
 import { MFE_MOBILE_2025 } from '../emissionFactors/mobile/mfe2025'
@@ -447,6 +459,7 @@ function ukTable(f: { combustion: Record<string, CitedValue>; steam_kwh: CitedVa
   return { ...Object.fromEntries(Object.entries(f.combustion).map(([k, c]) => [k, { co2: c.value, ch4: 0, n2o: 0 }])),
     steam_kwh: { co2: f.steam_kwh.value, ch4: 0, n2o: 0 } }
 }
+const EF_UK_2023 = ukTable(DESNZ_2023)   // T3d 2024: the 2023 full set's stored (unrounded) totals
 const EF_UK_2024 = ukTable(DESNZ_2024)
 const EF_UK_2025 = ukTable(DESNZ_2025)
 /** T3d: where an older held edition prints a value, from the citation its edition file carries. */
@@ -461,13 +474,13 @@ const citedNotes = (edition: string, values: Record<string, CitedValue>): Record
  * describes the newest edition's cells, so a 2024 row never points a verifier at a 2026 cell.
  */
 const EDITION_VALUE_NOTE: Partial<Record<DatasetId, Record<number, Record<string, string>>>> = {
-  desnz_combustion: { 2024: citedNotes(DESNZ_2024.edition, DESNZ_2024.combustion), 2025: citedNotes(DESNZ_2025.edition, DESNZ_2025.combustion) },
+  desnz_combustion: { 2023: citedNotes(DESNZ_2023.edition, DESNZ_2023.combustion), 2024: citedNotes(DESNZ_2024.edition, DESNZ_2024.combustion), 2025: citedNotes(DESNZ_2025.edition, DESNZ_2025.combustion) },
   // EPA: where Table 1 prints the three gases, and the same exact steps EF applies (per scf x 1,000; g / 1,000).
-  epa_hub_combustion: { 2024: Object.fromEntries(Object.entries(EPA_2024.combustion).map(([k, g]) =>
-    [k, `${EPA_2024.edition}, ${g.co2.cite.table}, ${g.co2.cite.row} (${[g.co2, g.ch4, g.n2o].map(x => x.cite.cell).join(', ')}): ${g.co2.value} kg CO2, ${g.ch4.value} kg CH4, ${g.n2o.value} kg N2O ${g.co2.unit.replace(/^kg CO2 /, '')}${g.co2.derivation ? `; ${g.co2.derivation}` : ''}`])) },
+  epa_hub_combustion: Object.fromEntries(([[2023, EPA_2023], [2024, EPA_2024]] as const).map(([y, F]) => [y, Object.fromEntries(Object.entries(F.combustion).map(([k, g]) =>
+    [k, `${F.edition}, ${g.co2.cite.table}, ${g.co2.cite.row} (${[g.co2, g.ch4, g.n2o].map(x => x.cite.cell).join(', ')}): ${g.co2.value} kg CO2, ${g.ch4.value} kg CH4, ${g.n2o.value} kg N2O ${g.co2.unit.replace(/^kg CO2 /, '')}${g.co2.derivation ? `; ${g.co2.derivation}` : ''}`]))])),
   // NGA 2024: a PDF only, so the row shows the energy content and per-GJ factor it is the product of (FI3: cited on the row).
-  nga_combustion: { 2024: Object.fromEntries(Object.entries(NGA_2024.combustion).map(([k, v]) =>
-    [k, `${NGA_2024.edition}, ${v.cite.table.split(' ').slice(0, 2).join(' ')} (p. ${v.cite.page}), ${v.cite.row}: ${v.value} ${v.unit}${v.derivation ? `; ${v.derivation}` : ''}`])) },
+  nga_combustion: Object.fromEntries(([[2023, NGA_2023], [2024, NGA_2024]] as const).map(([y, F]) => [y, Object.fromEntries(Object.entries(F.combustion).map(([k, v]) =>
+    [k, `${F.edition}, ${v.cite.table.split(' ').slice(0, 2).join(' ')} (p. ${v.cite.page}), ${v.cite.row}: ${v.value} ${v.unit}${v.derivation ? `; ${v.derivation}` : ''}`]))])),
 }
 
 // EU combustion factors: the emission factor per TJ and the net calorific value per mass from EU MRR Annex VI
@@ -891,8 +904,18 @@ const EF_SOURCES = {
   // ── T3d: THE OLDER HELD EDITIONS, ONE CITATION EACH ─────────────────────────────────────────────────────────────
   // The keys above name the newest edition a jurisdiction holds. A row priced on an older held edition cites one of
   // these instead (EDITION_CITATION), so a 2024 row never names the 2026 document. Values: lib/ghg/factors/.
+  edition_desnz_2023: `${defraCitation(2023)}, full set v1.1 (as updated 28 Jun 2023)`,
   edition_desnz_2024: `${defraCitation(2024)}, full set v1.1 (as corrected 30 Oct 2024)`,
   edition_desnz_2025: `${defraCitation(2025)}, full set v1`,
+  edition_epa_2023: 'US EPA (2023) Emission Factors for Greenhouse Gas Inventories',
+  edition_epa_2023_mobile: 'US EPA GHG Emission Factors Hub 2023 (Last Modified 12 September 2023), Tables 2 to 5, mobile combustion',
+  edition_nga_2023: 'DCCEEW NGA 2023, Table 1, Scope 2 (location-based)',
+  edition_nga_2023_combustion: 'DCCEEW NGA 2023 (AR5), Tables 5 and 8, energy content x combined Scope 1 factor as printed',
+  edition_nga_2023_mobile: 'DCCEEW NGA 2023, Table 9 (transport) and Table 8 (non-road equipment)',
+  edition_nga_2023_residual: 'DCCEEW NGA 2023, Table 2a: national Residual Mix Factor, Scope 2 (see residual_au)',
+  edition_mfe_2023: 'NZ MfE Measuring Emissions 2023 (as-published basis: factors stored verbatim, no AR re-basing)',
+  edition_aib_2023: 'AIB European Residual Mixes 2023 (Version 1.0, 2024-05-30, Grexel/AIB): combined CO₂e, gCO₂/kWh.',
+  edition_eea_2023_revised: 'EEA (2025) Greenhouse gas emission intensity of electricity generation, country level, data year 2023 as revised in the data year 2024 release (the final 2023 inventory)',
   edition_epa_2024: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
   edition_epa_2024_mobile: 'US EPA GHG Emission Factors Hub 2024 (Last Modified 5 June 2024), Tables 2 to 5, mobile combustion',
   edition_nga_2024: 'DCCEEW NGA 2024, Table 1, Scope 2 (location-based)',
@@ -911,7 +934,7 @@ const EF_SOURCES = {
   // KEPT — exported, and still read by the methodology summary in app/dashboard/ghg/page.tsx as a
   // catalogue of every grid source this engine can apply. It must NOT be used on a workings row:
   // a verifier reading one row needs the ONE source that priced it, not the six it might have been.
-  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 and v4.0 (CA) / DEFRA 2024 to 2026 (UK) / EEA 2023 and 2024 (EU) / DCCEEW NGA 2024 and 2025 (AU) / NZ MfE 2026 (NZ)',
+  electricity: 'US EPA eGRID2023 (US) / ECCC v3.0 and v4.0 (CA) / DEFRA 2023 to 2026 (UK) / EEA 2023 and 2024 (EU) / DCCEEW NGA 2023 to 2025 (AU) / NZ MfE 2026 (NZ)',
   // The catalogue above, split so gridSource() can resolve the one actually applied.
   electricity_us: 'US EPA eGRID2023',
   electricity_ca: 'ECCC (2025) Emission factors and reference values v3.0',
@@ -1161,7 +1184,7 @@ const GRID_EF: Record<string, Record<number, number>> = {
   //                   second look at the workbook before this reaches a customer report.
   //   T3d: 2024 and 2025 are read from their edition files (lib/ghg/factors/desnz-2024.ts and -2025.ts), each cited to its
   //   workbook cell; 2025 is the same 0.177 (UK electricity!E26 of the 2025 full set), now with its citation.
-  UK: { 2024: DESNZ_2024.grid_uk.value, 2025: DESNZ_2025.grid_uk.value, 2026: 0.13096 },
+  UK: { 2023: DESNZ_2023.grid_uk.value, 2024: DESNZ_2024.grid_uk.value, 2025: DESNZ_2025.grid_uk.value, 2026: 0.13096 },
   // EU member states — EEA "GHG emission intensity of electricity generation, country level" (2023),
   // gCO2e/kWh ÷ 1000. Generation-based, location-based Scope 2. EU_AVG = EEA EU-27 aggregate.
   EU_AT: { 2023: 0.085 }, EU_BE: { 2023: 0.145 }, EU_BG: { 2023: 0.281 }, EU_HR: { 2023: 0.134 },
@@ -1171,7 +1194,7 @@ const GRID_EF: Record<string, Record<number, number>> = {
   EU_LT: { 2023: 0.124 }, EU_LU: { 2023: 0.056 }, EU_MT: { 2023: 0.342 }, EU_NL: { 2023: 0.263 },
   EU_PL: { 2023: 0.614 }, EU_PT: { 2023: 0.119 }, EU_RO: { 2023: 0.234 }, EU_SK: { 2023: 0.084 },
   EU_SI: { 2023: 0.176 }, EU_ES: { 2023: 0.158 }, EU_SE: { 2023: 0.008 },
-  EU_AVG: { 2023: 0.210 },
+  EU_AVG: {},   // T3d 2024: no 2023 value (the EU-27 row of the revised release is not loaded); was 0.210, the superseded estimate
   // T3d: data year 2024 from lib/ghg/factors/eea-2024.ts (the corrected export of 10 Jul 2026), added to each EU_XX key
   // below. EU_AVG has no 2024 value: the EU-27 row ("#N/A" in the export) is not loaded (ruling, 8 Oct 2026).
   // Australia — DCCEEW National Greenhouse Accounts (NGA) Factors 2025, Table 1 Scope 2
@@ -1185,20 +1208,25 @@ const GRID_EF: Record<string, Record<number, number>> = {
   // T3d: NGA 2024 (activity year 2024-25) from lib/ghg/factors/nga-2024.ts, added to each AU key below.
   // New Zealand — MfE "Measuring Emissions" 2026 (v2), national electricity (kg CO2e/kWh).
   // National grid (no sub-national split); year-keyed like the Canadian provinces.
-  NZ: { 2023: 0.0766, 2024: 0.0994, 2025: 0.0787 },
+  NZ: {},   // T3d 2024: the printed 2023 to 2025 rows, joined below from lib/ghg/factors/mfe-2026v2-grid.ts (were 0.0766, 0.0994, 0.0787)
 }
 // T3d: each edition file's values joined onto GRID_EF under its data year (CA, EU) or edition year (AU), so a value is
 // typed once, in the file that cites it.
 for (const [k, v] of Object.entries(ECCC_TABLE_5_4)) GRID_EF[k][2024] = v.value
 for (const [k, v] of Object.entries(EEA_2024)) GRID_EF[k][2024] = v.value
 for (const [k, v] of Object.entries(NGA_2024.grid)) GRID_EF[k][2024] = v.value
+// T3d 2024: NGA 2023; EEA data year 2023 as revised (ruling 1); the MfE grid rows as printed (ruling 2). ECCC data year 2023
+// stays Table 5.3 as v4.0 prints it (ruling 3 reversed, 8 Oct 2026; see the registry note on Table 5.3).
+for (const [k, v] of Object.entries(NGA_2023.grid)) GRID_EF[k][2023] = v.value
+for (const [k, v] of Object.entries(EEA_2023_REVISED)) GRID_EF[k][2023] = v.value
+for (const [y, v] of Object.entries(MFE_GRID_2026V2)) GRID_EF.NZ[Number(y)] = v.value
 
 // New Zealand electricity transmission & distribution (T&D) losses — MfE 2026 (v2), kg CO2e/kWh.
 // This is a Scope 3 Category 3 factor, NOT Scope 2; year-keyed for nearest-year lookup like GRID_EF.
 // Added as an optional, separately-labelled line only when a NZ location opts in (nz_td_losses).
 // T3d: the 2024 row (data!J1708) and the 2025 row as printed (data!J1712, 0.00595616; it was held rounded as 0.00596), both
 // from lib/ghg/factors/mfe-2026v2-td.ts.
-const NZ_TD_LOSS: Record<number, number> = { 2024: MFE_TD_2026V2[2024].value, 2025: MFE_TD_2026V2[2025].value }
+const NZ_TD_LOSS: Record<number, number> = { 2023: MFE_TD_2026V2[2023].value, 2024: MFE_TD_2026V2[2024].value, 2025: MFE_TD_2026V2[2025].value }
 // Nearest-year (≤ requested, else earliest) NZ T&D loss factor, kg CO2e/kWh. Scope 3 Cat 3.
 // Shared by calcLocation and buildWorkings so the calc term and the workings row never diverge.
 //
@@ -1274,6 +1302,8 @@ const RESIDUAL_EU: Record<string, Record<number, number | null>> = {
 }
 // T3d: AIB 2025 (data year 2025) from lib/ghg/factors/aib-2025.ts; Austria and the Netherlands print "NA" (null).
 for (const [k, v] of Object.entries(AIB_2025)) RESIDUAL_EU[k][2025] = v.value
+// T3d 2024: AIB 2023 (data year 2023), Table 2's printed figures; Austria "N/A" is null.
+for (const [k, v] of Object.entries(AIB_2023)) RESIDUAL_EU[k][2023] = v.value
 
 // US residual: lb/MWh with gas split. co2 = Green-e Adjusted System Mix (residual);
 // ch4/n2o = eGRID2023 Rev2 grid values (Green-e publishes no residual CH4/N2O — grid is the
@@ -1328,7 +1358,7 @@ const RESIDUAL_US: Record<string, Record<number, ResidualGas>> = {
 //
 // Year key = the WORKBOOK EDITION already cited by EF_SOURCES.electricity_au, so the location-based
 // and market-based figures on one AU inventory name the same document.
-const RESIDUAL_AU: Record<number, number> = { 2024: NGA_2024.residual.value, 2025: 0.81 }   // T3d: NGA 2024, Table 2, p. 9
+const RESIDUAL_AU: Record<number, number> = { 2023: NGA_2023.residual.value, 2024: NGA_2024.residual.value, 2025: 0.81 }   // T3d: NGA 2024, Table 2, p. 9
 
 // A grid_region is "resolved" iff it's a real GRID_EF key. 'us_average' (the init default), '' and any
 // unmapped string are UNRESOLVED; the deliberate US_AVG/EU_AVG/AU_AVG fallback keys and every AU_/NZ
@@ -1354,6 +1384,17 @@ function isResolvedGridRegion(region: string): boolean {
 // RESOLUTION SEMANTICS UNCHANGED. `years` was already sorted one line above `years[0]` — there was no
 // enumeration-order hazard to fix — and the forward fallback is left exactly as it was. This adds
 // disclosure only; no figure moves.
+/** T3d 2024: a GRID_EF region as a person reads it in a sentence ("the EU-27 average", "Ontario", "Germany"); never the
+ *  key. Names from lib/ghg/gridRegionWords.ts, EU member states from the engine's country names. */
+export function gridRegionWords(region: string): string {
+  const avg = GRID_REGION_AVERAGES[region]
+  if (avg) return /average$|Kingdom$/.test(avg) ? `the ${avg}` : avg
+  if (GRID_REGION_CA[region]) return GRID_REGION_CA[region]
+  if (region.startsWith('US_') && GRID_REGION_US[region.slice(3)]) return GRID_REGION_US[region.slice(3)]
+  if (region.startsWith('AU_') && GRID_REGION_AU[region.slice(3)]) return GRID_REGION_AU[region.slice(3)]
+  if (region.startsWith('EU_')) { const c = region.slice(3); return countryNameEn(c === 'EL' ? 'GR' : c) }
+  return 'this grid region'
+}
 function getGridFactor(region: string, sel: Sel): { ef: number; usedRegion: string; edition: EditionUse } {
   // T3c: the edition the window needs for this region's publisher, through editionFor; MissingEditionError when it is not
   // held. No `<=` loop, no forward move to the earliest key: those were the nearest-year substitution this replaces.
@@ -1371,7 +1412,7 @@ function getGridFactor(region: string, sel: Sel): { ef: number; usedRegion: stri
   // an export-blocking edition_missing issue naming the site. Never an uncaught error, and never another year's value.
   if (ef === undefined) {
     throw new MissingEditionError(u.dataset, u.label, 'not_held',
-      `${u.label} ${DATASETS[u.dataset].family} factors for grid region ${region} are needed for ${reportingYearLabel(sel.win).inText} ` +
+      `${u.label} ${DATASETS[u.dataset].family} factors for ${gridRegionWords(region)} are needed for ${reportingYearLabel(sel.win).inText} ` +
       'and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
   }
   return { ef, usedRegion: region, edition: u }
@@ -3021,11 +3062,14 @@ export function steamPricing(loc: Location, sel: Sel): SteamPriced | null {
 /** T3d: each published steam table keyed by the edition it holds, with its citation where it is not STEAM_EF's own. */
 const STEAM_BY_EDITION: Partial<Record<EfJurisdiction, Record<number, { ef: CombustionEF; source?: string }>>> = {
   US: {
+    2023: { ef: { co2: EPA_2023.steam_mmbtu.co2.value, ch4: EPA_2023.steam_mmbtu.ch4.value, n2o: EPA_2023.steam_mmbtu.n2o.value },
+      source: 'US EPA (2023) GHG Emission Factors Hub, Table 7, Steam and Heat (natural gas at 80% thermal efficiency; combustion only, tank-to-wheel)' },
     2024: { ef: { co2: EPA_2024.steam_mmbtu.co2.value, ch4: EPA_2024.steam_mmbtu.ch4.value, n2o: EPA_2024.steam_mmbtu.n2o.value },
       source: 'US EPA (2024) GHG Emission Factors Hub, Table 7, Steam and Heat (natural gas at 80% thermal efficiency; combustion only, tank-to-wheel)' },
     2025: { ef: EF.steam_mmbtu },
   },
   UK: {
+    2023: { ef: EF_UK_2023.steam_kwh, source: `${EF_SOURCES.edition_desnz_2023}, Heat and steam sheet, Heat and steam > District heat and steam (${DESNZ_2023.steam_kwh.cite.cell})` },
     2024: { ef: EF_UK_2024.steam_kwh, source: `${EF_SOURCES.edition_desnz_2024}, Heat and steam sheet, Heat and steam > District heat and steam (${DESNZ_2024.steam_kwh.cite.cell})` },
     2025: { ef: EF_UK_2025.steam_kwh, source: `${EF_SOURCES.edition_desnz_2025}, Heat and steam sheet, Heat and steam > District heat and steam (${DESNZ_2025.steam_kwh.cite.cell})` },
     2026: { ef: EF_UK.steam_kwh },
@@ -3163,21 +3207,21 @@ const splitKey = (key: string): [string, string] => {
  * never the 2026 one beside it.
  */
 const EDITION_CITATION: Partial<Record<DatasetId, Record<number, string>>> = {
-  desnz_combustion: { 2024: EF_SOURCES.edition_desnz_2024, 2025: EF_SOURCES.edition_desnz_2025 },
-  desnz_mobile: { 2024: EF_SOURCES.edition_desnz_2024, 2025: EF_SOURCES.edition_desnz_2025 },
-  desnz_steam: { 2024: EF_SOURCES.edition_desnz_2024, 2025: EF_SOURCES.edition_desnz_2025 },
-  epa_hub_combustion: { 2024: EF_SOURCES.edition_epa_2024 },
-  epa_hub_mobile: { 2024: EF_SOURCES.edition_epa_2024_mobile },
-  nga_grid: { 2024: EF_SOURCES.edition_nga_2024 },
-  nga_combustion: { 2024: EF_SOURCES.edition_nga_2024_combustion },
-  nga_mobile: { 2024: EF_SOURCES.edition_nga_2024_mobile },
-  nga_residual: { 2024: EF_SOURCES.edition_nga_2024_residual },
-  mfe_combustion: { 2024: EF_SOURCES.edition_mfe_2024, 2025: EF_SOURCES.edition_mfe_2025 },
-  mfe_mobile: { 2024: EF_SOURCES.edition_mfe_2024, 2025: EF_SOURCES.edition_mfe_2025 },
+  desnz_combustion: { 2023: EF_SOURCES.edition_desnz_2023, 2024: EF_SOURCES.edition_desnz_2024, 2025: EF_SOURCES.edition_desnz_2025 },
+  desnz_mobile: { 2023: EF_SOURCES.edition_desnz_2023, 2024: EF_SOURCES.edition_desnz_2024, 2025: EF_SOURCES.edition_desnz_2025 },
+  desnz_steam: { 2023: EF_SOURCES.edition_desnz_2023, 2024: EF_SOURCES.edition_desnz_2024, 2025: EF_SOURCES.edition_desnz_2025 },
+  epa_hub_combustion: { 2023: EF_SOURCES.edition_epa_2023, 2024: EF_SOURCES.edition_epa_2024 },
+  epa_hub_mobile: { 2023: EF_SOURCES.edition_epa_2023_mobile, 2024: EF_SOURCES.edition_epa_2024_mobile },
+  nga_grid: { 2023: EF_SOURCES.edition_nga_2023, 2024: EF_SOURCES.edition_nga_2024 },
+  nga_combustion: { 2023: EF_SOURCES.edition_nga_2023_combustion, 2024: EF_SOURCES.edition_nga_2024_combustion },
+  nga_mobile: { 2023: EF_SOURCES.edition_nga_2023_mobile, 2024: EF_SOURCES.edition_nga_2024_mobile },
+  nga_residual: { 2023: EF_SOURCES.edition_nga_2023_residual, 2024: EF_SOURCES.edition_nga_2024_residual },
+  mfe_combustion: { 2023: EF_SOURCES.edition_mfe_2023, 2024: EF_SOURCES.edition_mfe_2024, 2025: EF_SOURCES.edition_mfe_2025 },
+  mfe_mobile: { 2023: EF_SOURCES.edition_mfe_2023, 2024: EF_SOURCES.edition_mfe_2024, 2025: EF_SOURCES.edition_mfe_2025 },
   eccc_grid: { 2024: EF_SOURCES.edition_eccc_v4 },
   eccc_mobile: { 2024: EF_SOURCES.edition_eccc_nir_2026_mobile },
-  aib: { 2025: EF_SOURCES.edition_aib_2025 },
-  eea_grid: { 2024: EF_SOURCES.edition_eea_2024 },
+  aib: { 2023: EF_SOURCES.edition_aib_2023, 2025: EF_SOURCES.edition_aib_2025 },
+  eea_grid: { 2023: EF_SOURCES.edition_eea_2023_revised, 2024: EF_SOURCES.edition_eea_2024 },
 }
 /** The citation for an edition, or `fallback` (the newest edition's) where none is recorded separately. */
 export function editionCitation(u: EditionUse, fallback: string): string {
@@ -3189,17 +3233,20 @@ const gasTable = (v: Record<string, { co2: CitedValue; ch4: CitedValue; n2o: Cit
   Object.fromEntries(Object.entries(v).map(([k, g]) => [k, { co2: g.co2.value, ch4: g.ch4.value, n2o: g.n2o.value }]))
 const combinedTable = (v: Record<string, CitedValue>): Record<string, CombustionEF> =>
   Object.fromEntries(Object.entries(v).map(([k, c]) => [k, { co2: c.value, ch4: 0, n2o: 0 }]))
+const EF_US_2023 = gasTable(EPA_2023.combustion)
 const EF_US_2024 = gasTable(EPA_2024.combustion)
+const EF_AU_2023 = combinedTable(NGA_2023.combustion)
 const EF_AU_2024 = combinedTable(NGA_2024.combustion)
+const EF_NZ_2023 = { commercial: combinedTable(MFE_2023.combustion.commercial), industrial: combinedTable(MFE_2023.combustion.industrial) }
 const EF_NZ_2024 = { commercial: combinedTable(MFE_2024.combustion.commercial), industrial: combinedTable(MFE_2024.combustion.industrial) }
 const EF_NZ_2025 = { commercial: combinedTable(MFE_2025.combustion.commercial), industrial: combinedTable(MFE_2025.combustion.industrial) }
 const COMBUSTION_BY_EDITION: Record<EfJurisdiction, Record<number, unknown>> = {
-  US: { 2024: EF_US_2024, 2025: EF },
+  US: { 2023: EF_US_2023, 2024: EF_US_2024, 2025: EF },
   CA: { 2023: EF_CA, 2024: EF_CA, 2025: EF_CA, 2026: EF_CA },   // ECCC v3.0's 2023/24, 2025 and 2026 sets (identical for these keys)
-  UK: { 2024: EF_UK_2024, 2025: EF_UK_2025, 2026: EF_UK },
+  UK: { 2023: EF_UK_2023, 2024: EF_UK_2024, 2025: EF_UK_2025, 2026: EF_UK },
   EU: {},                                                    // exempt: a fixed default (MRR Annex VI, IPCC 2006)
-  AU: { 2024: EF_AU_2024, 2025: EF_AU },
-  NZ: { 2024: EF_NZ_2024, 2025: EF_NZ_2025, 2026: EF_NZ },
+  AU: { 2023: EF_AU_2023, 2024: EF_AU_2024, 2025: EF_AU },
+  NZ: { 2023: EF_NZ_2023, 2024: EF_NZ_2024, 2025: EF_NZ_2025, 2026: EF_NZ },
 }
 function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial'] | string, sel: Sel): PickedFactor {
   const ctry = canonicalCountryCode(loc.country)
@@ -3269,9 +3316,9 @@ const FLEET_DATASET: Record<EfJurisdiction, DatasetId> = {
 }
 /** T3c: each mobile table keyed by the edition it holds (the registry's editionYear, or dataYear for ECCC's NIR). */
 const FLEET_BY_EDITION: Record<EfJurisdiction, Record<number, MobilePublisher>> = {
-  US: { 2024: EPA_MOBILE_2024, 2025: EPA_MOBILE_2025 }, CA: { 2023: ECCC_MOBILE_2025, 2024: ECCC_MOBILE_2026 },
-  UK: { 2024: DEFRA_MOBILE_2024, 2025: DEFRA_MOBILE_2025, 2026: DEFRA_MOBILE_2026 }, EU: {},
-  AU: { 2024: NGA_MOBILE_2024, 2025: NGA_MOBILE_2025 }, NZ: { 2024: MFE_MOBILE_2024, 2025: MFE_MOBILE_2025, 2026: MFE_MOBILE_2026 },
+  US: { 2023: EPA_MOBILE_2023, 2024: EPA_MOBILE_2024, 2025: EPA_MOBILE_2025 }, CA: { 2023: ECCC_MOBILE_2025, 2024: ECCC_MOBILE_2026 },
+  UK: { 2023: DEFRA_MOBILE_2023, 2024: DEFRA_MOBILE_2024, 2025: DEFRA_MOBILE_2025, 2026: DEFRA_MOBILE_2026 }, EU: {},
+  AU: { 2023: NGA_MOBILE_2023, 2024: NGA_MOBILE_2024, 2025: NGA_MOBILE_2025 }, NZ: { 2023: MFE_MOBILE_2023, 2024: MFE_MOBILE_2024, 2025: MFE_MOBILE_2025, 2026: MFE_MOBILE_2026 },
 }
 /**
  * FI9 diff 3: which optional fleet questions a site's publisher needs. Miles: US only (EPA's road CH4 and N2O are per
@@ -3356,7 +3403,7 @@ function pickFleet(loc: Location, key: string, j: EfJurisdiction, ctry: string, 
     valueText = `CO2 ${nFleet(co2.value)} ${co2.unit}`
   } else if (j === 'AU') {
     // T3d: the energy content printed in the same edition as the row.
-    const ec = (edition.key === 2024 ? NGA_MOBILE_ENERGY_CONTENT_2024 : NGA_MOBILE_ENERGY_CONTENT_2025)[fuel].value
+    const ec = (edition.key === 2023 ? NGA_MOBILE_ENERGY_CONTENT_2023 : edition.key === 2024 ? NGA_MOBILE_ENERGY_CONTENT_2024 : NGA_MOBILE_ENERGY_CONTENT_2025)[fuel].value
     native = { co2: (co2.value + row.ch4 + row.n2o) * ec / 1000, ch4: 0, n2o: 0 }
     valueText = `CO2 ${nFleet(co2.value)} ${co2.unit}, at ${nFleet(ec)} GJ/kL (Table ${type === 'non_road' ? 8 : 9} energy content)`
   } else {

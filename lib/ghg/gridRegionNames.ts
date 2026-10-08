@@ -15,30 +15,12 @@
 
 import { US_SUBREGIONS } from './engine'
 import { COUNTRY_WORDS } from './series'
+import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES } from './gridRegionWords'
 
-const CA: Record<string, string> = {
-  ON: 'Ontario', QC: 'Quebec', BC: 'British Columbia', AB: 'Alberta', SK: 'Saskatchewan', MB: 'Manitoba',
-  NB: 'New Brunswick', NS: 'Nova Scotia', PE: 'Prince Edward Island', NL: 'Newfoundland and Labrador',
-  YT: 'Yukon', NT: 'Northwest Territories', NU: 'Nunavut',
-}
-const US: Record<string, string> = {
-  AK: 'Alaska', AL: 'Alabama', AR: 'Arkansas', AZ: 'Arizona', CA: 'California', CO: 'Colorado', CT: 'Connecticut',
-  DC: 'District of Columbia', DE: 'Delaware', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', IA: 'Iowa', ID: 'Idaho',
-  IL: 'Illinois', IN: 'Indiana', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', MA: 'Massachusetts', MD: 'Maryland',
-  ME: 'Maine', MI: 'Michigan', MN: 'Minnesota', MO: 'Missouri', MS: 'Mississippi', MT: 'Montana', NC: 'North Carolina',
-  ND: 'North Dakota', NE: 'Nebraska', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NV: 'Nevada',
-  NY: 'New York', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island',
-  SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VA: 'Virginia', VT: 'Vermont',
-  WA: 'Washington', WI: 'Wisconsin', WV: 'West Virginia', WY: 'Wyoming',
-}
-const AU: Record<string, string> = {
-  NSW: 'New South Wales', VIC: 'Victoria', QLD: 'Queensland', SA: 'South Australia', TAS: 'Tasmania',
-  WA: 'Western Australia (South West Interconnected System)', NT: 'Northern Territory (Darwin-Katherine Interconnected System)',
-}
-const AVERAGES: Record<string, string> = {
-  US_AVG: 'United States national average', EU_AVG: 'EU-27 average', AU_AVG: 'Australia national average',
-  UK: 'United Kingdom', NZ: 'New Zealand',
-}
+const CA = GRID_REGION_CA
+const US = GRID_REGION_US
+const AU = GRID_REGION_AU
+const AVERAGES = GRID_REGION_AVERAGES
 
 const country = (code: string): string | null => {
   const w = COUNTRY_WORDS[code]

@@ -48,17 +48,17 @@ describe('the majority rule', () => {
 })
 
 describe('DESNZ (class (a), DESNZ rule)', () => {
-  it('March 2025 selects 2024 (held since T3d); March 2024 selects 2023 (published, not held: missing)', () => {
+  it('March 2025 selects 2024 and March 2024 selects 2023 (held since T3d); March 2023 selects 2022 (published, not held: missing)', () => {
     expect(chosen(sel('desnz_grid', 2025, 3)).edition.label).toBe('DEFRA 2024')
-    const r = sel('desnz_grid', 2024, 3)
-    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2023', rule: 'desnz_april_march', reason: 'not_held' }) })
-    if ('missing' in r) expect(r.missing.basis).toBe('DEFRA 2023 grid electricity factors are needed for the year ending 31 March 2024 and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
+    expect(chosen(sel('desnz_grid', 2024, 3)).edition.label).toBe('DEFRA 2023')
+    const r = sel('desnz_grid', 2023, 3)
+    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2022', rule: 'desnz_april_march', reason: 'not_held' }) })
+    if ('missing' in r) expect(r.missing.basis).toBe('DEFRA 2022 grid electricity factors are needed for the year ending 31 March 2023 and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
   })
 
   it('June 2024 selects 2023, because the 2024 edition was first published on 8 July 2024', () => {
-    const r = sel('desnz_grid', 2024, 6)
-    expect(label(r)).toBe('missing DEFRA 2023')
-    if ('missing' in r) expect(r.missing.rule).toBe('desnz_july_june')
+    const r = chosen(sel('desnz_grid', 2024, 6))
+    expect([r.edition.label, r.rule]).toEqual(['DEFRA 2023', 'desnz_july_june'])   // held since T3d 2024
   })
 
   it('June 2025 selects 2025 (published 10 June 2025), with the design wording', () => {
@@ -145,7 +145,8 @@ describe('class (b): data year, else newest published on or before the preparati
   })
 
   it('EEA: 2023 matches 2023; 2024 matches 2024 (T3d, published 6 November 2025, corrected 10 July 2026); later windows take 2024', () => {
-    expect(chosen(sel('eea_grid', 2023, 12)).basis).toBe('EEA 2023: data year 2023 matches reporting year 2023.')
+    // T3d 2024 (ruling 1): data year 2023 as revised in the final inventory of 6 November 2025.
+    expect(chosen(sel('eea_grid', 2023, 12)).basis).toBe('EEA 2023: data year 2023 matches reporting year 2023. Values as corrected on 6 November 2025.')
     const r24 = chosen(sel('eea_grid', 2024, 12))
     expect([r24.edition.label, r24.correction?.date, r24.correctionHeld]).toEqual(['EEA 2024', '2026-07-10', true])
     expect(chosen(sel('eea_grid', 2025, 12)).basis).toMatch(/^EEA 2024 \(published 6 November 2025, corrected on 10 July 2026\): the newest edition when this inventory was first prepared on 8 October 2026; no 2025 data year was published\./)
@@ -153,9 +154,9 @@ describe('class (b): data year, else newest published on or before the preparati
     expect(chosen(sel('eea_grid', 2025, 12, '2025-10-01')).edition.label).toBe('EEA 2023')
   })
 
-  it('AIB: a March 2024 window selects data year 2023 (majority)', () => {
-    const r = sel('aib', 2024, 3)
-    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'AIB 2023', rule: 'data_year_match', reason: 'not_held' }) })
+  it('AIB: a March 2024 window selects data year 2023 (majority), held since T3d 2024', () => {
+    const r = chosen(sel('aib', 2024, 3))
+    expect([r.edition.label, r.rule]).toEqual(['AIB 2023', 'data_year_match'])
   })
 
   it('eGRID: no 2024 or 2025 data year is registered, so the newest released by the preparation date, with its revision', () => {
@@ -204,8 +205,8 @@ describe('R19: an edition not yet published', () => {
     expect(r.basis).toBe('US EPA 2025 factors: 2025 contains 275 of the 365 days in the year ending 31 March 2026.')
   })
 
-  it('published but not held is missing, not provisional (DESNZ 2023 for March 2024; 2024 to 2026 held)', () => {
-    expect(sel('desnz_combustion', 2024, 3)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2023', reason: 'not_held' }) })
+  it('published but not held is missing, not provisional (DESNZ 2022 for March 2023; 2023 to 2026 held)', () => {
+    expect(sel('desnz_combustion', 2023, 3)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2022', reason: 'not_held' }) })
     // An older year the registry does not list is published, not awaited: missing.
     expect(sel('desnz_combustion', 2021, 12)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2021', reason: 'not_held' }) })
   })

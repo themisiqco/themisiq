@@ -17,6 +17,7 @@
 import raw from './defraEnergy2026.json'
 import raw2025 from './defraEnergy2025.json'
 import raw2024 from './defraEnergy2024.json'
+import raw2023 from './defraEnergy2023.json'
 
 /**
  * The CO2, CH4 and N2O split, where DEFRA publishes one. null where the sheet publishes only CO2e.
@@ -87,6 +88,7 @@ const artefact = raw as unknown as EnergyArtefact
  * that edition's full set, cell by cell, so the 2024 and 2025 records cite their own workbooks.
  */
 export const DEFRA_ENERGY_BY_EDITION: Readonly<Record<number, EnergyArtefact>> = {
+  2023: raw2023 as unknown as EnergyArtefact,
   2024: raw2024 as unknown as EnergyArtefact,
   2025: raw2025 as unknown as EnergyArtefact,
   2026: artefact,

@@ -1,0 +1,45 @@
+// ── DCCEEW NGA 2023: TRANSPORT FUELS (TABLE 9) AND NON-ROAD (TABLE 8) ─────────────────────────────────────
+//
+// T3d (reporting year 2024). Transcribed from ~/themisiq-sources/nga/national-greenhouse-account-factors-2023.pdf
+// (Table 9 and its pre-2004 note; Table 8; printed pages on each row), and nothing else. The note says "instead of those
+// presented in Table 7", a cross-reference slip in the edition, quoted as printed. The same rows, mapping and
+// units as nga2025.ts (kg CO2-e per GJ, energy content in GJ per kL). The 2023 edition is a PDF only: no workbook cell
+// is cited. The pre-2004 note reads, p. 26: "* For vehicles manufactured prior to 2004, the following scope 1 emission factors (in kg CO2-e/GJ) should be used instead of those presented in Table 7: Gasoline CH4 =0.6, N2O = 1.6, Diesel oil CH4 =0.1, N2O = 0.4, LPG CH4 =0.7, N2O = 0.6, Ethanol CH4= 0.8, N2O = 1.7, Renewable diesel CH4 = 0.1, N2O = 0.4."
+//
+// ⚠️ NO HEAVY-DUTY PETROL ROW, AND NONE IS BORROWED FROM ANOTHER NGA DOCUMENT. NGA 2023 Table 9, like 2024 and 2025,
+// prints no heavy-duty gasoline row. nga2025.ts takes heavy petrol from the NGER (Measurement) Determination 2008,
+// Compilation No. 21 (1 July 2026), which is not this edition's document and was not transcribed for 2023. So a heavy petrol
+// line on NGA 2023 takes R16's stated fallback (select.ts): CH4 and N2O from IPCC 2006 Vol. 2 Ch. 3, CO2 from this edition's
+// Table 9, and the row says so, as for NGA 2024. See the T3d report.
+// NON-ROAD: the basis is the Determination's definition of stationary energy purposes (s 2.41(2)), quoted as in
+// nga2025.ts; it decides which table applies, not a value. The values are NGA 2023 Table 8's.
+
+import type { MobileGasRow, MobilePublisher } from './types'
+
+/** Energy content, GJ per kL, as Table 9 prints it (column "Energy Content factor"). */
+export const NGA_MOBILE_ENERGY_CONTENT_2023 = {petrol: {value: 34.2,unit: "GJ/kL",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Cars and light commercial vehicles, Gasoline",column: "Energy Content factor (GJ per unit of fuel)",page: "24"}},diesel: {value: 38.6,unit: "GJ/kL",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Cars and light commercial vehicles, Diesel oil (and every Heavy duty diesel row: Diesel oil - Euro iv or higher, Euro iii, Euro i, all 38.6, printed p.25 / PDF p.26)",column: "Energy Content factor (GJ per unit of fuel)",page: "24"}}}
+
+export const NGA_MOBILE_2023: MobilePublisher = {
+  publisher: 'DCCEEW National Greenhouse Accounts Factors',
+  edition: '2023',
+  document: 'DCCEEW (2023) National Greenhouse Accounts Factors 2023',
+  co2: [
+    {fuel: "petrol",value: 67.4,unit: "kg CO2-e/GJ",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Cars and light commercial vehicles, Gasoline",column: "Scope 1 Emission Factor CO2",page: "24"}},
+    {fuel: "diesel",value: 69.9,unit: "kg CO2-e/GJ",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Cars and light commercial vehicles, Diesel oil (and every Heavy duty diesel row, printed p.25 / PDF p.26, all printed 69.9)",column: "Scope 1 Emission Factor CO2",page: "24"}},
+  ],
+  rows: ([
+    {fuel: "petrol",type: "light",vehicle: "Cars and light commercial vehicles",detail: "manufactured 2004 or later",ch4: 0.02,n2o: 0.2,unit: "kg CO2-e/GJ",gas: "co2e_ar5",years: {from: 2004,to: null},cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Cars and light commercial vehicles, Gasoline, manufactured 2004 or later",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "24"}},
+    {fuel: "petrol",type: "light",vehicle: "Cars and light commercial vehicles",detail: "manufactured prior to 2004",ch4: 0.6,n2o: 1.6,unit: "kg CO2-e/GJ",gas: "co2e_ar5",years: {from: null,to: 2003},cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment, notes",row: "Cars and light commercial vehicles, Gasoline, manufactured prior to 2004",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "25"}},
+    {fuel: "diesel",type: "light",vehicle: "Cars and light commercial vehicles",detail: "manufactured 2004 or later",ch4: 0.01,n2o: 0.5,unit: "kg CO2-e/GJ",gas: "co2e_ar5",years: {from: 2004,to: null},cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Cars and light commercial vehicles, Diesel oil, manufactured 2004 or later",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "24"}},
+    {fuel: "diesel",type: "light",vehicle: "Cars and light commercial vehicles",detail: "manufactured prior to 2004",ch4: 0.1,n2o: 0.4,unit: "kg CO2-e/GJ",gas: "co2e_ar5",years: {from: null,to: 2003},cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment, notes",row: "Cars and light commercial vehicles, Diesel oil, manufactured prior to 2004",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "25"}},
+    {fuel: "diesel",type: "heavy",vehicle: "Heavy duty vehicles",detail: "Euro iv or higher",ch4: 0.07,n2o: 0.4,unit: "kg CO2-e/GJ",gas: "co2e_ar5",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Heavy duty vehicles, Diesel oil, Euro iv or higher",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "25"}},
+    {fuel: "diesel",type: "heavy",vehicle: "Heavy duty vehicles",detail: "Euro iii",ch4: 0.1,n2o: 0.4,unit: "kg CO2-e/GJ",gas: "co2e_ar5",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Heavy duty vehicles, Diesel oil, Euro iii",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "25"}},
+    {fuel: "diesel",type: "heavy",vehicle: "Heavy duty vehicles",detail: "Euro i",ch4: 0.2,n2o: 0.4,unit: "kg CO2-e/GJ",gas: "co2e_ar5",cite: {table: "Table 9 Direct (scope 1) and indirect (scope 3) emission factors for the consumption of transport fuels in different transport equipment",row: "Heavy duty vehicles, Diesel oil, Euro i",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "25"}},
+    {fuel: "petrol",type: "non_road",vehicle: "Equipment not registered for road use (stationary energy purposes)",detail: null,ch4: 0.2,n2o: 0.2,unit: "kg CO2-e/GJ",gas: "co2e_ar5",cite: {table: "Table 8 Direct (Scope 1) and indirect (scope 3) emission factors for the consumption of liquid fuels, including certain petroleum based products for stationary energy purposes",row: "Automotive gasoline/petrol (other than for use as fuel in an aircraft)",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "20",basis: "Determination s 2.41(2), p. 78: \"transport energy purposes includes purposes for which fuel is combusted that consist of any of the following: (a) transport by vehicles registered for road use; (b) rail transport; (c) waterborne transport; (d) air transport\", and \"stationary energy purposes means purposes for which fuel is combusted that do not involve transport energy purposes\"; so equipment not registered for road use takes Schedule 1 Part 3, NGA Table 8 (the 2023 edition titles Table 8 \"for stationary energy purposes\")."}},
+    {fuel: "diesel",type: "non_road",vehicle: "Equipment not registered for road use (stationary energy purposes)",detail: null,ch4: 0.1,n2o: 0.2,unit: "kg CO2-e/GJ",gas: "co2e_ar5",cite: {table: "Table 8 Direct (Scope 1) and indirect (scope 3) emission factors for the consumption of liquid fuels, including certain petroleum based products for stationary energy purposes",row: "Diesel oil",column: "Scope 1 Emission Factor (kg CO2-e/GJ): CH4, N2O",page: "20",basis: "Determination s 2.41(2), p. 78: \"transport energy purposes includes purposes for which fuel is combusted that consist of any of the following: (a) transport by vehicles registered for road use; (b) rail transport; (c) waterborne transport; (d) air transport\", and \"stationary energy purposes means purposes for which fuel is combusted that do not involve transport energy purposes\"; so equipment not registered for road use takes Schedule 1 Part 3, NGA Table 8 (the 2023 edition titles Table 8 \"for stationary energy purposes\")."}},
+  ] as MobileGasRow[]),
+  absent: [{ type: 'heavy', fuel: 'petrol', said: null }],
+  splitBy: {
+    'light:petrol': 'Model year', 'light:diesel': 'Model year', 'heavy:diesel': 'Euro standard',
+  },
+}

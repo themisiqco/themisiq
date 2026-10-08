@@ -211,7 +211,8 @@ describe('T3d 2025: what still does not price, and why', () => {
     const l = L({ id: 'a', name: 'Brussels office', country: 'BE', grid_region: 'EU_AVG', electricity_kwh: 10000 })
     const sel = selectionFor(2025, 12, PREP)
     expect(() => getGridFactor('EU_AVG', sel)).toThrow(MissingEditionError)
-    const msg = 'EEA 2024 grid electricity factors for grid region EU_AVG are needed for reporting year 2025 and are not loaded, so this line at Brussels office is not counted. Export is blocked until they are loaded.'
+    // T3d 2024: the region in words, never the key.
+    const msg = 'EEA 2024 grid electricity factors for the EU-27 average are needed for reporting year 2025 and are not loaded, so this line at Brussels office is not counted. Export is blocked until they are loaded.'
     const rows = (buildWorkings([l], 'AR6', 2025, [], 12, PREP) as Row[]).filter(r => r.stream === 'electricity')
     expect(rows.map(r => [r.scope2_method, r.declaration, r.result_tco2e, r.unpriced?.reason, r.note])).toEqual([
       ['location-based', 'unpriced', null, 'edition_missing', `NOT PRICED: ${msg}`],
@@ -219,8 +220,8 @@ describe('T3d 2025: what still does not price, and why', () => {
     const c = calcLocation(l, 'AR6', 2025, sel)
     expect([c.s2_location, c.s2_market]).toEqual([0, 0])
     expect(findUnresolvedCoverage([l], 2025, 12, [], PREP).map(i => [i.status, i.field, i.message])).toEqual([['edition_missing', 'electricity_kwh', msg]])
-    // On EEA 2023 (a 2023 window), EU_AVG still prices on its EU-27 value, as before.
-    expect(getGridFactor('EU_AVG', selectionFor(2023, 12, PREP)).ef).toBe(0.21)
+    // T3d 2024 (ruling 1): EU_AVG holds no 2023 value either, so a window that takes data year 2023 is unpriced too.
+    expect(() => getGridFactor('EU_AVG', selectionFor(2023, 12, PREP))).toThrow(MissingEditionError)
   })
 
   it('AIB 2024 Netherlands is null (Table 2 and Residual Mixes!Q27 print NA; full disclosure), not the CO2 sheet\'s 382.47', () => {

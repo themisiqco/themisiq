@@ -44,7 +44,9 @@ describe('methodology page: emission factors (FI8)', () => {
     expect(EF_SOURCES.edition_eccc_v4).toContain('v4.0, Table 5.4')
     expect(PAGE).toContain('Emission factors and reference values v3.0 and v4.0')
     expect(EF_SOURCES.edition_aib_2025).toContain('AIB European Residual Mixes 2025')
-    expect(PAGE).toContain('European Residual Mixes 2024 and 2025')
+    // T3d 2024: AIB 2023 is held too.
+    expect(EF_SOURCES.edition_aib_2023).toContain('AIB European Residual Mixes 2023')
+    expect(PAGE).toContain('European Residual Mixes 2023, 2024 and 2025')
     expect(EF_SOURCES.combustion_eu).toContain('2018/2066 Annex VI Table 1')
     expect(PAGE).toContain('2018/2066), Annex VI Table 1')
     expect(EF_SOURCES.residual_eu).toContain('AIB European Residual Mixes 2024')

@@ -121,11 +121,12 @@ describe('THE CASE THE COLUMN EXISTS FOR', () => {
     }
   })
 
-  it('F5 T3c: no year is substituted; a UK 2023 inventory records no grid edition (DEFRA 2023 is not held)', () => {
-    // GRID_EF.UK holds 2024 to 2026 (T3d). Until T3c a 2023 inventory resolved FORWARD to the earliest key and recorded
+  it('F5 T3c: no year is substituted; a UK 2022 inventory records no grid edition (DEFRA 2022 is not held)', () => {
+    // GRID_EF.UK holds 2023 to 2026 (T3d). Until T3c an older inventory resolved FORWARD to the earliest key and recorded
     // it. Now the line is unpriced (edition_missing), priced nothing, and names no edition.
-    expect(() => getGridFactor('UK', testSel(2023))).toThrow(MissingEditionError)
-    expect(buildFactorEditions([uk()], 2023).UK?.electricity).toBeUndefined()
+    expect(() => getGridFactor('UK', testSel(2022))).toThrow(MissingEditionError)
+    expect(buildFactorEditions([uk()], 2022).UK?.electricity).toBeUndefined()
+    expect(buildFactorEditions([uk()], 2023).UK!.electricity!.edition).toBe('DEFRA 2023')
     expect(buildFactorEditions([uk()], 2024).UK!.electricity!.edition).toBe('DEFRA 2024')
     expect(buildFactorEditions([uk()], 2025).UK!.electricity!.edition).toBe('DEFRA 2025')
   })

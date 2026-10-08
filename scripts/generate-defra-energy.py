@@ -229,10 +229,13 @@ def as_float(sheet: str, ref: str, raw) -> float:
         die(f"{sheet!r} {ref}: value {raw!r} is not a number")
 
 
-def quote(rows: dict, sheet: str, opening: str) -> dict:
-    """A guidance paragraph found by its opening words, with the cell it was found in."""
+def quote(rows: dict, sheet: str, opening) -> dict:
+    """A guidance paragraph found by its opening words, with the cell it was found in. `opening` may be a tuple of
+    the wordings different editions print (T3d: the 2023 edition words the overseas WTT paragraph differently); the
+    paragraph is still quoted verbatim from the edition read."""
+    openings = opening if isinstance(opening, tuple) else (opening,)
     hits = [(n, c, v) for n, cells in rows.items() for c, v in cells.items()
-            if v.strip().lstrip("●• ").startswith(opening)]
+            if any(v.strip().lstrip("●• ").startswith(o) for o in openings)]
     if len(hits) != 1:
         die(f"{sheet!r}: expected exactly one paragraph opening {opening!r}, found {len(hits)} "
             f"({[cell(n, c) for n, c, _ in hits]})")
@@ -467,7 +470,8 @@ guidance = {
     "overseas_td_at_iea": quote(sheet_rows[OVERSEAS_SHEET], OVERSEAS_SHEET,
                                 "Further, the IEA now also publishes data for transmission"),
     "overseas_wtt_withdrawn": quote(sheet_rows[ELEC_SHEET], ELEC_SHEET,
-                                    "We no longer provide WTT data for overseas electricity"),
+                                    ("We no longer provide WTT data for overseas electricity",
+                                     "We no longer provide overseas the WTT data for overseas electricity")),   # 2023 wording
     "electricity_separate_lines": quote(sheet_rows[ELEC_SHEET], ELEC_SHEET,
                                         "The kWh energy is multiplied by the WTT factor"),
     "heat_distribution_to_scope3": quote(sheet_rows[SCOPE2_HEAT_SHEET], SCOPE2_HEAT_SHEET,

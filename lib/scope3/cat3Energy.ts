@@ -319,6 +319,7 @@ function priced(
 /** T3d: the NGA editions held for Category 3, with the printed page of each note the lines quote (the 2024 edition's
  *  Table 5 and 6 notes run a page earlier than 2025's). The edition a line uses is the window's (eds.nga). */
 const NGA_PAGES: Readonly<Record<string, { instruction: number; metro: number; leakage: number; formula: number; ecNotes: number }>> = {
+  '2023': { instruction: 18, metro: 17, leakage: 18, formula: 18, ecNotes: 17 },   // printed pages (one less than the PDF's)
   '2024': { instruction: 19, metro: 18, leakage: 19, formula: 19, ecNotes: 18 },
   '2025': { instruction: 20, metro: 20, leakage: 20, formula: 20, ecNotes: 19 },
 }
