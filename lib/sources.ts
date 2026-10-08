@@ -127,6 +127,27 @@ export const SBTI_NET_ZERO_STANDARD_URL =
 // @source-status: unverified
 export const EPA_EGRID_POWER_PROFILER_URL = 'https://www.epa.gov/egrid/power-profiler'
 
+// Intent: eGRID's current download page, which lists the eGRID2023 release and its two revisions ("Released:
+// 1/15/2025", "Revision 1 Released: 1/17/2025", "Revision 2 Released: 6/12/2025"). Cited as the source of those
+// dates in lib/ghg/factorEditionRegistry.ts (T3c). UNVERIFIED: the dates were supplied by Lisa's reviewer from
+// this page and by factor-year-selection.md s 4.2 (which read /egrid/download-data); not opened in this session.
+// @source-status: unverified
+export const EPA_EGRID_DETAILED_DATA_URL = 'https://www.epa.gov/egrid/detailed-data'
+
+// Intent: eGRID's historical data page, which lists earlier releases with their dates (eGRID2021 "released
+// 1/30/2023", eGRID2022 "released 1/30/2024", as factor-year-selection.md s 4.2 records). Cited by the registry.
+// UNVERIFIED: not opened in this session.
+// @source-status: unverified
+export const EPA_EGRID_HISTORICAL_URL = 'https://www.epa.gov/egrid/historical-egrid-data'
+
+// Intent: the EEA indicator "Greenhouse gas emission intensity of electricity generation", country level, from
+// which eea/EEA-ghg-intensity-electricity-generation-country-level.csv was downloaded. Cited by the registry for EEA
+// 2023's dates ("Published" 25 Oct 2024, "Modified" 27 Jun 2025), which Lisa read from this page on 8 Oct 2026.
+// UNVERIFIED here: not opened in a Claude Code session.
+// @source-status: unverified
+export const EEA_GRID_INTENSITY_URL =
+  'https://www.eea.europa.eu/en/analysis/indicators/greenhouse-gas-emission-intensity-of-1/greenhouse-gas-emission-intensity-of-electricity-generation-country-level'
+
 // Intent: the EPA's landing page for the USEEIO environmentally-extended input-output models, cited
 // by SPEND_EF_SOURCES.useeio_us in lib/emissionFactors/spend.ts as the provenance for US
 // spend-based factors.

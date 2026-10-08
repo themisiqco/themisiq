@@ -604,3 +604,81 @@ where it differs.
   - T3b, T3c and T3d move to a separate branch, `factor-years`, created from main after derived-figures
     merges.
   - In T3d, editions for reporting year 2025 are loaded first, then 2024, then 2026.
+
+### 8.7 Rulings, fourth set (8 Oct 2026): R17, R18, R19
+
+Recorded also in docs/review/design-derived-figures.md section 10. Implemented as data and rules in
+lib/ghg/factorEditionRegistry.ts (T3c diff 1); nothing in the engine reads it yet.
+
+**R17. Datasets added since the 1 Oct rulings take their publisher's existing rule.**
+
+| Dataset | Class and rule |
+|---|---|
+| DEFRA/DESNZ mobile (fleet) factors; DESNZ Scope 3 energy (Category 3 well-to-tank and T&D) | (a), DESNZ rule |
+| US EPA Hub mobile (Tables 2 to 5); MfE mobile (Transport Fuel) | (a), majority |
+| NGA mobile (Table 9 and the Table 8 non-road rows); NGA Scope 3 (Tables 1 and 6, FI6) | (a), NGA activity-year rule (8.2) |
+| ECCC NIR mobile (Table A6.1-15); ECCC NIR Table A4-2 natural gas heat content (R12) | (b) |
+| IPCC 2006 (stationary and mobile); EU MRR 2018/2066 Annex VI; JEC Well-to-Tank v5 densities | exempt: fixed defaults, never "missing" |
+| Steam estimate (R14) | the edition its gas factor used |
+
+**R18. Scope 3 module factor sets.**
+- Category 3 energy is selected in T3c with the rule of the GHG factor it sits beside: the DESNZ rule for DEFRA
+  well-to-tank and T&D, the NGA rule for FI6's NGA Scope 3.
+- DEFRA travel and waste are registered now, every edition recorded. Their selection is wired in T3e, after T3d
+  loads the older editions; until then they keep today's behaviour.
+- EXIOBASE (spend) is a fixed model edition (2019 price year), exempt from selection. T3b already discloses the
+  price year.
+
+**R19. Edition not yet published** (amends 8.6, "An unpublished edition blocks").
+- Published but not held: the line is unpriced and blocks export (unchanged).
+- Not yet published: the line is priced with the newest published edition of that dataset, export is allowed,
+  and the row says so: "The {year} {publisher} {family} factors have not been published yet, so the {edition}
+  factors are used. This line will be re-priced when the {year} factors are loaded."
+- The selection is marked provisional. When the required edition is later registered as published and held, the
+  inventory is flagged so the customer sees what changed before exporting again (wired in a later diff).
+- A provisional selection is never frozen (unlike class (b)).
+- **Basis.** GHG Protocol, *Scope 2 Guidance* (2015), s 6.10.1 "Grid average emission factors", "Other data
+  quality", printed page 54 (PDF page 56):
+  > "Grid-average emission factors in particular may face challenges with temporal representativeness due to time
+  > delays between the year in which energy generation and resulting emissions occurred, and the year in which the
+  > data is published and made available to users."
+
+  The ruling cited p. 48. The passage is on p. 54. It describes the delay as a data-quality limitation to take
+  into account, not as an instruction to substitute an earlier edition.
+
+**How "not yet published" is decided in the registry.** A required class (a) edition is "not yet published" when
+its registry entry has a publication date after the preparation date, or when it has no entry and its year is
+later than the newest edition registered for that dataset. An unregistered year earlier than that is published
+and not held: missing. A DESNZ July to June window that has not ended on the preparation date is also
+provisional, since a newer edition may still be published by its last day.
+
+**R20. Publication date not printed** (Lisa, 8 Oct 2026). Where a publisher prints no publication date, the
+registry records the earliest date the edition is proven to have been published, as `published.onOrBefore` with
+its evidence, in this order:
+1. a date printed in the edition or its correction;
+2. the publisher's page;
+3. a dated publication from the same publisher that cites it;
+4. the date ThemisIQ first held it (git history).
+
+Never a guessed date. `selectEdition` treats `onOrBefore` like a published date, and the row says "published on or
+before {date}".
+
+| Edition | On or before | Evidence |
+|---|---|---|
+| AIB 2024 | 11 Aug 2025 | printed: v1.1 cover, "Version 1.1, 2025-08-11" (no v1.0 date printed) |
+| ECCC NIR 2025 (1990-2023) | 24 Oct 2025 | cited by the publisher: ECCC v3.0 revision history, "3.0 October 24, 2025 ... alignment with the National Inventory Report 1990-2023"; Table 5.3 fn33 "ECCC. (2025). NIR 1990-2023, Part 3, Tables A13-2 to A13-14" |
+| ECCC NIR 2026 (1990-2024) | 9 Sep 2026 | cited by the publisher: ECCC v4.0 revision history, "4.0 September 9, 2026 ... alignment with the National Inventory Report 1990-2024"; Table 5.4 fn42 "ECCC. (2026). NIR 1990-2024, Part 3, Tables A7-2 to A7-14" |
+| Green-e 2025 (2023 data) | 30 May 2026 | first held: git 6dd16c4, which first added the values. The code's "publ. 2026-01-29, CRS" arrived in the same commit with no page, document or quote behind it, and is not used. |
+
+Also recorded on 8 Oct 2026:
+- **EEA 2023:** published 25 Oct 2024, modified 27 Jun 2025 (EEA indicator page). The modification does not say what
+  changed and is not treated as a correction.
+- **DESNZ 2026:** the 31 Jul 2026 correction revised the flat file only ("to correct a number of values that were
+  initially reported as 0"). The full set "has not been revised", so the held full-set values are current.
+- **eGRID2024:** not registered. No document in ~/themisiq-sources shows it, and EPA's page lists eGRID2023
+  revision 2 as the newest.
+- **MfE 2025.3:** the workbook's printed release date, 24 Feb 2026, is used. The download page lists 1 Feb 2025.
+
+**Dates.** A date the document prints only as a month (NGA: "Canberra, August") is recorded as that month and read
+as its last day. A year alone is not a date. An entry with neither a date nor an on-or-before date is never
+selected; `DATE_NEEDED` lists them. No held edition is on it.

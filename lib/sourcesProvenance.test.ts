@@ -118,6 +118,10 @@ const EXPECTED: Record<string, Status> = {
   // why it is the lowest priority of the two rather than the most urgent.
   SBTI_NET_ZERO_STANDARD_URL: 'unverified',
   EPA_EGRID_POWER_PROFILER_URL: 'unverified',
+  // Added 8 Oct 2026 for the factor edition registry (T3c diff 1). Cited for dates; none opened yet.
+  EPA_EGRID_DETAILED_DATA_URL: 'unverified',
+  EPA_EGRID_HISTORICAL_URL: 'unverified',
+  EEA_GRID_INTENSITY_URL: 'unverified',
 }
 
 const STATUSES: Status[] = ['unverified', 'resolves', 'form-verified', 'verified']
