@@ -19,7 +19,7 @@
 // combustion itself is already in the customer's Scope 1 and Scope 2.
 
 import {
-  DEFRA_ENERGY_META, energyFactor, energyConversion,
+  DEFRA_ENERGY_META, DEFRA_ENERGY_YEARS, defraEnergyMetaFor, energyFactor, energyConversion,
   type EnergyFuelFactor, type EnergyLineFactor,
 } from '../emissionFactors/defraEnergy'
 import { normalizeUnit, GJ_PER_MMBTU, KWH_PER_GJ, EXACT_CONVERSIONS } from '../unitConversions'
@@ -179,8 +179,8 @@ export interface Cat3Result {
 // table 3.1, p. 39, covers fuels and energy). Anything else is unit_not_published, by name.
 
 /** A conversion the DEFRA artefact publishes, optionally scaled by an exact multiple (mcf is 1,000 ft3). */
-function defraConversion(key: string, from: string, to: string, scale = 1): Cat3Conversion {
-  const c = energyConversion(key)
+function defraConversion(year: number, key: string, from: string, to: string, scale = 1): Cat3Conversion {
+  const c = energyConversion(key, year)
   if (!c) throw new Error(`cat3Energy: the artefact publishes no conversion ${key}`)
   return {
     factor: c.factor * scale,
@@ -204,41 +204,41 @@ const KWH_PER_MMBTU = GJ_PER_MMBTU * KWH_PER_GJ
 const definitional = (factor: number, from: string, to: string, cite: string): Cat3Conversion =>
   ({ factor, from, to, source: 'definitional', cite })
 
-interface FuelRoute { factorKey: string; conversion: () => Cat3Conversion | null }
+interface FuelRoute { factorKey: string; conversion: (defraYear: number) => Cat3Conversion | null }
 
 const FUEL_ROUTES: Record<Exclude<Cat3Stream, 'electricity' | 'purchased_steam' | 'refrigerants'>,
                           Record<string, FuelRoute>> = {
   natural_gas: {
     kwh: { factorKey: 'natural_gas_kwh_gross_cv', conversion: () => null },
     m3: { factorKey: 'natural_gas_cubic_metres', conversion: () => null },
-    mcf: { factorKey: 'natural_gas_cubic_metres', conversion: () => defraConversion('cubic_foot_to_cubic_metre', 'mcf', 'm3', 1000) },
-    therms: { factorKey: 'natural_gas_kwh_gross_cv', conversion: () => defraConversion('therm_to_kwh', 'therms', 'kWh') },
+    mcf: { factorKey: 'natural_gas_cubic_metres', conversion: y => defraConversion(y, 'cubic_foot_to_cubic_metre', 'mcf', 'm3', 1000) },
+    therms: { factorKey: 'natural_gas_kwh_gross_cv', conversion: y => defraConversion(y, 'therm_to_kwh', 'therms', 'kWh') },
     mmbtu: { factorKey: 'natural_gas_kwh_gross_cv', conversion: () => definitional(KWH_PER_MMBTU, 'mmbtu', 'kWh', 'GJ_PER_MMBTU x KWH_PER_GJ (lib/unitConversions.ts)') },
   },
   propane: {
     litres: { factorKey: 'propane_litres', conversion: () => null },
-    gallons: { factorKey: 'propane_litres', conversion: () => defraConversion('us_gallon_to_litre', 'gallons', 'litres') },
-    kg: { factorKey: 'propane_tonnes', conversion: () => defraConversion('kilogram_to_tonne', 'kg', 'tonnes') },
+    gallons: { factorKey: 'propane_litres', conversion: y => defraConversion(y, 'us_gallon_to_litre', 'gallons', 'litres') },
+    kg: { factorKey: 'propane_tonnes', conversion: y => defraConversion(y, 'kilogram_to_tonne', 'kg', 'tonnes') },
   },
   diesel_stationary: {
     litres: { factorKey: 'diesel_average_biofuel_blend_litres', conversion: () => null },
-    gallons: { factorKey: 'diesel_average_biofuel_blend_litres', conversion: () => defraConversion('us_gallon_to_litre', 'gallons', 'litres') },
+    gallons: { factorKey: 'diesel_average_biofuel_blend_litres', conversion: y => defraConversion(y, 'us_gallon_to_litre', 'gallons', 'litres') },
   },
   mobile_diesel: {
     litres: { factorKey: 'diesel_average_biofuel_blend_litres', conversion: () => null },
-    gallons: { factorKey: 'diesel_average_biofuel_blend_litres', conversion: () => defraConversion('us_gallon_to_litre', 'gallons', 'litres') },
+    gallons: { factorKey: 'diesel_average_biofuel_blend_litres', conversion: y => defraConversion(y, 'us_gallon_to_litre', 'gallons', 'litres') },
   },
   mobile_gasoline: {
     litres: { factorKey: 'petrol_average_biofuel_blend_litres', conversion: () => null },
-    gallons: { factorKey: 'petrol_average_biofuel_blend_litres', conversion: () => defraConversion('us_gallon_to_litre', 'gallons', 'litres') },
+    gallons: { factorKey: 'petrol_average_biofuel_blend_litres', conversion: y => defraConversion(y, 'us_gallon_to_litre', 'gallons', 'litres') },
   },
   fuel_oil_distillate: {
     litres: { factorKey: 'fuel_oil_distillate_litres', conversion: () => null },
-    gallons: { factorKey: 'fuel_oil_distillate_litres', conversion: () => defraConversion('us_gallon_to_litre', 'gallons', 'litres') },
+    gallons: { factorKey: 'fuel_oil_distillate_litres', conversion: y => defraConversion(y, 'us_gallon_to_litre', 'gallons', 'litres') },
   },
   fuel_oil_residual: {
     litres: { factorKey: 'fuel_oil_residual_litres', conversion: () => null },
-    gallons: { factorKey: 'fuel_oil_residual_litres', conversion: () => defraConversion('us_gallon_to_litre', 'gallons', 'litres') },
+    gallons: { factorKey: 'fuel_oil_residual_litres', conversion: y => defraConversion(y, 'us_gallon_to_litre', 'gallons', 'litres') },
   },
 }
 
@@ -278,10 +278,11 @@ function standInFlags(row: Cat3InputRow): Cat3Flag[] {
 }
 
 function priced(
-  row: Cat3InputRow, line: Cat3LineKind, factorKey: string, conversion: Cat3Conversion | null,
+  row: Cat3InputRow, line: Cat3LineKind, factorKey: string, conversion: Cat3Conversion | null, defraYear: number,
 ): Cat3PricedLine {
-  const factor = energyFactor(factorKey) as EnergyFuelFactor | EnergyLineFactor | null
-  if (!factor) throw new Error(`cat3Energy: the artefact holds no factor ${factorKey}`)
+  // T3d: the DEFRA edition the window selected (eds.defra), never a fixed one.
+  const factor = energyFactor(factorKey, defraYear) as EnergyFuelFactor | EnergyLineFactor | null
+  if (!factor) throw new Error(`cat3Energy: the DEFRA ${defraYear} artefact holds no factor ${factorKey}`)
   const activityPriced = conversion ? row.activity * conversion.factor : row.activity
   return {
     row_id: row.id,
@@ -315,7 +316,12 @@ function priced(
 // stand-in. Every other Australian stream (liquids, LPG, steam) keeps the DEFRA stand-in and its flag. The NGA Table 2
 // market-based Scope 3 figure is not read: Category 3 rests on the location-based row (CAT3_LOCATION_BASED_SENTENCE).
 
-const NGA_EDITION = '2025'
+/** T3d: the NGA editions held for Category 3, with the printed page of each note the lines quote (the 2024 edition's
+ *  Table 5 and 6 notes run a page earlier than 2025's). The edition a line uses is the window's (eds.nga). */
+const NGA_PAGES: Readonly<Record<string, { instruction: number; metro: number; leakage: number; formula: number; ecNotes: number }>> = {
+  '2024': { instruction: 19, metro: 18, leakage: 19, formula: 19, ecNotes: 18 },
+  '2025': { instruction: 20, metro: 20, leakage: 20, formula: 20, ecNotes: 19 },
+}
 
 /** The state as the wizard stores it, to NGA's Table 1 row. WA and the NT use the grids the Scope 2 factor uses
  *  (detectGridRegion maps WA to SWIS and the NT to DKIS); NSW and the ACT share a row. */
@@ -338,10 +344,11 @@ export const NGA_METRO_DEFINITION =
 
 /** NGA Table 5, natural gas distributed in a pipeline: the energy content NGA's own formula (p. 20) applies with Table
  *  6. 0.0393 GJ/m3, measured at 101.325 kPa and 15.0 degrees Celsius (Table 5 notes, p. 19). */
-const NGA_GJ_PER_M3 = 0.0393
-const NGA_EC_CITE = 'NGA 2025 Table 5, natural gas distributed in a pipeline, 0.0393 GJ/m3, the energy content NGA\'s formula on p. 20 applies with Table 6'
+const NGA_GJ_PER_M3 = 0.0393   // the same in the 2024 and 2025 editions (Table 5, p. 17 and p. 19)
+const ngaEcCite = (ed: string) => `NGA ${ed} Table 5, natural gas distributed in a pipeline, 0.0393 GJ/m3, the energy content NGA's formula on p. ${NGA_PAGES[ed].formula} applies with Table 6`
 
-const ngaGasConversion = (unit: string): Cat3Conversion | null | undefined => {
+const ngaGasConversion = (unit: string, ed: string): Cat3Conversion | null | undefined => {
+  const NGA_EC_CITE = ngaEcCite(ed)
   switch (unit) {
     case 'gj': return null
     case 'm3': return { factor: NGA_GJ_PER_M3, from: 'm3', to: 'GJ', source: 'nga', cite: NGA_EC_CITE }
@@ -359,7 +366,7 @@ const isAu = (row: Cat3InputRow): boolean => row.country_resolved && (row.countr
 const auState = (row: Cat3InputRow): string => (row.au_state ?? '').toUpperCase().trim()
 
 function ngaLine(
-  row: Cat3InputRow, line: Cat3LineKind, f: NgaCited, conversion: Cat3Conversion | null, unitPriced: string, note: string,
+  row: Cat3InputRow, line: Cat3LineKind, f: NgaCited, conversion: Cat3Conversion | null, unitPriced: string, note: string, NGA_EDITION: string,
 ): Cat3PricedLine {
   const activityPriced = conversion ? row.activity * conversion.factor : row.activity
   return {
@@ -367,9 +374,10 @@ function ngaLine(
     activity_as_entered: row.activity, unit_as_entered: row.unit,
     activity_priced: activityPriced, unit_priced: unitPriced,
     conversion,
-    factor: { key: `nga_${NGA_EDITION}_${f.table.split(' ').slice(0, 2).join('_').toLowerCase()}_${f.cell}`,
+    // T3d: the 2024 edition is a PDF only, so its record has a printed page and no workbook cell.
+    factor: { key: `nga_${NGA_EDITION}_${f.table.split(' ').slice(0, 2).join('_').toLowerCase()}_${f.cell ?? `p${f.page}`}`,
       kg_co2e: f.value as number, unit: f.unit === 'kg CO2-e/kWh' ? 'kWh' : 'GJ',
-      sheet: `NGA ${NGA_EDITION} ${f.table.split(' ').slice(0, 2).join(' ')}`, cell: f.cell },
+      sheet: `NGA ${NGA_EDITION} ${f.table.split(' ').slice(0, 2).join(' ')}`, cell: f.cell ?? `p. ${f.page}` },
     kg_co2e: activityPriced * (f.value as number),
     entry_method: row.entry_method ?? null,
     // No uk_stand_in: the factor is the site's own country's publisher.
@@ -379,21 +387,22 @@ function ngaLine(
 }
 
 /** Australian electricity: one NGA Table 1 line, which includes grid losses (R15 c). Replaces DEFRA's three lines. */
-function priceAuElectricity(row: Cat3InputRow, lines: Cat3PricedLine[], reject: (r: Cat3Reason) => void): void {
+function priceAuElectricity(row: Cat3InputRow, lines: Cat3PricedLine[], reject: (r: Cat3Reason) => void, NGA_EDITION: string): void {
   const key = NGA_ELECTRICITY_ROW[auState(row)]
   if (!key) { reject({ code: 'au_state_missing', location: row.location }); return }
   const f = ngaScope3(NGA_EDITION)!.electricity[key]
   const grid = NGA_GRID_SENTENCE[auState(row)]
   lines.push(ngaLine(row, 'electricity_nga_scope3', f, null, 'kWh',
     `NGA ${NGA_EDITION}, Table 1, Scope 3, ${f.row}: ${f.printed} kg CO2-e/kWh. This factor includes electricity lost ` +
-    `in the grid, so there is no separate transmission and distribution line.${grid ? ` ${grid}` : ''}`))
+    `in the grid, so there is no separate transmission and distribution line.${grid ? ` ${grid}` : ''}`, NGA_EDITION))
 }
 
 /** Australian natural gas: NGA Table 6 for the state and area, per GJ (R15 a, b). */
-function priceAuGas(row: Cat3InputRow, unit: string | null, lines: Cat3PricedLine[], reject: (r: Cat3Reason) => void): void {
+function priceAuGas(row: Cat3InputRow, unit: string | null, lines: Cat3PricedLine[], reject: (r: Cat3Reason) => void, NGA_EDITION: string): void {
+  const pages = NGA_PAGES[NGA_EDITION]
   const state = auState(row)
   if (!NGA_ELECTRICITY_ROW[state]) { reject({ code: 'au_state_missing', location: row.location }); return }
-  const conversion = unit ? ngaGasConversion(unit) : undefined
+  const conversion = unit ? ngaGasConversion(unit, NGA_EDITION) : undefined
   if (conversion === undefined) { reject({ code: 'unit_not_published', stream: row.stream, unit: row.unit }); return }
   const gas = ngaScope3(NGA_EDITION)!.naturalGas
   let f: NgaCited
@@ -403,7 +412,7 @@ function priceAuGas(row: Cat3InputRow, unit: string | null, lines: Cat3PricedLin
     // Neither names a metro area, so the non-metro factor applies (R15 b), and the area is not asked.
     f = (state === 'TAS' ? gas.VIC : gas.WA).non_metro
     extra = ` NGA prints no factor for ${state === 'TAS' ? 'Tasmania' : 'the Northern Territory'} (C, confidential) ` +
-      `and says: "${NGA_TAS_NT_GAS_INSTRUCTION}" (Table 6 notes, p. 20). No metro area is named there, so the ` +
+      `and says: "${NGA_TAS_NT_GAS_INSTRUCTION}" (Table 6 notes, p. ${pages.instruction}). No metro area is named there, so the ` +
       `non-metro factor applies.`
   } else if (state === 'VIC') {
     // 4.0 either way, so the area is not asked; the chosen one is cited if there is one.
@@ -419,11 +428,11 @@ function priceAuGas(row: Cat3InputRow, unit: string | null, lines: Cat3PricedLin
   // The conversion to GJ is not repeated here: the line's own arithmetic (cat3LineText, the CSV) states it, with its cite.
   lines.push(ngaLine(row, 'fuel_wtt', f, conversion, 'GJ',
     `NGA ${NGA_EDITION}, Table 6, ${f.row}, ${area}: ${f.printed} kg CO2-e/GJ. NGA's Scope 3 gas factors ` +
-    `exclude leakage from low-pressure distribution pipelines (p. 20).${extra}`))
+    `exclude leakage from low-pressure distribution pipelines (p. ${pages.leakage}).${extra}`, NGA_EDITION))
 }
 
 /** T3c (R18): the edition a Category 3 line is priced on, as the engine selected it. */
-export interface Cat3EditionCell { label: string; rule: string; basis: string; provisional: boolean }
+export interface Cat3EditionCell { label: string; rule: string; basis: string; provisional: boolean; /** The edition year (class (a)). */ key: number | null }
 /**
  * T3c (R18): one Category 3 edition for the window, or why it is missing. Selected by the engine's selectEdition and
  * passed in (lib/scope3/cat3Editions.ts builds it), so this module still imports nothing from lib/ghg.
@@ -433,6 +442,16 @@ export type Cat3Edition =
   | { missing: { edition: string; sentence: (site: string) => string } }
 /** T3c (R18): the two Category 3 editions for the window: DEFRA well-to-tank and T&D, and NGA Scope 3. */
 export interface Cat3Editions { defra: Cat3Edition; nga: Cat3Edition }
+/** T3d: the NGA Scope 3 edition a line is priced on, as the table key ('2024', '2025'). After `missing(eds.nga)`. */
+function ngaEditionOf(eds: Cat3Editions): string {
+  if (!('held' in eds.nga) || eds.nga.held.key === null || !NGA_PAGES[String(eds.nga.held.key)]) throw new Error('cat3Energy: no NGA Scope 3 edition held for this window')
+  return String(eds.nga.held.key)
+}
+/** The DEFRA edition year a line is priced on. Called only after `missing(eds.defra)` has returned false. */
+function defraYearOf(eds: Cat3Editions): number {
+  if (!('held' in eds.defra) || eds.defra.held.key === null) throw new Error('cat3Energy: no DEFRA edition held for this window')
+  return eds.defra.held.key
+}
 
 function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpriced[], eds: Cat3Editions): void {
   const reject = (reason: Cat3Reason) =>
@@ -471,7 +490,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
     }
     if (isAu(row)) {
       if (missing(eds.nga)) return
-      priceAuElectricity(row, lines, reject); return
+      priceAuElectricity(row, lines, reject, ngaEditionOf(eds)); return
     }
     const isNz = (row.country ?? '').toUpperCase().trim() === 'NZ'
     let defraMissingSaid = false
@@ -497,7 +516,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
         continue
       }
       if ('missing' in eds.defra) { if (!defraMissingSaid) missing(eds.defra); defraMissingSaid = true; continue }
-      lines.push(priced(row, line, key, null))
+      lines.push(priced(row, line, key, null, defraYearOf(eds)))
     }
     return
   }
@@ -509,13 +528,13 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
       return
     }
     if (missing(eds.defra)) return
-    for (const [line, key] of STEAM_LINES) lines.push(priced(row, line, key, make()))
+    for (const [line, key] of STEAM_LINES) lines.push(priced(row, line, key, make(), defraYearOf(eds)))
     return
   }
 
   if (row.stream === 'natural_gas' && isAu(row)) {
     if (missing(eds.nga)) return
-    priceAuGas(row, unit, lines, reject); return
+    priceAuGas(row, unit, lines, reject, ngaEditionOf(eds)); return
   }
   const routes = FUEL_ROUTES[row.stream]
   const route = unit ? routes[unit] : undefined
@@ -524,7 +543,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
     return
   }
   if (missing(eds.defra)) return
-  lines.push(priced(row, 'fuel_wtt', route.factorKey, route.conversion()))
+  lines.push(priced(row, 'fuel_wtt', route.factorKey, route.conversion(defraYearOf(eds)), defraYearOf(eds)))
 }
 
 /**
@@ -536,10 +555,13 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
  * never said: that withholds, naming the streams.
  */
 export function priceCat3(inputs: Cat3Inputs, eds: Cat3Editions): Cat3Result {
+  // T3d: the selected DEFRA edition's own record; the newest edition's when none is held for the window.
+  const m = 'held' in eds.defra && eds.defra.held.key !== null && DEFRA_ENERGY_YEARS.includes(eds.defra.held.key)
+    ? defraEnergyMetaFor(eds.defra.held.key) : DEFRA_ENERGY_META
   const meta = {
-    gwp_basis: DEFRA_ENERGY_META.gwp_basis,
-    source: DEFRA_ENERGY_META.source,
-    edition: DEFRA_ENERGY_META.edition,
+    gwp_basis: m.gwp_basis,
+    source: m.source,
+    edition: m.edition,
   }
   const undeclared = [...inputs.declaration.undeclared]
   if (undeclared.length > 0) {

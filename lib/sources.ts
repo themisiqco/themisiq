@@ -148,6 +148,15 @@ export const EPA_EGRID_HISTORICAL_URL = 'https://www.epa.gov/egrid/historical-eg
 export const EEA_GRID_INTENSITY_URL =
   'https://www.eea.europa.eu/en/analysis/indicators/greenhouse-gas-emission-intensity-of-1/greenhouse-gas-emission-intensity-of-electricity-generation-country-level'
 
+// Intent: the EEA chart page for the same indicator, data year 2024, from which
+// eea/EEA-ghg-intensity-electricity-generation-country-level-2024.csv was exported. Cited by the registry for EEA 2024's
+// dates ("Temporal coverage 1990-2024", "Published 06 Nov 2025", "Modified 10 Jul 2026"), which Lisa read from this page
+// on 8 Oct 2026 and checked three 2024 values against (Romania 188, France 36, Germany 291).
+// UNVERIFIED here: not opened in a Claude Code session.
+// @source-status: unverified
+export const EEA_GRID_INTENSITY_2024_URL =
+  'https://www.eea.europa.eu/en/analysis/indicators/greenhouse-gas-emission-intensity-of-1/greenhouse-gas-emission-intensity-of-electricity-generation'
+
 // Intent: the EPA's landing page for the USEEIO environmentally-extended input-output models, cited
 // by SPEND_EF_SOURCES.useeio_us in lib/emissionFactors/spend.ts as the provenance for US
 // spend-based factors.

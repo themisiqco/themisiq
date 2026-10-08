@@ -103,10 +103,11 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
       .not.toContain("['Combustion factors', efSources.combustion]")
     expect(pdfSrc, 'the six-jurisdiction catalogue must not be the electricity row again')
       .not.toContain("['Electricity factors', efSources.electricity]")
-    expect(pdfSrc).toContain('gridSourcesFor(inventory.locations)')
+    expect(pdfSrc).toContain('gridSourcesFor(inventory.locations, factorSel)')
     // Bound once each, not called twice in one expression.
     expect(pdfSrc).toContain('const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)')
-    expect(pdfSrc).toContain('const gridCitations = gridSourcesFor(inventory.locations)')
+    // T3d: with the inventory's selection, so each location cites the edition that priced it.
+    expect(pdfSrc).toContain('const gridCitations = gridSourcesFor(inventory.locations, factorSel)')
   })
 
   it('V7 the XLSX calls the SAME helpers as the PDF — agreement is structural, not asserted', () => {

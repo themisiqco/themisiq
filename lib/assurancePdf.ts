@@ -233,7 +233,7 @@ export function generateAssurancePDF(
   // T3c: the citations name the editions the inventory's own window selects.
   const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)
   const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)
-  const gridCitations = gridSourcesFor(inventory.locations)
+  const gridCitations = gridSourcesFor(inventory.locations, factorSel)
   autoTable(doc, {
     startY: 92,
     head: [['Element', 'Basis']],

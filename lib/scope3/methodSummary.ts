@@ -18,11 +18,17 @@
 import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method } from './categoryMethods'
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
 import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
-import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
+import { DEFRA_ENERGY_META, DEFRA_ENERGY_YEARS } from '../emissionFactors/defraEnergy'
 import { CAT15_GWP_TAIL } from './cat15'
 import { CAT6_ASSISTANT_PHRASE } from './businessTravelCopy'
 import { CAT7_ASSISTANT_PHRASE } from './commutingCopy'
 import { DEFRA_TRAVEL_META } from '../emissionFactors/defraTravel'
+
+/** T3d: the DEFRA/DESNZ upstream energy editions held, in words: "2024, 2025 or 2026". Read from the record. */
+const editionYears = (): string => {
+  const ys = DEFRA_ENERGY_YEARS.map(String)
+  return ys.length < 2 ? ys.join('') : `${ys.slice(0, -1).join(', ')} or ${ys[ys.length - 1]}`
+}
 
 /**
  * The fifteen categories by their GHG Protocol Scope 3 Standard titles, in prose case.
@@ -165,7 +171,7 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
   // year is READ from the record, as the waste and travel phrases read theirs.
   fuel_and_energy_upstream: () =>
     `derived from the energy already recorded in the bound GHG inventory and priced on the UK DEFRA/DESNZ ` +
-    `${DEFRA_ENERGY_META.year} upstream factors, well-to-tank for fuels and generation, transmission and ` +
+    `upstream factors of the edition the reporting year requires (${editionYears()}), well-to-tank for fuels and generation, transmission and ` +
     `distribution for electricity and heat, excluding the combustion already counted in Scope 1 and Scope 2`,
   business_travel_factors: () => CAT6_ASSISTANT_PHRASE,
   employee_commuting_factors: () => CAT7_ASSISTANT_PHRASE,
@@ -266,7 +272,7 @@ const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
   fuel_and_energy_upstream: {
     kind: 'publisher',
     basis: DEFRA_ENERGY_META.gwp_basis,
-    publisher: `UK DEFRA/DESNZ ${DEFRA_ENERGY_META.year} upstream energy factors`,
+    publisher: `UK DEFRA/DESNZ upstream energy factors (${editionYears()})`,
   },
   pcaf: { kind: 'investee' },
 }

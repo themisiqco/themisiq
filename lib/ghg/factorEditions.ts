@@ -29,7 +29,7 @@
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
   efJurisdiction, steamFactorFor, steamPricingOrMissing, nzUseClassVariant, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, fleetLinePublishers, combustionLinePublishers,
-  COMBUSTION_EDITION, selectionFor, MissingEditionError,
+  COMBUSTION_EDITION, selectionFor, MissingEditionError, editionCitation,
 } from './engine'
 import type { Location, SelectionContext } from './engine'
 
@@ -242,6 +242,8 @@ export function buildFactorEditions(locations: readonly Location[], year: number
   // Collected per jurisdiction before being written out, because the electricity edition is a set:
   // see the join below.
   const gridYears: Partial<Record<FactorJurisdiction, Set<string>>> = {}
+  // T3d: the citation of each edition that priced a grid row (an older held edition cites its own document).
+  const gridCites: Partial<Record<FactorJurisdiction, Set<string>>> = {}
 
   for (const loc of locations) {
     // ── EXCLUDED FROM THE TOTALS => NO EDITION, FOR ANY FAMILY ─────────────────────────────────
@@ -319,7 +321,7 @@ export function buildFactorEditions(locations: readonly Location[], year: number
       // T3c: the selected edition's label; a missing edition priced nothing and records nothing.
       try {
         const g = getGridFactor(loc.grid_region, sel)
-        if (j) { (gridYears[j] ??= new Set()).add(g.edition.label); if (g.edition.provisional) provisional.add(`${j}|electricity`) }
+        if (j) { (gridYears[j] ??= new Set()).add(g.edition.label); (gridCites[j] ??= new Set()).add(editionCitation(g.edition, CITATIONS[j].electricity)); if (g.edition.provisional) provisional.add(`${j}|electricity`) }
       } catch (e) { if (!(e instanceof MissingEditionError)) throw e }
     }
 
@@ -341,7 +343,8 @@ export function buildFactorEditions(locations: readonly Location[], year: number
       const priced = steamPricingOrMissing(loc, sel)
       const edition = priced?.edition?.label
       if (j && edition) {
-        (out[j] ??= {}).steam = { source: CITATIONS[j].steam!, edition }
+        // T3d: the selected edition's own citation (DEFRA 2024 or 2025), never the newest edition's beside it.
+        (out[j] ??= {}).steam = { source: priced!.edition ? editionCitation(priced!.edition, CITATIONS[j].steam!) : CITATIONS[j].steam!, edition }
         if (priced?.edition?.provisional) provisional.add(`${j}|steam`)
       }
     } else if (streamState(loc, 'purchased_steam') === 'quantified'
@@ -369,7 +372,7 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // picking the first would quietly drop the other. Sorted so the string is stable across saves
     // and two inventories can be compared by equality.
     ;(out[j] ??= {}).electricity = {
-      source: CITATIONS[j].electricity,
+      source: [...(gridCites[j] ?? [CITATIONS[j].electricity])].sort().join('; '),
       edition: [...years].sort().join(', '),
     }
   }

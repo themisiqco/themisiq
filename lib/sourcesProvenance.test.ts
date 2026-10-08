@@ -122,6 +122,7 @@ const EXPECTED: Record<string, Status> = {
   EPA_EGRID_DETAILED_DATA_URL: 'unverified',
   EPA_EGRID_HISTORICAL_URL: 'unverified',
   EEA_GRID_INTENSITY_URL: 'unverified',
+  EEA_GRID_INTENSITY_2024_URL: 'unverified',
 }
 
 const STATUSES: Status[] = ['unverified', 'resolves', 'form-verified', 'verified']

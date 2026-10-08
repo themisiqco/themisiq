@@ -1006,9 +1006,10 @@ describe('N10. the golden inventory is unchanged', () => {
   // T3c MOVES IT AGAIN, ON PURPOSE: Ontario's grid is class (b). RY2025 has no data-year-2025 table, so it takes the newest
   // ECCC table published by the preparation date. Prepared before ECCC v4.0 (9 Sep 2026) that is Table 5.3, data year
   // 2023, 0.059 kg/kWh: until T3c the v3.0 "2025" applicability key (Table 5.2, data year 2022, 0.038) priced it, which
-  // was ECCC's offset-system rule (ruling 8.1, C1). Prepared after, it is Table 5.4 (data year 2024), not held until T3d,
-  // so electricity is an unpriced line and the inventory blocks. The light-vehicle diesel blocks with it: ECCC's mobile
-  // factors are NIR Table A6.1-15, class (b), and the newest NIR after 9 Sep 2026 is NIR 2026 (data year 2024), not held.
+  // was ECCC's offset-system rule (ruling 8.1, C1). Prepared after, it is Table 5.4 (data year 2024).
+  // T3d MOVES IT AGAIN, ON PURPOSE: Table 5.4 and NIR 2026 are held. Prepared after 9 Sep 2026, Ontario's electricity is
+  // Table 5.4, data year 2024, 0.073 kg/kWh (until T3d: unpriced and blocking), and the fleet diesel is NIR 2026's
+  // Table A6.1-15, whose values are the same as NIR 2025's, so Scope 1 does not move.
   const BEFORE_V4 = { preparedOn: new Date(2026, 5, 1) }
   it('ON, RY2025, prepared 1 Jun 2026: gas 120,000 m3 + light-vehicle diesel 5,000 L + R-410A 12 kg + 850,000 kWh = 322.733844 tCO2e', () => {
     const t = calcInventory([golden()], 'AR6', 2025, selectionFor(2025, 12, BEFORE_V4)) as any;
@@ -1019,14 +1020,16 @@ describe('N10. the golden inventory is unchanged', () => {
     expect(t.s2_location).toBeCloseTo(50.15, 6);     // 850,000 kWh x ON Table 5.3 (data year 2023) 0.059
   });
 
-  it('ON, RY2025, prepared after ECCC v4.0: electricity and fleet diesel are unpriced (Table 5.4 and NIR 2026 not held) and block', () => {
+  it('ON, RY2025, prepared after ECCC v4.0 (T3d): 272.583844 + 62.05 = 334.633844 tCO2e on Table 5.4 and NIR 2026, nothing blocks', () => {
     const sel = selectionFor(2025, 12, { preparedOn: TEST_PREPARED_ON })
     const t = calcInventory([golden()], 'AR6', 2025, sel);
-    // Gas 231.798912 + R-410A 27.072; the diesel's 13.712932 and the electricity are out, each as a blocking line.
-    expect([t.s1_total, t.s2_location].map(v => Number(v.toFixed(6)))).toEqual([258.870912, 0]);
-    const issues = findUnresolvedCoverage([golden()], 2025, 12, [], { preparedOn: TEST_PREPARED_ON }).filter(i => i.status === 'edition_missing');
-    expect(issues.map(i => i.field).sort()).toEqual(['electricity_kwh', 'light_diesel_amount']);
-    expect(issues.find(i => i.field === 'electricity_kwh')!.message).toBe('ECCC Table 5.4 (NIR 1990-2024) grid electricity factors are needed for reporting year 2025 and are not loaded, so this line at Test Site is not counted. Export is blocked until they are loaded.');
+    // Scope 1 as before (NIR 2026's mobile values equal NIR 2025's); Scope 2: 850,000 kWh x ON Table 5.4 (data year 2024) 0.073.
+    expect([t.s1_total, t.s2_location].map(v => Number(v.toFixed(6)))).toEqual([272.583844, 62.05]);
+    expect(t.s1_total + t.s2_location).toBeCloseTo(334.633844, 6);
+    expect(findUnresolvedCoverage([golden()], 2025, 12, [], { preparedOn: TEST_PREPARED_ON }).filter(i => i.status === 'edition_missing')).toEqual([]);
+    const rows = buildWorkings([golden()], 'AR6', 2025, [], 12, { preparedOn: TEST_PREPARED_ON }) as { stream?: string; source?: string; scope2_method?: string; factor_edition?: string; declaration?: string }[];
+    expect(rows.find(r => r.scope2_method === 'location-based')!.factor_edition).toBe('ECCC Table 5.4 (NIR 1990-2024)');
+    expect(rows.find(r => r.source === 'Diesel (light vehicles)' && !r.declaration)!.factor_edition).toBe('ECCC NIR 2026 (1990-2024)');
   });
 
   it('the declaration rows carry no figure, so the workings still sum to the same total', () => {
@@ -1058,10 +1061,9 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
   const tdRow = (year: number) =>
     buildWorkings([nzLoc()], 'AR6', year, [], 12).find((r: any) => r.scope === 3) as any;
 
-  it('O1 the table still holds exactly one year — the premise these tests rest on', () => {
-    // If a second key is ever added, O2/O3 stop testing a fallback and start testing an exact hit.
-    // Pinned so that addition is a deliberate act rather than a silent change of what O2/O3 mean.
-    expect(Object.keys(NZ_TD_LOSS)).toEqual(['2025']);
+  it('O1 the table holds the 2024 and 2025 rows (T3d), the premise these tests rest on', () => {
+    // O2/O3 test the newest-row case (2026 has no row). Pinned so a further key is a deliberate act.
+    expect(Object.keys(NZ_TD_LOSS)).toEqual(['2024', '2025']);
   });
 
   it('O2 a 2026 inventory stamps the selected series row, not the inventory year (T3c: class (b), newest row)', () => {
@@ -1089,10 +1091,10 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
     expect(r.ef_source, 'no nearest-year note').not.toContain('applied to');
   });
 
-  it('O5 T3c: a 2023 or 2024 inventory is NOT priced forward on the 2025 row; the line is unpriced until its row is loaded', () => {
-    // Until T3c `let ty = years[0]` resolved a 2023 or 2024 inventory FORWARD to the 2025 factor. MfE publishes those
-    // rows (registered, not held), so the line is unpriced with the edition message and blocks export.
-    for (const y of [2023, 2024]) {
+  it('O5 T3c: a 2023 inventory is NOT priced forward on a later row; the line is unpriced until its row is loaded', () => {
+    // Until T3c `let ty = years[0]` resolved a 2023 inventory FORWARD to the earliest held row. MfE publishes the 2023 row
+    // (registered, not held), so the line is unpriced with the edition message and blocks export. (T3d holds 2024.)
+    for (const y of [2023]) {
       const r = tdRow(y);
       expect([r.declaration, r.result_tco2e, r.unpriced?.reason], `inv ${y}`).toEqual(['unpriced', null, 'edition_missing']);
       expect(r.note, `inv ${y}`).toBe(`NOT PRICED: MfE 2026 v2 (${y} row) transmission and distribution losses factors are needed for reporting year ${y} and are not loaded, so this line at Test Site is not counted. Export is blocked until they are loaded.`);
@@ -1102,20 +1104,23 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
 
   it('O6 nzTdLoss returns the selected MfE series row (T3c: class (b), data year), with its edition', () => {
     const td = nzTdLoss(testSel(2025));
-    expect([td.ef, td.vintage, td.edition.rule]).toEqual([0.00596, 'MfE 2026 v2 (2025 row)', 'data_year_match']);
+    // T3d: the 2025 row as printed, 0.00595616 (data!J1712); it was held rounded, as 0.00596, until T3d.
+    expect([td.ef, td.vintage, td.edition.rule]).toEqual([0.00595616, 'MfE 2026 v2 (2025 row)', 'data_year_match']);
+    expect([nzTdLoss(testSel(2024)).ef, nzTdLoss(testSel(2024)).vintage]).toEqual([0.00752331, 'MfE 2026 v2 (2024 row)'])
     // 2026 has no 2026 row: the newest published row is used, and the basis says so. Never a nearest-year note.
-    expect(nzTdLoss(testSel(2026)).ef).toBe(0.00596);
+    expect(nzTdLoss(testSel(2026)).ef).toBe(0.00595616);
     expect(nzTdLoss(testSel(2026)).edition.rule).toBe('data_year_newest');
   });
 
-  it('O7 REGRESSION — no figure moved: the calc term and the row still agree, and still exclude S2', () => {
+  it('O7 the calc term and the row still agree, and still exclude S2 (T3d: on the 2025 row as printed)', () => {
     // This is a provenance fix. calcLocation and buildWorkings share nzTdLoss precisely so the calc
     // term and the workings row cannot diverge; changing the return shape must not break that.
     for (const y of [2025, 2026]) {   // T3c: 2023 is unpriced (O5)
       const c = calcLocation(nzLoc(), 'AR6', y);
-      expect(c.s3_td, `inv ${y}`).toBeCloseTo(100_000 * 0.00596 / 1000, 9);
+      // T3d moves this: 0.596 t became 0.595616 t (100,000 kWh x 0.00595616, the value MfE prints).
+      expect(c.s3_td, `inv ${y}`).toBeCloseTo(100_000 * 0.00595616 / 1000, 9);
       expect(tdRow(y).result_tco2e, `inv ${y} row vs calc`).toBeCloseTo(c.s3_td, 9);
-      expect(tdRow(y).emission_factor).toBe('0.00596 kg CO₂e/kWh');
+      expect(tdRow(y).emission_factor).toBe('0.00595616 kg CO₂e/kWh');
       // Still Scope 3, still out of every Scope 2 total.
       expect(tdRow(y).scope).toBe(3);
       expect(c.s2_location).toBeCloseTo(100_000 * getGridFactor('NZ', testSel(y)).ef / 1000, 9);
@@ -1202,8 +1207,8 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
     expect(mb.ef_source.startsWith(EF_SOURCES.residual_eu)).toBe(true);
     expect(mb.selection_basis).toBe('AIB 2024: data year 2024 matches reporting year 2024. Whether the values held reflect the correction of 11 August 2025 is not recorded.');
     expect(mb.ef_source, 'no grid note rides along when the grid factor did not price the row').not.toContain('Grid factor for');
-    // The location-based row beside it names EEA's newest data year, 2023.
-    expect([lb.factor_vintage, lb.selection_rule]).toEqual(['EEA 2023', 'data_year_newest']);
+    // The location-based row beside it names EEA's data year 2024 (held since T3d), a data-year match.
+    expect([lb.factor_vintage, lb.selection_rule]).toEqual(['EEA 2024', 'data_year_match']);
     expect(mb.emission_factor).not.toBe(lb.emission_factor);   // genuinely different factors
   });
 
@@ -1240,7 +1245,8 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
       // T3c: ON keyed by data year; 2021 is Table 5.1 (0.03), 2023 is Table 5.3 (0.059). ON 2026 needs Table 5.4 (T3d).
       ['ON 2021', on, 2021, 0.03],
       ['ON 2023', on, 2023, 0.059],
-      ['EU_DE 2026', euDe, 2026, 0.329],
+      // T3d: EEA's newest data year is 2024 (291 g/kWh), held; it was 2023 (329).
+      ['EU_DE 2026', euDe, 2026, 0.291],
       ['UK 2026', () => loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 100_000 }), 2026, 0.13096],
       ['NZ 2026', () => loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100_000 }), 2026, 0.0787],
     ];
@@ -1289,8 +1295,10 @@ describe('P9. residual mix editions are selected by data year, never substituted
     expect(() => getResidualFactor('EU_DE', testSel(2023), 'AR6')).toThrow('AIB 2023 residual mix factors are needed for reporting year 2023 and are not loaded');
   });
 
-  it('P10 EU_DE at 2026 takes the newest published, AIB 2025 (not held yet): MissingEditionError, not the 2024 mix', () => {
-    expect(() => getResidualFactor('EU_DE', testSel(2026), 'AR6')).toThrow('AIB 2025 residual mix factors are needed for reporting year 2026');
+  it('P10 EU_DE at 2026 takes the newest published, AIB 2025 (held since T3d): its own value, never the 2024 mix', () => {
+    const r = getResidualFactor('EU_DE', testSel(2026), 'AR6')
+    expect([r.ef, r.vintage, r.edition?.rule]).toEqual([0.70147, 'AIB 2025', 'data_year_newest'])
+    expect(r.source).toBe(EF_SOURCES.edition_aib_2025)
   });
 
   it('P11 EU_DE at 2024: exact match, no note, the data-year rule', () => {
@@ -1868,7 +1876,9 @@ describe('Z. fuel oil grades are seeded per table', () => {
         //     allowed "DEFRA 2025 and 2026" on that line exempted a disallowed "DEFRA/DESNZ (2025)"
         //     beside it. Reverting the page passed. Allowed spellings are now STRIPPED and the
         //     remainder tested, so one legitimate mention cannot shelter an illegitimate one.
-        const allowed = [/WAS DEFRA\/DESNZ 2025/g, /2025 workbook/g, /DEFRA 2025\+2026/g, /DEFRA 2025 and 2026/g];
+        // T3d: DEFRA 2025 is now a held EDITION (lib/ghg/factors/desnz-2025.ts), selected by the reporting window; its
+        // module names are not a stale citation. EF_UK itself stays DEFRA 2026.
+        const allowed = [/WAS DEFRA\/DESNZ 2025/g, /2025 workbook/g, /DEFRA 2025\+2026/g, /DEFRA 2025 and 2026/g, /DEFRA_MOBILE_20\d\d/g];
         let probe = ln;
         for (const a of allowed) probe = probe.replace(a, '');
         if (!/DEFRA.{0,14}2025/.test(probe)) continue;
@@ -5649,6 +5659,13 @@ describe('FI2 exact conversions and honest provenance', () => {
   const TABLE_BY_SOURCE = new Map<string, Record<string, any>>([
     [EF_SOURCES.combustion, EF], [EF_SOURCES.combustion_ca, EF_CA], [EF_SOURCES.combustion_uk, EF_UK],
     [EF_SOURCES.combustion_eu, EF_EU], [EF_SOURCES.combustion_au, EF_AU], [EF_SOURCES.combustion_nz, EF_NZ.commercial],
+    // T3d: a row priced on an older held edition cites that edition's document, and is found in that edition's file.
+    ...([DESNZ_2024, DESNZ_2025] as const).map(f => [(EF_SOURCES as Record<string, string>)[`edition_desnz_${f.edition.slice(-4)}`],
+      Object.fromEntries(Object.entries(f.combustion).map(([k, c]) => [k, { co2: c.value, ch4: 0, n2o: 0 }]))] as [string, Record<string, { co2: number; ch4: number; n2o: number }>]),
+    ...([[EF_SOURCES.edition_mfe_2024, MFE_2024.combustion.commercial], [EF_SOURCES.edition_mfe_2025, MFE_2025.combustion.commercial],
+      [EF_SOURCES.edition_nga_2024_combustion, NGA_2024.combustion]] as const).map(([src, t]) =>
+      [src, Object.fromEntries(Object.entries(t).map(([k, c]) => [k, { co2: c.value, ch4: 0, n2o: 0 }]))] as [string, Record<string, { co2: number; ch4: number; n2o: number }>]),
+    [EF_SOURCES.edition_epa_2024, Object.fromEntries(Object.entries(EPA_2024.combustion).map(([k, g]) => [k, { co2: g.co2.value, ch4: g.ch4.value, n2o: g.n2o.value }]))],
   ]);
   const LINES: [keyof Location, keyof Location, Partial<Location>, string[]][] = [
     ['natural_gas_amount', 'natural_gas_unit', { has_natural_gas: true }, ['mcf', 'therms', 'mmbtu', 'm3', 'kwh']],
@@ -5678,15 +5695,16 @@ describe('FI2 exact conversions and honest provenance', () => {
           // Canadian gas: the province's ECCC value (EF_CA_NG_CO2_M3), per m3 or per Mcf at the exact factor.
           expected = EF_CA_NG_CO2_M3.ON * ratio;
         } else if (table === EF_CA && r.factor_key === 'natural_gas_gj') {
-          // FI3 (R12): per GJ gross, the province's per-m3 value / 0.03859 GJ per m3 (NIR Table A4-2), computed.
-          expected = EF_CA_NG_CO2_M3.ON / 0.03859 * ratio;
+          // FI3 (R12): per GJ gross, the province's per-m3 value / the heat content, computed. T3d: a 2025 window prepared
+          // after 9 Sep 2026 takes NIR 2026's 0.03852 GJ per m3 (Table A4-2, p. 521); NIR 2025's was 0.03859.
+          expected = EF_CA_NG_CO2_M3.ON / 0.03852 * ratio;
         } else {
           expect(table![r.factor_key], `${label}: "${r.factor_key}" is not in the table the row cites`).toBeDefined();
           expected = table![r.factor_key].co2 * ratio;
         }
         expect(Math.abs(shownCo2 - expected) / expected, `${label}: value ${shownCo2} is not ${r.ef_source}'s ${r.factor_key}`).toBeLessThan(1e-9);
         // The edition is the same table's.
-        expect(r.factor_vintage, label).toBe(pickEF(l, r.factor_key, heldSel(l)).publisher?.edition);
+        expect(r.factor_vintage, label).toBe(pickEF(l, r.factor_key, testSel(2025)).publisher?.edition);
         if (country !== 'US' && table === EF) fellBack++;   // FI2 diff 2: must stay 0
         checked++;
       }
@@ -6945,26 +6963,27 @@ describe('T3c diff 2: factor editions selected by rule', () => {
   });
 
   it('a missing edition: the line is unpriced (excluded, not zero), the other lines price, and export is blocked with the message', () => {
-    // A UK year ending March 2025 needs DEFRA 2024 (the DESNZ April to March rule), published and not held.
+    // T3d: DEFRA 2024 and 2025 are held now. A UK year ending March 2024 needs DEFRA 2023 (the DESNZ April to March rule),
+    // published and not held.
     const l = loc({ name: 'Leeds', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000, has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
-    const sel = selectionFor(2025, 3, PREP);
-    const c = calcLocation(l, 'AR6', 2025, sel);
-    expect([c.s1_total, c.s2_location]).toEqual([0, 0]);   // both DEFRA 2024 (grid and fuels): unpriced, never priced on 2025
-    const rows = rowsAt(l, 2025, 3);
+    const sel = selectionFor(2024, 3, PREP);
+    const c = calcLocation(l, 'AR6', 2024, sel);
+    expect([c.s1_total, c.s2_location]).toEqual([0, 0]);   // both DEFRA 2023 (grid and fuels): unpriced, never priced on 2024
+    const rows = rowsAt(l, 2024, 3);
     const gas = rows.find(r => r.stream === 'natural_gas')!;
     expect([gas.declaration, gas.result_tco2e, gas.unpriced!.reason]).toEqual(['unpriced', null, 'edition_missing']);
-    const msg = 'DEFRA 2024 fuel combustion factors are needed for the year ending 31 March 2025 and are not loaded, so this line at Leeds is not counted. Export is blocked until they are loaded.';
+    const msg = 'DEFRA 2023 fuel combustion factors are needed for the year ending 31 March 2024 and are not loaded, so this line at Leeds is not counted. Export is blocked until they are loaded.';
     expect(gas.note).toBe(`NOT PRICED: ${msg}`);
-    const issues = findUnresolvedCoverage([l], 2025, 3, [], PREP).filter(i => i.status === 'edition_missing');
+    const issues = findUnresolvedCoverage([l], 2024, 3, [], PREP).filter(i => i.status === 'edition_missing');
     expect(issues.map(i => [i.field, i.message])).toEqual([
       ['natural_gas_amount', msg],
-      ['electricity_kwh', 'DEFRA 2024 grid electricity factors are needed for the year ending 31 March 2025 and are not loaded, so this line at Leeds is not counted. Export is blocked until they are loaded.'],
+      ['electricity_kwh', 'DEFRA 2023 grid electricity factors are needed for the year ending 31 March 2024 and are not loaded, so this line at Leeds is not counted. Export is blocked until they are loaded.'],
     ]);
     expect(UNPRICED_STATUSES.has('edition_missing')).toBe(true);
     for (const i of issues) expect(i.message).not.toContain('\u2014');
     // Another line at the same site, whose edition IS held, still prices: a refrigerant needs only a GWP.
     const withRef = loc({ ...l, has_hfc_refrigerants: true, refrigerant_type: 'r410a', refrigerant_purchased_kg: 10 });
-    expect(calcLocation(withRef, 'AR6', 2025, sel).s1_total).toBeCloseTo(10 * 2256 / 1000, 9);
+    expect(calcLocation(withRef, 'AR6', 2024, sel).s1_total).toBeCloseTo(10 * 2256 / 1000, 9);
   });
 
   it('R19: a US calendar-2026 site prices on EPA Hub 2025, provisionally, with the sentence; export is not blocked', () => {
@@ -6980,14 +6999,14 @@ describe('T3c diff 2: factor editions selected by rule', () => {
     expect(rowsAt(l, 2026, 3).find(r => r.stream === 'natural_gas')!.provisional).toBe(false);
   });
 
-  it('UK calendar 2026 prices on DEFRA 2026; a UK March 2025 window is missing DEFRA 2024', () => {
+  it('UK calendar 2026 prices on DEFRA 2026; a UK March 2024 window is missing DEFRA 2023', () => {
     const l = loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 1000, has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
     const r26 = rowsAt(l, 2026);
     expect(r26.filter(r => r.factor_edition).map(r => [r.stream, r.factor_edition, r.selection_rule])).toEqual([
       ['natural_gas', 'DEFRA 2026', 'desnz_calendar'], ['electricity', 'DEFRA 2026', 'desnz_calendar'], ['electricity', 'DEFRA 2026', 'desnz_calendar']]);
     expect(r26.find(r => r.stream === 'natural_gas')).toMatchObject({ edition_published: '11 June 2026', provisional: false });
     expect(r26.find(r => r.stream === 'natural_gas')!.edition_corrected, 'the flat-file correction does not touch the full set').toBeUndefined();
-    expect(rowsAt(l, 2025, 3).filter(r => r.unpriced?.reason === 'edition_missing').map(r => r.unpriced!.publisher)).toEqual(['DEFRA 2024', 'DEFRA 2024', 'DEFRA 2024']);
+    expect(rowsAt(l, 2024, 3).filter(r => r.unpriced?.reason === 'edition_missing').map(r => r.unpriced!.publisher)).toEqual(['DEFRA 2023', 'DEFRA 2023', 'DEFRA 2023']);
   });
 
   it('every factor row carries the edition fields; class (b) carries selected_on; R20 dates read "on or before"', () => {
@@ -6995,7 +7014,8 @@ describe('T3c diff 2: factor editions selected by rule', () => {
     const lb = rows.find(r => r.scope2_method === 'location-based')!, mb = rows.find(r => r.scope2_method === 'market-based')!;
     for (const r of [lb, mb]) for (const k of ['factor_vintage', 'factor_edition', 'selection_rule', 'selection_basis', 'edition_published', 'provisional', 'selected_on'])
       expect(r, `${r.scope2_method} ${k}`).toHaveProperty(k);
-    expect([lb.factor_edition, lb.edition_published, lb.selected_on]).toEqual(['EEA 2023', '25 October 2024', '2026-10-08']);
+    // T3d: EEA 2024 (data year 2024) is held; its values are the 10 Jul 2026 correction, which the row records.
+    expect([lb.factor_edition, lb.edition_published, lb.selected_on, lb.edition_corrected]).toEqual(['EEA 2024', '6 November 2025', '2026-10-08', '10 July 2026']);
     expect([mb.factor_edition, mb.edition_published]).toEqual(['AIB 2024', 'on or before 11 August 2025']);
   });
 
@@ -7021,12 +7041,12 @@ describe('T3c diff 2: factor editions selected by rule', () => {
     const monthly = buildMonthlyEmissions(inv26, deps, 'AR6', PREP).slices.reduce((a, s) => a + s.tco2e, 0);
     expect(monthly).toBeCloseTo(12_000 * 0.13096 / 1000, 5);
     expect(monthly).toBeCloseTo(calcInventory(deriveLocations(inv26), 'AR6', 2026, selectionFor(2026, 12, PREP)).s2_location, 5);
-    // 2024: DEFRA 2024 is not held, so neither the annual figure nor any month is priced (never 2025's factor).
-    const inv24 = { locations: [uk(2024)], reporting_year: 2024, coverage_resolutions: [] };
-    const m24 = buildMonthlyEmissions(inv24, deps, 'AR6', PREP);
-    expect(m24.slices).toEqual([]);
-    expect(m24.skipped.map(k => k.reason)).toEqual(['edition_missing']);
-    expect(calcInventory(deriveLocations(inv24), 'AR6', 2024, selectionFor(2024, 12, PREP)).s2_location).toBe(0);
+    // 2023: DEFRA 2023 is not held, so neither the annual figure nor any month is priced (never 2023's factor).
+    const inv23 = { locations: [uk(2023)], reporting_year: 2023, coverage_resolutions: [] };
+    const m23 = buildMonthlyEmissions(inv23, deps, 'AR6', PREP);
+    expect(m23.slices).toEqual([]);
+    expect(m23.skipped.map(k => k.reason)).toEqual(['edition_missing']);
+    expect(calcInventory(deriveLocations(inv23), 'AR6', 2023, selectionFor(2023, 12, PREP)).s2_location).toBe(0);
   });
 
   it('factor_editions records the selected label and marks a provisional one; a change between years is still detected', () => {
@@ -7042,13 +7062,20 @@ describe('T3c diff 2: factor editions selected by rule', () => {
 
   it('the save payload prices totals, workings and editions on one selection (the year end included)', () => {
     const inv = { locations: [loc({ country: 'US', state: 'TX', grid_region: 'US_TX', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' })],
-      reporting_year: 2025, fiscal_year_end_month: 3, coverage_resolutions: [] };
+      reporting_year: 2024, fiscal_year_end_month: 3, coverage_resolutions: [] };
     const f = figuresForSave(inv as never, 'AR6', PREP);
-    // A year ending March 2025 needs EPA Hub 2024 (not held): the totals leave the gas out, as the workings do.
+    // A year ending March 2024 needs EPA Hub 2023 (not held; T3d holds 2024): the totals leave the gas out, as the workings do.
     expect(f.totals.s1_total).toBe(0);
     expect((f.workings as WRow[]).find(r => r.stream === 'natural_gas')!.unpriced!.reason).toBe('edition_missing');
   });
 });
+
+import { DESNZ_2024 } from './factors/desnz-2024';
+import { DESNZ_2025 } from './factors/desnz-2025';
+import { MFE_2024 } from './factors/mfe-2024';
+import { MFE_2025 } from './factors/mfe-2025';
+import { NGA_2024 } from './factors/nga-2024';
+import { EPA_2024 } from './factors/epa-2024';
 
 // ── T3c DIFF 2b: FLEET, HEAT CONTENT, THE STEAM ESTIMATE AND CATEGORY 3 SELECTED BY RULE ─────────────────────────────
 import { cat3EditionsFor } from '../scope3/cat3Editions';
@@ -7087,14 +7114,14 @@ describe('T3c diff 2b: fleet, R12 heat content, R14 steam estimate and Category 
   });
 
   it('fleet: a missing mobile edition is an unpriced, export-blocking line; R19 prices provisionally', () => {
-    // UK calendar 2025 needs DEFRA 2025 vehicle fuel rows, published and not held.
+    // UK calendar 2023 needs DEFRA 2023 vehicle fuel rows, published and not held (T3d holds 2024 to 2026).
     const uk = fleet({ country: 'GB', grid_region: 'UK' });
-    expect(calcLocation(uk, 'AR6', 2025, selectionFor(2025, 12, PREP)).s1_mobile).toBe(0);
-    const r = rows(uk, 2025).find(x => x.source === 'Diesel (light vehicles)')!;
-    expect([r.declaration, r.result_tco2e, r.unpriced?.reason, r.unpriced?.publisher]).toEqual(['unpriced', null, 'edition_missing', 'DEFRA 2025']);
-    const issues = findUnresolvedCoverage([uk], 2025, 12, [], PREP).filter(i => i.status === 'edition_missing');
+    expect(calcLocation(uk, 'AR6', 2023, selectionFor(2023, 12, PREP)).s1_mobile).toBe(0);
+    const r = rows(uk, 2023).find(x => x.source === 'Diesel (light vehicles)')!;
+    expect([r.declaration, r.result_tco2e, r.unpriced?.reason, r.unpriced?.publisher]).toEqual(['unpriced', null, 'edition_missing', 'DEFRA 2023']);
+    const issues = findUnresolvedCoverage([uk], 2023, 12, [], PREP).filter(i => i.status === 'edition_missing');
     expect(issues.map(i => [i.field, i.message])).toEqual([['light_diesel_amount',
-      'DEFRA 2025 vehicle fuel factors are needed for reporting year 2025 and are not loaded, so this line at Depot is not counted. Export is blocked until they are loaded.']]);
+      'DEFRA 2023 vehicle fuel factors are needed for reporting year 2023 and are not loaded, so this line at Depot is not counted. Export is blocked until they are loaded.']]);
     // US calendar 2026: EPA Hub 2026 not yet published, so EPA 2025, provisionally, and nothing blocks.
     const us = fleet({ country: 'US', state: 'TX', grid_region: 'US_TX', light_diesel_unit: 'gallons' });
     const p = rows(us, 2026).find(x => x.source === 'Diesel (light vehicles)' && !x.declaration)!;
@@ -7103,14 +7130,17 @@ describe('T3c diff 2b: fleet, R12 heat content, R14 steam estimate and Category 
     expect(findUnresolvedCoverage([us], 2026, 12, [], PREP).filter(i => UNPRICED_STATUSES.has(i.status))).toEqual([]);
   });
 
-  it('Canada after NIR 2026 (9 Sep 2026): fleet and gas in GJ are missing NIR 2026; gas in m3 still prices', () => {
+  it('Canada after NIR 2026 (9 Sep 2026): fleet and gas in GJ price on NIR 2026 (T3d); gas in m3 needs no heat content', () => {
     const on = { country: 'CA', province: 'ON', grid_region: 'ON' } as const;
     const ca = fleet({ ...on, has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' });
     const after = rows(ca, 2025);
-    expect(after.find(r => r.source === 'Diesel (light vehicles)')!.unpriced?.publisher).toBe('ECCC NIR 2026 (1990-2024)');
-    expect(after.find(r => r.stream === 'natural_gas')!.unpriced?.publisher).toBe('ECCC NIR 2026 (1990-2024)');
-    expect(findUnresolvedCoverage([ca], 2025, 12, [], PREP).filter(i => i.status === 'edition_missing').map(i => i.field).sort())
-      .toEqual(['light_diesel_amount', 'natural_gas_amount']);
+    expect(after.find(r => r.source === 'Diesel (light vehicles)' && !r.declaration)!.factor_edition).toBe('ECCC NIR 2026 (1990-2024)');
+    const gjAfter = after.find(r => r.stream === 'natural_gas' && !r.declaration)!;
+    // R12: 38.52 MJ/m3 (NIR 2026, Table A4-2, p. 521): 100 GJ / 0.03852 GJ per m3, at Ontario's per-m3 factor.
+    expect(gjAfter.note).toContain('Converted to m³ at 38.52 MJ/m³');
+    expect(gjAfter.note).toContain('Heat content: ECCC NIR 2026 (1990-2024)');
+    expect(gjAfter.result_tco2e).toBeCloseTo(100 / 0.03852 * (1.921 + 0.000037 * 29.8 + 0.000035 * 273) / 1000, 9);
+    expect(findUnresolvedCoverage([ca], 2025, 12, [], PREP).filter(i => i.status === 'edition_missing')).toEqual([]);
     // The same gas in m3 needs no heat content: it prices on ECCC's per-m3 factor.
     const m3 = rows({ ...ca, natural_gas_unit: 'm3' }, 2025).find(r => r.stream === 'natural_gas' && !r.declaration)!;
     expect([m3.factor_edition, (m3.result_tco2e ?? 0) > 0]).toEqual(['ECCC 2025 v3.0', true]);
@@ -7135,17 +7165,16 @@ describe('T3c diff 2b: fleet, R12 heat content, R14 steam estimate and Category 
     const ok = cat3EditionsFor(testSel(2026, 6));
     expect('held' in ok.defra && ok.defra.held.label).toBe('DEFRA 2026');
     expect('held' in ok.nga && ok.nga.held.label).toBe('DCCEEW NGA 2025');
-    // Calendar 2025: the DESNZ calendar rule needs DEFRA 2025 (not held); NGA activity year 2025-26 is held.
-    const cal25 = cat3EditionsFor(selectionFor(2025, 12, PREP));
-    expect('missing' in cal25.defra && cal25.defra.missing.edition).toBe('DEFRA 2025');
-    expect('held' in cal25.nga).toBe(true);
+    // Calendar 2023: the DESNZ calendar rule needs DEFRA 2023 (not held; T3d holds 2024 to 2026).
+    const cal25 = cat3EditionsFor(selectionFor(2023, 12, PREP));
+    expect('missing' in cal25.defra && cal25.defra.missing.edition).toBe('DEFRA 2023');
     const inputs = { declaration: { undeclared: [] }, rows: [
       { id: 'r1', location: 'Leeds', country: 'GB', stream: 'natural_gas', activity: 1000, unit: 'kwh', scope2_method: null },
     ] } as never;
     const priced = priceCat3(inputs, ok), missing = priceCat3(inputs, cal25);
     expect(priced.lines.map(l => l.edition?.label)).toEqual(['DEFRA 2026']);
     expect(missing.lines).toEqual([]);
-    expect(missing.unpriced.map(u => u.reason)).toEqual([{ code: 'edition_missing', edition: 'DEFRA 2025',
-      message: 'DEFRA 2025 well-to-tank and transmission and distribution factors are needed for reporting year 2025 and are not loaded, so this line at Leeds is not counted.' }]);
+    expect(missing.unpriced.map(u => u.reason)).toEqual([{ code: 'edition_missing', edition: 'DEFRA 2023',
+      message: 'DEFRA 2023 well-to-tank and transmission and distribution factors are needed for reporting year 2023 and are not loaded, so this line at Leeds is not counted.' }]);
   });
 });

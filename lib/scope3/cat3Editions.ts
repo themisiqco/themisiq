@@ -12,7 +12,7 @@ import type { Cat3Edition, Cat3Editions } from './cat3Energy'
 function pick(dataset: 'desnz_scope3_energy' | 'nga_scope3', sel: Sel): Cat3Edition {
   try {
     const u = editionFor(dataset, sel)
-    return { held: { label: u.label, rule: u.rule, basis: u.basis, provisional: u.provisional } }
+    return { held: { label: u.label, rule: u.rule, basis: u.basis, provisional: u.provisional, key: u.key } }
   } catch (e) {
     if (!(e instanceof MissingEditionError)) throw e
     return { missing: { edition: e.edition, sentence: site => e.forSite(site) } }

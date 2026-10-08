@@ -73,17 +73,18 @@ describe('the CA province dropdown shows the factor the engine will apply', () =
   // ── THE VALUES ────────────────────────────────────────────────────────────────────────────────
   // T3c: GRID_EF's Canadian rows are keyed by ECCC DATA YEAR (2021, 2022, 2023: v3.0 Tables 5.1 to 5.3), and a
   // reporting year takes the table whose data year matches it (class (b)). The year-blind rule still disagrees.
-  it('T1 ON at 2021: the engine prices at 0.03 (Table 5.1, data year 2021), and the year-blind rule says 0.059', () => {
+  // T3d: data year 2024 (v4.0 Table 5.4) is held, so the newest key, and the year-blind rule with it, is 2024.
+  it('T1 ON at 2021: the engine prices at 0.03 (Table 5.1, data year 2021), and the year-blind rule says 0.073', () => {
     expect(getGridFactor('ON', testSel(2021)).ef).toBe(0.03)
-    expect(yearBlindEf('ON'), 'what the deleted GRID_REGIONS_CA.ef held for Ontario').toBe(0.059)
+    expect(yearBlindEf('ON'), 'what a year-blind field would hold for Ontario: the newest key').toBe(0.073)
     expect(getGridFactor('ON', testSel(2021)).ef).not.toBe(yearBlindEf('ON'))
-    expect(yearBlindEf('ON') / getGridFactor('ON', testSel(2021)).ef).toBeCloseTo(1.9667, 3)
+    expect(yearBlindEf('ON') / getGridFactor('ON', testSel(2021)).ef).toBeCloseTo(2.4333, 3)
   })
 
-  it('T2 ON at 2023: the two agree, because the newest key IS data year 2023', () => {
-    expect(getGridFactor('ON', testSel(2023)).ef).toBe(0.059)
-    expect(yearBlindEf('ON')).toBe(0.059)
-    expect(Math.max(...Object.keys(GRID_EF.ON).map(Number)), 'newest ON key').toBe(2023)
+  it('T2 ON at 2024: the two agree, because the newest key IS data year 2024', () => {
+    expect(getGridFactor('ON', testSel(2024)).ef).toBe(0.073)
+    expect(yearBlindEf('ON')).toBe(0.073)
+    expect(Math.max(...Object.keys(GRID_EF.ON).map(Number)), 'newest ON key').toBe(2024)
   })
 
   it('T3 a single-year table is invariant — NO CA province is one, so this is asserted on US', () => {
@@ -101,7 +102,7 @@ describe('the CA province dropdown shows the factor the engine will apply', () =
     }
   })
 
-  it('T4 the two sources diverge for EVERY province in 2021 and 2022, and agree in 2023', () => {
+  it('T4 the two sources diverge for EVERY province in 2021 and 2022, and agree in 2024 (the newest data year, T3d)', () => {
     // The full matrix. This is what makes the textual guard worth having: without the fix, EVERY
     // Canadian customer on a pre-2026 inventory saw a wrong figure, not just Ontario.
     // Built from CA_PROVINCES + the formula, which is exactly what GRID_REGIONS_CA.map used to do —
@@ -109,7 +110,7 @@ describe('the CA province dropdown shows the factor the engine will apply', () =
     const stale = CA_PROVINCES.map(p => [p, yearBlindEf(p)] as const)
     expect(stale, 'all thirteen provinces, as GRID_REGIONS_CA covered').toHaveLength(13)
     for (const [p, constEf] of stale) {
-      expect(getGridFactor(p, testSel(2023)).ef, `${p} 2023 should match the newest key`).toBe(constEf)
+      expect(getGridFactor(p, testSel(2024)).ef, `${p} 2024 should match the newest key`).toBe(constEf)
     }
     const divergent: string[] = []
     for (const year of [2021, 2022]) {

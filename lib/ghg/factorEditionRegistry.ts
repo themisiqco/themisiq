@@ -31,7 +31,7 @@
 
 import { reportingYearLabel } from './reportingYear'
 import { dateInWords } from './dateWords'
-import { EPA_EGRID_DETAILED_DATA_URL, EPA_EGRID_HISTORICAL_URL, EEA_GRID_INTENSITY_URL } from '../sources'
+import { EPA_EGRID_DETAILED_DATA_URL, EPA_EGRID_HISTORICAL_URL, EEA_GRID_INTENSITY_URL, EEA_GRID_INTENSITY_2024_URL } from '../sources'
 
 export type EditionClass = 'a' | 'b' | 'exempt'
 export type DatasetRule = 'desnz' | 'majority' | 'nga_activity_year' | 'data_year' | 'exempt'
@@ -162,6 +162,7 @@ export const SOURCE_FILES: readonly string[] = [
   'aib/AIB-2024-residual-mix-final-results-v1.1-11082025.pdf', 'aib/AIB-2024-residual-mix-results-30052025.xlsx',
   'aib/AIB-2025-residual-mix-final-results-26052026.pdf', 'aib/AIB-2025-residual-mix-results-25052026.xlsx',
   'eea/EEA-ghg-intensity-electricity-generation-country-level.csv',
+  'eea/EEA-ghg-intensity-electricity-generation-country-level-2024.csv',
   'ipcc/V2_2_Ch2_Stationary_Combustion.pdf', 'ipcc/V2_3_Ch3_Mobile_Combustion.pdf',
   'eu/CELEX_02018R2066-20250527_EN_TXT.pdf', 'jrc/JRC119036_01.pdf',
 ]
@@ -170,11 +171,12 @@ export const SOURCE_FILES: readonly string[] = [
 // None of the full sets prints a publication date (each prints only "Next publication date", Version and Year), so
 // first publication is the GOV.UK page's first_published_at, as recorded in factor-year-selection.md section 4.1 (D1).
 const GOVUK = (y: number) => `https://www.gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors-${y}`
-const DESNZ_EDITIONS: { year: number; published: string; corrections: Correction[]; sourceFile?: string }[] = [
+const DESNZ_EDITIONS: { year: number; published: string; corrections: Correction[]; sourceFile?: string; heldCorrection?: string }[] = [
   { year: 2022, published: '2022-06-22', corrections: [{ date: '2022-09-20', source: `${GOVUK(2022)} (change history)`, note: 'Flat file heading corrected.', affectsHeldValues: false }] },
   { year: 2023, published: '2023-06-07', sourceFile: 'defra/ghg-conversion-factors-2023-full-file-update.xlsx',
     corrections: [{ date: '2023-06-28', source: `${GOVUK(2023)} (change history); the file prints Introduction B6 "Version: 1.1"`, note: 'A small number of factors updated (Passenger vehicles X45: unknown and plug-in hybrid factors converted to AR5).' }] },
-  { year: 2024, published: '2024-07-08', sourceFile: 'defra/ghg-conversion-factors-2024-full_set__for_advanced_users__v1_1.xlsx',
+  // T3d: the held 2024 values are read from the v1.1 file, so they reflect the 30 Oct 2024 correction.
+  { year: 2024, published: '2024-07-08', sourceFile: 'defra/ghg-conversion-factors-2024-full_set__for_advanced_users__v1_1.xlsx', heldCorrection: '2024-10-30',
     corrections: [{ date: '2024-10-30', source: `${GOVUK(2024)} (change history); the file prints Introduction B6 "Version: 1.1"`, note: 'Rounding error that reduced some diesel factors to zero corrected.' }] },
   { year: 2025, published: '2025-06-10', corrections: [], sourceFile: 'defra/ghg-conversion-factors-2025-full-set.xlsx' },
   { year: 2026, published: '2026-06-11', sourceFile: 'defra/ghg-conversion-factors-2026-full-set.xlsx',
@@ -187,6 +189,7 @@ const desnz = (dataset: DatasetId, heldYears: number[]): FactorEditionEntry[] =>
   dataset, label: `DEFRA ${e.year}`, class: 'a', editionYear: e.year,
   published: { date: e.published, source: `${GOVUK(e.year)}, first_published_at (factor-year-selection.md s 4.1)` },
   corrections: e.corrections, held: heldYears.includes(e.year),
+  ...(heldYears.includes(e.year) && e.heldCorrection ? { heldCorrection: e.heldCorrection } : {}),
   ...(e.sourceFile ? { sourceFile: e.sourceFile } : {}),
 }))
 
@@ -201,7 +204,7 @@ const epa = (dataset: DatasetId, heldYears: number[], heldNote?: string, labelSu
   dataset, label: `US EPA ${e.year}${labelSuffix}`, class: 'a', editionYear: e.year,
   published: { date: e.date, source: e.quote }, corrections: [], held: heldYears.includes(e.year),
   sourceFile: `epa/ghg-emission-factors-hub-${e.year}.xlsx`,
-  ...(e.note || (heldNote && heldYears.includes(e.year)) ? { note: [e.note, heldYears.includes(e.year) ? heldNote : undefined].filter(Boolean).join(' ') } : {}),
+  ...(e.note || (heldNote && e.year === 2025) ? { note: [e.note, e.year === 2025 ? heldNote : undefined].filter(Boolean).join(' ') } : {}),
 }))
 
 // ── NGA: each edition prints only a month ("Canberra, August"); activity year 1 July N to 30 June N+1 (8.2) ───────
@@ -256,27 +259,31 @@ const ECCC_V = {
 const CLASS_B_NOT_SELECTED = 'Never selected until a publication date is recorded.'
 
 export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
-  // DESNZ (class (a), DESNZ rule). Held: grid 2025 and 2026; everything else 2026 (EF_UK, STEAM_EDITION, FI9, Scope 3).
-  ...desnz('desnz_grid', [2025, 2026]),
-  ...desnz('desnz_combustion', [2026]),
-  ...desnz('desnz_steam', [2026]),
-  ...desnz('desnz_mobile', [2026]),
-  ...desnz('desnz_scope3_energy', [2026]),
+  // DESNZ (class (a), DESNZ rule). Held: 2024 to 2026 for grid, combustion, steam, mobile and Scope 3 energy (T3d: the
+  // 2024 and 2025 values are in lib/ghg/factors/desnz-2024.ts and -2025.ts, mobile/defra2024.ts and -2025.ts, and
+  // defraEnergy2024.json and -2025.json). Travel and waste stay at 2026 until T3e.
+  ...desnz('desnz_grid', [2024, 2025, 2026]),
+  ...desnz('desnz_combustion', [2024, 2025, 2026]),
+  ...desnz('desnz_steam', [2024, 2025, 2026]),
+  ...desnz('desnz_mobile', [2024, 2025, 2026]),
+  ...desnz('desnz_scope3_energy', [2024, 2025, 2026]),
   ...desnz('desnz_travel', [2026]),
   ...desnz('desnz_waste', [2026]),
-  // US EPA Hub (class (a), majority). Held 2025 for all three.
-  ...epa('epa_hub_combustion', [2025], 'Held values were read from the 2025 workbook. The engine labelled them "US EPA 2024" until T3c, which reads this registry and labels them US EPA 2025.'),
-  ...epa('epa_hub_steam', [2025], undefined, ' Table 7'),   // labelled as the engine has always named the steam table
-  ...epa('epa_hub_mobile', [2025]),
-  // NGA (class (a), activity years). Held 2025.
-  ...nga('nga_grid', [2025]),
-  ...nga('nga_residual', [2025]),
-  ...nga('nga_combustion', [2025]),
-  ...nga('nga_mobile', [2025]),
-  ...nga('nga_scope3', [2025]),
-  // MfE (class (a), majority). Held 2026 v2.
-  ...mfe('mfe_combustion', [2026]),
-  ...mfe('mfe_mobile', [2026]),
+  // US EPA Hub (class (a), majority). Held 2024 (T3d: lib/ghg/factors/epa-2024.ts, mobile/epa2024.ts) and 2025.
+  ...epa('epa_hub_combustion', [2024, 2025], 'Held values were read from the 2025 workbook. The engine labelled them "US EPA 2024" until T3c, which reads this registry and labels them US EPA 2025.'),
+  ...epa('epa_hub_steam', [2024, 2025], undefined, ' Table 7'),   // labelled as the engine has always named the steam table
+  ...epa('epa_hub_mobile', [2024, 2025]),
+  // NGA (class (a), activity years). Held 2024 (T3d: lib/ghg/factors/nga-2024.ts, mobile/nga2024.ts, ngaScope3_2025.ts '2024')
+  // and 2025.
+  ...nga('nga_grid', [2024, 2025]),
+  ...nga('nga_residual', [2024, 2025]),
+  ...nga('nga_combustion', [2024, 2025]),
+  ...nga('nga_mobile', [2024, 2025]),
+  ...nga('nga_scope3', [2024, 2025]),
+  // MfE (class (a), majority). Held 2024 and 2025 v3 (T3d: lib/ghg/factors/mfe-2024.ts and -2025.ts, mobile/mfe2024.ts and
+  // -2025.ts) and 2026 v2.
+  ...mfe('mfe_combustion', [2024, 2025, 2026]),
+  ...mfe('mfe_mobile', [2024, 2025, 2026]),
   // ECCC combustion (class (a), majority on applicability year). v3.0 values are held; they are identical across the
   // 2023/24, 2025 and 2026 sets (engine.ts EF_CA header). v4.0 adds 2027.
   ...[2023, 2024, 2025, 2026].map((y): FactorEditionEntry => ({
@@ -319,34 +326,41 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
       source: 'aib/AIB-2024-residual-mix-final-results-v1.1-11082025.pdf p1 "Version 1.1, 2025-08-11" (Version 1.0 date not printed)' },
     corrections: [{ date: '2025-08-11', source: 'aib/AIB-2024-residual-mix-final-results-v1.1-11082025.pdf p1 "Version 1.1, 2025-08-11"', note: 'Small errors in Tables 6 and 7 and Figure 16 corrected.' }],
     held: true, heldCorrection: 'unknown', sourceFile: 'aib/AIB-2024-residual-mix-results-30052025.xlsx',
-    note: 'EF_SOURCES.residual_eu records "publ. 2025-05-30" and the xlsx file name reads 30052025; neither is printed in the document. Which version the held values reflect is not recorded.' },
+    note: 'EF_SOURCES.residual_eu records "publ. 2025-05-30" and the xlsx file name reads 30052025; neither is printed in the document. Which version the held values reflect is not recorded. T3d: the Netherlands is held as null ("NA" in Residual Mixes!Q27 and Table 2, p. 8; full disclosure, p. 1), not the CO2 sheet\'s 382.47 (lib/ghg/factors/aib-2024.ts).' },
   { dataset: 'aib', label: 'AIB 2025', class: 'b', dataYear: 2025,
     published: { date: '2026-05-26', source: 'aib/AIB-2025-residual-mix-final-results-26052026.pdf p1 "Version 1.0, 2026-05-26"' },
-    corrections: [], held: false, sourceFile: 'aib/AIB-2025-residual-mix-results-25052026.xlsx' },
+    corrections: [], held: true, sourceFile: 'aib/AIB-2025-residual-mix-results-25052026.xlsx',
+    note: 'T3d: lib/ghg/factors/aib-2025.ts, Residual Mixes column Q. Italy: the CO2 sheet prints 427.78 and Table 2 420.2; Table 2 footnote 6 says its values are correct, so 420.2 is held. Austria and the Netherlands print "NA" (full disclosure): held as null.' },
 
   // EEA (class (b)). The CSV prints no publication date; its latest data year is 2023.
   { dataset: 'eea_grid', label: 'EEA 2023', class: 'b', dataYear: 2023,
     published: { date: '2024-10-25', source: `${EEA_GRID_INTENSITY_URL} ("Published" 25 Oct 2024)` },
     corrections: [], held: true, sourceFile: 'eea/EEA-ghg-intensity-electricity-generation-country-level.csv',
     note: 'The indicator page also shows "Modified" 27 Jun 2025, without saying what changed; it is not recorded as a correction. The CSV prints no date; its temporal coverage reads "1990, 2000, 2010, 2023".' },
+  // T3d: data year 2024, from the export of the chart page (lib/ghg/factors/eea-2024.ts). The comma-separated block only.
+  { dataset: 'eea_grid', label: 'EEA 2024', class: 'b', dataYear: 2024,
+    published: { date: '2025-11-06', source: `${EEA_GRID_INTENSITY_2024_URL} ("Temporal coverage 1990-2024", "Published 06 Nov 2025")` },
+    corrections: [{ date: '2026-07-10', source: `${EEA_GRID_INTENSITY_2024_URL} ("Modified 10 Jul 2026")`, note: 'Values revised (Lisa, 8 Oct 2026: the correction affects values).' }],
+    held: true, heldCorrection: '2026-07-10', sourceFile: 'eea/EEA-ghg-intensity-electricity-generation-country-level-2024.csv',
+    note: 'The held values are the corrected ones: the comma-separated block of the CSV export (35 values, 1990 to 2024, then the country); the semicolon-separated block, an earlier version with truncated rows, is ignored. Checked by Lisa against the live EEA chart on 8 Oct 2026: Romania 188, France 36 and Germany 291 for 2024 match. The "#N/A" row is EU-27 and is not loaded; its 1990, 2023 and 2024 values (501, 206, 183) reproduce the page\'s "63% less ... than in 1990 and 11% less than in 2023".' },
 
   // ECCC grid (class (b), DATA YEAR). Each table is dated by the version that first carried it (revision history).
   { dataset: 'eccc_grid', label: 'ECCC Table 5.1 (NIR 1990-2021)', class: 'b', dataYear: 2021,
     published: { ...ECCC_V['1.1'] }, corrections: [], held: true, sourceFile: 'eccc/En84-294-2025-eng.pdf',
-    note: 'v4.0 Table 5.1, fn36 "NIR 1990-2021"; ECCC: "must be used for" calendar years 2023 and 2024. Held as engine key 2024, transcribed from v3.0 (values unchanged in v4.0).' },
+    note: 'v4.0 Table 5.1, fn36 "NIR 1990-2021"; ECCC: "must be used for" calendar years 2023 and 2024. Held under its data year, GRID_EF key 2021 (re-keyed in T3c; values unchanged in v4.0).' },
   { dataset: 'eccc_grid', label: 'ECCC Table 5.2 (NIR 1990-2022)', class: 'b', dataYear: 2022,
     published: { ...ECCC_V['2.0'] }, corrections: [], held: true, sourceFile: 'eccc/En84-294-2025-eng.pdf',
-    note: 'v4.0 Table 5.2, fn38 "NIR 1990-2022"; ECCC: calendar year 2025. Held as engine key 2025, from v3.0.' },
+    note: 'v4.0 Table 5.2, fn38 "NIR 1990-2022"; ECCC: calendar year 2025. Held under its data year, GRID_EF key 2022 (re-keyed in T3c; values unchanged in v4.0).' },
   { dataset: 'eccc_grid', label: 'ECCC Table 5.3 (NIR 1990-2023)', class: 'b', dataYear: 2023,
     published: { ...ECCC_V['3.0'] }, corrections: [], held: true, sourceFile: 'eccc/En84-294-2025-eng.pdf',
-    note: 'v4.0 Table 5.3, fn40 "NIR 1990-2023"; ECCC: calendar year 2026. Held as engine key 2026, from v3.0.' },
+    note: 'v4.0 Table 5.3, fn40 "NIR 1990-2023"; ECCC: calendar year 2026. Held under its data year, GRID_EF key 2023 (re-keyed in T3c; values unchanged in v4.0).' },
   { dataset: 'eccc_grid', label: 'ECCC Table 5.4 (NIR 1990-2024)', class: 'b', dataYear: 2024,
-    published: { ...ECCC_V['4.0'] }, corrections: [], held: false, sourceFile: 'eccc/En84-294-2026-eng.pdf',
-    note: 'v4.0 Table 5.4, fn42 "NIR 1990-2024, Part 3, Tables A7-2 to A7-14"; ECCC: calendar year 2027. Table 5.4 omits the 5.1 to 5.3 footnote that PEI takes New Brunswick\'s value (PEI 265, NB 375).' },
+    published: { ...ECCC_V['4.0'] }, corrections: [], held: true, sourceFile: 'eccc/En84-294-2026-eng.pdf',
+    note: 'v4.0 Table 5.4, fn42 "NIR 1990-2024, Part 3, Tables A7-2 to A7-14"; ECCC: calendar year 2027. Table 5.4 omits the 5.1 to 5.3 footnote that PEI takes New Brunswick\'s value (PEI 265, NB 375). T3d: held under data year 2024, lib/ghg/factors/eccc-2026.ts.' },
 
   // MfE grid and T&D (class (b), series row year), from the 2026 v2 workbook.
   mfeRow('mfe_grid', 2023, true), mfeRow('mfe_grid', 2024, true), mfeRow('mfe_grid', 2025, true),
-  mfeRow('mfe_td', 2023, false), mfeRow('mfe_td', 2024, false),
+  mfeRow('mfe_td', 2023, false), mfeRow('mfe_td', 2024, true),   // T3d: lib/ghg/factors/mfe-2026v2-td.ts
   mfeRow('mfe_td', 2025, true, 'MfE marks the 2025 T&D value as calculated from the latest observed T&D-to-purchased-electricity ratio, not observed (H1709:H1712).'),
 
   // ECCC NIR (class (b)): mobile (A6.1-15) and natural gas heat content (A4-2). The NIR prints only its year.
@@ -359,7 +373,7 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
     { dataset, label: 'ECCC NIR 2026 (1990-2024)', class: 'b', dataYear: 2024,
       published: { onOrBefore: { date: '2026-09-09', evidence: 'cited_by_publisher' },
         source: 'eccc/En84-294-2026-eng.pdf p iii, revision history "4.0 September 9, 2026 ... alignment with the National Inventory Report 1990-2024"; Table 5.4 fn42 "ECCC. (2026). NIR 1990-2024, Part 3, Tables A7-2 to A7-14". The NIR prints only its year.' },
-      corrections: [], held: false, sourceFile: 'eccc/NIR-1990-2024-2026-edition.pdf',
+      corrections: [], held: true, sourceFile: 'eccc/NIR-1990-2024-2026-edition.pdf',   // T3d: mobile/eccc2026.ts; factors/eccc-2026.ts
       note: dataset === 'eccc_mobile' ? 'Table A6.1-15, p 541.' : 'Table A4-2, p 521 (natural gas 38.52 TJ/GL).' },
   ]),
 

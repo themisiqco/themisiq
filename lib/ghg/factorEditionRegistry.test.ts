@@ -48,10 +48,11 @@ describe('the majority rule', () => {
 })
 
 describe('DESNZ (class (a), DESNZ rule)', () => {
-  it('March 2025 selects 2024 (published, not held: missing)', () => {
-    const r = sel('desnz_grid', 2025, 3)
-    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2024', rule: 'desnz_april_march', reason: 'not_held' }) })
-    if ('missing' in r) expect(r.missing.basis).toBe('DEFRA 2024 grid electricity factors are needed for the year ending 31 March 2025 and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
+  it('March 2025 selects 2024 (held since T3d); March 2024 selects 2023 (published, not held: missing)', () => {
+    expect(chosen(sel('desnz_grid', 2025, 3)).edition.label).toBe('DEFRA 2024')
+    const r = sel('desnz_grid', 2024, 3)
+    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2023', rule: 'desnz_april_march', reason: 'not_held' }) })
+    if ('missing' in r) expect(r.missing.basis).toBe('DEFRA 2023 grid electricity factors are needed for the year ending 31 March 2024 and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
   })
 
   it('June 2024 selects 2023, because the 2024 edition was first published on 8 July 2024', () => {
@@ -78,8 +79,8 @@ describe('DESNZ (class (a), DESNZ rule)', () => {
       ? { ...e, published: { source: 'x' } } : e)
     const r = sel('desnz_grid', 2025, 12, PREPARED, reg)
     expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2025', reason: 'no_date' }) })
-    // June 2025 now finds 2024 as the newest dated edition by 30 June 2025, not the undated 2025.
-    expect(label(sel('desnz_grid', 2025, 6, PREPARED, reg))).toBe('missing DEFRA 2024')
+    // June 2025 now finds 2024 as the newest dated edition by 30 June 2025, not the undated 2025 (held since T3d).
+    expect(chosen(sel('desnz_grid', 2025, 6, PREPARED, reg)).edition.label).toBe('DEFRA 2024')
   })
 
   it('values come from the latest correction to the file the values are held from (D2)', () => {
@@ -124,7 +125,7 @@ describe('class (b): data year, else newest published on or before the preparati
       'Whether the values held reflect the correction of 11 August 2025 is not recorded.')
     // An entry with no date at all is never selected: the match is skipped and the newest is taken instead.
     const reg = FACTOR_EDITION_REGISTRY.map(e => e.dataset === 'aib' && e.dataYear === 2024 ? { ...e, published: { source: 't' } } : e)
-    expect(label(selectEdition('aib', win(2025, 3), 2025, PREPARED, undefined, reg))).toBe('missing AIB 2025')
+    expect(label(selectEdition('aib', win(2025, 3), 2025, PREPARED, undefined, reg))).toBe('AIB 2025')   // held since T3d
   })
 
   it('R20: an on-or-before date selects like a published date, and the row says "on or before"', () => {
@@ -132,8 +133,10 @@ describe('class (b): data year, else newest published on or before the preparati
     const r = chosen(sel('eccc_mobile', 2025, 12, '2026-06-01'))
     expect(r.edition.label).toBe('ECCC NIR 2025 (1990-2023)')
     expect(r.basis).toBe('ECCC NIR 2025 (1990-2023) (published on or before 24 October 2025): the newest edition when this inventory was first prepared on 1 June 2026; no 2025 data year was published.')
-    // Prepared after v4.0 cites the 2026 NIR (on or before 9 September 2026), that edition is newest, and not held.
-    expect(sel('eccc_mobile', 2025, 12)).toEqual({ missing: expect.objectContaining({ edition: 'ECCC NIR 2026 (1990-2024)', reason: 'not_held' }) })
+    // Prepared after v4.0 cites the 2026 NIR (on or before 9 September 2026), that edition is newest, and held (T3d).
+    const after = chosen(sel('eccc_mobile', 2025, 12))
+    expect(after.edition.label).toBe('ECCC NIR 2026 (1990-2024)')
+    expect(after.basis).toMatch(/^ECCC NIR 2026 \(1990-2024\) \(published on or before 9 September 2026\): the newest edition/)
     // Green-e 2025 (2023 data): on or before 30 May 2026, the date ThemisIQ first held it.
     const g = chosen(sel('greene', 2025, 12))
     expect(g.basis).toMatch(/^Green-e 2025 \(2023 data\) \(published on or before 30 May 2026\): the newest edition/)
@@ -141,9 +144,13 @@ describe('class (b): data year, else newest published on or before the preparati
     expect(sel('greene', 2025, 12, '2026-05-01')).toEqual({ missing: expect.objectContaining({ reason: 'nothing_published' }) })
   })
 
-  it('EEA 2023: published 25 October 2024; a 2023 window matches it, later windows take it as the newest', () => {
+  it('EEA: 2023 matches 2023; 2024 matches 2024 (T3d, published 6 November 2025, corrected 10 July 2026); later windows take 2024', () => {
     expect(chosen(sel('eea_grid', 2023, 12)).basis).toBe('EEA 2023: data year 2023 matches reporting year 2023.')
-    expect(chosen(sel('eea_grid', 2025, 12)).basis).toBe('EEA 2023 (published 25 October 2024): the newest edition when this inventory was first prepared on 8 October 2026; no 2025 data year was published.')
+    const r24 = chosen(sel('eea_grid', 2024, 12))
+    expect([r24.edition.label, r24.correction?.date, r24.correctionHeld]).toEqual(['EEA 2024', '2026-07-10', true])
+    expect(chosen(sel('eea_grid', 2025, 12)).basis).toMatch(/^EEA 2024 \(published 6 November 2025, corrected on 10 July 2026\): the newest edition when this inventory was first prepared on 8 October 2026; no 2025 data year was published\./)
+    // Prepared before 6 November 2025, 2024 was not yet published: EEA 2023 is the newest.
+    expect(chosen(sel('eea_grid', 2025, 12, '2025-10-01')).edition.label).toBe('EEA 2023')
   })
 
   it('AIB: a March 2024 window selects data year 2023 (majority)', () => {
@@ -160,11 +167,10 @@ describe('class (b): data year, else newest published on or before the preparati
     expect(chosen(sel('egrid', 2023, 12)).basis).toMatch(/^eGRID2023: data year 2023 matches reporting year 2023\./)
   })
 
-  it('ECCC grid: reporting year 2024 matches data year 2024 (Table 5.4); 2025 and 2026 take the newest, data year 2024', () => {
+  it('ECCC grid: reporting year 2024 matches data year 2024 (Table 5.4, held since T3d); 2025 and 2026 take the newest, data year 2024', () => {
     for (const y of [2024, 2025, 2026]) {
-      const r = sel('eccc_grid', y, 12)
-      expect(r, String(y)).toEqual({ missing: expect.objectContaining({ edition: 'ECCC Table 5.4 (NIR 1990-2024)', reason: 'not_held' }) })
-      if ('missing' in r) expect(r.missing.rule, String(y)).toBe(y === 2024 ? 'data_year_match' : 'data_year_newest')
+      const r = chosen(sel('eccc_grid', y, 12))
+      expect([r.edition.label, r.rule], String(y)).toEqual(['ECCC Table 5.4 (NIR 1990-2024)', y === 2024 ? 'data_year_match' : 'data_year_newest'])
     }
     // Prepared before v4.0 (9 September 2026), 2025 takes the newest then: data year 2023, held.
     expect(chosen(sel('eccc_grid', 2025, 12, '2026-06-01')).edition.label).toBe('ECCC Table 5.3 (NIR 1990-2023)')
@@ -198,8 +204,8 @@ describe('R19: an edition not yet published', () => {
     expect(r.basis).toBe('US EPA 2025 factors: 2025 contains 275 of the 365 days in the year ending 31 March 2026.')
   })
 
-  it('published but not held is missing, not provisional (DESNZ 2024 for March 2025, only 2026 held)', () => {
-    expect(sel('desnz_combustion', 2025, 3)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2024', reason: 'not_held' }) })
+  it('published but not held is missing, not provisional (DESNZ 2023 for March 2024; 2024 to 2026 held)', () => {
+    expect(sel('desnz_combustion', 2024, 3)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2023', reason: 'not_held' }) })
     // An older year the registry does not list is published, not awaited: missing.
     expect(sel('desnz_combustion', 2021, 12)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2021', reason: 'not_held' }) })
   })

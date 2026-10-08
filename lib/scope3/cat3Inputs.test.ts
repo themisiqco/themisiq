@@ -139,13 +139,14 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     expect(elec).toHaveLength(1)                                   // location-based only
     expect(elec[0].scope2_method).toBe('location-based')
     expect(elec[0].activity).toBe(250_000)                         // the total, renewable included
-    expect(elec[0].nz_td_result_tco2e).toBeCloseTo(250_000 * 0.00596 / 1000, 12)
+    // T3d: the 2025 T&D row as MfE prints it, 0.00595616 (held rounded as 0.00596 until T3d).
+    expect(elec[0].nz_td_result_tco2e).toBeCloseTo(250_000 * 0.00595616 / 1000, 12)
     expect(r.skipped).toContainEqual({ code: 'market_based_row_not_used', location: 'Auckland' })
     // Priced: 3c is the engine's figure, the two WTT lines are DEFRA with a stand-in flag.
     const priced = priceCat3(r.inputs!, CAT3_EDS)
     const td = priced.lines.find(l => l.line === 'electricity_td_loss')!
     expect(td.factor).toBeNull()
-    expect(td.kg_co2e).toBeCloseTo(250_000 * 0.00596, 9)
+    expect(td.kg_co2e).toBeCloseTo(250_000 * 0.00595616, 9)
     // An NZ location that never opted in has no engine figure, so the 3c line withholds and says why.
     const dunedin = answered({ name: 'Dunedin', country: 'NZ', electricity_kwh: 1000, grid_region: 'NZ' }, ['electricity'])
     const off = cat3InputsFrom(workingsOf([dunedin]), [dunedin])

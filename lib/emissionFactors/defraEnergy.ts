@@ -15,6 +15,8 @@
 // line discloses because the inventory it derives from may be on another basis.
 
 import raw from './defraEnergy2026.json'
+import raw2025 from './defraEnergy2025.json'
+import raw2024 from './defraEnergy2024.json'
 
 /**
  * The CO2, CH4 and N2O split, where DEFRA publishes one. null where the sheet publishes only CO2e.
@@ -79,7 +81,27 @@ interface EnergyArtefact {
 
 const artefact = raw as unknown as EnergyArtefact
 
-export const DEFRA_ENERGY_META = artefact.metadata as {
+/**
+ * T3d (R18): every DEFRA/DESNZ edition held, by edition year. Category 3 prices on the one the reporting window selects
+ * (the DESNZ rule, through the engine's editionFor); each artefact comes from scripts/generate-defra-energy.py run on
+ * that edition's full set, cell by cell, so the 2024 and 2025 records cite their own workbooks.
+ */
+export const DEFRA_ENERGY_BY_EDITION: Readonly<Record<number, EnergyArtefact>> = {
+  2024: raw2024 as unknown as EnergyArtefact,
+  2025: raw2025 as unknown as EnergyArtefact,
+  2026: artefact,
+}
+/** The edition years held, oldest first. */
+export const DEFRA_ENERGY_YEARS: readonly number[] = Object.keys(DEFRA_ENERGY_BY_EDITION).map(Number).sort((a, b) => a - b)
+
+/** The artefact for an edition year; throws for one not held (the caller has already selected a held edition). */
+function artefactFor(year: number): EnergyArtefact {
+  const a = DEFRA_ENERGY_BY_EDITION[year]
+  if (!a) throw new Error(`defraEnergy: DEFRA ${year} upstream energy factors are not held`)
+  return a
+}
+
+export type DefraEnergyMeta = {
   source: string
   title_as_published: string
   edition: string
@@ -114,6 +136,10 @@ export const DEFRA_ENERGY_META = artefact.metadata as {
   generated_by: string
   energy_fingerprint_sha256: string
 }
+/** The newest edition's metadata: the AR5 basis, licence and guidance every held edition shares. */
+export const DEFRA_ENERGY_META = artefact.metadata as DefraEnergyMeta
+/** An edition's own metadata (its year, version, file and fingerprint). */
+export const defraEnergyMetaFor = (year: number): DefraEnergyMeta => artefactFor(year).metadata as DefraEnergyMeta
 
 export const DEFRA_ENERGY_FUELS: readonly EnergyFuelFactor[] = artefact.fuels
 export const DEFRA_ENERGY_ELECTRICITY: readonly EnergyLineFactor[] = artefact.electricity
@@ -131,13 +157,14 @@ export const DEFRA_ENERGY_RECORDS: readonly (EnergyFuelFactor | EnergyLineFactor
  * ⚠️ null IS AN ABSENCE, NEVER A ZERO. A caller that cannot find its factor must say so and withhold
  * the figure, the way the GHG engine refuses a fuel whose unit no table publishes.
  */
-export function energyFactor(key: string): EnergyFuelFactor | EnergyLineFactor | null {
-  const hit = [...artefact.fuels, ...artefact.electricity, ...artefact.heat_and_steam]
+export function energyFactor(key: string, year = 2026): EnergyFuelFactor | EnergyLineFactor | null {
+  const a = artefactFor(year)
+  const hit = [...a.fuels, ...a.electricity, ...a.heat_and_steam]
     .find(r => r.key === key)
   return hit ?? null
 }
 
-/** A published conversion by its key, or null. Same rule: null is an absence. */
-export function energyConversion(key: string): EnergyConversion | null {
-  return artefact.conversions.find(c => c.key === key) ?? null
+/** A published conversion by its key, in an edition's own Conversions sheet, or null. Same rule: null is an absence. */
+export function energyConversion(key: string, year = 2026): EnergyConversion | null {
+  return artefactFor(year).conversions.find(c => c.key === key) ?? null
 }

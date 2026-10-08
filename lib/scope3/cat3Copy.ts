@@ -16,7 +16,7 @@
 // lib/scope3/commutingCopy.ts words its rows, because a customer reading two categories should not
 // meet two voices.
 
-import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
+import { DEFRA_ENERGY_META, DEFRA_ENERGY_YEARS, defraEnergyMetaFor } from '../emissionFactors/defraEnergy'
 import { scope3MethodDescription } from './categoryMethods'
 import type {
   Cat3Flag, Cat3LineKind, Cat3PricedLine, Cat3Reason, Cat3Result, Cat3Stream, Cat3Unpriced, Cat3Withheld,
@@ -73,10 +73,19 @@ const nFac = (x: number) => String(x)
 
 // ── THE SENTENCES THAT DO NOT DEPEND ON A RECORD ─────────────────────────────────────────────────
 
-export const CAT3_SOURCE_SENTENCE =
-  `Priced from ${m.source} (${m.factor_set.toLowerCase()} v${m.file_version}, factor edition ${m.edition}): ` +
-  `the ${m.sheets.filter(s => s !== 'Conversions').join(', ')} sheets, with unit conversions from its ` +
-  `Conversions sheet.`
+/** T3d: the DEFRA edition a result was priced on (its meta.edition, "DEFRA 2024"), or the newest held one. */
+function editionMeta(r?: Pick<Cat3Result, 'meta'> | null) {
+  const y = r ? Number(r.meta.edition.slice(-4)) : NaN
+  return DEFRA_ENERGY_YEARS.includes(y) ? defraEnergyMetaFor(y) : m
+}
+/** The source sentence, naming the DEFRA edition the lines were priced on (T3d: the window's, not always the newest). */
+export function cat3SourceSentence(r?: Pick<Cat3Result, 'meta'> | null): string {
+  const e = editionMeta(r)
+  return `Priced from ${e.source} (${e.factor_set.toLowerCase()} v${e.file_version}, factor edition ${e.edition}): ` +
+    `the ${e.sheets.filter(s => s !== 'Conversions').join(', ')} sheets, with unit conversions from its ` +
+    `Conversions sheet.`
+}
+export const CAT3_SOURCE_SENTENCE = cat3SourceSentence()
 
 export const CAT3_DERIVED_SENTENCE =
   'Nothing in this category is entered here. Every figure is the fuel, electricity and purchased heat or ' +
@@ -168,6 +177,8 @@ export const CAT3_NGA_SENTENCE =
 
 /** A line priced from NGA rather than the DEFRA artefact. */
 const isNga = (l: Cat3PricedLine): boolean => l.factor?.sheet.startsWith('NGA ') === true
+/** T3d: the NGA edition the Australian lines were priced on, read from their factor ("NGA 2024 Table 1"). */
+const ngaYear = (r: Cat3Result): string => r.lines.find(isNga)?.factor?.sheet.split(' ')[1] ?? ''
 
 /** The licence the factors are published under, and the acknowledgement it requires. */
 export const CAT3_ATTRIBUTION = m.attribution_required
@@ -447,8 +458,8 @@ export function cat3WorkingsSummary(r: Cat3Result, skipped: readonly Cat3Skipped
     `; ${excluded.length} ${excluded.length === 1 ? 'location' : 'locations'} excluded (${excluded.join(', ')})`
   return (
     `${r.lines.length} ${r.lines.length === 1 ? 'line' : 'lines'} at ${locations} ` +
-    `${locations === 1 ? 'location' : 'locations'}, priced from the DEFRA/DESNZ ${m.year} upstream energy ` +
-    `factors${r.lines.some(isNga) ? ' and, for Australian gas and electricity, the NGA 2025 Scope 3 factors,' : ''} ` +
+    `${locations === 1 ? 'location' : 'locations'}, priced from the DEFRA/DESNZ ${editionMeta(r).year} upstream energy ` +
+    `factors${r.lines.some(isNga) ? ` and, for Australian gas and electricity, the NGA ${ngaYear(r)} Scope 3 factors,` : ''} ` +
     `on the bound GHG inventory${note}`
   )
 }
@@ -471,7 +482,7 @@ const isEpaPriced = (l: Cat3PricedLine): boolean =>
 
 export function cat3MethodSentences(r: Cat3Result, gwpSentence: string): string[] {
   const out: string[] = [
-    CAT3_SOURCE_SENTENCE,
+    cat3SourceSentence(r),
     CAT3_ATTRIBUTION,
     CAT3_LICENCE_LINE,
     CAT3_DERIVED_SENTENCE,
@@ -823,13 +834,13 @@ export function cat3Basis(
   if (!r || noFigure) return { basis: 'Not priced', detail: noFigure ?? 'It was not priced, and no reason was recorded.' }
   if (r.status === 'zero') {
     return {
-      basis: `${m.source}, upstream energy factors, on the bound GHG inventory`,
+      basis: `${editionMeta(r).source}, upstream energy factors, on the bound GHG inventory`,
       detail: `${cat3ZeroText()}${notPricedSummary(r, inputs)}`,
     }
   }
   const locations = new Set(r.lines.map(l => l.location)).size
   return {
-    basis: `${m.source}, upstream energy factors per line${r.lines.some(isNga) ? '; DCCEEW NGA 2025 Scope 3 for Australian gas and electricity' : ''}, on the bound GHG inventory`,
+    basis: `${editionMeta(r).source}, upstream energy factors per line${r.lines.some(isNga) ? `; DCCEEW NGA ${ngaYear(r)} Scope 3 for Australian gas and electricity` : ''}, on the bound GHG inventory`,
     detail:
       `${scope3MethodDescription('fuel_and_energy_upstream')} ${r.lines.length} ` +
       `${r.lines.length === 1 ? 'line' : 'lines'} priced at ${locations} ` +

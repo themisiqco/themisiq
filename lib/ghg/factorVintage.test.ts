@@ -141,10 +141,10 @@ describe('G. combustion and steam rows carry their factor edition', () => {
 
   it('G6 T3c: a combustion edition is selected by the reporting window, like the grid row beside it; never substituted', () => {
     // Until T3c the combustion tables had no year dimension, and DEFRA 2026 priced every UK year. Now the edition the
-    // window needs is selected: 2026 prices on DEFRA 2026, and 2023 to 2025 need editions not held yet (T3d), so the
-    // line is unpriced, never priced on 2026.
-    expect(priced(COMBUSTION_SITES[2][1], 'natural_gas', 2026).factor_vintage, 'UK 2026').toBe('DEFRA 2026')
-    for (const year of [2023, 2024, 2025]) {
+    // window needs is selected: each of 2024 to 2026 prices on its own DEFRA edition (T3d), and 2023 needs an edition not
+    // held, so the line is unpriced, never priced on another year.
+    for (const year of [2024, 2025, 2026]) expect(priced(COMBUSTION_SITES[2][1], 'natural_gas', year).factor_vintage, `UK ${year}`).toBe(`DEFRA ${year}`)
+    for (const year of [2023]) {
       const r = rowsFor(COMBUSTION_SITES[2][1], year).find(x => x.stream === 'natural_gas')
       expect([r.declaration, r.result_tco2e, r.unpriced.reason], `UK ${year}`).toEqual(['unpriced', null, 'edition_missing'])
       expect(r.note, `UK ${year}`).toContain(`DEFRA ${year} fuel combustion factors are needed for reporting year ${year}`)

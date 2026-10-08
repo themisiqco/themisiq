@@ -39,6 +39,7 @@ an empty one aborts, naming the sheet and cell.
 Standard library only.
 """
 
+import argparse
 import hashlib
 import json
 import pathlib
@@ -50,13 +51,22 @@ from datetime import date
 from decimal import Decimal
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-INPUT = ROOT / "data" / "reference" / "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx"
-OUT = ROOT / "lib" / "emissionFactors" / "defraEnergy2026.json"
+
+# T3d: the edition is an argument, so the 2024 and 2025 artefacts come from the same reader as 2026.
+#     python3 scripts/generate-defra-energy.py --year 2025 --input ~/themisiq-sources/defra/ghg-conversion-factors-2025-full-set.xlsx
+# With no arguments it reads the committed 2026 workbook and writes defraEnergy2026.json, as before.
+_ARGS = argparse.ArgumentParser(description="DEFRA/DESNZ upstream energy factors to JSON")
+_ARGS.add_argument("--year", type=int, default=2026)
+_ARGS.add_argument("--input", type=pathlib.Path, default=None)
+_PARSED = _ARGS.parse_args()
+YEAR = _PARSED.year
+INPUT = (_PARSED.input.expanduser() if _PARSED.input
+         else ROOT / "data" / "reference" / "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx")
+OUT = ROOT / "lib" / "emissionFactors" / f"defraEnergy{YEAR}.json"
 
 PUBLISHERS = "DEFRA/DESNZ"
 TITLE = "GHG Conversion Factors for Company Reporting"
 TITLE_AS_PUBLISHED = "UK Government GHG Conversion Factors for Company Reporting"
-YEAR = 2026
 CITATION = f"UK {PUBLISHERS} ({YEAR}) {TITLE}"
 EDITION = f"DEFRA {YEAR}"
 
@@ -164,7 +174,8 @@ def check_frame(rows: dict, sheet: str) -> dict:
         die(f"{sheet!r} Year cell reads {year!r}; this generator is for {YEAR}")
     return {
         "scope": labelled_value(rows, sheet, "Scope:"),
-        "version": labelled_value(rows, sheet, "Version:"),
+        # The 2024 workbook stores "1.1" as a float cell (1.1000000000000001); the sheet displays 1.1.
+        "version": format(float(labelled_value(rows, sheet, "Version:")), "g"),
         "factor_set": labelled_value(rows, sheet, "Factor set:"),
         "year": year,
     }

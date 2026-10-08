@@ -121,12 +121,12 @@ describe('THE CASE THE COLUMN EXISTS FOR', () => {
     }
   })
 
-  it('F5 T3c: no year is substituted; a UK 2023 or 2024 inventory records no grid edition (DEFRA 2023 and 2024 are not held)', () => {
-    // GRID_EF.UK holds 2025 and 2026 only. Until T3c a 2023 or 2024 inventory resolved FORWARD to 2025 and recorded
-    // '2025'. Now the line is unpriced (edition_missing), priced nothing, and names no edition.
+  it('F5 T3c: no year is substituted; a UK 2023 inventory records no grid edition (DEFRA 2023 is not held)', () => {
+    // GRID_EF.UK holds 2024 to 2026 (T3d). Until T3c a 2023 inventory resolved FORWARD to the earliest key and recorded
+    // it. Now the line is unpriced (edition_missing), priced nothing, and names no edition.
     expect(() => getGridFactor('UK', testSel(2023))).toThrow(MissingEditionError)
     expect(buildFactorEditions([uk()], 2023).UK?.electricity).toBeUndefined()
-    expect(buildFactorEditions([uk()], 2024).UK?.electricity).toBeUndefined()
+    expect(buildFactorEditions([uk()], 2024).UK!.electricity!.edition).toBe('DEFRA 2024')
     expect(buildFactorEditions([uk()], 2025).UK!.electricity!.edition).toBe('DEFRA 2025')
   })
 })
@@ -143,8 +143,8 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
     expect(Object.keys(ed).sort()).toEqual(['CA', 'NZ', 'UK', 'US'])
     expect(ed.US!.electricity!.edition, 'every US row is eGRID2023').toBe('eGRID2023')
     // T3c: Canada's grid is class (b). Prepared after ECCC v4.0 (9 Sep 2026), the newest data year is 2024 (Table 5.4),
-    // not held until T3d, so the line is unpriced and records no edition.
-    expect(ed.CA!.electricity, 'ECCC Table 5.4 is not held yet').toBeUndefined()
+    // held since T3d, and recorded with its own citation.
+    expect(ed.CA!.electricity).toEqual({ edition: 'ECCC Table 5.4 (NIR 1990-2024)', source: EF_SOURCES.edition_eccc_v4 })
     expect(ed.NZ!.electricity!.edition, 'class (b): no 2026 row, so the newest published row').toBe('MfE 2026 v2 (2025 row)')
     expect(ed.UK!.electricity!.edition).toBe('DEFRA 2026')
     expect(ed.CA!.combustion!.edition).toBe('ECCC 2025 v3.0')
@@ -165,7 +165,8 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
 
     expect(Object.keys(ed)).toEqual(['EU'])
     expect(ed.EU!.combustion!.edition).toBe('IPCC 2006')
-    expect(ed.EU!.electricity!.edition, 'class (b): the newest EEA data year, 2023').toBe('EEA 2023')
+    expect(ed.EU!.electricity!.edition, 'class (b): the newest EEA data year, 2024 (T3d)').toBe('EEA 2024')
+    expect(ed.EU!.electricity!.source, 'cited to the 2024 edition, not the 2023 one').toBe(EF_SOURCES.edition_eea_2024)
     // Not vacuous: the two locations really are priced with different NUMBERS.
     expect(getGridFactor('EU_DE', testSel(2026)).ef).not.toBe(getGridFactor('EU_FR', testSel(2026)).ef)
   })

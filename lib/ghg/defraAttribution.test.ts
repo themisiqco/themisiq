@@ -44,7 +44,8 @@ describe('DEFRA/DESNZ licence attribution', () => {
     // EF_SOURCES.electricity is excluded because it is a six-publisher CATALOGUE that names DEFRA; it is
     // never a row's citation, and sourceAttributionsFor says not to pass it.
     const others = Object.entries(EF_SOURCES)
-      .filter(([k]) => !['combustion_uk', 'steam_uk', 'electricity_uk', 'electricity'].includes(k))
+      // T3d: edition_desnz_* are the older DEFRA editions' citations, attributed like combustion_uk.
+      .filter(([k]) => !['combustion_uk', 'steam_uk', 'electricity_uk', 'electricity'].includes(k) && !k.startsWith('edition_desnz_'))
       .map(([, v]) => v)
     expect(sourceAttributionsFor(others)).toEqual([])
     // NOT_PROVIDED is the workings rows' empty-value words since 27 Sep 2026; it names no publisher either.
