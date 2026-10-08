@@ -291,7 +291,8 @@ describe('the GHG page surfaces', () => {
     const live = PAGE.split("EPA 2024 (US)").length - 1
     expect(live, 'the old catalogue string is gone, comment included').toBe(0)
     expect(PAGE).toContain('This line was a fixed catalogue string naming the EPA (US)')
-    expect(PAGE).toContain("publishersForLocation(loc, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)")
+    // T3c diff 3: with the page's selection context (the frozen class (b) choices).
+    expect(PAGE).toContain("publishersForLocation(loc, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)")
     expect(PAGE).toContain('inventoryPublishers.join')
   })
 

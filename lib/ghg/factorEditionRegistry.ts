@@ -402,6 +402,14 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
 // from the registry; these records are the evidence for it: the publisher's page, checked on the date given, listed
 // nothing newer. Selection does not read them (no rule changes); the test holds every awaited edition to a record, so
 // "not yet published" is evidenced, not assumed. When an edition appears, register it above and delete its record here.
+// ── THE RULE, IN THE WORDS EVERY SURFACE PRINTS (T3c diff 3) ────────────────────────────────────────────────────────
+// The methodology page states these verbatim (a source test holds the page to them) and the assurance PDF's methods
+// table prints them, so the public statement of the rule and the one in a verifier's package cannot drift apart.
+/** Class (b): data year, else the newest when first prepared, frozen with its date (lib/ghg/factorSelection.ts). */
+export const FACTOR_YEAR_RULE_CLASS_B = 'For data published some years after the period it describes (eGRID, Green-e, AIB, EEA, the ECCC grid intensities and the New Zealand grid and transmission loss series), we use the edition whose data year is the reporting year where one exists, and otherwise the newest edition published when the inventory was first prepared. That choice is saved with the inventory, with the date it was made, and kept on every later save; it is made again only if the reporting year or its year end changes.'
+/** No substitution, and what happens instead (unpriced line, export blocked). */
+export const FACTOR_YEAR_NO_SUBSTITUTION = "We never substitute another year's factors: where the edition a year needs is published but not loaded, the line is not counted and the inventory cannot be exported until it is."
+
 export interface NotYetPublished { dataset: DatasetId[]; edition: string; checked: { date: string; source: string; found: string } }
 export const NOT_YET_PUBLISHED: readonly NotYetPublished[] = [
   { dataset: ['epa_hub_combustion', 'epa_hub_steam', 'epa_hub_mobile'], edition: 'US EPA 2026',

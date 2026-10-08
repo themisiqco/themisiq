@@ -9,7 +9,7 @@ import type { CountryRefusal } from '../../../lib/ghg/engine'
 import { yearLabel, periodWords } from '../../../lib/ghg/engine'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
-import { workingsActivityCell, workingsVintageCell, workingsScope2MethodCell, workingsResultCell,
+import { workingsActivityCell, workingsVintageCell, workingsEditionLines, workingsScope2MethodCell, workingsResultCell,
   workingsFactorSourceCell, COVERAGE_ROW_BASIS } from '../../../lib/ghg/workingsCells'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
@@ -57,6 +57,10 @@ interface WorkingRow {
   // The factor's own vintage, distinct from the inventory's reporting year. 'Electricity (ON, 2025)'
   // read like a reporting year and was in fact the year of the ECCC factor table applied.
   factor_vintage?: string
+  // T3c: the edition the row was priced with, the rule that chose it and why, its dates, and for class (b) the day it
+  // was selected. Worded by workingsEditionLines (lib/ghg/workingsCells.ts), as the assurance PDF words them.
+  factor_edition?: string; selection_rule?: string; selection_basis?: string
+  edition_published?: string; edition_corrected?: string; selected_on?: string; provisional?: boolean
   /** FI10: the variant of the table that priced the row (an MfE use class), shown in the Factor source cell. */
   factor_variant?: string
   // Refrigerants: what the figure counts. Recharge treated as emitted.
@@ -1178,7 +1182,16 @@ export default function VerifierPage() {
                         under a heading that said GWP, which told a verifier a Scope 2 method was a GWP
                         set; and the factor's year was inside the Source label where it read as the
                         reporting year. Both are structured fields on the row, so both get a column. */}
-                    <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{workingsVintageCell(w)}</td>
+                    <td style={{ padding: '8px 10px', color: '#555553' }}>
+                      <div style={{ whiteSpace: 'nowrap' }}>{workingsVintageCell(w)}</div>
+                      {/* T3c: the rule, basis and dates under the edition, wrapped, never truncated (a basis is a
+                          sentence a verifier checks against the publisher's page). */}
+                      {workingsEditionLines(w).length > 0 && (
+                        <div style={{ maxWidth: 260, whiteSpace: 'normal', overflowWrap: 'anywhere', marginTop: 3, fontSize: 10, lineHeight: 1.4, color: 'var(--color-ink-muted)' }}>
+                          {workingsEditionLines(w).map((line, i) => <div key={i} style={i === 0 && w.provisional ? { color: 'var(--color-state-warn)' } : undefined}>{line}</div>)}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{workingsScope2MethodCell(w)}</td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>
                       <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{w.gwp_basis}</div>

@@ -26,7 +26,8 @@ import {
   type YearDataStatus,
   type YearExclusion,
 } from "./series";
-import { findUnpriceableLocations, unpricedLines, deriveStoredLocations, selectionFor, type Location } from "./engine";
+import { findUnpriceableLocations, unpricedLines, deriveStoredLocations, selectionFor, type Location, type StoredFactorSelection } from "./engine";
+import { selectionContextFor } from "./factorSelection";
 import type { FactorEditions } from "./factorEditions";
 import { anyPublishedFactorApplied } from "./factorEditions";
 import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
@@ -97,7 +98,8 @@ export interface Completeness {
 // null total or a null company_id, and a dropped row is indistinguishable from an absent one. The
 // whole point of the comparability step is to tell "no prior year" apart from "a prior year we
 // cannot describe", so it fetches its one row itself and brings it here for the verdict.
-export function assessCompleteness(workings: unknown, locationsData: unknown, reportingYear: number, fiscalYearEndMonth: number | null = 12): Completeness {
+export function assessCompleteness(workings: unknown, locationsData: unknown, reportingYear: number, fiscalYearEndMonth: number | null = 12,
+  factorSelection: StoredFactorSelection | null = null): Completeness {
   // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
   if (Array.isArray(workings)) {
     // ⚠️ MATCHES ALL FOUR EXCLUSION MARKERS. Filtering on "unpriceable" alone would let a year
@@ -139,9 +141,11 @@ export function assessCompleteness(workings: unknown, locationsData: unknown, re
   try {
     // The row's own year (T7 revision): the check is "can this year be priced with today's tables", and
     // the tables are looked up by reporting year. Called without it, every year was checked as 2024.
-    const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear, fiscalYearEndMonth ?? 12);
-    // T3c: and its window, so a year is checked against the editions its own year end selects.
-    const sel = selectionFor(reportingYear, fiscalYearEndMonth ?? 12);
+    // T3c: and its window, so a year is checked against the editions its own year end selects; diff 3: with the
+    // class (b) choices the row froze when it was saved, so a year is checked on the editions that priced it.
+    const ctx = selectionContextFor({ reporting_year: reportingYear, fiscal_year_end_month: fiscalYearEndMonth, factor_selection: factorSelection });
+    const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear, fiscalYearEndMonth ?? 12, ctx);
+    const sel = selectionFor(reportingYear, fiscalYearEndMonth ?? 12, ctx);
     // FI1: a missing factor is one unpriced LINE, not an excluded location, so it is named as a line. A row
     // with no marker was saved before either was recorded, and totalled under an older rule (the whole
     // location left out), so whether its totals include those lines, or the rest of the location, cannot
@@ -208,6 +212,9 @@ interface RawRow {
   // written before 2026-08-13 predates the column and PostgREST is not the only thing that could
   // hand us an absent key.
   factor_editions: FactorEditions | null;
+  // T3c diff 3: the frozen class (b) choices, read so the completeness check prices on them. Nullable for the same
+  // reason as factor_editions.
+  factor_selection: StoredFactorSelection | null;
   // reverse embed: object when to-one detected, array otherwise, null when none
   //
   // ⚠️ THE COVERAGE COLUMNS ARE NULLABLE AND UNBACKFILLED. Every scope3_inventories row saved before
@@ -235,7 +242,7 @@ const SELECT =
   // Small (one object, a handful of short strings) and NOT derivable from anything else selected
   // here: workings carries factor_vintage per grid row but nothing for combustion editions, and only
   // for inventories saved since the provenance pass.
-  "factor_editions, " +
+  "factor_editions, factor_selection, " +
   "workings, locations_data, fiscal_year_end_month, coverage_resolutions, " +
   // The total ALONE cannot say whether it covers two categories or fifteen, and it is read as a Scope 3
   // baseline by the SBTi dashboard. The five coverage columns come with it, per inventory.
@@ -283,7 +290,7 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
         ? r.scope3_inventories[0]
         : r.scope3_inventories;
       // Derived first (T7): locations_data is saved raw, so a figure from bills would otherwise read as 0.
-      const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year, r.fiscal_year_end_month);
+      const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year, r.fiscal_year_end_month, r.factor_selection);
       mapped.push({
         ...completeness,
         inventory_id: r.id,

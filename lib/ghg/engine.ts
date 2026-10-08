@@ -1015,17 +1015,25 @@ function vintageOf(
 // edition the reporting WINDOW needs, prepared on a date. There is no nearest-year lookup anywhere: a required edition
 // that is not held throws MissingEditionError, and the caller leaves THAT LINE unpriced with an export-blocking issue
 // (edition_missing); an edition not yet published is priced on the newest published one, provisionally (R19).
-/** T3c: the frozen class (b) selections an inventory carries, by dataset (saved and read back in diff 3). */
+/** T3c: the frozen class (b) selections an inventory carries, by dataset, as selectEdition takes them. Read from the
+ *  saved column (StoredFactorSelection) by lib/ghg/factorSelection.ts, for the inventory's current window only. */
 export type FactorSelection = Partial<Record<DatasetId, FrozenSelection>>
-/** What a caller passes: when the inventory was prepared (default: now) and any frozen class (b) selections. */
-export interface SelectionContext { preparedOn?: Date; frozen?: FactorSelection }
+/** One entry of `ghg_inventories.factor_selection` (T3c diff 3): a class (b) edition chosen on `selected_on` for the
+ *  reporting window `window` ("yyyy-mm-dd/yyyy-mm-dd", ruling A of 8 Oct 2026). Only data_year_match and
+ *  data_year_newest selections are stored (ruling D); a provisional or class (a) selection is never frozen. */
+export interface StoredSelectionEntry { edition: string; data_year: number | null; rule: 'data_year_match' | 'data_year_newest'; selected_on: string; window: string }
+export type StoredFactorSelection = Partial<Record<DatasetId, StoredSelectionEntry>>
+/** What a caller passes: when the inventory was prepared (default: now), any frozen class (b) selections, and, for a
+ *  save, a map that records every edition the calculation used (lib/ghg/savePayload.ts writes the column from it). */
+export interface SelectionContext { preparedOn?: Date; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse> }
 /** The resolved context every selector takes: the reporting window, its year and the preparation date. */
-export interface Sel { year: number; win: { start: Date; end: Date }; preparedOn: string; frozen?: FactorSelection }
+export interface Sel { year: number; win: { start: Date; end: Date }; preparedOn: string; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse> }
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 /** The selection context for a reporting year and year end, prepared on `ctx.preparedOn` (today when not given). */
 export function selectionFor(year: number, fiscalYearEndMonth: number | null | undefined = 12, ctx: SelectionContext = {}): Sel {
   const w = periodFromYearAndEnd(year, fiscalYearEndMonth ?? 12)
-  return { year, win: { start: w.start, end: w.end }, preparedOn: isoDay(ctx.preparedOn ?? new Date()), ...(ctx.frozen ? { frozen: ctx.frozen } : {}) }
+  return { year, win: { start: w.start, end: w.end }, preparedOn: isoDay(ctx.preparedOn ?? new Date()), ...(ctx.frozen ? { frozen: ctx.frozen } : {}),
+    ...(ctx.record ? { record: ctx.record } : {}) }
 }
 /** The edition a line was priced with, and what its workings row says about it. `key` is the table key: the data year
  *  for class (b), the edition year for class (a), null for an exempt default. */
@@ -1064,6 +1072,8 @@ export function editionFor(dataset: DatasetId, sel: Sel): EditionUse {
     EDITION_MEMO.set(k, hit)
   }
   if (hit instanceof MissingEditionError) throw hit
+  // T3c diff 3: a save records what it used, so the class (b) choices can be frozen (lib/ghg/factorSelection.ts).
+  sel.record?.set(dataset, hit)
   return hit
 }
 /** The fields every factor row carries (T3c). factor_vintage is the edition label. */
@@ -1230,42 +1240,18 @@ for (const [k, v] of Object.entries(EEA_2023_REVISED)) GRID_EF[k][2023] = v.valu
 for (const [y, v] of Object.entries(MFE_GRID_2026V2)) GRID_EF.NZ[Number(y)] = v.value
 
 // New Zealand electricity transmission & distribution (T&D) losses — MfE 2026 (v2), kg CO2e/kWh.
-// This is a Scope 3 Category 3 factor, NOT Scope 2; year-keyed for nearest-year lookup like GRID_EF.
+// This is a Scope 3 Category 3 factor, NOT Scope 2; keyed by the MfE series data year, selected by editionFor('mfe_td').
 // Added as an optional, separately-labelled line only when a NZ location opts in (nz_td_losses).
 // T3d: the 2024 row (data!J1708) and the 2025 row as printed (data!J1712, 0.00595616; it was held rounded as 0.00596), both
 // from lib/ghg/factors/mfe-2026v2-td.ts.
 const NZ_TD_LOSS: Record<number, number> = { 2023: MFE_TD_2026V2[2023].value, 2024: MFE_TD_2026V2[2024].value, 2025: MFE_TD_2026V2[2025].value }
-// Nearest-year (≤ requested, else earliest) NZ T&D loss factor, kg CO2e/kWh. Scope 3 Cat 3.
+// The NZ T&D loss factor the window selects (class (b), MfE series data year), kg CO2e/kWh. Scope 3 Cat 3.
 // Shared by calcLocation and buildWorkings so the calc term and the workings row never diverge.
 //
-// ⚠️ RETURNS ITS OWN VINTAGE, BECAUSE THE CALLER CANNOT KNOW IT. This returned a bare number, and the
-// workings row stamped `factor_vintage: String(year)` — the INVENTORY year. NZ_TD_LOSS holds one key,
-// 2025, so every NZ inventory got the 2025 factor while the row claimed the factor was contemporaneous
-// with the reporting year: a 2026 inventory read "factor_vintage 2026" over a 2025 figure. That is not
-// a stale factor silently applied — it is a stale factor with a FALSE vintage printed beside it, which
-// is worse, because the column exists so a verifier does not have to take the year on trust.
-// The caller had no way to do better: a bare number carries no provenance, so `String(year)` was the
-// only year in scope at the call site. Returning the provenance with the factor is the fix.
-//
-// Shaped like getResidualFactor's { ef, vintage, note } for the same reason and in the same style:
-// same disclosure obligation, same nearest-year fallback, so the same contract.
-//
-// TWO NOTE WORDINGS, NOT ONE — and the second is the deviation from getResidualFactor, deliberately.
-// The residual helpers say "(latest vintage held)" whichever direction they resolved. That is right
-// when the factor is OLDER than the inventory (we reached back to the newest one we hold). It is wrong
-// when the factor is NEWER: `let ty = years[0]` means a 2023 or 2024 inventory — both selectable today
-// — resolves FORWARD to the 2025 factor, and a "latest" claim says the opposite of what happened.
-//   ONE VOCABULARY ACROSS ALL THREE HELPERS: "(latest vintage held)" / "(earliest vintage held)" are
-//   now the only two spellings getGridFactor, getResidualFactor and nzTdLoss emit. "vintage" is the
-//   right noun because both branches are about WHEN the factor applies, which is also what the
-//   factor_vintage column beside the note reports — one word, one meaning, in both places.
-//
-// ⚠️ THE FORWARD NOTE DESCRIBES OUR COVERAGE, NOT MfE'S. It first read "(no earlier factor published)",
-// which was FALSE: MfE publishes an annual T&D loss series back to 2010. The gap is in NZ_TD_LOSS,
-// which holds one year. A note blaming the publisher for our own single-key table would send a verifier
-// to look for a source document that does not exist, and would quietly excuse a table that should be
-// filled in. "(earliest vintage held)" claims only what can be checked from this file.
-// Same rule as the error-message one: state what was observed, never a cause you have not verified.
+// It returns its edition with the factor because the caller cannot know it. Before T3c this returned a bare number
+// from a nearest-year lookup, and the row printed the INVENTORY year as the factor's vintage over another year's
+// figure. T3c removed the lookup: the edition is the one selectEdition chooses, or the line is unpriced
+// (MissingEditionError), and editionCells prints that edition's label, rule and basis on the row.
 function nzTdLoss(sel: Sel): { ef: number; vintage: string; edition: EditionUse } {
   // T3c: the MfE T&D series row the window selects (class (b), data year). No nearest-year lookup.
   const u = editionFor('mfe_td', sel)
@@ -1374,24 +1360,10 @@ const RESIDUAL_AU: Record<number, number> = { 2023: NGA_2023.residual.value, 202
 function isResolvedGridRegion(region: string): boolean {
   return Object.prototype.hasOwnProperty.call(GRID_EF, region)
 }
-// RETURNS ITS OWN FALLBACK NOTE, in the shape getResidualFactor and nzTdLoss already use. usedYear was
-// stamped as factor_vintage from the start, so the year on the row was never wrong — but a bare year is
-// not a disclosure. Eighty of the 103 GRID_EF keys resolve to 2023 for a 2026 inventory, and the only
-// signal was a column reading "2023" beside a row headed 2026, which a reader has to notice and then
-// interpret. The note says it.
-//
-// PUBLISHER-FREE WORDING, deliberately: ef_source already carries the publisher (gridSource(loc) picks
-// eGRID / ECCC / DEFRA / EEA / DCCEEW / MfE per country), and repeating it here would let the two drift
-// into naming different sources on one row.
-//
-// BOTH DIRECTIONS, because both are reachable. `let best = years[0]` means a year below the earliest
-// key resolves FORWARD — Ontario at 2023 takes the 2024 factor, and 2023 is selectable in the wizard
-// today. "latest vintage held" would be the opposite of what happened there. Same reasoning, and the
-// same "held" (our coverage, not the publisher's), as the NZ T&D note.
-//
-// RESOLUTION SEMANTICS UNCHANGED. `years` was already sorted one line above `years[0]` — there was no
-// enumeration-order hazard to fix — and the forward fallback is left exactly as it was. This adds
-// disclosure only; no figure moves.
+// getGridFactor (below) returns its edition with the factor, as nzTdLoss and getResidualFactor do, so the row's
+// vintage, rule and basis come from the selection and never from the call site. Before T3c it resolved the nearest
+// held year (backward, or forward to the earliest key) and wrote a "(latest|earliest vintage held)" note to disclose
+// it; T3c removed that substitution, and with it the notes. A region whose required edition is not held is unpriced.
 /** T3d 2024: a GRID_EF region as a person reads it in a sentence ("the EU-27 average", "Ontario", "Germany"); never the
  *  key. Names from lib/ghg/gridRegionWords.ts, EU member states from the engine's country names. */
 export function gridRegionWords(region: string): string {
@@ -1425,16 +1397,8 @@ function getGridFactor(region: string, sel: Sel): { ef: number; usedRegion: stri
   }
   return { ef, usedRegion: region, edition: u }
 }
-// DIRECTION-AWARE FALLBACK NOTE for the residual helpers. `year !== y` fired one wording in both
-// directions, so a forward resolution claimed the LATEST vintage when it had reached for the EARLIEST.
-// Live, not hypothetical: every EU region holds one key (2024), so an EU location on a 2023 inventory —
-// selectable in the wizard — read "AIB 2024 residual mix applied to 2023 inventory (latest vintage
-// held)", and that note reaches the assurance PDF and the XLSX export, not just the screen.
-//
-// Same two spellings getGridFactor and nzTdLoss emit, and `label` is whatever the caller uses for
-// `vintage`, so the note and the vintage column can never name the factor differently.
-// RESOLUTION SEMANTICS UNCHANGED — `let y = years[0]` still resolves forward, exactly as getGridFactor
-// does. This is disclosure only; no figure moves.
+// The residual helpers select their edition the same way (editionFor, by the window), with no nearest-year move and
+// no "vintage held" note: T3c removed both. A residual edition that is not held is a missing edition (unpriced line).
 // Returns the market-based residual factor for a region, in kg CO2e/kWh, with provenance.
 // applicable=false means no residual mix exists for this region (e.g. full-disclosure AT, or a
 // region we don't cover) — caller MUST fall back to the location-based factor and stamp the note.
@@ -2451,6 +2415,12 @@ locations: Location[]
    * inventory shape stays in one place; the engine neither builds nor reads it.
    */
   factor_editions?: FactorEditions
+  /**
+   * The frozen class (b) edition choices, `ghg_inventories.factor_selection` (T3c diff 3). Absent or `{}`: none made
+   * yet (an inventory saved before the column existed, or never saved); the next save makes them, dated that day.
+   * Carried here like factor_editions; lib/ghg/factorSelection.ts reads and writes it, the engine does not.
+   */
+  factor_selection?: StoredFactorSelection
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({
@@ -5234,11 +5204,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       fromTable === 'CA' && heldKey === 'natural_gas_gj' ? `${(picked.heat && CA_GAS_HEAT_TEXT[picked.heat.key as number]?.note) || CA_GAS_GJ_NOTE}${picked.heat ? ` Heat content: ${picked.heat.basis}` : ''}` : '',
       fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
-    // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
-    // table has no year dimension: EF_UK is DEFRA 2026 whichever year is being reported, so the vintage
-    // is a property of the TABLE and is constant across reporting years by construction. That is the
-    // opposite of the grid row beside it, whose vintage is getGridFactor().usedYear because GRID_EF IS
-    // year-keyed. Both answer "which edition priced this line"; they differ because the tables do.
+    // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. Since T3c every
+    // factor row, combustion and grid alike, takes it from the edition selectEdition chose for the window
+    // (editionCells), so "which edition priced this line" has one answer on every row.
     //   ONE DECLARATION, shared with ghg_inventories.factor_editions — see COMBUSTION_EDITION. A
     // separate source here would let the workings row and the stored edition map name two different
     // publications for one figure, which is precisely the disagreement factor_editions exists to end.

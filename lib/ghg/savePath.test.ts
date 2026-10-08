@@ -65,14 +65,14 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
     expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/FleetBlock.tsx'), 'utf8')).toContain('{p.figure(f.amount, f.unit)}')
   })
   it('the prior-year summary derives the stored row before reading it', () => {
-    expect(pageSrc).toContain("boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions')")
+    expect(pageSrc).toContain("boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions, factor_selection')")
     expect(pageSrc).toContain('const priorLocations = deriveStoredLocations(row)')
-    expect(pageSrc).toContain('assessCompleteness(row.workings, priorLocations, row.reporting_year)')
+    expect(pageSrc).toContain('assessCompleteness(row.workings, priorLocations, row.reporting_year, row.fiscal_year_end_month, row.factor_selection)')
   })
   it('the trends completeness check derives the stored row before reading it', () => {
     const series = readFileSync(join(ROOT, 'lib/ghg/loadSeries.ts'), 'utf8')
     expect(series).toContain('"workings, locations_data, fiscal_year_end_month, coverage_resolutions, "')
-    expect(series).toContain('assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year, r.fiscal_year_end_month)')
+    expect(series).toContain('assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year, r.fiscal_year_end_month, r.factor_selection)')
   })
 })
 

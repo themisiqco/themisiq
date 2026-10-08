@@ -1865,6 +1865,16 @@ supplies every year label below. Follows T3b on the same branch.
 - **SQL:** `supabase/migrations/2026MMDD_ghg_factor_selection.sql` adds
   `ghg_inventories.factor_selection jsonb not null default '{}'`.
   - It holds the frozen class (b) selections as `{dataset: {edition, data_year, rule, selected_on}}`.
+    - **Amended (ruling A, 8 Oct 2026, Lisa; T3c diff 3):** each entry also records `window`, the reporting window
+      it was chosen for (`"yyyy-mm-dd/yyyy-mm-dd"`, first and last day), so the shape is
+      `{dataset: {edition, data_year, rule, selected_on, window}}`. On read, an entry whose window differs from the
+      inventory's current window (the reporting year or year end was changed) is discarded and the dataset selected
+      again, dated that save. Recorded in the migration header too.
+    - **Rulings B to E (8 Oct 2026):** a class (b) dataset first used on a later save is selected on that save, dated
+      that day, and merged in; earlier entries are never replaced (B). The free-calculator claim is the inventory's
+      first save and writes the column dated the claim day; the in-browser calculation freezes nothing (C). Only
+      `data_year_match` and `data_year_newest` selections are written; provisional and class (a) selections are
+      never frozen (D). The column is not projected to the verifier in diff 3 (E); workings rows carry `selected_on`.
   - It is a separate column because `factor_editions` is recomputed on every save ("a non-empty recompute
     always wins", factorEditions.ts:340). A frozen selection cannot live in a value that is rewritten.
   - No RLS change. No new GRANT: table privileges cover a new column. The header records a pre-check that

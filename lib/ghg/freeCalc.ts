@@ -137,6 +137,9 @@ export function inventoryRow(inv: Inventory, userId: string, companyId: string, 
     derivation_version: saved.derivation_version,
     gwp_version: 'AR6',
     factor_editions: saved.factor_editions,
+    // T3c diff 3, ruling C: the claim is the inventory's first save, so its class (b) choices are made and frozen
+    // here, dated `now` (the claim day). A draft carries no factor_selection, so a replaced free row is chosen afresh.
+    factor_selection: saved.factor_selection,
     workings: saved.workings,
     status: 'draft',
     free_tier: freeTier,

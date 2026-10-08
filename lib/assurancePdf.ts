@@ -3,7 +3,11 @@ import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
 import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
-import { countryRefusal, yearLabel, periodWords, selectionFor } from './ghg/engine'
+import { countryRefusal, yearLabel, periodWords, selectionFor, buildWorkings, type CoverageResolution, type Location, type StoredFactorSelection } from './ghg/engine'
+import { selectionContextFor } from './ghg/factorSelection'
+import { FACTOR_YEAR_NO_SUBSTITUTION, FACTOR_YEAR_RULE_CLASS_B } from './ghg/factorEditionRegistry'
+import { SELECTION_RULE_WORDS } from './ghg/workingsCells'
+import { isoDateInWords } from './ghg/dateWords'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
 // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
 // TEXT: a subheading at what was line 258 and the running eyebrow in sectionTitle(). Both are now INK.
@@ -33,6 +37,9 @@ export interface PdfInventory {
   employee_count: number; boundary_approach: string
   selected_frameworks: string[]
   locations: PdfLocation[]
+  // T3c diff 3: what the workings read, so the PDF's editions are the ones the inventory was priced with.
+  coverage_resolutions?: CoverageResolution[]
+  factor_selection?: StoredFactorSelection | null
 }
 export interface PdfTotals { s1_total: number; s2_location: number; s2_market: number; co2: number; ch4: number; n2o: number; biogenic: number }
 export interface PdfFramework { id: string; name: string; full: string; gwp: string; deadline: string }
@@ -230,8 +237,9 @@ export function generateAssurancePDF(
   sectionTitle(doc, 'Methodology & Emission Factors', M)
   // Bound once each. Both are read twice below (length check, then map), and calling them twice would
   // walk the locations twice to build a value that cannot change between the two calls.
-  // T3c: the citations name the editions the inventory's own window selects.
-  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)
+  // T3c: the citations name the editions the inventory's own window selects, with its frozen class (b) choices.
+  const factorCtx = selectionContextFor(inventory)
+  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)
   const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)
   const gridCitations = gridSourcesFor(inventory.locations, factorSel)
   autoTable(doc, {
@@ -268,6 +276,8 @@ export function generateAssurancePDF(
       ['GWP values (AR6)', efSources.gwp_ar6],
       ['Reporting year', yl.heading],
       ['Reporting period', period],
+      // T3c: the window the editions were chosen for, and the rule, in the methodology page's words.
+      ['Factor-year rule', `Each emission factor comes from the edition its publisher's rule assigns to the reporting window, ${period}. ${FACTOR_YEAR_RULE_CLASS_B} ${FACTOR_YEAR_NO_SUBSTITUTION} Where the edition a year needs has not yet been published, the line is priced on the newest published edition and labelled provisional.`],
       ['Standard', 'GHG Protocol Corporate Standard'],
     ],
     theme: 'grid',
@@ -301,6 +311,47 @@ export function generateAssurancePDF(
       columnStyles: { 0: { cellWidth: 90 }, 2: { cellWidth: 'auto' } },
       margin: { left: M, right: M },
     })
+  }
+
+  // ── PAGE 3b: FACTOR EDITIONS (T3c) ──
+  // One row per edition as the workings record it: the edition, the rule that chose it and why, its publication and
+  // correction dates, and for class (b) the day it was selected. From the engine's own rows, on the same selection
+  // context as the citations above, so this table and the workings cannot name different editions.
+  {
+    const rows = buildWorkings(inventory.locations as unknown as Location[], 'AR6', inventory.reporting_year,
+      inventory.coverage_resolutions ?? [], inventory.fiscal_year_end_month ?? 12, factorCtx) as {
+      factor_edition?: string; selection_rule?: string; selection_basis?: string; edition_published?: string
+      edition_corrected?: string; selected_on?: string; provisional?: boolean }[]
+    const seen = new Set<string>()
+    const body: string[][] = []
+    for (const w of rows) {
+      if (!w.factor_edition) continue
+      const row = [
+        w.provisional ? `${w.factor_edition} (provisional)` : w.factor_edition,
+        w.selection_rule ? (SELECTION_RULE_WORDS[w.selection_rule] ?? w.selection_rule) : '',
+        w.selection_basis ?? '',
+        w.edition_published ?? '',
+        w.edition_corrected ?? '',
+        w.selected_on ? isoDateInWords(w.selected_on) : '',
+      ].map(cell => cell.replace(/₂/g, '2').replace(/₃/g, '3').replace(/₄/g, '4'))
+      const key = row.join('|')
+      if (seen.has(key)) continue
+      seen.add(key); body.push(row)
+    }
+    if (body.length > 0) {
+      doc.addPage()
+      sectionTitle(doc, 'Factor Editions', M)
+      autoTable(doc, {
+        startY: 92,
+        head: [['Edition', 'Rule', 'Basis', 'Published', 'Corrected', 'Selected on']],
+        body,
+        theme: 'grid',
+        headStyles: { fillColor: INK, textColor: ON_COVER, fontSize: 8 },
+        bodyStyles: { fontSize: 7, textColor: TABLE_INK },
+        columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 80 }, 2: { cellWidth: 'auto' }, 3: { cellWidth: 60 }, 4: { cellWidth: 55 }, 5: { cellWidth: 55 } },
+        margin: { left: M, right: M },
+      })
+    }
   }
 
   // ── PAGE 4 — SOURCE DOCUMENT INDEX ──

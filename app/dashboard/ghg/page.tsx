@@ -24,6 +24,7 @@ import { saveFailedText } from '../../../lib/planGateError'
 import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
 import { figuresForSave } from '../../../lib/ghg/savePayload'
+import { selectionContextFor } from '../../../lib/ghg/factorSelection'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
 import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
 import { unitLabel, unitOptionsShowing } from '../../../lib/ghg/unitLabels'
@@ -63,7 +64,7 @@ import {
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords, reportingWindowIso, selectionFor, MissingEditionError, steamPricingOrMissing,
+  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords, reportingWindowIso, selectionFor, MissingEditionError, steamPricingOrMissing, type StoredFactorSelection,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -999,7 +1000,7 @@ const searchParams = useSearchParams()
     const priorReportingYear = inventory.reporting_year - 1
     supabase
       .from('ghg_inventories')
-      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions')
+      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions, factor_selection')
       .eq('company_id', companyId)
       .eq('reporting_year', priorReportingYear)
       .limit(2)
@@ -1018,12 +1019,14 @@ const searchParams = useSearchParams()
           scope1_total: number | null; scope2_location_total: number | null
           boundary_approach: string | null
           reporting_year: number; fiscal_year_end_month: number | null; coverage_resolutions: unknown
+          factor_selection: StoredFactorSelection | null
         }
         // DERIVED FIRST (T7): locations_data is saved raw, so a figure that comes from bills would read
         // as 0, and fuelTypesPresent would drop electricity or vehicle fuel that the year did have.
         const priorLocations = deriveStoredLocations(row)
         // The one verdict on whether a stored total is complete, imported rather than reimplemented.
-        const verdict = assessCompleteness(row.workings, priorLocations, row.reporting_year)
+        // T3c: with its year end and its frozen class (b) choices, as the trends page checks it (lib/ghg/loadSeries.ts).
+        const verdict = assessCompleteness(row.workings, priorLocations, row.reporting_year, row.fiscal_year_end_month, row.factor_selection)
         // A summary needs readable location detail. Without it there is nothing to compare, and a
         // count of 0 would render as "your inventory went from 0 locations to 6" — a structural
         // claim about a year we cannot read. Null instead: the module then withholds Tier B and
@@ -1125,6 +1128,8 @@ const searchParams = useSearchParams()
           // column's own default for it. This must be threaded through or the next save writes an
           // empty map over a real one: the payload is built key by key from `inventory`.
           factor_editions: data.factor_editions ?? {},
+          // T3c diff 3: the frozen class (b) edition choices; '{}' (the column's default) means none made yet.
+          factor_selection: data.factor_selection ?? {},
         }))
         // ⚠️ AFTER THE LOAD, NEVER BEFORE IT. A step shown against a blank wizard is a step the
         // customer did not ask for, on data that is not theirs yet. An unknown name opens at the first
@@ -1663,7 +1668,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // overlaps lacking an accepted resolution, plus the no-silent-zero issues (undated, invalid_period,
   // mixed_units, all_rejected). A straddle is not an issue (T3). conciergeReady composes over it.
   const coverageResolutions = inventory.coverage_resolutions ?? []
-  const unresolvedCoverage = findUnresolvedCoverage(inventory.locations, inventory.reporting_year, inventory.fiscal_year_end_month, coverageResolutions)
+  // T3c: the factor selection context every figure on this page is priced with: the inventory's window, prepared
+  // today, with the class (b) choices frozen on its first save (diff 3) for that window. The save, the monthly series
+  // and the assurance PDF take the same context, so every surface prices on one selection.
+  const factorCtx = selectionContextFor(inventory)
+  const unresolvedCoverage = findUnresolvedCoverage(inventory.locations, inventory.reporting_year, inventory.fiscal_year_end_month, coverageResolutions, factorCtx)
   // FI1: the issues explained under an upload. An unpriced line is a coverage issue too (it blocks export
   // through conciergeReady), but it is explained on its own line and beside its field, not under an upload.
   const uploadCoverageIssues = unresolvedCoverage.filter(i => !UNPRICED_STATUSES.has(i.status))
@@ -1710,20 +1719,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // time. Running the probe per basis would triple a pure-arithmetic sweep to reach that same
   // answer, and — worse — would invite a future reader to believe the sets could differ.
   // FI1: a COUNTRY refusal is the only whole-location exclusion. A missing factor is one unpriced line.
-  const unpriceableLocations = findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)
+  const unpriceableLocations = findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)
   const refusedLocations = unpriceableLocations
   // FI1: every line that cannot be priced (a unit with no factor, an unknown refrigerant type, Canadian gas
   // with no province), from the DERIVED locations on every render, so a line clears the moment its input is
   // fixed, without a save. One list, read by the step-2 panel, the field notes, the gate and the totals note.
-  // T3c: the factor selection context every figure on this page is priced with: the inventory's window, prepared today.
-  // Diff 3 saves and reads back the frozen class (b) choices; until then nothing is frozen.
-  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)
+  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)
   // A grid factor for display beside a region picker: the selected edition's value, or that it is not loaded.
   const gridShown = (region: string): string => {
     try { return String(getGridFactor(region, factorSel).ef) } catch (e) { if (e instanceof MissingEditionError) return 'not loaded'; throw e }
   }
+  // The edition beside the value is the one that priced it, never a fixed name (T3c: the labels here were literals
+  // and fell behind the selection, e.g. "DCCEEW NGA 2025" beside an NGA 2026 value). A provisional one says so (R19).
   const gridLabel = (region: string): string => {
-    try { return getGridFactor(region, factorSel).edition.label } catch (e) { if (e instanceof MissingEditionError) return `${e.edition} (not loaded)`; throw e }
+    try { const e = getGridFactor(region, factorSel).edition; return e.provisional ? `${e.label}, provisional` : e.label } catch (e) { if (e instanceof MissingEditionError) return `${e.edition} (not loaded)`; throw e }
   }
   const residualShown = (l: Location, gwp: GwpVersion) => {
     try { return getResidualFactor(residualRegionFor(l), factorSel, gwp, l.country) } catch (e) {
@@ -1753,7 +1762,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // Every publisher that priced anything in this inventory, in first-appearance order. The union of
   // the per-location lists, so the checklist note and each location's own line cannot disagree.
   const inventoryPublishers = [...new Set(
-    derivedLocations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)),
+    derivedLocations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)),
   )]
   // One phrasing of "this total leaves something out", used at every site that shows a total.
   // ⚠️ "we can't work out YET" IS TRUE OF A UNIT MISMATCH AND FALSE OF A COUNTRY WE HOLD NO FACTORS
@@ -2067,13 +2076,15 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       // docs/review/patches/T7.sql, run BEFORE this code is deployed, or every save is refused.
       derivation_version: saved.derivation_version,
       gwp_version: 'AR6',
-      // Which factor editions priced the totals above. The electricity edition comes from
-      // getGridFactor().usedYear, NOT from the citation — EF_SOURCES.electricity_uk is deliberately
-      // year-neutral because GRID_EF.UK holds two editions, so the citation records both years
-      // identically and usedYear is the only thing that tells the earlier inventory from the later.
+      // Which factor editions priced the totals above: the label of each edition the window selected
+      // (T3c), not the citation, which is year-neutral for a grid table holding several editions.
       // The stored map is passed as the fallback so a save that computes nothing (an inventory with
       // no priced location yet) leaves an earlier record intact rather than erasing it to '{}'.
       factor_editions: saved.factor_editions,
+      // T3c diff 3: the class (b) edition choices, frozen on the first save and kept on every later one for the same
+      // reporting window (lib/ghg/factorSelection.ts). The column must exist first:
+      // supabase/migrations/20261008_ghg_factor_selection.sql, run BEFORE this code is deployed.
+      factor_selection: saved.factor_selection,
       status: 'draft',
 // ⚠️ THIS IS ALSO THE RECORD OF WHAT THE SAVED TOTALS LEFT OUT. scope1_total / scope2_* above are
 // computed with refused locations EXCLUDED and unpriced lines left out (FI1), and buildWorkings emits one
@@ -2107,7 +2118,8 @@ workings: saved.workings,
           inventory,
           { calcGas, pickEF, getGridFactor, isResolvedGridRegion },
           'AR6',
-          { preparedOn: new Date() },
+          // The same frozen choices the annual figures were saved with (diff 3), so the two use one edition.
+          selectionContextFor({ ...inventory, factor_selection: saved.factor_selection }),
         )
         // idempotent: replace this inventory's monthly rows
         const del = await supabase.from('ghg_monthly_emissions').delete().eq('inventory_id', savedId)
@@ -2139,6 +2151,13 @@ workings: saved.workings,
     } catch (e) {
       console.error('Monthly emissions write failed (annual save committed, unaffected):', e)
     }
+    // T3c diff 3: the choices just saved become the inventory's, so every later figure and the next save read them.
+    // The save wrote them, not the customer, so this is not an edit: when nothing changed while the save was in
+    // flight the baseline moves with it; when something did, the page stays dirty, as it should.
+    setInventory(i => {
+      if (inventoryFingerprint(i) === savingFingerprint) skipSavedReset.current = true
+      return { ...i, factor_selection: saved.factor_selection }
+    })
     setSaved(true)
     setBaseline(savingFingerprint)
     } finally { setIsSaving(false) }
@@ -2721,14 +2740,14 @@ workings: saved.workings,
                     whose region is unresolved, which is a real and fixable state. */}
                 {countryRefusal(loc) ? null : loc.country === 'AU'
                   ? (loc.grid_region.startsWith('AU_')
-                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
+                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({gridLabel(loc.grid_region)})</div>
                       : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Select your state above to resolve the grid emission factor.</div>)
                   : loc.state
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion ? gridRegionDisplay(detectedRegion.value) : ''}</strong>: {detectedRegion ? gridShown(detectedRegion.value) : "—"} kg CO₂e/kWh (eGRID 2023)</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion ? gridRegionDisplay(detectedRegion.value) : ''}</strong>: {detectedRegion ? gridShown(detectedRegion.value) : "—"} kg CO₂e/kWh{detectedRegion ? ` (${gridLabel(detectedRegion.value)})` : ''}</div>
                   : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK' || loc.grid_region === 'NZ')
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({loc.grid_region === 'UK' ? gridLabel(loc.grid_region) : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({gridLabel(loc.grid_region)})</div>
                   : isResolvedGridRegion(loc.grid_region)
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({gridLabel(loc.grid_region)})</div>
                   : (loc.country === 'CA' || loc.country === 'US')
                   ? <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                       <div style={{ fontSize: 12, color: '#92400e' }}>Select your {loc.country === 'CA' ? 'province' : 'state'}/region to resolve the grid emission factor.</div>
@@ -2926,7 +2945,7 @@ workings: saved.workings,
                   derives from the location's own priced workings rows, so it is empty for a refused
                   location and for one with no figures, by construction rather than by a guard. */}
               {(() => {
-                const pubs = publishersForLocation(loc, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)
+                const pubs = publishersForLocation(loc, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)
                 return pubs.length === 0 ? null : (
                   <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{pubs.join(' · ')}</div>
                 )
@@ -3136,7 +3155,7 @@ workings: saved.workings,
             // ONE derivation. The tested engine builds every workings row (including Phase-3b declaration
             // rows and the always-emitted market-based row); the screen just filters by location. The
             // second, hand-rolled table derivation that used to live here is gone (Phase 4).
-            const allRows = buildWorkings(derivedLocations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month)
+            const allRows = buildWorkings(derivedLocations, wGwp, inventory.reporting_year, coverageResolutions, inventory.fiscal_year_end_month, factorCtx)
             // The licence attributions the cited sources require, from the SAME rows the tables render.
             const attributions = sourceAttributionsFor(allRows.map(r => r.ef_source))
             return <>{derivedLocations.map((loc, i) => {

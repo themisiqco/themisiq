@@ -151,6 +151,47 @@ export function workingsScope2MethodCell(r: WorkingsFactorCellRow): string {
   return r.scope2_method || NOT_APPLICABLE
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// THE EDITION A ROW WAS PRICED WITH, AND WHY (T3c diff 3). One renderer for the verifier page and the assurance
+// PDF, so the two cannot describe one selection differently. The engine writes the fields (editionCells); this
+// only words them. A row with no factor_edition (a declaration, an unpriced line) has nothing to say here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The selection rule, as a person reads it. Keyed by the registry's SelectionRule; an unknown key prints as given. */
+export const SELECTION_RULE_WORDS: Readonly<Record<string, string>> = {
+  desnz_calendar: 'DESNZ guidance, calendar year',
+  desnz_april_march: 'DESNZ guidance, April to March year',
+  desnz_july_june: 'DESNZ guidance, July to June year',
+  desnz_majority_fallback: 'Edition for the year holding most of the reporting year (no DESNZ guidance for this year end)',
+  majority: 'Edition for the year holding most of the reporting year',
+  nga_activity_year: 'NGA activity year (1 July to 30 June)',
+  data_year_match: 'Data year matches the reporting year',
+  data_year_newest: 'Newest edition when the inventory was first prepared',
+  frozen: 'Kept as selected when the inventory was first prepared',
+  exempt: 'Fixed default, not year-keyed',
+}
+
+export interface WorkingsEditionRow {
+  factor_edition?: string; selection_rule?: string; selection_basis?: string
+  edition_published?: string; edition_corrected?: string; selected_on?: string; provisional?: boolean
+}
+
+/**
+ * The edition lines under a row's vintage: provisional first (it changes how the figure is read), then the rule,
+ * the basis the selector wrote, and the dates. Empty for a row that names no edition.
+ */
+export function workingsEditionLines(r: WorkingsEditionRow): string[] {
+  if (!r.factor_edition) return []
+  const out: string[] = []
+  if (r.provisional) out.push('Provisional: the edition this year needs has not been published yet')
+  if (r.selection_rule) out.push(`Rule: ${SELECTION_RULE_WORDS[r.selection_rule] ?? r.selection_rule}`)
+  if (r.selection_basis) out.push(r.selection_basis)
+  if (r.edition_published) out.push(`Published ${r.edition_published}`)
+  if (r.edition_corrected) out.push(`Values as corrected on ${r.edition_corrected}`)
+  if (r.selected_on) out.push(`Selected on ${isoDateInWords(r.selected_on)}`)
+  return out
+}
+
 /**
  * The Result column.
  *

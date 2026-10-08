@@ -221,7 +221,9 @@ describe('H. step 1 labels the grid factor for every resolved location', () => {
     // T3c: through gridShown, which reads the page's selection context (the inventory's window).
     expect(labelLine()).toContain('gridShown(loc.grid_region)')
     expect(pageSrc).toContain('try { return String(getGridFactor(region, factorSel).ef) }')
-    expect(pageSrc).toContain('const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)')
+    // T3c diff 3: with the inventory's frozen class (b) choices for its window.
+    expect(pageSrc).toContain('const factorCtx = selectionContextFor(inventory)')
+    expect(pageSrc).toContain('const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)')
   })
 
   it('H4 the gate is TRUE for a resolved US, CA and AU location and FALSE for a fresh one', () => {

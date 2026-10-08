@@ -13,18 +13,13 @@
 // from the same locations and reporting_year that produced the saved totals, so the editions and the
 // figures cannot describe different calculations.
 //
-// ⚠️ THE ELECTRICITY EDITION COMES FROM getGridFactor().usedYear, NOT FROM THE CITATION STRING.
-// This is the whole point of the module and the one thing that is easy to get backwards.
-// EF_SOURCES.electricity_uk is DELIBERATELY year-neutral ("UK DEFRA/DESNZ GHG Conversion Factors for
-// Company Reporting", no year) because GRID_EF.UK holds 2025 AND 2026 — naming one edition in the
-// citation would be wrong for the other, and would contradict factor_vintage on the workings row.
-// So gridSource() returns the SAME string for a 2025 and a 2026 UK inventory. Storing its output as
-// the edition would record the two years identically and record nothing about the one divergence
-// this column exists to expose. usedYear is the year the lookup actually RESOLVED to — including
-// when it resolves backward or forward off the end of the table — and it is the only value that
-// tells them apart.
-//   Combustion is the opposite case, and the asymmetry is deliberate on both sides: EF_UK is a
-// single edition refreshed wholesale, so combustionSource() carries its year honestly.
+// ⚠️ THE ELECTRICITY EDITION COMES FROM THE SELECTION (getGridFactor().edition.label), NOT FROM THE
+// CITATION STRING. This is the whole point of the module and the one thing that is easy to get backwards.
+// A grid table holds several editions side by side, and the year-neutral catalogue citation names none
+// of them, so storing it would record two different editions identically and record nothing about the
+// one divergence this column exists to expose. Until T3c the edition was the year a nearest-year lookup
+// resolved to (usedYear); since T3c it is the label of the edition selectEdition chose for the window,
+// the same label the workings row prints, and the citation recorded beside it is that edition's own.
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
@@ -364,13 +359,12 @@ export function buildFactorEditions(locations: readonly Location[], year: number
   for (const j of JURISDICTIONS) {
     const years = gridYears[j]
     if (!years?.size) continue
-    // USUALLY ONE YEAR, BUT NOT GUARANTEED. Every GRID_EF region within a jurisdiction currently
-    // holds the same year keys (all 13 CA provinces 2024-2026, all 52 US rows 2023, all 28 EU rows
-    // 2023), so one inventory year resolves every location in a jurisdiction to the same usedYear.
-    // That is a property of today's tables, not of the code — one region gaining a year the others
-    // lack would split them. Recording every distinct year that priced a row is true in both cases;
-    // picking the first would quietly drop the other. Sorted so the string is stable across saves
-    // and two inventories can be compared by equality.
+    // USUALLY ONE EDITION, BUT NOT GUARANTEED. Every GRID_EF region within a jurisdiction is priced from
+    // one dataset today, so one window selects one edition for every location in it. That is a property
+    // of today's registry, not of the code: a jurisdiction priced from two datasets would select two.
+    // Recording every distinct edition that priced a row is true in both cases; picking the first would
+    // quietly drop the other. Sorted so the string is stable across saves and two inventories can be
+    // compared by equality.
     ;(out[j] ??= {}).electricity = {
       source: [...(gridCites[j] ?? [CITATIONS[j].electricity])].sort().join('; '),
       edition: [...years].sort().join(', '),
@@ -421,8 +415,8 @@ export function factorEditionsForSave(
  * ever moved between files byte-identically (ccbca10, 54e6c3a).
  *
  * ⚠️ WHAT THIS GIVES UP, WRITTEN DOWN. A label is only as specific as it is written. Electricity's is
- * the usedYear alone ('2026'), which identifies an edition only because each jurisdiction's grid
- * factors come from ONE publisher. If a jurisdiction ever took grid factors from a second publisher
+ * the selected edition's label ('DEFRA 2026', 'eGRID2023'), which identifies an edition only because each
+ * jurisdiction's grid factors come from ONE publisher. If a jurisdiction ever took grid factors from a second publisher
  * with the same year, two different editions would compare equal here. The fix then is a more
  * specific label — never a return to comparing prose.
  */
