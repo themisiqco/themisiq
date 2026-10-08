@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { combustionSourcesFor, combustionSource, gridSourcesFor, gridSource, EF_SOURCES } from './engine'
+import { heldSel } from '../testing/heldSelection'
 
 // THE ASSURANCE PDF CITED A PUBLISHER THAT DID NOT PRICE THE INVENTORY.
 //
@@ -35,29 +36,29 @@ const loc = (country: string) => ({ country })
 
 describe('combustion citations follow the jurisdiction that priced them', () => {
   it('V1 a CA-only inventory cites ECCC, not US EPA', () => {
-    expect(combustionSourcesFor([loc('CA'), loc('CA')]))
+    expect(combustionSourcesFor([loc('CA'), loc('CA')], heldSel(([loc('CA'), loc('CA')])[0] ?? {})))
       .toEqual(['ECCC (2025) Emission factors and reference values v3.0'])
-    expect(combustionSourcesFor([loc('CA')])[0], 'the defect: US EPA on a Canadian inventory')
+    expect(combustionSourcesFor([loc('CA')], heldSel(([loc('CA')])[0] ?? {}))[0], 'the defect: US EPA on a Canadian inventory')
       .not.toBe(EF_SOURCES.combustion)
   })
 
   it('V2 a US-only inventory is unchanged', () => {
-    expect(combustionSourcesFor([loc('US'), loc('US')])).toEqual([EF_SOURCES.combustion])
-    expect(combustionSourcesFor([loc('US')])[0]).toBe('US EPA (2024) Emission Factors for Greenhouse Gas Inventories')
+    expect(combustionSourcesFor([loc('US'), loc('US')], heldSel(([loc('US'), loc('US')])[0] ?? {}))).toEqual([EF_SOURCES.combustion])
+    expect(combustionSourcesFor([loc('US')], heldSel(([loc('US')])[0] ?? {}))[0]).toBe('US EPA (2025) Emission Factors for Greenhouse Gas Inventories')
   })
 
   it('V3 a mixed CA + US inventory emits BOTH, deduplicated, in first-appearance order', () => {
     // Taking locations[0] would be right for most customers and silently wrong here — the reading
     // that looks fine until the case that matters.
-    expect(combustionSourcesFor([loc('CA'), loc('US'), loc('CA'), loc('US')])).toEqual([
+    expect(combustionSourcesFor([loc('CA'), loc('US'), loc('CA'), loc('US')], heldSel(([loc('CA'), loc('US'), loc('CA'), loc('US')])[0] ?? {}))).toEqual([
       'ECCC (2025) Emission factors and reference values v3.0',
-      'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
+      'US EPA (2025) Emission Factors for Greenhouse Gas Inventories',
     ])
-    expect(combustionSourcesFor([loc('US'), loc('CA')])[0], 'order follows the locations').toBe(EF_SOURCES.combustion)
+    expect(combustionSourcesFor([loc('US'), loc('CA')], heldSel(([loc('US'), loc('CA')])[0] ?? {}))[0], 'order follows the locations').toBe(EF_SOURCES.combustion)
   })
 
   it('V4 every jurisdiction resolves to its own citation, and five locations give five sources', () => {
-    const all = combustionSourcesFor([loc('US'), loc('CA'), loc('GB'), loc('DE'), loc('AU'), loc('NZ')])
+    const all = combustionSourcesFor([loc('US'), loc('CA'), loc('GB'), loc('DE'), loc('AU'), loc('NZ')], heldSel(([loc('US'), loc('CA'), loc('GB'), loc('DE'), loc('AU'), loc('NZ')])[0] ?? {}))
     expect(all).toHaveLength(6)
     expect(new Set(all).size, 'no two jurisdictions share a citation').toBe(6)
     for (const c of ['US', 'CA', 'GB', 'DE', 'AU', 'NZ']) {
@@ -74,7 +75,7 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
     //
     // Unreachable today (emptyLocation() is always seeded), so this pins WHICH WAY TO BE WRONG if it
     // ever becomes reachable, and keeps the two exports behaving identically.
-    expect(combustionSourcesFor([])).toEqual([])
+    expect(combustionSourcesFor([], heldSel(([])[0] ?? {}))).toEqual([])
     expect(gridSourcesFor([])).toEqual([])
     // Neither call site may reintroduce a fallback — that is what the assertions below are guarding.
     expect(pdfSrc, 'the PDF must not invent a combustion citation when none resolved')
@@ -104,7 +105,7 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
       .not.toContain("['Electricity factors', efSources.electricity]")
     expect(pdfSrc).toContain('gridSourcesFor(inventory.locations)')
     // Bound once each, not called twice in one expression.
-    expect(pdfSrc).toContain('const combustionCitations = combustionSourcesFor(inventory.locations)')
+    expect(pdfSrc).toContain('const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)')
     expect(pdfSrc).toContain('const gridCitations = gridSourcesFor(inventory.locations)')
   })
 
@@ -115,7 +116,7 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
     // one helper each removes the thing that could drift.
     // derivedLocations since T7: a figure from bills is on the derived locations, not the stored ones.
     expect(lineIn(pageSrc, PAGE, "['Combustion factors', src]"))
-      .toContain('combustionSourcesFor(derivedLocations)')
+      .toContain('combustionSourcesFor(derivedLocations, factorSel)')
     expect(lineIn(pageSrc, PAGE, "['Electricity factors', src]"))
       .toContain('gridSourcesFor(derivedLocations)')
     // Kept: the catalogue was the electricity row until this pass, and it must not come back.
@@ -142,14 +143,14 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
     ]
     for (const inv of inventories) {
       const where = `[${inv.map(l => l.country).join(', ')}]`
-      expect(combustionSourcesFor(inv), `combustion mismatch for ${where}`).toEqual(xlsxCombustion(inv))
+      expect(combustionSourcesFor(inv, heldSel(inv[0] ?? {})), `combustion mismatch for ${where}`).toEqual(xlsxCombustion(inv))
       expect(gridSourcesFor(inv), `electricity mismatch for ${where}`).toEqual(xlsxGrid(inv))
-      expect(combustionSourcesFor(inv).length, `${where}: never empty for a real inventory`).toBeGreaterThan(0)
+      expect(combustionSourcesFor(inv, heldSel(inv[0] ?? {})).length, `${where}: never empty for a real inventory`).toBeGreaterThan(0)
     }
     // And the two families are genuinely being compared, not the same list twice: at least one of
     // these inventories must yield different combustion and electricity sets, or this test would pass
     // even if gridSourcesFor were aliased to combustionSourcesFor.
-    expect(inventories.some(inv => JSON.stringify(combustionSourcesFor(inv)) !== JSON.stringify(gridSourcesFor(inv))))
+    expect(inventories.some(inv => JSON.stringify(combustionSourcesFor(inv, heldSel(inv[0] ?? {}))) !== JSON.stringify(gridSourcesFor(inv))))
       .toBe(true)
   })
 
@@ -218,7 +219,7 @@ describe('electricity citations follow the jurisdiction that priced them', () =>
     // electricity ALWAYS name different sources, using GB as the example. They were identical for GB:
     // DEFRA publishes both families in one document, and so does ECCC for CA.
     for (const c of ['US', 'DE', 'AU', 'NZ', 'GB']) {
-      expect(combustionSourcesFor([loc(c)])[0], `${c}`).not.toBe(gridSourcesFor([loc(c)])[0])
+      expect(combustionSourcesFor([loc(c)], heldSel(([loc(c)])[0] ?? {}))[0], `${c}`).not.toBe(gridSourcesFor([loc(c)])[0])
     }
     // ⚠️ GB MOVED INTO THIS GROUP WITH THE DEFRA 2026 REFRESH, and the reason is worth keeping.
     // DEFRA still publishes both families in one workbook. But GRID_EF.UK now holds TWO editions
@@ -226,11 +227,11 @@ describe('electricity citations follow the jurisdiction that priced them', () =>
     // there would contradict factor_vintage on a 2025 UK inventory. combustion_uk keeps its year
     // because EF_UK is single-edition. One publisher, two citation shapes, because the two tables
     // have different year dimensions.
-    expect(combustionSourcesFor([loc('GB')])[0]).toContain('(2026)')
+    expect(combustionSourcesFor([loc('GB')], heldSel(([loc('GB')])[0] ?? {}))[0]).toContain('(2026)')
     expect(gridSourcesFor([loc('GB')])[0], 'year-neutral — the vintage column carries the year')
       .not.toMatch(/20\d\d/)
     // CA still coincides: ECCC covers both families and is single-edition on both sides.
-    expect(combustionSourcesFor([loc('CA')])[0], 'CA — one publisher, both families')
+    expect(combustionSourcesFor([loc('CA')], heldSel(([loc('CA')])[0] ?? {}))[0], 'CA — one publisher, both families')
       .toBe(gridSourcesFor([loc('CA')])[0])
   })
 })

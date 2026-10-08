@@ -109,7 +109,8 @@ export function inventoryFromDraft(draft: GhgDraft, company: string, now: Date =
  * figuresForSave (lib/ghg/savePayload.ts). Nothing the client calculated is stored as a figure.
  */
 export function inventoryRow(inv: Inventory, userId: string, companyId: string, freeTier: boolean, now: Date = new Date()) {
-  const saved = figuresForSave(inv, 'AR6')
+  // T3c: prepared on `now`, the same date the row records, so the editions it selects are the ones that applied then.
+  const saved = figuresForSave(inv, 'AR6', { preparedOn: now })
   const rev = inv.revenue_millions
   return {
     user_id: userId,

@@ -346,7 +346,10 @@ export function describeYearStatus(y: SeriesYear): string | null {
     // FI1: lines left out are worded as lines, never as a location that "can't be worked out".
     const lineEx = all.filter((e): e is Extract<YearExclusion, { kind: 'line' }> => e.kind === "line");
     const ex = all.filter((e) => e.kind !== "line");
-    const lineDetail = lineEx.map((e) => `${e.locationName}: ${e.source.toLowerCase()} in ${UNIT_WORDS[e.unit] ?? e.unit} is not priced`).join("; ");
+    // T3c: a line left out because its factor edition is not loaded says that, not that its unit is unpriced.
+    const lineDetail = lineEx.map((e) => e.reason === "edition_missing"
+      ? `${e.locationName}: ${e.source.toLowerCase()} is not priced, because the factor edition it needs is not loaded`
+      : `${e.locationName}: ${e.source.toLowerCase()} in ${UNIT_WORDS[e.unit] ?? e.unit} is not priced`).join("; ");
     const k = lineEx.length;
     const linesSentence = k === 0 ? "" : `${k} line${k === 1 ? " is" : "s are"} not priced, and that year's totals exclude ${k === 1 ? "it" : "them"} (${lineDetail})`;
     if (ex.length === 0) {

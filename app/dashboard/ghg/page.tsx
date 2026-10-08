@@ -59,11 +59,11 @@ import {
   deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, fleetTypeProblem, fleetTypeOfField, withFleetTypeTicked, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
-  findSteamFactorGaps, steamFactorFor, steamPricing, STEAM_ESTIMATE_SHORT,
+  findSteamFactorGaps, steamFactorFor, STEAM_ESTIMATE_SHORT,
   ngUnitOptions, liquidUnitOptions, fuelOilUnitOptions, propaneUnitOptions, steamUnitOptions,
   snapUnitsForCountry, changeUnit, applyUnitOutcomes, convertedUnitChange, unitChangeMessage, UNIT_FIELDS, type UnitFieldName,
   validateElectricity, validateNaturalGas, validateCompleteness,
-  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords, reportingWindowIso,
+  periodFromYearAndEnd, FLEET_FIELDS, fleetAsks, yearLabel, periodWords, reportingWindowIso, selectionFor, MissingEditionError, steamPricingOrMissing,
 } from '../../../lib/ghg/engine'
 import { countryRefusalText, refusalBannerHeading, refusalBannerTrailer, refusalResultsHeading, storedCountryEchoLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { SUPPORTED_COUNTRY_OPTIONS, OTHER_COUNTRY_OPTIONS, NOT_LISTED_OPTION, selectedCountryValue } from '../../../lib/ghg/countryPicker'
@@ -1710,12 +1710,28 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // time. Running the probe per basis would triple a pure-arithmetic sweep to reach that same
   // answer, and — worse — would invite a future reader to believe the sets could differ.
   // FI1: a COUNTRY refusal is the only whole-location exclusion. A missing factor is one unpriced line.
-  const unpriceableLocations = findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year)
+  const unpriceableLocations = findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)
   const refusedLocations = unpriceableLocations
   // FI1: every line that cannot be priced (a unit with no factor, an unknown refrigerant type, Canadian gas
   // with no province), from the DERIVED locations on every render, so a line clears the moment its input is
   // fixed, without a save. One list, read by the step-2 panel, the field notes, the gate and the totals note.
-  const unpricedAll = derivedLocations.flatMap(l => unpricedLines(l))
+  // T3c: the factor selection context every figure on this page is priced with: the inventory's window, prepared today.
+  // Diff 3 saves and reads back the frozen class (b) choices; until then nothing is frozen.
+  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)
+  // A grid factor for display beside a region picker: the selected edition's value, or that it is not loaded.
+  const gridShown = (region: string): string => {
+    try { return String(getGridFactor(region, factorSel).ef) } catch (e) { if (e instanceof MissingEditionError) return 'not loaded'; throw e }
+  }
+  const gridLabel = (region: string): string => {
+    try { return getGridFactor(region, factorSel).edition.label } catch (e) { if (e instanceof MissingEditionError) return `${e.edition} (not loaded)`; throw e }
+  }
+  const residualShown = (l: Location, gwp: GwpVersion) => {
+    try { return getResidualFactor(residualRegionFor(l), factorSel, gwp, l.country) } catch (e) {
+      if (e instanceof MissingEditionError) return { applicable: false, source: '', vintage: e.edition, note: e.forSite(l.name || 'Location') }
+      throw e
+    }
+  }
+  const unpricedAll = derivedLocations.flatMap(l => unpricedLines(l, 'AR6', factorSel))
   const unpricedAt = (locId: string) => unpricedAll.filter(u => u.locId === locId)
   const unpricedFor = (locId: string, field: string) => unpricedAll.find(u => u.locId === locId && String(u.field) === field)
   // ⚠️ THE EXPORT GATE BLOCKS ONLY ON WHAT THE CUSTOMER CAN FIX, AND THAT IS NOT A RELAXATION.
@@ -1737,7 +1753,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // Every publisher that priced anything in this inventory, in first-appearance order. The union of
   // the per-location lists, so the checklist note and each location's own line cannot disagree.
   const inventoryPublishers = [...new Set(
-    derivedLocations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year)),
+    derivedLocations.flatMap(l => publishersForLocation(l, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)),
   )]
   // One phrasing of "this total leaves something out", used at every site that shows a total.
   // ⚠️ "we can't work out YET" IS TRUE OF A UNIT MISMATCH AND FALSE OF A COUNTRY WE HOLD NO FACTORS
@@ -1763,7 +1779,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // factor (CA/AU/NZ/EU) and supplied no provider figure. Its steam contributes NOTHING to any total,
   // so exporting would hand a verifier an assurance package whose Scope 2 is short by a stream the
   // customer positively declared. The remedy is the supplier-factor field on the Energy & fuel step.
-  const steamFactorGaps = findSteamFactorGaps(derivedLocations)
+  const steamFactorGaps = findSteamFactorGaps(derivedLocations, factorSel)
   const steamFactorsReady = steamFactorGaps.length === 0
   const needsPriorYear = inventory.selected_frameworks.includes('cdp')
   const needsEmployees = inventory.selected_frameworks.includes('ecovadis')
@@ -1801,7 +1817,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // Every surface below reads totals_ar6 directly; lib/ghg/gwpBasis.test.ts fails if a framework's gwp
   // ever stops being AR6, because then these surfaces would label AR6 figures with another basis.
   // The engine still computes on AR4 and AR5 (its GWP table and tests use them); only this page stopped.
-  const totals_ar6 = calcInventory(derivedLocations, 'AR6', inventory.reporting_year)
+  const totals_ar6 = calcInventory(derivedLocations, 'AR6', inventory.reporting_year, factorSel)
 
   // Everything the comparability step hands forward. Assembled here rather than read out of
   // scattered state at save time, so the write path takes FACTS and infers nothing.
@@ -2090,7 +2106,8 @@ workings: saved.workings,
         const { slices } = buildMonthlyEmissions(
           inventory,
           { calcGas, pickEF, getGridFactor, isResolvedGridRegion },
-          'AR6'
+          'AR6',
+          { preparedOn: new Date() },
         )
         // idempotent: replace this inventory's monthly rows
         const del = await supabase.from('ghg_monthly_emissions').delete().eq('inventory_id', savedId)
@@ -2442,7 +2459,7 @@ workings: saved.workings,
 <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flex: '1 0 auto', justifyContent: 'space-between', minHeight: 38 }}>
 {isResolvedGridRegion(loc.grid_region) && (
   <span style={{ fontSize: 12, color: '#0F6E56', alignSelf: 'center', whiteSpace: 'nowrap' }}>
-    Grid: {loc.grid_region} ({getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg/kWh)
+    Grid: {loc.grid_region} ({gridShown(loc.grid_region)} kg/kWh)
   </span>
 )}
 {/* ⚠️ NO CONTROL AT ALL WHEN ONE LOCATION REMAINS, RATHER THAN A DISABLED ONE.
@@ -2480,7 +2497,7 @@ workings: saved.workings,
     // to in order to FIX one — so an unguarded call here takes down the only screen that can undo
     // the problem. The blocking panel below replaces the live-results figures entirely.
     const blockedHere = unpriceableById.get(loc.id)
-    const calc = blockedHere ? null : calcLocation(loc, 'AR6', inventory.reporting_year)
+    const calc = blockedHere ? null : calcLocation(loc, 'AR6', inventory.reporting_year, factorSel)
     const detectedRegion = [...GRID_REGIONS_CA, ...GRID_REGIONS_US].find(r => r.value === loc.grid_region)
     // The question a user is asked and the absence they later attest MUST be the same words (STEP 3):
     // both derive from STREAM_META. See the attestation block below and the workings declaration rows.
@@ -2704,21 +2721,21 @@ workings: saved.workings,
                     whose region is unresolved, which is a real and fixable state. */}
                 {countryRefusal(loc) ? null : loc.country === 'AU'
                   ? (loc.grid_region.startsWith('AU_')
-                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
+                      ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh (DCCEEW NGA 2025)</div>
                       : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Select your state above to resolve the grid emission factor.</div>)
                   : loc.state
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion ? gridRegionDisplay(detectedRegion.value) : ''}</strong>: {detectedRegion ? getGridFactor(detectedRegion.value, inventory.reporting_year).ef : "—"} kg CO₂e/kWh (eGRID 2023)</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region auto-detected: <strong>{detectedRegion ? gridRegionDisplay(detectedRegion.value) : ''}</strong>: {detectedRegion ? gridShown(detectedRegion.value) : "—"} kg CO₂e/kWh (eGRID 2023)</div>
                   : (loc.grid_region.startsWith('EU_') || loc.grid_region === 'UK' || loc.grid_region === 'NZ')
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.grid_region === 'UK' ? `DEFRA ${getGridFactor(loc.grid_region, inventory.reporting_year).usedYear}` : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({loc.grid_region === 'UK' ? gridLabel(loc.grid_region) : loc.grid_region === 'NZ' ? 'NZ MfE 2026' : 'EEA 2023'})</div>
                   : isResolvedGridRegion(loc.grid_region)
-                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {getGridFactor(loc.grid_region, inventory.reporting_year).ef} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
+                  ? <div style={{ background: '#E6F1FB', border: '0.5px solid rgba(12,68,124,0.15)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#0C447C' }}>✓ Grid region: <strong>{gridRegionDisplay(loc.grid_region)}</strong>: {gridShown(loc.grid_region)} kg CO₂e/kWh ({loc.country === 'CA' ? 'ECCC v3.0' : loc.country === 'US' ? 'US EPA eGRID2023' : loc.country === 'AU' ? 'DCCEEW NGA 2025' : 'grid factor'})</div>
                   : (loc.country === 'CA' || loc.country === 'US')
                   ? <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
                       <div style={{ fontSize: 12, color: '#92400e' }}>Select your {loc.country === 'CA' ? 'province' : 'state'}/region to resolve the grid emission factor.</div>
                       {loc.country === 'CA'
-                        ? <><select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{gridRegionDisplay(r.value)}: {getGridFactor(r.value, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>
+                        ? <><select value="" onChange={e => updateLocation(activeLocation, 'province', e.target.value)} style={inputStyle}><option value="" disabled>Select province…</option>{GRID_REGIONS_CA.map(r => <option key={r.value} value={r.value}>{gridRegionDisplay(r.value)}: {gridShown(r.value)} kg CO₂e/kWh</option>)}</select>
                           <UnpricedNote line={unpricedAll.find(u => u.locId === loc.id && u.reason === 'province_missing')} /></>
-                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{gridRegionDisplay('US_' + s)}: {getGridFactor('US_' + s, inventory.reporting_year).ef} kg CO₂e/kWh</option>)}</select>}
+                        : <select value="" onChange={e => updateLocation(activeLocation, 'state', e.target.value)} style={inputStyle}><option value="" disabled>Select state…</option>{US_STATES.map(s => <option key={s} value={s}>{gridRegionDisplay('US_' + s)}: {gridShown('US_' + s)} kg CO₂e/kWh</option>)}</select>}
                     </div>
                   : <div style={{ background: '#FEF3E2', border: '0.5px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e' }}>Grid factor not available for this jurisdiction: <a href="mailto:hello@themisiq.co" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>contact us</a>.</div>
                 }
@@ -2803,7 +2820,7 @@ workings: saved.workings,
                           is more accurate than ours and will be used instead, worth giving your verifier where
                           steam is a material part of your footprint.
                         </div>
-                      ) : entry.kind === 'estimated' && !hasSupplier && steamPricing(loc) ? (
+                      ) : entry.kind === 'estimated' && !hasSupplier && steamPricingOrMissing(loc, factorSel) ? (
                         // R14: no publisher prints a factor here, so the line prices on a labelled estimate. The full
                         // note is on the workings row; this is its short form, beside the figure.
                         <div style={{ fontSize: 11, color: 'var(--color-state-warn)', lineHeight: 1.5 }}>{STEAM_ESTIMATE_SHORT}</div>
@@ -2902,14 +2919,14 @@ workings: saved.workings,
                 </div>
               )}
               {/* ⚠️ THE PUBLISHERS THAT PRICED THIS LOCATION, NOT THE CATALOGUE OF ALL OF THEM.
-                  This line was the fixed string "EPA 2024 (US) · ECCC v3.0 (CA) · DEFRA 2026 (UK) ·
-                  IPCC AR6 GWP · eGRID 2023", rendered under every location whatever its country. A
+                  This line was a fixed catalogue string naming the EPA (US), ECCC v3.0 (CA), DEFRA 2026 (UK),
+                  IPCC AR6 GWP and eGRID 2023, rendered under every location whatever its country. A
                   UK site cited the EPA and eGRID, which priced nothing there, and a refused site
                   cited five publishers when nothing had priced it at all. publishersForLocation
                   derives from the location's own priced workings rows, so it is empty for a refused
                   location and for one with no figures, by construction rather than by a guard. */}
               {(() => {
-                const pubs = publishersForLocation(loc, 'AR6', inventory.reporting_year)
+                const pubs = publishersForLocation(loc, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)
                 return pubs.length === 0 ? null : (
                   <div style={{ marginTop: 10, fontSize: 11, color: 'var(--color-ink-2)', lineHeight: 1.6 }}>{pubs.join(' · ')}</div>
                 )
@@ -3127,7 +3144,7 @@ workings: saved.workings,
               // run for one — this line is a second unguarded render-path crash site, not just the
               // totals at the top of the component.
               const blocked = unpriceableById.get(loc.id)
-              const c = blocked ? null : calcLocation(loc, wGwp, inventory.reporting_year)
+              const c = blocked ? null : calcLocation(loc, wGwp, inventory.reporting_year, factorSel)
               const key = `loc_${i}`
               const locRows = allRows.filter(r => r.location === (loc.name || 'Location'))
               return (
@@ -3544,7 +3561,8 @@ workings: saved.workings,
     const residualRows: string[][] = needsMkt
       ? derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
           const resRegion = residualRegionFor(l)
-          const res = getResidualFactor(resRegion, inventory.reporting_year, 'AR6', l.country)
+          void resRegion
+          const res = residualShown(l, 'AR6')
           return [
             l.name || 'Location',
             res.applicable ? res.source : 'Location-factor fallback',
@@ -3609,12 +3627,12 @@ workings: saved.workings,
       ...(exclusionNote ? [['Excluded from the figures above', exclusionNote]] : []),
       [''],
       ['METHODS'],
-      ...combustionSourcesFor(derivedLocations).map(src => ['Combustion factors', src]),
+      ...combustionSourcesFor(derivedLocations, factorSel).map(src => ['Combustion factors', src]),
       // T10a: the same derivation lines as the assurance PDF's methods table.
-      ...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),
+      ...factorDerivationsFor(derivedLocations, factorSel).map(d => ['Factor derivation', d]),
       ...gridSourcesFor(derivedLocations).map(src => ['Electricity factors', src]),
       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
-      ...sourceAttributionsForLocations(derivedLocations).flatMap(a => [
+      ...sourceAttributionsForLocations(derivedLocations, factorSel).flatMap(a => [
         [`Licence attribution: ${a.publisher}`, a.attribution],
         [`Licence: ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
       ]),
@@ -3625,7 +3643,8 @@ workings: saved.workings,
             ['Market-based Scope 2', 'Residual-mix factor applied to uncovered load, or, where no residual mix is loaded, the location-based grid average (named per location below); covered (contractual) kWh counted at zero'],
             ...derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
               const resRegion = residualRegionFor(l)
-              const res = getResidualFactor(resRegion, inventory.reporting_year, fw.gwp as GwpVersion, l.country)
+              void resRegion
+              const res = residualShown(l, fw.gwp as GwpVersion)
               return [`Residual factor: ${l.name}`, res.applicable ? `${res.source} · vintage: ${res.vintage}${res.note ? ` · ${res.note}` : ''}` : `Location-factor fallback${res.note ? ` · ${res.note}` : ''}`]
             }),
           ]
@@ -3655,7 +3674,7 @@ workings: saved.workings,
             // basis cell beside it reads "excluded". Three statements of one fact in one row.
             countryRefusalText(blocked.refusal, 'verifier', locationHasEnteredFigures(loc))]
         }
-        const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year)
+        const c = calcLocation(loc, fw.gwp as 'AR4' | 'AR5', inventory.reporting_year, factorSel)
         // FI1: a location's totals leave out its unpriced lines; the note names each, with its message.
         const missing = unpricedAt(loc.id).map(u => `NOT PRICED: ${u.message}`).join(' ')
         return [loc.name, loc.grid_region, c.s1_total.toFixed(CSV_DP), c.s2_location.toFixed(CSV_DP), missing]

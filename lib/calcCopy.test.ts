@@ -25,7 +25,7 @@ describe('/calculate-emissions copy', () => {
 
   it('CC3: the example figure is the engine figure for the stated inputs', () => {
     const site = { ...emptyLocation('example', 'Example site'), country: 'US', grid_region: 'US_AVG', electricity_kwh: 1_200_000, has_natural_gas: true, natural_gas_amount: 8_500, natural_gas_unit: 'therms' } as Location
-    const t = calcInventory([site], 'AR6')
+    const t = calcInventory([site], 'AR6', 2025)   // T3c: the year the page computes it for
     expect(Math.round(t.s1_total + t.s2_location)).toBe(465)
     expect(PAGE).toContain('~{EXAMPLE_T.toLocaleString')
     expect(PAGE).toContain('one site on the US average grid')

@@ -159,14 +159,14 @@ describe('the Category 3 summary says a location was left out', () => {
 
   it('names the excluded location in the summary line', () => {
     const read = cat3InputsFrom(buildWorkings([A, B], 'AR6', 2025) as never, [A, B] as never)
-    const summary = cat3WorkingsSummary(priceCat3(read.inputs!), read.skipped)
+    const summary = cat3WorkingsSummary(priceCat3(read.inputs!, CAT3_EDS), read.skipped)
     expect(summary).toContain('at 1 location')
     expect(summary).toContain('1 location excluded (other)')
   })
 
   it('says nothing when nothing is excluded', () => {
     const read = cat3InputsFrom(buildWorkings([A], 'AR6', 2025) as never, [A] as never)
-    expect(cat3WorkingsSummary(priceCat3(read.inputs!), read.skipped)).not.toContain('excluded')
+    expect(cat3WorkingsSummary(priceCat3(read.inputs!, CAT3_EDS), read.skipped)).not.toContain('excluded')
   })
 
   it('a location name is reproduced exactly as entered, never capitalised by position', () => {
@@ -176,7 +176,7 @@ describe('the Category 3 summary says a location was left out', () => {
     expect(text).toContain('the location other is excluded')
     expect(text, 'never sentence-initial').not.toMatch(/^Other\b/)
     const read = cat3InputsFrom(buildWorkings([A, B], 'AR6', 2025) as never, [A, B] as never)
-    expect(cat3WorkingsSummary(priceCat3(read.inputs!), read.skipped)).toContain('(other)')
+    expect(cat3WorkingsSummary(priceCat3(read.inputs!, CAT3_EDS), read.skipped)).toContain('(other)')
     // And on the GHG side, the sentence never opens with the name either.
     const rows = buildWorkings([B], 'AR6', 2025)
     expect(rows.find(r => r.declaration === 'country_not_listed')!.note).not.toMatch(/^other\b/i)
@@ -210,8 +210,9 @@ describe('a location cites the publishers that priced it, and no others', () => 
 
   it('a US location cites the EPA and eGRID', () => {
     const pubs = publishersForLocation(us, 'AR6', 2025).join(' · ')
-    expect(pubs).toContain('US EPA 2024')
-    expect(pubs).toContain('eGRID 2023')
+    expect(pubs).toContain('US EPA 2025')
+    // T3c: the grid row's own edition label.
+    expect(pubs).toContain('eGRID2023')
     expect(pubs, 'and no publisher from another country').not.toContain('DEFRA')
   })
 
@@ -245,6 +246,7 @@ describe('a location cites the publishers that priced it, and no others', () => 
 // check at all on the surfaces a customer actually reads.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { CAT3_EDS } from '../testing/heldSelection'
 const PAGE = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
 
 describe('the GHG page surfaces', () => {
@@ -284,9 +286,12 @@ describe('the GHG page surfaces', () => {
     // location, and the Review step's assurance checklist note. Both are now derived. A catalogue is
     // correct as a catalogue and wrong as an attribution, which is the same defect 06b6125 removed
     // from the workings table and a later change removed from the assurance PDF's methodology page.
+    // T3c: the comment explaining the removal no longer quotes the string either. The held US edition is 2025, and
+    // publisherClaims P1 refuses any "EPA 2024" left in app/, comments included.
     const live = PAGE.split("EPA 2024 (US)").length - 1
-    expect(live, 'only the comment explaining the removal may still contain the old string').toBe(1)
-    expect(PAGE).toContain("publishersForLocation(loc, 'AR6', inventory.reporting_year)")
+    expect(live, 'the old catalogue string is gone, comment included').toBe(0)
+    expect(PAGE).toContain('This line was a fixed catalogue string naming the EPA (US)')
+    expect(PAGE).toContain("publishersForLocation(loc, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month)")
     expect(PAGE).toContain('inventoryPublishers.join')
   })
 

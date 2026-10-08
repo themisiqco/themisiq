@@ -26,7 +26,7 @@ import {
   type YearDataStatus,
   type YearExclusion,
 } from "./series";
-import { findUnpriceableLocations, unpricedLines, deriveStoredLocations, type Location } from "./engine";
+import { findUnpriceableLocations, unpricedLines, deriveStoredLocations, selectionFor, type Location } from "./engine";
 import type { FactorEditions } from "./factorEditions";
 import { anyPublishedFactorApplied } from "./factorEditions";
 import type { Scope3CoverageEntry } from "../scope3/categoryStatus";
@@ -97,7 +97,7 @@ export interface Completeness {
 // null total or a null company_id, and a dropped row is indistinguishable from an absent one. The
 // whole point of the comparability step is to tell "no prior year" apart from "a prior year we
 // cannot describe", so it fetches its one row itself and brings it here for the verdict.
-export function assessCompleteness(workings: unknown, locationsData: unknown, reportingYear: number): Completeness {
+export function assessCompleteness(workings: unknown, locationsData: unknown, reportingYear: number, fiscalYearEndMonth: number | null = 12): Completeness {
   // 1. The recorded marker wins — it describes the stored total, which is what we are qualifying.
   if (Array.isArray(workings)) {
     // ⚠️ MATCHES ALL FOUR EXCLUSION MARKERS. Filtering on "unpriceable" alone would let a year
@@ -139,14 +139,16 @@ export function assessCompleteness(workings: unknown, locationsData: unknown, re
   try {
     // The row's own year (T7 revision): the check is "can this year be priced with today's tables", and
     // the tables are looked up by reporting year. Called without it, every year was checked as 2024.
-    const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear);
+    const unpriceable = findUnpriceableLocations(locationsData as Location[], "AR6", reportingYear, fiscalYearEndMonth ?? 12);
+    // T3c: and its window, so a year is checked against the editions its own year end selects.
+    const sel = selectionFor(reportingYear, fiscalYearEndMonth ?? 12);
     // FI1: a missing factor is one unpriced LINE, not an excluded location, so it is named as a line. A row
     // with no marker was saved before either was recorded, and totalled under an older rule (the whole
     // location left out), so whether its totals include those lines, or the rest of the location, cannot
     // be told. Refused locations keep their own sentence.
     const lines = (locationsData as Location[])
       .filter((l) => !unpriceable.some((u) => u.locId === l.id))
-      .flatMap((l) => unpricedLines(l));
+      .flatMap((l) => unpricedLines(l, "AR6", sel));
     const parts: string[] = [];
     if (unpriceable.length > 0) {
       const names = unpriceable.map((u) => u.locName).join(", ");
@@ -154,7 +156,10 @@ export function assessCompleteness(workings: unknown, locationsData: unknown, re
     }
     if (lines.length > 0) {
       // The same unit words as describeYearStatus, so the two sentences about one year cannot disagree.
-      const named = lines.map((u) => `${u.site}: ${u.source.toLowerCase()} in ${UNIT_WORDS[u.unit] ?? u.unit}`).join(", ");
+      // T3c: an edition_missing line names the edition, not the unit.
+      const named = lines.map((u) => u.reason === "edition_missing"
+        ? `${u.site}: ${u.source.toLowerCase()}, as the ${u.factor.edition} factors are not loaded`
+        : `${u.site}: ${u.source.toLowerCase()} in ${UNIT_WORDS[u.unit] ?? u.unit}`).join(", ");
       parts.push(`${lines.length} line${lines.length > 1 ? "s" : ""} in this year's inventory can't be priced (${named})`);
     }
     if (parts.length > 0) {
@@ -278,7 +283,7 @@ export async function loadCompanySeries(): Promise<LoadSeriesResult> {
         ? r.scope3_inventories[0]
         : r.scope3_inventories;
       // Derived first (T7): locations_data is saved raw, so a figure from bills would otherwise read as 0.
-      const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year);
+      const completeness = assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year, r.fiscal_year_end_month);
       mapped.push({
         ...completeness,
         inventory_id: r.id,

@@ -17,6 +17,8 @@ const row = { ...inventoryRow(inv, 'u', 'c', true, NOW), id: '3f9c2a7e-5b1d-4c8e
 const email = () => buildResultsEmail({ row, fullName: 'Pat Lee', siteUrl: SITE })
 
 // The plain text exactly as it was before the shell (captured from the code at 13f09df, 5 Oct 2026).
+// Re-captured at T3c diff 2 (8 Oct 2026), for engine changes only: the US citation reads 2025, and Toronto's 2025 grid
+// needs ECCC Table 5.4 (prepared after 9 Sep 2026), not held until T3d, so it is listed as not calculated.
 const GOLDEN_TEXT = readFileSync(join(__dirname, '__fixtures__', 'results-email-sample.txt'), 'utf8')
 
 describe('the email shell', () => {

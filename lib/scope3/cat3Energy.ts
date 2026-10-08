@@ -104,6 +104,9 @@ export type Cat3Reason =
   /** FI6 (R15): Australian gas in NSW and the ACT, QLD, SA or WA, where NGA's factor depends on the metro or
    *  non-metro area and none has been chosen. */
   | { code: 'au_gas_area_missing'; location: string }
+  /** T3c (R18): the factor edition the reporting window needs (DEFRA well-to-tank and T&D by the DESNZ rule; NGA Scope 3
+   *  by its activity years) is not held. `message` is the engine's sentence, naming the site. */
+  | { code: 'edition_missing'; edition: string; message: string }
 
 export interface Cat3Conversion {
   factor: number
@@ -136,6 +139,9 @@ export interface Cat3PricedLine {
   flags: Cat3Flag[]
   /** FI6: the line's own citation and method sentence, where it is not a DEFRA line (NGA's Australian lines). */
   note?: string
+  /** T3c (R18): the edition the window selected for this line, with its basis. Absent on the NZ 3c line (the
+   *  engine's own figure, selected there). */
+  edition?: { label: string; rule: string; basis: string; provisional: boolean }
 }
 
 export interface Cat3Unpriced {
@@ -416,9 +422,29 @@ function priceAuGas(row: Cat3InputRow, unit: string | null, lines: Cat3PricedLin
     `exclude leakage from low-pressure distribution pipelines (p. 20).${extra}`))
 }
 
-function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpriced[]): void {
+/** T3c (R18): the edition a Category 3 line is priced on, as the engine selected it. */
+export interface Cat3EditionCell { label: string; rule: string; basis: string; provisional: boolean }
+/**
+ * T3c (R18): one Category 3 edition for the window, or why it is missing. Selected by the engine's selectEdition and
+ * passed in (lib/scope3/cat3Editions.ts builds it), so this module still imports nothing from lib/ghg.
+ */
+export type Cat3Edition =
+  | { held: Cat3EditionCell }
+  | { missing: { edition: string; sentence: (site: string) => string } }
+/** T3c (R18): the two Category 3 editions for the window: DEFRA well-to-tank and T&D, and NGA Scope 3. */
+export interface Cat3Editions { defra: Cat3Edition; nga: Cat3Edition }
+
+function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpriced[], eds: Cat3Editions): void {
   const reject = (reason: Cat3Reason) =>
     unpriced.push({ row_id: row.id, location: row.location, stream: row.stream, reason })
+  // T3c (R18): a line whose edition is missing is unpriced with the engine's message, never priced on another edition.
+  // The engine's sentence without its export clause: a Category 3 line that is not counted does not block a GHG export.
+  const missing = (e: Cat3Edition) => {
+    if ('held' in e) return false
+    reject({ code: 'edition_missing', edition: e.missing.edition,
+      message: e.missing.sentence(row.location).replace(/ Export is blocked until they are loaded\.$/, '') })
+    return true
+  }
 
   if (row.stream === 'refrigerants') {
     // ⚠️ REJECTED BY NAME, NOT DROPPED. Refrigerants are Scope 1 fugitive emissions with no upstream
@@ -443,8 +469,12 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
       reject({ code: 'unit_not_published', stream: row.stream, unit: row.unit })
       return
     }
-    if (isAu(row)) { priceAuElectricity(row, lines, reject); return }
+    if (isAu(row)) {
+      if (missing(eds.nga)) return
+      priceAuElectricity(row, lines, reject); return
+    }
     const isNz = (row.country ?? '').toUpperCase().trim() === 'NZ'
+    let defraMissingSaid = false
     for (const [line, key] of ELECTRICITY_LINES) {
       if (line === 'electricity_td_loss' && isNz) {
         // ⚠️ NEW ZEALAND'S 3c IS THE ENGINE'S OWN FIGURE, NEVER RECOMPUTED. lib/ghg/engine.ts already
@@ -466,6 +496,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
         })
         continue
       }
+      if ('missing' in eds.defra) { if (!defraMissingSaid) missing(eds.defra); defraMissingSaid = true; continue }
       lines.push(priced(row, line, key, null))
     }
     return
@@ -477,17 +508,22 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
       reject({ code: 'unit_not_published', stream: row.stream, unit: row.unit })
       return
     }
+    if (missing(eds.defra)) return
     for (const [line, key] of STEAM_LINES) lines.push(priced(row, line, key, make()))
     return
   }
 
-  if (row.stream === 'natural_gas' && isAu(row)) { priceAuGas(row, unit, lines, reject); return }
+  if (row.stream === 'natural_gas' && isAu(row)) {
+    if (missing(eds.nga)) return
+    priceAuGas(row, unit, lines, reject); return
+  }
   const routes = FUEL_ROUTES[row.stream]
   const route = unit ? routes[unit] : undefined
   if (!route) {
     reject({ code: 'unit_not_published', stream: row.stream, unit: row.unit })
     return
   }
+  if (missing(eds.defra)) return
   lines.push(priced(row, 'fuel_wtt', route.factorKey, route.conversion()))
 }
 
@@ -499,7 +535,7 @@ function priceRow(row: Cat3InputRow, lines: Cat3PricedLine[], unpriced: Cat3Unpr
  * means the inventory does not yet say what it burns, and a zero would assert something the customer
  * never said: that withholds, naming the streams.
  */
-export function priceCat3(inputs: Cat3Inputs): Cat3Result {
+export function priceCat3(inputs: Cat3Inputs, eds: Cat3Editions): Cat3Result {
   const meta = {
     gwp_basis: DEFRA_ENERGY_META.gwp_basis,
     source: DEFRA_ENERGY_META.source,
@@ -516,7 +552,15 @@ export function priceCat3(inputs: Cat3Inputs): Cat3Result {
   }
   const lines: Cat3PricedLine[] = []
   const unpriced: Cat3Unpriced[] = []
-  for (const row of inputs.rows) priceRow(row, lines, unpriced)
+  for (const row of inputs.rows) {
+    const before = lines.length
+    priceRow(row, lines, unpriced, eds)
+    for (const l of lines.slice(before)) {
+      if (l.flags.some(f => f.code === 'nz_mfe_3c')) continue
+      const u = l.note ? eds.nga : eds.defra
+      if ('held' in u) l.edition = { ...u.held }
+    }
+  }
   if (lines.length === 0) {
     // Rows arrived and none could be priced: a figure of zero would be a claim about emissions when
     // what happened is that nothing was priceable. The reasons say which rows and why.

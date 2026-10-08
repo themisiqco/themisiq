@@ -50,36 +50,36 @@ describe('the majority rule', () => {
 describe('DESNZ (class (a), DESNZ rule)', () => {
   it('March 2025 selects 2024 (published, not held: missing)', () => {
     const r = sel('desnz_grid', 2025, 3)
-    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DESNZ 2024', rule: 'desnz_april_march', reason: 'not_held' }) })
-    if ('missing' in r) expect(r.missing.basis).toBe('DESNZ 2024 grid electricity factors are needed for the year ending 31 March 2025 and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
+    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2024', rule: 'desnz_april_march', reason: 'not_held' }) })
+    if ('missing' in r) expect(r.missing.basis).toBe('DEFRA 2024 grid electricity factors are needed for the year ending 31 March 2025 and are not loaded, so this line is not counted. Export is blocked until they are loaded.')
   })
 
   it('June 2024 selects 2023, because the 2024 edition was first published on 8 July 2024', () => {
     const r = sel('desnz_grid', 2024, 6)
-    expect(label(r)).toBe('missing DESNZ 2023')
+    expect(label(r)).toBe('missing DEFRA 2023')
     if ('missing' in r) expect(r.missing.rule).toBe('desnz_july_june')
   })
 
   it('June 2025 selects 2025 (published 10 June 2025), with the design wording', () => {
     const r = chosen(sel('desnz_grid', 2025, 6))
-    expect(r.edition.label).toBe('DESNZ 2025')
-    expect(r.basis).toBe('DESNZ 2025 factors (published 10 June 2025), the newest published by 30 June 2025, following DESNZ guidance for July to June years.')
+    expect(r.edition.label).toBe('DEFRA 2025')
+    expect(r.basis).toBe('DEFRA 2025 factors (published 10 June 2025), the newest published by 30 June 2025, following DESNZ guidance for July to June years.')
   })
 
   it('calendar years take the year; September uses the majority fallback', () => {
     expect(chosen(sel('desnz_grid', 2026, 12)).basis).toMatch(/^DESNZ 2026 factors for reporting year 2026, following DESNZ guidance for calendar years\./)
     const sep = chosen(sel('desnz_grid', 2026, 9))
-    expect([sep.edition.label, sep.rule]).toEqual(['DESNZ 2026', 'desnz_majority_fallback'])
-    expect(sep.basis).toMatch(/^DESNZ 2026 factors: 2026 contains 273 of the 365 days in the year ending 30 September 2026\. DESNZ gives no guidance/)
+    expect([sep.edition.label, sep.rule]).toEqual(['DEFRA 2026', 'desnz_majority_fallback'])
+    expect(sep.basis).toMatch(/^DEFRA 2026 factors: 2026 contains 273 of the 365 days in the year ending 30 September 2026\. DESNZ gives no guidance/)
   })
 
   it('an edition with no recorded date is never selected', () => {
     const reg = FACTOR_EDITION_REGISTRY.map(e => e.dataset === 'desnz_grid' && e.editionYear === 2025
       ? { ...e, published: { source: 'x' } } : e)
     const r = sel('desnz_grid', 2025, 12, PREPARED, reg)
-    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DESNZ 2025', reason: 'no_date' }) })
+    expect(r).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2025', reason: 'no_date' }) })
     // June 2025 now finds 2024 as the newest dated edition by 30 June 2025, not the undated 2025.
-    expect(label(sel('desnz_grid', 2025, 6, PREPARED, reg))).toBe('missing DESNZ 2024')
+    expect(label(sel('desnz_grid', 2025, 6, PREPARED, reg))).toBe('missing DEFRA 2024')
   })
 
   it('values come from the latest correction to the file the values are held from (D2)', () => {
@@ -104,15 +104,15 @@ describe('DESNZ (class (a), DESNZ rule)', () => {
 describe('NGA (class (a), activity years 1 July N to 30 June N+1)', () => {
   it('each year end maps per section 8.2', () => {
     const ed = (y: number, m: number) => { const r = sel('nga_grid', y, m); return 'missing' in r ? r.missing.edition : 'provisional' in r ? r.provisional.edition.label : r.edition.label }
-    expect([ed(2025, 12), ed(2025, 3), ed(2025, 6), ed(2025, 9)]).toEqual(['NGA 2025', 'NGA 2024', 'NGA 2024', 'NGA 2024'])
-    expect([ed(2026, 3), ed(2026, 6), ed(2026, 9)]).toEqual(['NGA 2025', 'NGA 2025', 'NGA 2025'])
+    expect([ed(2025, 12), ed(2025, 3), ed(2025, 6), ed(2025, 9)]).toEqual(['DCCEEW NGA 2025', 'DCCEEW NGA 2024', 'DCCEEW NGA 2024', 'DCCEEW NGA 2024'])
+    expect([ed(2026, 3), ed(2026, 6), ed(2026, 9)]).toEqual(['DCCEEW NGA 2025', 'DCCEEW NGA 2025', 'DCCEEW NGA 2025'])
     expect(majorityYear(win(2025, 12), true)).toEqual({ year: 2025, days: 184, total: 365 })
     expect(chosen(sel('nga_grid', 2025, 12)).basis).toBe('NGA 2025 factors: the 2025-26 activity year (1 July 2025 to 30 June 2026) contains 184 of the 365 days in reporting year 2025.')
   })
 
   it('a month-only date is read as that month\'s last day', () => {
     expect(effectiveDate('2025-08')).toBe('2025-08-31')
-    expect(chosen(sel('nga_grid', 2026, 3, '2026-10-08')).edition.label).toBe('NGA 2025')
+    expect(chosen(sel('nga_grid', 2026, 3, '2026-10-08')).edition.label).toBe('DCCEEW NGA 2025')
   })
 })
 
@@ -199,15 +199,15 @@ describe('R19: an edition not yet published', () => {
   })
 
   it('published but not held is missing, not provisional (DESNZ 2024 for March 2025, only 2026 held)', () => {
-    expect(sel('desnz_combustion', 2025, 3)).toEqual({ missing: expect.objectContaining({ edition: 'DESNZ 2024', reason: 'not_held' }) })
+    expect(sel('desnz_combustion', 2025, 3)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2024', reason: 'not_held' }) })
     // An older year the registry does not list is published, not awaited: missing.
-    expect(sel('desnz_combustion', 2021, 12)).toEqual({ missing: expect.objectContaining({ edition: 'DESNZ 2021', reason: 'not_held' }) })
+    expect(sel('desnz_combustion', 2021, 12)).toEqual({ missing: expect.objectContaining({ edition: 'DEFRA 2021', reason: 'not_held' }) })
   })
 
   it('a June window that has not ended is provisional: a newer edition may still be published by its last day', () => {
     const r = sel('desnz_grid', 2027, 6, '2026-10-08')
     if (!('provisional' in r)) throw new Error(label(r))
-    expect([r.provisional.edition.label, r.provisional.awaited]).toEqual(['DESNZ 2026', 2027])
+    expect([r.provisional.edition.label, r.provisional.awaited]).toEqual(['DEFRA 2026', 2027])
   })
 })
 
@@ -273,7 +273,7 @@ describe('registry integrity', () => {
 
   it('R18: DESNZ travel and waste are registered with selection wired in T3e', () => {
     expect([DATASETS.desnz_travel.selectionWiredIn, DATASETS.desnz_waste.selectionWiredIn]).toEqual(['T3e', 'T3e'])
-    expect(FACTOR_EDITION_REGISTRY.filter(e => e.dataset === 'desnz_travel').map(e => e.label)).toEqual(['DESNZ 2022', 'DESNZ 2023', 'DESNZ 2024', 'DESNZ 2025', 'DESNZ 2026'])
+    expect(FACTOR_EDITION_REGISTRY.filter(e => e.dataset === 'desnz_travel').map(e => e.label)).toEqual(['DEFRA 2022', 'DEFRA 2023', 'DEFRA 2024', 'DEFRA 2025', 'DEFRA 2026'])
   })
 
   it('no sentence the selector writes has an em dash', () => {

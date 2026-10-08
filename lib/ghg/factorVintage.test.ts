@@ -7,6 +7,7 @@ import {
 } from './engine'
 import type { Location } from './engine'
 import { buildFactorEditions } from './factorEditions'
+import { testSel, heldYearFor } from '../testing/heldSelection'
 
 // ── THE VINTAGE COLUMN WAS HALF EMPTY, AND THE EMPTY HALF LOOKED LIKE AN ABSENCE OF FACTS ────────
 //
@@ -45,8 +46,10 @@ const pageSrc = readFileSync(join(ROOT, PAGE), 'utf8')
 
 const loc = (over: Partial<Location>): Location => ({ ...emptyLocation('l1', 'Site'), ...over })
 
-const rowsFor = (l: Location, year = 2026) => buildWorkings([l], 'AR6', year, [], 12) as any[]
-const priced = (l: Location, stream: string, year = 2026) =>
+// T3c: each site at the year whose editions are all held (lib/testing/heldSelection.ts), so these tests price on
+// today's tables as they did before edition selection.
+const rowsFor = (l: Location, year = heldYearFor(l.country)) => buildWorkings([l], 'AR6', year, [], 12) as any[]
+const priced = (l: Location, stream: string, year = heldYearFor(l.country)) =>
   rowsFor(l, year).find(r => r.stream === stream && !r.declaration)
 
 // One quantified combustion site per jurisdiction, each in a fuel and unit that jurisdiction offers.
@@ -60,11 +63,17 @@ const COMBUSTION_SITES: [string, Location][] = [
   ['NZ', loc({ country: 'NZ', grid_region: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' })],
 ]
 
+// T3c: the edition each site's window selects at its held year.
+const SELECTED: Record<string, string> = {
+  US: 'US EPA 2025', CA: 'ECCC 2025 v3.0', UK: 'DEFRA 2026', EU: 'IPCC 2006', AU: 'DCCEEW NGA 2025', NZ: 'MfE 2026 v2',
+}
+
 describe('G. combustion and steam rows carry their factor edition', () => {
   it('G1 the two rows seen blank in production now name their edition', () => {
     // THE EXACT PAIR FROM THE REPORT, asserted by value rather than by "is not empty".
     const propane = priced(COMBUSTION_SITES[0][1], 'propane')
-    expect(propane.factor_vintage, 'US propane read — before this').toBe('US EPA 2024')
+    // T3c: the held US values are the 2025 workbook, and the label now says so (it read 'US EPA 2024').
+    expect(propane.factor_vintage, 'US propane read').toBe('US EPA 2025')
 
     const steam = priced(loc({
       country: 'US', grid_region: 'US_CA',
@@ -77,10 +86,13 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     for (const [j, site] of COMBUSTION_SITES) {
       const row = rowsFor(site).find(r => !r.declaration && r.scope === 1)
       expect(row, `${j} produced no priced combustion row — the fixture is wrong, not the code`).toBeDefined()
-      expect(row.factor_vintage, `${j}`).toBe(COMBUSTION_EDITION[j as keyof typeof COMBUSTION_EDITION])
+      // T3c: the edition the window selected, from the registry, and the row's factor_edition says the same.
+      expect(row.factor_vintage, `${j}`).toBe(SELECTED[j])
+      expect(row.factor_edition, `${j}`).toBe(row.factor_vintage)
     }
     // Six distinct labels, so a fixture that quietly priced two jurisdictions from one table would
     // not be able to pass G2 by coincidence.
+    expect(new Set(Object.values(SELECTED)).size).toBe(6)
     expect(new Set(Object.values(COMBUSTION_EDITION)).size).toBe(6)
   })
 
@@ -89,7 +101,7 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     // copied. Compared per jurisdiction against the map the SAME save would write.
     for (const [j, site] of COMBUSTION_SITES) {
       const row = rowsFor(site).find(r => !r.declaration && r.scope === 1)
-      const stored = buildFactorEditions([site], 2026)[j as 'US']!
+      const stored = buildFactorEditions([site], heldYearFor(site.country))[j as 'US']!
       expect(stored.combustion!.edition, `${j} combustion edition`).toBe(row.factor_vintage)
       // ...and the citation on the row is the same citation the map recorded.
       expect(stored.combustion!.source).toBe(row.ef_source)
@@ -127,18 +139,21 @@ describe('G. combustion and steam rows carry their factor edition', () => {
     expect(STEAM_EDITION.CA, 'and no steam label is declared for it').toBeUndefined()
   })
 
-  it('G6 a combustion vintage does NOT move with the reporting year', () => {
-    // The tables have no year dimension. If this ever fails, someone has "aligned" combustion with
-    // the grid row's usedYear and reintroduced the NZ T&D defect one stream along.
-    for (const year of [2023, 2024, 2025, 2026]) {
-      expect(priced(COMBUSTION_SITES[2][1], 'natural_gas', year).factor_vintage, `UK ${year}`).toBe('DEFRA 2026')
+  it('G6 T3c: a combustion edition is selected by the reporting window, like the grid row beside it; never substituted', () => {
+    // Until T3c the combustion tables had no year dimension, and DEFRA 2026 priced every UK year. Now the edition the
+    // window needs is selected: 2026 prices on DEFRA 2026, and 2023 to 2025 need editions not held yet (T3d), so the
+    // line is unpriced, never priced on 2026.
+    expect(priced(COMBUSTION_SITES[2][1], 'natural_gas', 2026).factor_vintage, 'UK 2026').toBe('DEFRA 2026')
+    for (const year of [2023, 2024, 2025]) {
+      const r = rowsFor(COMBUSTION_SITES[2][1], year).find(x => x.stream === 'natural_gas')
+      expect([r.declaration, r.result_tco2e, r.unpriced.reason], `UK ${year}`).toEqual(['unpriced', null, 'edition_missing'])
+      expect(r.note, `UK ${year}`).toContain(`DEFRA ${year} fuel combustion factors are needed for reporting year ${year}`)
     }
-    // The grid row beside it DOES move, which is what makes the asymmetry visible rather than assumed.
     const gridRow = (year: number) => rowsFor(loc({
       country: 'GB', grid_region: 'UK', electricity_kwh: 100_000,
     }), year).find(r => r.scope2_method === 'location-based')
-    expect(gridRow(2025).factor_vintage).toBe('2025')
-    expect(gridRow(2026).factor_vintage).toBe('2026')
+    expect(gridRow(2025).factor_vintage).toBe('DEFRA 2025')
+    expect(gridRow(2026).factor_vintage).toBe('DEFRA 2026')
   })
 
   it('G7 NO FIGURE MOVED — the vintage is a label beside the number, not an input to it', () => {
@@ -203,15 +218,18 @@ describe('H. step 1 labels the grid factor for every resolved location', () => {
 
   it('H3 the label prices through the engine at the reporting year', () => {
     // Same contract gridDisplay.test.ts pins for the step-2 dropdowns: never a year-blind constant.
-    expect(labelLine()).toContain('getGridFactor(loc.grid_region, inventory.reporting_year).ef')
+    // T3c: through gridShown, which reads the page's selection context (the inventory's window).
+    expect(labelLine()).toContain('gridShown(loc.grid_region)')
+    expect(pageSrc).toContain('try { return String(getGridFactor(region, factorSel).ef) }')
+    expect(pageSrc).toContain('const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)')
   })
 
   it('H4 the gate is TRUE for a resolved US, CA and AU location and FALSE for a fresh one', () => {
     // The behaviour the textual guard stands in for. isResolvedGridRegion is the engine's own
     // predicate, so this asserts the three markets really do resolve rather than that the JSX changed.
-    for (const region of ['US_CA', 'ON', 'AU_NSW', 'UK', 'EU_FR', 'NZ']) {
+    for (const [region, country] of [['US_CA', 'US'], ['ON', 'CA'], ['AU_NSW', 'AU'], ['UK', 'GB'], ['EU_FR', 'FR'], ['NZ', 'NZ']]) {
       expect(isResolvedGridRegion(region), region).toBe(true)
-      expect(getGridFactor(region, 2026).ef, `${region} must price`).toBeGreaterThan(0)
+      expect(getGridFactor(region, testSel(heldYearFor(country))).ef, `${region} must price`).toBeGreaterThan(0)
     }
     // A brand-new location carries the 'us_average' init default, which is deliberately NOT a
     // GRID_EF key — so the label stays hidden until a country or state is actually chosen.

@@ -279,6 +279,8 @@ export function cat3ReasonText(r: Cat3Reason): string {
       return `no Australian state is recorded for ${r.location}, and NGA's Scope 3 factor depends on the state, so it is not counted yet; it is not priced at NGA's national figure`
     case 'au_gas_area_missing':
       return `whether ${r.location} is in a metro gas area is not recorded, and NGA's Scope 3 gas factor depends on it, so it is not counted yet`
+    case 'edition_missing':
+      return `the ${r.edition} factors this reporting year needs are not loaded, so it is not counted yet`
   }
 }
 
@@ -418,6 +420,8 @@ export function cat3LineText(l: Cat3PricedLine): string {
 export function cat3UnpricedText(u: Cat3Unpriced): string {
   if (u.reason.code === 'au_gas_area_missing') return cat3AuGasAreaMissingText(u.location)
   if (u.reason.code === 'au_state_missing') return cat3AuStateMissingText(u.location, u.stream)
+  // T3c: the engine's own sentence, naming the edition, the year and the site.
+  if (u.reason.code === 'edition_missing') return u.reason.message
   return endSentence(`${u.location}, ${CAT3_STREAM_LABEL[u.stream]}: not priced, ${cat3ReasonText(u.reason)}`)
 }
 

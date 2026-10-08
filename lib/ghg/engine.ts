@@ -20,6 +20,9 @@ import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 // copied: lib/unitConversions.ts is the single source and its header forbids inlining these.
 import { GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF, EXACT_UNITS, exactConversion, convertToCanonical, type FuelType } from '../unitConversions'
 import { dateInWords, isoDateInWords } from './dateWords'
+import { periodFromYearAndEnd, reportingYearLabel, reportingPeriodWords, reportingWindowIso, periodWords, yearLabel, type ReportingYearLabel } from './reportingYear'
+export { reportingYearLabel, reportingPeriodWords, reportingWindowIso, periodWords, yearLabel, type ReportingYearLabel }
+import { selectEdition, registryDateInWords, type DatasetId, type FrozenSelection, type SelectionRule } from './factorEditionRegistry'
 // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
 // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
 import { NOT_PROVIDED } from '../notProvided'
@@ -73,7 +76,7 @@ const GWP = {
      r507:  { AR4: 3985, AR5: 3985, AR6: 4775 },
    }
 
-// ⚠️ EDITION UNVERIFIED. EF_SOURCES.combustion cites "US EPA (2024)"; the workbook these values were
+// T3c: SETTLED AS 2025. EF_SOURCES.combustion cited "US EPA (2024)" until T3c; the workbook these values were
 // read from is the 2025 edition, last modified 15 January 2025. Nobody has checked whether the two
 // editions differ, so the citation may name the wrong year — exactly the position EF_UK was in before
 // 13 Aug 2026.
@@ -287,6 +290,8 @@ const EF_CA_NG_CH4_N2O_M3 = { ch4: 0.000037, n2o: 0.000035 }
 // Best Practices Methodology also use one national figure. A gas figure in GJ (gross, as billed) is converted to m³ at
 // this value and priced on the province's own per-m³ factor.
 const CA_NG_GJ_PER_M3 = 38.59 / 1000
+/** T3c (R18): the heat content keyed by its NIR data year (eccc_ng_heat). NIR 2025 (data year 2023) is the one held. */
+const CA_NG_HEAT_BY_EDITION: Record<number, number> = { 2023: CA_NG_GJ_PER_M3 }
 /** R12: the note on a Canadian gas row priced through the national heat content. */
 export const CA_GAS_GJ_NOTE =
   'Converted to m³ at 38.59 MJ/m³, Canada\'s national gross heat content for natural gas (ECCC National Inventory ' +
@@ -635,14 +640,14 @@ const US_PUBLISHED_NOTE: Record<string, string> = {
  * gas basis note, which states a basis; both stay on the row. Refused locations and unpriced lines are dropped, as in
  * combustionSourcesFor.
  */
-export function factorDerivationsFor(locations: readonly { country?: string }[]): string[] {
+export function factorDerivationsFor(locations: readonly { country?: string }[], sel: Sel): string[] {
   const out: string[] = []
   const words = (u: string) => EXACT_UNITS[u]?.many ?? u
   // The PDF passes its own location shape (the derived locations, typed loosely); read as a Location, as before.
   for (const loc of locations as readonly Location[]) {
     if (countryRefusal(loc)) continue
     for (const line of combustionLines(loc)) {
-      const picked = pickEF(loc, line.efKey as keyof typeof EF)
+      const picked = pickEF(loc, line.efKey as keyof typeof EF, sel)
       if (!picked.publisher) continue
       const c = picked.conversion
       if (c) out.push(`${line.source}: ${words(c.from)} converted to ${words(c.to)} (${c.statement}, exact).`)
@@ -653,7 +658,7 @@ export function factorDerivationsFor(locations: readonly { country?: string }[])
       if (derived) out.push(`${line.source}: ${derived}`)
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
-      const priced = steamPricing(loc)
+      const priced = steamPricingOrMissing(loc, sel)
       const from = loc.purchased_steam_unit ?? 'mmbtu'
       const c = priced && from !== priced.basis ? exactConversion(from, priced.basis) : null
       if (c) out.push(`Purchased steam: ${words(from)} converted to ${words(priced!.basis)} (${c.statement}, exact).`)
@@ -755,8 +760,8 @@ import { DEFRA_DESNZ_PUBLICATION, defraCitation, sourceAttributionsFor, type Sou
 export { DEFRA_DESNZ_PUBLICATION, defraCitation, sourceAttributionsFor, type SourceAttribution }
 
 /** The attributions an inventory's locations require: from the same citations its exports print. */
-export function sourceAttributionsForLocations(locations: readonly { country?: string }[]): SourceAttribution[] {
-  return sourceAttributionsFor([...combustionSourcesFor(locations), ...gridSourcesFor(locations)])
+export function sourceAttributionsForLocations(locations: readonly { country?: string }[], sel: Sel): SourceAttribution[] {
+  return sourceAttributionsFor([...combustionSourcesFor(locations, sel), ...gridSourcesFor(locations)])
 }
 
 /** Where, inside a publication, a factor was read from. Separate from the citation by design. */
@@ -799,7 +804,8 @@ function citeWithLocator(key: keyof typeof EF_SOURCES): string {
 }
 
 const EF_SOURCES = {
-  combustion: 'US EPA (2024) Emission Factors for Greenhouse Gas Inventories',
+  // T3c: the held values are the 2025 workbook (factorEditionRegistry, epa_hub_combustion), so the citation says 2025.
+  combustion: 'US EPA (2025) Emission Factors for Greenhouse Gas Inventories',
   combustion_ca: 'ECCC (2025) Emission factors and reference values v3.0',
   combustion_uk: defraCitation(2026),
   // ⚠️ NAMES THE DENSITY CONVERSION, AND THAT CLAUSE IS THE POINT OF THE STRING.
@@ -902,8 +908,91 @@ function vintageOf(
   return v ? { factor_vintage: v } : {}
 }
 
+// ── T3c: FACTOR EDITIONS ARE CHOSEN BY selectEdition, NEVER SUBSTITUTED ─────────────────────────────────────────
+// Rulings: docs/review/factor-year-selection.md section 8 (8.1 to 8.7) and design section 10 (R17 to R20). Every
+// year-keyed factor is read through editionFor, which asks the registry (lib/ghg/factorEditionRegistry.ts) which
+// edition the reporting WINDOW needs, prepared on a date. There is no nearest-year lookup anywhere: a required edition
+// that is not held throws MissingEditionError, and the caller leaves THAT LINE unpriced with an export-blocking issue
+// (edition_missing); an edition not yet published is priced on the newest published one, provisionally (R19).
+/** T3c: the frozen class (b) selections an inventory carries, by dataset (saved and read back in diff 3). */
+export type FactorSelection = Partial<Record<DatasetId, FrozenSelection>>
+/** What a caller passes: when the inventory was prepared (default: now) and any frozen class (b) selections. */
+export interface SelectionContext { preparedOn?: Date; frozen?: FactorSelection }
+/** The resolved context every selector takes: the reporting window, its year and the preparation date. */
+export interface Sel { year: number; win: { start: Date; end: Date }; preparedOn: string; frozen?: FactorSelection }
+const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/** The selection context for a reporting year and year end, prepared on `ctx.preparedOn` (today when not given). */
+export function selectionFor(year: number, fiscalYearEndMonth: number | null | undefined = 12, ctx: SelectionContext = {}): Sel {
+  const w = periodFromYearAndEnd(year, fiscalYearEndMonth ?? 12)
+  return { year, win: { start: w.start, end: w.end }, preparedOn: isoDay(ctx.preparedOn ?? new Date()), ...(ctx.frozen ? { frozen: ctx.frozen } : {}) }
+}
+/** The edition a line was priced with, and what its workings row says about it. `key` is the table key: the data year
+ *  for class (b), the edition year for class (a), null for an exempt default. */
+export interface EditionUse {
+  dataset: DatasetId; key: number | null; label: string; rule: SelectionRule; basis: string
+  published: string; corrected: string | null; provisional: boolean; selected_on?: string
+}
+/** T3c: the edition the rules require is not held (or nothing is published). The line is unpriced, never zero. */
+export class MissingEditionError extends Error {
+  readonly name = 'MissingEditionError'
+  constructor(readonly dataset: DatasetId, readonly edition: string, readonly reason: 'not_held' | 'no_date' | 'nothing_published', readonly basis: string) {
+    super(basis)
+  }
+  /** The message with the site named, as every other blocking message names it. */
+  forSite(site: string): string { return this.basis.replace('so this line is not counted', `so this line at ${site} is not counted`) }
+}
+const EDITION_MEMO = new Map<string, EditionUse | MissingEditionError>()
+/** The edition `dataset` is priced with for `sel`, or MissingEditionError. Pure; memoised on its inputs. */
+export function editionFor(dataset: DatasetId, sel: Sel): EditionUse {
+  const frozen = sel.frozen?.[dataset]
+  const k = [dataset, isoDay(sel.win.start), isoDay(sel.win.end), sel.year, sel.preparedOn, frozen ? `${frozen.label}@${frozen.selected_on}` : ''].join('|')
+  let hit = EDITION_MEMO.get(k)
+  if (!hit) {
+    const r = selectEdition(dataset, sel.win, sel.year, sel.preparedOn, frozen)
+    if ('missing' in r) hit = new MissingEditionError(dataset, r.missing.edition, r.missing.reason, r.missing.basis)
+    else {
+      const c = 'provisional' in r ? r.provisional : r
+      const e = c.edition
+      hit = { dataset, key: e.dataYear ?? e.editionYear ?? null, label: e.label, rule: c.rule, basis: c.basis,
+        // R20: an edition with no printed date is dated "on or before" the earliest date it is proven to exist.
+        published: e.published.date ? registryDateInWords(e.published.date)
+          : e.published.onOrBefore ? `on or before ${registryDateInWords(e.published.onOrBefore.date)}` : '',
+        corrected: c.correction && c.correctionHeld ? registryDateInWords(c.correction.date) : null,
+        provisional: 'provisional' in r, ...(c.selected_on ? { selected_on: c.selected_on } : {}) }
+    }
+    EDITION_MEMO.set(k, hit)
+  }
+  if (hit instanceof MissingEditionError) throw hit
+  return hit
+}
+/** The fields every factor row carries (T3c). factor_vintage is the edition label. */
+export function editionCells(u: EditionUse) {
+  return { factor_vintage: u.label, factor_edition: u.label, selection_rule: u.rule, selection_basis: u.basis,
+    edition_published: u.published, ...(u.corrected ? { edition_corrected: u.corrected } : {}), provisional: u.provisional,
+    ...(u.selected_on ? { selected_on: u.selected_on } : {}) }
+}
+/** The registry dataset each jurisdiction's stationary combustion table belongs to. The EU table is MRR Annex VI with
+ *  IPCC 2006 defaults: exempt, a fixed default (R17). */
+const COMBUSTION_DATASET: Record<EfJurisdiction, DatasetId> = {
+  US: 'epa_hub_combustion', CA: 'eccc_combustion', UK: 'desnz_combustion', EU: 'ipcc2006', AU: 'nga_combustion', NZ: 'mfe_combustion',
+}
+/** Purchased steam: only the US and the UK publish a factor (STEAM_EF); the R14 estimate takes its gas factor's edition. */
+const STEAM_DATASET: Partial<Record<EfJurisdiction, DatasetId>> = { US: 'epa_hub_steam', UK: 'desnz_steam' }
+/** The registry dataset a GRID_EF region belongs to. */
+function gridDataset(region: string): DatasetId {
+  if (region === 'UK') return 'desnz_grid'
+  if (region === 'NZ') return 'mfe_grid'
+  if (region.startsWith('US_')) return 'egrid'
+  if (region.startsWith('EU_')) return 'eea_grid'
+  if (region.startsWith('AU_')) return 'nga_grid'
+  return 'eccc_grid'   // the Canadian provinces and territories, keyed by ECCC data year
+}
+
+// THE HELD EDITION'S LABEL per jurisdiction, for the surfaces that name a table without pricing a line (a catalogue,
+// an unpriced line's publisher). Every priced row carries its SELECTED edition instead (editionCells). US: the held
+// values are the 2025 workbook (registry), so the label says 2025; it said "US EPA 2024" until T3c.
 const COMBUSTION_EDITION: Record<EfJurisdiction, string> = {
-  US: 'US EPA 2024',      // ⚠️ EF_SOURCES.combustion's year is itself UNVERIFIED — see the EF header.
+  US: 'US EPA 2025',
   CA: 'ECCC 2025 v3.0',
   UK: 'DEFRA 2026',
   EU: 'IPCC 2006',
@@ -917,7 +1006,7 @@ const COMBUSTION_EDITION: Record<EfJurisdiction, string> = {
  * tables by edition (`{ publisher, edition?, value }`): a value is always reported with the source that supplied it,
  * never with the location's country.
  */
-export interface FactorSource { jurisdiction: EfJurisdiction; publisher: string; edition?: string }
+export interface FactorSource { jurisdiction: EfJurisdiction; publisher: string; edition?: string; provisional?: true }
 const COMBUSTION_TABLE_SOURCE: Record<EfJurisdiction, FactorSource> = {
   US: { jurisdiction: 'US', publisher: EF_SOURCES.combustion, edition: COMBUSTION_EDITION.US },
   CA: { jurisdiction: 'CA', publisher: EF_SOURCES.combustion_ca, edition: COMBUSTION_EDITION.CA },
@@ -955,20 +1044,23 @@ const STEAM_EDITION: Partial<Record<EfJurisdiction, string>> = {
 const GWP_AS_PUBLISHED = 'as-published — see factor source'
 
 const GRID_EF: Record<string, Record<number, number>> = {
-  // Canadian provinces / territories — ECCC "Emission factors and reference values" v3.0 (Oct 2025), NIR 1990-2023 consumption intensities
-  ON: { 2024: 0.030, 2025: 0.038, 2026: 0.059 },
-  QC: { 2024: 0.0017, 2025: 0.0017, 2026: 0.0019 },
-  BC: { 2024: 0.015, 2025: 0.015, 2026: 0.018 },
-  AB: { 2024: 0.540, 2025: 0.490, 2026: 0.438 },
-  SK: { 2024: 0.730, 2025: 0.670, 2026: 0.631 },
-  MB: { 2024: 0.0020, 2025: 0.0014, 2026: 0.0025 },
-  NB: { 2024: 0.300, 2025: 0.350, 2026: 0.234 },
-  NS: { 2024: 0.690, 2025: 0.700, 2026: 0.581 },
-  PE: { 2024: 0.300, 2025: 0.350, 2026: 0.234 },
-  NL: { 2024: 0.017, 2025: 0.018, 2026: 0.017 },
-  YT: { 2024: 0.080, 2025: 0.070, 2026: 0.074 },
-  NT: { 2024: 0.170, 2025: 0.190, 2026: 0.420 },
-  NU: { 2024: 0.840, 2025: 0.820, 2026: 0.800 },
+  // Canadian provinces / territories — ECCC "Emission factors and reference values" v3.0 (Oct 2025) Tables 5.1 to 5.3.
+  // T3c: KEYED BY DATA YEAR (the NIR edition each table cites: 5.1 NIR 1990-2021, 5.2 1990-2022, 5.3 1990-2023), not by
+  // the calendar year ECCC says each "must be used for" (2023/24, 2025, 2026), which is the offset-system rule; class
+  // (b) applies (ruling 8.1, C1). The values are unchanged in v4.0. Data year 2024 (v4.0 Table 5.4) is not held yet.
+  ON: { 2021: 0.030, 2022: 0.038, 2023: 0.059 },
+  QC: { 2021: 0.0017, 2022: 0.0017, 2023: 0.0019 },
+  BC: { 2021: 0.015, 2022: 0.015, 2023: 0.018 },
+  AB: { 2021: 0.540, 2022: 0.490, 2023: 0.438 },
+  SK: { 2021: 0.730, 2022: 0.670, 2023: 0.631 },
+  MB: { 2021: 0.0020, 2022: 0.0014, 2023: 0.0025 },
+  NB: { 2021: 0.300, 2022: 0.350, 2023: 0.234 },
+  NS: { 2021: 0.690, 2022: 0.700, 2023: 0.581 },
+  PE: { 2021: 0.300, 2022: 0.350, 2023: 0.234 },
+  NL: { 2021: 0.017, 2022: 0.018, 2023: 0.017 },
+  YT: { 2021: 0.080, 2022: 0.070, 2023: 0.074 },
+  NT: { 2021: 0.170, 2022: 0.190, 2023: 0.420 },
+  NU: { 2021: 0.840, 2022: 0.820, 2023: 0.800 },
   // US states — EPA eGRID2023 state output rates (lb/MWh x 0.4536 / 1000)
   US_AK: { 2023: 0.3695 }, US_AL: { 2023: 0.3239 }, US_AR: { 2023: 0.4529 }, US_AZ: { 2023: 0.3126 },
   US_CA: { 2023: 0.1791 }, US_CO: { 2023: 0.4949 }, US_CT: { 2023: 0.2453 }, US_DC: { 2023: 0.1792 },
@@ -1053,19 +1145,12 @@ const NZ_TD_LOSS: Record<number, number> = { 2025: 0.00596 }
 // to look for a source document that does not exist, and would quietly excuse a table that should be
 // filled in. "(earliest vintage held)" claims only what can be checked from this file.
 // Same rule as the error-message one: state what was observed, never a cause you have not verified.
-function nzTdLoss(year: number): { ef: number; vintage: string; note: string } {
-  const years = Object.keys(NZ_TD_LOSS).map(Number).sort((a, b) => a - b)
-  let ty = years[0]; for (const y of years) { if (y <= year) ty = y }
-  return {
-    ef: NZ_TD_LOSS[ty],
-    // 'MfE 2025', matching 'AIB 2024' / 'Green-e 2025 [2023 data]': publisher + the factor's own
-    // applicability year, NOT the edition year of the document (MfE's 2026 v2 publishes a 2025 factor).
-    vintage: `MfE ${ty}`,
-    note:
-      ty === year ? ''
-      : ty < year ? `MfE ${ty} T&D loss factor applied to ${year} inventory (latest vintage held).`
-      : `MfE ${ty} T&D loss factor applied to ${year} inventory (earliest vintage held).`,
-  }
+function nzTdLoss(sel: Sel): { ef: number; vintage: string; edition: EditionUse } {
+  // T3c: the MfE T&D series row the window selects (class (b), data year). No nearest-year lookup.
+  const u = editionFor('mfe_td', sel)
+  const ef = NZ_TD_LOSS[u.key as number]
+  if (ef === undefined) throw new Error(`The registry holds ${u.label}, but NZ_TD_LOSS has no ${u.key} value.`)
+  return { ef, vintage: u.label, edition: u }
 }
 // ── DEFERRED: Scope 3 Category 3 (upstream / T&D) ELECTRICITY factors — AU + NZ ──────────────
 // NOT WIRED HERE. Category 3 electricity is priced in lib/scope3/cat3Energy.ts from DEFRA's upstream factors (a UK
@@ -1181,21 +1266,20 @@ function isResolvedGridRegion(region: string): boolean {
 // RESOLUTION SEMANTICS UNCHANGED. `years` was already sorted one line above `years[0]` — there was no
 // enumeration-order hazard to fix — and the forward fallback is left exactly as it was. This adds
 // disclosure only; no figure moves.
-function getGridFactor(region: string, year: number): { ef: number; usedRegion: string; usedYear: number; note: string } {
+function getGridFactor(region: string, sel: Sel): { ef: number; usedRegion: string; edition: EditionUse } {
+  // T3c: the edition the window needs for this region's publisher, through editionFor; MissingEditionError when it is not
+  // held. No `<=` loop, no forward move to the earliest key: those were the nearest-year substitution this replaces.
   const table = GRID_EF[region]
-  // Unknown region → US national average. UNCHANGED and still undisclosed: `note: ''` is here only
-  // because the return type requires it. buildWorkings cannot reach this branch (isResolvedGridRegion
-  // gates it), but calcLocation and four UI banners can. Giving it a note or an applicable flag is a
-  // separate decision, deliberately not taken here.
-  if (!table) return { ef: GRID_EF.US_AVG[2023], usedRegion: 'US_AVG', usedYear: 2023, note: '' }
-  const years = Object.keys(table).map(Number).sort((a, b) => a - b)
-  if (table[year] !== undefined) return { ef: table[year], usedRegion: region, usedYear: year, note: '' }
-  let best = years[0]
-  for (const y of years) { if (y <= year) best = y }
-  return { ef: table[best], usedRegion: region, usedYear: best,
-    note: best < year
-      ? `Grid factor for ${best} applied to ${year} inventory (latest vintage held).`
-      : `Grid factor for ${best} applied to ${year} inventory (earliest vintage held).` }
+  // Unknown region → US national average. UNCHANGED and still undisclosed, as before T3c, except that the eGRID edition is
+  // now selected. buildWorkings cannot reach this branch (isResolvedGridRegion gates it).
+  if (!table) {
+    const u = editionFor('egrid', sel)
+    return { ef: GRID_EF.US_AVG[u.key as number], usedRegion: 'US_AVG', edition: u }
+  }
+  const u = editionFor(gridDataset(region), sel)
+  const ef = table[u.key as number]
+  if (ef === undefined) throw new Error(`The registry holds ${u.label}, but GRID_EF.${region} has no ${u.key} value.`)
+  return { ef, usedRegion: region, edition: u }
 }
 // DIRECTION-AWARE FALLBACK NOTE for the residual helpers. `year !== y` fired one wording in both
 // directions, so a forward resolution claimed the LATEST vintage when it had reached for the EARLIEST.
@@ -1207,11 +1291,6 @@ function getGridFactor(region: string, year: number): { ef: number; usedRegion: 
 // `vintage`, so the note and the vintage column can never name the factor differently.
 // RESOLUTION SEMANTICS UNCHANGED — `let y = years[0]` still resolves forward, exactly as getGridFactor
 // does. This is disclosure only; no figure moves.
-const vintageNote = (label: string, resolved: number, year: number): string =>
-  resolved === year ? ''
-  : resolved < year ? `${label} residual mix applied to ${year} inventory (latest vintage held).`
-  : `${label} residual mix applied to ${year} inventory (earliest vintage held).`
-
 // Returns the market-based residual factor for a region, in kg CO2e/kWh, with provenance.
 // applicable=false means no residual mix exists for this region (e.g. full-disclosure AT, or a
 // region we don't cover) — caller MUST fall back to the location-based factor and stamp the note.
@@ -1235,28 +1314,28 @@ export function residualRegionFor(loc: Pick<Location, 'residual_region' | 'grid_
 
 function getResidualFactor(
   region: string,
-  year: number,
+  sel: Sel,
   gwpVersion: GwpVersion,
   // FI8: the location's country, so the note can say which country has no residual mix loaded.
   country?: string,
-): { ef: number; applicable: boolean; source: string; vintage: string; usedRegion: string; note: string } {
+): { ef: number; applicable: boolean; source: string; vintage: string; usedRegion: string; note: string; edition?: EditionUse } {
   // EU: published combined CO2e in gCO2/kWh. region is the EU_XX grid key.
   if (region.startsWith('EU_')) {
     const table = RESIDUAL_EU[region]
     if (table) {
-      const years = Object.keys(table).map(Number).sort((a, b) => a - b)
-      let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
-      const val = table[y]
+      // T3c: the AIB data year the window selects (class (b)); MissingEditionError when it is not held.
+      const u = editionFor('aib', sel)
+      const val = table[u.key as number]
+      if (val === undefined) throw new Error(`The registry holds ${u.label}, but RESIDUAL_EU.${region} has no ${u.key} value.`)
       // ONE binding for the factor's identity, used by BOTH `vintage` and the note. They named the same
       // factor twice in two places; a single source is what stops them drifting (see the US branch,
       // where they HAD drifted).
-      const vintage = `AIB ${y}`
+      const vintage = u.label
       if (val === null) {
         return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage, usedRegion: region,
           note: 'Full-disclosure regime — no residual mix published; market-based falls back to location factor.' }
       }
-      return { ef: val / 1000, applicable: true, source: EF_SOURCES.residual_eu, vintage, usedRegion: region,
-        note: vintageNote(vintage, y, year) }
+      return { ef: val / 1000, applicable: true, source: EF_SOURCES.residual_eu, vintage, usedRegion: region, note: '', edition: u }
     }
     return { ef: 0, applicable: false, source: EF_SOURCES.residual_eu, vintage: 'n/a', usedRegion: region,
       note: 'No published residual mix for this region; market-based falls back to location factor.' }
@@ -1264,23 +1343,26 @@ function getResidualFactor(
   // AU: DCCEEW publishes ONE national combined CO2e figure — no gas split, no region lookup, the year
   // is the only dimension. Dispatched on the country token residualRegionFor emits.
   if (region === 'AU') {
-    const years = Object.keys(RESIDUAL_AU).map(Number).sort((a, b) => a - b)
-    let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
+    // T3c: the NGA edition the window selects (class (a), activity years).
+    const u = editionFor('nga_residual', sel)
+    const y = u.key as number
+    if (RESIDUAL_AU[y] === undefined) throw new Error(`The registry holds ${u.label}, but RESIDUAL_AU has no ${y} value.`)
     // Names the publisher, the edition AND the basis. DCCEEW computes the RMF over financial years
     // (ending June) with a 3-year averaging lag, because LGCs are created on a calendar-year basis up
     // to 12 months after the generation they represent. A verifier reconciling a CALENDAR-year
     // inventory against this figure needs that before they start; the full explanation is in
     // EF_SOURCES.residual_au.
     const vintage = `DCCEEW ${y} RMF (FY basis, 3-yr avg)`
-    return { ef: RESIDUAL_AU[y], applicable: true, source: EF_SOURCES.residual_au, vintage, usedRegion: region,
-      note: vintageNote(vintage, y, year) }
+    return { ef: RESIDUAL_AU[y], applicable: true, source: EF_SOURCES.residual_au, vintage, usedRegion: region, note: '', edition: u }
   }
   // US: Green-e residual CO2 + eGRID CH4/N2O, lb/MWh -> kg/kWh CO2e via selected GWP. region is the eGRID subregion.
   const table = RESIDUAL_US[region]
   if (table) {
-    const years = Object.keys(table).map(Number).sort((a, b) => a - b)
-    let y = years[0]; for (const yy of years) { if (yy <= year) y = yy }
+    // T3c: the Green-e data year the window selects (class (b)).
+    const u = editionFor('greene', sel)
+    const y = u.key as number
     const g = table[y]
+    if (g === undefined) throw new Error(`The registry holds ${u.label}, but RESIDUAL_US.${region} has no ${y} value.`)
     const gwp = GWP[gwpVersion]
     const lbPerMwh = g.co2 + g.ch4 * gwp.CH4_fossil + g.n2o * gwp.N2O
     const ef = lbPerMwh * 0.453592 / 1000 // lb/MWh -> kg/kWh
@@ -1296,10 +1378,8 @@ function getResidualFactor(
     // sentence would misattribute the mix to a publisher that does not produce one. So the note carries
     // the factor name alone, and the vintage is built FROM it — which is what keeps the two from
     // drifting while still letting them say the right thing in their different roles.
-    const factorName = `Green-e ${y + 2} [${y} data]`
-    const vintage = `${factorName} + eGRID2023 Rev2`
-    return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage, usedRegion: region,
-      note: vintageNote(factorName, y, year) }
+    const vintage = `${u.label} + eGRID2023 Rev2`
+    return { ef, applicable: true, source: EF_SOURCES.residual_us, vintage, usedRegion: region, note: '', edition: u }
   }
   // FI8: say WHY there is no residual mix. A blank region outside the US means none is loaded for that country (the
   // UK, Canada and New Zealand today); a blank US region means no eGRID subregion has been chosen. Not "no published
@@ -1942,63 +2022,8 @@ export function overrideProblem(o: { reason: string; by?: { userId: string; emai
   return null
 }
 
-// Derive the reporting period from a reporting year + fiscal year-end MONTH (1-12).
-// 12 (December) -> Jan 1 – Dec 31 of the reporting year (calendar year, the default).
-// Any other month -> the 12 months ENDING on the last day of that month in the reporting year.
-// The last day is computed leap-year-aware (e.g. a February end resolves to 28 or 29 correctly).
+// The reporting window and its labels live in lib/ghg/reportingYear.ts (T3c diff 2), imported above and re-exported.
 const parseLocalDate = (s: string): Date => { const [y, m, d] = s.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d) }
-function periodFromYearAndEnd(reportingYear: number, fiscalYearEndMonth: number = 12): { start: Date; end: Date; label: string } {
-  const m = (fiscalYearEndMonth >= 1 && fiscalYearEndMonth <= 12) ? fiscalYearEndMonth : 12
-  const end = new Date(reportingYear, m, 0) // day 0 of the next month = last day of month m (leap-aware)
-  const start = new Date(end)
-  start.setDate(start.getDate() + 1)
-  start.setFullYear(start.getFullYear() - 1)
-  const fmt = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-  return { start, end, label: `${fmt(start)} – ${fmt(end)}` }
-}
-// The reporting year as a customer reads it, built from the window periodFromYearAndEnd returns (`end` is the
-// last day IN the year), never from reporting_year and a month. THE ONE PLACE THIS LABEL IS BUILT (T3a, T3b).
-// "FY2024" was ambiguous for a non-December year end (the year ending in 2024, or the one starting in it), so
-// a non-December year is named by its window. No form uses "FY" or "YE".
-//   heading (menus, tiles, headings): December '2025'; otherwise 'Apr 2024 to Mar 2025', the first and last months.
-//   axis (chart axes only):           December '2025'; otherwise '2024–25' (an en dash, axes only).
-//   fileTag (filenames):              December '2025'; otherwise '2024-04_to_2025-03'.
-//   inText (running text):            December 'reporting year 2025'; otherwise 'the year ending 31 March 2025'.
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-export interface ReportingYearLabel { heading: string; axis: string; fileTag: string; inText: string }
-export function reportingYearLabel(win: { start: Date; end: Date }): ReportingYearLabel {
-  const s = win.start, e = win.end
-  if (e.getMonth() === 11 && e.getDate() === 31) {
-    const y = String(e.getFullYear())
-    return { heading: y, axis: y, fileTag: y, inText: `reporting year ${y}` }
-  }
-  const mon = (d: Date) => MONTH_NAMES[d.getMonth()].slice(0, 3)
-  const mm = (d: Date) => String(d.getMonth() + 1).padStart(2, '0')
-  return {
-    heading: `${mon(s)} ${s.getFullYear()} to ${mon(e)} ${e.getFullYear()}`,
-    axis: `${s.getFullYear()}\u2013${String(e.getFullYear()).slice(-2)}`,
-    fileTag: `${s.getFullYear()}-${mm(s)}_to_${e.getFullYear()}-${mm(e)}`,
-    inText: `the year ending ${e.getDate()} ${MONTH_NAMES[e.getMonth()]} ${e.getFullYear()}`,
-  }
-}
-/** T3b: the window in words, for the "Reporting period" and "Year end" rows and the field hint:
- *  period '1 April 2024 to 31 March 2025', yearEnd '31 March'. Dates in words, as everywhere a date is shown (T10c). */
-export function reportingPeriodWords(win: { start: Date; end: Date }): { period: string; yearEnd: string } {
-  return { period: `${dateInWords(win.start)} to ${dateInWords(win.end)}`, yearEnd: `${win.end.getDate()} ${MONTH_NAMES[win.end.getMonth()]}` }
-}
-/** T3b diff b: the window as inclusive yyyy-mm-dd dates, in local time, for a request that carries it (the Scope 3
- *  spend-factor route). Built from periodFromYearAndEnd, so the window has one definition. */
-export function reportingWindowIso(reportingYear: number, fiscalYearEndMonth?: number | null): { start: string; end: string } {
-  const w = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth ?? 12)
-  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return { start: iso(w.start), end: iso(w.end) }
-}
-/** T3b: the window in words for a stored reporting_year and fiscal_year_end_month (null or missing is December). */
-export const periodWords = (reportingYear: number, fiscalYearEndMonth?: number | null) =>
-  reportingPeriodWords(periodFromYearAndEnd(reportingYear, fiscalYearEndMonth ?? 12))
-/** T3b: the label for a stored reporting_year and fiscal_year_end_month (null or missing is December). */
-export const yearLabel = (reportingYear: number, fiscalYearEndMonth?: number | null): ReportingYearLabel =>
-  reportingYearLabel(periodFromYearAndEnd(reportingYear, fiscalYearEndMonth ?? 12))
 
 // T10c: dates in words come from lib/ghg/dateWords.ts, the one place they are built; re-exported for callers.
 export { dateInWords, isoDateInWords }
@@ -2848,7 +2873,13 @@ export function steamEstimateNote(country: string, gasFactor: string, gasSource:
   return `Estimated: no published factor for purchased steam or district heat in ${country}. Calculated as if generated from natural gas at 80% efficiency: ${gasFactor} (${gasSource}) / 0.80 (method: GHG Protocol Scope 2 Guidance, Appendix A; 80% assumption: US EPA GHG Emission Factors Hub 2025, Table 7). It excludes distribution losses and may overstate a network that uses low-carbon heat. Enter your provider's emission intensity to replace it.`
 }
 
-export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBasis; source: string; supplier: boolean; estimated?: { note: string; vintage?: string } } | null {
+export type SteamPriced = { ef: CombustionEF; basis: SteamBasis; source: string; supplier: boolean; edition?: EditionUse; estimated?: { note: string; vintage?: string } }
+/**
+ * The factor that prices this location's purchased steam, or null where there is none (FI7). T3c: a published factor
+ * (US EPA Table 7, DEFRA) is the edition the window selects, and the R14 estimate takes its gas factor's selection;
+ * either throws MissingEditionError when the edition it needs is not held. A supplier figure has no edition.
+ */
+export function steamPricing(loc: Location, sel: Sel): SteamPriced | null {
   const sup = loc.purchased_steam_supplier_ef
   if (typeof sup === 'number' && sup > 0) {
     // A supplier states ONE kg CO2e per unit with its own GWP set baked in — the same shape as DEFRA,
@@ -2864,13 +2895,20 @@ export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBas
   const entry = steamFactorFor(loc)
   // null entry = the country resolves to no jurisdiction, so there is no table to ask: not priced. The location is
   // excluded whole before this is reached.
-  if (entry?.kind === 'published') return { ef: entry.ef, basis: entry.basis, source: entry.source, supplier: false }
+  if (entry?.kind === 'published') {
+    const j = efJurisdiction(loc)!
+    const u = editionFor(STEAM_DATASET[j]!, sel)
+    return { ef: entry.ef, basis: entry.basis, source: entry.source, supplier: false, edition: u }
+  }
   if (entry?.kind !== 'estimated') return null
   // R14: the site's OWN country's natural gas factor per GJ gross (pickEF reads that table only: never another
   // country's, R2), each gas divided by the efficiency. CA needs its province (R12); with none, there is no gas factor
   // and the line is unpriced with the province message.
   const j = efJurisdiction(loc)!
-  const gas = pickEF(loc, 'natural_gas_gj')
+  const gas = pickEF(loc, 'natural_gas_gj', sel)
+  // R14 (R17): the estimate takes its gas factor's edition, so a missing gas edition is the steam line's too.
+  const gasEdition = editionMissOf(gas.factor)
+  if (gasEdition) throw gasEdition
   if (!isPriceableEF(gas.factor) || !gas.publisher) return null
   const e = STEAM_BOILER_EFFICIENCY
   const ef = { co2: gas.factor.co2 / e, ch4: gas.factor.ch4 / e, n2o: gas.factor.n2o / e }
@@ -2878,14 +2916,19 @@ export function steamPricing(loc: Location): { ef: CombustionEF; basis: SteamBas
   const gasFactor = `${Number(gas.factor.co2.toPrecision(5))} kg ${combined ? 'CO2e' : 'CO2 (with CH4 and N2O on the same basis)'} per GJ gross natural gas`
   const ctry = canonicalCountryCode(loc.country)
   const note = steamEstimateNote(countryNameEn(ctry === 'EL' ? 'GR' : ctry), gasFactor, steamGasSource(loc, j))
-  return { ef, basis: 'gj', supplier: false, estimated: { note, vintage: gas.publisher.edition },
+  return { ef, basis: 'gj', supplier: false, estimated: { note, vintage: gas.publisher.edition }, ...(gas.edition ? { edition: gas.edition } : {}),
     source: `Estimate: ${gas.publisher.publisher} natural gas / 0.80 (GHG Protocol Scope 2 Guidance, Appendix A; US EPA GHG Emission Factors Hub 2025, Table 7)` }
 }
 
+/** steamPricing, with a missing edition read as "not priced" (null). For callers that only need the figure; the
+ *  unpriced line and its message come from unpricedLines. */
+export function steamPricingOrMissing(loc: Location, sel: Sel): SteamPriced | null {
+  try { return steamPricing(loc, sel) } catch (e) { if (e instanceof MissingEditionError) return null; throw e }
+}
 /** The priced steam figure in tonnes, or 0 when the stream cannot be priced. Shared by both callers. */
-function steamTonnes(loc: Location, gwpVersion: GwpVersion): number {
+function steamTonnes(loc: Location, gwpVersion: GwpVersion, sel: Sel): number {
   if (!loc.has_purchased_steam || loc.purchased_steam_mmbtu <= 0) return 0
-  const p = steamPricing(loc)
+  const p = steamPricingOrMissing(loc, sel)
   if (!p) return 0
   return calcGas(p.ef, steamToBasis(loc.purchased_steam_mmbtu, loc.purchased_steam_unit, p.basis).amount, gwpVersion).total
 }
@@ -2904,11 +2947,13 @@ function steamTonnes(loc: Location, gwpVersion: GwpVersion): number {
 // factor is not missing from a table; the input that selects it is, so the line asks for the province.
 // FI9: 'fleet_legacy', a fleet figure entered before vehicle types were asked; 'equipment', non-road fuel whose publisher
 // splits by equipment type, with none chosen. Like 'province', the factor exists; the input that selects it is missing.
-type MissCause = 'province' | 'fleet_legacy' | 'equipment'
-interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string; cause?: MissCause } }
+type MissCause = 'province' | 'fleet_legacy' | 'equipment' | 'edition'
+interface MissingEF { co2?: undefined; ch4?: undefined; n2o?: undefined; __missing: { key: string; country: string; cause?: MissCause; edition?: MissingEditionError } }
 
-const efMiss = (key: string, country: string, cause?: MissCause): CombustionEF =>
-  ({ __missing: { key, country: country || '(unset)', ...(cause ? { cause } : {}) } } as unknown as CombustionEF)
+const efMiss = (key: string, country: string, cause?: MissCause, edition?: MissingEditionError): CombustionEF =>
+  ({ __missing: { key, country: country || '(unset)', ...(cause ? { cause } : {}), ...(edition ? { edition } : {}) } } as unknown as CombustionEF)
+/** T3c: the MissingEditionError a miss carries, if the edition was the reason. */
+const editionMissOf = (ef: CombustionEF): MissingEditionError | undefined => (ef as unknown as MissingEF).__missing?.edition
 
 // FI2: the shared resolution step that lived here (efOr) is tableLookup, below pickEF, which also returns the table
 // that supplied the value. Scalar entries such as EF.ammonia (never priced: no GWP) are still a miss there.
@@ -2943,6 +2988,8 @@ const isPriceableEF = (ef: CombustionEF | MissingEF | null | undefined): ef is C
 function assertPriceable(ef: CombustionEF | MissingEF | null | undefined): asserts ef is CombustionEF {
   if (isPriceableEF(ef)) return
   const miss = (ef as MissingEF | null | undefined)?.__missing
+  // T3c: a missing edition is its own refusal, so a caller can name the edition rather than a unit.
+  if (miss?.edition) throw miss.edition
   const { fuel, unit } = splitFactorKey(miss?.key ?? '')
   throw new MissingEmissionFactorError(fuel, unit, miss?.country ?? '(unknown country)', miss?.key ?? '(unknown key)')
 }
@@ -2960,6 +3007,10 @@ export interface PickedFactor {
   /** FI9: a fleet row's note (publisher, row used, why) and, for a US road line with no miles, the sentence saying
    *  methane and nitrous oxide are not counted. */
   fleet?: { note: string; notCounted?: string; type: FleetType; fuel: FleetFuel }
+  /** T3c: the edition the value came from, as selected for the window. Absent on a miss. */
+  edition?: EditionUse
+  /** T3c (R12, R18): a Canadian gas figure in an energy unit, priced through this NIR edition's heat content. */
+  heat?: EditionUse
 }
 
 /**
@@ -2992,17 +3043,37 @@ const splitKey = (key: string): [string, string] => {
   return i < 0 ? [key, ''] : [key.slice(0, i), key.slice(i + 1)]
 }
 
-function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial'] | string): PickedFactor {
+// T3c: each combustion table keyed by the edition it holds. Today's single held edition per table, as the registry
+// records it held; a window that needs another edition gets MissingEditionError, never this one.
+const COMBUSTION_BY_EDITION: Record<EfJurisdiction, Record<number, unknown>> = {
+  US: { 2025: EF },
+  CA: { 2023: EF_CA, 2024: EF_CA, 2025: EF_CA, 2026: EF_CA },   // ECCC v3.0's 2023/24, 2025 and 2026 sets (identical for these keys)
+  UK: { 2026: EF_UK },
+  EU: {},                                                    // exempt: a fixed default (MRR Annex VI, IPCC 2006)
+  AU: { 2025: EF_AU },
+  NZ: { 2026: EF_NZ },
+}
+function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof typeof EF_UK | keyof typeof EF_EU | keyof typeof EF_AU | keyof (typeof EF_NZ)['commercial'] | string, sel: Sel): PickedFactor {
   const ctry = canonicalCountryCode(loc.country)
   // ⚠️ STEAM DOES NOT COME THROUGH HERE. See STEAM_EF.
   const j = efJurisdiction(loc)
   // ⚠️ AN UNSUPPORTED COUNTRY IS A MISS. efMiss is the uniform marker a missing factor produces, so calcGas's
   // assertPriceable refuses it, and the country refusal excludes the location.
   if (j === null) return { factor: efMiss(String(key), loc.country || ''), publisher: null }
-  if (String(key).startsWith('fleet:')) return pickFleet(loc, String(key), j, ctry)
-  let own: Record<string, unknown> =
-    j === 'US' ? EF : j === 'CA' ? EF_CA : j === 'UK' ? EF_UK : j === 'EU' ? EF_EU : j === 'AU' ? EF_AU
-      : (EF_NZ as Record<string, Record<string, unknown>>)[loc.nz_use_class ?? 'commercial']   // NZ is use-class keyed
+  if (String(key).startsWith('fleet:')) return pickFleet(loc, String(key), j, ctry, sel)
+  // T3c: the edition the window needs, from the registry. A missing one is a miss carrying the error, so the line is
+  // unpriced with its own message (unpricedLines), never priced from another edition.
+  let edition: EditionUse
+  try { edition = editionFor(COMBUSTION_DATASET[j], sel) } catch (e) {
+    if (e instanceof MissingEditionError) return { factor: efMiss(String(key), ctry, 'edition', e), publisher: null }
+    throw e
+  }
+  const held = j === 'EU' ? EF_EU : COMBUSTION_BY_EDITION[j][edition.key as number]
+  if (!held) throw new Error(`The registry holds ${edition.label}, but the ${j} combustion table has no ${edition.key} edition.`)
+  let heat: EditionUse | undefined
+  let own: Record<string, unknown> = j === 'NZ'
+    ? (held as Record<string, Record<string, unknown>>)[loc.nz_use_class ?? 'commercial']   // NZ is use-class keyed
+    : held as Record<string, unknown>
   if (j === 'CA' && String(key).startsWith('natural_gas_')) {
     // ⚠️ CANADIAN GAS, ANY UNIT, NEEDS THE PROVINCE (FI1). ECCC publishes natural gas CO2 by province, per m³; with no
     // province there is no factor, so the line is a miss with cause 'province'. With one, the province's CO2 and the
@@ -3012,11 +3083,24 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
     const perM3 = { co2: EF_CA_NG_CO2_M3[prov], ...EF_CA_NG_CH4_N2O_M3 }
     // FI3 (R12): per GJ gross = the province's per-m³ factor / 0.03859 GJ per m³, computed here so a factor update
     // flows through. No per-GJ literal is stored.
-    const m3PerGj = 1 / CA_NG_GJ_PER_M3
-    own = { ...own, natural_gas_m3: perM3,
-      natural_gas_gj: { co2: perM3.co2 * m3PerGj, ch4: perM3.ch4 * m3PerGj, n2o: perM3.n2o * m3PerGj } }
+    own = { ...own, natural_gas_m3: perM3 }
+    // T3c (R12, R18): the heat content is its own edition (ECCC NIR, by data year). Only a figure in an energy unit
+    // goes through it; a missing NIR edition is a miss on that line alone, never priced on another year's heat content.
+    if (EXACT_UNITS[splitKey(String(key))[1]]?.kind === 'energy') {
+      try { heat = editionFor('eccc_ng_heat', sel) } catch (e) {
+        if (e instanceof MissingEditionError) return { factor: efMiss(String(key), ctry, 'edition', e), publisher: null }
+        throw e
+      }
+      const gjPerM3 = CA_NG_HEAT_BY_EDITION[heat.key as number]
+      if (gjPerM3 === undefined) throw new Error(`The registry holds ${heat.label}, but no Canadian heat content is held for ${heat.key}.`)
+      const m3PerGj = 1 / gjPerM3
+      own = { ...own, natural_gas_gj: { co2: perM3.co2 * m3PerGj, ch4: perM3.ch4 * m3PerGj, n2o: perM3.n2o * m3PerGj } }
+    }
   }
-  return routeFactor(own, String(key), j, ctry)
+  const r = routeFactor(own, String(key), j, ctry)
+  // The row cites the table and the SELECTED edition (not the table's default label).
+  return r.publisher ? { ...r, publisher: { ...r.publisher, edition: edition.label, ...(edition.provisional ? { provisional: true as const } : {}) }, edition,
+    ...(heat && r.key === 'natural_gas_gj' ? { heat } : {}) } : r
 }
 
 // ── FI9 (R16): FLEET FUEL FROM EACH PUBLISHER'S MOBILE ROW ─────────────────────────────────────────────────
@@ -3030,6 +3114,15 @@ function pickEF(loc: Location, key: keyof typeof EF | keyof typeof EF_CA | keyof
 // A stationary key is never read for a vehicle. The UK's Fuels rows are the same figures DEFRA states apply to vehicles.
 const FLEET_PUBLISHER: Record<EfJurisdiction, MobilePublisher> = {
   US: EPA_MOBILE_2025, CA: ECCC_MOBILE_2025, UK: DEFRA_MOBILE_2026, EU: IPCC_MOBILE_2006, AU: NGA_MOBILE_2025, NZ: MFE_MOBILE_2026,
+}
+/** T3c (R18): each jurisdiction's mobile dataset in the edition registry. IPCC 2006 (EU) is exempt: never missing. */
+const FLEET_DATASET: Record<EfJurisdiction, DatasetId> = {
+  US: 'epa_hub_mobile', CA: 'eccc_mobile', UK: 'desnz_mobile', EU: 'ipcc2006', AU: 'nga_mobile', NZ: 'mfe_mobile',
+}
+/** T3c: each mobile table keyed by the edition it holds (the registry's editionYear, or dataYear for ECCC's NIR). */
+const FLEET_BY_EDITION: Record<EfJurisdiction, Record<number, MobilePublisher>> = {
+  US: { 2025: EPA_MOBILE_2025 }, CA: { 2023: ECCC_MOBILE_2025 }, UK: { 2026: DEFRA_MOBILE_2026 }, EU: {},
+  AU: { 2025: NGA_MOBILE_2025 }, NZ: { 2026: MFE_MOBILE_2026 },
 }
 /**
  * FI9 diff 3: which optional fleet questions a site's publisher needs. Miles: US only (EPA's road CH4 and N2O are per
@@ -3072,14 +3165,21 @@ const fleetTable = (t: string): string => {
   return t.endsWith(', notes') ? `${base}, notes` : base
 }
 
-function pickFleet(loc: Location, key: string, j: EfJurisdiction, ctry: string): PickedFactor {
+function pickFleet(loc: Location, key: string, j: EfJurisdiction, ctry: string, factorSel: Sel): PickedFactor {
   const [, typeTok, fuelTok, unitTok] = key.split(':')
   const fuel = fuelTok as FleetFuel
   if (typeTok === 'legacy') return { factor: efMiss(key, ctry, 'fleet_legacy'), publisher: null }
   const type = typeTok as FleetType
   const field = FLEET_FIELDS.find(f => f.type === type && f.fuel === fuel)!
   const val = (k?: keyof Location) => (k ? (loc as unknown as Record<string, unknown>)[k] : undefined)
-  const pub = FLEET_PUBLISHER[j]
+  // T3c (R18): the mobile edition the window needs. A missing one is a miss carrying the error, as for combustion.
+  let edition: EditionUse
+  try { edition = editionFor(FLEET_DATASET[j], factorSel) } catch (e) {
+    if (e instanceof MissingEditionError) return { factor: efMiss(key, ctry, 'edition', e), publisher: null }
+    throw e
+  }
+  const pub = j === 'EU' ? IPCC_MOBILE_2006 : FLEET_BY_EDITION[j][edition.key as number]
+  if (!pub) throw new Error(`The registry holds ${edition.label}, but the ${j} mobile table has no ${edition.key} edition.`)
   const equipment = val(field.equipment) as EquipmentType | undefined
   const modelYear = typeof val(field.modelYear) === 'number' ? val(field.modelYear) as number : undefined
   if (type === 'non_road' && !equipment && pub.rows.some(r => r.type === 'non_road' && r.fuel === fuel && r.equipment !== undefined)) {
@@ -3133,14 +3233,14 @@ function pickFleet(loc: Location, key: string, j: EfJurisdiction, ctry: string):
         `not counted because EPA publishes them per mile and no miles were entered. Enter the miles to include them.`
     }
   }
-  const src = FLEET_SOURCE[j]
+  const src: FactorSource = { ...FLEET_SOURCE[j], edition: edition.label, ...(edition.provisional ? { provisional: true as const } : {}) }
   const gases = notCounted ? '' :
     ` CH4 and N2O ${fleetTable(row.cite.table)}, ${row.cite.row}${fleetWhere(row.cite)}, ${nFleet(row.ch4)} and ${nFleet(row.n2o)} ${row.unit}${milesText}.`
   const basis = row.cite.basis && (type === 'non_road' || j === 'UK') ? ` ${row.cite.basis}` : ''
   const note = `${pub.publisher}, ${pub.edition}: ${valueText}.${gases} ${notCounted ? '' : sel.reason}${basis}${notCounted ? notCounted : ''}`
     .replace(/\s+/g, ' ').trim()
   return {
-    factor, publisher: src, key: `mobile: ${fleetTable(row.cite.table)}, ${row.cite.row}`,
+    factor, publisher: src, key: `mobile: ${fleetTable(row.cite.table)}, ${row.cite.row}`, edition,
     ...(c ? { conversion: { from: unitTok, to: nativeUnit, toPerFrom: k, statement: c.statement } } : {}),
     fleet: { note, ...(notCounted ? { notCounted } : {}), type, fuel },
   }
@@ -3203,13 +3303,6 @@ export function gridSource(loc: Location): string {
   return EF_SOURCES.electricity_us
 }
 
-// Short publisher labels for the grid tables, one per jurisdiction. The LONG citation lives in
-// EF_SOURCES and is what a workings row and an export print; this is the compact form a live panel
-// has room for. Both are needed and they must not be derived from each other by string surgery.
-const GRID_PUBLISHER: Record<EfJurisdiction, string> = {
-  US: 'eGRID', CA: 'ECCC', UK: 'DEFRA', EU: 'EEA', AU: 'DCCEEW', NZ: 'MfE',
-}
-
 const COMBUSTION_STREAMS = new Set([
   'natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'mobile',
 ])
@@ -3235,19 +3328,21 @@ const COMBUSTION_STREAMS = new Set([
  * .test.ts closes by saying does not exist yet. It is per location, not per page, so it does not
  * close that gap on its own.
  */
-export function publishersForLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024): string[] {
+export function publishersForLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024, fiscalYearEndMonth: number = 12, ctx: SelectionContext = {}): string[] {
   const j = efJurisdiction(loc)
   if (j === null) return []
   const out: string[] = []
   const add = (label: string | undefined) => { if (label && !out.includes(label)) out.push(label) }
   let usedOurGwp = false
-  for (const r of buildWorkings([loc], gwpVersion, year)) {
+  // T3c: with the year end (it was built without it, so a non-December inventory named December's editions).
+  for (const r of buildWorkings([loc], gwpVersion, year, [], fiscalYearEndMonth, ctx)) {
     if (r.result_tco2e == null) continue
     if (r.scope2_method === 'market-based') continue
     const stream = String(r.stream ?? '')
     // FI2: the edition the row itself records, which is the table that supplied its value.
     if (COMBUSTION_STREAMS.has(stream)) add(r.factor_vintage ?? COMBUSTION_EDITION[j])
-    else if (stream === 'electricity') add(`${GRID_PUBLISHER[j]} ${getGridFactor(loc.grid_region, year).usedYear}`)
+    // T3c: the edition label the row records (eGRID2023, DEFRA 2026 ...), not a publisher and a year rebuilt here.
+    else if (stream === 'electricity') add(r.factor_vintage)
     else if (stream === 'purchased_steam') add(r.factor_vintage ?? STEAM_EDITION[j])   // R14: an estimate names its gas table
     if (r.gwp_basis === gwpVersion) usedOurGwp = true
   }
@@ -3294,7 +3389,7 @@ function combustionSource(loc: Location): string {
 // A SET, not a single string, because an inventory may span jurisdictions. Taking locations[0] would
 // be right for most customers and silently wrong for the multi-country ones — the reading that looks
 // fine until the case that matters.
-export function combustionSourcesFor(locations: readonly { country?: string }[]): string[] {
+export function combustionSourcesFor(locations: readonly { country?: string }[], sel: Sel): string[] {
   // ⚠️ REFUSED LOCATIONS ARE DROPPED BEFORE THE CITATION IS TAKEN, AND THIS IS THE LAST PLACE A US
   // EPA CLAIM COULD HAVE SURVIVED. combustionSource falls through to EF_SOURCES.combustion for any
   // country it does not recognise, so a Japanese site would put "US EPA" on the methodology page of
@@ -3308,8 +3403,8 @@ export function combustionSourcesFor(locations: readonly { country?: string }[])
   // therefore adds that table's citation instead of hiding behind the location's.
   // FI10: an NZ citation names the use class that priced it, as the PDF and XLSX have no per-row column for it.
   return [...new Set(locations.filter(l => !countryRefusal(l)).flatMap(l => {
-    const priced = [...combustionLinePublishers(l as Location).map(p => p.jurisdiction === 'NZ' ? `${p.publisher}, ${nzUseClassVariant(l as Location)}` : p.publisher),
-      ...fleetLinePublishers(l as Location).map(p => p.publisher)]
+    const priced = [...combustionLinePublishers(l as Location, sel).map(p => p.jurisdiction === 'NZ' ? `${p.publisher}, ${nzUseClassVariant(l as Location)}` : p.publisher),
+      ...fleetLinePublishers(l as Location, sel).map(p => p.publisher)]
     return priced.length > 0 ? priced : [combustionSource(l as Location)]
   }))]
 }
@@ -3407,10 +3502,10 @@ const hasRefrigerantLine = (loc: Location): boolean =>
  * `{ publisher, edition?, value }` shape FI2 and T3c extend; `value` is null because no factor applied.
  */
 export type UnpricedReason = 'factor_missing' | 'refrigerant_unknown' | 'province_missing' | 'figure_cleared' | 'steam_factor_missing'
-  | 'fleet_type_missing' | 'equipment_missing'
+  | 'fleet_type_missing' | 'equipment_missing' | 'edition_missing'
 /** The coverage-issue statuses an unpriced line raises (FI1): the reason, used as the status. */
 export const UNPRICED_STATUSES: ReadonlySet<string> = new Set<UnpricedReason>(['factor_missing', 'refrigerant_unknown', 'province_missing', 'figure_cleared', 'steam_factor_missing',
-  'fleet_type_missing', 'equipment_missing'])
+  'fleet_type_missing', 'equipment_missing', 'edition_missing'])
 export interface UnpricedLine {
   reason: UnpricedReason
   locId: string
@@ -3461,16 +3556,21 @@ export const UNPRICED_MESSAGE = {
  * Every line at a location that cannot be priced, and why (FI1). A location refused for its country has no
  * lines here: its exclusion is whole and stated (findUnpriceableLocations), not a line-level gap.
  */
-export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): UnpricedLine[] {
+export function unpricedLines(loc: Location, gwpVersion: GwpVersion, sel: Sel): UnpricedLine[] {
   const j = efJurisdiction(loc)
   if (j === null) return []
   const site = loc.name || 'Location'
   const publisher = COMBUSTION_EDITION[j]
   const out: UnpricedLine[] = []
+  // T3c: a line whose required edition is not held is unpriced with the edition message (edition_missing).
+  const editionLine = (e: MissingEditionError, field: keyof Location, stream: DeclarableStream, source: string, amount: number, unit: string, factorKey: string): UnpricedLine =>
+    ({ reason: 'edition_missing', locId: loc.id, site, field, stream, source, amount, unit, country: canonicalCountryCode(loc.country), factorKey,
+      factor: { publisher: e.edition, edition: e.edition, value: null }, supportedUnits: [], message: e.forSite(site) })
   for (const line of combustionLines(loc)) {
-    const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
+    const ef = pickEF(loc, line.efKey as keyof typeof EF, sel).factor
     if (isPriceableEF(ef)) continue
     const miss = (ef as unknown as MissingEF).__missing
+    if (miss.edition) { out.push(editionLine(miss.edition, line.field, line.stream, line.source, line.entered, line.enteredUnit, line.efKey)); continue }
     const base = { locId: loc.id, site, field: line.field, stream: line.stream, source: line.source, amount: line.entered,
       unit: line.enteredUnit, country: miss.country, factorKey: line.efKey, factor: { publisher, value: null } }
     if (miss.cause === 'province') {
@@ -3494,7 +3594,7 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
     // The units the same publisher DOES price this fuel in at this location: each candidate unit is put
     // through the same line construction and lookup, so the list cannot name a unit that would also fail.
     const supported = (LINE_UNITS[line.field] ?? []).filter(u => u !== line.enteredUnit && combustionLines({ ...loc, [line.unitField]: u } as Location)
-      .filter(l => l.field === line.field).every(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF).factor)))
+      .filter(l => l.field === line.field).every(l => isPriceableEF(pickEF(loc, l.efKey as keyof typeof EF, sel).factor)))
     // FI3: at an EU site, a volume with no cited property to reach MRR's per-energy factor says so, and offers the unit
     // that does price: kg or tonnes where MRR's mass basis is offered for the fuel, kWh for gas.
     const kind = EXACT_UNITS[unitToken(line.enteredUnit)]?.kind
@@ -3517,9 +3617,33 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion = 'AR6'): Un
       factor: { publisher: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], value: null }, supportedUnits: [],
       message: UNPRICED_MESSAGE.refrigerant_unknown(site) })
   }
+  // T3c: electricity, its market-based residual mix and the NZ T&D line, each through its own edition.
+  if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
+    const kwh = loc.electricity_kwh
+    try { getGridFactor(loc.grid_region, sel) } catch (e) {
+      if (!(e instanceof MissingEditionError)) throw e
+      out.push(editionLine(e, 'electricity_kwh', 'electricity', `Electricity (${loc.grid_region})`, kwh, 'kWh', `grid:${loc.grid_region}`))
+    }
+    try { getResidualFactor(residualRegionFor(loc), sel, gwpVersion, loc.country) } catch (e) {
+      if (!(e instanceof MissingEditionError)) throw e
+      out.push(editionLine(e, 'electricity_kwh', 'electricity', 'Electricity (S2 market-based)', Math.max(0, kwh - loc.renewable_electricity_kwh), 'kWh uncovered', `residual:${residualRegionFor(loc)}`))
+    }
+    if (loc.country === 'NZ' && loc.nz_td_losses) {
+      try { nzTdLoss(sel) } catch (e) {
+        if (!(e instanceof MissingEditionError)) throw e
+        out.push(editionLine(e, 'electricity_kwh', 'electricity', 'Electricity T&D losses (NZ)', kwh, 'kWh', 'nz_td'))
+      }
+    }
+  }
+  if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
+    try { steamPricing(loc, sel) } catch (e) {
+      if (!(e instanceof MissingEditionError)) throw e
+      out.push(editionLine(e, 'purchased_steam_mmbtu', 'purchased_steam', 'Purchased steam', loc.purchased_steam_mmbtu, loc.purchased_steam_unit ?? 'mmbtu', 'steam'))
+    }
+  }
   // FI7: steam with no published factor and no supplier figure is an unpriced line, like any other (FI1). A supplier
   // figure prices it (steamPricing), and the line goes.
-  if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0 && !steamPricing(loc)) {
+  if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0 && !out.some(u => u.field === 'purchased_steam_mmbtu') && !steamPricingOrMissing(loc, sel)) {
     const entry = steamFactorFor(loc)
     if (entry && entry.kind !== 'published') {
       const ctry = canonicalCountryCode(loc.country)
@@ -3568,8 +3692,8 @@ const CLEARED_FIELD_STREAM: Record<string, { stream: DeclarableStream; source: s
  * FI1: true when at least one combustion line at the location is priced by its table. A location whose only
  * fuel line is unpriced burned nothing the table priced, so it names no combustion edition (factorEditions).
  */
-export function hasPricedCombustionLine(loc: Location): boolean {
-  return combustionLinePublishers(loc).length > 0
+export function hasPricedCombustionLine(loc: Location, sel: Sel): boolean {
+  return combustionLinePublishers(loc, sel).length > 0
 }
 
 /**
@@ -3577,36 +3701,47 @@ export function hasPricedCombustionLine(loc: Location): boolean {
  * names a combustion publisher for a location (factorEditions, combustionSourcesFor), so a list can only name a
  * table that supplied a value. Usually one; two where a line's key came from the US fallback (until FI2 diff 2).
  */
-export function combustionLinePublishers(loc: Location): FactorSource[] {
+export function combustionLinePublishers(loc: Location, sel: Sel): FactorSource[] {
   const out: FactorSource[] = []
   for (const l of combustionLines(loc)) {
     // FI9: fleet rows are cited to their own mobile document (fleetLinePublishers), not to the stationary table, so they
     // do not name the combustion edition here. Recording mobile editions in factor_editions is T3c's.
     if (l.efKey.startsWith('fleet:')) continue
-    const p = pickEF(loc, l.efKey as keyof typeof EF)
+    const p = pickEF(loc, l.efKey as keyof typeof EF, sel)
     if (isPriceableEF(p.factor) && p.publisher && !out.some(o => o.jurisdiction === p.publisher!.jurisdiction)) out.push(p.publisher)
   }
   return out
 }
 
 /** FI9: the mobile documents that priced this location's fleet lines, each once. */
-export function fleetLinePublishers(loc: Location): FactorSource[] {
+export function fleetLinePublishers(loc: Location, sel: Sel): FactorSource[] {
   const out: FactorSource[] = []
   for (const l of combustionLines(loc)) {
     if (!l.efKey.startsWith('fleet:')) continue
-    const p = pickEF(loc, l.efKey)
+    const p = pickEF(loc, l.efKey, sel)
     if (isPriceableEF(p.factor) && p.publisher && !out.some(o => o.publisher === p.publisher!.publisher)) out.push(p.publisher)
   }
   return out
 }
 
-function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
+/** T3c: a value read through a selector, or null when the edition it needs is missing (the line is unpriced). */
+function orMissing<T>(f: () => T): T | null {
+  try { return f() } catch (e) { if (e instanceof MissingEditionError) return null; throw e }
+}
+/** T3c: a selection context given for `year`, or the default one (December, prepared today). A mismatch is a bug. */
+function selFor(year: number, sel?: Sel): Sel {
+  const s = sel ?? selectionFor(year)
+  if (s.year !== year) throw new Error('Selection context is for ' + s.year + ', but the year asked for is ' + year + '.')
+  return s
+}
+function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: number = 2024, selArg?: Sel) {
+  const sel = selFor(year, selArg)
   let s1_stationary = 0, s1_mobile = 0
   const gases = { co2: 0, ch4: 0, n2o: 0 }
   // FI1: a line with no factor is skipped, never priced as zero and never taking the location with it.
   // unpricedLines names it; findUnresolvedCoverage blocks export on it; buildWorkings writes its row.
   for (const line of combustionLines(loc)) {
-    const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
+    const ef = pickEF(loc, line.efKey as keyof typeof EF, sel).factor
     if (!isPriceableEF(ef)) continue
     const g = calcGas(ef, line.entered, gwpVersion)   // the factor is per unit entered (pickEF converts exactly)
     if (line.mobile) s1_mobile += g.total; else s1_stationary += g.total
@@ -3621,7 +3756,9 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // '', unmapped country), OMIT the electricity Scope 2 entirely — no getGridFactor call, no electricity
   // contribution — exactly like an absent Scope 1 fuel. Steam (grid-independent) is unaffected.
   const gridResolved = isResolvedGridRegion(loc.grid_region)
-  const grid_ef = gridResolved ? getGridFactor(loc.grid_region, year).ef : 0
+  // T3c: a grid edition that is not held leaves electricity unpriced (both Scope 2 figures), never another year's factor.
+  const grid = gridResolved ? orMissing(() => getGridFactor(loc.grid_region, sel)) : null
+  const grid_ef = grid ? grid.ef : 0
   // Steam prices through calcGas like every other stream, so a split factor's CH4 and N2O are counted
   // at the active GWP set. calcGas returns TONNES while the electricity term is still kg, so the /1000
   // sits on the electricity term alone rather than wrapping the sum.
@@ -3629,24 +3766,24 @@ function calcLocation(loc: Location, gwpVersion: GwpVersion = 'AR6', year: numbe
   // has no published factor and no supplier figure was given. The location total is therefore SHORT by
   // a stream the customer declared, which is why buildWorkings emits a loud no_published_factor row and
   // findSteamFactorGaps blocks export. Do NOT read this 0 as evidence of anything.
-  const steam_t = steamTonnes(loc, gwpVersion)
-  const s2_location = (gridResolved ? loc.electricity_kwh * grid_ef : 0) / 1000 + steam_t
+  const steam_t = steamTonnes(loc, gwpVersion, sel)
+  const s2_location = (grid ? loc.electricity_kwh * grid_ef : 0) / 1000 + steam_t
   // Market-based: covered (contractual) kWh @ 0 (RECs/PPAs/green tariffs assumed zero-emission — documented);
   // uncovered kWh @ residual-mix factor. If no residual mix applies (full-disclosure region, or US subregion
   // not yet selected), fall back to the location grid factor for uncovered load and flag it.
   const uncovered_kwh = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
   const resRegion = residualRegionFor(loc)
-  const res = getResidualFactor(resRegion, year, gwpVersion, loc.country)
-  const market_elec_ef = res.applicable ? res.ef : grid_ef
+  // T3c: a residual-mix edition that is not held leaves the market-based electricity unpriced; it never falls back.
+  const res = orMissing(() => getResidualFactor(resRegion, sel, gwpVersion, loc.country))
+  const market_elec_ef = res === null ? null : res.applicable ? res.ef : grid ? grid_ef : null
   // steam_t is the SAME term in both figures, unchanged: no market instrument applies to steam today,
   // so location- and market-based carry an identical steam contribution. Recovering CH4/N2O above
   // moves both by the same amount, which keeps that identity intact.
-  const s2_market = (gridResolved ? uncovered_kwh * market_elec_ef : 0) / 1000 + steam_t
+  const s2_market = (gridResolved && market_elec_ef !== null ? uncovered_kwh * market_elec_ef : 0) / 1000 + steam_t
   // NZ transmission & distribution losses — Scope 3 Category 3, NOT Scope 2. Kept as a DISTINCT
   // term (s3_td) and deliberately never added into s2_location/s2_market. Opt-in per NZ location.
-  const s3_td = (loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0)
-    ? loc.electricity_kwh * nzTdLoss(year).ef / 1000
-    : 0
+  const td = (loc.country === 'NZ' && loc.nz_td_losses && loc.electricity_kwh > 0) ? orMissing(() => nzTdLoss(sel)) : null
+  const s3_td = td ? loc.electricity_kwh * td.ef / 1000 : 0
   return { s1_stationary, s1_mobile, s1_fugitive, s1_total, s2_location, s2_market, s3_td, gases, biogenic: loc.biogenic_co2_mt }
 }
 
@@ -3709,7 +3846,10 @@ export type UnpriceableLocation = {
 // wrong, which the component turns into a per-location state, a note on every affected total,
 // and an export gate.
 // `locations` must be deriveLocations output (T4), so a location is judged on the figures it will be priced on.
-export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024): UnpriceableLocation[] {
+// T3c: takes the year end and selection context with the year, like every pricing entry point. The answer is the
+// country alone (FI1), so neither changes it; a missing edition is a line (unpricedLines), never a location.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, _fiscalYearEndMonth: number = 12, _ctx: SelectionContext = {}): UnpriceableLocation[] {
   const out: UnpriceableLocation[] = []
   for (const loc of locations) {
     const why = unpriceableReason(loc, gwpVersion, year)
@@ -3720,12 +3860,13 @@ export function findUnpriceableLocations(locations: Location[], gwpVersion: GwpV
 }
 
 // `locations` must be deriveLocations output (T4): a stored document-backed field can be stale.
-function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024) {
+function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, selArg?: Sel) {
+  const sel = selFor(year, selArg)
   return locations.reduce((acc, loc) => {
     // Excluded, never zeroed: a location that cannot be priced contributes nothing and is named on
     // screen. Adding 0 would assert it emits nothing, which is a figure we have no evidence for.
     if (unpriceableReason(loc, gwpVersion, year)) return acc
-    const c = calcLocation(loc, gwpVersion, year)
+    const c = calcLocation(loc, gwpVersion, year, sel)
     return {
       s1_total: acc.s1_total + c.s1_total,
       s2_location: acc.s2_location + c.s2_location,
@@ -3745,19 +3886,20 @@ function calcInventory(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
 // diesel and fleet diesel, which share fuelType 'diesel', stay separate: an estimate on one must never
 // count the other as estimated. Same EFs, same grid gate, same GWP as calcLocation, so a field's share
 // here reconciles with the inventory total.
-function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number): Record<string, number> {
+function fuelEmissionsByType(loc: Location, gwpVersion: GwpVersion, year: number, selArg?: Sel): Record<string, number> {
+  const sel = selFor(year, selArg)
   const out: Record<string, number> = {}
   const add = (k: string, v: number) => { out[k] = (out[k] ?? 0) + v }
   // The same lines calcLocation prices, skipping the same unpriced ones (FI1), so a field's share here
   // reconciles with the inventory total.
   for (const line of combustionLines(loc)) {
-    const ef = pickEF(loc, line.efKey as keyof typeof EF).factor
+    const ef = pickEF(loc, line.efKey as keyof typeof EF, sel).factor
     if (isPriceableEF(ef)) add(String(line.field), calcGas(ef, line.entered, gwpVersion).total)
   }
   // Electricity = Scope 2 location-based (the series' headline basis). Same grid gate as calcLocation:
-  // an unresolved grid_region contributes 0 there, so it must contribute 0 here too.
-  if (isResolvedGridRegion(loc.grid_region) && loc.electricity_kwh > 0)
-    add('electricity_kwh', loc.electricity_kwh * getGridFactor(loc.grid_region, year).ef / 1000)
+  // an unresolved grid_region contributes 0 there, so it must contribute 0 here too. T3c: so does a missing edition.
+  const grid = isResolvedGridRegion(loc.grid_region) && loc.electricity_kwh > 0 ? orMissing(() => getGridFactor(loc.grid_region, sel)) : null
+  if (grid) add('electricity_kwh', loc.electricity_kwh * grid.ef / 1000)
   return out
 }
 
@@ -3791,8 +3933,10 @@ export interface FieldEmissions {
 export function emissionsByLocationField(
   inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
   gwpVersion: GwpVersion,
+  ctx: SelectionContext = {},
 ): FieldEmissions[] {
   const year = inventory.reporting_year
+  const sel = selectionFor(year, inventory.fiscal_year_end_month, ctx)
   const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12)
   const resolutions = inventory.coverage_resolutions ?? []
   const out: FieldEmissions[] = []
@@ -3802,7 +3946,7 @@ export function emissionsByLocationField(
     for (const c of billContributions(loc, acceptedResolutions(loc, resolutions), win)) {
       if (c.counted) evidenced[String(c.field)] = (evidenced[String(c.field)] ?? 0) + c.value * (c.share ?? 0)
     }
-    for (const [field, annual] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year))) {
+    for (const [field, annual] of Object.entries(fuelEmissionsByType(loc, gwpVersion, year, sel))) {
       const figure = (loc as unknown as Record<string, number>)[field]
       const ev = evidenced[field]
       const grossedUp = ev == null ? 0 : figure - ev
@@ -3833,16 +3977,18 @@ export function emissionsByLocationField(
 export function pctEstimated(
   inventory: { locations: Location[]; reporting_year: number; fiscal_year_end_month?: number; coverage_resolutions?: CoverageResolution[] },
   gwpVersion: GwpVersion,
+  ctx: SelectionContext = {},
 ): number | null {
   const locations = deriveLocations(inventory)
-  const estimated = emissionsByLocationField(inventory, gwpVersion).reduce((a, f) => a + f.estimated, 0)
+  const sel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, ctx)
+  const estimated = emissionsByLocationField(inventory, gwpVersion, ctx).reduce((a, f) => a + f.estimated, 0)
   // A wholly manual inventory (no confirmed concierge proposal on any location) has no evidence
   // basis to measure "estimated share" against — null is an absence, not a 0% claim.
   const hasConciergeData = locations.some(loc =>
     (loc.source_docs ?? []).some(d => (d.extracted ?? []).some(p => p.status === 'confirmed' && p.value != null)))
   if (estimated <= 0 && !hasConciergeData) return null
 
-  const inv = calcInventory(locations, gwpVersion, inventory.reporting_year)
+  const inv = calcInventory(locations, gwpVersion, inventory.reporting_year, sel)
   const total = inv.s1_total + inv.s2_location
   if (total <= 0) return 0 // concierge data present but zero emissions → 0% estimated, not an absence
   return (estimated / total) * 100
@@ -4755,9 +4901,11 @@ const ZERO_ROW_FIELDS: { field: keyof Location; source: string; scope: number; u
   { field: 'electricity_kwh', source: 'Electricity', scope: 2, unit: 'kWh' },
 ]
 
-function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12) {
+function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12, ctx: SelectionContext = {}) {
   const rows: any[] = []
   const win = periodFromYearAndEnd(year, fiscalYearEndMonth)
+  // T3c: one selection context for every row: the reporting window, prepared on ctx.preparedOn (today by default).
+  const sel = selectionFor(year, fiscalYearEndMonth, ctx)
   // Screen abbreviations for the combined-factor display, matching what renderStep4 showed (gal / L);
   // every other unit (mcf, kg, therms, mmbtu…) passes through unchanged. emission_factor (the gas split)
   // is UNTOUCHED — the VERIFIER PAGE depends on it: app/verify/[token] renders emission_factor, and its
@@ -4845,7 +4993,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // FI2: the value AND the table that supplied it. The row cites that table, never the location's country.
     // `picked.factor` is per unit ENTERED: where the table prints another unit of the same quantity, pickEF has already
     // converted exactly, so the displayed factor × the entered activity is the result, and the note states the step.
-    const picked = pickEF(loc, efKey as keyof typeof EF)
+    const picked = pickEF(loc, efKey as keyof typeof EF, sel)
     const ef = picked.factor
     const g = calcGas(ef, entered, gwpVersion)
     const efShown = ef
@@ -4865,7 +5013,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       fromTable === 'AU' ? auPublishedNote(loc, heldKey) : '',
       fromTable === 'US' ? US_PUBLISHED_NOTE[heldKey] : '',
       fromTable === 'UK' ? UK_PUBLISHED_NOTE[heldKey] : '',
-      fromTable === 'CA' && heldKey === 'natural_gas_gj' ? CA_GAS_GJ_NOTE : '',
+      fromTable === 'CA' && heldKey === 'natural_gas_gj' ? `${CA_GAS_GJ_NOTE}${picked.heat ? ` Heat content: ${picked.heat.basis}` : ''}` : '',
       fromTable === 'NZ' && heldKey.startsWith('natural_gas_') ? NZ_GAS_BASIS_NOTE : ''].filter(Boolean).join(' · ')
     // `factor_vintage` IS THE EDITION LABEL, NOT THE REPORTING YEAR — the same distinction section O
     // pinned for the NZ T&D row after it stamped the inventory year over a 2025 factor. A combustion
@@ -4898,8 +5046,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       ...(conversion_note ? { conversion_note } : {}),
       ...(picked.conversion ? { conversion_factor: picked.conversion.toPerFrom } : {}),
       ...(unitChange ? { unit_change: unitChange } : {}),
-      ...(picked.publisher?.edition ? { factor_vintage: picked.publisher.edition } : vintageOf(COMBUSTION_EDITION, loc)),
-      result_tco2e: g.total, ...(note ? { note } : {}), ...(prov ?? {}) })
+      // T3c: the SELECTED edition, with its rule, basis and dates. A provisional (R19) row says so in its note too.
+      ...(picked.edition ? editionCells(picked.edition) : picked.publisher?.edition ? { factor_vintage: picked.publisher.edition } : vintageOf(COMBUSTION_EDITION, loc)),
+      result_tco2e: g.total, ...(note || picked.edition?.provisional ? { note: [note, picked.edition?.provisional ? picked.edition.basis : ''].filter(Boolean).join(' · ') } : {}), ...(prov ?? {}) })
   }
   // NO STALE-FIELD FALLBACK (T5). Workings are built from derived locations, so every document-backed
   // figure is the fold of its counted bills whatever the stored field says. Idempotent, so a caller that
@@ -4984,9 +5133,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // The entered figure is the derived one (T5): figure() and line.entered read the same derived location.
     // Fuel oil reports the figure AS ENTERED with its own unit, and the conversion to the factor's unit as
     // the note, so all three steps are on one row (pickEF converts to the publisher's unit, FI2).
-    const unpriced = new Map(unpricedLines(loc, gwpVersion).map(u => [String(u.field), u]))
-    const pushUnpriced = (u: UnpricedLine, prov?: Provenance) => rows.push({ location: loc.name || 'Location', stream: u.stream,
-      source: u.source, scope: 1, activity_data: u.amount, activity_unit: u.unit, emission_factor: NOT_PROVIDED,
+    const unpricedAll = unpricedLines(loc, gwpVersion, sel)
+    // Combustion and steam lines by field. The electricity edition lines are read by source below (three per field).
+    const unpriced = new Map(unpricedAll.filter(u => u.stream !== 'electricity').map(u => [String(u.field), u]))
+    const pushUnpriced = (u: UnpricedLine, prov?: Provenance, scope = 1) => rows.push({ location: loc.name || 'Location', stream: u.stream,
+      source: u.source, scope, activity_data: u.amount, activity_unit: u.unit, emission_factor: NOT_PROVIDED,
       emission_factor_display: NOT_PROVIDED, ef_source: NOT_PROVIDED, gwp_basis: 'unpriced', result_tco2e: null,
       declaration: 'unpriced', entry_method: prov?.entry_method ?? 'manual',
       unpriced: { reason: u.reason, field: String(u.field), factor_key: u.factorKey, publisher: u.factor.publisher, value: null },
@@ -5006,44 +5157,56 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // getGridFactor call, no US_AVG row). The NZ T&D row below sits inside this gate too, so it needs grid_region 'NZ',
     // which gridRegionForCountry sets for an NZ location.
     if (loc.electricity_kwh > 0 && isResolvedGridRegion(loc.grid_region)) {
-      const gf = getGridFactor(loc.grid_region, year)
-      // ONE note, appended wherever the grid factor priced the row. factor_vintage below is UNCHANGED —
-      // it was already the factor's own year; the note is what turns a year into a disclosure.
-      const gridNote = gf.note ? ` · ${gf.note}` : ''
-      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: `${gridSource(loc)}${gridNote}`, factor_vintage: String(gf.usedYear), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...provOf('electricity_kwh') })
+      // T3c: each of the three electricity rows is priced through its own edition, or is an unpriced row (result null,
+      // the edition message) when that edition is not held. One missing edition never takes another row with it.
+      // Found by factor key (grid:, residual:, nz_td), not by wording.
+      const elecUnpriced = (keyPrefix: string) => unpricedAll.find(u => u.reason === 'edition_missing' && u.factorKey.startsWith(keyPrefix))
+      const gf = orMissing(() => getGridFactor(loc.grid_region, sel))
+      if (gf) {
+        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (${gf.usedRegion})`, scope: 2, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(gf.ef)} kg CO₂e/kWh`, ef_source: gridSource(loc), ...editionCells(gf.edition), scope2_method: 'location-based', gwp_basis: GWP_AS_PUBLISHED, result_tco2e: loc.electricity_kwh * gf.ef / 1000, ...(gf.edition.provisional ? { note: gf.edition.basis } : {}), ...provOf('electricity_kwh') })
+      } else {
+        const u = elecUnpriced('grid:')!
+        pushUnpriced(u, provOf('electricity_kwh'), 2)
+        rows[rows.length - 1].scope2_method = 'location-based'
+      }
       // Market-based Scope 2: residual-mix factor on uncovered load, with provenance stamped for the verifier.
       const resRegion = residualRegionFor(loc)
-      const res = getResidualFactor(resRegion, year, gwpVersion, loc.country)
+      const res = orMissing(() => getResidualFactor(resRegion, sel, gwpVersion, loc.country))
       const uncovered = Math.max(0, loc.electricity_kwh - loc.renewable_electricity_kwh)
-      const mktEf = res.applicable ? res.ef : gf.ef
-      // ⚠️ THE ROW MUST CITE WHAT PRICED IT. When no residual mix applies, mktEf IS gf.ef — the location
-      // grid factor — yet the row cited Green-e (or AIB) and stamped NO vintage at all, because res.vintage
-      // is 'n/a' on that path. So a US site with no eGRID subregion selected showed a 2023 grid factor
-      // under a Green-e citation with an empty vintage column: both structured fields a verifier reads
-      // pointed away from the number in front of them. The prose note said "falls back to location
-      // factor", which is the only reason this was recoverable at all.
-      //   applicable === true is UNTOUCHED: res.ef priced it, so res.source and res.vintage are correct.
-      const mktApplied = res.applicable
-        ? { src: res.source, vintage: res.vintage && res.vintage !== 'n/a' ? { factor_vintage: res.vintage } : {}, gridNote: '' }
-        // gridNote rides along ONLY here. On the applicable path the grid factor did not price this row,
-        // so a note about the grid vintage would describe a factor the row never used — a new falsehood
-        // in place of the one being removed. "Both rows disclose" holds exactly when both are priced by
-        // the same factor, which is this branch.
-        : { src: gridSource(loc), vintage: { factor_vintage: String(gf.usedYear) }, gridNote }
-      // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
-      rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${mktApplied.src}${res.note ? ` · ${res.note}` : ''}${mktApplied.gridNote}`, ...mktApplied.vintage, scope2_method: 'market-based', gwp_basis: res.applicable && res.source !== EF_SOURCES.residual_eu ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, entry_method: 'manual' })
+      if (res === null || (!res.applicable && !gf)) {
+        // The residual edition is missing, or there is no residual mix and the grid factor it falls back to is missing.
+        const u = elecUnpriced('residual:') ?? { ...elecUnpriced('grid:')!, source: 'Electricity (S2 market-based)', amount: uncovered, unit: 'kWh uncovered' }
+        pushUnpriced(u, { entry_method: 'manual' }, 2)
+        rows[rows.length - 1].scope2_method = 'market-based'
+      } else {
+        const mktEf = res.applicable ? res.ef : gf!.ef
+        // ⚠️ THE ROW MUST CITE WHAT PRICED IT. When no residual mix applies, mktEf IS gf.ef, the location grid factor,
+        // so the row cites the grid source and the grid edition; otherwise the residual mix and its own edition.
+        const mktApplied = res.applicable
+          ? { src: res.source, cells: res.edition ? editionCells(res.edition) : res.vintage && res.vintage !== 'n/a' ? { factor_vintage: res.vintage } : {} }
+          : { src: gridSource(loc), cells: editionCells(gf!.edition) }
+        // US: the residual edition is Green-e; the vintage also names the eGRID revision supplying CH4 and N2O.
+        const vintage = res.applicable && res.edition && res.vintage !== res.edition.label ? { factor_vintage: res.vintage } : {}
+        const provisional = res.applicable ? res.edition?.provisional : gf!.edition.provisional
+        // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
+        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${mktApplied.src}${res.note ? ` · ${res.note}` : ''}`, ...mktApplied.cells, ...vintage, scope2_method: 'market-based', gwp_basis: res.applicable && res.source !== EF_SOURCES.residual_eu ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, ...(provisional ? { note: (res.applicable ? res.edition! : gf!.edition).basis } : {}), entry_method: 'manual' })
+      }
       // NZ T&D losses — Scope 3 Category 3, NOT Scope 2. Distinct row (scope 3) so it never reads as
       // part of the S2 figure; opt-in per NZ location. Kept in lock-step with calcLocation via nzTdLoss.
       if (loc.country === 'NZ' && loc.nz_td_losses) {
-        const td = nzTdLoss(year)
-        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td.ef)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)${td.note ? ` · ${td.note}` : ''}`, factor_vintage: td.vintage, gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td.ef / 1000, entry_method: 'manual' })
+        const td = orMissing(() => nzTdLoss(sel))
+        if (td) rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td.ef)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)`, ...editionCells(td.edition), gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td.ef / 1000, ...(td.edition.provisional ? { note: td.edition.basis } : {}), entry_method: 'manual' })
+        else pushUnpriced(elecUnpriced('nz_td')!, { entry_method: 'manual' }, 3)
       }
     }
     if (loc.has_purchased_steam && loc.purchased_steam_mmbtu > 0) {
       // Same rule as fuel oil: the factor is published per MMBtu, so the activity it multiplies must
       // be MMBtu. The note carries the entered GJ figure and the arithmetic.
-      const priced = steamPricing(loc)
-      if (!priced) {
+      // T3c: a published factor (or the R14 estimate's gas factor) whose edition is not held is an unpriced line.
+      const steamEditionLine = unpricedAll.find(u => u.reason === 'edition_missing' && u.field === 'purchased_steam_mmbtu')
+      const priced = steamEditionLine ? null : steamPricing(loc, sel)
+      if (steamEditionLine) pushUnpriced(steamEditionLine, undefined, 2)
+      else if (!priced) {
         // ── NO PUBLISHED FACTOR, AND NO SUPPLIER FIGURE ──────────────────────────────────────────
         // FI7: an FI1 unpriced line (unpricedLines, reason steam_factor_missing): result null, never 0, listed by the
         // export gate with its message, and the rest of the location prices normally. The row keeps its own
@@ -5091,8 +5254,9 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // on a private number. The column renders '—' there, which is what "no published edition" looks
       // like, and ef_source already names the supplier route. Same gate buildFactorEditions applies.
       // R14: an estimated row records the edition of the gas table it was computed from.
-      const steamVintage = priced.supplier ? undefined : priced.estimated ? priced.estimated.vintage : vintageOf(STEAM_EDITION, loc).factor_vintage
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ? { factor_vintage: steamVintage } : {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(priced.estimated && efJurisdiction(loc) === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
+      // T3c: a published factor or an estimate carries its selected edition (the estimate, its gas factor's).
+      const steamVintage = priced.supplier ? undefined : priced.edition ? editionCells(priced.edition) : priced.estimated ? { factor_vintage: priced.estimated.vintage } : vintageOf(STEAM_EDITION, loc)
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ?? {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(priced.estimated && efJurisdiction(loc) === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
       }
     }
     // ── All-excluded fields: a zero row carrying the contributions (T5 ruling) ─────────────────────
@@ -5293,9 +5457,12 @@ export function findUnresolvedCoverage(
   locations: Location[],
   reportingYear: number,
   fiscalYearEndMonth: number,
-  allResolutions: CoverageResolution[]
+  allResolutions: CoverageResolution[],
+  ctx: SelectionContext = {},
 ): CoverageIssue[] {
   const coverageWin = periodFromYearAndEnd(reportingYear, fiscalYearEndMonth)
+  // T3c: the same selection context the totals use, so an edition_missing line here is the line the totals leave out.
+  const sel = selectionFor(reportingYear, fiscalYearEndMonth, ctx)
   return locations.flatMap(loc => {
     const resolutions = acceptedResolutions(loc, allResolutions)
     const site = loc.name || 'Location'
@@ -5366,8 +5533,8 @@ export function findUnresolvedCoverage(
 
     // FI1: every line that cannot be priced blocks export, keyed (location, field), with its own message.
     // Judged on the DERIVED location, as the totals are: a figure from bills is the figure that would price.
-    // status is the reason: factor_missing, refrigerant_unknown or province_missing.
-    for (const u of unpricedLines(derivedHere)) {
+    // status is the reason: factor_missing, refrigerant_unknown, province_missing ... or edition_missing (T3c).
+    for (const u of unpricedLines(derivedHere, 'AR6', sel)) {
       // FI5: a cleared figure confirmed as none (an accepted used_none for the field) is answered.
       if (u.reason === 'figure_cleared' && resolutions.some(r => r.kind === 'used_none' && r.field === String(u.field))) continue
       out.push({ locId: loc.id, fuelType: FIELD_FUEL[String(u.field)] ?? String(u.field), status: u.reason, field: String(u.field), message: u.message })
@@ -5611,10 +5778,12 @@ export function findUndeclaredStreams(
 // blocking without that field would strand them with no way out.
 export function findSteamFactorGaps(
   locations: Location[],
+  sel: Sel,
 ): { locId: string; locName: string; jurisdiction: EfJurisdiction; kind: 'unpublished' | 'not_searched' | 'estimated'; guidance: string }[] {
   return locations.flatMap(loc => {
     if (!loc.has_purchased_steam || loc.purchased_steam_mmbtu <= 0) return []
-    if (steamPricing(loc)) return []
+    // T3c: a missing edition is an edition_missing line (unpricedLines), not a request for a supplier figure.
+    try { if (steamPricing(loc, sel)) return [] } catch (e) { if (e instanceof MissingEditionError) return []; throw e }
     const entry = steamFactorFor(loc)
     // ⚠️ A REFUSED COUNTRY IS SKIPPED HERE, DELIBERATELY, AND IT IS NOT AN OVERSIGHT.
     // This gate asks the customer for a supplier-specific factor so the steam row can price. A
@@ -5628,7 +5797,7 @@ export function findSteamFactorGaps(
     const j = efJurisdiction(loc)
     if (j === null) return []                   // unreachable: a null entry above implies a null j
     // R14: an estimate that could not be computed (a Canadian site with no province) is reported with its line's message.
-    const guidance = entry.kind === 'estimated' ? (unpricedLines(loc).find(u => u.field === 'purchased_steam_mmbtu')?.message ?? '') : entry.guidance
+    const guidance = entry.kind === 'estimated' ? (unpricedLines(loc, 'AR6', sel).find(u => u.field === 'purchased_steam_mmbtu')?.message ?? '') : entry.guidance
     return [{ locId: loc.id, locName: loc.name || 'Location', jurisdiction: j, kind: entry.kind, guidance }]
   })
 }

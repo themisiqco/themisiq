@@ -49,7 +49,7 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
   })
   it('totals, gates and exports read the derived locations', () => {
     for (const s of ['calcInventory(derivedLocations,', 'findUndeclaredStreams(derivedLocations,', 'findUnpriceableLocations(derivedLocations,',
-      'findSteamFactorGaps(derivedLocations)', 'buildWorkings(derivedLocations,', 'const loc = derivedLocations[activeLocation]',
+      'findSteamFactorGaps(derivedLocations, factorSel)', 'buildWorkings(derivedLocations,', 'const loc = derivedLocations[activeLocation]',
       'generateAssurancePDF({ ...inventory, locations: derivedLocations }']) {
       expect(pageSrc, s).toContain(s)
     }
@@ -72,7 +72,7 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
   it('the trends completeness check derives the stored row before reading it', () => {
     const series = readFileSync(join(ROOT, 'lib/ghg/loadSeries.ts'), 'utf8')
     expect(series).toContain('"workings, locations_data, fiscal_year_end_month, coverage_resolutions, "')
-    expect(series).toContain('assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year)')
+    expect(series).toContain('assessCompleteness(r.workings, deriveStoredLocations(r), r.reporting_year, r.fiscal_year_end_month)')
   })
 })
 

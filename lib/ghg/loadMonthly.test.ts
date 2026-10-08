@@ -61,26 +61,28 @@ describe('Trends monthly view, by inventory (T12)', () => {
   })
 
   it('a year ending in March shows April to March, in that order, not the calendar year', async () => {
-    // Bills from January 2024 to June 2025: the year ending 31 March 2025 keeps April 2024 to March 2025.
-    save('inv-fy25', 2025, 3, months([2024, 1], 18))
-    const r = await loadMonthly('inv-fy25')
+    // Bills from January 2025 to June 2026: the year ending 31 March 2026 keeps April 2025 to March 2026. (T3c: the year
+    // ending March 2026 takes EPA Hub 2025, which is held; the year ending March 2025 needs 2024, which is not.)
+    save('inv-fy26', 2026, 3, months([2025, 1], 18))
+    const r = await loadMonthly('inv-fy26')
     expect(r.buckets.map(b => b.month)).toEqual([
-      '2024-04', '2024-05', '2024-06', '2024-07', '2024-08', '2024-09', '2024-10', '2024-11', '2024-12', '2025-01', '2025-02', '2025-03'])
+      '2025-04', '2025-05', '2025-06', '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'])
     expect(r.buckets.map(b => b.monthLabel)).toEqual(['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'])
     expect(r.measuredMonths).toBe(12)
   })
 
   it('two inventories with slices in the same calendar year are not mixed', async () => {
-    // Same company, both with months in calendar 2025: the year ending March 2025 and calendar 2025.
-    save('inv-fy25', 2025, 3, months([2024, 4], 12))
-    save('inv-cal25', 2025, 12, months([2025, 1], 12))
-    const fy = await loadMonthly('inv-fy25')
-    const cal = await loadMonthly('inv-cal25')
-    expect(fy.buckets.map(b => b.month)).toEqual(months([2024, 4], 12).map(p => p.periodStart!.slice(0, 7)))
-    expect(cal.buckets.map(b => b.month)).toEqual(months([2025, 1], 12).map(p => p.periodStart!.slice(0, 7)))
-    // January to March 2025 belong to both inventories' windows; each shows only its own figure.
-    const janFy = fy.buckets.find(b => b.month === '2025-01')!.total
-    const janCal = cal.buckets.find(b => b.month === '2025-01')!.total
+    // Same company, both with months in calendar 2026: the year ending March 2026 and calendar 2026. (T3c: calendar 2026
+    // prices provisionally on EPA Hub 2025, R19, the same factor the year ending March 2026 selects.)
+    save('inv-fy26', 2026, 3, months([2025, 4], 12))
+    save('inv-cal26', 2026, 12, months([2026, 1], 12))
+    const fy = await loadMonthly('inv-fy26')
+    const cal = await loadMonthly('inv-cal26')
+    expect(fy.buckets.map(b => b.month)).toEqual(months([2025, 4], 12).map(p => p.periodStart!.slice(0, 7)))
+    expect(cal.buckets.map(b => b.month)).toEqual(months([2026, 1], 12).map(p => p.periodStart!.slice(0, 7)))
+    // January to March 2026 belong to both inventories' windows; each shows only its own figure.
+    const janFy = fy.buckets.find(b => b.month === '2026-01')!.total
+    const janCal = cal.buckets.find(b => b.month === '2026-01')!.total
     expect(janFy, 'one bill each, so each inventory shows one bill\'s January, not both added together').toBe(janCal)
     expect(cal.totalTco2e).toBeCloseTo(fy.totalTco2e, 4)
   })

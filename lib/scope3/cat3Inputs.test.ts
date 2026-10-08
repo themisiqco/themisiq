@@ -8,6 +8,7 @@ import { cat3GhgFixes, CAT3_GHG_LINKS } from './cat3Copy'
 // declaration logic against the engine's own findUndeclaredStreams, which is the only way to know the
 // copy still matches. C3I-12 asserts neither module imports it.
 import { buildWorkings, emptyLocation, findUndeclaredStreams, efJurisdiction, type Location } from '../ghg/engine'
+import { CAT3_EDS } from '../testing/heldSelection'
 
 const STREAMS = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate',
   'fuel_oil_residual', 'mobile', 'refrigerants', 'electricity', 'purchased_steam'] as const
@@ -72,7 +73,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     const mixed = answered({ name: 'Odd site', country: 'NZ', grid_region: 'NZ', electricity_kwh: 10_000,
       has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }, ['natural_gas', 'electricity'])
     const m = cat3InputsFrom(workingsOf([mixed]), [mixed])
-    const priced = priceCat3(m.inputs!)
+    const priced = priceCat3(m.inputs!, CAT3_EDS)
     // The page renders the fixes block when there is a priced result, a fix and a bound inventory.
     expect(priced.lines.length).toBeGreaterThan(0)
     expect(cat3GhgFixes(priced, m)).toEqual(['scope1Line'])
@@ -86,7 +87,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     // Nothing unpriced, no link.
     const ok = answered({ name: 'Fine site', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000 }, ['electricity'])
     const o = cat3InputsFrom(workingsOf([ok]), [ok])
-    expect(cat3GhgFixes(priceCat3(o.inputs!), o)).not.toContain('scope1Line')
+    expect(cat3GhgFixes(priceCat3(o.inputs!, CAT3_EDS), o)).not.toContain('scope1Line')
   })
 
   it('C3I-5 a duplicate name in two countries is unresolved, never the first one found', () => {
@@ -99,7 +100,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     }
     expect(r.unresolved_locations).toEqual(['Depot'])
     // And the pricing module flags every one of them.
-    const pricedRows = priceCat3(r.inputs!)
+    const pricedRows = priceCat3(r.inputs!, CAT3_EDS)
     expect(pricedRows.lines.length, 'the fixture must actually price, or this loop proves nothing').toBe(6)
     for (const line of pricedRows.lines) {
       expect(line.flags.map(f => f.code)).toEqual(['country_unresolved', 'uk_stand_in'])
@@ -141,7 +142,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     expect(elec[0].nz_td_result_tco2e).toBeCloseTo(250_000 * 0.00596 / 1000, 12)
     expect(r.skipped).toContainEqual({ code: 'market_based_row_not_used', location: 'Auckland' })
     // Priced: 3c is the engine's figure, the two WTT lines are DEFRA with a stand-in flag.
-    const priced = priceCat3(r.inputs!)
+    const priced = priceCat3(r.inputs!, CAT3_EDS)
     const td = priced.lines.find(l => l.line === 'electricity_td_loss')!
     expect(td.factor).toBeNull()
     expect(td.kg_co2e).toBeCloseTo(250_000 * 0.00596, 9)
@@ -149,7 +150,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     const dunedin = answered({ name: 'Dunedin', country: 'NZ', electricity_kwh: 1000, grid_region: 'NZ' }, ['electricity'])
     const off = cat3InputsFrom(workingsOf([dunedin]), [dunedin])
     expect(off.inputs!.rows[0].nz_td_result_tco2e).toBeNull()
-    expect(priceCat3(off.inputs!).unpriced.map(u => u.reason.code)).toEqual(['no_nz_td_figure'])
+    expect(priceCat3(off.inputs!, CAT3_EDS).unpriced.map(u => u.reason.code)).toEqual(['no_nz_td_figure'])
   })
 
   it('C3I-9 the mirrored declaration logic agrees with the engine\'s findUndeclaredStreams', () => {
@@ -187,10 +188,10 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
     // And the two ends of decision 6, through the pricing module.
     const empty = cat3InputsFrom(workingsOf([allDeclaredEmpty]), [allDeclaredEmpty])
     expect(empty.inputs!.declaration.undeclared).toEqual([])
-    expect(priceCat3(empty.inputs!).status).toBe('zero')
+    expect(priceCat3(empty.inputs!, CAT3_EDS).status).toBe('zero')
     const missing = cat3InputsFrom(workingsOf([oneUndeclared]), [oneUndeclared])
     expect(missing.inputs!.declaration.undeclared).toEqual(['propane'])
-    expect(priceCat3(missing.inputs!).status).toBe('withheld')
+    expect(priceCat3(missing.inputs!, CAT3_EDS).status).toBe('withheld')
   })
 
   it('C3I-10 the UK is recognised in every spelling the engine accepts, and nothing else becomes the US', () => {
@@ -236,7 +237,7 @@ describe('Category 3 inputs, from the bound GHG inventory', () => {
                         ['electricity', 'natural_gas', 'mobile'])
     const r = cat3InputsFrom(workingsOf([uk, us]), [uk, us])
     expect(r.reason).toBeNull()
-    const priced = priceCat3(r.inputs!)
+    const priced = priceCat3(r.inputs!, CAT3_EDS)
     expect(priced.status).toBe('priced')
     expect(priced.lines).toHaveLength(9)
     // The design's figure is the rounded one; the module rounds nothing, so the test holds both.
@@ -399,7 +400,8 @@ describe('R14: an estimated steam row reaches Category 3 as purchased heat (Scop
   it('C3I-R14 a Canadian site with an estimated steam figure gives a purchased_steam input, and no Scope 1 skip', () => {
     const l = answered({ name: 'Toronto plant', country: 'CA', province: 'ON', grid_region: 'ON',
       has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' }, ['purchased_steam'])
-    const rows = workingsOf([l])
+    // T3c: 2023, the data year of the held ECCC NIR heat content the estimate's gas factor goes through (R12).
+    const rows = buildWorkings([l], 'AR6', 2023, [], 12)
     const steamRow = rows.find(r => r.stream === 'purchased_steam')!
     expect((steamRow as { estimated?: string }).estimated).toBe('steam_gas_boiler_80')
     expect(steamRow.scope).toBe(2)

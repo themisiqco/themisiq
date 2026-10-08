@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { EF_SOURCES, buildWorkings, emptyLocation, type Location } from './ghg/engine'
+import { heldYearFor } from './testing/heldSelection'
 
 // ── FI8: THE METHODOLOGY PAGE'S EMISSION-FACTOR CLAIMS, CHECKED AGAINST THE ENGINE ─────────────────
 //
@@ -17,7 +18,8 @@ const PAGE = readFileSync(join(__dirname, '..', 'app/methodology/page.tsx'), 'ut
 const ENGINE = readFileSync(join(__dirname, 'ghg/engine.ts'), 'utf8')
 
 const loc = (o: Partial<Location>): Location => ({ ...emptyLocation('L1', 'Site'), ...o })
-const notesFor = (l: Location) => buildWorkings([l], 'AR6', 2025).map(r => `${r.note ?? ''} ${r.conversion_note ?? ''}`).join('\n')
+// T3c: at the year every edition the site's country needs is held (lib/testing/heldSelection.ts).
+const notesFor = (l: Location) => buildWorkings([l], 'AR6', heldYearFor(l.country)).map(r => `${r.note ?? ''} ${r.conversion_note ?? ''}`).join('\n')
 
 describe('methodology page: emission factors (FI8)', () => {
   it('no longer claims a fallback to another publisher', () => {

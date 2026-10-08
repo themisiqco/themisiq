@@ -6,6 +6,7 @@ import {
 import {
   emptyLocation, calcLocation, findUnresolvedCoverage, fleetAsks, applyUnitOutcomes, unitsForCountryChange, type Location,
 } from './engine'
+import { heldYearFor } from '../testing/heldSelection'
 
 // FI9 diff 3: the fleet block's words and state changes (lib/ghg/fleetForm.ts), tested without a browser.
 
@@ -75,7 +76,7 @@ describe('FI9 diff 3: fleet form', () => {
     expect(moved.fleet_assignments).toEqual([{ from: 'diesel_mobile_amount', to: 'heavy', field: 'heavy_diesel_amount', value: 250,
       unit: 'litres', at: AT, by: BY }])
     expect(findUnresolvedCoverage([moved], 2025, 12, []).map(i => i.status)).not.toContain('fleet_type_missing')
-    expect(calcLocation(moved, 'AR6', 2025).s1_mobile).toBeGreaterThan(0)
+    expect(calcLocation(moved, 'AR6', heldYearFor('CA')).s1_mobile).toBeGreaterThan(0)
     // A refusal is said in plain words.
     const refused = assignLegacy({ ...l, fleet_heavy: true, heavy_diesel_amount: 9 }, 'diesel_mobile_amount', 'heavy', AT, BY)
     expect(refused).toEqual({ refusal: 'Heavy vehicles already hold a diesel figure at Depot, so this one was not moved. ' +

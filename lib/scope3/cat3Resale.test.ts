@@ -14,6 +14,7 @@ import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
 import { publisherGwpSentence } from './gwpSentence'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 import { RESULTS_TABLE_EMPTY, resultsTableAllUnpriced } from './formCopy'
+import { CAT3_EDS } from '../testing/heldSelection'
 
 // ── TASK 8: THE ACTIVITY D SCREENING QUESTION ────────────────────────────────────────────────────
 //
@@ -26,7 +27,7 @@ const page = () => readFileSync(PAGE, 'utf8')
 const GWP = publisherGwpSentence(CAT3_GWP_PUBLISHER, true, 'AR6')
 const worked = () => {
   const read = cat3InputsFrom(SCOPE3_FIXTURE_GHG.workings, SCOPE3_FIXTURE_GHG.locations)
-  return { read, priced: priceCat3(read.inputs!) }
+  return { read, priced: priceCat3(read.inputs!, CAT3_EDS) }
 }
 
 describe('Category 3 activity D screening', () => {

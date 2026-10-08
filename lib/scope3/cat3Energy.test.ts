@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { priceCat3, type Cat3InputRow, type Cat3Inputs } from './cat3Energy'
+import { CAT3_EDS } from '../testing/heldSelection'
 
 // ── CATEGORY 3 PRICING ───────────────────────────────────────────────────────────────────────────
 //
@@ -44,7 +45,7 @@ describe('Category 3 pricing', () => {
       row({ id: 'us-elec', stream: 'electricity', activity: 200_000, unit: 'kWh', location: 'US site', country: 'US', scope2_method: 'location-based', scope1_publisher: 'US EPA (2025) Emission Factors Hub' }),
       row({ id: 'us-gas', stream: 'natural_gas', activity: 1_000, unit: 'therms', location: 'US site', country: 'US' }),
       row({ id: 'us-diesel', stream: 'mobile_diesel', activity: 500, unit: 'gal', location: 'US site', country: 'US' }),
-    ]))
+    ]), CAT3_EDS)
 
     expect(r.status).toBe('priced')
     expect(r.lines).toHaveLength(9)
@@ -83,7 +84,7 @@ describe('Category 3 pricing', () => {
       row({ id: 'uk-gas', stream: 'natural_gas', activity: 1, unit: 'kwh' }),
       row({ id: 'us-diesel', stream: 'mobile_diesel', activity: 1, unit: 'litres', country: 'US', scope1_publisher: 'US EPA (2025) Emission Factors Hub' }),
       row({ id: 'fr-steam', stream: 'purchased_steam', activity: 1, unit: 'kwh', country: 'FR' }),
-    ]))
+    ]), CAT3_EDS)
     expect(line(r, 'uk-gas', 'fuel_wtt').flags).toEqual([])
     // A FUEL at a non-UK location is a stand-in too, and the flag names the Scope 1 publisher beside it.
     expect(line(r, 'us-diesel', 'fuel_wtt').flags).toEqual([
@@ -97,7 +98,7 @@ describe('Category 3 pricing', () => {
   it('C3-3 an unresolved country still carries uk_stand_in, and says it is unresolved', () => {
     const r = priceCat3(inputs([
       row({ id: 'x', stream: 'natural_gas', activity: 1, unit: 'kwh', country: null, country_resolved: false }),
-    ]))
+    ]), CAT3_EDS)
     expect(line(r, 'x', 'fuel_wtt').flags).toEqual([
       { code: 'country_unresolved' },
       { code: 'uk_stand_in', country: null, scope1_publisher: null },
@@ -108,7 +109,7 @@ describe('Category 3 pricing', () => {
     const r = priceCat3(inputs([
       row({ id: 'nz', stream: 'electricity', activity: 250_000, unit: 'kWh', country: 'NZ',
             scope2_method: 'location-based', nz_td_result_tco2e: 1.49 }),
-    ]))
+    ]), CAT3_EDS)
     const td = line(r, 'nz', 'electricity_td_loss')
     expect(td.kg_co2e).toBe(1.49 * 1000)                     // tonnes to kg, an exact identity
     expect(td.factor).toBeNull()                             // no DEFRA row priced it
@@ -122,7 +123,7 @@ describe('Category 3 pricing', () => {
     // An NZ row with no figure loses only its 3c line, and says why.
     const missing = priceCat3(inputs([
       row({ id: 'nz2', stream: 'electricity', activity: 1, unit: 'kWh', country: 'NZ', scope2_method: 'location-based' }),
-    ]))
+    ]), CAT3_EDS)
     expect(missing.lines.map(l => l.line)).toEqual(['electricity_generation_wtt', 'electricity_td_wtt'])
     expect(missing.unpriced).toEqual([
       { row_id: 'nz2', location: 'Site', stream: 'electricity', reason: { code: 'no_nz_td_figure', location: 'Site' } },
@@ -133,7 +134,7 @@ describe('Category 3 pricing', () => {
     const r = priceCat3(inputs([
       row({ id: 'loc', stream: 'electricity', activity: 1_000, unit: 'kWh', scope2_method: 'location-based' }),
       row({ id: 'mkt', stream: 'electricity', activity: 400, unit: 'kWh uncovered', scope2_method: 'market-based' }),
-    ]))
+    ]), CAT3_EDS)
     expect(r.lines.every(l => l.row_id === 'loc')).toBe(true)
     expect(r.lines).toHaveLength(3)
     expect(r.unpriced).toEqual([
@@ -145,7 +146,7 @@ describe('Category 3 pricing', () => {
     const r = priceCat3(inputs([
       row({ id: 'r134a', stream: 'refrigerants', activity: 12, unit: 'kg' }),
       row({ id: 'gas', stream: 'natural_gas', activity: 1, unit: 'kwh' }),
-    ]))
+    ]), CAT3_EDS)
     expect(r.lines.map(l => l.row_id)).toEqual(['gas'])
     expect(r.unpriced).toEqual([
       { row_id: 'r134a', location: 'Site', stream: 'refrigerants', reason: { code: 'refrigerants_not_in_category' } },
@@ -158,7 +159,7 @@ describe('Category 3 pricing', () => {
       row({ id: 'lbs', stream: 'propane', activity: 100, unit: 'lbs' }),
       row({ id: 'mwh', stream: 'electricity', activity: 5, unit: 'MWh', scope2_method: 'location-based' }),
       row({ id: 'who-knows', stream: 'fuel_oil_residual', activity: 5, unit: 'barrels' }),
-    ]))
+    ]), CAT3_EDS)
     expect(r.status).toBe('withheld')
     expect(r.withheld).toEqual({ code: 'nothing_priced' })
     expect(r.unpriced.map(u => u.reason)).toEqual([
@@ -186,7 +187,7 @@ describe('Category 3 pricing', () => {
     ]
     for (const [stream, units, activity] of cases) {
       for (const unit of units) {
-        const r = priceCat3(inputs([row({ id: `${stream}-${unit}`, stream, activity, unit, scope2_method: 'location-based' })]))
+        const r = priceCat3(inputs([row({ id: `${stream}-${unit}`, stream, activity, unit, scope2_method: 'location-based' })]), CAT3_EDS)
         expect(r.unpriced, `${stream} in ${unit}`).toEqual([])
         expect(r.lines.length, `${stream} in ${unit}`).toBeGreaterThan(0)
         for (const l of r.lines) expect(l.kg_co2e, `${stream} in ${unit}`).toBeGreaterThan(0)
@@ -195,7 +196,7 @@ describe('Category 3 pricing', () => {
   })
 
   it('C3-9 decision 6: every stream declared and nothing entered is a zero; an undeclared stream withholds', () => {
-    const empty = priceCat3(inputs([]))
+    const empty = priceCat3(inputs([]), CAT3_EDS)
     expect(empty.status).toBe('zero')
     expect(empty.kg_co2e).toBe(0)
     expect(empty.zero_basis).toEqual({ code: 'no_rows' })
@@ -203,7 +204,7 @@ describe('Category 3 pricing', () => {
 
     const undeclared = priceCat3(inputs([
       row({ id: 'gas', stream: 'natural_gas', activity: 1_000, unit: 'kwh' }),
-    ], ['purchased_steam', 'propane']))
+    ], ['purchased_steam', 'propane']), CAT3_EDS)
     expect(undeclared.status).toBe('withheld')
     expect(undeclared.withheld).toEqual({ code: 'undeclared_streams', streams: ['purchased_steam', 'propane'] })
     expect(undeclared.kg_co2e).toBe(0)
@@ -220,7 +221,7 @@ describe('Category 3 pricing', () => {
       row({ id: 'kwh', stream: 'purchased_steam', activity: 100_000, unit: 'kWh' }),
       row({ id: 'gj', stream: 'purchased_steam', activity: 360, unit: 'gj' }),
       row({ id: 'mmbtu', stream: 'purchased_steam', activity: 100, unit: 'mmbtu' }),
-    ]))
+    ]), CAT3_EDS)
     expect(line(r, 'kwh', 'steam_wtt').kg_co2e).toBeCloseTo(100_000 * STEAM_WTT, 6)
     expect(line(r, 'kwh', 'steam_distribution_loss').kg_co2e).toBeCloseTo(100_000 * STEAM_LOSS, 6)
     expect(line(r, 'kwh', 'steam_distribution_wtt').kg_co2e).toBeCloseTo(100_000 * STEAM_LOSS_WTT, 6)
@@ -253,7 +254,7 @@ describe('Category 3 pricing', () => {
       const r = priceCat3(inputs([
         row({ id: `g-${country}`, stream: 'mobile_diesel', activity: 100, unit: 'gallons',
               country, country_resolved: country !== null }),
-      ]))
+      ]), CAT3_EDS)
       const l = line(r, `g-${country}`, 'fuel_wtt')
       expect(l.conversion, `${country}`).toMatchObject({ key: 'us_gallon_to_litre', cite: 'Conversions!C40' })
       expect(l.activity_priced, `${country}`).toBeCloseTo(100 * GAL_L_CELL, 9)

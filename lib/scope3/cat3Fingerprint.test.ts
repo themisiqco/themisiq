@@ -7,6 +7,7 @@ import { cat3Fingerprint, cat3FingerprintChange, cat3FingerprintMoved, isCat3Fin
 import { cat3StaleNotice } from './cat3Copy'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 import { buildWorkings, emptyLocation, type Location } from '../ghg/engine'
+import { CAT3_EDS } from '../testing/heldSelection'
 
 // ── TASK 7: THE FINGERPRINT AND THE STALENESS NOTICE ─────────────────────────────────────────────
 //
@@ -120,14 +121,14 @@ describe('Category 3 fingerprint', () => {
       .filter(x => !used.includes(x)).map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' }))
     const withheld = cat3InputsFrom(SCOPE3_FIXTURE_GHG.workings,
       SCOPE3_FIXTURE_GHG.locations.map(l => ({ ...l, stream_attestations: [] })))
-    expect(priceCat3(withheld.inputs!).status).toBe('withheld')
+    expect(priceCat3(withheld.inputs!, CAT3_EDS).status).toBe('withheld')
     expect(cat3Fingerprint(withheld.inputs)).toEqual(worked())  // the activity is the same activity
     const zero = cat3InputsFrom(
       ['natural_gas', 'electricity'].map(stream => ({ location: 'Office', stream, source: 'Declaration',
         scope: 1, activity_data: 0, activity_unit: '—', declaration: 'attested_absent',
         gwp_basis: 'declaration', result_tco2e: null })),
       [{ id: 'o', name: 'Office', country: 'GB', stream_attestations: attest([]) }])
-    expect(priceCat3(zero.inputs!).status).toBe('zero')
+    expect(priceCat3(zero.inputs!, CAT3_EDS).status).toBe('zero')
     expect(cat3Fingerprint(zero.inputs)).toEqual({ version: 1, rows: [] })
     // A record saved when it held energy, re-opened once every meter is gone: every row is reported gone.
     const gone = cat3FingerprintChange(worked(), cat3Fingerprint(zero.inputs))!

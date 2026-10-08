@@ -38,9 +38,9 @@
 
 import {
   parseLocalDate, countryRefusal, billContributions, acceptedResolutions, periodFromYearAndEnd,
-  deriveLocations, unpricedLines, emissionsByLocationField, streamSwitchOff,
+  deriveLocations, unpricedLines, emissionsByLocationField, streamSwitchOff, selectionFor,
 } from "./engine";
-import type { CoverageResolution, Location } from "./engine";
+import type { CoverageResolution, Location, Sel, SelectionContext } from "./engine";
 
 /** The inventory fields the monthly split and the reconciliation read. */
 export interface MonthlyInventory {
@@ -58,8 +58,9 @@ export interface EFFactor { co2: number; ch4: number; n2o: number }
 export interface MonthlyDeps {
   calcGas: (ef: EFFactor, amount: number, gwp: GwpVersion, biogenic?: boolean) => { total: number };
   // FI2: the engine's pickEF, which returns the value with the table that supplied it; this module prices the value.
-  pickEF: (loc: any, key: any) => { factor: EFFactor };   // accept caller's Location + literal-union key
-  getGridFactor: (region: string, year: number) => { ef: number; usedRegion: string; usedYear: number };
+  pickEF: (loc: any, key: any, sel: Sel) => { factor: EFFactor };   // accept caller's Location + literal-union key
+  // T3c: the grid factor for the edition the window selects (throws MissingEditionError when it is not held).
+  getGridFactor: (region: string, sel: Sel) => { ef: number; usedRegion: string; edition: { label: string } };
   // True iff region is a real GRID_EF key. Unresolved grid regions OMIT electricity monthly rows
   // (no getGridFactor call, no US_AVG fallback), mirroring the annual calc/workings guard.
   isResolvedGridRegion: (region: string) => boolean;
@@ -200,12 +201,15 @@ function resolveBill(
 export function buildMonthlyEmissions(
   inventory: MonthlyInventory,
   deps: MonthlyDeps,
-  gwp: GwpVersion = "AR6"
+  gwp: GwpVersion = "AR6",
+  ctx: SelectionContext = {},
 ): MonthlyResult {
   const slices: MonthlySlice[] = [];
   const skipped: SkippedBill[] = [];
   const year = inventory.reporting_year;
   const win = periodFromYearAndEnd(year, inventory.fiscal_year_end_month ?? 12);
+  // T3c: the annual figure's selection context (window, prepared on), so monthly and annual price one edition.
+  const sel = selectionFor(year, inventory.fiscal_year_end_month ?? 12, ctx);
   // The window as periodFromYearAndEnd returns it: `end` is the last day IN the year, so the exclusive
   // boundary is end + 1 day. Same construction as billContributions.
   const winStart = new Date(win.start.getFullYear(), win.start.getMonth(), win.start.getDate());
@@ -217,7 +221,10 @@ export function buildMonthlyEmissions(
   //   The location-level "unpriceable" skip that sat here is gone: since FI1 findUnpriceableLocations returns
   // only country refusals, which the countryRefusal check below already skips. Both read the location's
   // country, and deriveLocations never changes it, so the two could only ever agree.
-  const unpricedReason = new Map(deriveLocations(inventory).flatMap(l => unpricedLines(l, gwp)).map(u => [`${u.locId}|${String(u.field)}`, u.reason]));
+  // T3c: the market-based and T&D edition lines are not location-based electricity, which is all the monthly split prices.
+  const unpricedReason = new Map(deriveLocations(inventory).flatMap(l => unpricedLines(l as Location, gwp, sel))
+    .filter(u => u.stream !== "electricity" || u.factorKey.startsWith("grid:"))
+    .map(u => [`${u.locId}|${String(u.field)}`, u.reason]));
 
   for (const loc of inventory.locations) {
     // ⚠️ A LOCATION REFUSED FOR ITS COUNTRY CONTRIBUTES NO MONTHLY ROW AT ALL, AND THE FUEL GUARD
@@ -270,16 +277,16 @@ export function buildMonthlyEmissions(
           skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `unresolved grid region (${loc.grid_region ?? ""})` });
           continue;
         }
-        const gf = deps.getGridFactor(loc.grid_region ?? "", year);
+        const gf = deps.getGridFactor(loc.grid_region ?? "", sel);
         billTotal = (c.value * gf.ef) / 1000;
-        efSource = `grid:${gf.usedRegion}:${gf.usedYear}`;
+        efSource = `grid:${gf.usedRegion}:${gf.edition.label}`;
       } else {
         // The refusal now comes from calcGas, not pickEF: pickEF returns a uniform "no factor"
         // marker for a key no table carries, and calcGas is what declines to price it. Both calls
         // sit inside the try, so an unpriceable bill lands in `skipped` where the caller already
         // reads it, rather than taking the whole monthly write down.
         try {
-          const ef: EFFactor = deps.pickEF(loc, resolved.efKey).factor;
+          const ef: EFFactor = deps.pickEF(loc, resolved.efKey, sel).factor;
           billTotal = deps.calcGas(ef, c.value, gwp).total;
         } catch (e) {
           skipped.push({ fuelType: c.fuelType, document_type: doc.document_type, reason: `cannot price ${resolved.efKey}: ${e instanceof Error ? e.message : String(e)}` });

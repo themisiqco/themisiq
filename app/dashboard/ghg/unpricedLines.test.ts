@@ -15,7 +15,7 @@ const CODE = stripTsComments(PAGE)
 
 describe('the GHG page explains every unpriced line (FI1)', () => {
   it('derives the lines on every render, from the derived locations, so they clear without a save', () => {
-    expect(CODE).toContain('const unpricedAll = derivedLocations.flatMap(l => unpricedLines(l))')
+    expect(CODE).toContain("const unpricedAll = derivedLocations.flatMap(l => unpricedLines(l, 'AR6', factorSel))")
     // derivedLocations is a memo of the live inventory, not the saved one.
     expect(CODE).toContain('const derivedLocations = useMemo(() => deriveLocations(inventory), [inventory])')
   })

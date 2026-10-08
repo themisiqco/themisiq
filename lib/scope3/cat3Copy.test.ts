@@ -16,6 +16,7 @@ import {
 } from './cat3Copy'
 import { publisherGwpSentence } from './gwpSentence'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
+import { CAT3_EDS } from '../testing/heldSelection'
 
 // ── CATEGORY 3'S CUSTOMER TEXT ───────────────────────────────────────────────────────────────────
 //
@@ -32,7 +33,7 @@ const page = () => readFileSync(PAGE, 'utf8')
 const worked = () => {
   const read = cat3InputsFrom(SCOPE3_FIXTURE_GHG.workings, SCOPE3_FIXTURE_GHG.locations)
   expect(read.reason, 'the fixture inventory must be readable').toBeNull()
-  return { read, priced: priceCat3(read.inputs!) }
+  return { read, priced: priceCat3(read.inputs!, CAT3_EDS) }
 }
 
 describe('Category 3 copy', () => {
@@ -208,7 +209,7 @@ describe('Category 3 copy', () => {
         result_tco2e: null, entry_method: 'manual' })),
       [{ id: 'o', name: 'Office', country: 'GB', electricity_kwh: 0, stream_attestations: attest(answered) }],
     )
-    const zero = priceCat3(zeroRead.inputs!)
+    const zero = priceCat3(zeroRead.inputs!, CAT3_EDS)
     expect(zero.status).toBe('zero')
     expect(zero.kg_co2e).toBe(0)
     expect(cat3Sentences(zero, zeroRead, GWP)).toContain(cat3ZeroText())
@@ -222,7 +223,7 @@ describe('Category 3 copy', () => {
       [{ id: 'o', name: 'Office', country: 'GB', electricity_kwh: 1_000,
          stream_attestations: attest(answered.filter(s => s !== 'propane' && s !== 'mobile')) }],
     )
-    const open = priceCat3(openRead.inputs!)
+    const open = priceCat3(openRead.inputs!, CAT3_EDS)
     expect(open.status).toBe('withheld')
     expect(open.withheld).toEqual({ code: 'undeclared_streams', streams: ['propane', 'mobile'] })
     const notice = cat3NoFigureText(open, openRead)!
@@ -273,7 +274,7 @@ describe('Category 3 copy', () => {
     )
     // UK, kWh: the gross CV sentence is true and stays; the EPA one is not and goes.
     const uk = gasOnly('GB', 'kwh', 50_000)
-    const ukPriced = priceCat3(uk.inputs!)
+    const ukPriced = priceCat3(uk.inputs!, CAT3_EDS)
     expect(ukPriced.lines[0].factor!.key).toBe('natural_gas_kwh_gross_cv')
     const ukSentences = cat3Sentences(ukPriced, uk, GWP)
     expect(ukSentences).toContain(CAT3_GROSS_CV_SENTENCE)
@@ -283,13 +284,13 @@ describe('Category 3 copy', () => {
     // US, therms and MMBtu, priced by the EPA: both sentences, because that entry is where the two bases meet.
     for (const unit of ['therms', 'mmbtu']) {
       const us = gasOnly('US', unit, 1_000)
-      const usSentences = cat3Sentences(priceCat3(us.inputs!), us, GWP)
+      const usSentences = cat3Sentences(priceCat3(us.inputs!, CAT3_EDS), us, GWP)
       expect(usSentences, unit).toContain(CAT3_GROSS_CV_SENTENCE)
       expect(usSentences, unit).toContain(CAT3_EPA_HHV_SENTENCE)
     }
     // A US mcf entry prices from the cubic metres row, not the gross CV one, so neither sentence applies.
     const mcf = gasOnly('US', 'mcf', 100)
-    const mcfSentences = cat3Sentences(priceCat3(mcf.inputs!), mcf, GWP)
+    const mcfSentences = cat3Sentences(priceCat3(mcf.inputs!, CAT3_EDS), mcf, GWP)
     expect(mcfSentences).not.toContain(CAT3_GROSS_CV_SENTENCE)
     expect(mcfSentences).not.toContain(CAT3_EPA_HHV_SENTENCE)
     // Neither sentence asserts what priced THIS inventory's Scope 1 beyond the unit that was entered.
@@ -307,7 +308,7 @@ describe('Category 3 copy', () => {
          activity_unit: unit, ef_source: efSource, result_tco2e: 1, entry_method: 'manual' }],
       [{ id: 's', name: 'Site', country, has_natural_gas: true, natural_gas_amount: 1_000, natural_gas_unit: unit, stream_attestations: attest }],
     )
-    const sentences = (r: ReturnType<typeof gas>) => cat3Sentences(priceCat3(r.inputs!), r, GWP)
+    const sentences = (r: ReturnType<typeof gas>) => cat3Sentences(priceCat3(r.inputs!, CAT3_EDS), r, GWP)
     // Therms at a New Zealand site: priced by MfE (therms convert to its per-kWh factor). Gross CV, no EPA claim.
     // (FI6: this used an Australian site; Australian gas is now priced from NGA, not the DEFRA gross CV row.)
     const nz = sentences(gas('NZ', 'therms', 'NZ MfE Measuring Emissions 2026 v2'))
@@ -337,7 +338,7 @@ describe('Category 3 copy', () => {
          result_tco2e: 2, entry_method: 'manual' }],
       [{ id: 'b', name: 'Buffalo', country: 'US', electricity_kwh: 10_000, stream_attestations: attest }],
     )
-    const priced = priceCat3(read.inputs!)
+    const priced = priceCat3(read.inputs!, CAT3_EDS)
     // The publisher reaches the flag alone.
     const flag = priced.lines[0].flags.find(f => f.code === 'uk_stand_in') as { scope1_publisher: string }
     expect(flag.scope1_publisher).toBe('US EPA eGRID2023')
@@ -425,7 +426,7 @@ describe('Category 3 copy', () => {
       answered.map(stream => ({ location: 'Office', stream, source: 'Declaration', scope: 1, activity_data: 0,
         activity_unit: '—', declaration: 'attested_absent', gwp_basis: 'declaration', result_tco2e: null })),
       [{ id: 'o', name: 'Office', country: 'GB', stream_attestations: answered.map(x => ({ stream: x, attested_at: 'x' })) }])
-    const zero = priceCat3(zeroRead.inputs!)
+    const zero = priceCat3(zeroRead.inputs!, CAT3_EDS)
     expect(zero.kg_co2e).toBe(0)
     expect(cat3CsvRows(zero, zeroRead, null, GWP, undefined, '400,000 USD'))
       .toContainEqual(['Spend recorded on this record', '400,000 USD', CAT3_RECORDED_NOT_USED])
@@ -473,7 +474,7 @@ describe('Category 3 copy', () => {
     // 3. Withheld: the reason that withheld it, verbatim, and the same sentence the panel shows.
     const openRead = cat3InputsFrom(SCOPE3_FIXTURE_GHG.workings,
       SCOPE3_FIXTURE_GHG.locations.map(l => ({ ...l, stream_attestations: [] })))
-    const open = priceCat3(openRead.inputs!)
+    const open = priceCat3(openRead.inputs!, CAT3_EDS)
     expect(open.status).toBe('withheld')
     expect(cat3Basis(open, openRead, null)).toEqual({ basis: 'Not priced', detail: cat3NoFigureText(open, openRead) })
     // 4. A calculated zero: an answer, and it says so.
@@ -484,7 +485,7 @@ describe('Category 3 copy', () => {
         activity_unit: '—', declaration: 'attested_absent', gwp_basis: 'declaration', result_tco2e: null })),
       [{ id: 'o', name: 'Office', country: 'GB', stream_attestations: answered.map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })) }],
     )
-    const zero = priceCat3(zeroRead.inputs!)
+    const zero = priceCat3(zeroRead.inputs!, CAT3_EDS)
     const zb = cat3Basis(zero, zeroRead, null)
     expect(zb.basis).toContain('upstream energy factors, on the bound GHG inventory')
     expect(zb.detail).toContain('calculated zero, not a blank')
@@ -547,7 +548,7 @@ describe('Category 3 copy', () => {
          ef_source: 'NZ MfE (2025) · T&D losses (Scope 3 Cat 3)', result_tco2e: 0.745, entry_method: 'manual' }],
       [{ id: 'nz', name: 'Auckland', country: 'NZ', electricity_kwh: 50_000, nz_td_losses: true, stream_attestations: attest }],
     )
-    const priced = priceCat3(read.inputs!)
+    const priced = priceCat3(read.inputs!, CAT3_EDS)
     const rows = cat3CsvRows(priced, read, null, GWP)
     const td = rows.find(r => r[0].includes('generation of the electricity lost'))!
     expect(td[2]).toBe("745.00 kg CO2e, taken from the GHG inventory's own New Zealand transmission and " +
@@ -567,7 +568,7 @@ describe('Category 3 copy', () => {
         ? { ...l, has_propane: true, propane_amount: 4, stream_attestations: l.stream_attestations.filter(a => a.stream !== 'propane') }
         : l),
     )
-    const priced = priceCat3(read.inputs!) as Cat3Result
+    const priced = priceCat3(read.inputs!, CAT3_EDS) as Cat3Result
     expect(priced.status).toBe('priced')
     expect(priced.lines).toHaveLength(9)
     expect(priced.unpriced).toHaveLength(1)

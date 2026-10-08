@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
 import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
-import { countryRefusal, yearLabel, periodWords } from './ghg/engine'
+import { countryRefusal, yearLabel, periodWords, selectionFor } from './ghg/engine'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
 // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
 // TEXT: a subheading at what was line 258 and the running eyebrow in sectionTitle(). Both are now INK.
@@ -230,7 +230,9 @@ export function generateAssurancePDF(
   sectionTitle(doc, 'Methodology & Emission Factors', M)
   // Bound once each. Both are read twice below (length check, then map), and calling them twice would
   // walk the locations twice to build a value that cannot change between the two calls.
-  const combustionCitations = combustionSourcesFor(inventory.locations)
+  // T3c: the citations name the editions the inventory's own window selects.
+  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month)
+  const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)
   const gridCitations = gridSourcesFor(inventory.locations)
   autoTable(doc, {
     startY: 92,
@@ -253,11 +255,11 @@ export function generateAssurancePDF(
       // way. Both exports now behave the same, which is also one less thing to explain.
       ...combustionCitations.map(src => ['Combustion factors', src]),
       // T10a: how a cited factor became the per-unit figure applied, where we derived it (Australian gas).
-      ...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),
+      ...factorDerivationsFor(inventory.locations, factorSel).map(d => ['Factor derivation', d]),
       ...gridCitations.map(src => ['Electricity factors', src]),
       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
       // From the same locations as the two citation lists above, so it appears exactly when they cite it.
-      ...sourceAttributionsForLocations(inventory.locations).flatMap(a => [
+      ...sourceAttributionsForLocations(inventory.locations, factorSel).flatMap(a => [
         [`Licence attribution — ${a.publisher}`, a.attribution],
         [`Licence — ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
       ]),

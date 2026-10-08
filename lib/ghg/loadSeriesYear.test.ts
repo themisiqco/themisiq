@@ -32,9 +32,10 @@ import { emptyLocation } from './engine'
 describe('assessCompleteness uses the row\'s own reporting year', () => {
   it('re-checks an unmarked row with that year, not the 2024 default', () => {
     const locs = [{ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' }]
+    // T3c: 2023 needs EPA Hub 2023, not held, so that year's gas line is unpriced (checked below); 2025 and 2026 price.
     for (const year of [2023, 2025, 2026]) {
       calls.length = 0
-      expect(assessCompleteness([], locs, year).dataStatus, `${year}`).toBe('ok')
+      expect(assessCompleteness([], locs, year).dataStatus, `${year}`).toBe(year === 2023 ? 'unverifiable' : 'ok')
       expect(calls).toHaveLength(1)
       expect(calls[0][2], `${year}: the year the tables are looked up by`).toBe(year)
     }

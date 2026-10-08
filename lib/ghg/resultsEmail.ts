@@ -225,6 +225,9 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
   for (const l of locs) { const n = l?.name || 'Location'; if (!names.includes(n)) names.push(n) }
   // In words, never the engine code. A code with no name (none today: gridRegionNames.test.ts) reads as the
   // country's grid rather than as the code.
+  // T3c: an unpriced line on the email's own basis: Scope 1 and location-based Scope 2, as the priced lines below. A
+  // missing grid edition also leaves the market-based row unpriced; listing both would count one meter twice.
+  const notPricedHere = (r: (typeof rows)[number]) => r.declaration === 'unpriced' && r.scope2_method !== 'market-based' && r.scope !== 3
   const gridWords = (code: string | null, c: unknown) =>
     !code ? 'Not applicable' : gridRegionName(code) ?? `${countryWords(c)} grid`
   const locations = names.map(name => {
@@ -233,20 +236,22 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
     // ('unpriceable'). Since FI1 a missing factor is one 'unpriced' line instead: the location's other lines
     // are in its totals, and notPriced counts what they leave out.
     const excluded = mine.some(r => r.declaration === 'unpriceable' || (r.declaration ?? '').startsWith('country_'))
-    const notPriced = mine.filter(r => r.declaration === 'unpriced').length
+    const notPriced = mine.filter(notPricedHere).length
     const s1 = mine.filter(r => r.scope === 1 && priced(r))
     const s2 = mine.filter(r => r.scope === 2 && r.scope2_method === 'location-based' && priced(r))
+    // T3c: the grid region of the location-based row, priced or not (an unpriced row still names its region).
+    const s2Any = mine.filter(r => r.scope === 2 && r.scope2_method === 'location-based')
     const loc = locs.find(l => (l?.name || 'Location') === name)
     return {
       name: plain(name),
       country: countryWords(loc?.country),
-      gridRegion: gridWords(s2.map(gridCodeOf).find(Boolean) ?? null, loc?.country),
+      gridRegion: gridWords(s2Any.map(gridCodeOf).find(Boolean) ?? null, loc?.country),
       scope1: excluded ? null : s1.reduce((a, r) => a + (r.result_tco2e as number), 0),
       scope2: excluded ? null : s2.reduce((a, r) => a + (r.result_tco2e as number), 0),
       notPriced: excluded ? 0 : notPriced,
     }
   })
-  const notPricedLines = rows.filter(r => r.declaration === 'unpriced')
+  const notPricedLines = rows.filter(notPricedHere)
     .map(r => plain(RESULTS_EMAIL_COPY.notPricedLine(r.location ?? 'Location', sourceWords(r), workingsActivityCell(r))))
 
   const lines = scope12.filter(r => priced(r) && r.scope2_method !== 'market-based').map(r => {

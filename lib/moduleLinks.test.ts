@@ -9,6 +9,7 @@ import { CAT3_GHG_LINKS, CAT3_SAVE_FIRST_HINT, cat3GhgFixes, CAT3_FIX_IN_GHG_HEA
 import { cat3InputsFrom } from './scope3/cat3Inputs'
 import { priceCat3 } from './scope3/cat3Energy'
 import { SCOPE3_FIXTURE_GHG } from './scope3/scope3SurfacesFixture'
+import { CAT3_EDS } from './testing/heldSelection'
 
 const ROOT = join(__dirname, '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
@@ -149,17 +150,17 @@ describe('the GHG and Scope 3 modules, linked', () => {
     const read3 = (w: unknown, l: unknown) => cat3InputsFrom(w, l)
     // The worked example: every country resolves and no steam row was skipped, so no fixes.
     const ok = read3(SCOPE3_FIXTURE_GHG.workings, SCOPE3_FIXTURE_GHG.locations)
-    expect(cat3GhgFixes(priceCat3(ok.inputs!), ok)).toEqual([])
+    expect(cat3GhgFixes(priceCat3(ok.inputs!, CAT3_EDS), ok)).toEqual([])
     // A location whose country the join cannot answer: the country fix, once, however many lines carry it.
     const unknownCountry = read3(
       SCOPE3_FIXTURE_GHG.workings,
       SCOPE3_FIXTURE_GHG.locations.map(l => ({ ...l, country: '' })),
     )
-    expect(cat3GhgFixes(priceCat3(unknownCountry.inputs!), unknownCountry)).toEqual(['country'])
+    expect(cat3GhgFixes(priceCat3(unknownCountry.inputs!, CAT3_EDS), unknownCountry)).toEqual(['country'])
     // ⚠️ A UK STAND-IN AT A KNOWN COUNTRY IS NOT A FIX: it is the method, and no GHG edit removes it.
     const us = read3(SCOPE3_FIXTURE_GHG.workings, SCOPE3_FIXTURE_GHG.locations)
-    expect(priceCat3(us.inputs!).lines.some(l => l.flags.some(f => f.code === 'uk_stand_in'))).toBe(true)
-    expect(cat3GhgFixes(priceCat3(us.inputs!), us)).not.toContain('country')
+    expect(priceCat3(us.inputs!, CAT3_EDS).lines.some(l => l.flags.some(f => f.code === 'uk_stand_in'))).toBe(true)
+    expect(cat3GhgFixes(priceCat3(us.inputs!, CAT3_EDS), us)).not.toContain('country')
   })
 
   it('ML5d every link to the GHG module is an action on its own line, in the platform\'s own style', () => {

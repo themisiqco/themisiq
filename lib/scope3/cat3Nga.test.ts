@@ -3,6 +3,7 @@ import { priceCat3, NGA_TAS_NT_GAS_INSTRUCTION, type Cat3InputRow, type Cat3Resu
 import { cat3InputsFrom } from './cat3Inputs'
 import { cat3UnpricedText, cat3GhgFixes, cat3MethodSentences, CAT3_NGA_SENTENCE, cat3LineText } from './cat3Copy'
 import { buildWorkings, emptyLocation, type Location } from '../ghg/engine'
+import { CAT3_EDS } from '../testing/heldSelection'
 
 // ── FI6 DIFF 2 (ruling R15): AUSTRALIAN CATEGORY 3 GAS AND ELECTRICITY FROM NGA 2025 SCOPE 3, BY STATE ──
 //
@@ -21,7 +22,7 @@ const AREA_MESSAGE = (site: string) =>
 const row = (over: Partial<Cat3InputRow> & Pick<Cat3InputRow, 'id' | 'stream' | 'activity' | 'unit'>): Cat3InputRow => ({
   location: 'Site', country: 'AU', country_resolved: true, entry_method: 'manual', ...over,
 })
-const price = (rows: Cat3InputRow[]): Cat3Result => priceCat3({ rows, declaration: { undeclared: [] } })
+const price = (rows: Cat3InputRow[]): Cat3Result => priceCat3({ rows, declaration: { undeclared: [] } }, CAT3_EDS)
 
 // Every stream answered, so nothing withholds the category for being unanswered.
 const STREAMS = ['natural_gas', 'propane', 'diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual',
@@ -32,9 +33,10 @@ const site = (over: Partial<Location>, used: readonly string[]): Location => ({
     .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })) as Location['stream_attestations'],
 })
 const throughInventory = (locations: Location[]) => {
-  const workings = buildWorkings(locations, 'AR6', 2026, [], 12)
+  // T3c: 2025, the activity year NGA 2025 (held) covers; calendar 2026 needs NGA 2026, not loaded until T3d.
+  const workings = buildWorkings(locations, 'AR6', 2025, [], 12)
   const inputs = cat3InputsFrom(workings, locations)
-  return { workings, inputs, result: priceCat3(inputs.inputs!) }
+  return { workings, inputs, result: priceCat3(inputs.inputs!, CAT3_EDS) }
 }
 
 describe('FI6: Australian electricity, NGA Table 1 Scope 3', () => {

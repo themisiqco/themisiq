@@ -29,7 +29,7 @@
 //   D2: values come from the edition's latest correction; the correction the held values reflect is recorded.
 // The steam estimate (R14) has no edition of its own: it uses whatever edition its gas factor used (R17).
 
-import { reportingYearLabel } from './engine'
+import { reportingYearLabel } from './reportingYear'
 import { dateInWords } from './dateWords'
 import { EPA_EGRID_DETAILED_DATA_URL, EPA_EGRID_HISTORICAL_URL, EEA_GRID_INTENSITY_URL } from '../sources'
 
@@ -62,21 +62,21 @@ export interface DatasetMeta {
 }
 
 export const DATASETS: Readonly<Record<DatasetId, DatasetMeta>> = {
-  desnz_grid: { publisher: 'DESNZ', family: 'grid electricity', class: 'a', rule: 'desnz', short: 'DESNZ' },
-  desnz_combustion: { publisher: 'DESNZ', family: 'fuel combustion', class: 'a', rule: 'desnz', short: 'DESNZ' },
-  desnz_steam: { publisher: 'DESNZ', family: 'heat and steam', class: 'a', rule: 'desnz', short: 'DESNZ' },
-  desnz_mobile: { publisher: 'DESNZ', family: 'vehicle fuel', class: 'a', rule: 'desnz', short: 'DESNZ', note: 'R17: the Fuels rows DESNZ states apply to vehicles (FI9).' },
-  desnz_scope3_energy: { publisher: 'DESNZ', family: 'well-to-tank and transmission and distribution', class: 'a', rule: 'desnz', short: 'DESNZ', note: 'R17, R18: Category 3 energy, selected with the DESNZ rule beside the GHG factor.' },
-  desnz_travel: { publisher: 'DESNZ', family: 'business travel', class: 'a', rule: 'desnz', short: 'DESNZ', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions.' },
-  desnz_waste: { publisher: 'DESNZ', family: 'waste disposal', class: 'a', rule: 'desnz', short: 'DESNZ', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions.' },
+  desnz_grid: { publisher: 'DESNZ', family: 'grid electricity', class: 'a', rule: 'desnz', short: 'DEFRA' },
+  desnz_combustion: { publisher: 'DESNZ', family: 'fuel combustion', class: 'a', rule: 'desnz', short: 'DEFRA' },
+  desnz_steam: { publisher: 'DESNZ', family: 'heat and steam', class: 'a', rule: 'desnz', short: 'DEFRA' },
+  desnz_mobile: { publisher: 'DESNZ', family: 'vehicle fuel', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R17: the Fuels rows DESNZ states apply to vehicles (FI9).' },
+  desnz_scope3_energy: { publisher: 'DESNZ', family: 'well-to-tank and transmission and distribution', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R17, R18: Category 3 energy, selected with the DESNZ rule beside the GHG factor.' },
+  desnz_travel: { publisher: 'DESNZ', family: 'business travel', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions.' },
+  desnz_waste: { publisher: 'DESNZ', family: 'waste disposal', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions.' },
   epa_hub_combustion: { publisher: 'US EPA', family: 'combustion', class: 'a', rule: 'majority', short: 'US EPA', note: 'H1 (8.5): Hub edition N is read as intended for activity year N; EPA does not state it.' },
   epa_hub_steam: { publisher: 'US EPA', family: 'steam and heat', class: 'a', rule: 'majority', short: 'US EPA' },
   epa_hub_mobile: { publisher: 'US EPA', family: 'vehicle fuel', class: 'a', rule: 'majority', short: 'US EPA', note: 'R17: Tables 2 to 5.' },
-  nga_grid: { publisher: 'NGA', family: 'grid electricity', class: 'a', rule: 'nga_activity_year', short: 'NGA' },
-  nga_residual: { publisher: 'NGA', family: 'residual mix', class: 'a', rule: 'nga_activity_year', short: 'NGA' },
-  nga_combustion: { publisher: 'NGA', family: 'fuel combustion', class: 'a', rule: 'nga_activity_year', short: 'NGA' },
-  nga_mobile: { publisher: 'NGA', family: 'vehicle fuel', class: 'a', rule: 'nga_activity_year', short: 'NGA', note: 'R17: Table 9 and the Table 8 non-road rows.' },
-  nga_scope3: { publisher: 'NGA', family: 'Scope 3 energy', class: 'a', rule: 'nga_activity_year', short: 'NGA', note: 'R17, R18: Tables 1 and 6 (FI6).' },
+  nga_grid: { publisher: 'NGA', family: 'grid electricity', class: 'a', rule: 'nga_activity_year', short: 'DCCEEW NGA' },
+  nga_residual: { publisher: 'NGA', family: 'residual mix', class: 'a', rule: 'nga_activity_year', short: 'DCCEEW NGA' },
+  nga_combustion: { publisher: 'NGA', family: 'fuel combustion', class: 'a', rule: 'nga_activity_year', short: 'DCCEEW NGA' },
+  nga_mobile: { publisher: 'NGA', family: 'vehicle fuel', class: 'a', rule: 'nga_activity_year', short: 'DCCEEW NGA', note: 'R17: Table 9 and the Table 8 non-road rows.' },
+  nga_scope3: { publisher: 'NGA', family: 'Scope 3 energy', class: 'a', rule: 'nga_activity_year', short: 'DCCEEW NGA', note: 'R17, R18: Tables 1 and 6 (FI6).' },
   mfe_combustion: { publisher: 'MfE', family: 'fuel combustion', class: 'a', rule: 'majority', short: 'MfE' },
   mfe_mobile: { publisher: 'MfE', family: 'vehicle fuel', class: 'a', rule: 'majority', short: 'MfE', note: 'R17: Transport Fuel.' },
   eccc_combustion: { publisher: 'ECCC', family: 'fuel combustion', class: 'a', rule: 'majority', short: 'ECCC', note: '8.3: class (a), majority on the applicability year each table states.' },
@@ -155,6 +155,7 @@ export const SOURCE_FILES: readonly string[] = [
   'mfe/Measuring_Emissions_Flat_EmissionFactors_2024.xlsx',
   'mfe/EmissionFactors_2025_v3.xlsx',
   'mfe/NZ_emission_factors_2026_v2.xlsx',
+  'mfe/emission_factors_2026_v2.xlsx',
   'eccc/En84-294-2025-eng.pdf', 'eccc/En84-294-2026-eng.pdf',
   'eccc/2025NIR%20-%20Part%202.pdf', 'eccc/NIR-1990-2024-2026-edition.pdf',
   'aib/AIB-2023-residual-mix-final-results-v1.0.pdf', 'aib/AIB-2023-residual-mix-results.xlsx',
@@ -182,7 +183,8 @@ const DESNZ_EDITIONS: { year: number; published: string; corrections: Correction
       affectsHeldValues: false }] },
 ]
 const desnz = (dataset: DatasetId, heldYears: number[]): FactorEditionEntry[] => DESNZ_EDITIONS.map(e => ({
-  dataset, label: `DESNZ ${e.year}`, class: 'a', editionYear: e.year,
+  // Labelled as the engine and stored factor_editions have always named them (DEFRA/DESNZ publishes as "DEFRA").
+  dataset, label: `DEFRA ${e.year}`, class: 'a', editionYear: e.year,
   published: { date: e.published, source: `${GOVUK(e.year)}, first_published_at (factor-year-selection.md s 4.1)` },
   corrections: e.corrections, held: heldYears.includes(e.year),
   ...(e.sourceFile ? { sourceFile: e.sourceFile } : {}),
@@ -195,8 +197,8 @@ const EPA_EDITIONS: { year: number; date: string; quote: string; note?: string }
     note: 'The file notes updates "from the original release of the 2024 version"; the original release date is not printed.' },
   { year: 2025, date: '2025-01-15', quote: 'epa/ghg-emission-factors-hub-2025.pdf p1 "Last Modified: January 15, 2025"' },
 ]
-const epa = (dataset: DatasetId, heldYears: number[], heldNote?: string): FactorEditionEntry[] => EPA_EDITIONS.map(e => ({
-  dataset, label: `US EPA ${e.year}`, class: 'a', editionYear: e.year,
+const epa = (dataset: DatasetId, heldYears: number[], heldNote?: string, labelSuffix = ''): FactorEditionEntry[] => EPA_EDITIONS.map(e => ({
+  dataset, label: `US EPA ${e.year}${labelSuffix}`, class: 'a', editionYear: e.year,
   published: { date: e.date, source: e.quote }, corrections: [], held: heldYears.includes(e.year),
   sourceFile: `epa/ghg-emission-factors-hub-${e.year}.xlsx`,
   ...(e.note || (heldNote && heldYears.includes(e.year)) ? { note: [e.note, heldYears.includes(e.year) ? heldNote : undefined].filter(Boolean).join(' ') } : {}),
@@ -210,7 +212,7 @@ const NGA_EDITIONS: { year: number; date: string; quote: string; sourceFile: str
   { year: 2026, date: '2026-08', quote: 'nga/national-greenhouse-accounts-factors-2026.pdf p2 "DCCEEW 2026, ... Canberra, August." (the file itself was created October 2026)', sourceFile: 'nga/national-greenhouse-accounts-factors-2026.xlsx' },
 ]
 const nga = (dataset: DatasetId, heldYears: number[]): FactorEditionEntry[] => NGA_EDITIONS.map(e => ({
-  dataset, label: `NGA ${e.year}`, class: 'a', editionYear: e.year,
+  dataset, label: `DCCEEW NGA ${e.year}`, class: 'a', editionYear: e.year,
   activityPeriod: { start: `${e.year}-07-01`, end: `${e.year + 1}-06-30` },
   published: { date: e.date, source: e.quote }, corrections: [], held: heldYears.includes(e.year), sourceFile: e.sourceFile,
 }))
@@ -226,9 +228,9 @@ const MFE_EDITIONS: { year: number; label: string; published: DatedSource; corre
     corrections: [], sourceFile: 'mfe/EmissionFactors_2025_v3.xlsx',
     note: `The guide's download page (${MFE_PAGE}) lists 2025.3 as 1 February 2025; the workbook's printed release date is used.` },
   { year: 2026, label: 'MfE 2026 v2', published: { date: '2026-05-26', source: `${MFE_PAGE} (2026.1)` },
-    corrections: [{ date: '2026-05-29', source: 'mfe/NZ_emission_factors_2026_v2.xlsx, README A10/B10 "Published date" "2026-05-29" (release 2026.2)', note: 'Release 2026.2: DOCf applied twice in non-municipal waste factors corrected.' }],
-    heldCorrection: '2026-05-29', sourceFile: 'mfe/NZ_emission_factors_2026_v2.xlsx',
-    note: 'The local copy was re-saved on 2026-07-11 (file metadata), so it is not byte-identical to the published file.' },
+    corrections: [{ date: '2026-05-29', source: 'mfe/emission_factors_2026_v2.xlsx, README A10/B10 "Published date" "2026-05-29" (release 2026.2)', note: 'Release 2026.2: DOCf applied twice in non-municipal waste factors corrected.' }],
+    heldCorrection: '2026-05-29', sourceFile: 'mfe/emission_factors_2026_v2.xlsx',
+    note: 'MfE\'s untouched copy. Identical cell for cell to NZ_emission_factors_2026_v2.xlsx, the copy the values were transcribed from, which was re-saved locally on 2026-07-11.' },
 ]
 const mfe = (dataset: DatasetId, heldYears: number[]): FactorEditionEntry[] => MFE_EDITIONS.map(e => ({
   dataset, label: e.label, class: 'a', editionYear: e.year, published: e.published, corrections: e.corrections,
@@ -240,7 +242,7 @@ const mfe = (dataset: DatasetId, heldYears: number[]): FactorEditionEntry[] => M
 const mfeRow = (dataset: DatasetId, dataYear: number, held: boolean, note?: string): FactorEditionEntry => ({
   dataset, label: `MfE 2026 v2 (${dataYear} row)`, class: 'b', dataYear,
   published: MFE_EDITIONS[3].published, corrections: MFE_EDITIONS[3].corrections, held,
-  ...(held ? { heldCorrection: '2026-05-29' } : {}), sourceFile: 'mfe/NZ_emission_factors_2026_v2.xlsx', ...(note ? { note } : {}),
+  ...(held ? { heldCorrection: '2026-05-29' } : {}), sourceFile: 'mfe/emission_factors_2026_v2.xlsx', ...(note ? { note } : {}),
 })
 
 // ── ECCC Emission factors and reference values: revision history, v4.0 p iii ─────────────────────────────────────
@@ -263,8 +265,8 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
   ...desnz('desnz_travel', [2026]),
   ...desnz('desnz_waste', [2026]),
   // US EPA Hub (class (a), majority). Held 2025 for all three.
-  ...epa('epa_hub_combustion', [2025], 'Held values were read from the 2025 workbook; the engine labels them "US EPA 2024" (COMBUSTION_EDITION.US, flagged unverified), to be corrected when the engine reads this registry.'),
-  ...epa('epa_hub_steam', [2025]),
+  ...epa('epa_hub_combustion', [2025], 'Held values were read from the 2025 workbook. The engine labelled them "US EPA 2024" until T3c, which reads this registry and labels them US EPA 2025.'),
+  ...epa('epa_hub_steam', [2025], undefined, ' Table 7'),   // labelled as the engine has always named the steam table
   ...epa('epa_hub_mobile', [2025]),
   // NGA (class (a), activity years). Held 2025.
   ...nga('nga_grid', [2025]),
@@ -278,10 +280,11 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
   // ECCC combustion (class (a), majority on applicability year). v3.0 values are held; they are identical across the
   // 2023/24, 2025 and 2026 sets (engine.ts EF_CA header). v4.0 adds 2027.
   ...[2023, 2024, 2025, 2026].map((y): FactorEditionEntry => ({
-    dataset: 'eccc_combustion', label: `ECCC v3.0 (${y} set)`, class: 'a', editionYear: y,
+    // Labelled as the engine and stored factor_editions name the table; the applicability set is the entry's year.
+    dataset: 'eccc_combustion', label: 'ECCC 2025 v3.0', class: 'a', editionYear: y,
     published: { date: ECCC_V['3.0'].date, source: ECCC_V['3.0'].source }, corrections: [], held: true,
     sourceFile: 'eccc/En84-294-2025-eng.pdf' })),
-  { dataset: 'eccc_combustion', label: 'ECCC v4.0 (2027 set)', class: 'a', editionYear: 2027,
+  { dataset: 'eccc_combustion', label: 'ECCC 2026 v4.0', class: 'a', editionYear: 2027,
     published: { date: ECCC_V['4.0'].date, source: ECCC_V['4.0'].source }, corrections: [], held: false, sourceFile: 'eccc/En84-294-2026-eng.pdf' },
 
   // eGRID (class (b), data year N). Dates from the eGRID pages (factor-year-selection.md s 4.2 and the reviewer). No

@@ -82,8 +82,9 @@ The engine is pure calc (no React/Supabase): all factor tables, coverage analysi
 - **No factor is priced through a density, energy content or gross/net ratio that is not cited on its row (FI3).**
 - **An estimated factor is always labelled as an estimate on every surface that shows the row (R14).**
 - **A fleet line is priced only with a mobile factor; a stationary factor is never used for a vehicle unless the publisher states, cited, that one factor covers both uses (FI9, R16).**
+- **Factor editions are chosen by `selectEdition` from the reporting window and the registry. No selector takes a bare year and none substitutes a different year. A missing edition is an unpriced line with an export-blocking issue; an edition not yet published is priced on the newest published edition, labelled provisional (R19).**
 - **`s3_td` (NZ electricity T&D, Scope 3 Cat 3) is a DISTINCT total — never folded into S1/S2.** `calcInventory` surfaces it separately.
-- **Run `npx vitest run lib/ghg/engine.test.ts` (479 passed, 0 todo, verified 7 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
+- **Run `npx vitest run lib/ghg/engine.test.ts` (497 passed, 0 todo, verified 8 Oct 2026) before and after any engine change.** If a previously-green test breaks, stop. The count only ever goes up; treat a *lower* number as a sign that tests were removed, not that this line is stale again.
 
 ---
 

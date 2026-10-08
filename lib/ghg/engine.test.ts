@@ -324,7 +324,7 @@ describe('GROUP E — NZ T&D losses (Scope 3 Cat 3)', () => {
 
   it("E2 s3_td must NOT be folded into s1_total or s2_location/s2_market (guard — should already hold)", () => {
     const c = calcLocation(nz, 'AR6', 2025);
-    const gridEf = getGridFactor('NZ', 2025).ef;
+    const gridEf = getGridFactor('NZ', testSel(2025)).ef;
     expect(c.s1_total).toBe(0);
     expect(c.s2_location).toBeCloseTo(100000 * gridEf / 1000, 6);      // grid only, no T&D
     expect(c.s2_location).not.toBeCloseTo(c.s2_location + c.s3_td, 6); // T&D not added into S2
@@ -344,14 +344,14 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
     const l = loc({
       has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
       source_docs: [doc('utility_bill_gas', [prop({
-        fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30',
+        fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-09-30',
       })])],
     });
     const res: CoverageResolution = {
       locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', monthsCovered: 9, pctEstimated: 25,
-      note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2024-06-01T00:00:00Z',
+      note: '9 of 12 months; grossed ×12/9', acknowledgedAt: '2025-06-01T00:00:00Z',
     };
-    const inv = { locations: [l], reporting_year: 2024, coverage_resolutions: [res] };
+    const inv = { locations: [l], reporting_year: 2025, coverage_resolutions: [res] };
     const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
     const r = reconcile(slices, inv, 'AR6');
     expect(r.reconciles).toBe(true);
@@ -364,11 +364,11 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
     const l = loc({
       has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
       source_docs: [doc('utility_bill_gas', [prop({
-        fuelType: 'natural_gas', value: 1200, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-12-31',
+        fuelType: 'natural_gas', value: 1200, unit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-12-31',
       })])],
     });
-    const annual = calcInventory([l], 'AR6', 2024);
-    const inv = { locations: [l], reporting_year: 2024 };
+    const annual = calcInventory([l], 'AR6', 2025);
+    const inv = { locations: [l], reporting_year: 2025 };
     const slices = buildMonthlyEmissions(inv, deps, 'AR6').slices;
     const r = reconcile(slices, inv, 'AR6');
     expect(r.reconciles).toBe(true);
@@ -381,10 +381,10 @@ describe('GROUP F — monthly/annual reconciliation models the (correct) diverge
   // The defect the reconciler still exists to catch is monthly rows that disagree with the bills: here,
   // rows written while a second bill was on file, read against the inventory after it was removed.
   it("F1c a REAL defect — monthly rows the current bills do not support — does NOT reconcile", () => {
-    const jan = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-09-30' })], 'kept');
-    const oct = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 400, unit: 'mcf', periodStart: '2024-10-01', periodEnd: '2024-12-31' })], 'removed');
-    const before = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan, oct] })], reporting_year: 2024 };
-    const after = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan] })], reporting_year: 2024 };
+    const jan = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 900, unit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-09-30' })], 'kept');
+    const oct = doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value: 400, unit: 'mcf', periodStart: '2025-10-01', periodEnd: '2025-12-31' })], 'removed');
+    const before = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan, oct] })], reporting_year: 2025 };
+    const after = { locations: [loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [jan] })], reporting_year: 2025 };
     const staleSlices = buildMonthlyEmissions(before, deps, 'AR6').slices;
     expect(reconcile(staleSlices, before, 'AR6').reconciles, 'consistent with the bills they came from').toBe(true);
     const r = reconcile(staleSlices, after, 'AR6');
@@ -410,8 +410,8 @@ describe('GROUP G — regression guards', () => {
   });
 
   it('G3 CA natural-gas CO2 is per-province (ON ≠ AB)', () => {
-    const on = pickEF(loc({ country: 'CA', grid_region: 'ON', natural_gas_unit: 'm3' }), 'natural_gas_m3').factor;
-    const ab = pickEF(loc({ country: 'CA', grid_region: 'AB', natural_gas_unit: 'm3' }), 'natural_gas_m3').factor;
+    const on = pickEF(loc({ country: 'CA', grid_region: 'ON', natural_gas_unit: 'm3' }), 'natural_gas_m3', heldSel(loc({ country: 'CA', grid_region: 'ON', natural_gas_unit: 'm3' }))).factor;
+    const ab = pickEF(loc({ country: 'CA', grid_region: 'AB', natural_gas_unit: 'm3' }), 'natural_gas_m3', heldSel(loc({ country: 'CA', grid_region: 'AB', natural_gas_unit: 'm3' }))).factor;
     expect(on.co2).not.toBe(ab.co2);
     expect(on.co2).toBeCloseTo(1.921, 3);
     expect(ab.co2).toBeCloseTo(1.962, 3);
@@ -419,7 +419,7 @@ describe('GROUP G — regression guards', () => {
 
   it('G4 UK/AU/NZ fuels do NOT respond to the AR toggle; US/CA/EU DO', () => {
     const same = (l: Location, key: any) => {
-      const ef = pickEF(l, key).factor;
+      const ef = pickEF(l, key, heldSel(l)).factor;
       return calcGas(ef, 1000, 'AR4').total === calcGas(ef, 1000, 'AR6').total;
     };
     // published-basis (CO2e baked into co2, ch4/n2o = 0) → GWP-invariant
@@ -433,7 +433,7 @@ describe('GROUP G — regression guards', () => {
   });
 
   it('G5 EU_AT residual mix is not applicable (full-disclosure regime), ef 0 — NOT treated as zero-emission', () => {
-    const r = getResidualFactor('EU_AT', 2024, 'AR6');
+    const r = getResidualFactor('EU_AT', testSel(2024), 'AR6');
     expect(r.applicable).toBe(false);
     expect(r.ef).toBe(0);
   });
@@ -520,29 +520,29 @@ describe('GROUP J — pctEstimated', () => {
   });
   // A confirmed dated bill on the gas field → the location counts as concierge-read.
   const gasBill = (value: number, periodEnd: string) =>
-    doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart: '2024-01-01', periodEnd })]);
+    doc('utility_bill_gas', [prop({ fuelType: 'natural_gas', value, unit: 'mcf', periodStart: '2025-01-01', periodEnd })]);
 
   it('J1 one fuel, 1/12 months extrapolated, sole emission source → ≈91.7% estimated', () => {
     const l = loc({
       has_natural_gas: true, natural_gas_amount: 1200, natural_gas_unit: 'mcf',
-      source_docs: [gasBill(100, '2024-01-31')], // 1 month evidenced, grossed ×12 into the 1200 field
+      source_docs: [gasBill(100, '2025-01-31')], // 1 month evidenced, grossed ×12 into the 1200 field
     });
     // 11/12 of the sole fuel's emissions are estimated → 91.67%.
-    expect(pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2024 }, 'AR6')).toBeCloseTo(91.67, 1);
+    expect(pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2025 }, 'AR6')).toBeCloseTo(91.67, 1);
   });
 
   it('J2 same 1/12 gas extrapolation, but electricity is 95% of tCO2e → estimation is SMALL (~4.6%), not 91.7% — weighting is by emissions, not fuel count', () => {
     // Derive electricity_kwh from the engine so electricity is exactly 19× the gas emissions
     // (gas = 5% of the S1+2 total). No hand-computed EFs → robust to factor-table changes.
-    const gasT = calcLocation(loc({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }), 'AR6', 2024).s1_total;
-    const gf = getGridFactor('US_AVG', 2024).ef; // resolved grid key (G1)
+    const gasT = calcLocation(loc({ has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }), 'AR6', 2025).s1_total;
+    const gf = getGridFactor('US_AVG', testSel(2025)).ef; // resolved grid key (G1)
     const kwh = (19 * gasT * 1000) / gf; // electricity tCO2e = kwh·gf/1000 = 19·gasT
     const l = loc({
       has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf',
       grid_region: 'US_AVG', electricity_kwh: kwh,
-      source_docs: [gasBill(1000 / 12, '2024-01-31')],
+      source_docs: [gasBill(1000 / 12, '2025-01-31')],
     });
-    const pct = pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2024 }, 'AR6');
+    const pct = pctEstimated({ locations: [l], coverage_resolutions: [extrapolate('natural_gas', 1)], reporting_year: 2025 }, 'AR6');
     // (gasT × 11/12) / (20 × gasT) × 100 = (11/12)/20 × 100 ≈ 4.58 — NOT 91.7.
     expect(pct).toBeCloseTo(4.58, 1);
     expect(pct).toBeLessThan(10);
@@ -603,12 +603,14 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
   for (const { country, unit, key } of unpriceable) {
     it(`K ${country} + ${unit} throws MissingEmissionFactorError naming fuel, unit and country`, () => {
       const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
+      // T3c: at the year whose editions are held, so the unit (not a missing edition) is what is tested.
+      const y = heldYearFor(country);
 
-      expect(() => calcGas(pickEF(l, key as any).factor, 1000, 'AR6')).toThrow(MissingEmissionFactorError);
+      expect(() => calcGas(pickEF(l, key as any, heldSel(l)).factor, 1000, 'AR6')).toThrow(MissingEmissionFactorError);
 
       // The message must carry enough for a customer-facing string to be built from it later.
       try {
-        calcGas(pickEF(l, key as any).factor, 1000, 'AR6');
+        calcGas(pickEF(l, key as any, heldSel(l)).factor, 1000, 'AR6');
         throw new Error('expected a throw');
       } catch (e) {
         const err = e as MissingEmissionFactorError;
@@ -623,12 +625,12 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
 
       // FI1: calcLocation no longer refuses the LOCATION. The line is unpriced (skipped, never zero), the
       // location is not excluded, and unpricedLines names the line with a blocking factor_missing issue.
-      expect(() => calcLocation(l, 'AR6', 2024)).not.toThrow();
-      expect(calcLocation(l, 'AR6', 2024).s1_total).toBe(0);
-      expect(findUnpriceableLocations([l], 'AR6', 2024)).toEqual([]);
-      const [u] = unpricedLines(l);
+      expect(() => calcLocation(l, 'AR6', y)).not.toThrow();
+      expect(calcLocation(l, 'AR6', y).s1_total).toBe(0);
+      expect(findUnpriceableLocations([l], 'AR6', y)).toEqual([]);
+      const [u] = unpricedLines(l, 'AR6', heldSel(l));
       expect(u).toMatchObject({ reason: 'factor_missing', locId: l.id, field: 'natural_gas_amount', unit, country, factorKey: key, factor: { value: null } });
-      expect(findUnresolvedCoverage([l], 2024, 12, []).filter(i => i.status === 'factor_missing').map(i => i.field)).toEqual(['natural_gas_amount']);
+      expect(findUnresolvedCoverage([l], y, 12, []).filter(i => i.status === 'factor_missing').map(i => i.field)).toEqual(['natural_gas_amount']);
     });
   }
 
@@ -640,7 +642,7 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
     // rather than printing 'undefined'. T16 covers the refusal path for the same blank country.
     const l = loc({ country: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
     // FI1: calcLocation no longer throws; the factor lookup itself still names the blank country.
-    expect(() => calcGas(pickEF(l, 'natural_gas_m3').factor, 1000, 'AR6')).toThrow(/\(unset\)/);
+    expect(() => calcGas(pickEF(l, 'natural_gas_m3', heldSel(l)).factor, 1000, 'AR6')).toThrow(/\(unset\)/);
   });
 
   it('K every priceable (country, unit) pair still prices — the guard refuses absence, not everything', () => {
@@ -659,7 +661,7 @@ describe('GROUP K — a factor the tables do not carry is refused, not priced', 
     ];
     for (const { country, unit, key } of priceable) {
       const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: unit });
-      const total = calcGas(pickEF(l, key as any).factor, 1000, 'AR6').total;
+      const total = calcGas(pickEF(l, key as any, heldSel(l)).factor, 1000, 'AR6').total;
       expect(Number.isFinite(total), `${country} + ${unit} should price`).toBe(true);
       expect(total).toBeGreaterThan(0);
     }
@@ -679,8 +681,8 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
   const bad = () => loc({ id: 'BAD', name: 'Blocked Site', country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3' });
 
   it('L1 a mixed inventory still totals, and the priceable location keeps its exact figure', () => {
-    const aloneTotal = calcInventory([good()], 'AR6', 2024).s1_total;
-    const mixed = calcInventory([good(), bad()], 'AR6', 2024);
+    const aloneTotal = calcInventory([good()], 'AR6', 2025).s1_total;
+    const mixed = calcInventory([good(), bad()], 'AR6', 2025);
     expect(aloneTotal).toBeGreaterThan(0);
     expect(mixed.s1_total).toBe(aloneTotal); // the unpriced gas adds nothing, not a zero claim
   });
@@ -688,8 +690,8 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
   it('L2 the location is NOT excluded; its one line is unpriced, and order does not matter', () => {
     expect(calcInventory([bad(), good()], 'AR6', 2024)).toEqual(calcInventory([good(), bad()], 'AR6', 2024));
     expect(findUnpriceableLocations([good(), bad()], 'AR6', 2024)).toEqual([]);
-    expect(unpricedLines(bad()).map(u => [u.locId, u.field, u.reason])).toEqual([['BAD', 'natural_gas_amount', 'factor_missing']]);
-    expect(unpricedLines(good())).toEqual([]);
+    expect(unpricedLines(bad(), 'AR6', heldSel(bad())).map(u => [u.locId, u.field, u.reason])).toEqual([['BAD', 'natural_gas_amount', 'factor_missing']]);
+    expect(unpricedLines(good(), 'AR6', heldSel(good()))).toEqual([]);
   });
 
   it('L3 WAS "every scope is excluded": now the location\'s priceable electricity IS in every total', () => {
@@ -702,7 +704,8 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
   });
 
   it('L4 buildWorkings writes ONE unpriced row for the line, with null result and the message, beside its priced rows', () => {
-    const rows = buildWorkings([good(), loc({ ...bad(), grid_region: 'NZ', electricity_kwh: 50_000 })], 'AR6', 2024, [], 12);
+    // T3c: 2026, where the NZ editions are held, so the unit is what leaves the line unpriced.
+    const rows = buildWorkings([good(), loc({ ...bad(), grid_region: 'NZ', electricity_kwh: 50_000 })], 'AR6', 2026, [], 12);
     const badRows = rows.filter(r => r.location === 'Blocked Site');
     const gas = badRows.filter(r => r.stream === 'natural_gas');
     expect(gas).toHaveLength(1);
@@ -710,7 +713,7 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
     expect(gas[0].result_tco2e).toBeNull();       // an absence never renders as 0
     expect(gas[0].activity_data).toBe(1000);
     expect(gas[0].activity_unit).toBe('m3');
-    expect(gas[0].note).toBe(`NOT PRICED: ${unpricedLines(bad())[0].message}`);
+    expect(gas[0].note).toBe(`NOT PRICED: ${unpricedLines(bad(), 'AR6', heldSel(bad()))[0].message}`);
     expect(gas[0].unpriced).toMatchObject({ reason: 'factor_missing', field: 'natural_gas_amount', factor_key: 'natural_gas_m3', value: null });
     // Its electricity is priced, and no whole-location exclusion row exists any more.
     expect(badRows.some(r => r.stream === 'electricity' && r.result_tco2e > 0)).toBe(true);
@@ -725,7 +728,7 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
 
   it('L6 the probe is GWP-independent: the same lines are unpriced on AR4, AR5 and AR6', () => {
     const ls = [good(), bad()];
-    const lines = (g: 'AR4' | 'AR5' | 'AR6') => ls.flatMap(l => unpricedLines(l, g)).map(u => `${u.locId}:${u.field}`);
+    const lines = (g: 'AR4' | 'AR5' | 'AR6') => ls.flatMap(l => unpricedLines(l, g, heldSel(l))).map(u => `${u.locId}:${u.field}`);
     expect(lines('AR4')).toEqual(['BAD:natural_gas_amount']);
     expect(lines('AR5')).toEqual(lines('AR4'));
     expect(lines('AR6')).toEqual(lines('AR4'));
@@ -738,7 +741,7 @@ describe('GROUP L: an unpriceable line is isolated, unpriced and recorded; the l
       get(t, p) { if (p === 'has_propane') throw new TypeError('boom'); return (t as any)[p] },
     }) as Location;
     expect(() => calcInventory([exploding], 'AR6', 2024)).toThrow(TypeError);
-    expect(() => unpricedLines(exploding)).toThrow(TypeError);
+    expect(() => unpricedLines(exploding, 'AR6', heldSel(exploding))).toThrow(TypeError);
   });
 });
 
@@ -848,7 +851,8 @@ describe('N. no stream can be silent', () => {
   const rowsFor = (s: DeclarableStream, declared: boolean, quantified: boolean) => {
     const f = FIXTURES[s];
     const l = loc({ ...(declared ? f.declare : {}), ...(quantified ? f.quantify : {}) });
-    return buildWorkings([l], 'AR6', 2024, [], 12).filter((r: any) => r.stream === s);
+    // T3c: 2025, the US year whose EPA Hub edition is held, so a quantified stream prices.
+    return buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12).filter((r: any) => r.stream === s);
   };
 
   it('N1 every stream emits at least one row in all four declared/quantified combinations', () => {
@@ -958,7 +962,7 @@ describe('N. no stream can be silent', () => {
         for (const quantified of [true, false]) {
           const f = FIXTURES[s];
           const l = loc({ ...(declared ? f.declare : {}), ...(quantified ? f.quantify : {}) });
-          const rows = buildWorkings([l], 'AR6', 2024, [], 12).filter((r: any) => r.stream === s) as any[];
+          const rows = buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12).filter((r: any) => r.stream === s) as any[];
           const state = streamState(l, s);
           const expected = rows.some(r => r.declaration === undefined) ? 'quantified'
             : rows[0].declaration === 'declared_unquantified' ? 'declared_unquantified' : 'undeclared';
@@ -999,19 +1003,36 @@ describe('N10. the golden inventory is unchanged', () => {
 
   // FI9 MOVES THIS NUMBER, ON PURPOSE: the fleet diesel was priced on ECCC's stationary row (13.446652 t, total 304.6176)
   // and is now priced on its mobile row (13.712932 t). Every other component is unchanged.
-  it('ON, RY2025, gas 120,000 m3 + light-vehicle diesel 5,000 L + R-410A 12 kg + 850,000 kWh = 304.883844 tCO2e', () => {
-    const t = calcInventory([golden()], 'AR6', 2025) as any;
-    expect(t.s1_total + t.s2_location).toBeCloseTo(304.883844, 6);
+  // T3c MOVES IT AGAIN, ON PURPOSE: Ontario's grid is class (b). RY2025 has no data-year-2025 table, so it takes the newest
+  // ECCC table published by the preparation date. Prepared before ECCC v4.0 (9 Sep 2026) that is Table 5.3, data year
+  // 2023, 0.059 kg/kWh: until T3c the v3.0 "2025" applicability key (Table 5.2, data year 2022, 0.038) priced it, which
+  // was ECCC's offset-system rule (ruling 8.1, C1). Prepared after, it is Table 5.4 (data year 2024), not held until T3d,
+  // so electricity is an unpriced line and the inventory blocks. The light-vehicle diesel blocks with it: ECCC's mobile
+  // factors are NIR Table A6.1-15, class (b), and the newest NIR after 9 Sep 2026 is NIR 2026 (data year 2024), not held.
+  const BEFORE_V4 = { preparedOn: new Date(2026, 5, 1) }
+  it('ON, RY2025, prepared 1 Jun 2026: gas 120,000 m3 + light-vehicle diesel 5,000 L + R-410A 12 kg + 850,000 kWh = 322.733844 tCO2e', () => {
+    const t = calcInventory([golden()], 'AR6', 2025, selectionFor(2025, 12, BEFORE_V4)) as any;
+    expect(t.s1_total + t.s2_location).toBeCloseTo(322.733844, 6);
     // The components, so a future failure says WHICH one moved rather than only that the total did.
     // Diesel: 5,000 x 2.6805 = 13.4025 t CO2; CH4 5,000 x 0.068 g = 0.34 kg x 29.8; N2O 5,000 x 0.22 g = 1.1 kg x 273.
-    expect(t.s1_total).toBeCloseTo(272.583844, 6);   // gas 231.798912 + diesel 13.712932 + R-410A 27.072
-    expect(t.s2_location).toBeCloseTo(32.3, 6);      // 850,000 kWh x ON 2025 grid 0.038
+    expect(t.s1_total).toBeCloseTo(272.583844, 6);   // gas 231.798912 + diesel 13.712932 + R-410A 27.072 (unchanged)
+    expect(t.s2_location).toBeCloseTo(50.15, 6);     // 850,000 kWh x ON Table 5.3 (data year 2023) 0.059
+  });
+
+  it('ON, RY2025, prepared after ECCC v4.0: electricity and fleet diesel are unpriced (Table 5.4 and NIR 2026 not held) and block', () => {
+    const sel = selectionFor(2025, 12, { preparedOn: TEST_PREPARED_ON })
+    const t = calcInventory([golden()], 'AR6', 2025, sel);
+    // Gas 231.798912 + R-410A 27.072; the diesel's 13.712932 and the electricity are out, each as a blocking line.
+    expect([t.s1_total, t.s2_location].map(v => Number(v.toFixed(6)))).toEqual([258.870912, 0]);
+    const issues = findUnresolvedCoverage([golden()], 2025, 12, [], { preparedOn: TEST_PREPARED_ON }).filter(i => i.status === 'edition_missing');
+    expect(issues.map(i => i.field).sort()).toEqual(['electricity_kwh', 'light_diesel_amount']);
+    expect(issues.find(i => i.field === 'electricity_kwh')!.message).toBe('ECCC Table 5.4 (NIR 1990-2024) grid electricity factors are needed for reporting year 2025 and are not loaded, so this line at Test Site is not counted. Export is blocked until they are loaded.');
   });
 
   it('the declaration rows carry no figure, so the workings still sum to the same total', () => {
-    const rows = buildWorkings([golden()], 'AR6', 2025, [], 12) as any[];
+    const rows = buildWorkings([golden()], 'AR6', 2025, [], 12, BEFORE_V4) as any[];
     const scope12 = rows.filter(r => r.result_tco2e != null && r.scope !== 3 && r.scope2_method !== 'market-based');
-    expect(scope12.reduce((n, r) => n + r.result_tco2e, 0)).toBeCloseTo(304.883844, 6);
+    expect(scope12.reduce((n, r) => n + r.result_tco2e, 0)).toBeCloseTo(322.733844, 6);
     // Four streams are absent from this site and every one of them is on the record as absent.
     const declarations = rows.filter(r => r.declaration).map(r => r.stream).sort();
     expect(declarations).toEqual(['diesel_stationary', 'fuel_oil_distillate', 'fuel_oil_residual', 'propane', 'purchased_steam']);
@@ -1043,60 +1064,61 @@ describe('O. NZ T&D losses carry their own vintage and disclose a fallback', () 
     expect(Object.keys(NZ_TD_LOSS)).toEqual(['2025']);
   });
 
-  it('O2 a 2026 inventory stamps the FACTOR year, not the inventory year', () => {
-    // THE DEFECT. Was 'factor_vintage: "2026"' over a 2025 factor.
+  it('O2 a 2026 inventory stamps the selected series row, not the inventory year (T3c: class (b), newest row)', () => {
+    // THE DEFECT this block was written for: 'factor_vintage: "2026"' over a 2025 factor. Since T3c the row names the
+    // MfE series row the window selected, with the rule that selected it.
     const r = tdRow(2026);
-    expect(r.factor_vintage, 'the row must not claim a vintage the factor does not have').toBe('MfE 2025');
+    expect(r.factor_vintage, 'the row must not claim a vintage the factor does not have').toBe('MfE 2026 v2 (2025 row)');
     expect(r.factor_vintage).not.toBe('2026');
+    expect(r.selection_rule).toBe('data_year_newest');
   });
 
-  it('O3 the fallback is DISCLOSED, in the same style as the residual helpers', () => {
-    // getResidualFactor: 'AIB 2024 residual mix applied to 2026 inventory (latest vintage held).'
-    // Same spelling as getResidualFactor and getGridFactor — one vocabulary across all three helpers.
+  it('O3 the selection is DISCLOSED as its basis, and no "vintage held" note remains', () => {
     const r = tdRow(2026);
-    expect(r.ef_source).toContain('MfE 2025 T&D loss factor applied to 2026 inventory (latest vintage held).');
-    // The source citation itself survives — the note is appended, not substituted.
+    expect(r.selection_basis).toMatch(/^MfE 2026 v2 \(2025 row\) \(published 26 May 2026, corrected on 29 May 2026\): the newest edition when this inventory was first prepared on .*; no 2026 data year was published\./);
+    expect([r.edition_published, r.edition_corrected]).toEqual(['26 May 2026', '29 May 2026']);
+    // The source citation itself survives, and the old nearest-year note is gone for good.
     expect(r.ef_source).toContain('T&D losses (Scope 3 Cat 3)');
+    expect(r.ef_source).not.toContain('vintage held');
   });
 
-  it('O4 NO note when the factor year and the inventory year match', () => {
+  it('O4 a matching data year says so', () => {
     const r = tdRow(2025);
-    expect(r.factor_vintage).toBe('MfE 2025');
-    expect(r.ef_source, 'a matching year has nothing to disclose').not.toContain('applied to');
+    expect(r.factor_vintage).toBe('MfE 2026 v2 (2025 row)');
+    expect(r.selection_basis).toBe('MfE 2026 v2 (2025 row): data year 2025 matches reporting year 2025. Values as corrected on 29 May 2026.');
+    expect(r.ef_source, 'no nearest-year note').not.toContain('applied to');
   });
 
-  it('O5 resolving FORWARD says so, rather than claiming the latest vintage', () => {
-    // `let ty = years[0]` means a 2023 or 2024 inventory — both selectable in the wizard today —
-    // resolves forward to the 2025 factor, so a "latest" claim would say the opposite of what
-    // happened. The note must also not blame MfE: they publish an annual T&D series back to 2010, so
-    // the missing years are OURS. It claims only our own coverage — see the note in nzTdLoss.
+  it('O5 T3c: a 2023 or 2024 inventory is NOT priced forward on the 2025 row; the line is unpriced until its row is loaded', () => {
+    // Until T3c `let ty = years[0]` resolved a 2023 or 2024 inventory FORWARD to the 2025 factor. MfE publishes those
+    // rows (registered, not held), so the line is unpriced with the edition message and blocks export.
     for (const y of [2023, 2024]) {
       const r = tdRow(y);
-      expect(r.factor_vintage, `inv ${y}`).toBe('MfE 2025');
-      expect(r.ef_source, `inv ${y}`).toContain(`MfE 2025 T&D loss factor applied to ${y} inventory (earliest vintage held).`);
-      // TRACKS THE LIVE WORDING. This read `.not.toContain('latest available')`; once that spelling was
-      // retired the assertion could never fail again — a guard that had quietly stopped guarding.
-      expect(r.ef_source, `inv ${y} must not claim the latest vintage`).not.toContain('latest vintage held');
+      expect([r.declaration, r.result_tco2e, r.unpriced?.reason], `inv ${y}`).toEqual(['unpriced', null, 'edition_missing']);
+      expect(r.note, `inv ${y}`).toBe(`NOT PRICED: MfE 2026 v2 (${y} row) transmission and distribution losses factors are needed for reporting year ${y} and are not loaded, so this line at Test Site is not counted. Export is blocked until they are loaded.`);
+      expect(calcLocation(nzLoc(), 'AR6', y).s3_td, `inv ${y}: excluded, not priced`).toBe(0);
     }
   });
 
-  it('O6 nzTdLoss returns the residual-helper shape', () => {
-    expect(nzTdLoss(2025)).toEqual({ ef: 0.00596, vintage: 'MfE 2025', note: '' });
-    expect(nzTdLoss(2026).ef).toBe(0.00596);
-    expect(nzTdLoss(2026).note).not.toBe('');
+  it('O6 nzTdLoss returns the selected MfE series row (T3c: class (b), data year), with its edition', () => {
+    const td = nzTdLoss(testSel(2025));
+    expect([td.ef, td.vintage, td.edition.rule]).toEqual([0.00596, 'MfE 2026 v2 (2025 row)', 'data_year_match']);
+    // 2026 has no 2026 row: the newest published row is used, and the basis says so. Never a nearest-year note.
+    expect(nzTdLoss(testSel(2026)).ef).toBe(0.00596);
+    expect(nzTdLoss(testSel(2026)).edition.rule).toBe('data_year_newest');
   });
 
   it('O7 REGRESSION — no figure moved: the calc term and the row still agree, and still exclude S2', () => {
     // This is a provenance fix. calcLocation and buildWorkings share nzTdLoss precisely so the calc
     // term and the workings row cannot diverge; changing the return shape must not break that.
-    for (const y of [2023, 2025, 2026]) {
+    for (const y of [2025, 2026]) {   // T3c: 2023 is unpriced (O5)
       const c = calcLocation(nzLoc(), 'AR6', y);
       expect(c.s3_td, `inv ${y}`).toBeCloseTo(100_000 * 0.00596 / 1000, 9);
       expect(tdRow(y).result_tco2e, `inv ${y} row vs calc`).toBeCloseTo(c.s3_td, 9);
       expect(tdRow(y).emission_factor).toBe('0.00596 kg CO₂e/kWh');
       // Still Scope 3, still out of every Scope 2 total.
       expect(tdRow(y).scope).toBe(3);
-      expect(c.s2_location).toBeCloseTo(100_000 * getGridFactor('NZ', y).ef / 1000, 9);
+      expect(c.s2_location).toBeCloseTo(100_000 * getGridFactor('NZ', testSel(y)).ef / 1000, 9);
     }
   });
 });
@@ -1132,31 +1154,29 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
   const on = () => loc({ country: 'CA', province: 'ON', grid_region: 'ON', electricity_kwh: 100_000 });
   const euDe = () => loc({ country: 'DE', grid_region: 'EU_DE', electricity_kwh: 100_000 });
 
-  it('P1 BACKWARD fallback — US_CA at 2026 discloses on BOTH rows, vintage 2023 on both', () => {
+  // T3c: no year is substituted. Each row names the edition the window selected, with its rule and basis; the old
+  // "Grid factor for {y} applied to {year} inventory (latest|earliest vintage held)" notes are gone.
+  it('P1 US_CA at 2026: eGRID2023, the newest edition (class (b)), on BOTH rows, with the basis', () => {
     const { lb, mb } = byMethod(usCa(), 2026);
-    const note = 'Grid factor for 2023 applied to 2026 inventory (latest vintage held).';
-    expect(lb.factor_vintage).toBe('2023');
-    expect(lb.ef_source).toContain(note);
-    // Both rows are priced by the SAME factor here, so both must say so.
-    expect(mb.factor_vintage, 'market-based vintage was null before this fix').toBe('2023');
-    expect(mb.ef_source).toContain(note);
+    expect([lb.factor_vintage, lb.selection_rule]).toEqual(['eGRID2023', 'data_year_newest']);
+    expect(lb.selection_basis).toMatch(/^eGRID2023 \(published 15 January 2025, revision 2 of 12 June 2025\): the newest edition when this inventory was first prepared on .*; no 2026 data year was published\./);
+    // Both rows are priced by the SAME factor here, so both carry its edition.
+    expect([mb.factor_vintage, mb.selection_rule], 'market-based vintage was null before FI8').toEqual(['eGRID2023', 'data_year_newest']);
+    for (const r of [lb, mb]) expect(r.ef_source).not.toContain('vintage held');
   });
 
-  it('P2 FORWARD fallback — ON at 2023 says "earliest", never "latest"', () => {
-    // `let best = years[0]` resolves forward when the inventory year precedes every key. 2023 is
-    // selectable in the wizard and ON's earliest key is 2024, so this is live, not hypothetical.
+  it('P2 ON at 2023 matches data year 2023 (Table 5.3): no forward fallback', () => {
+    // Until T3c ON's keys were applicability sets and 2023 resolved FORWARD to the 2025 key. Keyed by data year, 2023
+    // matches Table 5.3 exactly.
     const { lb, mb } = byMethod(on(), 2023);
-    const note = 'Grid factor for 2024 applied to 2023 inventory (earliest vintage held).';
-    expect(lb.factor_vintage).toBe('2024');
-    expect(lb.ef_source).toContain(note);
-    expect(lb.ef_source, 'a forward resolution must not claim the latest vintage').not.toContain('latest vintage held');
-    expect(mb.factor_vintage).toBe('2024');
-    expect(mb.ef_source).toContain(note);
+    expect([lb.factor_vintage, lb.selection_rule]).toEqual(['ECCC Table 5.3 (NIR 1990-2023)', 'data_year_match']);
+    expect(lb.selection_basis).toBe('ECCC Table 5.3 (NIR 1990-2023): data year 2023 matches reporting year 2023.');
+    expect(mb.factor_vintage).toBe('ECCC Table 5.3 (NIR 1990-2023)');
   });
 
-  it('P3 EXACT match emits no note at all', () => {
-    const { lb } = byMethod(on(), 2026);
-    expect(lb.factor_vintage).toBe('2026');
+  it('P3 an exact data-year match appends nothing to the citation', () => {
+    const { lb } = byMethod(on(), 2022);
+    expect(lb.factor_vintage).toBe('ECCC Table 5.2 (NIR 1990-2022)');
     expect(lb.ef_source).toBe(EF_SOURCES.electricity_ca);   // citation only, nothing appended
     expect(lb.ef_source).not.toContain('applied to');
   });
@@ -1175,44 +1195,41 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
     expect(mb.emission_factor).toBe(lb.emission_factor);
   });
 
-  it('P5 residual APPLICABLE → the market row is untouched, and carries NO grid note', () => {
-    // EU_DE has an AIB residual mix, so res.ef prices this row and gf.ef does not. A grid-vintage note
-    // here would describe a factor the row never used — the same class of falsehood as P4, inverted.
-    const { lb, mb } = byMethod(euDe(), 2026);
-    expect(mb.factor_vintage).toBe('AIB 2024');
+  it('P5 residual APPLICABLE → the market row carries the residual edition, and NO grid edition', () => {
+    // EU_DE at 2024 matches AIB 2024 (class (b), data year 2024), so res.ef prices this row and gf.ef does not.
+    const { lb, mb } = byMethod(euDe(), 2024);
+    expect([mb.factor_vintage, mb.selection_rule]).toEqual(['AIB 2024', 'data_year_match']);
     expect(mb.ef_source.startsWith(EF_SOURCES.residual_eu)).toBe(true);
-    expect(mb.ef_source).toContain('AIB 2024 residual mix applied to 2026 inventory (latest vintage held).');
-    expect(mb.ef_source, 'the grid note must not ride along when the grid factor did not price the row')
-      .not.toContain('Grid factor for');
-    // The location-based row beside it DOES disclose — EEA 2023 against a 2026 inventory.
-    expect(lb.ef_source).toContain('Grid factor for 2023 applied to 2026 inventory (latest vintage held).');
+    expect(mb.selection_basis).toBe('AIB 2024: data year 2024 matches reporting year 2024. Whether the values held reflect the correction of 11 August 2025 is not recorded.');
+    expect(mb.ef_source, 'no grid note rides along when the grid factor did not price the row').not.toContain('Grid factor for');
+    // The location-based row beside it names EEA's newest data year, 2023.
+    expect([lb.factor_vintage, lb.selection_rule]).toEqual(['EEA 2023', 'data_year_newest']);
     expect(mb.emission_factor).not.toBe(lb.emission_factor);   // genuinely different factors
   });
 
   it('P6 all five getResidualFactor note strings, verbatim — previously untested', () => {
     // Zero coverage before this: grep for these strings across *.test.ts returned only section O's
     // comment quoting one of them as the style being copied.
-    expect(getResidualFactor('EU_DE', 2026, 'AR6').note)
-      .toBe('AIB 2024 residual mix applied to 2026 inventory (latest vintage held).');
-    expect(getResidualFactor('EU_DE', 2024, 'AR6').note, 'exact year → silence').toBe('');
-    expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
+    // T3c: the edition notes are gone (the selection basis replaces them); a matched or newest edition carries none.
+    expect(getResidualFactor('EU_DE', testSel(2024), 'AR6').note, 'exact year → silence').toBe('');
+    expect(getResidualFactor('EU_AT', testSel(2024), 'AR6').note)
       .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
-    expect(getResidualFactor('EU_ZZ', 2024, 'AR6').note)
+    expect(getResidualFactor('EU_ZZ', testSel(2024), 'AR6').note)
       .toBe('No published residual mix for this region; market-based falls back to location factor.');
-    expect(getResidualFactor('CAMX', 2026, 'AR6').note)
-      .toBe('Green-e 2025 [2023 data] residual mix applied to 2026 inventory (latest vintage held).');
-    expect(getResidualFactor('CAMX', 2023, 'AR6').note, 'exact year → silence').toBe('');
-    expect(getResidualFactor('', 2026, 'AR6').note)
+    expect(getResidualFactor('CAMX', testSel(2026), 'AR6').note, 'newest edition → no nearest-year note').toBe('');
+    expect(getResidualFactor('CAMX', testSel(2026), 'AR6').edition?.rule).toBe('data_year_newest');
+    expect(getResidualFactor('CAMX', testSel(2023), 'AR6').note, 'exact year → silence').toBe('');
+    expect(getResidualFactor('', testSel(2026), 'AR6').note)
       .toBe(NO_SUBREGION_NOTE);
     // FI8: a country with no residual mix loaded is named; a non-blank US key that is not held keeps its own note.
-    expect(getResidualFactor('', 2026, 'AR6', 'GB').note).toBe(`No residual mix is loaded for United Kingdom, ${FALLBACK_TAIL}`);
-    expect(getResidualFactor('', 2026, 'AR6', 'CA').note).toBe(`No residual mix is loaded for Canada, ${FALLBACK_TAIL}`);
-    expect(getResidualFactor('', 2026, 'AR6', 'NZ').note).toBe(`No residual mix is loaded for New Zealand, ${FALLBACK_TAIL}`);
-    expect(getResidualFactor('', 2026, 'AR6', 'US').note).toBe(NO_SUBREGION_NOTE);
-    expect(getResidualFactor('ZZZZ', 2026, 'AR6', 'US').note)
+    expect(getResidualFactor('', testSel(2026), 'AR6', 'GB').note).toBe(`No residual mix is loaded for United Kingdom, ${FALLBACK_TAIL}`);
+    expect(getResidualFactor('', testSel(2026), 'AR6', 'CA').note).toBe(`No residual mix is loaded for Canada, ${FALLBACK_TAIL}`);
+    expect(getResidualFactor('', testSel(2026), 'AR6', 'NZ').note).toBe(`No residual mix is loaded for New Zealand, ${FALLBACK_TAIL}`);
+    expect(getResidualFactor('', testSel(2026), 'AR6', 'US').note).toBe(NO_SUBREGION_NOTE);
+    expect(getResidualFactor('ZZZZ', testSel(2026), 'AR6', 'US').note)
       .toBe('No published residual mix for this subregion; market-based falls back to location factor.');
     // AT is applicable:false but NOT a coverage gap — it must never read as a zero-emission mix.
-    expect(getResidualFactor('EU_AT', 2024, 'AR6').applicable).toBe(false);
+    expect(getResidualFactor('EU_AT', testSel(2024), 'AR6').applicable).toBe(false);
   });
 
   it('P7 NO FIGURE MOVED — factors and totals pinned across five jurisdictions', () => {
@@ -1220,25 +1237,25 @@ describe('P. electricity rows: citation and fallback disclosure', () => {
     // before it, asserted directly rather than recomputed from the same tables that could drift.
     const cases: [string, () => Location, number, number][] = [
       ['US_CA 2026', usCa, 2026, 0.1791],
-      ['ON 2023', on, 2023, 0.03],
-      ['ON 2026', on, 2026, 0.059],
+      // T3c: ON keyed by data year; 2021 is Table 5.1 (0.03), 2023 is Table 5.3 (0.059). ON 2026 needs Table 5.4 (T3d).
+      ['ON 2021', on, 2021, 0.03],
+      ['ON 2023', on, 2023, 0.059],
       ['EU_DE 2026', euDe, 2026, 0.329],
       ['UK 2026', () => loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 100_000 }), 2026, 0.13096],
       ['NZ 2026', () => loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100_000 }), 2026, 0.0787],
     ];
     for (const [label, mk, year, ef] of cases) {
       const l = mk();
-      expect(getGridFactor(l.grid_region, year).ef, label).toBe(ef);
+      expect(getGridFactor(l.grid_region, testSel(year)).ef, label).toBe(ef);
       expect(byMethod(l, year).lb.result_tco2e, `${label} row`).toBeCloseTo(100_000 * ef / 1000, 9);
       expect(calcLocation(l, 'AR6', year).s2_location, `${label} calc`).toBeCloseTo(100_000 * ef / 1000, 9);
       expect(calcInventory([l], 'AR6', year).s2_location, `${label} inventory`).toBeCloseTo(100_000 * ef / 1000, 9);
     }
   });
 
-  it('P8 the note is the ONLY thing added — vintage and source were already right on the location row', () => {
-    // Guards against a "fix" that starts rewriting factor_vintage on the location-based row. It has
-    // always carried gf.usedYear; the defect was the absent note, not a wrong year.
-    for (const [mk, year, vintage] of [[usCa, 2026, '2023'], [on, 2023, '2024'], [on, 2026, '2026']] as const) {
+  it('P8 the location row names its selected edition, and its citation still leads', () => {
+    // T3c: factor_vintage is the selected edition's label (it was the bare key year).
+    for (const [mk, year, vintage] of [[usCa, 2026, 'eGRID2023'], [on, 2022, 'ECCC Table 5.2 (NIR 1990-2022)'], [on, 2023, 'ECCC Table 5.3 (NIR 1990-2023)']] as const) {
       const lb = byMethod(mk(), year).lb;
       expect(lb.factor_vintage, `${year}`).toBe(vintage);
       expect(lb.ef_source.split(' · ')[0], `${year} citation must lead`).toBe(gridSourceFor(mk().country));
@@ -1265,65 +1282,51 @@ function gridSourceFor(country: string): string {
 // inventory — 2023 is in the wizard's year list — read "applied to 2023 inventory (latest vintage
 // held)" about the only vintage held. That note reaches the assurance PDF (page.tsx:2310) and the
 // XLSX methods block (page.tsx:2358), not only the workings table.
-describe('P9. residual fallback discloses its direction', () => {
-  it('P9 EU_DE at 2023 resolves FORWARD and says "earliest", never "latest"', () => {
-    const r = getResidualFactor('EU_DE', 2023, 'AR6');
-    expect(r.note).toBe('AIB 2024 residual mix applied to 2023 inventory (earliest vintage held).');
-    expect(r.note, 'the 2024 factor is the only one held — it is not the latest of several')
-      .not.toContain('latest vintage held');
+describe('P9. residual mix editions are selected by data year, never substituted (T3c)', () => {
+  it('P9 EU_DE at 2023 needs AIB 2023 (published, not held): MissingEditionError, not the 2024 mix', () => {
+    // Until T3c a 2023 EU inventory resolved FORWARD to AIB 2024 and said "earliest vintage held".
+    expect(() => getResidualFactor('EU_DE', testSel(2023), 'AR6')).toThrow(MissingEditionError);
+    expect(() => getResidualFactor('EU_DE', testSel(2023), 'AR6')).toThrow('AIB 2023 residual mix factors are needed for reporting year 2023 and are not loaded');
   });
 
-  it('P10 EU_DE at 2026 still resolves BACKWARD and still says "latest"', () => {
-    expect(getResidualFactor('EU_DE', 2026, 'AR6').note)
-      .toBe('AIB 2024 residual mix applied to 2026 inventory (latest vintage held).');
+  it('P10 EU_DE at 2026 takes the newest published, AIB 2025 (not held yet): MissingEditionError, not the 2024 mix', () => {
+    expect(() => getResidualFactor('EU_DE', testSel(2026), 'AR6')).toThrow('AIB 2025 residual mix factors are needed for reporting year 2026');
   });
 
-  it('P11 EU_DE at 2024 — exact match, no note', () => {
-    expect(getResidualFactor('EU_DE', 2024, 'AR6').note).toBe('');
+  it('P11 EU_DE at 2024: exact match, no note, the data-year rule', () => {
+    const r = getResidualFactor('EU_DE', testSel(2024), 'AR6');
+    expect([r.note, r.vintage, r.edition?.rule]).toEqual(['', 'AIB 2024', 'data_year_match']);
   });
 
-  it('P12 a US subregion resolves FORWARD below its earliest key', () => {
-    // Every RESIDUAL_US subregion keys on 2023, so a forward case needs an inventory year <= 2022.
-    // NOT reachable from the wizard today (its list starts at 2023) — constructible here, and it
-    // becomes reachable the moment the year list gains 2022 or a Green-e refresh moves the key.
-    const r = getResidualFactor('CAMX', 2022, 'AR6');
-    expect(r.note).toContain('applied to 2022 inventory (earliest vintage held).');
-    expect(r.note).not.toContain('latest vintage held');
+  it('P12 a US subregion below its data year takes the newest published Green-e edition (class (b)), with no note', () => {
+    // 2022's data year (the Green-e 2024 edition) has no recorded publication date, so it is never selected.
+    const r = getResidualFactor('CAMX', testSel(2022), 'AR6');
+    expect([r.note, r.edition?.label, r.edition?.rule]).toEqual(['', 'Green-e 2025 (2023 data)', 'data_year_newest']);
+    expect(r.edition?.published).toBe('on or before 30 May 2026');
   });
 
-  it('P13 the note and the vintage name the same factor — neither can drift alone', () => {
-    // THE DRIFT THIS PINS. vintage read `Green-e 2025 [2023 data] + eGRID2023 Rev2` while the note read
-    // `Green-e 2023` — two names for one factor on one row, and "Green-e 2023" is not an edition
-    // Green-e publishes (2023 is the data year, 2025 the edition).
-    //
-    // They are NOT identical strings, deliberately: the vintage documents both inputs (Green-e mix +
-    // eGRID CH4/N2O), while the note is a sentence about which MIX was applied, and eGRID publishes no
-    // mix. So the assertion is containment in the direction the code builds them — the vintage is
-    // derived from the note's factor name — rather than equality. It holds for EU too, where the two
-    // happen to coincide. Asserts the RELATIONSHIP, so it survives a reformat of either string.
-    for (const [region, year] of [['CAMX', 2026], ['CAMX', 2022], ['EU_DE', 2026], ['EU_DE', 2023]] as const) {
-      const r = getResidualFactor(region, year, 'AR6');
-      expect(r.note, `${region} ${year}`).not.toBe('');
-      const factorName = r.note.split(' residual mix applied to ')[0];
-      expect(factorName, `${region} ${year}: the note must open with a factor name`).not.toBe(r.note);
-      expect(r.vintage.startsWith(factorName),
-        `${region} ${year}: vintage "${r.vintage}" must be built from the note's factor name "${factorName}"`).toBe(true);
+  it('P13 the vintage is built from the selected edition label, so the two cannot drift', () => {
+    for (const [region, year] of [['CAMX', 2026], ['CAMX', 2022], ['CAMX', 2023], ['EU_DE', 2024]] as const) {
+      const r = getResidualFactor(region, testSel(year), 'AR6');
+      expect(r.vintage.startsWith(r.edition!.label), `${region} ${year}: "${r.vintage}" from "${r.edition!.label}"`).toBe(true);
     }
+    // The US vintage also names the eGRID revision that supplies CH4 and N2O; the EU one is the label alone.
+    expect(getResidualFactor('CAMX', testSel(2023), 'AR6').vintage).toBe('Green-e 2025 (2023 data) + eGRID2023 Rev2');
+    expect(getResidualFactor('EU_DE', testSel(2024), 'AR6').vintage).toBe('AIB 2024');
   });
 
-  it('P14 NO FIGURE MOVED — residual factors identical across every year probed', () => {
-    // Disclosure only. ef depends on the resolved year, which the direction split does not touch.
+  it('P14 the residual factor is the selected edition\'s value in every year that prices', () => {
     for (const year of [2022, 2023, 2024, 2025, 2026]) {
-      expect(getResidualFactor('EU_DE', year, 'AR6').ef, `EU_DE ${year}`).toBeCloseTo(0.72456, 9);
-      expect(getResidualFactor('CAMX', year, 'AR6').ef, `CAMX ${year}`).toBeCloseTo(0.19766813612800002, 9);
-      expect(getResidualFactor('EU_DE', year, 'AR6').applicable).toBe(true);
+      expect(getResidualFactor('CAMX', testSel(year), 'AR6').ef, `CAMX ${year}`).toBeCloseTo(0.19766813612800002, 9);
     }
-    // The four direction-independent strings are untouched.
-    expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
+    expect(getResidualFactor('EU_DE', testSel(2024), 'AR6').ef).toBeCloseTo(0.72456, 9);
+    expect(getResidualFactor('EU_DE', testSel(2024), 'AR6').applicable).toBe(true);
+    // The four edition-independent strings are untouched.
+    expect(getResidualFactor('EU_AT', testSel(2024), 'AR6').note)
       .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
-    expect(getResidualFactor('EU_ZZ', 2024, 'AR6').note)
+    expect(getResidualFactor('EU_ZZ', testSel(2024), 'AR6').note)
       .toBe('No published residual mix for this region; market-based falls back to location factor.');
-    expect(getResidualFactor('', 2026, 'AR6').note)
+    expect(getResidualFactor('', testSel(2026), 'AR6').note)
       .toBe(NO_SUBREGION_NOTE);
   });
 });
@@ -1352,8 +1355,9 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
     diesel_stationary_amount: 1000,
     diesel_stationary_unit: country === 'US' ? 'gallons' : 'litres',
   });
+  // T3c: each country at the year whose combustion edition is held.
   const row = (country: string, g: typeof SETS[number]) =>
-    (buildWorkings([dieselLoc(country)], g, 2025, [], 12) as any[])
+    (buildWorkings([dieselLoc(country)], g, heldYearFor(country), [], 12) as any[])
       .find(r => r.stream === 'diesel_stationary' && !r.declaration);
 
   it('X1 AU, UK and NZ stamp as-published, under every AR set', () => {
@@ -1473,30 +1477,29 @@ describe('Y. Australia has a published residual mix', () => {
   const VINTAGE = 'DCCEEW 2025 RMF (FY basis, 3-yr avg)';
 
   it('Y1 AU at 2025 — 0.81, applicable, no note', () => {
-    const r = getResidualFactor('AU', 2025, 'AR6');
+    const r = getResidualFactor('AU', testSel(2025), 'AR6');
     expect(r.ef).toBe(0.81);
     expect(r.applicable).toBe(true);
     expect(r.note, 'the workbook edition matches the inventory year — nothing to disclose').toBe('');
     expect(r.usedRegion).toBe('AU');
   });
 
-  it('Y2 AU at 2026 resolves BACKWARD and says so', () => {
-    const r = getResidualFactor('AU', 2026, 'AR6');
-    expect(r.ef).toBe(0.81);
-    expect(r.note).toBe(`${VINTAGE} residual mix applied to 2026 inventory (latest vintage held).`);
+  // T3c: the NGA edition the window's activity year needs, never another held one.
+  it('Y2 AU calendar 2026 needs NGA 2026 (published, not held): MissingEditionError, not the 2025 RMF', () => {
+    expect(() => getResidualFactor('AU', testSel(2026), 'AR6')).toThrow('DCCEEW NGA 2026 residual mix factors are needed for reporting year 2026 and are not loaded');
+    // A year ending June 2026 is the 2025-26 activity year: NGA 2025, held.
+    expect(getResidualFactor('AU', testSel(2026, 6), 'AR6').ef).toBe(0.81);
   });
 
-  it('Y3 AU at 2023 resolves FORWARD and says so', () => {
-    const r = getResidualFactor('AU', 2023, 'AR6');
-    expect(r.ef).toBe(0.81);
-    expect(r.note).toBe(`${VINTAGE} residual mix applied to 2023 inventory (earliest vintage held).`);
-    expect(r.note, 'a forward resolution must not claim the latest vintage').not.toContain('latest vintage held');
+  it('Y3 AU calendar 2023 needs NGA 2023 (published, not held): MissingEditionError, never a forward resolution', () => {
+    expect(() => getResidualFactor('AU', testSel(2023), 'AR6')).toThrow('DCCEEW NGA 2023 residual mix factors are needed for reporting year 2023');
   });
 
-  it('Y4 the "no published residual mix" strings are unreachable for AU', () => {
-    for (const y of [2023, 2024, 2025, 2026]) {
+  it('Y4 the "no published residual mix" strings are unreachable for AU, in every window that prices', () => {
+    for (const sel of [testSel(2025), testSel(2026, 3), testSel(2026, 6), testSel(2026, 9)]) {
       for (const g of SETS) {
-        const r = getResidualFactor('AU', y, g);
+        const y = sel.year;
+        const r = getResidualFactor('AU', sel, g);
         expect(r.note, `AU ${y} ${g}`).not.toContain('No published residual mix');
         expect(r.applicable, `AU ${y} ${g}`).toBe(true);
       }
@@ -1507,14 +1510,14 @@ describe('Y. Australia has a published residual mix', () => {
     // DCCEEW computes the RMF over years ending June with a 3-year averaging lag, because LGCs are
     // created on a CALENDAR-year basis up to 12 months after generation. A verifier reconciling a
     // calendar-year inventory against 0.81 has to know that, and the vintage column is where they look.
-    const v = getResidualFactor('AU', 2025, 'AR6').vintage;
+    const v = getResidualFactor('AU', testSel(2025), 'AR6').vintage;
     expect(v).toBe(VINTAGE);
     expect(v).toContain('FY basis');
     expect(v).toContain('3-yr avg');
     expect(v).toContain('DCCEEW');
     expect(v.length, 'the vintage sits in a table cell').toBeLessThan(45);
     // Scope 3 (0.11 in the same table) is NOT seeded — there is no Scope 3 electricity line to put it on.
-    expect(getResidualFactor('AU', 2025, 'AR6').ef).not.toBe(0.11);
+    expect(getResidualFactor('AU', testSel(2025), 'AR6').ef).not.toBe(0.11);
   });
 
   it('Y6 AU is national — no state key exists, and none may be added silently', () => {
@@ -1522,18 +1525,17 @@ describe('Y. Australia has a published residual mix', () => {
     // creations can come from off-grid generation. A per-state table would not correspond to anything
     // published. AU_NSW is a GRID region, not a residual one, and must not resolve.
     for (const k of ['AU_NSW', 'AU_VIC', 'AU_AVG']) {
-      expect(getResidualFactor(k, 2025, 'AR6').applicable, `${k} must not be a residual key`).toBe(false);
+      expect(getResidualFactor(k, testSel(2025), 'AR6').applicable, `${k} must not be a residual key`).toBe(false);
     }
   });
 
-  it('Y7 EU and US are unchanged', () => {
-    expect(getResidualFactor('EU_DE', 2025, 'AR6').note)
-      .toBe('AIB 2024 residual mix applied to 2025 inventory (latest vintage held).');
-    expect(getResidualFactor('EU_DE', 2026, 'AR6').ef).toBeCloseTo(0.72456, 9);
-    expect(getResidualFactor('CAMX', 2026, 'AR6').ef).toBeCloseTo(0.19766813612800002, 9);
-    expect(getResidualFactor('EU_AT', 2024, 'AR6').note)
+  it('Y7 EU and US are unchanged where their editions are held', () => {
+    expect(getResidualFactor('EU_DE', testSel(2024), 'AR6').note).toBe('');
+    expect(getResidualFactor('EU_DE', testSel(2024), 'AR6').ef).toBeCloseTo(0.72456, 9);
+    expect(getResidualFactor('CAMX', testSel(2026), 'AR6').ef).toBeCloseTo(0.19766813612800002, 9);
+    expect(getResidualFactor('EU_AT', testSel(2024), 'AR6').note)
       .toBe('Full-disclosure regime — no residual mix published; market-based falls back to location factor.');
-    expect(getResidualFactor('', 2026, 'AR6').note)
+    expect(getResidualFactor('', testSel(2026), 'AR6').note)
       .toBe(NO_SUBREGION_NOTE);
   });
 
@@ -1597,11 +1599,13 @@ describe('Y. Australia has a published residual mix', () => {
       anyLoc({ country: 'CA', grid_region: 'ON' }),
     ]) {
       const region = residualRegionFor(l);
-      const mb = (buildWorkings([l], 'AR6', 2025, [], 12) as any[])
+      // T3c: each at the year whose editions are held.
+      const y = heldYearFor(l.country);
+      const mb = (buildWorkings([l], 'AR6', y, [], 12) as any[])
         .find(r => r.scope2_method === 'market-based');
-      const res = getResidualFactor(region, 2025, 'AR6');
+      const res = getResidualFactor(region, testSel(y), 'AR6');
       // The workings row is built from the same region, so its applied factor must match.
-      const expected = res.applicable ? res.ef : getGridFactor(l.grid_region, 2025).ef;
+      const expected = res.applicable ? res.ef : getGridFactor(l.grid_region, testSel(y)).ef;
       expect(mb.result_tco2e, `${l.country}`).toBeCloseTo(100_000 * expected / 1000, 9);
     }
   });
@@ -1611,12 +1615,13 @@ describe('Y. Australia has a published residual mix', () => {
       ['US_CA no subregion', { country: 'US', grid_region: 'US_CA' }, 0.1791],
       ['US_CA + CAMX', { country: 'US', grid_region: 'US_CA', residual_region: 'CAMX' }, 0.19766813612800002],
       ['EU_DE', { country: 'DE', grid_region: 'EU_DE' }, 0.72456],
-      ['CA ON', { country: 'CA', grid_region: 'ON' }, 0.038],
-      ['GB', { country: 'GB', grid_region: 'UK' }, 0.177],
+      // T3c: each at its held year. CA 2023 is Table 5.3 (data year 2023); GB 2026 is DEFRA 2026.
+      ['CA ON', { country: 'CA', grid_region: 'ON' }, 0.059],
+      ['GB', { country: 'GB', grid_region: 'UK' }, 0.13096],
       ['NZ', { country: 'NZ', grid_region: 'NZ' }, 0.0787],
     ];
     for (const [label, o, ef] of pin) {
-      const mb = (buildWorkings([anyLoc(o)], 'AR6', 2025, [], 12) as any[])
+      const mb = (buildWorkings([anyLoc(o)], 'AR6', heldYearFor(o.country), [], 12) as any[])
         .find(r => r.scope2_method === 'market-based');
       expect(mb.result_tco2e, label).toBeCloseTo(100_000 * ef / 1000, 9);
     }
@@ -1688,7 +1693,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
     }
     // And a figure in the other unit prices from the location's own table, never the US one.
     for (const c of ['CA', 'GB', 'DE', 'AU', 'NZ']) {
-      expect(pickEF(loc({ country: c, grid_region: c === 'CA' ? 'ON' : '' }), 'fuel_oil_residual_gallon').publisher?.jurisdiction, c).not.toBe('US');
+      expect(pickEF(loc({ country: c, grid_region: c === 'CA' ? 'ON' : '' }), 'fuel_oil_residual_gallon', heldSel(loc({ country: c, grid_region: c === 'CA' ? 'ON' : '' }))).publisher?.jurisdiction, c).not.toBe('US');
     }
   });
 
@@ -1738,7 +1743,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect((EF_EU as any).fuel_oil_distillate_litre).toBeUndefined();
     expect((EF_EU as any).fuel_oil_distillate_kg.co2).toBeCloseTo(74.1 * 43.0 / 1000, 12);
     // A gallon figure prices at exactly these x 3.785411784, from the same table.
-    expect(pickEF(loc({ country: 'GB' }), 'fuel_oil_residual_gallon').factor.co2).toBeCloseTo(3.17492 * G, 12);
+    expect(pickEF(loc({ country: 'GB' }), 'fuel_oil_residual_gallon', heldSel(loc({ country: 'GB' }))).factor.co2).toBeCloseTo(3.17492 * G, 12);
   });
 
   it('Z7 EU distillate shares the Gas/Diesel oil row\'s NCV and factor, but not a density (FI3, R8)', () => {
@@ -1797,7 +1802,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
     const gb = loc({ country: 'GB' });
     for (const [l, g] of [['propane_litre', 'propane_gallon'], ['diesel_litre', 'diesel_gallon'],
       ['fuel_oil_residual_litre', 'fuel_oil_residual_gallon'], ['fuel_oil_distillate_litre', 'fuel_oil_distillate_gallon']]) {
-      const p = pickEF(gb, g);
+      const p = pickEF(gb, g, heldSel(gb));
       expect(p.key, g).toBe(l);
       expect(p.factor.co2, `${g} = ${l} x L_PER_GAL, exactly`).toBeCloseTo((EF_UK as any)[l].co2 * G, 12);
     }
@@ -1807,12 +1812,14 @@ describe('Z. fuel oil grades are seeded per table', () => {
   it('Z11 the UK grid holds BOTH editions, and each year resolves to its own', () => {
     // GRID_EF IS year-keyed, so two editions side by side is correct here where it would be wrong in
     // EF_UK. Replacing 2025 would have re-priced every stored 2025 UK inventory at the 2026 factor.
-    expect(getGridFactor('UK', 2026).ef, 'DEFRA 2026 UK electricity').toBe(0.13096);
-    expect(getGridFactor('UK', 2026).usedYear).toBe(2026);
-    expect(getGridFactor('UK', 2026).note, 'exact year — nothing to disclose').toBe('');
-    expect(getGridFactor('UK', 2025).ef, 'a 2025 inventory keeps the 2025 factor').toBe(0.177);
-    expect(getGridFactor('UK', 2025).usedYear).toBe(2025);
-    expect(getGridFactor('UK', 2027).usedYear, 'later years hold at the newest edition').toBe(2026);
+    expect(getGridFactor('UK', testSel(2026)).ef, 'DEFRA 2026 UK electricity').toBe(0.13096);
+    expect(getGridFactor('UK', testSel(2026)).edition.label).toBe('DEFRA 2026');
+    expect(getGridFactor('UK', testSel(2026)).edition.provisional, 'the edition the rule requires').toBe(false);
+    expect(getGridFactor('UK', testSel(2025)).ef, 'a 2025 inventory keeps the 2025 factor').toBe(0.177);
+    expect(getGridFactor('UK', testSel(2025)).edition.label).toBe('DEFRA 2025');
+    // T3c (R19): 2027 is not published yet, so the newest published edition prices it, provisionally.
+    expect(getGridFactor('UK', testSel(2027)).edition.label).toBe('DEFRA 2026');
+    expect(getGridFactor('UK', testSel(2027)).edition.provisional).toBe(true);
   });
 
   it('Z12 UK figures MOVED; every other jurisdiction is untouched', () => {
@@ -1830,7 +1837,8 @@ describe('Z. fuel oil grades are seeded per table', () => {
     expect(gas(2026), 'DEFRA 2026: 0.18231').toBeCloseTo(18.231, 9);
     // Every other jurisdiction: unchanged.
     expect(kwh('US', 2026)).toBeCloseTo(17.91, 9);
-    expect(kwh('CA', 2026)).toBeCloseTo(5.9, 9);
+    // T3c: Canada keyed by data year; 2023 is Table 5.3 (0.059). 2026 needs Table 5.4, not held until T3d.
+    expect(kwh('CA', 2023)).toBeCloseTo(5.9, 9);
   });
 
   it('Z13 the UK table still stamps as-published — ch4/n2o remain 0 after the refresh', () => {
@@ -1972,7 +1980,7 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     expect(EF.propane_gallon.co2, '0.091 x 62.87, as printed').toBeCloseTo(0.091 * 62.87, 2);
     // FI2 diff 2 (ruling R5): no stored per-litre key. Litres convert exactly from EPA's per-gallon figure.
     expect((EF as any).propane_litre, 'the pre-multiplied 1.51137 is gone').toBeUndefined();
-    expect(pickEF(loc({ country: 'US' }), 'propane_litre').factor.co2, '5.72 / L_PER_GAL, exactly').toBeCloseTo(5.72 / L_PER_GAL, 12);
+    expect(pickEF(loc({ country: 'US' }), 'propane_litre', heldSel(loc({ country: 'US' }))).factor.co2, '5.72 / L_PER_GAL, exactly').toBeCloseTo(5.72 / L_PER_GAL, 12);
   });
 
   it('AA2 THE OLD AND NEW VALUES, PINNED — this moved a live customer figure', () => {
@@ -1986,7 +1994,7 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     expect(EF.propane_gallon.co2).toBe(PRINTED);
     expect(EF.propane_gallon.co2, 'the LPG-derived value must not come back').not.toBe(OLD_GALLON);
     // FI2 diff 2: the per-litre figure is the exact conversion of NEW_GALLON (1.5113732…, was the stored 1.51137).
-    const perLitre = pickEF(loc({ country: 'US' }), 'propane_litre').factor.co2;
+    const perLitre = pickEF(loc({ country: 'US' }), 'propane_litre', heldSel(loc({ country: 'US' }))).factor.co2;
     expect(perLitre).toBeCloseTo(PRINTED / L_PER_GAL, 12);
     expect(perLitre).not.toBeCloseTo(OLD_LITRE, 3);
 
@@ -1997,7 +2005,7 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
 
   it('AA3 propane per litre is propane_gallon divided by 3.785411784, all three gases, exactly (FI2)', () => {
     // FI2 diff 2 (ruling R5): the per-litre key, which stored these quotients rounded to 3 significant figures, is gone.
-    const l = pickEF(loc({ country: 'US' }), 'propane_litre');
+    const l = pickEF(loc({ country: 'US' }), 'propane_litre', heldSel(loc({ country: 'US' })));
     for (const g of ['co2', 'ch4', 'n2o'] as const) expect(l.factor[g], g).toBeCloseTo(EF.propane_gallon[g] / L_PER_GAL, 14);
     expect(l.key).toBe('propane_gallon');
     expect(l.conversion?.statement).toBe('1 US gallon = 3.785411784 litres');
@@ -2044,7 +2052,9 @@ describe('AA. propane CO2 comes from the Propane row, not the LPG row beneath it
     expect(block, 'the value it replaced').toContain('5.61561');
     expect(block, 'NOT an edition problem').toMatch(/blue-text marker/);
     // The header's edition warning is NOT resolved by this fix and must survive it.
-    expect(src, 'the edition question is still open for every other key').toContain('⚠️ EDITION UNVERIFIED.');
+    // T3c settles the edition question: the held values are the 2025 workbook (the registry records it), and the
+    // header says so in place of the old warning.
+    expect(src, 'the edition is settled, and the header says how').toContain('T3c: SETTLED AS 2025.');
   });
 
   it('AA7 the check-list transposition is gone, and no other US key moved', () => {
@@ -2103,7 +2113,7 @@ describe('S. purchased steam — EPA Hub 2025 Table 7, all three columns', () =>
   const steamLoc = (o: Partial<Location> = {}) =>
     loc({ country: 'US', has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'mmbtu', ...o });
   const steamRow = (gwp: 'AR4' | 'AR5' | 'AR6' = 'AR6', l = steamLoc()) =>
-    (buildWorkings([l], gwp, 2025, [], 12) as any[]).find(r => r.stream === 'purchased_steam' && !r.declaration);
+    (buildWorkings([l], gwp, heldYearFor(l.country), [], 12) as any[]).find(r => r.stream === 'purchased_steam' && !r.declaration);
 
   it('S1 the stored triple is Table 7, in kg', () => {
     // Stored in kg like every other US mass-basis key, so the grams columns divide by 1000.
@@ -2209,7 +2219,7 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
   const steamLoc = (o: Partial<Location> = {}) =>
     loc({ has_purchased_steam: true, purchased_steam_mmbtu: 1000, purchased_steam_unit: 'gj', ...o });
   const steamRow = (l: Location, gwp: 'AR4' | 'AR5' | 'AR6' = 'AR6') =>
-    (buildWorkings([l], gwp, 2025, [], 12) as any[]).find(r => r.stream === 'purchased_steam');
+    (buildWorkings([l], gwp, heldYearFor(l.country), [], 12) as any[]).find(r => r.stream === 'purchased_steam');
   const UNSEEDED = ['CA', 'AU', 'NZ', 'DE'] as const;
 
   it('T1 GB prices from EF_UK.steam_kwh, and NOT from EF', () => {
@@ -2253,7 +2263,7 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
       const l = steamLoc({ country, ...(country === 'CA' ? { province: 'ON', grid_region: 'ON' } : {}) });
       const row = steamRow(l);
       expect(row.estimated, `${country}`).toBe('steam_gas_boiler_80');
-      const gas = pickEF(l, 'natural_gas_gj');
+      const gas = pickEF(l, 'natural_gas_gj', heldSel(l));
       expect(gas.publisher?.jurisdiction, `${country}: its own gas table`).toBe(country === 'DE' ? 'EU' : country);
       expect(row.result_tco2e, `${country}`).toBeCloseTo(calcGas({ co2: gas.factor.co2 / 0.8, ch4: gas.factor.ch4 / 0.8, n2o: gas.factor.n2o / 0.8 }, 1000, 'AR6').total, 9);
       expect(row.ef_source, `${country}`).toContain(`Estimate: ${gas.publisher!.publisher} natural gas / 0.80`);
@@ -2266,7 +2276,7 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     // is 62.9364 t; if any of these ever equals that, the fallback is back.
     for (const country of UNSEEDED) {
       for (const g of ['AR4', 'AR5', 'AR6'] as const) {
-        const t = calcLocation(steamLoc({ country, ...(country === 'CA' ? { province: 'ON', grid_region: 'ON' } : {}) }), g, 2025).s2_location;
+        const t = calcLocation(steamLoc({ country, ...(country === 'CA' ? { province: 'ON', grid_region: 'ON' } : {}) }), g, heldYearFor(country)).s2_location;
         expect(t, `${country} ${g} must not be the US factor`).not.toBeCloseTo(62.9364, 2);
         // R14: the estimate, from the country's own gas table (T4); never 0, never the US figure.
         expect(t, `${country} ${g}`).toBeGreaterThan(0);
@@ -2341,18 +2351,18 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     expect(c.s1_total, 'diesel still priced').toBeGreaterThan(0);
     expect(findUnpriceableLocations([l], 'AR6', 2025), 'the location is NOT excluded').toEqual([]);
     // And the steam gap is reported by its own probe rather than by silence.
-    expect(findSteamFactorGaps([l]).map(g => g.jurisdiction)).toEqual(['CA']);
+    expect(findSteamFactorGaps([l], heldSel(l)).map(g => g.jurisdiction)).toEqual(['CA']);
   });
 
   it('T10 findSteamFactorGaps fires exactly when the stream cannot be priced', () => {
-    expect(findSteamFactorGaps([steamLoc({ country: 'GB' })]), 'published factor').toEqual([]);
-    expect(findSteamFactorGaps([steamLoc({ country: 'US', purchased_steam_unit: 'mmbtu' })]), 'published factor').toEqual([]);
-    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0.2, purchased_steam_supplier_ef_basis: 'kwh' })]), 'supplier figure').toEqual([]);
-    expect(findSteamFactorGaps([loc({ country: 'CA' })]), 'no steam declared').toEqual([]);
-    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_mmbtu: 0 })]), 'declared, no figure').toEqual([]);
-    expect(findSteamFactorGaps([steamLoc({ country: 'CA' })]).length, 'declared, quantified, unpriceable').toBe(1);
+    expect(findSteamFactorGaps([steamLoc({ country: 'GB' })], heldSel(([steamLoc({ country: 'GB' })])[0] ?? {})), 'published factor').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'US', purchased_steam_unit: 'mmbtu' })], heldSel(([steamLoc({ country: 'US', purchased_steam_unit: 'mmbtu' })])[0] ?? {})), 'published factor').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0.2, purchased_steam_supplier_ef_basis: 'kwh' })], heldSel(([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0.2, purchased_steam_supplier_ef_basis: 'kwh' })])[0] ?? {})), 'supplier figure').toEqual([]);
+    expect(findSteamFactorGaps([loc({ country: 'CA' })], heldSel(([loc({ country: 'CA' })])[0] ?? {})), 'no steam declared').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_mmbtu: 0 })], heldSel(([steamLoc({ country: 'CA', purchased_steam_mmbtu: 0 })])[0] ?? {})), 'declared, no figure').toEqual([]);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA' })], heldSel(([steamLoc({ country: 'CA' })])[0] ?? {})).length, 'declared, quantified, unpriceable').toBe(1);
     // A zero supplier factor is NOT a factor — it is an empty field, and must not price the stream at 0.
-    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0 })]).length, '0 is not a factor').toBe(1);
+    expect(findSteamFactorGaps([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0 })], heldSel(([steamLoc({ country: 'CA', purchased_steam_supplier_ef: 0 })])[0] ?? {})).length, '0 is not a factor').toBe(1);
   });
 
   it('T11 unit conversion reaches the right basis, and the note names the defining constant', () => {
@@ -2391,8 +2401,8 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
       for (const g of ['AR4', 'AR5', 'AR6'] as const) {
         const l = steamLoc({ country, purchased_steam_unit: country === 'US' ? 'mmbtu' : 'gj' });
         const row = steamRow(l, g);
-        expect(calcLocation(l, g, 2025).s2_location, `${country} ${g}`).toBeCloseTo(row.result_tco2e, 12);
-        expect(calcInventory([l], g, 2025).s2_location, `${country} ${g}`).toBeCloseTo(row.result_tco2e, 12);
+        expect(calcLocation(l, g, heldYearFor(country)).s2_location, `${country} ${g}`).toBeCloseTo(row.result_tco2e, 12);
+        expect(calcInventory([l], g, heldYearFor(country)).s2_location, `${country} ${g}`).toBeCloseTo(row.result_tco2e, 12);
       }
     }
   });
@@ -2411,11 +2421,11 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
       expect(efJurisdiction({ country }), country).toBe(expected);
     }
     // A supported jurisdiction is untouched: a GB diesel litre is still DEFRA's.
-    expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any).factor.co2).toBe(2.58354);
+    expect(pickEF(loc({ country: 'GB' }), 'diesel_litre' as any, heldSel(loc({ country: 'GB' }))).factor.co2).toBe(2.58354);
     // ⚠️ AND THE JAPANESE ONE IS NOW A REFUSAL, NOT A NUMBER. pickEF returns the same uniform miss
     // marker a missing table row produces, so calcGas declines to price it by the path that already
     // existed. The figure it used to return, 10.20648, was the US EPA diesel factor.
-    expect(() => calcGas(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any).factor, 100, 'AR6')).toThrow(MissingEmissionFactorError);
+    expect(() => calcGas(pickEF(loc({ country: 'JP' }), 'diesel_gallon' as any, heldSel(loc({ country: 'JP' }))).factor, 100, 'AR6')).toThrow(MissingEmissionFactorError);
   });
 });
 
@@ -2608,11 +2618,11 @@ describe('T16 country refusals', () => {
     // methodology page plus the export's source list are both built from these two lists. A
     // Japanese site would have named US EPA as the publisher of figures nothing priced.
     const refused = loc({ id: 'jp', country: 'JP', grid_region: 'US_FL' });
-    expect(combustionSourcesFor([refused])).toEqual([]);
+    expect(combustionSourcesFor([refused], heldSel(refused))).toEqual([]);
     expect(gridSourcesFor([refused])).toEqual([]);
     // Beside a real one, only the real one is cited.
     const gb = loc({ id: 'gb', country: 'GB', grid_region: 'UK' });
-    expect(combustionSourcesFor([gb, refused])).toEqual([EF_SOURCES.combustion_uk]);
+    expect(combustionSourcesFor([gb, refused], heldSel(([gb, refused])[0] ?? {}))).toEqual([EF_SOURCES.combustion_uk]);
     expect(gridSourcesFor([gb, refused])).toEqual([EF_SOURCES.electricity_uk]);
   });
 
@@ -2733,7 +2743,7 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
   const round = (x: number, sf: number) => Number(x.toPrecision(sf));
   const EU = EF_EU as Record<string, { co2: number; ch4: number; n2o: number }>;
   const site = (o: Partial<Location>) => loc({ country: 'DE', grid_region: 'EU_DE', ...o });
-  const rowsOf = (l: Location) => buildWorkings([l], 'AR6', 2025, [], 12);
+  const rowsOf = (l: Location) => buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12);
   const fuelRow = (l: Location) => rowsOf(l).find(r => r.scope === 1 && r.stream && r.stream !== 'refrigerants' && !r.declaration);
 
   it('U1 every EU litre key IS MRR factor x MRR NCV x JEC density: CO2 at 6 s.f., CH4 and N2O at 4, one density for all three', () => {
@@ -2789,7 +2799,7 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
   })
 
   it('U5 EU heating oil in litres, EU LPG in litres and EU gas in m3 are unpriced with the exact message', () => {
-    const msg = (l: Location) => unpricedLines(l).map(u => [u.reason, u.message])
+    const msg = (l: Location) => unpricedLines(l, 'AR6', heldSel(l)).map(u => [u.reason, u.message])
     expect(msg(site({ has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' }))).toEqual([['factor_missing',
       'The EU factor for heating oil at Test Site is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Enter the quantity in kilograms or tonnes, or reject the bill. Export is blocked until this is resolved.']])
     expect(msg(site({ has_propane: true, propane_amount: 500, propane_unit: 'litres' }))).toEqual([['factor_missing',
@@ -2827,8 +2837,8 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
     expect(r.note).toContain('EU MRR 2018/2066, Annex VI Table 1, Natural gas')
     const gj = fuelRow(site({ has_natural_gas: true, natural_gas_amount: 36, natural_gas_unit: 'mmbtu' as never }))
     expect(gj.factor_key).toBe('natural_gas_kwh')
-    expect(pickEF(site({}), 'natural_gas_gj').factor.co2).toBeCloseTo(0.181764 * KWH_PER_GJ, 12)
-    expect(pickEF(site({}), 'natural_gas_mj').factor.co2).toBeCloseTo(0.181764 / 3.6, 12)
+    expect(pickEF(site({}), 'natural_gas_gj', heldSel(site({}))).factor.co2).toBeCloseTo(0.181764 * KWH_PER_GJ, 12)
+    expect(pickEF(site({}), 'natural_gas_mj', heldSel(site({}))).factor.co2).toBeCloseTo(0.181764 / 3.6, 12)
   })
 
   it('U8 only EU rows carry the EU notes; US/CA/UK/AU/NZ cite their own', () => {
@@ -2840,9 +2850,9 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
 
   it('U9 gallons convert exactly to the EU litre key; Mcf and m3 have no EU key', () => {
     const de = site({})
-    expect(pickEF(de, 'diesel_gallon').factor.co2).toBeCloseTo(EU.diesel_litre.co2 * 3.785411784, 12)
+    expect(pickEF(de, 'diesel_gallon', heldSel(de)).factor.co2).toBeCloseTo(EU.diesel_litre.co2 * 3.785411784, 12)
     for (const k of ['natural_gas_mcf', 'natural_gas_m3', 'natural_gas_ccf', 'fuel_oil_distillate_litre', 'propane_litre']) {
-      expect((pickEF(de, k as never).factor as unknown as { __missing?: unknown }).__missing, k).toBeDefined()
+      expect((pickEF(de, k as never, heldSel(de)).factor as unknown as { __missing?: unknown }).__missing, k).toBeDefined()
     }
   })
 
@@ -2872,7 +2882,7 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
     expect([after.natural_gas_unit, after.natural_gas_amount]).toEqual(['kwh', 0])
     const msg = 'The natural gas figure was in m³, which cannot be converted exactly to kWh, so it has been cleared. Enter it in kWh.'
     expect(unitChangeMessage(after.unit_changes!.at(-1)!)).toBe(msg)
-    expect(unpricedLines(after).map(u => [u.reason, u.message])).toEqual([['figure_cleared', msg]])
+    expect(unpricedLines(after, 'AR6', heldSel(after)).map(u => [u.reason, u.message])).toEqual([['figure_cleared', msg]])
     // A document-backed unit keeps its plain label (T10d), and an offered unit is not repeated.
     expect(unitOptionsShowing(ngUnitOptions('DE'), 'm3', true)).toEqual([['kwh', 'kWh'], ['m3', 'm³']])
     expect(unitOptionsShowing(ngUnitOptions('DE'), 'kwh', false)).toEqual([['kwh', 'kWh']])
@@ -2891,7 +2901,7 @@ describe('U. EU combustion: every property cited on its row, or the line is unpr
 
 // ── FI3: UK gas in m³ (R11) and Canadian gas in GJ (R12) ────────────────────────────────────────────────────────
 describe('FI3. UK gas in m3 and Canadian gas in GJ', () => {
-  const rowOf = (l: Location) => buildWorkings([l], 'AR6', 2025, [], 12).find(r => r.stream === 'natural_gas' && !r.declaration)
+  const rowOf = (l: Location) => buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12).find(r => r.stream === 'natural_gas' && !r.declaration)
 
   it('FI3-1 UK gas in m3 is offered and prices at DEFRA 2.02633', () => {
     expect(ngUnitOptions('GB').map(([v]) => v)).toContain('m3')
@@ -2902,27 +2912,28 @@ describe('FI3. UK gas in m3 and Canadian gas in GJ', () => {
 
   it('FI3-2 Canada: Ontario 100 GJ = 4,978.0 kg CO2, computed from the province factor and the national heat content', () => {
     const on = loc({ country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' })
-    const f = pickEF(on, 'natural_gas_gj')
+    const f = pickEF(on, 'natural_gas_gj', heldSel(on))
     expect(f.key).toBe('natural_gas_gj')
     expect(f.factor.co2).toBeCloseTo(1.921 / 0.03859, 12)
     expect(Number((calcGas(f.factor, 100, 'AR6').co2 * 1000).toPrecision(5))).toBe(4978.0)
     expect(f.factor.ch4).toBeCloseTo(0.000037 / 0.03859, 15)
     const r = rowOf(on)
-    expect(r.note).toBe("Converted to m³ at 38.59 MJ/m³, Canada's national gross heat content for natural gas (ECCC National Inventory Report 1990-2023, Part 2, Table A4-2). ECCC does not publish a provincial value.")
+    // T3c (R12, R18): the heat content is its own edition, and the note says which and why.
+    expect(r.note).toBe("Converted to m³ at 38.59 MJ/m³, Canada's national gross heat content for natural gas (ECCC National Inventory Report 1990-2023, Part 2, Table A4-2). ECCC does not publish a provincial value. Heat content: ECCC NIR 2025 (1990-2023): data year 2023 matches reporting year 2023.")
     // Not a stored literal: another province's factor flows through.
-    const bc = pickEF({ ...on, province: 'BC', grid_region: 'BC' }, 'natural_gas_gj')
+    const bc = pickEF({ ...on, province: 'BC', grid_region: 'BC' }, 'natural_gas_gj', heldSel({ ...on, province: 'BC', grid_region: 'BC' }))
     expect(bc.factor.co2).toBeCloseTo(1.966 / 0.03859, 12)
     expect((EF_CA as Record<string, unknown>).natural_gas_gj).toBeUndefined()
   })
 
   it('FI3-3 Canada with no province is unpriced as today; a stored MMBtu figure converts exactly to GJ', () => {
     const none = loc({ country: 'CA', province: '', grid_region: '', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' })
-    expect(unpricedLines(none).map(u => u.reason)).toEqual(['province_missing'])
+    expect(unpricedLines(none, 'AR6', heldSel(none)).map(u => u.reason)).toEqual(['province_missing'])
     const mmbtu = loc({ country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 10, natural_gas_unit: 'mmbtu' })
     const r = rowOf(mmbtu)
     expect(r.factor_key).toBe('natural_gas_gj')
     expect(r.note).toContain('10 MMBtu converted to 10.55 GJ (1 MMBtu = 1.05505585262 GJ, exact).')
-    expect(r.result_tco2e).toBeCloseTo(calcGas(pickEF(mmbtu, 'natural_gas_gj').factor, 10 * 1.05505585262, 'AR6').total, 12)
+    expect(r.result_tco2e).toBeCloseTo(calcGas(pickEF(mmbtu, 'natural_gas_gj', heldSel(mmbtu)).factor, 10 * 1.05505585262, 'AR6').total, 12)
     expect(ngUnitOptions('CA').map(([v]) => v)).not.toContain('mmbtu')
   })
 });
@@ -2945,7 +2956,7 @@ describe('FI3. UK gas in m3 and Canadian gas in GJ', () => {
 describe('V. activity data is the entered figure, and the row still reconciles', () => {
   const shownFactor = (r: any) => Number(String(r.emission_factor_display).match(/^[\d.]+/)![0]);
   const rowFor = (l: Location, stream: string) =>
-    (buildWorkings([l], 'AR6', 2025, [], 12) as any[]).find(r => r.stream === stream && !r.declaration);
+    (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as any[]).find(r => r.stream === stream && !r.declaration);
 
   // Every (jurisdiction, unit) combination the blast-radius sweep turned up, plus the two that were
   // already correct, so a regression in either direction fails.
@@ -3053,7 +3064,7 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
   const G = 3.785411784;
   const shown = (r: any) => Number(String(r.emission_factor_display).match(/^[\d.]+/)![0]);
   const row = (l: Location, grade: 'distillate' | 'residual') =>
-    (buildWorkings([l], 'AR6', 2025, [], 12) as any[]).find(r => r.stream === `fuel_oil_${grade}` && !r.declaration);
+    (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as any[]).find(r => r.stream === `fuel_oil_${grade}` && !r.declaration);
   // FI3 (R8): EU heating oil has no litre key, so the EU distillate site enters kg unless a unit is given.
   const site = (country: string, grade: 'distillate' | 'residual', unit?: 'litres' | 'gallons' | 'kg') =>
     loc({ country, [`has_fuel_oil_${grade}`]: true, [`fuel_oil_${grade}_amount`]: 1000,
@@ -3092,10 +3103,10 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
   it('W2 an EU gallon figure prices from the litre key, converted exactly (FI2: no gallon keys)', () => {
     const lit = (EF_EU as any).fuel_oil_residual_litre;
     expect((EF_EU as any).fuel_oil_residual_gallon, 'EU residual gallon key').toBeUndefined();
-    const p = pickEF(loc({ country: 'DE' }), 'fuel_oil_residual_gallon');
+    const p = pickEF(loc({ country: 'DE' }), 'fuel_oil_residual_gallon', heldSel(loc({ country: 'DE' })));
     for (const gas of ['co2', 'ch4', 'n2o'] as const) expect(p.factor[gas], `EU residual ${gas}`).toBeCloseTo(lit[gas] * G, 14);
     // FI3 (R8): heating oil has no litre key, so a gallon figure has nothing to convert to and is unpriced.
-    expect((pickEF(loc({ country: 'DE' }), 'fuel_oil_distillate_gallon').factor as any).__missing).toBeDefined();
+    expect((pickEF(loc({ country: 'DE' }), 'fuel_oil_distillate_gallon', heldSel(loc({ country: 'DE' }))).factor as any).__missing).toBeDefined();
   });
 
   it('W3 a metric row shows the STORED litre factor, with no rescale applied', () => {
@@ -3131,10 +3142,10 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
     const kgRow = (stream: 'diesel_stationary' | 'fuel_oil_distillate') => (buildWorkings([loc({ country: 'FR',
       ...(stream === 'diesel_stationary' ? {} : { has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'kg' }) })],
       'AR6', 2025, [], 12) as any[]).find(r => r.stream === stream && !r.declaration);
-    expect(pickEF(loc({ country: 'FR' }), 'fuel_oil_distillate_kg').factor).toEqual(pickEF(loc({ country: 'FR' }), 'diesel_kg').factor);
+    expect(pickEF(loc({ country: 'FR' }), 'fuel_oil_distillate_kg', heldSel(loc({ country: 'FR' }))).factor).toEqual(pickEF(loc({ country: 'FR' }), 'diesel_kg', heldSel(loc({ country: 'FR' }))).factor);
     expect(kgRow('fuel_oil_distillate').result_tco2e).toBeCloseTo(3.1971876, 9);
     const l = loc({ country: 'FR', has_fuel_oil_distillate: true, fuel_oil_distillate_amount: 1000, fuel_oil_distillate_unit: 'litres' });
-    expect(unpricedLines(l).map(u => u.field)).toEqual(['fuel_oil_distillate_amount']);
+    expect(unpricedLines(l, 'AR6', heldSel(l)).map(u => u.field)).toEqual(['fuel_oil_distillate_amount']);
   });
 
   it('W6 the EU density disclosure SURVIVED the re-basing', () => {
@@ -3172,8 +3183,8 @@ describe('W. metric fuel oil prices per litre, from the publisher\'s own figure'
       const unit = country === 'US' ? 'gallons' : undefined;   // the site default (EU heating oil in kg, FI3)
       for (const grade of ['distillate', 'residual'] as const) {
         const l = site(country, grade, unit);
-        expect(calcLocation(l, 'AR6', 2025).s1_total, `${country}/${grade}`).toBeCloseTo(row(l, grade).result_tco2e, 12);
-        expect(calcInventory([l], 'AR6', 2025).s1_total, `${country}/${grade}`).toBeCloseTo(row(l, grade).result_tco2e, 12);
+        expect(calcLocation(l, 'AR6', heldYearFor(country)).s1_total, `${country}/${grade}`).toBeCloseTo(row(l, grade).result_tco2e, 12);
+        expect(calcInventory([l], 'AR6', heldYearFor(country)).s1_total, `${country}/${grade}`).toBeCloseTo(row(l, grade).result_tco2e, 12);
       }
     }
   });
@@ -3313,7 +3324,7 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     // FI9: motor gasoline is not in EF_CA; fleet petrol prices from ECCC's mobile table. A gallon figure of a stationary
     // fuel prices at the per-litre rate x L_PER_GAL, converted exactly (FI2: no gallon keys).
     expect(CA.gasoline_litre).toBeUndefined();
-    expect(pickEF(loc({ country: 'CA' }), 'diesel_gallon').factor.ch4).toBeCloseTo(0.078 / 1000 * G, 14);
+    expect(pickEF(loc({ country: 'CA' }), 'diesel_gallon', heldSel(loc({ country: 'CA' }))).factor.ch4).toBeCloseTo(0.078 / 1000 * G, 14);
   });
 
   it('AB7 UK, AU and NZ have NO sector-varying gas split to pin — the gases are combined at source', () => {
@@ -3337,7 +3348,7 @@ describe('AB. CH4/N2O rates are pinned to the sector table they came from', () =
     const commercial = loc({ country: 'NZ', nz_use_class: 'commercial', has_diesel_stationary: true,
       diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' });
     const industrial = { ...commercial, nz_use_class: 'industrial' as const };
-    const rowOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as any[])
+    const rowOf = (l: Location) => (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as any[])
       .find(r => r.stream === 'diesel_stationary' && !r.declaration);
     // The selector genuinely changes the figure...
     expect(rowOf(commercial).result_tco2e).not.toBe(rowOf(industrial).result_tco2e);
@@ -4010,10 +4021,11 @@ describe('T3a reportingYearLabel', () => {
   });
 
   it('source: the label is built only in reportingYearLabel (no FY${...}, no other "reporting year ${" or "year ending ${")', () => {
-    const src = stripTsComments(readFileSync(join(__dirname, 'engine.ts'), 'utf8'));
-    const start = src.indexOf('export function reportingYearLabel(');
-    const helper = src.slice(start, src.indexOf('\n}\n', start));
-    const rest = src.slice(0, start) + src.slice(start + helper.length);
+    // T3c: the helper lives in lib/ghg/reportingYear.ts (re-exported by the engine); the engine builds no label.
+    const helperSrc = stripTsComments(readFileSync(join(__dirname, 'reportingYear.ts'), 'utf8'));
+    const start = helperSrc.indexOf('export function reportingYearLabel(');
+    const helper = helperSrc.slice(start, helperSrc.indexOf('\n}\n', start));
+    const rest = stripTsComments(readFileSync(join(__dirname, 'engine.ts'), 'utf8')) + helperSrc.slice(0, start) + helperSrc.slice(start + helper.length);
     expect(helper).toMatch(/reporting year \$\{/);
     expect(helper).toMatch(/year ending \$\{/);
     expect(rest).not.toMatch(/FY\s?\$\{/);
@@ -4142,7 +4154,8 @@ describe('T4 deriveLocations', () => {
       ['pending only, stale stored', inv([gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))])])],
       ['all rejected, typed figure', inv([gasSite(250, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'rejected' }))])])],
       ['mixed units', inv([gasSite(300, [gdoc('m1', gas(100, '2025-01-01', '2025-01-31')), gdoc('m2', gas(200, '2025-02-01', '2025-02-28', { unit: 'therms' }))])])],
-      ['March year end', inv([gasSite(0, [gdoc('a', gas(100, '2024-04-01', '2024-04-30')), gdoc('b', gas(100, '2025-04-01', '2025-04-30'))])], 2025, 3)],
+      // T3c: the year ending March 2026 (majority 2025, the EPA Hub edition held), so the bills price.
+      ['March year end', inv([gasSite(0, [gdoc('a', gas(100, '2025-04-01', '2025-04-30')), gdoc('b', gas(100, '2026-04-01', '2026-04-30'))])], 2026, 3)],
       ['electricity, market-based and gas together', inv([loc({ has_natural_gas: true, natural_gas_amount: 0, grid_region: 'US_CA', electricity_kwh: 7,
         renewable_electricity_kwh: 1000, source_docs: [
           gdoc('g', gas(100, '2025-01-01', '2025-01-31')),
@@ -4158,7 +4171,8 @@ describe('T4 deriveLocations', () => {
     for (const [label, i] of fixtures) {
       it(label, () => {
         const derived = deriveLocations(i);
-        const t = calcInventory(derived, 'AR6', i.reporting_year);
+        // T3c: the totals take the same window as the workings (the year end selects the edition).
+        const t = calcInventory(derived, 'AR6', i.reporting_year, selectionFor(i.reporting_year, i.fiscal_year_end_month));
         type Row = { scope?: number; scope2_method?: string; stream?: string; result_tco2e?: number | null };
         const rows = buildWorkings(derived, 'AR6', i.reporting_year, i.coverage_resolutions, i.fiscal_year_end_month) as Row[];
         const sum = (f: (r: Row) => boolean) => rows.filter(r => typeof r.result_tco2e === 'number' && f(r)).reduce((a, r) => a + (r.result_tco2e as number), 0);
@@ -4192,8 +4206,8 @@ describe('T4 deriveLocations', () => {
     // An unpriceable unit on a stale field: stored says 100 m3-on-a-NZ-site, but the only bill is pending.
     // FI1: the judgement is now per line (unpricedLines), not a whole-location exclusion; the property holds.
     const site = gasSite(100, [gdoc('a', gas(100, '2025-01-01', '2025-01-31', { status: 'extracted' }))], { country: 'NZ', natural_gas_unit: 'm3' });
-    expect(unpricedLines(site), 'stored: an unpriced line on a figure nothing supports').toHaveLength(1);
-    expect(unpricedLines(deriveLocations(inv([site]))[0])).toEqual([]);
+    expect(unpricedLines(site, 'AR6', heldSel(site)), 'stored: an unpriced line on a figure nothing supports').toHaveLength(1);
+    expect(unpricedLines(deriveLocations(inv([site]))[0], 'AR6', heldSel(deriveLocations(inv([site]))[0]))).toEqual([]);
     // findUnresolvedCoverage derives first, so it does not block on the stale figure either.
     expect(findUnresolvedCoverage([site], 2025, 12, []).filter(i => i.status === 'factor_missing')).toEqual([]);
   });
@@ -4419,8 +4433,9 @@ describe('T6 monthly split', () => {
   });
 
   it('a March year end splits over its own window: a bill across 31 March writes only March', () => {
-    const { slices } = buildMonthlyEmissions(inv([site([gdoc('m', gas(310, '2025-03-15', '2025-04-14'))])], 2025, 3), deps, 'AR6');
-    expect(slices.map(s => [s.period_month, s.reporting_year])).toEqual([['2025-03-01', 2025]]);
+    // T3c: the year ending March 2026 (majority 2025, whose EPA Hub edition is held).
+    const { slices } = buildMonthlyEmissions(inv([site([gdoc('m', gas(310, '2026-03-15', '2026-04-14'))])], 2026, 3), deps, 'AR6');
+    expect(slices.map(s => [s.period_month, s.reporting_year])).toEqual([['2026-03-01', 2026]]);
     expect(slices[0].activity_value).toBeCloseTo(310 * 17 / 31, 6);
   });
 
@@ -4441,10 +4456,11 @@ describe('T6 monthly split', () => {
   it('an unpriced line writes no monthly row, and the bill is skipped by name (FI1)', () => {
     // WAS "a location the totals exclude as unpriceable writes no monthly row". FI1 keeps the location;
     // the unpriced bill still writes nothing, and lands in skipped with the line's own reason (FI1 diff 2).
-    const blocked = site([gdoc('a', gas(100, ...month(2025, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'NZ' });
-    const r = buildMonthlyEmissions(inv([blocked], 2025), deps, 'AR6');
-    expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2025)), 'AR6', 2025)).toEqual([]);
-    expect(unpricedLines(deriveLocations(inv([blocked], 2025))[0]).map(u => u.reason)).toEqual(['factor_missing']);
+    // T3c: 2026, where the MfE edition is held, so the unit (not a missing edition) is what leaves it unpriced.
+    const blocked = site([gdoc('a', gas(100, ...month(2026, 1), { unit: 'm3' }))], { id: 'B', name: 'Blocked', natural_gas_unit: 'm3', country: 'NZ' });
+    const r = buildMonthlyEmissions(inv([blocked], 2026), deps, 'AR6');
+    expect(findUnpriceableLocations(deriveLocations(inv([blocked], 2026)), 'AR6', 2026)).toEqual([]);
+    expect(unpricedLines(deriveLocations(inv([blocked], 2026))[0], 'AR6', testSel(2026)).map(u => u.reason)).toEqual(['factor_missing']);
     expect(r.slices).toEqual([]);
     expect(r.skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'factor_missing' });
     expect(r.skipped.some(x => x.reason.startsWith('cannot price'))).toBe(false);
@@ -4692,7 +4708,7 @@ describe('T10a no figure, and MJ gas', () => {
     // FI2 diff 2: NGA's per-GJ figure, the MMBtu read converted back to GJ exactly (the derived 54.367 per MMBtu is gone).
     expect(t).toBeCloseTo(d.natural_gas_amount * 1.05505585262 * 51.53 / 1000, 12);   // the stored MMBtu read, to GJ exactly
     expect(t).toBeCloseTo(6.944 * 51.53 / 1000, 4);   // the same as NGA's per-GJ factor on the GJ read
-    const row = (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; ef_source?: string }[]).find(r => r.stream === 'natural_gas')!;
+    const row = (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { stream?: string; ef_source?: string }[]).find(r => r.stream === 'natural_gas')!;
     expect(row.ef_source).toContain('NGA');
   });
 
@@ -4713,14 +4729,14 @@ describe('T10a no figure, and MJ gas', () => {
     // The PDF and XLSX methods tables (FI2 follow-up): the conversion the row notes, once however many rows use it, and
     // nothing for a value NGA prints in the unit entered.
     const melb = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 6.58, natural_gas_unit: 'mmbtu' });
-    expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }])).toEqual(['Natural gas: MMBtu converted to GJ (1 MMBtu = 1.05505585262 GJ, exact).']);
+    expect(factorDerivationsFor([melb, { ...melb, id: 'L2' }], heldSel(([melb, { ...melb, id: 'L2' }])[0] ?? {}))).toEqual(['Natural gas: MMBtu converted to GJ (1 MMBtu = 1.05505585262 GJ, exact).']);
     const melbM3: Location = { ...melb, natural_gas_unit: 'm3' };
-    expect(factorDerivationsFor([melbM3]), 'a printed value is a citation, not a derivation').toEqual([]);
-    expect(factorDerivationsFor([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })])).toEqual([]);
+    expect(factorDerivationsFor([melbM3], heldSel(melbM3)), 'a printed value is a citation, not a derivation').toEqual([]);
+    expect(factorDerivationsFor([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })], heldSel(([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })])[0] ?? {}))).toEqual([]);
     const root = join(__dirname, '..', '..');
     expect(readFileSync(join(root, 'app/verify/[token]/page.tsx'), 'utf8')).toContain('{rowNoteOf(w) && (');
-    expect(readFileSync(join(root, 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),");
-    expect(readFileSync(join(root, 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain("...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),");
+    expect(readFileSync(join(root, 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations, factorSel).map(d => ['Factor derivation', d]),");
+    expect(readFileSync(join(root, 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain("...factorDerivationsFor(derivedLocations, factorSel).map(d => ['Factor derivation', d]),");
   });
 
   it('a confirmed proposal with no figure blocks, naming the document', () => {
@@ -4749,28 +4765,29 @@ describe('T10a no figure, and MJ gas', () => {
 
 describe('T10b delivery-based fuels', () => {
   // The run-through: six Melbourne LPG invoices, 90 kg each (177.143 L), one delivery date each, no billing
-  // period, in a year ending 30 September 2025. Before T10b each was stored as a one-day period.
-  const W = periodFromYearAndEnd(2025, 9);
-  const DATES = ['2024-10-14', '2024-12-09', '2025-02-03', '2025-04-14', '2025-06-23', '2025-08-25'];
+  // period, in a year ending 30 September 2026. (T3c: moved on one year from the run-through's year ending September
+  // 2025, which needs NGA 2024, not held until T3d; the year ending September 2026 takes NGA 2025.) Before T10b each was stored as a one-day period.
+  const W = periodFromYearAndEnd(2026, 9);
+  const DATES = ['2025-10-14', '2025-12-09', '2026-02-03', '2026-04-14', '2026-06-23', '2026-08-25'];
   const lpg = (id: string, date: string, o: Partial<ExtractedProposal> = {}): SourceDoc =>
     ({ ...doc('fuel_propane', [prop({ fuelType: 'propane', rawValue: 90, rawUnit: 'kg', value: 177.143, unit: 'litres',
       periodStart: date, periodEnd: date, sourceQuote: '90 kg', ...o })], id), file_name: `${id}.pdf` });
   const site = (docs: SourceDoc[]) => loc({ name: 'Melbourne', country: 'AU', state: 'VIC', grid_region: 'AU_VIC',
     has_propane: true, propane_unit: 'litres', source_docs: docs });
   const melbourne = () => site(DATES.map((d, k) => lpg(`lpg${k + 1}`, d)));
-  const issues = (l: Location, r: CoverageResolution[] = [], y = 2025, m = 9) => findUnresolvedCoverage([l], y, m, r);
+  const issues = (l: Location, r: CoverageResolution[] = [], y = 2026, m = 9) => findUnresolvedCoverage([l], y, m, r);
   const by = { userId: 'u1', email: 'lisa@example.com' };
-  const confirm = (l: Location, at = '2025-10-02T09:00:00Z') => {
+  const confirm = (l: Location, at = '2026-10-02T09:00:00Z') => {
     const i = issues(l).find(x => x.status === 'deliveries_unconfirmed')!;
     return deliveriesCompleteResolution({ locId: l.id, fuelType: 'propane', documentType: 'fuel_propane', docIds: i.docIds ?? [],
       statement: deliveriesStatement('propane', 'Melbourne', W), by, at });
   };
 
   it('deliveryDateOf: the reading decides, within delivery-capable document types only', () => {
-    expect(deliveryDateOf('fuel_propane', { periodStart: '2025-03-14', periodEnd: '2025-03-14' }), 'stored before T10b').toBe('2025-03-14');
-    expect(deliveryDateOf('fuel_propane', { periodStart: null, periodEnd: null, deliveryDate: '2025-03-14' })).toBe('2025-03-14');
-    expect(deliveryDateOf('fleet_fuel', { periodStart: '2025-03-01', periodEnd: '2025-03-31' }), 'a statement').toBeNull();
-    expect(deliveryDateOf('utility_bill_gas', { periodStart: '2025-03-14', periodEnd: '2025-03-14' }), 'gas is metered').toBeNull();
+    expect(deliveryDateOf('fuel_propane', { periodStart: '2026-03-14', periodEnd: '2026-03-14' }), 'stored before T10b').toBe('2026-03-14');
+    expect(deliveryDateOf('fuel_propane', { periodStart: null, periodEnd: null, deliveryDate: '2026-03-14' })).toBe('2026-03-14');
+    expect(deliveryDateOf('fleet_fuel', { periodStart: '2026-03-01', periodEnd: '2026-03-31' }), 'a statement').toBeNull();
+    expect(deliveryDateOf('utility_bill_gas', { periodStart: '2026-03-14', periodEnd: '2026-03-14' }), 'gas is metered').toBeNull();
     expect(deliveryDateOf('fuel_diesel', { periodStart: null, periodEnd: null }), 'undated').toBeNull();
   });
 
@@ -4786,26 +4803,26 @@ describe('T10b delivery-based fuels', () => {
     expect(got.some(i => i.status === 'gap')).toBe(false);
     expect(got.filter(i => i.status === 'deliveries_unconfirmed')).toEqual([{ locId: 'L1', fuelType: 'propane', status: 'deliveries_unconfirmed',
       documentType: 'fuel_propane', docIds: ['lpg1', 'lpg2', 'lpg3', 'lpg4', 'lpg5', 'lpg6'],
-      message: 'Confirm these are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025. Export is blocked until you confirm.' }]);
+      message: 'Confirm these are all the propane deliveries for Melbourne between 1 October 2025 and 30 September 2026. Export is blocked until you confirm.' }]);
   });
 
   it('the confirmation names fuel, site and window, records who and when, clears the issue and reaches the workings', () => {
     const l = melbourne();
     const r = confirm(l);
-    expect(deliveriesStatement('propane', 'Melbourne', W)).toBe('These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025.');
-    expect(r.note).toBe('lisa@example.com confirmed on 2 October 2025: These are all the propane deliveries for Melbourne between 1 October 2024 and 30 September 2025.');
+    expect(deliveriesStatement('propane', 'Melbourne', W)).toBe('These are all the propane deliveries for Melbourne between 1 October 2025 and 30 September 2026.');
+    expect(r.note).toBe('lisa@example.com confirmed on 2 October 2026: These are all the propane deliveries for Melbourne between 1 October 2025 and 30 September 2026.');
     expect(validateResolution(r, l)).toBeNull();
     expect(issues(l, [r])).toEqual([]);
-    const row = buildWorkings([l], 'AR6', 2025, [r], 9).find(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'deliveries_complete');
-    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com on 2 October 2025');
+    const row = buildWorkings([l], 'AR6', 2026, [r], 9).find(w => w.gwp_basis === 'coverage_resolution' && w.activity_unit === 'deliveries_complete');
+    expect(row?.emission_factor).toBe('Deliveries confirmed complete by lisa@example.com on 2 October 2026');
     expect(row?.ef_source).toBe(r.note);
   });
 
   it('adding, removing or rejecting a delivery reopens the confirmation, naming who confirmed and when', () => {
     const l = melbourne();
     const r = confirm(l);
-    const CHANGED = 'The propane deliveries for Melbourne have changed since lisa@example.com confirmed them on 2 October 2025. Check the list and confirm again. Export is blocked until you do.';
-    const added = { ...l, source_docs: [...l.source_docs, lpg('lpg7', '2025-09-15')] };
+    const CHANGED = 'The propane deliveries for Melbourne have changed since lisa@example.com confirmed them on 2 October 2026. Check the list and confirm again. Export is blocked until you do.';
+    const added = { ...l, source_docs: [...l.source_docs, lpg('lpg7', '2026-09-15')] };
     expect(issues(added, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
     const removed = { ...l, source_docs: l.source_docs.slice(1) };
     expect(issues(removed, [r]).filter(i => i.status === 'deliveries_unconfirmed').map(i => i.message)).toEqual([CHANGED]);
@@ -4815,32 +4832,33 @@ describe('T10b delivery-based fuels', () => {
   });
 
   it('a full year of deliveries exports after confirmation', () => {
+    // Calendar 2025 (NGA 2025's activity year holds most of it).
     const l = site(Array.from({ length: 12 }, (_, k) => lpg(`m${k + 1}`, `2025-${String(k + 1).padStart(2, '0')}-15`)));
     expect(issues(l, [], 2025, 12).map(i => i.status)).toEqual(['deliveries_unconfirmed']);
     const i = issues(l, [], 2025, 12)[0];
     const r = deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: i.docIds ?? [],
-      statement: deliveriesStatement('propane', 'Melbourne', periodFromYearAndEnd(2025, 12)), by, at: '2026-01-05T09:00:00Z' });
+      statement: deliveriesStatement('propane', 'Melbourne', periodFromYearAndEnd(2025, 12)), by, at: '2025-01-05T09:00:00Z' });
     expect(issues(l, [r], 2025, 12)).toEqual([]);
     expect(deriveLocations({ locations: [l], reporting_year: 2025, coverage_resolutions: [r] })[0].propane_amount).toBeCloseTo(12 * 177.143, 6);
   });
 
   it('the window: the day before it opens and the day after it closes count zero; the first and last day count in full', () => {
-    const l = site([lpg('before', '2024-09-30'), lpg('first', '2024-10-01'), lpg('last', '2025-09-30'), lpg('after', '2025-10-01')]);
+    const l = site([lpg('before', '2025-09-30'), lpg('first', '2025-10-01'), lpg('last', '2026-09-30'), lpg('after', '2026-10-01')]);
     expect(billContributions(l, [], W).map(c => [c.docId, c.reason, c.share])).toEqual([
       ['before', 'outside_year', 0], ['first', 'delivered', 1], ['last', 'delivered', 1], ['after', 'outside_year', 0]]);
   });
 
   it('a delivery on the 1st of a month counts; it is not an invalid period', () => {
-    const c = billContributions(site([lpg('d', '2025-03-01')]), [], W)[0];
-    expect([c.reason, c.share, c.deliveryDate]).toEqual(['delivered', 1, '2025-03-01']);
+    const c = billContributions(site([lpg('d', '2026-03-01')]), [], W)[0];
+    expect([c.reason, c.share, c.deliveryDate]).toEqual(['delivered', 1, '2026-03-01']);
   });
 
   it('a one-day billing period on the 1st covers that day and is not "reversed"', () => {
-    const one = canonicalPeriod(new Date(2025, 2, 1), new Date(2025, 2, 1));
+    const one = canonicalPeriod(new Date(2026, 2, 1), new Date(2026, 2, 1));
     expect([one.start.getDate(), one.endExclusive.getMonth(), one.endExclusive.getDate()]).toEqual([1, 2, 2]);
-    expect(canonicalPeriod(new Date(2024, 11, 1), new Date(2025, 0, 1)).endExclusive.getTime(), 'other periods unchanged').toBe(exclusiveEnd(new Date(2025, 0, 1)).getTime());
-    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2025-03-01', periodEnd: '2025-03-01' })], 'g')] });
-    const c = billContributions(gas, [], periodFromYearAndEnd(2025, 12))[0];
+    expect(canonicalPeriod(new Date(2025, 11, 1), new Date(2026, 0, 1)).endExclusive.getTime(), 'other periods unchanged').toBe(exclusiveEnd(new Date(2026, 0, 1)).getTime());
+    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ periodStart: '2026-03-01', periodEnd: '2026-03-01' })], 'g')] });
+    const c = billContributions(gas, [], periodFromYearAndEnd(2026, 12))[0];
     expect([c.reason, c.totalDays, c.inWindowDays]).toEqual(['counted', 1, 1]);
   });
 
@@ -4848,36 +4866,36 @@ describe('T10b delivery-based fuels', () => {
     const l = melbourne();
     expect(isDeliveryGroup(l, 'fuel_propane', 'propane')).toBe(true);
     const est = { locId: 'L1', fuelType: 'propane', kind: 'extrapolate', documentType: 'fuel_propane', monthsCovered: 6, pctEstimated: 50,
-      note: 'n', acknowledgedAt: '2025-10-02T09:00:00Z' } as CoverageResolution;
+      note: 'n', acknowledgedAt: '2026-10-02T09:00:00Z' } as CoverageResolution;
     expect(validateResolution(est, l)).toBe('Deliveries are counted as delivered, not estimated.');
     expect(applyResolutions(l, [est], W.start, W.end).propane_amount?.value).toBeCloseTo(6 * 177.143, 6);
   });
 
   it('the 0-months guard: no estimate is built from zero covered months, and a stored one changes nothing', () => {
     expect(() => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
-      monthsCovered: 0, pctEstimated: 100, at: '2025-10-02T09:00:00Z' })).toThrow(NO_MONTHS_TO_ESTIMATE);
-    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ value: 50, periodStart: '2025-03-10', periodEnd: '2025-03-20' })], 'g')] });
+      monthsCovered: 0, pctEstimated: 100, at: '2026-10-02T09:00:00Z' })).toThrow(NO_MONTHS_TO_ESTIMATE);
+    const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ value: 50, periodStart: '2026-03-10', periodEnd: '2026-03-20' })], 'g')] });
     const zero = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', documentType: 'utility_bill_gas', monthsCovered: 0, pctEstimated: 100,
-      note: 'n', acknowledgedAt: '2025-10-02T09:00:00Z' } as CoverageResolution;
+      note: 'n', acknowledgedAt: '2026-10-02T09:00:00Z' } as CoverageResolution;
     expect(validateResolution(zero, gas)).toBe('An estimate needs the number of months covered by bills.');
-    expect(applyResolutions(gas, [zero], new Date(2025, 0, 1), new Date(2025, 11, 31)).natural_gas_amount?.value).toBe(50);
-    expect(findUnresolvedCoverage([gas], 2025, 12, [zero]).map(i => i.status)).toContain('gap');
+    expect(applyResolutions(gas, [zero], new Date(2026, 0, 1), new Date(2026, 11, 31)).natural_gas_amount?.value).toBe(50);
+    expect(findUnresolvedCoverage([gas], 2026, 12, [zero]).map(i => i.status)).toContain('gap');
     const one = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
-      monthsCovered: 1, pctEstimated: 91.7, at: '2025-10-02T09:00:00Z' });
+      monthsCovered: 1, pctEstimated: 91.7, at: '2026-10-02T09:00:00Z' });
     expect(validateResolution(one, gas)).toBeNull();
   });
 
   it('a statement in a delivery-capable type is prorated and month-checked as before', () => {
     const fleet = loc({ has_mobile: true, gasoline_unit: 'litres', source_docs: [doc('fleet_fuel', [prop({ fuelType: 'gasoline', value: 400, unit: 'litres',
-      periodStart: '2025-03-01', periodEnd: '2025-03-31' })], 'card')] });
-    const got = findUnresolvedCoverage([fleet], 2025, 12, []);
+      periodStart: '2026-03-01', periodEnd: '2026-03-31' })], 'card')] });
+    const got = findUnresolvedCoverage([fleet], 2026, 12, []);
     expect(got.map(i => i.status)).toContain('gap');
     expect(got.some(i => i.status === 'deliveries_unconfirmed')).toBe(false);
   });
 
   it('a mixed field: statements are still prorated by their own days, and the field is confirmed as a whole', () => {
-    const statement = doc('fuel_propane', [prop({ fuelType: 'propane', value: 310, unit: 'litres', periodStart: '2024-09-15', periodEnd: '2024-10-14' })], 'stmt');
-    const l = site([statement, lpg('lpg1', '2025-02-03')]);
+    const statement = doc('fuel_propane', [prop({ fuelType: 'propane', value: 310, unit: 'litres', periodStart: '2025-09-15', periodEnd: '2025-10-14' })], 'stmt');
+    const l = site([statement, lpg('lpg1', '2026-02-03')]);
     const cs = billContributions(l, [], W);
     expect(cs.find(c => c.docId === 'stmt')?.reason).toBe('prorated');
     expect(cs.find(c => c.docId === 'stmt')?.share).toBeCloseTo(14 / 30, 6);
@@ -4887,13 +4905,13 @@ describe('T10b delivery-based fuels', () => {
   });
 
   it('a delivery returned as a delivery date with no period is the same delivery', () => {
-    const l = site([lpg('new', '', { periodStart: null, periodEnd: null, deliveryDate: '2025-02-03' })]);
-    expect(billContributions(l, [], W).map(c => [c.reason, c.deliveryDate])).toEqual([['delivered', '2025-02-03']]);
+    const l = site([lpg('new', '', { periodStart: null, periodEnd: null, deliveryDate: '2026-02-03' })]);
+    expect(billContributions(l, [], W).map(c => [c.reason, c.deliveryDate])).toEqual([['delivered', '2026-02-03']]);
   });
 
   it('monthly: each delivery lands whole in its delivery month, tagged delivery, and reconciles', () => {
     const l = melbourne();
-    const inv = { locations: [l], reporting_year: 2025, fiscal_year_end_month: 9, coverage_resolutions: [confirm(l)] };
+    const inv = { locations: [l], reporting_year: 2026, fiscal_year_end_month: 9, coverage_resolutions: [confirm(l)] };
     const { slices } = buildMonthlyEmissions(inv, { calcGas, pickEF, getGridFactor, isResolvedGridRegion }, 'AR6');
     expect(slices.map(s => [s.period_month, s.activity_value, s.pct_in_month, s.basis, s.period_start, s.period_end])).toEqual(
       DATES.map(d => [`${d.slice(0, 7)}-01`, 177.143, 1, 'delivery', d, d]));
@@ -5332,7 +5350,7 @@ describe('T15-fix2 not-counted line under each confirmed, uncounted reading', ()
 // non-blocking exclusion.
 describe('FI1 unpriced lines', () => {
   const BLOCKING = new Set(['factor_missing', 'refrigerant_unknown', 'province_missing', 'fleet_type_missing', 'equipment_missing']);
-  const gate = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => BLOCKING.has(i.status));
+  const gate = (l: Location, y = 2025) => findUnresolvedCoverage([l], y, 12, []).filter(i => BLOCKING.has(i.status));
 
   // Every fuel line the wizard or a bill can store: its switch, amount and unit fields, the wizard's own
   // options for the country, and (for a bill) every unit convertibleUnits accepts for the fuel.
@@ -5363,19 +5381,21 @@ describe('FI1 unpriced lines', () => {
         for (const unit of units) {
           const l = loc({ name: 'Site', country, grid_region: country === 'CA' ? 'ON' : '', ...f.on, [f.field]: 1000, [f.unitField]: unit } as Partial<Location>);
           const label = `${country} ${String(f.field)} in ${unit}`;
-          expect(findUnpriceableLocations([l], 'AR6', 2025), `${label}: never excluded`).toEqual([]);
-          const lines = unpricedLines(l);
-          const s1 = calcInventory([l], 'AR6', 2025).s1_total;
+          // T3c: at the year whose editions are held, so the unit (not the edition) decides priced or unpriced.
+          const y = heldYearFor(country);
+          expect(findUnpriceableLocations([l], 'AR6', y), `${label}: never excluded`).toEqual([]);
+          const lines = unpricedLines(l, 'AR6', heldSel(l));
+          const s1 = calcInventory([l], 'AR6', y).s1_total;
           if (lines.length === 0) {
             priced++;
             expect(s1, `${label}: priced, so above zero`).toBeGreaterThan(0);
-            expect(gate(l), `${label}: priced lines raise nothing`).toEqual([]);
+            expect(gate(l, y), `${label}: priced lines raise nothing`).toEqual([]);
           } else {
             unpriced++;
             expect(lines.map(u => u.field), label).toEqual([f.field]);
             expect(s1, `${label}: unpriced is absent from the total, never a figure`).toBe(0);
-            expect(gate(l).map(i => [i.status, i.field]), `${label}: blocks export`).toEqual([[lines[0].reason, String(f.field)]]);
-            const row = buildWorkings([l], 'AR6', 2025).find(r => r.declaration === 'unpriced');
+            expect(gate(l, y).map(i => [i.status, i.field]), `${label}: blocks export`).toEqual([[lines[0].reason, String(f.field)]]);
+            const row = buildWorkings([l], 'AR6', y).find(r => r.declaration === 'unpriced');
             expect(row?.result_tco2e, `${label}: null, not zero`).toBeNull();
           }
         }
@@ -5392,15 +5412,16 @@ describe('FI1 unpriced lines', () => {
       has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3',
       has_diesel_stationary: true, diesel_stationary_amount: 500, diesel_stationary_unit: 'gallons' });
     const without = loc({ ...mixed, has_natural_gas: false, natural_gas_amount: 0 });
-    expect(calcInventory([mixed], 'AR6', 2025)).toEqual(calcInventory([without], 'AR6', 2025));
-    expect(calcInventory([mixed], 'AR6', 2025).s1_total).toBeGreaterThan(0);
-    expect(calcInventory([mixed], 'AR6', 2025).s2_location).toBeGreaterThan(0);
-    const rows = buildWorkings([mixed], 'AR6', 2025);
+    // T3c: 2026, where the MfE editions are held.
+    expect(calcInventory([mixed], 'AR6', 2026)).toEqual(calcInventory([without], 'AR6', 2026));
+    expect(calcInventory([mixed], 'AR6', 2026).s1_total).toBeGreaterThan(0);
+    expect(calcInventory([mixed], 'AR6', 2026).s2_location).toBeGreaterThan(0);
+    const rows = buildWorkings([mixed], 'AR6', 2026);
     expect(rows.filter(r => r.result_tco2e > 0).map(r => r.stream).sort()).toEqual(['diesel_stationary', 'electricity', 'electricity']);
     expect(rows.filter(r => r.declaration === 'unpriced').map(r => r.stream)).toEqual(['natural_gas']);
-    expect(pctEstimated({ locations: [mixed], reporting_year: 2025 }, 'AR6')).toBe(pctEstimated({ locations: [without], reporting_year: 2025 }, 'AR6'));
+    expect(pctEstimated({ locations: [mixed], reporting_year: 2026 }, 'AR6')).toBe(pctEstimated({ locations: [without], reporting_year: 2026 }, 'AR6'));
     // The message names the fuel, the site, the unit, the publisher and the units it does price.
-    expect(gate(mixed)).toEqual([{ locId: 'M', fuelType: 'natural_gas', status: 'factor_missing', field: 'natural_gas_amount',
+    expect(gate(mixed, 2026)).toEqual([{ locId: 'M', fuelType: 'natural_gas', status: 'factor_missing', field: 'natural_gas_amount',
       message: 'Natural gas at Mixed is recorded in m³, and MfE 2026 v2 publishes no factor this figure can be converted to exactly, so it is not counted. Enter it in therms, MMBtu or kWh, or reject the bill. Export is blocked until this is resolved.' }]);
   });
 
@@ -5409,7 +5430,7 @@ describe('FI1 unpriced lines', () => {
     for (const [name, type] of [['an unrecognised type', 'r999x'], ['a blank type', '']] as const) {
       it(`${name} with 50 kg: an unpriced line, the issue, and a fugitive 0 that is not a priced zero`, () => {
         const l = site(type);
-        expect(unpricedLines(l).map(u => [u.reason, u.field, u.amount, u.unit])).toEqual([['refrigerant_unknown', 'refrigerant_purchased_kg', 50, 'kg']]);
+        expect(unpricedLines(l, 'AR6', heldSel(l)).map(u => [u.reason, u.field, u.amount, u.unit])).toEqual([['refrigerant_unknown', 'refrigerant_purchased_kg', 50, 'kg']]);
         expect(gate(l).map(i => i.message)).toEqual(['The refrigerant type at Depot is not one we hold a GWP for, so it is not counted. Choose the refrigerant type. Export is blocked until it is chosen.']);
         expect(calcLocation(l, 'AR6', 2025).s1_fugitive).toBe(0);
         const row = buildWorkings([l], 'AR6', 2025).find(r => r.stream === 'refrigerants')!;
@@ -5420,7 +5441,7 @@ describe('FI1 unpriced lines', () => {
     }
     it('choosing a held type clears the issue and prices at kg x GWP', () => {
       const l = site('r410a');
-      expect(unpricedLines(l)).toEqual([]);
+      expect(unpricedLines(l, 'AR6', heldSel(l))).toEqual([]);
       expect(gate(l)).toEqual([]);
       expect(calcLocation(l, 'AR6', 2025).s1_fugitive).toBeCloseTo(50 * 2256 / 1000, 12);
       const row = buildWorkings([l], 'AR6', 2025).find(r => r.stream === 'refrigerants')!;
@@ -5429,7 +5450,7 @@ describe('FI1 unpriced lines', () => {
     });
     it('ammonia is unchanged: no line, no issue', () => {
       const l = loc({ ...site(''), uses_ammonia: true });
-      expect(unpricedLines(l)).toEqual([]);
+      expect(unpricedLines(l, 'AR6', heldSel(l))).toEqual([]);
       expect(gate(l)).toEqual([]);
       expect(calcLocation(l, 'AR6', 2025).s1_fugitive).toBe(0);
     });
@@ -5451,13 +5472,13 @@ describe('FI1 unpriced lines', () => {
     const ca = (o: Partial<Location> = {}) => loc({ name: 'Moncton', country: 'CA', grid_region: '', province: '', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'm3', ...o });
     it('no province: unpriced with the province issue, and NOT priced at 1.921', () => {
       const l = ca();
-      expect(unpricedLines(l).map(u => u.reason)).toEqual(['province_missing']);
+      expect(unpricedLines(l, 'AR6', heldSel(l)).map(u => u.reason)).toEqual(['province_missing']);
       expect(gate(l).map(i => i.message)).toEqual(['The province for Moncton is not set, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.']);
       expect(calcInventory([l], 'AR6', 2025).s1_total).toBe(0);
-      expect(() => calcGas(pickEF(l, 'natural_gas_m3').factor, 1000, 'AR6')).toThrow(MissingEmissionFactorError);
+      expect(() => calcGas(pickEF(l, 'natural_gas_m3', heldSel(l)).factor, 1000, 'AR6')).toThrow(MissingEmissionFactorError);
       // Every unit, not just m3: the province selects the factor whatever the gas is billed in.
       for (const unit of ['mcf', 'kwh', 'therms', 'mmbtu'] as const)
-        expect(unpricedLines(ca({ natural_gas_unit: unit })).map(u => u.reason), unit).toEqual(['province_missing']);
+        expect(unpricedLines(ca({ natural_gas_unit: unit }), 'AR6', heldSel(ca({ natural_gas_unit: unit }))).map(u => u.reason), unit).toEqual(['province_missing']);
     });
     it('an unrecognised province says so, by its own value', () => {
       expect(gate(ca({ grid_region: 'ZZ' })).map(i => i.message)).toEqual(['The province for Moncton (ZZ) is not one we hold a natural gas factor for, so its natural gas is not counted. Choose the province. Export is blocked until it is chosen.']);
@@ -5465,11 +5486,11 @@ describe('FI1 unpriced lines', () => {
     it("choosing ON prices at Ontario's value, AB at Alberta's, and clears the issue", () => {
       const on = ca({ grid_region: 'ON', province: 'ON' }), ab = ca({ grid_region: 'AB', province: 'AB' });
       expect(gate(on)).toEqual([]);
-      expect(pickEF(on, 'natural_gas_m3').factor).toEqual({ co2: 1.921, ch4: 0.000037, n2o: 0.000035 });
-      expect(pickEF(ab, 'natural_gas_m3').factor).toEqual({ co2: 1.962, ch4: 0.000037, n2o: 0.000035 });
+      expect(pickEF(on, 'natural_gas_m3', heldSel(on)).factor).toEqual({ co2: 1.921, ch4: 0.000037, n2o: 0.000035 });
+      expect(pickEF(ab, 'natural_gas_m3', heldSel(ab)).factor).toEqual({ co2: 1.962, ch4: 0.000037, n2o: 0.000035 });
       // FI2: per Mcf at the EXACT 28.316846592 m3/Mcf (NIST SP 811), not the rounded 1000/35.3147 it used to be.
-      expect(pickEF(on, 'natural_gas_mcf').factor.co2).toBeCloseTo(1.921 * 28.316846592, 12);
-      expect(calcInventory([on], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(on, 'natural_gas_m3').factor, 1000, 'AR6').total, 12);
+      expect(pickEF(on, 'natural_gas_mcf', heldSel(on)).factor.co2).toBeCloseTo(1.921 * 28.316846592, 12);
+      expect(calcInventory([on], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(on, 'natural_gas_m3', heldSel(on)).factor, 1000, 'AR6').total, 12);
     });
     it('source: the Ontario fallback value is gone from EF_CA', () => {
       const src = readFileSync(join(process.cwd(), 'lib/ghg/engine.ts'), 'utf8');
@@ -5485,7 +5506,7 @@ describe('FI1 unpriced lines', () => {
       const [u] = findUnpriceableLocations([jp], 'AR6', 2025);
       expect(u.kind === 'country' && u.refusal.state).toBe('country_not_supported');
       expect(u.kind === 'country' && refusalIsFixable(u.refusal)).toBe(false);
-      expect(unpricedLines(jp)).toEqual([]);
+      expect(unpricedLines(jp, 'AR6', heldSel(jp))).toEqual([]);
       expect(gate(jp)).toEqual([]);
       expect(buildWorkings([jp], 'AR6', 2025).map(r => r.declaration)).toEqual(['country_not_supported']);
     });
@@ -5494,7 +5515,7 @@ describe('FI1 unpriced lines', () => {
       const [u] = findUnpriceableLocations([xx], 'AR6', 2025);
       expect(u.kind === 'country' && u.refusal.state).toBe('country_not_listed');
       expect(u.kind === 'country' && refusalIsFixable(u.refusal)).toBe(true);
-      expect(unpricedLines(xx)).toEqual([]);
+      expect(unpricedLines(xx, 'AR6', heldSel(xx))).toEqual([]);
     });
   });
 
@@ -5504,7 +5525,7 @@ describe('FI1 unpriced lines', () => {
     const l = loc({ name: 'Mixed', country: 'NZ', grid_region: 'NZ', has_natural_gas: true, natural_gas_unit: 'm3',
       source_docs: [b('gas', 1000, 'm3', 'natural_gas', 'utility_bill_gas'), b('power', 20_000, 'kwh', 'electricity', 'utility_electricity')] });
     const inv = { locations: [l], reporting_year: 2025 };
-    expect(unpricedLines(deriveLocations(inv)[0]).map(u => u.field)).toEqual(['natural_gas_amount']);
+    expect(unpricedLines(deriveLocations(inv)[0], 'AR6', heldSel(deriveLocations(inv)[0])).map(u => u.field)).toEqual(['natural_gas_amount']);
     const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
     const r = reconcile(buildMonthlyEmissions(inv, deps, 'AR6').slices, inv, 'AR6');
     expect(r.reconciles).toBe(true);
@@ -5520,14 +5541,15 @@ describe('FI1 unpriced lines', () => {
 
 // ── FI1 diff 2: consumers. The monthly split, and every issue clearing the moment its input is fixed ────
 describe('FI1 consumers', () => {
+  // T3c: 2026, the year whose NZ (MfE) editions are held, so a unit (not a missing edition) is what these test.
   const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
   const bill = (id: string, document_type: string, fuelType: string, value: number, unit: string) =>
-    ({ ...doc(document_type, [prop({ fuelType, value, unit, periodStart: '2025-01-01', periodEnd: '2025-06-30' })], id), file_name: `${id}.pdf` });
+    ({ ...doc(document_type, [prop({ fuelType, value, unit, periodStart: '2026-01-01', periodEnd: '2026-06-30' })], id), file_name: `${id}.pdf` });
 
   it('monthly: an unpriced bill is skipped with factor_missing, and reconcile reports zero unexplained', () => {
     const l = loc({ name: 'Leeds', country: 'NZ', grid_region: 'NZ', has_natural_gas: true, natural_gas_unit: 'm3',
       source_docs: [bill('gas', 'utility_bill_gas', 'natural_gas', 900, 'm3'), bill('power', 'utility_electricity', 'electricity', 20_000, 'kwh')] });
-    const inv = { locations: [l], reporting_year: 2025 };
+    const inv = { locations: [l], reporting_year: 2026 };
     const m = buildMonthlyEmissions(inv, deps, 'AR6');
     expect(m.skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'factor_missing' });
     expect(m.slices.every(x => x.fuel_type === 'electricity')).toBe(true);
@@ -5539,7 +5561,7 @@ describe('FI1 consumers', () => {
   it('monthly: Canadian gas with no province is skipped with province_missing', () => {
     const l = loc({ name: 'Moncton', country: 'CA', grid_region: '', province: '', has_natural_gas: true, natural_gas_unit: 'm3',
       source_docs: [bill('gas', 'utility_bill_gas', 'natural_gas', 900, 'm3')] });
-    const m = buildMonthlyEmissions({ locations: [l], reporting_year: 2025 }, deps, 'AR6');
+    const m = buildMonthlyEmissions({ locations: [l], reporting_year: 2026 }, deps, 'AR6');
     expect(m.skipped).toContainEqual({ fuelType: 'natural_gas', document_type: 'utility_bill_gas', reason: 'province_missing' });
     expect(m.slices).toEqual([]);
   });
@@ -5551,14 +5573,14 @@ describe('FI1 consumers', () => {
     // A refused location still writes nothing, and says so, through the country check.
     const jp = loc({ name: 'Osaka', country: 'JP', grid_region: 'US_CA', electricity_kwh: 1000,
       source_docs: [bill('power', 'utility_electricity', 'electricity', 20_000, 'kwh')] });
-    const m = buildMonthlyEmissions({ locations: [jp], reporting_year: 2025 }, deps, 'AR6');
+    const m = buildMonthlyEmissions({ locations: [jp], reporting_year: 2026 }, deps, 'AR6');
     expect(m.slices).toEqual([]);
     expect(m.skipped).toContainEqual({ fuelType: 'all', document_type: 'all', reason: 'location excluded: country_not_supported' });
   });
 
   it('each issue clears the moment its input is fixed: unit, refrigerant type, province', () => {
     // The page derives on every render (deriveLocations of the live inventory), so these are what it shows.
-    const issues = (l: Location) => findUnresolvedCoverage([l], 2025, 12, []).filter(i => UNPRICED_STATUSES.has(i.status)).map(i => i.status);
+    const issues = (l: Location) => findUnresolvedCoverage([l], 2026, 12, []).filter(i => UNPRICED_STATUSES.has(i.status)).map(i => i.status);
     const gas = loc({ name: 'A', country: 'NZ', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' });
     expect(issues(gas)).toEqual(['factor_missing']);
     expect(issues({ ...gas, natural_gas_unit: 'kwh' })).toEqual([]);
@@ -5571,9 +5593,9 @@ describe('FI1 consumers', () => {
     expect(issues({ ...ca, province: 'QC', grid_region: 'QC' })).toEqual([]);
     // From bills too: the figure is derived, so fixing the bill's unit clears it with no save.
     const fromBill = loc({ name: 'A', country: 'NZ', has_natural_gas: true, natural_gas_unit: 'kwh', source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'm3')] });
-    expect(unpricedLines(deriveLocations({ locations: [fromBill], reporting_year: 2025 })[0]).map(u => u.reason)).toEqual(['factor_missing']);
+    expect(unpricedLines(deriveLocations({ locations: [fromBill], reporting_year: 2026 })[0], 'AR6', heldSel(deriveLocations({ locations: [fromBill], reporting_year: 2026 })[0])).map(u => u.reason)).toEqual(['factor_missing']);
     const fixed = { ...fromBill, source_docs: [bill('g', 'utility_bill_gas', 'natural_gas', 50, 'kwh')] };
-    expect(unpricedLines(deriveLocations({ locations: [fixed], reporting_year: 2025 })[0])).toEqual([]);
+    expect(unpricedLines(deriveLocations({ locations: [fixed], reporting_year: 2026 })[0], 'AR6', heldSel(deriveLocations({ locations: [fixed], reporting_year: 2026 })[0]))).toEqual([]);
   });
 });
 
@@ -5664,7 +5686,7 @@ describe('FI2 exact conversions and honest provenance', () => {
         }
         expect(Math.abs(shownCo2 - expected) / expected, `${label}: value ${shownCo2} is not ${r.ef_source}'s ${r.factor_key}`).toBeLessThan(1e-9);
         // The edition is the same table's.
-        expect(r.factor_vintage, label).toBe(pickEF(l, r.factor_key).publisher?.edition);
+        expect(r.factor_vintage, label).toBe(pickEF(l, r.factor_key, heldSel(l)).publisher?.edition);
         if (country !== 'US' && table === EF) fellBack++;   // FI2 diff 2: must stay 0
         checked++;
       }
@@ -5692,8 +5714,9 @@ describe('FI2 exact conversions and honest provenance', () => {
       stream_attestations: STREAMS.filter(s => !['natural_gas', 'diesel_stationary', 'electricity'].includes(s))
         .map(stream => ({ stream, attested_at: '2026-01-01T00:00:00Z' })),
     }) as Location);
-    const read = cat3InputsFrom(buildWorkings(locations, 'AR6', 2026, [], 12), locations);
-    const r = priceCat3(read.inputs!);
+    // T3c: each site's workings at the year its editions are held (one year cannot hold every country's edition).
+    const read = cat3InputsFrom(locations.flatMap(l => buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12)), locations);
+    const r = priceCat3(read.inputs!, CAT3_EDS);
     const nga = ngaScope3('2025')!;
     let checked = 0;
     for (const l of r.lines) {
@@ -5754,10 +5777,10 @@ describe('FI2 exact conversions and honest provenance', () => {
     for (const [country, field, unit, outcome] of CASES) {
       const l = loc({ country, grid_region: country === 'CA' ? 'ON' : '', ...ON[field], [field]: 100, [UNIT_FIELD[field]]: unit } as Partial<Location>);
       const label = `${country} ${String(field)} in ${unit}`;
-      const rows = buildWorkings([l], 'AR6', 2025).filter(r => r.scope === 1 && r.stream && r.stream !== 'refrigerants');
+      const rows = buildWorkings([l], 'AR6', heldYearFor(country)).filter(r => r.scope === 1 && r.stream && r.stream !== 'refrigerants');
       if (outcome === 'unpriced') {
         expect(rows.map(r => r.declaration), label).toContain('unpriced');
-        expect(unpricedLines(l).map(u => u.field), label).toEqual([field]);
+        expect(unpricedLines(l, 'AR6', heldSel(l)).map(u => u.field), label).toEqual([field]);
         continue;
       }
       const r = rows.find(x => x.declaration === undefined)!;
@@ -5770,18 +5793,18 @@ describe('FI2 exact conversions and honest provenance', () => {
 
   it('calorific basis: AU kWh at 51.53 x 0.0036, EU kWh gross at MRR x 0.90 (FI3), UK therms via kWh at the DEFRA gross factor, NZ kWh with R4', () => {
     const au = loc({ country: 'AU', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
-    expect(pickEF(au, 'natural_gas_kwh').factor.co2).toBeCloseTo(51.53 * 0.0036, 14);
+    expect(pickEF(au, 'natural_gas_kwh', heldSel(au)).factor.co2).toBeCloseTo(51.53 * 0.0036, 14);
     expect(calcInventory([au], 'AR6', 2025).s1_total).toBeCloseTo(1000 * 51.53 * 0.0036 / 1000, 12);
     const eu = loc({ name: 'Lyon', country: 'FR', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
     // FI3 (R7): EU gas in kWh is gross, as billed, and prices on MRR's net factor x 0.90.
-    expect(unpricedLines(eu)).toEqual([]);
-    expect(calcInventory([eu], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(eu, 'natural_gas_kwh').factor, 1000, 'AR6').total, 12);
-    expect(pickEF(eu, 'natural_gas_kwh').factor.co2).toBe(0.181764);
-    const uk = buildWorkings([loc({ country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'therms' })], 'AR6', 2025).find(r => r.stream === 'natural_gas')!;
+    expect(unpricedLines(eu, 'AR6', heldSel(eu))).toEqual([]);
+    expect(calcInventory([eu], 'AR6', 2025).s1_total).toBeCloseTo(calcGas(pickEF(eu, 'natural_gas_kwh', heldSel(eu)).factor, 1000, 'AR6').total, 12);
+    expect(pickEF(eu, 'natural_gas_kwh', heldSel(eu)).factor.co2).toBe(0.181764);
+    const uk = buildWorkings([loc({ country: 'GB', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'therms' })], 'AR6', 2026).find(r => r.stream === 'natural_gas')!;
     expect(uk.factor_key).toBe('natural_gas_kwh');
     expect(uk.result_tco2e).toBeCloseTo(100 * (0.105505585262 / 0.0036) * 0.18231 / 1000, 12);
     expect(uk.conversion_note).toBe('100 therms converted to 2,930.71 kWh (1 therm = 0.105505585262 GJ and 1 kWh = 0.0036 GJ, exact).');
-    const nz = buildWorkings([loc({ country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' })], 'AR6', 2025).find(r => r.stream === 'natural_gas')!;
+    const nz = buildWorkings([loc({ country: 'NZ', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' })], 'AR6', 2026).find(r => r.stream === 'natural_gas')!;
     expect(nz.note).toBe(NZ_GAS_BASIS_NOTE);
     expect(NZ_GAS_BASIS_NOTE).toContain('Measuring Emissions Guide, Appendix A (A.1), "we have used gross calorific values"');
   });
@@ -5795,13 +5818,13 @@ describe('FI2 exact conversions and honest provenance', () => {
     expect(ca.result_tco2e).toBeCloseTo(100 * 2.8316846592 * (1.921 + 0.000037 * 29.8 + 0.000035 * 273) / 1000, 12);
     for (const [field, unitField, on, unit] of [['propane_amount', 'propane_unit', { has_propane: true }, 'lbs-ish'], ['diesel_stationary_amount', 'diesel_stationary_unit', { has_diesel_stationary: true }, 'barrels']] as const) {
       const l = loc({ country: 'US', ...on, [field]: 100, [unitField]: unit } as unknown as Partial<Location>);
-      expect(unpricedLines(l).map(u => [u.field, u.reason]), unit).toEqual([[field, 'factor_missing']]);
+      expect(unpricedLines(l, 'AR6', heldSel(l)).map(u => [u.field, u.reason]), unit).toEqual([[field, 'factor_missing']]);
       expect(calcInventory([l], 'AR6', 2025).s1_total, unit).toBe(0);
     }
   });
 
   it('Canada CH4 and N2O per Mcf are the per-m3 rates x 28.316846592, exactly (ruling R5)', () => {
-    const f = pickEF(loc({ country: 'CA', grid_region: 'ON' }), 'natural_gas_mcf');
+    const f = pickEF(loc({ country: 'CA', grid_region: 'ON' }), 'natural_gas_mcf', heldSel(loc({ country: 'CA', grid_region: 'ON' })));
     expect(f.factor.ch4).toBeCloseTo(0.000037 * 28.316846592, 15);
     expect(f.factor.n2o).toBeCloseTo(0.000035 * 28.316846592, 15);
     expect(f.key).toBe('natural_gas_m3');
@@ -5840,22 +5863,22 @@ describe('FI2 exact conversions and honest provenance', () => {
     const nzStationary = loc({ id: 'L3', country: 'NZ', has_diesel_stationary: true, diesel_stationary_amount: 100, diesel_stationary_unit: 'gallons' });
     // FI2 diff 2: a gallon figure converts to MfE's per-litre factor, so both name MfE. FI9: fleet petrol is MfE's
     // Transport Fuel row, which no use class selects, so it is cited without one.
-    expect(combustionSourcesFor([nzGallons])).toEqual([EF_SOURCES.combustion_nz]);
-    expect(combustionSourcesFor([nzLitres, nzGallons])).toEqual([EF_SOURCES.combustion_nz]);
+    expect(combustionSourcesFor([nzGallons], testSel(2026))).toEqual([EF_SOURCES.combustion_nz]);
+    expect(combustionSourcesFor([nzLitres, nzGallons], testSel(2026))).toEqual([EF_SOURCES.combustion_nz]);
     // FI10: a stationary row names the use class that priced it, as the PDF and XLSX have no per-row column for it.
-    expect(combustionSourcesFor([nzStationary])).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
+    expect(combustionSourcesFor([nzStationary], testSel(2026))).toEqual([`${EF_SOURCES.combustion_nz}, Commercial use class`]);
     // A location with no combustion keeps its country's citation, as before.
-    expect(combustionSourcesFor([loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100 })])).toEqual([EF_SOURCES.combustion_nz]);
+    expect(combustionSourcesFor([loc({ country: 'NZ', grid_region: 'NZ', electricity_kwh: 100 })], testSel(2026))).toEqual([EF_SOURCES.combustion_nz]);
   });
 
   it('the only priced value that moves is Canadian gas per Mcf, by the exact factor', () => {
     const on = loc({ country: 'CA', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' });
     const was = 1.921 * (1000 / 35.3147);
     const now = 1.921 * 28.316846592;
-    expect(pickEF(on, 'natural_gas_mcf').factor.co2).toBeCloseTo(now, 12);
+    expect(pickEF(on, 'natural_gas_mcf', heldSel(on)).factor.co2).toBeCloseTo(now, 12);
     expect(now - was).toBeCloseTo(0.0000512602, 9);
     // Everything else at a Canadian site is unchanged: per m3 is the province's value as published.
-    expect(pickEF(on, 'natural_gas_m3').factor.co2).toBe(1.921);
+    expect(pickEF(on, 'natural_gas_m3', heldSel(on)).factor.co2).toBe(1.921);
   });
 });
 
@@ -5866,7 +5889,7 @@ describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how i
     has_fuel_oil_distillate: true, has_fuel_oil_residual: true, has_mobile: true, natural_gas_amount: 1000, propane_amount: 1000,
     diesel_stationary_amount: 1000, fuel_oil_distillate_amount: 1000, fuel_oil_residual_amount: 1000, gasoline_amount: 1000,
     diesel_mobile_amount: 1000 })
-  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { declaration?: boolean; scope?: number; source: string; note?: string; result_tco2e: number }[])
+  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { declaration?: boolean; scope?: number; source: string; note?: string; result_tco2e: number }[])
     .filter(r => !r.declaration && r.scope === 1)
 
   it('FI2c1 each replaced US value equals the Table 1 figure (per scf x 1,000 for per Mcf)', () => {
@@ -5961,7 +5984,7 @@ describe('FI2c. US keys are EPA Table 1 as printed; every derived row says how i
 
 // ── FI2 follow-up (7 Oct 2026): DEFRA's per-m3 gas row, NGA's printed per-unit figures, and the methods tables ─────
 describe('FI2d. publishers\' own per-unit values, and methods tables that agree with the rows', () => {
-  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { declaration?: boolean; scope?: number; stream?: string; source: string; note?: string; factor_key?: string; result_tco2e: number | null }[])
+  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { declaration?: boolean; scope?: number; stream?: string; source: string; note?: string; factor_key?: string; result_tco2e: number | null }[])
     .filter(r => !r.declaration && r.scope === 1)
   const ukGas = (unit: Location['natural_gas_unit'], amount: number) =>
     loc({ country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: amount, natural_gas_unit: unit })
@@ -5975,7 +5998,7 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
     expect(r.result_tco2e).toBeCloseTo(2.02633, 12)
     expect(r.note ?? '', 'priced in the unit DEFRA prints: no conversion').not.toContain('converted')
     // GWP as published: the figure does not move with the AR set.
-    for (const g of ['AR4', 'AR5'] as const) expect(calcInventory([ukGas('m3', 1000)], g, 2025).s1_total).toBeCloseTo(2.02633, 12)
+    for (const g of ['AR4', 'AR5'] as const) expect(calcInventory([ukGas('m3', 1000)], g, 2026).s1_total).toBeCloseTo(2.02633, 12)
   })
 
   it('FI2d2 UK gas in Mcf and Ccf prices on the m3 row through the exact conversion, stated on the row', () => {
@@ -5987,7 +6010,7 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
     expect(ccf.factor_key).toBe('natural_gas_m3')
     expect(ccf.result_tco2e).toBeCloseTo(100 * 2.8316846592 * 2.02633 / 1000, 12)
     expect(ccf.note).toBe('100 Ccf converted to 283.17 m³ (1 Ccf = 2.8316846592 m³, exact).')
-    expect(unpricedLines(ukGas('ccf', 100))).toEqual([])
+    expect(unpricedLines(ukGas('ccf', 100), 'AR6', heldSel(ukGas('ccf', 100)))).toEqual([])
     // ccf is a stored unit (FI2 diff 2) the wizard does not offer yet (FI5): a US ccf figure also prices, on EPA's Mcf.
     const [us] = rowsOf(loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'ccf' }))
     expect(us.factor_key).toBe('natural_gas_mcf')
@@ -6023,7 +6046,8 @@ describe('FI2d. publishers\' own per-unit values, and methods tables that agree 
       loc({ id: 'L4', name: 'Austin', country: 'US', state: 'TX', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'mcf' }),
       loc({ id: 'L5', name: 'Leeds', country: 'GB', grid_region: 'UK', has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' }),
     ]
-    const methods = factorDerivationsFor(locs)
+    // T3c: each site at the year its editions are held (one inventory year cannot hold every country's edition).
+    const methods = [...new Set(locs.flatMap(l => factorDerivationsFor([l], heldSel(l))))]
     expect(methods).toEqual([
       'Natural gas: Mcf converted to m³ (1 Mcf = 28.316846592 m³, exact).',
       `Petrol (light vehicles): ${(buildWorkings([locs[1]], 'AR6', 2025) as { note?: string; stream?: string }[]).find(r => r.stream === 'mobile')!.note}`,
@@ -6051,7 +6075,7 @@ describe('FI5. a unit change never relabels a figure', () => {
     const from = String((l as unknown as Record<string, unknown>)[unitField] ?? '')
     return applyUnitOutcomes(l, { [unitField]: changeUnit(f.amount, Number((l as unknown as Record<string, unknown>)[f.amount]), from, to) }, AT, BY)
   }
-  const rowsOf = (l: Location) => buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; source: string; declaration?: string; note?: string; conversion_note?: string; ef_source?: string; scope2_method?: string; result_tco2e: number | null; activity_data?: number; activity_unit?: string }[]
+  const rowsOf = (l: Location) => buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { stream?: string; source: string; declaration?: string; note?: string; conversion_note?: string; ef_source?: string; scope2_method?: string; result_tco2e: number | null; activity_data?: number; activity_unit?: string }[]
 
   it('FI5-1 the CLAUDE.md case: 332 m3 switched to Mcf becomes 11.72447 Mcf, never 332 Mcf, and is recorded', () => {
     const gas = loc({ country: 'US', state: 'NY', has_natural_gas: true, natural_gas_amount: 332, natural_gas_unit: 'm3' })
@@ -6106,14 +6130,14 @@ describe('FI5. a unit change never relabels a figure', () => {
     expect(unitChangeMessage(c)).toBe(MSG)
     // FI1's issue: an unpriced line beside the field, and an export-blocking coverage issue, until it is entered.
     const site = { ...nz, grid_region: 'NZ' }
-    expect(unpricedLines(site).map(u => [u.reason, u.field, u.message])).toEqual([['figure_cleared', 'propane_amount', MSG]])
+    expect(unpricedLines(site, 'AR6', heldSel(site)).map(u => [u.reason, u.field, u.message])).toEqual([['figure_cleared', 'propane_amount', MSG]])
     expect(findUnresolvedCoverage([site], 2025, 12, []).filter(i => i.status === 'figure_cleared').map(i => i.message)).toEqual([MSG])
-    expect(unpricedLines({ ...site, propane_amount: 200 })).toEqual([])
+    expect(unpricedLines({ ...site, propane_amount: 200 }, 'AR6', heldSel({ ...site, propane_amount: 200 }))).toEqual([])
     // Confirmed as none: an accepted used_none for the field, or the stream answered as not used here.
     const none: CoverageResolution = { locId: site.id, fuelType: 'propane', kind: 'used_none', field: 'propane_amount', acknowledged: true,
       acknowledgedAt: AT, by: BY } as unknown as CoverageResolution
     expect(findUnresolvedCoverage([site], 2025, 12, [none]).filter(i => i.status === 'figure_cleared')).toEqual([])
-    expect(unpricedLines({ ...site, has_propane: false })).toEqual([])
+    expect(unpricedLines({ ...site, has_propane: false }, 'AR6', heldSel({ ...site, has_propane: false }))).toEqual([])
     expect(MSG).not.toContain('\u2014')
   })
 
@@ -6138,7 +6162,7 @@ describe('FI5. a unit change never relabels a figure', () => {
     expect(out.natural_gas_unit).toEqual({ unit: 'mcf', value: 100, conversion: null, locked: true })
     const nz = applyCountry(backed, 'NZ')
     expect([nz.natural_gas_unit, nz.natural_gas_amount, nz.unit_changes]).toEqual(['mcf', 100, undefined])
-    expect(unpricedLines(nz).some(u => u.reason === 'figure_cleared')).toBe(false)
+    expect(unpricedLines(nz, 'AR6', heldSel(nz)).some(u => u.reason === 'figure_cleared')).toBe(false)
   })
 
   it('FI5-7 a US site with a residual subregion switched to GB has no residual_region, and its market row does not cite Green-e', () => {
@@ -6216,7 +6240,7 @@ describe('FI5. a unit change never relabels a figure', () => {
 // LPG per kg; EPA, ECCC and NGA print no per-mass factor and no density, so kg or lb is unpriced there.
 describe('FI4. propane by mass', () => {
   const AT = '2026-10-07T12:00:00.000Z'
-  const propaneRow = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; factor_key?: string }[])
+  const propaneRow = (l: Location) => (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; factor_key?: string }[])
     .find(r => r.stream === 'propane' && !r.declaration)
   const site = (country: string, amount: number, unit: Location['propane_unit'], name = 'Depot') =>
     loc({ name, country, grid_region: country === 'GB' ? 'UK' : '', has_propane: true, propane_amount: amount, propane_unit: unit })
@@ -6259,13 +6283,13 @@ describe('FI4. propane by mass', () => {
   })
 
   it('FI4-5 EU LPG in litres is unpriced with the FI3 message and the mass sentence', () => {
-    expect(unpricedLines(site('FR', 500, 'litres', 'Lyon')).map(u => u.message)).toEqual([
+    expect(unpricedLines(site('FR', 500, 'litres', 'Lyon'), 'AR6', heldSel(site('FR', 500, 'litres', 'Lyon'))).map(u => u.message)).toEqual([
       'The EU factor for propane at Lyon is published per unit of energy, and we hold no cited density to convert litres to it, so this line is not counted. Enter the quantity in kilograms or tonnes, or reject the bill. Export is blocked until this is resolved.'])
   })
 
   it('FI4-6 NZ 1,000 kg is unchanged (MfE per kg); NZ litres stay unpriced', () => {
     expect(propaneRow(site('NZ', 1000, 'kg'))!.result_tco2e).toBeCloseTo(2.97164, 12)
-    expect(unpricedLines(site('NZ', 1000, 'litres')).map(u => u.reason)).toEqual(['factor_missing'])
+    expect(unpricedLines(site('NZ', 1000, 'litres'), 'AR6', heldSel(site('NZ', 1000, 'litres'))).map(u => u.reason)).toEqual(['factor_missing'])
   })
 
   it('FI4-7 a bill in lb is stored as kg exactly; US, CA and AU kg is unpriced with the blocking message naming the site', () => {
@@ -6277,7 +6301,7 @@ describe('FI4. propane by mass', () => {
     for (const [country, name] of [['US', 'Tulsa yard'], ['CA', 'Regina yard'], ['AU', 'Perth yard']] as const) {
       const l = loc({ name, country, grid_region: country === 'CA' ? 'SK' : '', province: country === 'CA' ? 'SK' : undefined,
         has_propane: true, propane_amount: read.value!, propane_unit: 'kg' })
-      const u = unpricedLines(l)
+      const u = unpricedLines(l, 'AR6', heldSel(l))
       expect(u.map(x => [x.field, x.reason]), country).toEqual([['propane_amount', 'factor_missing']])
       expect(u[0].message, country).toContain(`Propane at ${name} is recorded in kg`)
       expect(u[0].message, country).toContain('publishes no factor this figure can be converted to exactly')
@@ -6321,7 +6345,7 @@ describe('FI4. propane by mass', () => {
 describe('FI7. steam or district heat with no published factor (FI7b: priced on a labelled estimate, R14)', () => {
   const steam = (country: string, name: string, o: Partial<Location> = {}) => loc({ name, country, grid_region: gridRegionForCountry(country) || (country === 'CA' ? 'ON' : ''),
     province: country === 'CA' ? 'ON' : undefined, has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'gj', ...o })
-  const steamRow = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; unpriced?: { reason: string }; entry_method?: string }[])
+  const steamRow = (l: Location) => (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { stream?: string; declaration?: string; note?: string; result_tco2e: number | null; unpriced?: { reason: string }; entry_method?: string }[])
     .find(r => r.stream === 'purchased_steam')!
 
   // FI7b (R14): CA, AU, NZ and EU now price on a labelled estimate; FI7's "not counted" message is left for the case the
@@ -6346,7 +6370,7 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
     expect(r.note).toContain('Estimated: no published factor for purchased steam or district heat in Canada. Calculated as if generated from natural gas at 80% efficiency:')
     expect(r.note).toContain('/ 0.80 (method: GHG Protocol Scope 2 Guidance, Appendix A; 80% assumption: US EPA GHG Emission Factors Hub 2025, Table 7). It excludes distribution losses and may overstate a network that uses low-carbon heat. Enter your provider\'s emission intensity to replace it.')
     expect(r.note).not.toContain('\u2014')
-    expect(unpricedLines(on)).toEqual([])
+    expect(unpricedLines(on, 'AR6', heldSel(on))).toEqual([])
   })
 
   it('FI7-2b AU, NZ commercial and DE, 100 GJ each, from their own gas factor / 0.80', () => {
@@ -6354,7 +6378,7 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
     expect(co2kg(steam('AU', 'Perth depot', { purchased_steam_mmbtu: 100 }))).toBeCloseTo(6441.25, 6)
     expect(Number(co2kg(steam('NZ', 'Auckland office', { purchased_steam_mmbtu: 100 })).toPrecision(5))).toBe(6785.8)
     const de = steam('DE', 'Berlin office', { purchased_steam_mmbtu: 100 })
-    const deF = pickEF(de, 'natural_gas_gj').factor
+    const deF = pickEF(de, 'natural_gas_gj', heldSel(de)).factor
     expect(deF.co2 / 0.8 * 100).toBeCloseTo(6311.25, 6)
     expect(co2kg(de)).toBeCloseTo(calcGas({ co2: deF.co2 / 0.8, ch4: deF.ch4 / 0.8, n2o: deF.n2o / 0.8 }, 100, 'AR6').total * 1000, 6)
     expect(steamRow(de).note).toContain('in Germany. Calculated as if generated from natural gas at 80% efficiency: 50.49 kg CO2')
@@ -6365,7 +6389,7 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
 
   it('FI7-2c CA with no province is unpriced with the province message, and the gate lists it', () => {
     const l = steam('CA', 'Regina plant', { province: '', grid_region: '' })
-    expect(unpricedLines(l).map(u => [u.reason, u.message])).toEqual([['province_missing',
+    expect(unpricedLines(l, 'AR6', heldSel(l)).map(u => [u.reason, u.message])).toEqual([['province_missing',
       'The province for Regina plant is not set, so its purchased steam is not counted. Choose the province. Export is blocked until it is chosen.']])
     const r = steamRow(l) as ReturnType<typeof steamRow> & { emission_factor?: string; ef_source?: string }
     expect(r.result_tco2e).toBeNull()
@@ -6382,21 +6406,21 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
     const l = steam('AU', 'Perth depot')
     const note = steamRow(l).note!
     expect(note.startsWith('Estimated: no published factor')).toBe(true)
-    expect(factorDerivationsFor([l])).toContain(`Purchased steam: ${note}`)
+    expect(factorDerivationsFor([l], heldSel(l))).toContain(`Purchased steam: ${note}`)
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
     expect(page).toContain("{r.note && <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 3")
-    expect(page).toContain("...factorDerivationsFor(derivedLocations).map(d => ['Factor derivation', d]),")
+    expect(page).toContain("...factorDerivationsFor(derivedLocations, factorSel).map(d => ['Factor derivation', d]),")
     expect(page).toContain('{STEAM_ESTIMATE_SHORT}')
     expect(STEAM_ESTIMATE_SHORT).toBe("Estimated from natural gas at 80% efficiency. Enter your provider's figure below to replace it.")
     const verify = readFileSync(join(process.cwd(), 'app/verify/[token]/page.tsx'), 'utf8')
     expect(verify).toContain('{rowNoteOf(w) && (')
-    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations).map(d => ['Factor derivation', d]),")
+    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations, factorSel).map(d => ['Factor derivation', d]),")
   })
 
   it('FI7-3 a supplier figure clears the issue and prices, unchanged', () => {
     const l = steam('DE', 'Berlin office', { purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh', purchased_steam_supplier_source: 'Provider statement 2025' })
-    expect(unpricedLines(l)).toEqual([])
-    expect(findSteamFactorGaps([l])).toEqual([])
+    expect(unpricedLines(l, 'AR6', heldSel(l))).toEqual([])
+    expect(findSteamFactorGaps([l], heldSel(l))).toEqual([])
     const r = steamRow(l)
     expect(r.entry_method).toBe(SUPPLIER_SPECIFIC_ENTRY_METHOD)
     expect(r.result_tco2e).toBeCloseTo(500 * KWH_PER_GJ * 0.198 / 1000, 9)
@@ -6421,7 +6445,7 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
     expect((uk as { estimated?: string }).estimated).toBeUndefined()
     for (const c of ['CA', 'AU', 'NZ', 'FR']) {
       const l = steam(c, 'Site')
-      expect(pickEF(l, 'natural_gas_gj').publisher?.jurisdiction, c).toBe(c === 'FR' ? 'EU' : c)
+      expect(pickEF(l, 'natural_gas_gj', heldSel(l)).publisher?.jurisdiction, c).toBe(c === 'FR' ? 'EU' : c)
       expect(steamRow(l).result_tco2e, c).not.toBeCloseTo(calcGas(EF.steam_mmbtu, 500 / 1.05505585262, 'AR6').total, 6)
     }
   })
@@ -6433,7 +6457,7 @@ describe('FI10. NZ use class on every row', () => {
   const nz = (uc: 'commercial' | 'industrial', o: Partial<Location> = {}) => loc({ name: 'Auckland', country: 'NZ', grid_region: 'NZ', nz_use_class: uc,
     has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh', has_diesel_stationary: true, diesel_stationary_amount: 1000,
     diesel_stationary_unit: 'litres', ...o })
-  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', 2025, [], 12) as { stream?: string; scope?: number; declaration?: string; factor_variant?: string; result_tco2e: number | null; ef_source?: string; gwp_basis?: string }[])
+  const rowsOf = (l: Location) => (buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12) as { stream?: string; scope?: number; declaration?: string; factor_variant?: string; result_tco2e: number | null; ef_source?: string; gwp_basis?: string }[])
     .filter(r => !r.declaration && r.result_tco2e != null)
 
   it('FI10-1 an NZ industrial location\'s rows carry "Industrial use class" and price at the industrial values; commercial likewise', () => {
@@ -6453,27 +6477,27 @@ describe('FI10. NZ use class on every row', () => {
   })
 
   it('FI10-3 two inventories differing only in use class are not the same factor editions; a map saved before FI10 is not called changed', () => {
-    const a = buildFactorEditions([nz('commercial')], 2025), b = buildFactorEditions([nz('industrial')], 2025)
+    const a = buildFactorEditions([nz('commercial')], 2026), b = buildFactorEditions([nz('industrial')], 2026)
     expect(a.NZ?.combustion?.variant).toBe('Commercial use class')
     expect(b.NZ?.combustion?.variant).toBe('Industrial use class')
     expect(sameFactorEditions(a, b)).toBe(false)
-    expect(sameFactorEditions(a, buildFactorEditions([nz('commercial')], 2025))).toBe(true)
+    expect(sameFactorEditions(a, buildFactorEditions([nz('commercial')], 2026))).toBe(true)
     const legacy = { NZ: { combustion: { source: a.NZ!.combustion!.source, edition: a.NZ!.combustion!.edition } } }
     expect(sameFactorEditions(legacy, b), 'no recorded variant says nothing about which use class priced it').toBe(true)
     // Both classes across two NZ sites are both recorded.
-    expect(buildFactorEditions([nz('commercial'), { ...nz('industrial'), id: 'L2' }], 2025).NZ?.combustion?.variant).toBe('Commercial use class; Industrial use class')
+    expect(buildFactorEditions([nz('commercial'), { ...nz('industrial'), id: 'L2' }], 2026).NZ?.combustion?.variant).toBe('Commercial use class; Industrial use class')
     // And the steam estimate records the class it read.
-    const st = buildFactorEditions([nz('industrial', { has_natural_gas: false, has_diesel_stationary: false, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' })], 2025)
+    const st = buildFactorEditions([nz('industrial', { has_natural_gas: false, has_diesel_stationary: false, has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' })], 2026)
     expect(st.NZ?.steam?.variant).toBe('Industrial use class')
   })
 
   it('FI10-4 it renders in the Factor source cell (workings, review, verifier) and in the PDF and XLSX citation text', () => {
     const r = rowsOf(nz('industrial'))[0]
     expect(workingsFactorSourceCell(r)).toBe(`${EF_SOURCES.combustion_nz}, Industrial use class`)
-    expect(combustionSourcesFor([nz('industrial')])).toEqual([`${EF_SOURCES.combustion_nz}, Industrial use class`])
+    expect(combustionSourcesFor([nz('industrial')], heldSel(([nz('industrial')])[0] ?? {}))).toEqual([`${EF_SOURCES.combustion_nz}, Industrial use class`])
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
     expect(page).toContain('{workingsFactorSourceCell(r)}')
-    expect(page).toContain("...combustionSourcesFor(derivedLocations).map(src => ['Combustion factors', src]),")
+    expect(page).toContain("...combustionSourcesFor(derivedLocations, factorSel).map(src => ['Combustion factors', src]),")
     const verify = readFileSync(join(process.cwd(), 'app/verify/[token]/page.tsx'), 'utf8')
     expect(verify).toContain('const factorSourceOf = (w: WorkingRow): string => workingsFactorSourceCell(w)')
     expect(verify).toContain('factor_variant?: string')
@@ -6527,7 +6551,7 @@ describe('FI9 diff 2a: fleet fields by vehicle type (R16)', () => {
   it('a fleet figure prices under its type tick; a legacy figure is unpriced until assigned (2b)', () => {
     const legacyLoc = fleet({ diesel_mobile_amount: 1000, diesel_mobile_unit: 'litres' });
     expect(calcLocation(legacyLoc, 'AR6', 2026).s1_mobile).toBe(0);
-    expect(unpricedLines(legacyLoc).map(u => u.reason)).toEqual(['fleet_type_missing']);
+    expect(unpricedLines(legacyLoc, 'AR6', heldSel(legacyLoc)).map(u => u.reason)).toEqual(['fleet_type_missing']);
     // UK: DEFRA's Fuels row, which DEFRA states applies to vehicles: 1,000 L x 2.58354 kg CO2e/L, the same figure as before.
     const split = calcLocation(fleet({ fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres' }), 'AR6', 2026);
     expect(split.s1_mobile).toBeCloseTo(2.58354, 12);
@@ -6599,8 +6623,8 @@ describe('FI9 diff 2a: fleet fields by vehicle type (R16)', () => {
 // Expected values are typed from the publishers' documents (docs/review/mobile-factors.md), not read from the data files.
 describe('FI9 diff 2b: fleet pricing per publisher (R16)', () => {
   const site = (o: Partial<Location>): Location => loc({ name: 'Depot', has_mobile: true, ...o });
-  const fleetRow = (l: Location, src: string) => buildWorkings([l], 'AR6', 2025, [], 12).find(r => r.source === src && !r.declaration)!;
-  const t = (l: Location) => calcLocation(l, 'AR6', 2025).s1_mobile;
+  const fleetRow = (l: Location, src: string) => buildWorkings([l], 'AR6', heldYearFor(l.country), [], 12).find(r => r.source === src && !r.declaration)!;
+  const t = (l: Location) => calcLocation(l, 'AR6', heldYearFor(l.country)).s1_mobile;
   const G = 3.785411784;
   const CH4 = 29.8, N2O = 273;   // AR6, the inventory's set; CO2-e-printed rows (UK, AU, NZ) are applied as published.
 
@@ -6661,7 +6685,7 @@ describe('FI9 diff 2b: fleet pricing per publisher (R16)', () => {
     expect(r0.ch4_n2o_note).toBe('Methane and nitrous oxide for diesel in light vehicles at Depot are not counted because EPA ' +
       'publishes them per mile and no miles were entered. Enter the miles to include them.');
     expect(r0.note).toContain(r0.ch4_n2o_note);
-    expect(unpricedLines(none)).toEqual([]);
+    expect(unpricedLines(none, 'AR6', heldSel(none))).toEqual([]);
     expect(findUnresolvedCoverage([none], 2025, 12, []).filter(i => i.field === 'light_diesel_amount')).toEqual([]);
     // 2024 with 15,000 miles: after the latest row (2007-2022), which is used and said (R16, wording 6).
     const r1 = fleetRow(site({ ...base, light_model_year: 2024, light_diesel_miles: 15000 }), 'Diesel (light vehicles)');
@@ -6699,7 +6723,7 @@ describe('FI9 diff 2b: fleet pricing per publisher (R16)', () => {
     }
     const none = site({ country: 'US', state: 'TX', fleet_nonroad: true, nonroad_petrol_amount: 100, nonroad_petrol_unit: 'gallons' });
     expect(t(none)).toBe(0);
-    const u = unpricedLines(none);
+    const u = unpricedLines(none, 'AR6', heldSel(none));
     expect(u.map(x => [x.reason, x.field])).toEqual([['equipment_missing', 'nonroad_petrol_amount']]);
     expect(u[0].message).toBe('US EPA publishes non-road factors by equipment type, so the petrol used in non-road equipment at ' +
       'Depot is not counted until the equipment type is chosen. Choose the equipment type. Export is blocked until it is chosen.');
@@ -6711,7 +6735,7 @@ describe('FI9 diff 2b: fleet pricing per publisher (R16)', () => {
 
   it('a legacy fleet figure is an export-blocking line naming the site, the figure and the fuel, until assigned', () => {
     const l = site({ country: 'CA', province: 'ON', grid_region: 'ON', diesel_mobile_amount: 250, diesel_mobile_unit: 'litres' });
-    const u = unpricedLines(l);
+    const u = unpricedLines(l, 'AR6', heldSel(l));
     expect(u.map(x => x.reason)).toEqual(['fleet_type_missing']);
     expect(u[0].message).toBe('Depot has 250 litres of diesel for vehicles recorded before vehicle types were asked, so it is not counted. ' +
       'Choose the vehicles it was used in: light vehicles, heavy vehicles or non-road equipment. Export is blocked until it is chosen.');
@@ -6750,14 +6774,16 @@ import {
   fleetTypeProblem as fi9dTypeProblem, fleetTypeOfField as fi9dTypeOfField, withFleetTypeTicked as fi9dTicked,
   assignLegacyFleet as fi9dAssign,
 } from './engine';
+import { heldSel, testSel, heldYearFor, TEST_PREPARED_ON, CAT3_EDS } from '../testing/heldSelection'
+import { selectionFor, MissingEditionError, editionFor } from './engine'
 
 describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
   const BY = { userId: 'u1', email: 'a@b.co' };
   const fuelProp = (o: Partial<ExtractedProposal> = {}) => prop({ fuelType: 'diesel', value: 500, unit: 'litres',
-    periodStart: '2025-01-01', periodEnd: '2025-12-31', sourceQuote: '500 litres', ...o });
+    periodStart: '2026-01-01', periodEnd: '2026-12-31', sourceQuote: '500 litres', ...o });
   const site = (docs: SourceDoc[], o: Partial<Location> = {}) => loc({ country: 'GB', grid_region: 'UK', has_mobile: true, source_docs: docs, ...o });
   const derived = (l: Location, res: CoverageResolution[] = []) =>
-    deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: res })[0];
+    deriveLocations({ locations: [l], reporting_year: 2026, fiscal_year_end_month: 12, coverage_resolutions: res })[0];
 
   it('a reading with no vehicle type cannot be confirmed, and says so', () => {
     expect(fi9dTypeProblem('fleet_fuel', { fuelType: 'diesel' })).toBe('Choose the vehicles this diesel was used in before confirming.');
@@ -6772,11 +6798,11 @@ describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
     expect([d.heavy_diesel_amount, d.heavy_diesel_unit, d.diesel_mobile_amount, d.light_diesel_amount]).toEqual([500, 'litres', 0, 0]);
     // DEFRA's Fuels row, which DEFRA states applies to vehicles: 500 L x 2.58354 kg CO2e/L.
     expect(calcLocation(d, 'AR6', 2026).s1_mobile).toBeCloseTo(1.29177, 12);
-    expect(findUnresolvedCoverage([l], 2025, 12, [])).toEqual([]);
+    expect(findUnresolvedCoverage([l], 2026, 12, [])).toEqual([]);
     // With no type, the same reading lands on the legacy field and blocks until one is chosen.
     const untyped = site([doc('fleet_fuel', [fuelProp()])]);
     expect(derived(untyped).diesel_mobile_amount).toBe(500);
-    expect(findUnresolvedCoverage([untyped], 2025, 12, []).map(i => i.status)).toContain('fleet_type_missing');
+    expect(findUnresolvedCoverage([untyped], 2026, 12, []).map(i => i.status)).toContain('fleet_type_missing');
   });
 
   it('choosing a type at review ticks it, so a routed reading is never left on a field nothing counts', () => {
@@ -6791,24 +6817,24 @@ describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
 
   it('coverage is checked per vehicle type: light January to June and heavy July to December each leave a gap', () => {
     const l = site([
-      doc('fleet_fuel', [fuelProp({ fleetType: 'light', periodStart: '2025-01-01', periodEnd: '2025-06-30' })], 'a'),
-      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2025-07-01', periodEnd: '2025-12-31' })], 'b'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'light', periodStart: '2026-01-01', periodEnd: '2026-06-30' })], 'a'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2026-07-01', periodEnd: '2026-12-31' })], 'b'),
     ], { fleet_light: true, fleet_heavy: true });
-    const issues = findUnresolvedCoverage([l], 2025, 12, []);
+    const issues = findUnresolvedCoverage([l], 2026, 12, []);
     expect(issues.filter(i => i.status === 'gap').map(i => i.fleetType).sort()).toEqual(['heavy', 'light']);
     expect(issues.some(i => i.status === 'overlap')).toBe(false);
     // The same two periods for one type cover the year.
     const one = site([
-      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2025-01-01', periodEnd: '2025-06-30' })], 'a'),
-      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2025-07-01', periodEnd: '2025-12-31' })], 'b'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2026-01-01', periodEnd: '2026-06-30' })], 'a'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', periodStart: '2026-07-01', periodEnd: '2026-12-31' })], 'b'),
     ], { fleet_heavy: true });
-    expect(findUnresolvedCoverage([one], 2025, 12, [])).toEqual([]);
+    expect(findUnresolvedCoverage([one], 2026, 12, [])).toEqual([]);
     expect(derived(one).heavy_diesel_amount).toBe(1000);
     // Two types over the same days are two vehicle groups, not an overlap.
     const both = site([
       doc('fleet_fuel', [fuelProp({ fleetType: 'light' })], 'a'), doc('fleet_fuel', [fuelProp({ fleetType: 'heavy' })], 'b'),
     ], { fleet_light: true, fleet_heavy: true });
-    expect(findUnresolvedCoverage([both], 2025, 12, [])).toEqual([]);
+    expect(findUnresolvedCoverage([both], 2026, 12, [])).toEqual([]);
   });
 
   it('an old-field document moves with the legacy button: the type is set on the reading with who and when', () => {
@@ -6828,10 +6854,10 @@ describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
   it('the monthly chart includes fleet bills per type, priced on the type\'s mobile row and labelled by fuel', () => {
     const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
     const l = site([
-      doc('fleet_fuel', [fuelProp({ fleetType: 'light', value: 120, periodStart: '2025-01-01', periodEnd: '2025-12-31' })], 'a'),
-      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', value: 240, periodStart: '2025-01-01', periodEnd: '2025-12-31' })], 'b'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'light', value: 120, periodStart: '2026-01-01', periodEnd: '2026-12-31' })], 'a'),
+      doc('fleet_fuel', [fuelProp({ fleetType: 'heavy', value: 240, periodStart: '2026-01-01', periodEnd: '2026-12-31' })], 'b'),
     ], { fleet_light: true, fleet_heavy: true });
-    const out = buildMonthlyEmissions({ locations: [l], reporting_year: 2025, coverage_resolutions: [] }, deps, 'AR6');
+    const out = buildMonthlyEmissions({ locations: [l], reporting_year: 2026, coverage_resolutions: [] }, deps, 'AR6');
     const diesel = out.slices.filter(s => s.fuel_type === 'diesel');
     expect(diesel).toHaveLength(24);
     const total = diesel.reduce((a, s) => a + s.tco2e, 0);
@@ -6839,8 +6865,287 @@ describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
     expect(total).toBeCloseTo(360 * 2.58354 / 1000, 5);
     expect(total).toBeCloseTo(calcLocation(derived(l), 'AR6', 2026).s1_mobile, 5);
     // An untyped reading is not priced in the chart either; it is listed as skipped.
-    const untyped = buildMonthlyEmissions({ locations: [site([doc('fleet_fuel', [fuelProp()])])], reporting_year: 2025, coverage_resolutions: [] }, deps, 'AR6');
+    const untyped = buildMonthlyEmissions({ locations: [site([doc('fleet_fuel', [fuelProp()])])], reporting_year: 2026, coverage_resolutions: [] }, deps, 'AR6');
     expect(untyped.slices).toEqual([]);
     expect(untyped.skipped.length).toBeGreaterThan(0);
+  });
+});
+
+// ── T3c DIFF 2: EVERY YEAR-KEYED FACTOR IS SELECTED, NONE SUBSTITUTED ─────────────────────────────────────────────
+// Rulings: docs/review/factor-year-selection.md section 8 (8.1 to 8.7), design section 10 (R17 to R20). The engine
+// reads each edition through editionFor (selectEdition): the rule's edition, a provisional one (R19), or an unpriced
+// line with an export-blocking edition_missing issue. Never another held edition.
+import { selectEdition, type DatasetId } from './factorEditionRegistry';
+import { figuresForSave } from './savePayload';
+import { COMBUSTION_EDITION } from './engine';
+
+describe('T3c diff 2: factor editions selected by rule', () => {
+  const PREP = { preparedOn: TEST_PREPARED_ON };
+  // The workings fields these tests read.
+  type WRow = { result_tco2e: number | null; stream?: string; source?: string; scope?: number; scope2_method?: string; declaration?: string;
+    note?: string; factor_vintage?: string; factor_edition?: string; selection_rule?: string; selection_basis?: string; provisional?: boolean;
+    edition_published?: string; edition_corrected?: string; selected_on?: string; unpriced?: { reason: string; publisher?: string } };
+  const rowsAt = (l: Location, y: number, m = 12) => buildWorkings([l], 'AR6', y, [], m, PREP) as WRow[];
+
+  it('source: no selector keeps a nearest-year loop or a years[0] fallback', () => {
+    const src = stripTsComments(readFileSync(join(__dirname, 'engine.ts'), 'utf8'));
+    expect(src).not.toMatch(/<=\s*year\)/);
+    expect(src).not.toMatch(/years\[0\]/);
+    expect(src).not.toContain('vintage held');
+    for (const fn of ['function getGridFactor(region: string, sel: Sel)', 'function nzTdLoss(sel: Sel)', 'function getResidualFactor(\n  region: string,\n  sel: Sel,']) {
+      expect(src, fn).toContain(fn);
+    }
+  });
+
+  it('property: every priced row carries the edition selectEdition chooses; a row is never priced on another held edition', () => {
+    // Every jurisdiction's grid, residual, T&D, combustion and steam, across years 2021 to 2027 and four year ends.
+    const SITES: [string, Partial<Location>][] = [
+      ['US', { country: 'US', state: 'CA', grid_region: 'US_CA', residual_region: 'CAMX', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf', has_purchased_steam: true, purchased_steam_mmbtu: 10, purchased_steam_unit: 'mmbtu' }],
+      ['CA', { country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }],
+      ['GB', { country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'kwh', has_purchased_steam: true, purchased_steam_mmbtu: 10, purchased_steam_unit: 'kwh' }],
+      ['DE', { country: 'DE', grid_region: 'EU_DE', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'kwh' }],
+      ['AU', { country: 'AU', state: 'NSW', grid_region: 'AU_NSW', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'm3' }],
+      ['NZ', { country: 'NZ', grid_region: 'NZ', nz_td_losses: true, has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'kwh' }],
+    ];
+    const COMB: Record<string, DatasetId> = { US: 'epa_hub_combustion', CA: 'eccc_combustion', GB: 'desnz_combustion', DE: 'ipcc2006', AU: 'nga_combustion', NZ: 'mfe_combustion' };
+    const GRID: Record<string, DatasetId> = { US: 'egrid', CA: 'eccc_grid', GB: 'desnz_grid', DE: 'eea_grid', AU: 'nga_grid', NZ: 'mfe_grid' };
+    const RES: Partial<Record<string, DatasetId>> = { US: 'greene', DE: 'aib', AU: 'nga_residual' };
+    const STEAM: Partial<Record<string, DatasetId>> = { US: 'epa_hub_steam', GB: 'desnz_steam' };
+    const expected = (d: DatasetId, y: number, m: number): string | null => {
+      const w = periodFromYearAndEnd(y, m);
+      const r = selectEdition(d, { start: w.start, end: w.end }, y, '2026-10-08');
+      return 'missing' in r ? null : 'provisional' in r ? r.provisional.edition.label : r.edition.label;
+    };
+    let priced = 0, unpriced = 0;
+    for (const [c, o] of SITES) for (let y = 2021; y <= 2027; y++) for (const m of [3, 6, 9, 12]) {
+      const rows = rowsAt(loc({ electricity_kwh: 1000, ...o }), y, m);
+      const check = (row: WRow | undefined, d: DatasetId | undefined, what: string) => {
+        if (!row || !d) return;
+        const want = expected(d, y, m);
+        const label = `${c} ${y}/${m} ${what}`;
+        if (want === null) {
+          expect([row.result_tco2e, row.unpriced?.reason], label).toEqual([null, 'edition_missing']);
+          unpriced++;
+        } else {
+          expect(row.factor_edition ?? row.factor_vintage, label).toBe(want);
+          expect(row.result_tco2e, label).toBeGreaterThan(0);
+          priced++;
+        }
+      };
+      check(rows.find(r => r.stream === 'natural_gas'), COMB[c], 'combustion');
+      check(rows.find(r => r.scope2_method === 'location-based' && r.stream === 'electricity'), GRID[c], 'grid');
+      const mb = rows.find(r => r.scope2_method === 'market-based')!;
+      if (mb?.source?.includes('residual mix')) check(mb, RES[c], 'residual');
+      check(rows.find(r => r.stream === 'purchased_steam'), STEAM[c], 'steam');
+      check(rows.find(r => r.scope === 3 && r.stream === 'electricity'), c === 'NZ' ? 'mfe_td' : undefined, 'T&D');
+    }
+    // Not vacuous either way.
+    expect(priced).toBeGreaterThan(150);
+    expect(unpriced).toBeGreaterThan(50);
+  });
+
+  it('a missing edition: the line is unpriced (excluded, not zero), the other lines price, and export is blocked with the message', () => {
+    // A UK year ending March 2025 needs DEFRA 2024 (the DESNZ April to March rule), published and not held.
+    const l = loc({ name: 'Leeds', country: 'GB', grid_region: 'UK', electricity_kwh: 10_000, has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
+    const sel = selectionFor(2025, 3, PREP);
+    const c = calcLocation(l, 'AR6', 2025, sel);
+    expect([c.s1_total, c.s2_location]).toEqual([0, 0]);   // both DEFRA 2024 (grid and fuels): unpriced, never priced on 2025
+    const rows = rowsAt(l, 2025, 3);
+    const gas = rows.find(r => r.stream === 'natural_gas')!;
+    expect([gas.declaration, gas.result_tco2e, gas.unpriced!.reason]).toEqual(['unpriced', null, 'edition_missing']);
+    const msg = 'DEFRA 2024 fuel combustion factors are needed for the year ending 31 March 2025 and are not loaded, so this line at Leeds is not counted. Export is blocked until they are loaded.';
+    expect(gas.note).toBe(`NOT PRICED: ${msg}`);
+    const issues = findUnresolvedCoverage([l], 2025, 3, [], PREP).filter(i => i.status === 'edition_missing');
+    expect(issues.map(i => [i.field, i.message])).toEqual([
+      ['natural_gas_amount', msg],
+      ['electricity_kwh', 'DEFRA 2024 grid electricity factors are needed for the year ending 31 March 2025 and are not loaded, so this line at Leeds is not counted. Export is blocked until they are loaded.'],
+    ]);
+    expect(UNPRICED_STATUSES.has('edition_missing')).toBe(true);
+    for (const i of issues) expect(i.message).not.toContain('\u2014');
+    // Another line at the same site, whose edition IS held, still prices: a refrigerant needs only a GWP.
+    const withRef = loc({ ...l, has_hfc_refrigerants: true, refrigerant_type: 'r410a', refrigerant_purchased_kg: 10 });
+    expect(calcLocation(withRef, 'AR6', 2025, sel).s1_total).toBeCloseTo(10 * 2256 / 1000, 9);
+  });
+
+  it('R19: a US calendar-2026 site prices on EPA Hub 2025, provisionally, with the sentence; export is not blocked', () => {
+    const l = loc({ name: 'Austin', country: 'US', state: 'TX', grid_region: 'US_TX', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' });
+    const gas = rowsAt(l, 2026).find(r => r.stream === 'natural_gas')!;
+    expect([gas.factor_edition, gas.provisional, gas.selection_rule]).toEqual(['US EPA 2025', true, 'majority']);
+    const r19 = 'The 2026 US EPA combustion factors have not been published yet, so the US EPA 2025 factors are used. This line will be re-priced when the 2026 factors are loaded.';
+    expect(gas.selection_basis).toBe(r19);
+    expect(gas.note).toContain(r19);
+    expect(gas.result_tco2e).toBeCloseTo(calcLocation(l, 'AR6', 2025).s1_total, 12);
+    expect(findUnresolvedCoverage([l], 2026, 12, [], PREP).filter(i => UNPRICED_STATUSES.has(i.status))).toEqual([]);
+    // The edition the rule requires (2025, a year ending March 2026) is not provisional.
+    expect(rowsAt(l, 2026, 3).find(r => r.stream === 'natural_gas')!.provisional).toBe(false);
+  });
+
+  it('UK calendar 2026 prices on DEFRA 2026; a UK March 2025 window is missing DEFRA 2024', () => {
+    const l = loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 1000, has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' });
+    const r26 = rowsAt(l, 2026);
+    expect(r26.filter(r => r.factor_edition).map(r => [r.stream, r.factor_edition, r.selection_rule])).toEqual([
+      ['natural_gas', 'DEFRA 2026', 'desnz_calendar'], ['electricity', 'DEFRA 2026', 'desnz_calendar'], ['electricity', 'DEFRA 2026', 'desnz_calendar']]);
+    expect(r26.find(r => r.stream === 'natural_gas')).toMatchObject({ edition_published: '11 June 2026', provisional: false });
+    expect(r26.find(r => r.stream === 'natural_gas')!.edition_corrected, 'the flat-file correction does not touch the full set').toBeUndefined();
+    expect(rowsAt(l, 2025, 3).filter(r => r.unpriced?.reason === 'edition_missing').map(r => r.unpriced!.publisher)).toEqual(['DEFRA 2024', 'DEFRA 2024', 'DEFRA 2024']);
+  });
+
+  it('every factor row carries the edition fields; class (b) carries selected_on; R20 dates read "on or before"', () => {
+    const rows = rowsAt(loc({ country: 'DE', grid_region: 'EU_DE', electricity_kwh: 1000 }), 2024);
+    const lb = rows.find(r => r.scope2_method === 'location-based')!, mb = rows.find(r => r.scope2_method === 'market-based')!;
+    for (const r of [lb, mb]) for (const k of ['factor_vintage', 'factor_edition', 'selection_rule', 'selection_basis', 'edition_published', 'provisional', 'selected_on'])
+      expect(r, `${r.scope2_method} ${k}`).toHaveProperty(k);
+    expect([lb.factor_edition, lb.edition_published, lb.selected_on]).toEqual(['EEA 2023', '25 October 2024', '2026-10-08']);
+    expect([mb.factor_edition, mb.edition_published]).toEqual(['AIB 2024', 'on or before 11 August 2025']);
+  });
+
+  it('IPCC 2006 / MRR defaults (EU combustion) are exempt: never missing, in any year', () => {
+    for (const y of [2020, 2023, 2026, 2030]) {
+      const gas = rowsAt(loc({ country: 'FR', grid_region: 'EU_FR', has_natural_gas: true, natural_gas_amount: 1000, natural_gas_unit: 'kwh' }), y)
+        .find(r => r.stream === 'natural_gas')!;
+      expect([gas.factor_edition, gas.selection_rule, (gas.result_tco2e ?? 0) > 0], String(y)).toEqual(['IPCC 2006', 'exempt', true]);
+    }
+  });
+
+  it('the US EPA combustion label reads the registry edition (the held values are the 2025 workbook)', () => {
+    expect(COMBUSTION_EDITION.US).toBe('US EPA 2025');
+    expect(EF_SOURCES.combustion).toBe('US EPA (2025) Emission Factors for Greenhouse Gas Inventories');
+    expect(editionFor('epa_hub_combustion', testSel(2025)).label).toBe('US EPA 2025');
+  });
+
+  it('monthly and annual use the same edition: equal for a selected grid edition, both empty when it is missing', () => {
+    const deps = { calcGas, pickEF, getGridFactor, isResolvedGridRegion };
+    const bill = (y: number) => doc('utility_electricity', [prop({ fuelType: 'electricity', value: 12_000, unit: 'kwh', periodStart: `${y}-01-01`, periodEnd: `${y}-12-31` })], 'e');
+    const uk = (y: number) => loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 0, source_docs: [bill(y)] });
+    const inv26 = { locations: [uk(2026)], reporting_year: 2026, coverage_resolutions: [] };
+    const monthly = buildMonthlyEmissions(inv26, deps, 'AR6', PREP).slices.reduce((a, s) => a + s.tco2e, 0);
+    expect(monthly).toBeCloseTo(12_000 * 0.13096 / 1000, 5);
+    expect(monthly).toBeCloseTo(calcInventory(deriveLocations(inv26), 'AR6', 2026, selectionFor(2026, 12, PREP)).s2_location, 5);
+    // 2024: DEFRA 2024 is not held, so neither the annual figure nor any month is priced (never 2025's factor).
+    const inv24 = { locations: [uk(2024)], reporting_year: 2024, coverage_resolutions: [] };
+    const m24 = buildMonthlyEmissions(inv24, deps, 'AR6', PREP);
+    expect(m24.slices).toEqual([]);
+    expect(m24.skipped.map(k => k.reason)).toEqual(['edition_missing']);
+    expect(calcInventory(deriveLocations(inv24), 'AR6', 2024, selectionFor(2024, 12, PREP)).s2_location).toBe(0);
+  });
+
+  it('factor_editions records the selected label and marks a provisional one; a change between years is still detected', () => {
+    const us = loc({ country: 'US', state: 'TX', grid_region: 'US_TX', electricity_kwh: 1000, has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' });
+    const e25 = buildFactorEditions([us], 2025, 12, PREP), e26 = buildFactorEditions([us], 2026, 12, PREP);
+    expect(e25.US?.combustion).toMatchObject({ edition: 'US EPA 2025' });
+    expect(e25.US?.combustion?.provisional).toBeUndefined();
+    expect(e26.US?.combustion).toMatchObject({ edition: 'US EPA 2025', provisional: true });
+    expect(e25.US?.electricity?.edition).toBe('eGRID2023');
+    const uk = loc({ country: 'GB', grid_region: 'UK', electricity_kwh: 1000 });
+    expect(sameFactorEditions(buildFactorEditions([uk], 2025, 12, PREP), buildFactorEditions([uk], 2026, 12, PREP))).toBe(false);
+  });
+
+  it('the save payload prices totals, workings and editions on one selection (the year end included)', () => {
+    const inv = { locations: [loc({ country: 'US', state: 'TX', grid_region: 'US_TX', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'mcf' })],
+      reporting_year: 2025, fiscal_year_end_month: 3, coverage_resolutions: [] };
+    const f = figuresForSave(inv as never, 'AR6', PREP);
+    // A year ending March 2025 needs EPA Hub 2024 (not held): the totals leave the gas out, as the workings do.
+    expect(f.totals.s1_total).toBe(0);
+    expect((f.workings as WRow[]).find(r => r.stream === 'natural_gas')!.unpriced!.reason).toBe('edition_missing');
+  });
+});
+
+// ── T3c DIFF 2b: FLEET, HEAT CONTENT, THE STEAM ESTIMATE AND CATEGORY 3 SELECTED BY RULE ─────────────────────────────
+import { cat3EditionsFor } from '../scope3/cat3Editions';
+
+describe('T3c diff 2b: fleet, R12 heat content, R14 steam estimate and Category 3 editions', () => {
+  const PREP = { preparedOn: TEST_PREPARED_ON };
+  const BEFORE_V4 = { preparedOn: new Date(2026, 5, 1) };
+  type WRow = { result_tco2e: number | null; stream?: string; source?: string; declaration?: string; note?: string; estimated?: string;
+    factor_edition?: string; selection_rule?: string; selection_basis?: string; provisional?: boolean; selected_on?: string;
+    unpriced?: { reason: string; publisher?: string } };
+  const rows = (l: Location, y: number, m = 12, ctx: { preparedOn: Date } = PREP) => buildWorkings([l], 'AR6', y, [], m, ctx) as WRow[];
+  const fleet = (o: Partial<Location>) => loc({ name: 'Depot', has_mobile: true, fleet_light: true, light_diesel_amount: 1000, light_diesel_unit: 'litres', ...o });
+
+  it('source: pickFleet prices from the table of the selected edition, never FLEET_PUBLISHER directly', () => {
+    const src = stripTsComments(readFileSync(join(__dirname, 'engine.ts'), 'utf8'));
+    const body = src.slice(src.indexOf('function pickFleet('), src.indexOf('function routeFactor('));
+    expect(body).toContain("editionFor(FLEET_DATASET[j], factorSel)");
+    expect(body).toContain('FLEET_BY_EDITION[j][edition.key as number]');
+    expect(body).not.toContain('FLEET_PUBLISHER[j]');
+    expect(src).toContain("editionFor('eccc_ng_heat', sel)");
+  });
+
+  it('fleet: each publisher prices on its selected mobile edition, and the row carries it', () => {
+    const cases: [Partial<Location>, number, string, string][] = [
+      [{ country: 'US', state: 'TX', grid_region: 'US_TX', light_diesel_unit: 'gallons' }, 2025, 'US EPA 2025', 'majority'],
+      [{ country: 'GB', grid_region: 'UK' }, 2026, 'DEFRA 2026', 'desnz_calendar'],
+      [{ country: 'AU', state: 'VIC', grid_region: 'AU_VIC' }, 2025, 'DCCEEW NGA 2025', 'nga_activity_year'],
+      [{ country: 'NZ', grid_region: 'NZ' }, 2026, 'MfE 2026 v2', 'majority'],
+      [{ country: 'CA', province: 'ON', grid_region: 'ON' }, 2023, 'ECCC NIR 2025 (1990-2023)', 'data_year_match'],
+      [{ country: 'DE', grid_region: 'EU_DE' }, 2024, 'IPCC 2006', 'exempt'],
+    ];
+    for (const [o, y, label, rule] of cases) {
+      const r = rows(fleet(o), y).find(x => x.source === 'Diesel (light vehicles)' && !x.declaration)!;
+      expect([r.factor_edition, r.selection_rule, (r.result_tco2e ?? 0) > 0], `${o.country} ${y}`).toEqual([label, rule, true]);
+    }
+  });
+
+  it('fleet: a missing mobile edition is an unpriced, export-blocking line; R19 prices provisionally', () => {
+    // UK calendar 2025 needs DEFRA 2025 vehicle fuel rows, published and not held.
+    const uk = fleet({ country: 'GB', grid_region: 'UK' });
+    expect(calcLocation(uk, 'AR6', 2025, selectionFor(2025, 12, PREP)).s1_mobile).toBe(0);
+    const r = rows(uk, 2025).find(x => x.source === 'Diesel (light vehicles)')!;
+    expect([r.declaration, r.result_tco2e, r.unpriced?.reason, r.unpriced?.publisher]).toEqual(['unpriced', null, 'edition_missing', 'DEFRA 2025']);
+    const issues = findUnresolvedCoverage([uk], 2025, 12, [], PREP).filter(i => i.status === 'edition_missing');
+    expect(issues.map(i => [i.field, i.message])).toEqual([['light_diesel_amount',
+      'DEFRA 2025 vehicle fuel factors are needed for reporting year 2025 and are not loaded, so this line at Depot is not counted. Export is blocked until they are loaded.']]);
+    // US calendar 2026: EPA Hub 2026 not yet published, so EPA 2025, provisionally, and nothing blocks.
+    const us = fleet({ country: 'US', state: 'TX', grid_region: 'US_TX', light_diesel_unit: 'gallons' });
+    const p = rows(us, 2026).find(x => x.source === 'Diesel (light vehicles)' && !x.declaration)!;
+    expect([p.factor_edition, p.provisional]).toEqual(['US EPA 2025', true]);
+    expect(p.result_tco2e).toBeCloseTo(rows(us, 2025).find(x => x.source === 'Diesel (light vehicles)' && !x.declaration)!.result_tco2e!, 12);
+    expect(findUnresolvedCoverage([us], 2026, 12, [], PREP).filter(i => UNPRICED_STATUSES.has(i.status))).toEqual([]);
+  });
+
+  it('Canada after NIR 2026 (9 Sep 2026): fleet and gas in GJ are missing NIR 2026; gas in m3 still prices', () => {
+    const on = { country: 'CA', province: 'ON', grid_region: 'ON' } as const;
+    const ca = fleet({ ...on, has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' });
+    const after = rows(ca, 2025);
+    expect(after.find(r => r.source === 'Diesel (light vehicles)')!.unpriced?.publisher).toBe('ECCC NIR 2026 (1990-2024)');
+    expect(after.find(r => r.stream === 'natural_gas')!.unpriced?.publisher).toBe('ECCC NIR 2026 (1990-2024)');
+    expect(findUnresolvedCoverage([ca], 2025, 12, [], PREP).filter(i => i.status === 'edition_missing').map(i => i.field).sort())
+      .toEqual(['light_diesel_amount', 'natural_gas_amount']);
+    // The same gas in m3 needs no heat content: it prices on ECCC's per-m3 factor.
+    const m3 = rows({ ...ca, natural_gas_unit: 'm3' }, 2025).find(r => r.stream === 'natural_gas' && !r.declaration)!;
+    expect([m3.factor_edition, (m3.result_tco2e ?? 0) > 0]).toEqual(['ECCC 2025 v3.0', true]);
+    // Prepared before 9 Sep 2026, the newest NIR is 2025 (data year 2023): the GJ line prices and says why.
+    const before = rows(ca, 2025, 12, BEFORE_V4);
+    const gj = before.find(r => r.stream === 'natural_gas' && !r.declaration)!;
+    expect(gj.result_tco2e).toBeGreaterThan(0);
+    expect(gj.note).toContain('Heat content: ECCC NIR 2025 (1990-2023) (published on or before 24 October 2025): the newest edition when this inventory was first prepared on 1 June 2026; no 2025 data year was published.');
+    expect(before.find(r => r.source === 'Diesel (light vehicles)' && !r.declaration)!.factor_edition).toBe('ECCC NIR 2025 (1990-2023)');
+  });
+
+  it('R14: an estimated steam row carries the edition of the gas factor it is estimated from', () => {
+    const steam: Partial<Location> = { has_purchased_steam: true, purchased_steam_mmbtu: 100, purchased_steam_unit: 'gj' };
+    const au = rows(loc({ name: 'Plant', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', ...steam }), 2025).find(r => r.stream === 'purchased_steam' && !r.declaration)!;
+    expect([au.estimated, au.factor_edition, au.selection_rule]).toEqual(['steam_gas_boiler_80', 'DCCEEW NGA 2025', 'nga_activity_year']);
+    // AU calendar 2026 needs NGA 2026 (activity year 2026-27 straddles it): not held, so the estimate is not made either.
+    const au26 = rows(loc({ name: 'Plant', country: 'AU', state: 'VIC', grid_region: 'AU_VIC', ...steam }), 2026).find(r => r.stream === 'purchased_steam')!;
+    expect([au26.result_tco2e, au26.unpriced?.reason]).toEqual([null, 'edition_missing']);
+  });
+
+  it('Category 3: the window selects DEFRA and NGA Scope 3 editions; a missing one is an unpriced line, never another year', () => {
+    const ok = cat3EditionsFor(testSel(2026, 6));
+    expect('held' in ok.defra && ok.defra.held.label).toBe('DEFRA 2026');
+    expect('held' in ok.nga && ok.nga.held.label).toBe('DCCEEW NGA 2025');
+    // Calendar 2025: the DESNZ calendar rule needs DEFRA 2025 (not held); NGA activity year 2025-26 is held.
+    const cal25 = cat3EditionsFor(selectionFor(2025, 12, PREP));
+    expect('missing' in cal25.defra && cal25.defra.missing.edition).toBe('DEFRA 2025');
+    expect('held' in cal25.nga).toBe(true);
+    const inputs = { declaration: { undeclared: [] }, rows: [
+      { id: 'r1', location: 'Leeds', country: 'GB', stream: 'natural_gas', activity: 1000, unit: 'kwh', scope2_method: null },
+    ] } as never;
+    const priced = priceCat3(inputs, ok), missing = priceCat3(inputs, cal25);
+    expect(priced.lines.map(l => l.edition?.label)).toEqual(['DEFRA 2026']);
+    expect(missing.lines).toEqual([]);
+    expect(missing.unpriced.map(u => u.reason)).toEqual([{ code: 'edition_missing', edition: 'DEFRA 2025',
+      message: 'DEFRA 2025 well-to-tank and transmission and distribution factors are needed for reporting year 2025 and are not loaded, so this line at Leeds is not counted.' }]);
   });
 });

@@ -80,6 +80,7 @@ import {
   type AssuranceTone,
 } from '../../../lib/scope3/supplierAssurance'
 import { priceCat3 } from '../../../lib/scope3/cat3Energy'
+import { cat3EditionsFor } from '../../../lib/scope3/cat3Editions'
 import {
   cat3Sentences, cat3WorkingsSummary, cat3NoFigure, cat3Basis, cat3CsvRows, CAT3_GWP_PUBLISHER,
   CAT3_GHG_LINKS, CAT3_SAVE_FIRST_HINT, CAT3_FIX_IN_GHG_HEADING, cat3GhgFixes, type Cat3GhgLinkKey,
@@ -92,7 +93,7 @@ import { editRows, type RowEdit } from '../../../lib/rowList'
 import { sectionHead } from '@/app/components/headingStyles'
 import { btnPrimary, btnStep, btnStepDisabled, btnStepPrimary, btnStepPrimaryDisabled, toggleOff, toggleOn } from '@/app/components/buttonStyles'
 import { reportingYearOptions, defaultReportingYear } from '../../../lib/reportingYears'
-import { yearLabel, periodWords, reportingWindowIso } from '../../../lib/ghg/engine'
+import { yearLabel, periodWords, reportingWindowIso, selectionFor } from '../../../lib/ghg/engine'
 
 // Floor 2023, the same as GHG's. This wizard's year selector is disabled and inherited whenever
 // the inventory is bound to a GHG inventory (`disabled={!!boundInventoryId}`), so a year no GHG
@@ -2038,7 +2039,8 @@ export default function Scope3Dashboard() {
   // factors' AR5 basis and what the bound GHG inventory records, without claiming the two agree.
   const cat3GwpSentence: string = publisherGwpSentence(CAT3_GWP_PUBLISHER, !!boundInventoryId, ghgGwpVersion)
   const cat3Read = cat3InputsFrom(boundWorkings, boundLocations)
-  const cat3Priced = cat3Read.inputs ? priceCat3(cat3Read.inputs) : null
+  // T3c (R18): Category 3 editions are selected for the bound inventory's window, prepared today.
+  const cat3Priced = cat3Read.inputs ? priceCat3(cat3Read.inputs, cat3EditionsFor(selectionFor(reportingYear, yearEndMonth))) : null
   /** The sentence shown when Category 3 has no figure: the inventory could not be read, or a stream was
    *  never answered. null when there is a figure, including a calculated zero. */
   const cat3NoFigureAnswer = cat3NoFigure(cat3Priced, cat3Read)

@@ -283,17 +283,18 @@ describe('FI9 diff 4: the vehicle type of a fleet-fuel reading', () => {
   })
 
   it('an old-field document (read before FI9, no type) is moved by the chooser, with who and when', () => {
-    const old = { ...fuel, status: 'confirmed' as const }
+    // T3c: 2026, a year DEFRA's vehicle fuel rows are held for (DEFRA 2026).
+    const old = { ...fuel, status: 'confirmed' as const, periodStart: '2026-01-01', periodEnd: '2026-12-31' }
     const l = { ...emptyLocation('L1', 'Depot'), country: 'GB', grid_region: 'UK', has_mobile: true, source_docs: [fdoc(old)] } as Location
-    const before = deriveLocations({ locations: [l], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
+    const before = deriveLocations({ locations: [l], reporting_year: 2026, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
     expect(before.diesel_mobile_amount).toBe(500)
-    expect(findUnresolvedCoverage([l], 2025, 12, []).map(i => i.status)).toContain('fleet_type_missing')
+    expect(findUnresolvedCoverage([l], 2026, 12, []).map(i => i.status)).toContain('fleet_type_missing')
     const patch = chooseFleetType(old, 'heavy', { by: BY, at: AT })
     expect(patch).toEqual({ fleetType: 'heavy', fleetTypeLog: [{ from: null, to: 'heavy', at: AT, by: BY }] })
     const moved = { ...l, fleet_heavy: true, source_docs: [fdoc({ ...old, ...patch })] } as Location
-    const after = deriveLocations({ locations: [moved], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
+    const after = deriveLocations({ locations: [moved], reporting_year: 2026, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]
     expect([after.heavy_diesel_amount, after.diesel_mobile_amount]).toEqual([500, 0])
-    expect(findUnresolvedCoverage([moved], 2025, 12, [])).toEqual([])
+    expect(findUnresolvedCoverage([moved], 2026, 12, [])).toEqual([])
   })
 
   it('the page gates Confirm on the type, shows the chooser for fleet fuel, and ticks the chosen type', () => {

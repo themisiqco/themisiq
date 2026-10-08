@@ -62,7 +62,9 @@ const EXAMPLE_KWH = 1_200_000;
 const EXAMPLE_THERMS = 8_500;
 const EXAMPLE_T = (() => {
   const site: Location = { ...emptyLocation('example', 'Example site'), country: 'US', grid_region: 'US_AVG', electricity_kwh: EXAMPLE_KWH, has_natural_gas: true, natural_gas_amount: EXAMPLE_THERMS, natural_gas_unit: 'therms' } as Location;
-  const t = calcInventory([site], 'AR6');
+  // T3c: 2025, the year whose US editions are held (EPA Hub 2025, eGRID2023). The engine's default year (2024) needs
+  // EPA Hub 2024, not loaded, which would leave the gas out of the example.
+  const t = calcInventory([site], 'AR6', 2025);
   return Math.round(t.s1_total + t.s2_location);
 })();
 

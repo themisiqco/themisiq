@@ -28,10 +28,10 @@
 
 import {
   EF_SOURCES, combustionSource, gridSource, getGridFactor, isResolvedGridRegion, streamState,
-  efJurisdiction, steamFactorFor, steamPricing, nzUseClassVariant, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, fleetLinePublishers, combustionLinePublishers,
-  COMBUSTION_EDITION, STEAM_EDITION,
+  efJurisdiction, steamFactorFor, steamPricingOrMissing, nzUseClassVariant, findUnpriceableLocations, SUPPLIER_SPECIFIC_ENTRY_METHOD, fleetLinePublishers, combustionLinePublishers,
+  COMBUSTION_EDITION, selectionFor, MissingEditionError,
 } from './engine'
-import type { Location } from './engine'
+import type { Location, SelectionContext } from './engine'
 
 /**
  * The FACTOR-TABLE identity a location resolves to — NOT its country.
@@ -69,8 +69,10 @@ const FAMILIES: readonly FactorFamily[] = ['combustion', 'electricity', 'steam',
 export type FactorEdition = {
   /** The citation as the workings row and the assurance PDF print it — engine-derived, never retyped. */
   source: string
-  /** Short edition label. Combustion: declared in COMBUSTION_EDITION. Electricity: usedYear. */
+  /** Short edition label: the edition selectEdition chose for the window (T3c), as the workings rows record it. */
   edition: string
+  /** T3c (R19): true where the edition is provisional (the required one is not yet published). */
+  provisional?: true
   /**
    * FI10: the table variant(s) that priced the family, where the publisher prints more than one (today the MfE use
    * classes), sorted and joined with '; '. Absent where the table has no variants, and on maps saved before FI10.
@@ -232,11 +234,14 @@ export function factorJurisdiction(loc: Location, family: FactorFamily): FactorJ
  * workings are built from. Stored locations can carry a stale figure for a stream no document now
  * supports, which would record an edition for a stream the totals do not price.
  */
-export function buildFactorEditions(locations: readonly Location[], year: number): FactorEditions {
+export function buildFactorEditions(locations: readonly Location[], year: number, fiscalYearEndMonth: number = 12, ctx: SelectionContext = {}): FactorEditions {
   const out: FactorEditions = {}
+  // T3c: the same selection context as the totals beside it, so the edition recorded is the one that priced them.
+  const sel = selectionFor(year, fiscalYearEndMonth, ctx)
+  const provisional = new Set<string>()
   // Collected per jurisdiction before being written out, because the electricity edition is a set:
   // see the join below.
-  const gridYears: Partial<Record<FactorJurisdiction, Set<number>>> = {}
+  const gridYears: Partial<Record<FactorJurisdiction, Set<string>>> = {}
 
   for (const loc of locations) {
     // ── EXCLUDED FROM THE TOTALS => NO EDITION, FOR ANY FAMILY ─────────────────────────────────
@@ -279,7 +284,7 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // been raised before this line runs.
     //   FI1: findUnpriceableLocations now returns country refusals only, so this skips exactly the
     // locations excluded whole. A factor gap is a line (unpricedLines), handled by the family gates below.
-    if (findUnpriceableLocations([loc], 'AR6', year).length > 0) continue
+    if (findUnpriceableLocations([loc], 'AR6', year, fiscalYearEndMonth, ctx).length > 0) continue
 
     // ── COMBUSTION — only if this location actually burned something priced by the table.
     // Reuses streamState rather than re-reading has_*/amount pairs: that convention exists precisely
@@ -291,14 +296,15 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // table priced and names no combustion edition, while its priced electricity and steam still do.
     //   FI2: recorded for each TABLE that priced a line, from the line itself, never from the location's country. A
     // line whose key came from the US fallback (until FI2 diff 2) records the US edition, because that is what priced it.
-    for (const src of combustionLinePublishers(loc)) {
+    for (const src of combustionLinePublishers(loc, sel)) {
       const prev = out[src.jurisdiction]?.combustion
+      if (src.provisional) provisional.add(`${src.jurisdiction}|combustion`)
       ;(out[src.jurisdiction] ??= {}).combustion = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction],
         // FI10: the MfE use class(es) that priced NZ combustion, across every NZ location.
         ...(src.jurisdiction === 'NZ' ? { variant: joinVariants(prev?.variant, nzUseClassVariant(loc)) } : {}) }
     }
     // ── MOBILE (FI9): the mobile document that priced each fleet line, from the line itself.
-    for (const src of fleetLinePublishers(loc)) {
+    for (const src of fleetLinePublishers(loc, sel)) {
       ;(out[src.jurisdiction] ??= {}).mobile = { source: src.publisher, edition: src.edition ?? COMBUSTION_EDITION[src.jurisdiction] }
     }
 
@@ -310,7 +316,11 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // be an invented provenance, which is the one thing this column must never carry.
     if (isResolvedGridRegion(loc.grid_region) && streamState(loc, 'electricity') === 'quantified') {
       const j = factorJurisdiction(loc, 'electricity')
-      if (j) (gridYears[j] ??= new Set()).add(getGridFactor(loc.grid_region, year).usedYear)
+      // T3c: the selected edition's label; a missing edition priced nothing and records nothing.
+      try {
+        const g = getGridFactor(loc.grid_region, sel)
+        if (j) { (gridYears[j] ??= new Set()).add(g.edition.label); if (g.edition.provisional) provisional.add(`${j}|electricity`) }
+      } catch (e) { if (!(e instanceof MissingEditionError)) throw e }
     }
 
     // ── STEAM — quantified AND priced by a PUBLISHED table.
@@ -328,17 +338,21 @@ export function buildFactorEditions(locations: readonly Location[], year: number
         //     in a total and nothing should be filed under a publisher's name.
         && steamFactorFor(loc)?.kind === 'published') {
       const j = factorJurisdiction(loc, 'steam')
-      const edition = j ? STEAM_EDITION[j] : undefined
-      if (j && edition) (out[j] ??= {}).steam = { source: CITATIONS[j].steam!, edition }
+      const priced = steamPricingOrMissing(loc, sel)
+      const edition = priced?.edition?.label
+      if (j && edition) {
+        (out[j] ??= {}).steam = { source: CITATIONS[j].steam!, edition }
+        if (priced?.edition?.provisional) provisional.add(`${j}|steam`)
+      }
     } else if (streamState(loc, 'purchased_steam') === 'quantified'
         && !(typeof loc.purchased_steam_supplier_ef === 'number' && loc.purchased_steam_supplier_ef > 0)
-        && steamFactorFor(loc)?.kind === 'estimated' && steamPricing(loc)) {
+        && steamFactorFor(loc)?.kind === 'estimated' && steamPricingOrMissing(loc, sel)) {
       // R14: an estimated steam factor is the jurisdiction's own natural gas table / 0.80, so that table's edition is
       // what priced it, and it is recorded as such, marked as the estimate. No estimate (a Canadian site with no
       // province) priced nothing and records nothing.
       const j = efJurisdiction(loc) as FactorJurisdiction | null
       const prev = j ? out[j]?.steam : undefined
-      if (j) (out[j] ??= {}).steam = { source: `${CITATIONS[j].combustion}: natural gas / 0.80 (steam estimate, R14)`, edition: COMBUSTION_EDITION[j],
+      if (j) (out[j] ??= {}).steam = { source: `${CITATIONS[j].combustion}: natural gas / 0.80 (steam estimate, R14)`, edition: steamPricingOrMissing(loc, sel)?.edition?.label ?? COMBUSTION_EDITION[j],
         // FI10: the NZ estimate reads the gas factor for the location's use class.
         ...(j === 'NZ' ? { variant: joinVariants(prev?.variant, nzUseClassVariant(loc)) } : {}) }
     }
@@ -356,8 +370,14 @@ export function buildFactorEditions(locations: readonly Location[], year: number
     // and two inventories can be compared by equality.
     ;(out[j] ??= {}).electricity = {
       source: CITATIONS[j].electricity,
-      edition: [...years].sort((a, b) => a - b).join(', '),
+      edition: [...years].sort().join(', '),
     }
+  }
+  // R19: a family priced on a provisional edition says so, so a later re-pricing is visible as a change.
+  for (const k of provisional) {
+    const [j, family] = k.split('|') as [FactorJurisdiction, FactorFamily]
+    const e = out[j]?.[family]
+    if (e) e.provisional = true
   }
 
   return out
@@ -378,9 +398,9 @@ export function buildFactorEditions(locations: readonly Location[], year: number
  * not the fix.
  */
 export function factorEditionsForSave(
-  locations: readonly Location[], year: number, stored?: FactorEditions | null,
+  locations: readonly Location[], year: number, stored?: FactorEditions | null, fiscalYearEndMonth: number = 12, ctx: SelectionContext = {},
 ): FactorEditions {
-  const fresh = buildFactorEditions(locations, year)
+  const fresh = buildFactorEditions(locations, year, fiscalYearEndMonth, ctx)
   return Object.keys(fresh).length > 0 ? fresh : (stored ?? {})
 }
 

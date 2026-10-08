@@ -7,6 +7,7 @@ import {
 } from './engine'
 import type { Location } from './engine'
 import { NOT_PROVIDED } from '../notProvided'
+import { heldSel } from '../testing/heldSelection'
 
 // ⚠️ OGL v3.0's rights END AUTOMATICALLY if the source is not acknowledged. These tests pin the required
 // wording, that every DEFRA citation form triggers it, that no other publisher is attributed on a licence
@@ -53,9 +54,9 @@ describe('DEFRA/DESNZ licence attribution', () => {
   it('A4 a UK inventory is attributed from its locations and from its workings rows; a US one is not', () => {
     const uk = bare({ country: 'GB', grid_region: 'UK', electricity_kwh: 10_000 })
     const us = bare({ country: 'US', grid_region: 'US_CA', electricity_kwh: 10_000 })
-    expect(sourceAttributionsForLocations([uk])).toHaveLength(1)
-    expect(sourceAttributionsForLocations([us])).toEqual([])
-    expect(sourceAttributionsForLocations([us, uk])).toHaveLength(1)
+    expect(sourceAttributionsForLocations([uk], heldSel(uk))).toHaveLength(1)
+    expect(sourceAttributionsForLocations([us], heldSel(us))).toEqual([])
+    expect(sourceAttributionsForLocations([us, uk], heldSel(([us, uk])[0] ?? {}))).toHaveLength(1)
     expect(sourceAttributionsFor(buildWorkings([uk], 'AR6', 2026).map(r => r.ef_source))).toHaveLength(1)
     expect(sourceAttributionsFor(buildWorkings([us], 'AR6', 2026).map(r => r.ef_source))).toEqual([])
   })
@@ -66,9 +67,9 @@ describe('DEFRA/DESNZ licence attribution', () => {
     expect(ghg, 'workings').toContain('<SourceAttributions attributions={attributions}')
     // derivedLocations since T7 (the CSV); the PDF still reads inventory.locations, which the page now
     // passes as the derived locations.
-    expect(ghg, 'framework CSV').toContain('...sourceAttributionsForLocations(derivedLocations).flatMap(a => [')
+    expect(ghg, 'framework CSV').toContain('...sourceAttributionsForLocations(derivedLocations, factorSel).flatMap(a => [')
     expect(ghg, 'the PDF is given the derived locations').toContain('generateAssurancePDF({ ...inventory, locations: derivedLocations }')
-    expect(read('lib/assurancePdf.ts'), 'assurance PDF').toContain('...sourceAttributionsForLocations(inventory.locations).flatMap(a => [')
+    expect(read('lib/assurancePdf.ts'), 'assurance PDF').toContain('...sourceAttributionsForLocations(inventory.locations, factorSel).flatMap(a => [')
     expect(read('app/verify/[token]/page.tsx'), 'verifier page').toContain('<SourceAttributions attributions={sourceAttributionsFor(inv.workings.map(factorSourceOf))}')
     expect(read('app/methodology/page.tsx'), 'methodology').toContain('${DEFRA_DESNZ_PUBLICATION.attribution_required}')
     expect(read('app/components/SourceAttributions.tsx'), 'renderer').toContain('{a.attribution}')

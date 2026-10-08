@@ -8,8 +8,9 @@ import {
 import type { FactorEditions } from './factorEditions'
 import { buildCompanySeries } from './series'
 import type { InventoryRow } from './series'
-import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, unpricedLines, buildWorkings, COMBUSTION_EDITION } from './engine'
+import { EF_SOURCES, EF_SOURCE_LOCATORS, DEFRA_DESNZ_PUBLICATION, defraCitation, emptyLocation, getGridFactor, gridSource, combustionSource, findUnpriceableLocations, unpricedLines, buildWorkings, COMBUSTION_EDITION, MissingEditionError } from './engine'
 import type { Location } from './engine'
+import { heldSel, testSel, heldYearFor } from '../testing/heldSelection'
 
 // THE COLUMN EXISTS BECAUSE A 26% FALL LOOKED LIKE PERFORMANCE.
 //
@@ -63,9 +64,10 @@ describe('a single-jurisdiction inventory records one entry with both families',
       edition: 'DEFRA 2026',
     })
     // Electricity: the year-NEUTRAL citation, and the year the lookup resolved to.
+    // T3c: the edition label the selection chose (it recorded the bare year until T3c).
     expect(ed.UK!.electricity).toEqual({
       source: 'UK DEFRA/DESNZ GHG Conversion Factors for Company Reporting',
-      edition: '2026',
+      edition: 'DEFRA 2026',
     })
   })
 
@@ -86,19 +88,19 @@ describe('THE CASE THE COLUMN EXISTS FOR', () => {
       'fix: DEFRA 2025 priced UK grid at 0.177 and DEFRA 2026 at 0.13096, a ~26% fall on an ' +
       'unchanged meter, and if both years record the same edition nothing on the record separates ' +
       'the revision from real decarbonisation. Check that the electricity edition still comes from ' +
-      'getGridFactor(region, year).usedYear and not from the citation string.'
+      'the selected grid edition and not from the citation string.'
 
     const e25 = buildFactorEditions([uk()], 2025)
     const e26 = buildFactorEditions([uk()], 2026)
 
-    expect(e25.UK!.electricity!.edition, WHY).toBe('2025')
-    expect(e26.UK!.electricity!.edition, WHY).toBe('2026')
+    expect(e25.UK!.electricity!.edition, WHY).toBe('DEFRA 2025')
+    expect(e26.UK!.electricity!.edition, WHY).toBe('DEFRA 2026')
     expect(e25.UK!.electricity!.edition, WHY).not.toBe(e26.UK!.electricity!.edition)
     expect(sameFactorEditions(e25, e26), WHY).toBe(false)
 
     // NOT VACUOUS — the two years genuinely price differently, which is why the editions must differ.
-    expect(getGridFactor('UK', 2025).ef).toBe(0.177)
-    expect(getGridFactor('UK', 2026).ef).toBe(0.13096)
+    expect(getGridFactor('UK', testSel(2025)).ef).toBe(0.177)
+    expect(getGridFactor('UK', testSel(2026)).ef).toBe(0.13096)
   })
 
   it('F4 the electricity edition is NOT the citation string — the mutation that would defeat F3', () => {
@@ -109,21 +111,23 @@ describe('THE CASE THE COLUMN EXISTS FOR', () => {
     expect(EF_SOURCES.electricity_uk, 'a year here would contradict factor_vintage on the other half of GRID_EF.UK')
       .not.toMatch(/20\d\d/)
 
-    for (const year of [2023, 2024, 2025, 2026]) {
+    // T3c: 2023 and 2024 need DEFRA editions not held (F5), so they record no grid edition.
+    for (const year of [2025, 2026]) {
       const e = buildFactorEditions([uk()], year).UK!.electricity!
       expect(e.edition, `${year}: the edition must not be the citation`).not.toBe(e.source)
-      expect(e.edition, `${year}: the edition is a year, not prose`).toMatch(/^\d{4}(, \d{4})*$/)
-      expect(e.edition, `${year}: must equal usedYear`).toBe(String(getGridFactor('UK', year).usedYear))
+      // T3c: the selected edition's label, as the workings row records it.
+      expect(e.edition, `${year}: the edition is the label`).toMatch(/^DEFRA \d{4}$/)
+      expect(e.edition, `${year}: must equal the selected edition`).toBe(getGridFactor('UK', testSel(year)).edition.label)
     }
   })
 
-  it('F5 usedYear is the RESOLVED year, not the requested one', () => {
-    // GRID_EF.UK holds 2025 and 2026 only, so a 2023 or 2024 UK inventory resolves FORWARD to 2025.
-    // Recording the requested year would claim an edition that does not exist and would make F3 pass
-    // for the wrong reason.
-    expect(getGridFactor('UK', 2023).usedYear).toBe(2025)
-    expect(buildFactorEditions([uk()], 2023).UK!.electricity!.edition).toBe('2025')
-    expect(buildFactorEditions([uk()], 2024).UK!.electricity!.edition).toBe('2025')
+  it('F5 T3c: no year is substituted; a UK 2023 or 2024 inventory records no grid edition (DEFRA 2023 and 2024 are not held)', () => {
+    // GRID_EF.UK holds 2025 and 2026 only. Until T3c a 2023 or 2024 inventory resolved FORWARD to 2025 and recorded
+    // '2025'. Now the line is unpriced (edition_missing), priced nothing, and names no edition.
+    expect(() => getGridFactor('UK', testSel(2023))).toThrow(MissingEditionError)
+    expect(buildFactorEditions([uk()], 2023).UK?.electricity).toBeUndefined()
+    expect(buildFactorEditions([uk()], 2024).UK?.electricity).toBeUndefined()
+    expect(buildFactorEditions([uk()], 2025).UK!.electricity!.edition).toBe('DEFRA 2025')
   })
 })
 
@@ -137,11 +141,15 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
     ], 2026)
 
     expect(Object.keys(ed).sort()).toEqual(['CA', 'NZ', 'UK', 'US'])
-    expect(ed.US!.electricity!.edition, 'every US row is eGRID2023').toBe('2023')
-    expect(ed.CA!.electricity!.edition, 'ECCC holds 2026').toBe('2026')
-    expect(ed.NZ!.electricity!.edition, 'MfE holds 2023-2025, so 2026 resolves back').toBe('2025')
-    expect(ed.UK!.electricity!.edition).toBe('2026')
+    expect(ed.US!.electricity!.edition, 'every US row is eGRID2023').toBe('eGRID2023')
+    // T3c: Canada's grid is class (b). Prepared after ECCC v4.0 (9 Sep 2026), the newest data year is 2024 (Table 5.4),
+    // not held until T3d, so the line is unpriced and records no edition.
+    expect(ed.CA!.electricity, 'ECCC Table 5.4 is not held yet').toBeUndefined()
+    expect(ed.NZ!.electricity!.edition, 'class (b): no 2026 row, so the newest published row').toBe('MfE 2026 v2 (2025 row)')
+    expect(ed.UK!.electricity!.edition).toBe('DEFRA 2026')
     expect(ed.CA!.combustion!.edition).toBe('ECCC 2025 v3.0')
+    // R19: no 2026 EPA Hub is published, so US combustion is on 2025, provisionally, and says so.
+    expect(ed.US!.combustion).toMatchObject({ edition: 'US EPA 2025', provisional: true })
     expect(ed.US!.combustion!.source).toBe(EF_SOURCES.combustion)
   })
 
@@ -157,9 +165,9 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
 
     expect(Object.keys(ed)).toEqual(['EU'])
     expect(ed.EU!.combustion!.edition).toBe('IPCC 2006')
-    expect(ed.EU!.electricity!.edition, 'EEA holds 2023 only, so 2026 resolves back').toBe('2023')
+    expect(ed.EU!.electricity!.edition, 'class (b): the newest EEA data year, 2023').toBe('EEA 2023')
     // Not vacuous: the two locations really are priced with different NUMBERS.
-    expect(getGridFactor('EU_DE', 2026).ef).not.toBe(getGridFactor('EU_FR', 2026).ef)
+    expect(getGridFactor('EU_DE', testSel(2026)).ef).not.toBe(getGridFactor('EU_FR', testSel(2026)).ef)
   })
 
   it('F8 an unlisted country records NOTHING, because nothing priced it', () => {
@@ -192,7 +200,7 @@ describe('a multi-jurisdiction inventory records one entry per jurisdiction', ()
   it('F9 two locations in one jurisdiction record ONE entry, not two', () => {
     const ed = buildFactorEditions([uk({ id: 'a' }), uk({ id: 'b' })], 2026)
     expect(Object.keys(ed)).toEqual(['UK'])
-    expect(ed.UK!.electricity!.edition, 'one distinct usedYear, so one year').toBe('2026')
+    expect(ed.UK!.electricity!.edition, 'one edition, so one label').toBe('DEFRA 2026')
   })
 })
 
@@ -263,7 +271,7 @@ describe('no edition is invented for a family that priced nothing', () => {
       const ed = buildFactorEditions([
         loc({ country, grid_region: '', has_natural_gas: false, natural_gas_amount: 0, electricity_kwh: 0,
               has_purchased_steam: true, purchased_steam_mmbtu: 500, purchased_steam_unit: 'gj', ...extra }),
-      ], 2026) as Record<string, { steam?: { source: string; edition: string } }>
+      ], heldYearFor(country)) as Record<string, { steam?: { source: string; edition: string } }>
       const j = country === 'DE' ? 'EU' : country
       expect(Object.keys(ed), country).toEqual([j])
       expect(ed[j].steam!.source, country).toContain('natural gas / 0.80 (steam estimate, R14)')
@@ -306,7 +314,7 @@ describe('the declared edition labels cannot drift from their citations', () => 
     }
     for (const [j, citation] of cases) {
       const [c, region, unit] = country[j]
-      const ed = buildFactorEditions([loc({ country: c, grid_region: region, natural_gas_unit: unit })], 2026)[j as 'UK']!
+      const ed = buildFactorEditions([loc({ country: c, grid_region: region, natural_gas_unit: unit })], heldYearFor(c))[j as 'UK']!
       expect(ed.combustion!.source, `${j} citation`).toBe(citation)
       for (const token of ed.combustion!.edition.split(/\s+/)) {
         expect(citation, `${WHY}\n  ${j}: label token "${token}" is absent from "${citation}"`).toContain(token)
@@ -448,7 +456,7 @@ describe('factor_editions survives the load-then-save round trip', () => {
     // A REAL RECOMPUTE ALWAYS WINS — the editions must describe the totals saved beside them, so a
     // stale map preserved next to fresh figures would be the defect rather than the fix.
     const fresh = factorEditionsForSave([uk()], 2025, stored)
-    expect(fresh.UK!.electricity!.edition, 'the 2025 recompute must not be shadowed by a stored 2026').toBe('2025')
+    expect(fresh.UK!.electricity!.edition, 'the 2025 recompute must not be shadowed by a stored 2026').toBe('DEFRA 2025')
 
     // And with nothing stored, an empty recompute is an empty object — the column's own default,
     // never null: it is `not null default '{}'` and a null would be rejected at insert.
@@ -805,7 +813,7 @@ describe('the states a verifier and a customer each see', () => {
     // The discriminator itself, asserted end to end rather than only its wording. Each fixture is a
     // route to {}, and every one of them must land on B (nothing recordable) — none of them priced
     // from a published table. The two controls land on the other side.
-    const w = (l: Location | null) => buildWorkings(l ? [l] : [], 'AR6', 2025, [], 12) as never[]
+    const w = (l: Location | null) => buildWorkings(l ? [l] : [], 'AR6', l ? heldYearFor(l.country) : 2025, [], 12) as never[]
     const bare = (o: Partial<Location>): Location => ({ ...emptyLocation('l1', 'S'), ...o })
     const NOTHING_RECORDABLE: [string, Location | null][] = [
       ['brand-new', bare({ country: 'US' })],
@@ -992,7 +1000,7 @@ describe('a location excluded from the totals records no edition', () => {
       // NOT VACUOUS: assert the fixture really prices nothing before asserting the consequence. Since FI1
       // a factor gap is an unpriced LINE (the location stays in), and only a country excludes a location,
       // so each route is one or the other.
-      expect(findUnpriceableLocations([l], 'AR6', 2025).length + unpricedLines(l).length, `${name}: fixture must price nothing`).toBe(1)
+      expect(findUnpriceableLocations([l], 'AR6', 2025).length + unpricedLines(l, 'AR6', heldSel(l)).length, `${name}: fixture must price nothing`).toBe(1)
       expect(buildFactorEditions([l], 2025), `${name}: excluded location must name no edition`).toEqual({})
     }
   })
@@ -1009,7 +1017,7 @@ describe('a location excluded from the totals records no edition', () => {
     const noGas = (l: Location): Location => ({ ...l, has_fuel_oil_distillate: false, fuel_oil_distillate_amount: 0 })
     const withElec = bare({ ...base, grid_region: 'UK', electricity_kwh: 100_000 })
     expect(findUnpriceableLocations([withElec], 'AR6', 2025)).toEqual([])
-    expect(unpricedLines(withElec).map(u => u.reason)).toEqual(['factor_missing'])
+    expect(unpricedLines(withElec, 'AR6', heldSel(withElec)).map(u => u.reason)).toEqual(['factor_missing'])
     expect(buildFactorEditions([withElec], 2025)).toEqual(buildFactorEditions([noGas(withElec)], 2025))
     expect(buildFactorEditions([withElec], 2025).UK?.combustion, 'no combustion line priced').toBeUndefined()
     expect(buildFactorEditions([withElec], 2025).UK?.electricity, 'the priced electricity names its edition').toBeDefined()
@@ -1036,14 +1044,14 @@ describe('a location excluded from the totals records no edition', () => {
       has_propane: true, propane_amount: 1000, propane_unit: 'kg' as const }
     expect(findUnpriceableLocations([good], 'AR6', 2025).length, 'good must be priceable').toBe(0)
     // FI1: bad is no longer excluded; its one line is unpriced, and it prices nothing else.
-    expect(unpricedLines(bad).length, 'bad must hold an unpriced line').toBe(1)
+    expect(unpricedLines(bad, 'AR6', heldSel(bad)).length, 'bad must hold an unpriced line').toBe(1)
 
     const mixed = buildFactorEditions([good, bad], 2025)
     const aloneGood = buildFactorEditions([good], 2025)
     // Same jurisdiction, same family, one of each: the edition survives, sourced from the good one.
     expect(mixed, 'the excluded location must not erase its neighbour\'s edition').toEqual(aloneGood)
-    expect(mixed.US?.combustion?.edition).toBe('US EPA 2024')
-    expect(mixed.US?.electricity?.edition).toBe('2023')
+    expect(mixed.US?.combustion?.edition).toBe('US EPA 2025')
+    expect(mixed.US?.electricity?.edition).toBe('eGRID2023')
     // Order must not matter — the excluded one first is the same answer.
     expect(buildFactorEditions([bad, good], 2025)).toEqual(aloneGood)
     // And an inventory of ONLY the excluded location records nothing at all.
@@ -1059,7 +1067,7 @@ describe('a location excluded from the totals records no edition', () => {
     expect(buildFactorEditions([gb], 2026)).toEqual({
       UK: {
         combustion:  { source: EF_SOURCES.combustion_uk, edition: 'DEFRA 2026' },
-        electricity: { source: EF_SOURCES.electricity_uk, edition: '2026' },
+        electricity: { source: EF_SOURCES.electricity_uk, edition: 'DEFRA 2026' },
       },
     })
     // Steam too — a published-factor US steam location still names its edition.
@@ -1082,18 +1090,20 @@ describe('the editions name the tables that priced (FI2)', () => {
     expect(ed.US, 'no US table priced anything').toBeUndefined()
   })
 
-  it('FI9: a US fleet line records the EPA mobile document, a different edition from the stationary table', () => {
+  it('FI9: a US fleet line records the EPA mobile document, a different source from the stationary table', () => {
     const us = { ...emptyLocation('u1', 'Austin'), country: 'US', state: 'TX', grid_region: 'US_TX', has_diesel_stationary: true,
       diesel_stationary_amount: 10, diesel_stationary_unit: 'gallons' as const, has_mobile: true, fleet_heavy: true,
       heavy_diesel_amount: 100, heavy_diesel_unit: 'gallons' as const }
-    const ed = buildFactorEditions([us], 2026)
-    expect(ed.US?.combustion?.edition).toBe('US EPA 2024')
+    const ed = buildFactorEditions([us], 2025)
+    // T3c: both tables are the 2025 workbook (the stationary label read 'US EPA 2024' until T3c); the citations differ.
+    expect(ed.US?.combustion?.edition).toBe('US EPA 2025')
+    expect(ed.US?.combustion?.source).not.toBe(ed.US?.mobile?.source)
     expect(ed.US?.mobile?.edition).toBe('US EPA 2025')
     expect(ed.US?.mobile?.source).toMatch(/^US EPA GHG Emission Factors Hub 2025/)
   })
 
   it('an AU site with propane in gallons names NGA, which now prices it through the exact litre conversion', () => {
     const au = { ...emptyLocation('a1', 'Perth'), country: 'AU', has_propane: true, propane_amount: 100, propane_unit: 'gallons' as const }
-    expect(buildFactorEditions([au], 2026)).toEqual({ AU: { combustion: { source: EF_SOURCES.combustion_au, edition: 'DCCEEW NGA 2025' } } })
+    expect(buildFactorEditions([au], 2025)).toEqual({ AU: { combustion: { source: EF_SOURCES.combustion_au, edition: 'DCCEEW NGA 2025' } } })
   })
 })
