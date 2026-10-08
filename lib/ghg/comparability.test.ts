@@ -153,7 +153,7 @@ describe('Tier A magnitude', () => {
   it("states the doc's worked example verbatim", () => {
     const d = buildComparabilityDisclosure(base())!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an increase of 135%.',
+      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year, an increase of 135%.',
     )
   })
 
@@ -165,7 +165,7 @@ describe('Tier A magnitude', () => {
   it('reports identical figures as identical figures, and does not answer the question', () => {
     const d = buildComparabilityDisclosure(base({ priorScope1: 1000, thisScope1: 1000 }))!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,000 tCO₂e in Scope 1 last year and 1,000 tCO₂e this year — the same figure both years.',
+      'You reported 1,000 tCO₂e in Scope 1 last year and 1,000 tCO₂e this year, the same figure both years.',
     )
     // Not an increase, and not a claim that nothing changed — an acquisition offset by a closure
     // lands here too, and the question is still being asked.
@@ -184,7 +184,7 @@ describe('Tier A magnitude', () => {
   it('parameterises direction for a fall that rounds to zero', () => {
     const d = buildComparabilityDisclosure(base({ priorScope1: 1000, thisScope1: 998 }))!
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,000 tCO₂e in Scope 1 last year and 998 tCO₂e this year — a decrease of less than 1%.',
+      'You reported 1,000 tCO₂e in Scope 1 last year and 998 tCO₂e this year, a decrease of less than 1%.',
     )
     expect(textOf(d, 'magnitude_scope1')).not.toContain('increase')
   })
@@ -214,7 +214,7 @@ describe('Scope 2 is never inferred', () => {
   it('emits a Scope 2 line when a prior Scope 2 figure exists', () => {
     const d = buildComparabilityDisclosure(base({ priorScope2: 400, thisScope2: 500 }))!
     expect(textOf(d, 'magnitude_scope2')).toBe(
-      'You reported 400 tCO₂e in Scope 2 last year and 500 tCO₂e this year — an increase of 25%.',
+      'You reported 400 tCO₂e in Scope 2 last year and 500 tCO₂e this year, an increase of 25%.',
     )
   })
 
@@ -887,7 +887,7 @@ describe("a zero figure this year withholds that scope's movement", () => {
     const d = withPriorBothScopes({ thisScope1: 0, thisScope2: 500 })
     expect(kinds(d)).not.toContain('magnitude_scope1')
     expect(textOf(d, 'magnitude_scope2')).toBe(
-      'You reported 400 tCO₂e in Scope 2 last year and 500 tCO₂e this year — an increase of 25%.',
+      'You reported 400 tCO₂e in Scope 2 last year and 500 tCO₂e this year, an increase of 25%.',
     )
     expect(d.basis.scope1MagnitudeWithheldBecause).toContain("Scope 1 total is currently zero")
     expect(d.basis.scope2MagnitudeWithheldBecause).toBeNull()
@@ -897,7 +897,7 @@ describe("a zero figure this year withholds that scope's movement", () => {
     const d = withPriorBothScopes({ thisScope1: 2910, thisScope2: 0 })
     expect(kinds(d)).not.toContain('magnitude_scope2')
     expect(textOf(d, 'magnitude_scope1')).toBe(
-      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an increase of 135%.',
+      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year, an increase of 135%.',
     )
     expect(d.basis.scope2MagnitudeWithheldBecause).toContain("Scope 2 total is currently zero")
     expect(d.basis.scope1MagnitudeWithheldBecause).toBeNull()
@@ -950,7 +950,7 @@ describe('figures are printed at a precision that supports the clause beside the
   it('separates the pair that collided live', () => {
     const line = scope1Line(16.9975, 16.997472)
     expect(line).toBe(
-      'You reported 16.9975 tCO₂e in Scope 1 last year and 16.99747 tCO₂e this year — a decrease of less than 1%.',
+      'You reported 16.9975 tCO₂e in Scope 1 last year and 16.99747 tCO₂e this year, a decrease of less than 1%.',
     )
     // The two figures in the sentence must differ, or the clause contradicts them.
     const [a, b] = line.match(/[\d,]+\.?\d* tCO₂e/g)!
@@ -963,7 +963,7 @@ describe('figures are printed at a precision that supports the clause beside the
 
   it("gives the doc's round figures no decimals they do not need", () => {
     expect(scope1Line(1240, 2910)).toBe(
-      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an increase of 135%.',
+      'You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year, an increase of 135%.',
     )
   })
 
@@ -975,5 +975,27 @@ describe('figures are printed at a precision that supports the clause beside the
 
   it('stays readable at large magnitudes', () => {
     expect(scope1Line(1_240_000, 2_910_000)).toContain('1,240,000 tCO₂e')
+  })
+})
+
+describe('T3c diff 4: the magnitude sentence has no em dash, and the change of punctuation is not drift', () => {
+  it('reads "... this year, an increase of 135%." with no em dash', () => {
+    const line = textOf(buildComparabilityDisclosure(base()), 'magnitude_scope1')!
+    expect(line).toBe('You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year, an increase of 135%.')
+    expect(allText(buildComparabilityDisclosure(base()))).not.toContain('\u2014')
+  })
+
+  it('a record answered before the change (the dashed sentence) is not marked changed at the next save', () => {
+    const d = buildComparabilityDisclosure(base())!
+    const old = captureFrom(d, 'nothing_changed')
+    const legacy = { ...old, observations: old.observations.map(l => l.replace('this year, ', 'this year \u2014 ')) }
+    expect(legacy.observations[0]).toContain('\u2014')
+    const r = record({ capture: legacy, current: d })!
+    expect([r.observationsChanged, r.observationsAtSave]).toEqual([false, undefined])
+    // What the customer saw is kept as they saw it.
+    expect(r.observations).toEqual(legacy.observations)
+    // A real change of the figures still is drift.
+    const moved = record({ capture: legacy, current: buildComparabilityDisclosure(base({ thisScope1: 3000 })) })!
+    expect(moved.observationsChanged).toBe(true)
   })
 })

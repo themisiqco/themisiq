@@ -491,13 +491,15 @@ describe('factor_editions survives the load-then-save round trip', () => {
     for (const k of REQUIRED) expect(block, `payload key ${k} was dropped`).toContain(k)
     expect(block).toContain('factor_editions:')
     expect(block).toContain('factor_selection: saved.factor_selection')
+    expect(block).toContain('factor_edition_comparison: savedEditionComparison')
     // 25 pre-existing keys + the new one. Pinned so an ADDITION also has to come through this test,
     // rather than the list above quietly covering a payload that grew a key nobody reviewed.
     // [a-z0-9_] — the digits matter. Without them this misses scope1_total, scope2_location_total,
     // scope2_market_total, both intensities and both prior_year_s* keys: seven of the twenty-six.
     const keyCount = block.split('\n').filter(l => /^\s*[a-z0-9_]+:/.test(l)).length
-    // 27 since T7 added derivation_version; 28 since T3c diff 3 added factor_selection.
-    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(28)
+    // 27 since T7 added derivation_version; 28 since T3c diff 3 added factor_selection; 29 since F-06 (T3c diff 4)
+    // added factor_edition_comparison.
+    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(29)
   })
 
   it('F25 scans a real file — a moved call site fails loudly instead of passing vacuously', () => {

@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
-import type { ComparabilityRecord } from '../../../lib/ghg/comparability'
+import { COMPARABILITY_ANSWER_WORDS, comparabilityHeading, factorEditionSurfaceLines, type ComparabilityRecord, type FactorEditionComparison } from '../../../lib/ghg/comparability'
 import type { CountryRefusal } from '../../../lib/ghg/engine'
 import { yearLabel, periodWords } from '../../../lib/ghg/engine'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
@@ -174,6 +174,9 @@ interface InventoryData {
   // The column is `not null default '{}'`, so empty is the common case until a back catalogue is
   // re-saved: 23 of 29 inventories at the time of whitelisting.
   factor_editions?: FactorEditions | null
+  // F-06: the platform's factor-edition comparison, projected by 20261009_get_verifier_inventory_factor_edition_comparison.sql.
+  // Absent before that migration runs; null when no comparison was made.
+  factor_edition_comparison?: FactorEditionComparison | null
 }
 // ── THE SCOPE 3 RECORD, AS get_verifier_scope3 WHITELISTS IT ──────────────────────────────────────
 //
@@ -324,6 +327,7 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   // factor_editions column comment warned about, and the reason verifierWhitelist.test.ts now
   // asserts this map against the migration itself rather than trusting the next person to remember.
   factor_editions:       'Emission factor editions',
+  factor_edition_comparison: 'Emission factor editions compared with the prior year',
 }
 const auditFieldLabel = (key: string): string => AUDIT_FIELD_LABELS[key] ?? 'Another field'
 
@@ -782,9 +786,7 @@ export default function VerifierPage() {
             <p style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6, margin: 0 }}>
               <strong>Comparison with prior period</strong>
               {' — '}
-              {inv.comparability_disclosure.answer === 'nothing_changed'
-                ? 'The company states nothing changed that would affect comparability; the difference reflects normal business activity.'
-                : 'The company states something changed that would affect comparability.'}
+              {COMPARABILITY_ANSWER_WORDS[inv.comparability_disclosure.answer]}
             </p>
 
             {/* The company's own words, verbatim and unquoted. Empty is possible and is not filled
@@ -858,6 +860,33 @@ export default function VerifierPage() {
                 {inv.comparability_disclosure.basis.boundaryWithheldBecause}
               </p>
             )}
+
+            {/* F-06: the factor editions that changed between the two years and what the change alone does to this year's
+                figures, as recomputed at the save, then FACTOR_EDITION_DISCLOSURE beside them. A line the company was
+                shown above is not repeated. The same lines the CSV and the assurance PDF print (comparability.ts). */}
+            {factorEditionSurfaceLines(inv.comparability_disclosure, inv.factor_edition_comparison).length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginBottom: 4 }}>Emission factor editions</div>
+                {factorEditionSurfaceLines(inv.comparability_disclosure, inv.factor_edition_comparison).map((line, i) => (
+                  <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* F-06, UNANSWERED: the comparability question was not answered, so there is no company statement above and
+            none is invented here. The edition change is the platform's own finding, not the company's, so it is shown
+            anyway (Lisa's ruling, 8 Oct 2026), under the same heading the exports use. */}
+        {!inv.comparability_disclosure && factorEditionSurfaceLines(null, inv.factor_edition_comparison).length > 0 && (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: '2rem' }}>
+            <p style={{ fontSize: 13, color: '#0d0d0d', lineHeight: 1.6, margin: 0 }}>
+              <strong>{comparabilityHeading(inv.factor_edition_comparison!.priorHeading)}</strong>
+            </p>
+            <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', margin: '8px 0 4px' }}>Emission factor editions, compared by the platform. The company has not answered the comparability question.</div>
+            {factorEditionSurfaceLines(null, inv.factor_edition_comparison).map((line, i) => (
+              <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{line}</div>
+            ))}
           </div>
         )}
 

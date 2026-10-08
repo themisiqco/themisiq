@@ -157,6 +157,18 @@ The US steam factor, from the same Hub, already cites 2025: "US EPA (2025) GHG E
 
 ## F-06. The comparability disclosure has no factor-edition observation, and the export does not carry `FACTOR_EDITION_DISCLOSURE`
 
+**Status: CLOSED** (recorded 8 Oct 2026, T3c diff 4, docs/review/patches/t3c-4.patch, on the `factor-years` branch).
+A `factor_edition` observation names, for every dataset both years used whose edition changed, the prior and current
+edition and what that change alone does to this year's figures by scope, or why that could not be calculated
+(lib/ghg/factorEditionComparison.ts, lib/ghg/comparability.ts). The prior year is compared on the editions that
+priced it: its own window, its frozen class (b) choices and the day it was last saved. The lines and
+`FACTOR_EDITION_DISCLOSURE` print on the export screen, in the CSV/XLSX ("Comparability with {prior year}"), on the
+verifier page and in the assurance PDF. The platform's comparison is stored in its own column,
+`ghg_inventories.factor_edition_comparison` (20261008_ghg_factor_edition_comparison.sql, projected by
+20261009_get_verifier_inventory_factor_edition_comparison.sql), so the verifier page and the PDF show an edition change
+even when the comparability question is unanswered. The FAQ at app/climate-ghg/page.tsx was corrected (CG-23).
+The text below is the finding as recorded on 1 Oct 2026; its line numbers are for that tree.
+
 **What the comparability module observes.** `ObservationKind` is `magnitude_scope1`, `magnitude_scope2`,
 `exclusion`, `locations`, `fuels`, `jurisdictions`, `boundary`, `structure_unchanged`
 (lib/ghg/comparability.ts:103-111). A search of comparability.ts for "edition" returns nothing.

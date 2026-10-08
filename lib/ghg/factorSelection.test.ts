@@ -230,13 +230,21 @@ describe('T3c diff 3: the surfaces word the selection', () => {
     expect(read('lib/assurancePdf.ts')).toContain('const factorCtx = selectionContextFor(inventory)')
   })
 
-  it('the migration adds the column idempotently, with the departure and the pre-check, and no status line', () => {
+  it('the migration is the file as run: the column, the column-scoped grants, the departure, the pre-check and its result', () => {
     const sql = read('supabase/migrations/20261008_ghg_factor_selection.sql')
+    // T3c diff 4: Lisa ran it on 8 Oct 2026 with the two column-scoped grants, as 20260813 grants factor_editions.
+    expect(sql.split('\n')[0]).toBe('-- RUN 8 Oct 2026 in the Supabase SQL editor, with the column-scoped grants; grants verified.')
     expect(sql).toContain("add column if not exists factor_selection jsonb not null default '{}'::jsonb")
     expect(sql).toContain('DEPARTURE FROM THE DESIGN')
     expect(sql).toContain('information_schema.column_privileges')
-    expect(sql).not.toMatch(/^--\s*(RUN|APPLIED|NOT RUN)\b/m)
+    expect(sql).toContain('except service_role, which holds\n--   UPDATE on free_tier only')
+    expect(sql).toContain('authenticated holds INSERT, SELECT, UPDATE; service_role holds SELECT and REFERENCES; anon holds nothing.')
     const statements = sql.split('\n').filter(l => !l.trimStart().startsWith('--')).join('\n')
-    expect(statements).not.toMatch(/\b(grant|revoke|create policy|alter policy|drop policy)\b/i)
+    expect(statements).toContain('grant select (factor_selection), insert (factor_selection), update (factor_selection)\n  on public.ghg_inventories to authenticated;')
+    expect(statements).toContain('grant select (factor_selection)\n  on public.ghg_inventories to service_role;')
+    // Never anon, never a table-level grant, and no RLS change.
+    expect(statements).not.toMatch(/\banon\b/)
+    expect(statements).not.toMatch(/grant\s+(select|insert|update)\s+on\b/i)
+    expect(statements).not.toMatch(/\b(revoke|create policy|alter policy|drop policy)\b/i)
   })
 })

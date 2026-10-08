@@ -8,7 +8,9 @@ import { reportingYearOptions, defaultReportingYear } from '../../../lib/reporti
 import { supabase } from '../../../lib/supabase'
 import { csvBlob } from '../../../lib/csv'
 import { buildMonthlyEmissions } from '../../../lib/ghg/monthlyEmissions'
-import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines } from '../../../lib/ghg/comparability'
+import { buildComparabilityDisclosure, buildComparabilityRecord, observationLines, comparabilityHeading, comparabilitySurfaceLines } from '../../../lib/ghg/comparability'
+import { compareFactorEditions, type PriorYearPricing } from '../../../lib/ghg/factorEditionComparison'
+import type { FactorEditions } from '../../../lib/ghg/factorEditions'
 import { saveGhgDraft, readGhgDraftOwned, draftBelongsTo, clearGhgDraft, draftKeptSentence } from '../../../lib/ghg/draft'
 import { wantsNewCalculator, entryView, entryWall } from '../../../lib/ghg/entry'
 // "Keep my results" (LEAD1 L4): Save routing, the placements, the banners and the modal.
@@ -114,6 +116,9 @@ type PriorYearLookup =
        */
       storedScope1: number | null
       storedScope2: number | null
+      /** F-06: the prior row as stored, so its own calculation can be rerun to name the editions that priced it.
+       *  Null when the row has no readable location detail (the same case as a null summary). */
+      pricing: PriorYearPricing | null
     }
 
 // The series layer says 'ok'; the comparability module says 'clean'. Same fact, two vocabularies —
@@ -1000,7 +1005,7 @@ const searchParams = useSearchParams()
     const priorReportingYear = inventory.reporting_year - 1
     supabase
       .from('ghg_inventories')
-      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions, factor_selection')
+      .select('workings, locations_data, scope1_total, scope2_location_total, boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions, factor_selection, factor_editions, updated_at')
       .eq('company_id', companyId)
       .eq('reporting_year', priorReportingYear)
       .limit(2)
@@ -1020,6 +1025,7 @@ const searchParams = useSearchParams()
           boundary_approach: string | null
           reporting_year: number; fiscal_year_end_month: number | null; coverage_resolutions: unknown
           factor_selection: StoredFactorSelection | null
+          factor_editions: FactorEditions | null; updated_at: string | null
         }
         // DERIVED FIRST (T7): locations_data is saved raw, so a figure that comes from bills would read
         // as 0, and fuelTypesPresent would drop electricity or vehicle fuel that the year did have.
@@ -1038,6 +1044,12 @@ const searchParams = useSearchParams()
           summary: locs ? summarize(locs, row.boundary_approach) : null,
           storedScope1: row.scope1_total,
           storedScope2: row.scope2_location_total,
+          // F-06: what its own calculation needs: its window, its frozen class (b) choices, the day it was last saved.
+          pricing: locs ? {
+            locations: locs, reporting_year: row.reporting_year, fiscal_year_end_month: row.fiscal_year_end_month,
+            coverage_resolutions: (Array.isArray(row.coverage_resolutions) ? row.coverage_resolutions : []) as CoverageResolution[],
+            factor_selection: row.factor_selection, factor_editions: row.factor_editions, workings: row.workings, updated_at: row.updated_at,
+          } : null,
         })
       })
     return () => { cancelled = true }
@@ -1130,6 +1142,8 @@ const searchParams = useSearchParams()
           factor_editions: data.factor_editions ?? {},
           // T3c diff 3: the frozen class (b) edition choices; '{}' (the column's default) means none made yet.
           factor_selection: data.factor_selection ?? {},
+          // F-06: the platform's factor-edition comparison as last saved; null = none made.
+          factor_edition_comparison: data.factor_edition_comparison ?? null,
         }))
         // ⚠️ AFTER THE LOAD, NEVER BEFORE IT. A step shown against a blank wizard is a step the
         // customer did not ask for, on data that is not theirs yet. An unknown name opens at the first
@@ -1841,6 +1855,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       priorYearState: priorYear.status === 'found' ? priorYear.state : 'not_stored',
       priorSummary: priorYear.status === 'found' ? priorYear.summary : null,
       thisSummary: summarize(derivedLocations, inventory.boundary_approach),
+      // F-06: which factor editions changed, against the editions that priced the stored prior year.
+      factorEditions: priorYear.status === 'found' && priorYear.pricing
+        ? compareFactorEditions({ locations: derivedLocations, reporting_year: inventory.reporting_year, fiscal_year_end_month: inventory.fiscal_year_end_month,
+            coverage_resolutions: coverageResolutions }, factorCtx, priorYear.pricing)
+        : null,
     }),
     /** The answer as captured when given, with the observation and basis of that moment. */
     capture: comparabilityCapture,
@@ -1892,6 +1911,18 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
   // What the step renders. Unchanged — the customer still sees whatever Tier A can say from the
   // typed-in figures, on a failed lookup exactly as on a successful one.
   const comparability = comparabilityDraft.disclosure
+
+  // F-06: the comparability record the exports carry: the one this session's answer would save, else the one stored.
+  // Lines from comparabilitySurfaceLines, the same as the verifier page and the assurance PDF print. Null with no
+  // prior year at all (no question was ever due), so a first inventory carries no block.
+  const exportComparability = (() => {
+    const record = buildComparabilityRecord({ capture: comparabilityDraft.capture, note: comparabilityDraft.note,
+      priorYearLookupFailed: comparabilityDraft.priorYearLookupFailed, current: comparability, checkedAt: new Date().toISOString() })
+      ?? inventory.comparability_disclosure ?? null
+    if (!record && !comparability) return null
+    return { heading: comparabilityHeading(comparability?.factorEditions?.priorHeading ?? priorYl.heading),
+      lines: comparabilitySurfaceLines(record, comparability?.factorEditions ?? null) }
+  })()
 
   const STEPS = ['Reporting frameworks', 'Company setup', 'Energy & fuel data', 'Additional data', 'Review & workings', 'Export reports', 'Audit trail']
   const activeFrameworks = FRAMEWORKS.filter(f => inventory.selected_frameworks.includes(f.id))
@@ -2040,6 +2071,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // One derivation for every figure the save writes (T7): totals, workings, pct_estimated and
     // factor_editions from derived locations, locations_data as edited. See lib/ghg/savePayload.ts.
     const saved = figuresForSave(inventory, 'AR6')
+    const savedEditionComparison = priorYear.status === 'found' ? (comparability?.factorEditions ?? null)
+      : priorYear.status === 'none' ? null : (inventory.factor_edition_comparison ?? null)
     const payload = {
       user_id: session.user.id,
       reporting_year: inventory.reporting_year,
@@ -2085,6 +2118,11 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       // reporting window (lib/ghg/factorSelection.ts). The column must exist first:
       // supabase/migrations/20261008_ghg_factor_selection.sql, run BEFORE this code is deployed.
       factor_selection: saved.factor_selection,
+      // F-06: the platform's factor-edition comparison, answered or not, so the verifier sees an edition change even
+      // when the comparability question is unanswered. Written only from a lookup that resolved: the comparison when
+      // a prior inventory was found, null when there is none; on a failed, ambiguous or unsent lookup the stored one
+      // stands, since nothing was learned about the prior year. Column: 20261008_ghg_factor_edition_comparison.sql.
+      factor_edition_comparison: savedEditionComparison,
       status: 'draft',
 // ⚠️ THIS IS ALSO THE RECORD OF WHAT THE SAVED TOTALS LEFT OUT. scope1_total / scope2_* above are
 // computed with refused locations EXCLUDED and unpriced lines left out (FI1), and buildWorkings emits one
@@ -2156,7 +2194,7 @@ workings: saved.workings,
     // flight the baseline moves with it; when something did, the page stays dirty, as it should.
     setInventory(i => {
       if (inventoryFingerprint(i) === savingFingerprint) skipSavedReset.current = true
-      return { ...i, factor_selection: saved.factor_selection }
+      return { ...i, factor_selection: saved.factor_selection, factor_edition_comparison: savedEditionComparison }
     })
     setSaved(true)
     setBaseline(savingFingerprint)
@@ -3377,6 +3415,13 @@ workings: saved.workings,
     return (
       <div>
         <h2 style={sectionHead}>Export your reports</h2>
+        {/* F-06: the year-on-year disclosure every export carries, shown here as it will print. */}
+        {exportComparability && (
+          <div style={{ background: '#f8f7f5', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#0d0d0d', marginBottom: 6 }}>{exportComparability.heading}</div>
+            {exportComparability.lines.map((l, i) => <div key={i} style={{ fontSize: 12, color: '#555553', lineHeight: 1.6 }}>{l}</div>)}
+          </div>
+        )}
         {(() => {
           const fw = inventory.selected_frameworks
           const needsScope3Now = fw.includes('esrs') || fw.includes('csrd') || fw.includes('gri')
@@ -3594,7 +3639,9 @@ workings: saved.workings,
     // would have caught it. This one argument is passed typed so the union actually binds.
     // DERIVED LOCATIONS (T7): the PDF's citations, exclusions and document index read the locations, and
     // the citations choose publishers by which streams have figures, so it must see the derived ones.
-    generateAssurancePDF({ ...inventory, locations: derivedLocations } as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
+    // F-06: the live factor-edition comparison when there is one, else the stored one, so the package prints an edition
+    // change whether or not the comparability question was answered.
+    generateAssurancePDF({ ...inventory, locations: derivedLocations, factor_edition_comparison: comparability?.factorEditions ?? inventory.factor_edition_comparison ?? null } as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
   }
 
   const generateExport = async (frameworkId: string) => {
@@ -3644,6 +3691,8 @@ workings: saved.workings,
       //   It sits INSIDE the shared rows array, so it is emitted for cdp, esrs, gri, ecovadis and
       // ifrs alike. The per-framework branches above add rows; none of them replaces this block.
       ...(exclusionNote ? [['Excluded from the figures above', exclusionNote]] : []),
+      // F-06: the year-on-year disclosure, with the factor editions that changed and FACTOR_EDITION_DISCLOSURE.
+      ...(exportComparability ? [[''], [exportComparability.heading.toUpperCase()], ...exportComparability.lines.map(l => [l])] : []),
       [''],
       ['METHODS'],
       ...combustionSourcesFor(derivedLocations, factorSel).map(src => ['Combustion factors', src]),

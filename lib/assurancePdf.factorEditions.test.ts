@@ -24,6 +24,10 @@ import { generateAssurancePDF } from './assurancePdf'
 import { EF_SOURCES, emptyLocation, type Location } from './ghg/engine'
 import { figuresForSave } from './ghg/savePayload'
 import { FACTOR_YEAR_NO_SUBSTITUTION, FACTOR_YEAR_RULE_CLASS_B } from './ghg/factorEditionRegistry'
+import { FACTOR_EDITION_DISCLOSURE } from './ghg/factorEditions'
+import { buildComparabilityDisclosure, buildComparabilityRecord } from './ghg/comparability'
+import { compareFactorEditions } from './ghg/factorEditionComparison'
+import { selectionContextFor } from './ghg/factorSelection'
 
 const ON = { ...emptyLocation('on', 'Toronto'), country: 'CA', province: 'ON', grid_region: 'ON', electricity_kwh: 10000 } as Location
 const base = {
@@ -67,5 +71,55 @@ describe('assurance PDF: factor editions (T3c diff 3)', () => {
     expect(rule[1]).toContain(FACTOR_YEAR_RULE_CLASS_B)
     expect(rule[1]).toContain(FACTOR_YEAR_NO_SUBSTITUTION)
     expect(rule[1]).not.toContain('\u2014')
+  })
+
+  // F-06: the comparability section, from the saved record, with the factor editions that changed.
+  it('a Comparability section prints the record\'s lines, the edition change and FACTOR_EDITION_DISCLOSURE; none without a record', () => {
+    const UK = { ...emptyLocation('uk', 'Leeds'), country: 'GB', grid_region: 'UK', electricity_kwh: 10000 } as Location
+    const p = figuresForSave({ ...base, reporting_year: 2025, locations: [UK] } as never, 'AR6', { preparedOn: new Date(2026, 5, 1) })
+    const cur = { ...base, locations: [UK] }
+    const fe = compareFactorEditions({ locations: [UK], reporting_year: 2026, fiscal_year_end_month: 12, coverage_resolutions: [] },
+      selectionContextFor(cur as never, new Date(2026, 9, 8)),
+      { locations: [UK], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [], factor_selection: p.factor_selection,
+        factor_editions: p.factor_editions, workings: p.workings, updated_at: '2026-06-01T12:00:00Z' })
+    const sum = { locationCount: 1, fuelTypes: ['electricity'], jurisdictions: ['GB'], boundaryApproach: 'operational_control' }
+    const d = buildComparabilityDisclosure({ priorScope1: null, priorScope2: null, thisScope1: 0, thisScope2: 1, priorYearState: 'clean',
+      priorSummary: sum, thisSummary: sum, factorEditions: fe })!
+    const rec = buildComparabilityRecord({ capture: { observations: d.observations.map(o => o.text), question: d.question, answer: 'nothing_changed',
+      basis: d.basis, answeredAt: '2026-10-08T00:00:00Z' }, note: '', priorYearLookupFailed: false, current: d, checkedAt: '2026-10-08T00:00:00Z' })
+    text.mockClear()
+    const t = tablesOf({ ...cur, comparability_disclosure: rec }).find(x => x.head?.[0]?.[0]?.startsWith('Year-on-year comparability'))!
+    const rows = t.body!.map(r => r[0])
+    expect(rows.some(r => r.startsWith('Emission factors changed between reporting year 2025 and reporting year 2026: UK DESNZ grid electricity factors, DEFRA 2025 to DEFRA 2026.'))).toBe(true)
+    expect(rows.at(-1)).toBe(FACTOR_EDITION_DISCLOSURE.changed!.detail)
+    expect(rows.join(' ')).not.toContain('₂')
+    expect(text.mock.calls.map(c => String(c[0]))).toContain('Comparability with 2025')
+    expect(tablesOf(cur).some(x => x.head?.[0]?.[0]?.startsWith('Year-on-year comparability'))).toBe(false)
+  })
+
+  // F-06, unanswered (Lisa, 8 Oct 2026): the edition change is the platform's finding, so it prints without an answer.
+  it('unanswered: the edition lines and FACTOR_EDITION_DISCLOSURE still print, and no company answer is invented', () => {
+    const UK = { ...emptyLocation('uk', 'Leeds'), country: 'GB', grid_region: 'UK', electricity_kwh: 10000 } as Location
+    const p = figuresForSave({ ...base, reporting_year: 2025, locations: [UK] } as never, 'AR6', { preparedOn: new Date(2026, 5, 1) })
+    const cur = { ...base, locations: [UK] }
+    const cmp = compareFactorEditions({ locations: [UK], reporting_year: 2026, fiscal_year_end_month: 12, coverage_resolutions: [] },
+      selectionContextFor(cur as never, new Date(2026, 9, 8)),
+      { locations: [UK], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: [], factor_selection: p.factor_selection,
+        factor_editions: p.factor_editions, workings: p.workings, updated_at: '2026-06-01T12:00:00Z' })
+    text.mockClear()
+    const tables = tablesOf({ ...cur, comparability_disclosure: null, factor_edition_comparison: cmp })
+    const t = tables.find(x => x.head?.[0]?.[0]?.startsWith('Emission factor editions, compared by the platform'))!
+    const rows = t.body!.map(r => r[0])
+    expect(rows).toEqual([
+      'Emission factors changed between reporting year 2025 and reporting year 2026: UK DESNZ grid electricity factors, DEFRA 2025 to DEFRA 2026. ' +
+        `Pricing this year's activity at last year's factors would give ${rows[0].match(/give ([\d.]+) tCO2e/)![1]} tCO2e more in Scope 2 (location-based) and ${rows[0].match(/and ([\d.]+) tCO2e/)![1]} tCO2e more in Scope 2 (market-based).`,
+      FACTOR_EDITION_DISCLOSURE.changed!.detail,
+    ])
+    expect(rows.join(' ')).not.toMatch(/The company states|has not been answered/)
+    expect(tables.some(x => x.head?.[0]?.[0]?.startsWith('Year-on-year comparability'))).toBe(false)
+    expect(text.mock.calls.map(c => String(c[0]))).toContain('Comparability with 2025')
+    // A comparison that found nothing (consistent) prints no section.
+    expect(tablesOf({ ...cur, factor_edition_comparison: { ...cmp, changes: [], state: 'consistent', disclosure: null } })
+      .some(x => x.head?.[0]?.[0]?.startsWith('Emission factor editions, compared'))).toBe(false)
   })
 })

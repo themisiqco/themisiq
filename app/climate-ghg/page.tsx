@@ -159,7 +159,7 @@ export default function Page() {
               // lib/publisherClaims.test.ts now fails on a publisher-year or publisher-activity claim that
               // no factor record supports.
               { label: 'Emission factors', big: 'IPCC AR6',
-                note: "Scope 1 and 2 factors matched to each location's country: US EPA and eGRID (US), ECCC (Canada), DEFRA/DESNZ (UK), EU MRR/IPCC defaults and EEA (EU), DCCEEW (Australia) and MfE (New Zealand), with US EPA combustion factors elsewhere. IPCC AR6 GWPs by default; a factor published with its own GWP basis is applied as published. Every factor is cited on its workings row." },
+                note: "Scope 1 and 2 factors matched to each location's country: US EPA and eGRID (US), ECCC (Canada), DEFRA/DESNZ (UK), EU MRR/IPCC defaults and EEA (EU), DCCEEW (Australia) and MfE (New Zealand). A location in any other country is not priced and is named wherever the figures appear; it is never priced with another country's factors. IPCC AR6 GWPs by default; a factor published with its own GWP basis is applied as published. Every factor is cited on its workings row." },
               { label: 'First SB 253 report', big: sbShortDate,
                 // The first visible mention of CARB on this page, so the agency is spelled out (FIRST_USE).
                 note: `${SB253_DATE_STATUS}, for Scope 1 and 2 on the prior fiscal year. Scope 3 follows from ${SB253_SCOPE3_FROM}. ${SB253_PLATFORM_SENTENCE_FIRST_USE}` },
@@ -287,6 +287,10 @@ const FRAMEWORKS = [
 
 /**
  * ⚠️ THE FACTOR ANSWER NAMES SIX JURISDICTIONS AND ONE DECLARED GAP, and both halves are checkable:
+ * (T3c diff 4: it said "Everywhere else uses US EPA combustion factors" until 8 Oct 2026, which the engine does
+ * not do. A location in an unsupported country is refused (countryRefusal in lib/ghg/engine.ts), excluded from every
+ * total and named on every surface; no factor falls back to another country's or publisher's value. A source test,
+ * lib/climateGhgFactorClaims.test.ts, holds the page to that.)
  * FactorJurisdiction in lib/ghg/factorEditions.ts is 'US' | 'CA' | 'UK' | 'EU' | 'AU' | 'NZ', and
  * FAMILIES_NOT_COVERED is ['refrigerants']. "Flagged for review instead of estimated" is the Tier 3
  * branch of lib/unitConversions.ts, which queues needs_manual_review rather than guessing.
@@ -306,9 +310,9 @@ const FAQ: readonly Faq[] = [
   { q: 'Will this survive third-party assurance?',
     a: "It is built for it. Every figure carries its method and its factor edition, and is traceable to your source documents where you've uploaded them; the assurance package is assembled for ISO 14064-3 and ISAE 3410 engagements, and your verifier sees the same view you do through access you grant and can revoke. ThemisIQ produces an assurance-ready package; the assurance itself is your verifier's to give." },
   { q: 'What if you do not hold factors for one of our countries?',
-    a: 'Six jurisdictions have their own published factor editions: the US, Canada, the UK, the EU, Australia and New Zealand. Everywhere else uses US EPA combustion factors, and the workings row says so rather than hiding it. Anything that cannot be converted confidently is flagged for review instead of being estimated, and refrigerants are a declared gap rather than a silent one.' },
+    a: 'Six jurisdictions have their own published factor editions: the US, Canada, the UK, the EU, Australia and New Zealand. A location in a country we do not hold factors for is not priced: it is left out of every total, and it is named wherever the figures appear, so nothing is quietly missing. We never price it with another country\'s factors. Anything that cannot be converted confidently is flagged for review instead of being estimated, and refrigerants are a declared gap rather than a silent one.' },
   { q: 'Can we compare this year against last year?',
-    a: 'Yes, and the comparison carries its own disclosure of what changed between the years, including which factor editions were applied. A year-on-year movement can come from your emissions or from a factor revision, and a verifier needs to know which.' },
+    a: 'Yes, and the comparison carries its own disclosure of what changed between the years. When last year\'s inventory is held on the platform, it names each emission factor edition that changed and what that change alone does to this year\'s figures, or says why that could not be calculated. A year-on-year movement can come from your emissions or from a factor revision, and a verifier needs to know which.' },
   { q: 'When is the first California SB 253 report due?',
     a: `${sbDateAnswer()} The status word is not decoration: this date has already moved once.`,
     extra: SB253_STATUS_SENTENCE },

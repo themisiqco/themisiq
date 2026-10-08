@@ -8,6 +8,7 @@ import { selectionContextFor } from './ghg/factorSelection'
 import { FACTOR_YEAR_NO_SUBSTITUTION, FACTOR_YEAR_RULE_CLASS_B } from './ghg/factorEditionRegistry'
 import { SELECTION_RULE_WORDS } from './ghg/workingsCells'
 import { isoDateInWords } from './ghg/dateWords'
+import { comparabilityHeading, comparabilitySurfaceLines, factorEditionSurfaceLines, type ComparabilityRecord, type FactorEditionComparison } from './ghg/comparability'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
 // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
 // TEXT: a subheading at what was line 258 and the running eyebrow in sectionTitle(). Both are now INK.
@@ -40,6 +41,11 @@ export interface PdfInventory {
   // T3c diff 3: what the workings read, so the PDF's editions are the ones the inventory was priced with.
   coverage_resolutions?: CoverageResolution[]
   factor_selection?: StoredFactorSelection | null
+  // F-06: the year-on-year record, printed in its own section with the factor editions that changed.
+  comparability_disclosure?: ComparabilityRecord | null
+  // F-06: the platform's factor-edition comparison (the page's live one, else the stored column). Printed whether or
+  // not the comparability question was answered.
+  factor_edition_comparison?: FactorEditionComparison | null
 }
 export interface PdfTotals { s1_total: number; s2_location: number; s2_market: number; co2: number; ch4: number; n2o: number; biogenic: number }
 export interface PdfFramework { id: string; name: string; full: string; gwp: string; deadline: string }
@@ -349,6 +355,33 @@ export function generateAssurancePDF(
         headStyles: { fillColor: INK, textColor: ON_COVER, fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: TABLE_INK },
         columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 80 }, 2: { cellWidth: 'auto' }, 3: { cellWidth: 60 }, 4: { cellWidth: 55 }, 5: { cellWidth: 55 } },
+        margin: { left: M, right: M },
+      })
+    }
+  }
+
+  // ── PAGE 3c: COMPARABILITY (F-06) ──
+  // The year-on-year record as the verifier page shows it, from the same lines (comparability.ts): the company's
+  // answer, what it was shown, the basis, then the factor editions that changed and the effect, and
+  // FACTOR_EDITION_DISCLOSURE. The edition change is the platform's finding, not the company's, so it prints even when
+  // the question is unanswered (Lisa's ruling, 8 Oct 2026); then the section carries the edition lines alone and no
+  // answer is invented. With neither a record nor an edition change there is no section: on a first inventory no
+  // question was ever due, and the package says nothing rather than guess which.
+  {
+    const rec = inventory.comparability_disclosure ?? null
+    const cmp = inventory.factor_edition_comparison ?? null
+    const lines = rec ? comparabilitySurfaceLines(rec, cmp) : factorEditionSurfaceLines(null, cmp)
+    if (lines.length > 0) {
+      const prior = cmp?.priorHeading ?? rec?.factorEditions?.priorHeading ?? yearLabel(inventory.reporting_year - 1, inventory.fiscal_year_end_month).heading
+      doc.addPage()
+      sectionTitle(doc, comparabilityHeading(prior), M)
+      autoTable(doc, {
+        startY: 92,
+        head: [[rec ? 'Year-on-year comparability (ISO 14064-3, 6.3.1.5)' : 'Emission factor editions, compared by the platform (the comparability question was not answered)']],
+        body: lines.map(l => [l.replace(/₂/g, '2').replace(/₃/g, '3').replace(/₄/g, '4')]),
+        theme: 'grid',
+        headStyles: { fillColor: INK, textColor: ON_COVER, fontSize: 9 },
+        bodyStyles: { fontSize: 8, textColor: TABLE_INK },
         margin: { left: M, right: M },
       })
     }

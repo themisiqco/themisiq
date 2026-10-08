@@ -50,7 +50,7 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
   it('totals, gates and exports read the derived locations', () => {
     for (const s of ['calcInventory(derivedLocations,', 'findUndeclaredStreams(derivedLocations,', 'findUnpriceableLocations(derivedLocations,',
       'findSteamFactorGaps(derivedLocations, factorSel)', 'buildWorkings(derivedLocations,', 'const loc = derivedLocations[activeLocation]',
-      'generateAssurancePDF({ ...inventory, locations: derivedLocations }']) {
+      'generateAssurancePDF({ ...inventory, locations: derivedLocations, factor_edition_comparison:']) {
       expect(pageSrc, s).toContain(s)
     }
   })
@@ -65,7 +65,8 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
     expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/FleetBlock.tsx'), 'utf8')).toContain('{p.figure(f.amount, f.unit)}')
   })
   it('the prior-year summary derives the stored row before reading it', () => {
-    expect(pageSrc).toContain("boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions, factor_selection')")
+    // F-06: with factor_editions and updated_at, so the prior year's own calculation can be rerun.
+    expect(pageSrc).toContain("boundary_approach, reporting_year, fiscal_year_end_month, coverage_resolutions, factor_selection, factor_editions, updated_at')")
     expect(pageSrc).toContain('const priorLocations = deriveStoredLocations(row)')
     expect(pageSrc).toContain('assessCompleteness(row.workings, priorLocations, row.reporting_year, row.fiscal_year_end_month, row.factor_selection)')
   })

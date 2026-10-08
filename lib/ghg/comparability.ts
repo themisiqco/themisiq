@@ -98,6 +98,76 @@ export interface ComparabilityInput {
   /** The prior year's structure. Null when 'not_stored' — there is no stored inventory to describe. */
   priorSummary: InventorySummary | null
   thisSummary: InventorySummary
+  /**
+   * F-06: which factor editions changed between the two years, and what the change alone does to this year's
+   * figures, from lib/ghg/factorEditionComparison.ts. Absent or null: not compared (no stored prior inventory, or a
+   * caller that does not compare). Tier B: it needs the prior inventory, as the structural lines do.
+   */
+  factorEditions?: FactorEditionComparison | null
+}
+
+// ── F-06: factor editions ─────────────────────────────────────────────────────────────────────────
+//
+// ISO 14064-3:2019 cl. 6.3.1.5 (ruling of 2 Oct 2026, finding F-06): a change of factor edition between the compared
+// years is a change that bears on comparability, and the verifier must be able to see it. The types live here and the
+// computation in factorEditionComparison.ts, because computing the effect prices the inventory through the engine
+// and this module stays pure.
+
+/** The scopes an edition change can move, in the words each sentence uses. */
+export type EditionEffectScope = 'scope1' | 'scope2_location' | 'scope2_market' | 'scope3_cat3'
+export const EDITION_EFFECT_SCOPE_WORDS: Record<EditionEffectScope, string> = {
+  scope1: 'Scope 1',
+  scope2_location: 'Scope 2 (location-based)',
+  scope2_market: 'Scope 2 (market-based)',
+  scope3_cat3: 'Scope 3 Category 3',
+}
+
+/** One dataset whose selected edition differs between the compared years. */
+export interface FactorEditionChange {
+  /** The registry dataset id. A record key, never printed: the sentences use `publisher` and `family`. */
+  dataset: string
+  /** The publisher and the factor family, in the words a customer reads. */
+  publisher: string
+  family: string
+  priorEdition: string
+  currentEdition: string
+  /**
+   * This year's activity priced at the prior year's edition, minus the same activity at this year's edition, by
+   * scope, tCO2e; only the scopes it moves. Null when it could not be calculated (`effectWithheldBecause` says why).
+   */
+  effect_tco2e: Partial<Record<EditionEffectScope, number>> | null
+  /** One sentence on how the effect was measured, or why it could not be. */
+  effect_basis: string
+  /** The reason clause when the effect is null ("the DEFRA 2022 factors are not loaded"); null otherwise. */
+  effectWithheldBecause: string | null
+}
+
+export interface FactorEditionComparison {
+  /** reportingYearLabel(...).inText of each year ("reporting year 2025"). */
+  priorLabel: string
+  currentLabel: string
+  /** reportingYearLabel(...).heading of the prior year, for the "Comparability with {prior year}" headings. */
+  priorHeading: string
+  /** The sentence saying the comparison could not be made, when the prior year recorded no editions; else null. */
+  unrecordedBecause: string | null
+  changes: FactorEditionChange[]
+  /** FACTOR_EDITION_DISCLOSURE[state].detail (lib/ghg/factorEditions.ts), printed beside the lines; null when consistent. */
+  disclosure: string | null
+  state: 'consistent' | 'changed' | 'unknown'
+}
+
+const MORE_OR_LESS = (x: number) => (x > 0 ? 'more' : 'less')
+
+/** The sentence for one changed dataset, in the design's wording (T3c, F-06). */
+export function factorEditionChangeText(c: FactorEditionChange, cmp: Pick<FactorEditionComparison, 'priorLabel' | 'currentLabel'>): string {
+  const head = `Emission factors changed between ${cmp.priorLabel} and ${cmp.currentLabel}: ${c.publisher} ${c.family} factors, ${c.priorEdition} to ${c.currentEdition}.`
+  if (!c.effect_tco2e) return `${head} The effect could not be calculated because ${c.effectWithheldBecause ?? 'it was not measured'}.`
+  const parts = (Object.keys(EDITION_EFFECT_SCOPE_WORDS) as EditionEffectScope[])
+    .filter(k => c.effect_tco2e![k] !== undefined && c.effect_tco2e![k] !== 0)
+    .map(k => `${fmtTonnes(Math.abs(c.effect_tco2e![k]!))} tCO₂e ${MORE_OR_LESS(c.effect_tco2e![k]!)} in ${EDITION_EFFECT_SCOPE_WORDS[k]}`)
+  return parts.length === 0
+    ? `${head} Pricing this year's activity at last year's factors gives the same figures.`
+    : `${head} Pricing this year's activity at last year's factors would give ${listWords(parts)}.`
 }
 
 export type ObservationKind =
@@ -109,12 +179,15 @@ export type ObservationKind =
   | 'jurisdictions'
   | 'boundary'
   | 'structure_unchanged'
+  | 'factor_edition'
 
 export interface ComparabilityObservation {
   kind: ObservationKind
   tier: 'A' | 'B'
   /** One complete sentence, as stated to the customer. */
   text: string
+  /** F-06: the structured change behind a 'factor_edition' line; absent on the "could not be checked" line. */
+  factorEdition?: FactorEditionChange
 }
 
 /**
@@ -171,6 +244,8 @@ export interface ComparabilityDisclosure {
   /** Asked once, after every observation. */
   question: string
   basis: ComparabilityBasis
+  /** F-06: the factor-edition comparison the 'factor_edition' lines came from. Present only when one was made. */
+  factorEditions?: FactorEditionComparison
 }
 
 // ── Words ───────────────────────────────────────────────────────────────────────────────────────
@@ -225,8 +300,17 @@ const movementClause = (prior: number, current: number): string | null => {
 const magnitudeText = (scope: 1 | 2, prior: number, current: number): string => {
   const head = `You reported ${fmtTonnes(prior)} tCO₂e in Scope ${scope} last year and ${fmtTonnes(current)} tCO₂e this year`
   const clause = movementClause(prior, current)
-  return clause ? `${head} — ${clause}.` : `${head}.`
+  return clause ? `${head}, ${clause}.` : `${head}.`
 }
+
+/**
+ * The magnitude sentence as it read before 8 Oct 2026 (T3c diff 4), with an em dash before the movement clause.
+ * Stored records answered before then hold it verbatim, and a stored observation is never rewritten (it is what the
+ * customer saw). sameLines reads it as the line it now is, so the change of punctuation alone is never recorded as
+ * drift; a real difference in the figures still is.
+ */
+const LEGACY_MAGNITUDE = /^(You reported .* this year) \u2014 (.*)$/
+const currentWording = (line: string): string => line.replace(LEGACY_MAGNITUDE, '$1, $2')
 
 const fuelWord = (f: string): string => FUEL_WORDS[f] ?? f.replace(/_/g, ' ')
 const countryWord = (c: string): string =>
@@ -475,6 +559,16 @@ export function buildComparabilityDisclosure(
         text: `Your organisational boundary went from ${priorBoundary} to ${thisBoundary}.`,
       })
     }
+
+    // ── Factor editions (F-06) ────────────────────────────────────────────────────────────────
+    // After the structural lines, so "your locations, fuels and jurisdictions are the same" is decided before them
+    // and cannot be swept into or out of by an edition change. One line per dataset whose edition changed; one line
+    // saying why not, when the prior year recorded no editions; none when every edition is the same.
+    const fe = input.factorEditions
+    if (fe) {
+      if (fe.unrecordedBecause) observations.push({ kind: 'factor_edition', tier: 'B', text: fe.unrecordedBecause })
+      else for (const c of fe.changes) observations.push({ kind: 'factor_edition', tier: 'B', text: factorEditionChangeText(c, fe), factorEdition: c })
+    }
   }
 
   return {
@@ -495,6 +589,7 @@ export function buildComparabilityDisclosure(
       boundaryWithheldBecause,
       statement: basisStatement(priorYearState, tierA, tierB, tierAWithheldBecause, tierBWithheldBecause),
     },
+    ...(priorSummary && input.factorEditions ? { factorEditions: input.factorEditions } : {}),
   }
 }
 
@@ -607,6 +702,12 @@ export interface ComparabilityRecord {
    * them. Absent when `observationsChanged` is false, which says so explicitly.
    */
   observationsAtSave?: string[]
+  /**
+   * F-06: the factor-edition comparison as recomputed at this save. A fact of the calculation, not of the answer, so
+   * it is taken at save (like observationsAtSave) and never stands in for what the customer saw. Absent on a record
+   * written before F-06, or when no comparison was made.
+   */
+  factorEditions?: FactorEditionComparison
 }
 
 /** The rendered lines of a disclosure, in order — what a customer actually read. */
@@ -614,7 +715,7 @@ export const observationLines = (d: ComparabilityDisclosure): string[] =>
   d.observations.map(o => o.text)
 
 const sameLines = (a: string[], b: string[]): boolean =>
-  a.length === b.length && a.every((line, i) => line === b[i])
+  a.length === b.length && a.every((line, i) => currentWording(line) === currentWording(b[i]))
 
 /**
  * Build the record to store, or null to write nothing.
@@ -665,5 +766,48 @@ export function buildComparabilityRecord(input: {
     checkedAt,
     observationsChanged,
     ...(observationsChanged ? { observationsAtSave } : {}),
+    ...(current?.factorEditions ? { factorEditions: current.factorEditions } : {}),
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// THE SURFACES: one set of lines for the export screen, the CSV/XLSX, the verifier page and the PDF (F-06)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** The company's answer, as the verifier page has always worded it; every surface uses these. */
+export const COMPARABILITY_ANSWER_WORDS: Record<ComparabilityAnswer, string> = {
+  nothing_changed: 'The company states nothing changed that would affect comparability; the difference reflects normal business activity.',
+  something_changed: 'The company states something changed that would affect comparability.',
+}
+
+/** The heading every surface uses for the block: "Comparability with {prior year}". */
+export const comparabilityHeading = (priorHeading: string): string => `Comparability with ${priorHeading}`
+
+/**
+ * The factor-edition part of the block: each edition line the record's own observations do not already carry (a
+ * record answered before F-06, or no record at all), then FACTOR_EDITION_DISCLOSURE beside them. `comparison` is the
+ * platform's own (the page's live one, or ghg_inventories.factor_edition_comparison on the verifier page and in the
+ * PDF), and it wins over the record's copy: the edition change is computed by the platform, not stated by the
+ * company, so it prints whether or not the question was answered (Lisa's ruling, 8 Oct 2026).
+ */
+export function factorEditionSurfaceLines(record: ComparabilityRecord | null | undefined, comparison?: FactorEditionComparison | null): string[] {
+  const fe = comparison ?? record?.factorEditions ?? null
+  if (!fe) return []
+  const shown = new Set([...(record?.observations ?? []), ...(record?.observationsAtSave ?? [])])
+  const lines = fe.unrecordedBecause ? [fe.unrecordedBecause] : fe.changes.map(c => factorEditionChangeText(c, fe))
+  return [...lines.filter(l => !shown.has(l)), ...(fe.disclosure ? [fe.disclosure] : [])]
+}
+
+/** The whole block as lines: the answer, what was shown, how it moved since, the basis, then the factor editions. */
+export function comparabilitySurfaceLines(record: ComparabilityRecord | null | undefined, comparison?: FactorEditionComparison | null): string[] {
+  const out: string[] = []
+  if (!record) out.push('The comparability question has not been answered for this inventory.')
+  else {
+    out.push(COMPARABILITY_ANSWER_WORDS[record.answer])
+    if (record.answer === 'something_changed' && record.detailProvided && record.note) out.push(`In the company's words: ${record.note}`)
+    out.push(...record.observations)
+    if (record.observationsChanged) out.push('The figures have changed since the answer was given. What they say now:', ...(record.observationsAtSave ?? []))
+    out.push(record.basis.statement)
+  }
+  return [...out, ...factorEditionSurfaceLines(record, comparison)]
 }

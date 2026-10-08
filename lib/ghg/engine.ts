@@ -14,6 +14,7 @@
 // DISPLAY CONSTANTS ONLY — no functions, no I/O, so the purity note above still holds. The SB 253
 // first-report date is a CARB PROPOSAL that has moved twice; it is not the engine's to assert, and
 // FRAMEWORKS.deadline renders to a customer beside computed totals. See lib/sb253.ts.
+import type { FactorEditionComparison } from './comparability'
 import { SB253_FRAMEWORK_DEADLINE } from '../sb253'
 
 // The two EXACT conversion anchors, from the repo's conversion authority. Imported rather than
@@ -1025,15 +1026,27 @@ export interface StoredSelectionEntry { edition: string; data_year: number | nul
 export type StoredFactorSelection = Partial<Record<DatasetId, StoredSelectionEntry>>
 /** What a caller passes: when the inventory was prepared (default: now), any frozen class (b) selections, and, for a
  *  save, a map that records every edition the calculation used (lib/ghg/savePayload.ts writes the column from it). */
-export interface SelectionContext { preparedOn?: Date; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse> }
+export interface SelectionContext {
+  preparedOn?: Date; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse>
+  /** F-06: the editions the rules required and were not held, by dataset, recorded like `record`. */
+  recordMissing?: Map<DatasetId, string>
+  /** F-06 only (lib/ghg/factorEditionComparison.ts): price `dataset` with this edition, as another year's
+   *  calculation selected it, to measure what a change of edition alone does to this year's figures. Never set by
+   *  a save or a surface: no figure anyone reports is priced through it. */
+  override?: Partial<Record<DatasetId, EditionUse>>
+}
 /** The resolved context every selector takes: the reporting window, its year and the preparation date. */
-export interface Sel { year: number; win: { start: Date; end: Date }; preparedOn: string; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse> }
+export interface Sel {
+  year: number; win: { start: Date; end: Date }; preparedOn: string; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse>
+  recordMissing?: Map<DatasetId, string>; override?: Partial<Record<DatasetId, EditionUse>>
+}
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 /** The selection context for a reporting year and year end, prepared on `ctx.preparedOn` (today when not given). */
 export function selectionFor(year: number, fiscalYearEndMonth: number | null | undefined = 12, ctx: SelectionContext = {}): Sel {
   const w = periodFromYearAndEnd(year, fiscalYearEndMonth ?? 12)
   return { year, win: { start: w.start, end: w.end }, preparedOn: isoDay(ctx.preparedOn ?? new Date()), ...(ctx.frozen ? { frozen: ctx.frozen } : {}),
-    ...(ctx.record ? { record: ctx.record } : {}) }
+    ...(ctx.record ? { record: ctx.record } : {}), ...(ctx.recordMissing ? { recordMissing: ctx.recordMissing } : {}),
+    ...(ctx.override ? { override: ctx.override } : {}) }
 }
 /** The edition a line was priced with, and what its workings row says about it. `key` is the table key: the data year
  *  for class (b), the edition year for class (a), null for an exempt default. */
@@ -1053,6 +1066,9 @@ export class MissingEditionError extends Error {
 const EDITION_MEMO = new Map<string, EditionUse | MissingEditionError>()
 /** The edition `dataset` is priced with for `sel`, or MissingEditionError. Pure; memoised on its inputs. */
 export function editionFor(dataset: DatasetId, sel: Sel): EditionUse {
+  // F-06: a comparison pricing this year's activity at another year's edition (never a reported figure).
+  const forced = sel.override?.[dataset]
+  if (forced) { sel.record?.set(dataset, forced); return forced }
   const frozen = sel.frozen?.[dataset]
   const k = [dataset, isoDay(sel.win.start), isoDay(sel.win.end), sel.year, sel.preparedOn, frozen ? `${frozen.label}@${frozen.selected_on}` : ''].join('|')
   let hit = EDITION_MEMO.get(k)
@@ -1071,7 +1087,7 @@ export function editionFor(dataset: DatasetId, sel: Sel): EditionUse {
     }
     EDITION_MEMO.set(k, hit)
   }
-  if (hit instanceof MissingEditionError) throw hit
+  if (hit instanceof MissingEditionError) { sel.recordMissing?.set(dataset, hit.edition); throw hit }
   // T3c diff 3: a save records what it used, so the class (b) choices can be frozen (lib/ghg/factorSelection.ts).
   sel.record?.set(dataset, hit)
   return hit
@@ -2421,6 +2437,12 @@ locations: Location[]
    * Carried here like factor_editions; lib/ghg/factorSelection.ts reads and writes it, the engine does not.
    */
   factor_selection?: StoredFactorSelection
+  /**
+   * F-06: the factor editions that changed since the stored prior year, `ghg_inventories.factor_edition_comparison`,
+   * written on every save whether or not the comparability question was answered. Null: no comparison made.
+   * Carried here like factor_editions; lib/ghg/factorEditionComparison.ts computes it, the engine does not read it.
+   */
+  factor_edition_comparison?: FactorEditionComparison | null
 }
 
 const emptyLocation = (id: string, name: string, state = ''): Location => ({

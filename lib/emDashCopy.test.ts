@@ -258,7 +258,7 @@ export function renderedDashes(file: string): number {
  *
  * ⚠️ THE SHARED lib/ COPY WENT NEXT, 27 Sep 2026: 73 dashes across 22 modules, and 19 budget lines with
  * them. What is left in lib/ is there for a reason, not for want of a sweep:
- *   · THREE MODULES KEPT A DASH THE SWEEP HAD ALREADY TAKEN, and were put back the same day. Reachability
+ *   · THREE MODULES KEPT A DASH THE SWEEP HAD ALREADY TAKEN, and were put back the same day (two now). Reachability
  *     from a PDF is not the test; being PRINTED by one is, and these are:
  *       lib/materiality/severityScale.ts (1) worksheetSubtopicHeading, printed at boardReportPdf.ts:850
  *         and :922. It renders on app/impact/[token] too, so it cannot be split by surface: one function,
@@ -268,14 +268,13 @@ export function renderedDashes(file: string): number {
  *         reaches a screen only, and it stayed swept. The detail is ALSO half of a grouping key at
  *         boardReportPdf.ts:1042 — both sides come from this constant in the same process, so a rewrite
  *         does not break the grouping, but a `detail` that is keyed on is not display copy.
- *       lib/ghg/comparability.ts (1) magnitudeText, and this one is not about a PDF at all. Its output is
- *         STORED, in ghg_inventories.comparability_disclosure.observations, and compared against a
- *         recompute at the next save (comparability.ts:655). The capture is rehydrated from the stored
- *         record on page load (app/dashboard/ghg/page.tsx:859) precisely so the next save notices drift —
- *         so changing the generator would set observationsChanged on every inventory answered before the
- *         change, and show a verifier the "what was shown / what it says now" divergence block for a
- *         comma. docs/item-3-comparability-disclosure.md quotes the sentence, and comparability.test.ts
- *         asserts it eight times; all three move together or not at all.
+ *       lib/ghg/comparability.ts (1) magnitudeText kept its dash because its output is STORED, in
+ *         ghg_inventories.comparability_disclosure.observations, and compared against a recompute at the next
+ *         save. SWEPT 8 Oct 2026 (T3c diff 4): the sentence now reads "... this year, a decrease of 26%.", and
+ *         the drift comparison reads a stored dashed sentence as the line it now is (LEGACY_MAGNITUDE in
+ *         comparability.ts), so no record answered before then is marked changed for the punctuation. The
+ *         stored lines are not rewritten. comparability.test.ts and docs/item-3-comparability-disclosure.md
+ *         moved with it.
  *   · lib/ghg/engine.ts (64), lib/assurancePdf.ts (3), lib/auditTrailNotice.ts (3),
  *     lib/materiality/boardReport.ts (17), lib/materiality/boardReportPdf.ts (6),
  *     lib/cbam/report/build.ts (7), lib/cbam/sefa.ts (4), lib/cbam/sefaCompute.ts (1) all feed a PDF or
@@ -364,9 +363,8 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/cbam/sefa.ts': 4,
   'lib/cbam/sefaCompute.ts': 1,
   'lib/flag/estimate.ts': 9,
-  // Printed by a PDF, or stored and compared. Put back on 27 Sep 2026 after the shared-lib sweep had
-  // already taken them; the reason each survives is in the header above, per file.
-  'lib/ghg/comparability.ts': 1,
+  // Printed by a PDF. Put back on 27 Sep 2026 after the shared-lib sweep had already taken them; the reason each
+  // survives is in the header above, per file. (lib/ghg/comparability.ts left on 8 Oct 2026, T3c diff 4.)
   'lib/ghg/engine.ts': 58,
   'lib/materiality/boardReport.ts': 17,
   'lib/materiality/boardReportPdf.ts': 6,

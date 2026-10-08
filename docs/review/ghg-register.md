@@ -213,7 +213,7 @@ verified from the repository. Every **D** and **P** is repeated in section (a).
 | CG-20 | FAQ: "Everywhere else uses US EPA combustion factors, and the workings row says so" | climate-ghg:303 | Refused, nothing priced (engine.ts:3154-3177). | D |
 | CG-21 | FAQ: unconvertible units flagged for review | climate-ghg:303 | lib/unitConversions.ts:178-179. | A |
 | CG-22 ✔ | FAQ: "refrigerants are a declared gap rather than a silent one" | climate-ghg:303 | Refrigerants are calculated (engine.ts:58-62, 2627-2628, 3234-3236). | D |
-| CG-23 | FAQ: comparison discloses "which factor editions were applied" | climate-ghg:305 | No edition observation in comparability (comparability.ts:103-114). | P |
+| CG-23 **CLOSED** | FAQ: comparison discloses "which factor editions were applied" | climate-ghg:305 | **Closed 8 Oct 2026, T3c diff 4 (docs/review/patches/t3c-4.patch):** the comparison names each factor edition that changed and what the change alone does to this year's figures (factor_edition observation, lib/ghg/factorEditionComparison.ts), and the FAQ now claims only that, when last year's inventory is held on the platform. As recorded 1 Oct: no edition observation in comparability (comparability.ts:103-114). | P |
 | CG-24 | faq.ts: you approve every figure before it goes in | app/climate-ghg/faq.ts:60 | Only confirmed proposals write; pending ones block export. | A |
 | CG-25 | faq.ts: "We identify every data source…" | faq.ts:56 | A service description. | CV |
 | M-01 | Frameworks "required by SB 253, CDP, ESRS E1, GRI 305, and IFRS S2" | app/methodology/page.tsx:52 | Regulatory claim. | CV |
@@ -324,7 +324,7 @@ Statements that say something the code does not do. ✔ = re-checked directly.
 22. **SB 253 first-year Scope 3 banner** shown only for `year <= 2024` (ghg page.tsx:2891-2892); the first SB 253 report covers FY2025.
 23. **"Contracted volumes are not deducted from the grid average"** (methodology:71) and **"a conservative fallback"** (ghg page.tsx:2308); in the fallback branch the grid factor is applied to non-contracted load only, and nothing tests conservatism.
 24. **One GWP basis, "IPCC AR6", stamped on the whole CSV and per framework in the PDF** (ghg page.tsx:3109; assurancePdf.ts:168) while UK, AU and NZ rows are AR5-combined as published; and ✔ the AU residual-mix row itself is stamped AR6 (engine.ts:3266).
-25. **Comparability "which factor editions were applied"** (climate-ghg:305); the comparability record has no edition observation.
+25. **Comparability "which factor editions were applied"** (climate-ghg:305); the comparability record has no edition observation. **Closed 8 Oct 2026, T3c diff 4 (docs/review/patches/t3c-4.patch)**; see CG-23.
 26. **"ESRS E1-6 disclosure tables"** in the Scope 3 upgrade copy (scope3 page.tsx:4431); no generator exists.
 27. **Extraction "a blank that gets flagged for human entry"** (extract/route.ts:70); null values are dropped and the model's notes are not shown.
 28. **Duplicate resolution "drops a double-count"** (engine.ts code comments 1853, 2826); no adjustment is applied, and the basis text shown to customers says so (2888, 2903). The customer-facing text is accurate; the code comments are not.

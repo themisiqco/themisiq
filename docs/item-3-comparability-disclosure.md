@@ -27,7 +27,7 @@ including customers who did last year in a spreadsheet and typed the totals in.
 Compares `prior_year_s1` / `prior_year_s2` against this year's totals and states
 the movement.
 
-> You reported 1,240 tCO₂e in Scope 1 last year and 2,910 this year — an
+> You reported 1,240 tCO₂e in Scope 1 last year and 2,910 this year, an
 > increase of 135%. What changed?
 
 **Tier B — structural observations.** Requires a stored prior inventory. Adds
@@ -99,7 +99,7 @@ Heading:
 
 Observation, Tier A:
 
-> You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year — an
+> You reported 1,240 tCO₂e in Scope 1 last year and 2,910 tCO₂e this year, an
 > increase of 135%.
 
 Tier B appends:
