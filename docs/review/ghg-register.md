@@ -133,6 +133,14 @@ Columns in every register table: ID | Item | What the code does | Source/standar
 | S3-29 | CSV export | Header block (total, exclusions, Cat 12 split, Cat 6 RF); columns Category, Name, mt CO2e, Method, Confidence, Status, In total, Exclusion justification; ESTIMATE BASIS and METHODOLOGY NOTE blocks; footer "GHG Protocol Scope 3 Standard"; file `{company}_Scope3_{year}.csv`. | n/a | page.tsx:2763-2822, 2957-3041 | Yes | No GWP row for Cats 1, 2, 4. The Method column prints the default method even when an entered figure was used, contradicting the METHODOLOGY NOTE block in the same file. Bridge per-supplier lines are not exported. |
 | S3-30 | Scope 3 PDF | not found | n/a | not found | No | none |
 
+**Open items recorded 8 Oct 2026 (T3e, Lisa):**
+
+| ID | Item | What the code does | Source/standard and vintage cited | File:line | Customer-facing? | Notes |
+|---|---|---|---|---|---|---|
+| YOY-04 **OPEN** | F-06 does not compare Scope 3 factor editions | The year-on-year edition comparison reruns the Scope 1 and 2 calculation only (lib/ghg/factorEditionComparison.ts, buildWorkings). Scope 3 selects its own DEFRA travel, waste and Category 3 energy editions (lib/scope3/defraEditions.ts, cat3Editions.ts), and nothing compares them between years. Every surface now says so (FACTOR_EDITION_SCOPE_NOTE, lib/ghg/comparability.ts). | ISO 14064-3:2019 cl. 6.3.1.5 (F-06 ruling, 2 Oct 2026) | lib/ghg/factorEditionComparison.ts; lib/ghg/comparability.ts | Yes: the disclosure states the limit | Extend the comparison to the Scope 3 datasets (desnz_travel, desnz_waste, desnz_scope3_energy, nga_scope3). |
+| S3-31 **OPEN** | No Scope 3 export gate for unpriced lines | An unpriced Scope 3 line (an edition not held, a factor not published, an incomplete row) leaves its category out of the total, marked "(partial)" and named under "Excluded from total" in the export; nothing blocks the export. The GHG module blocks export on an unpriced line; Scope 3 does not, so the T3c sentence is used without its "Export is blocked" clause (lib/scope3/defraEditions.ts withoutExportClause). | none | app/dashboard/scope3/page.tsx (unpricedCatIds, totalScope3Label); lib/scope3/defraEditions.ts | Yes: "(partial)" | Design an export gate for Scope 3, then restore the clause. |
+| S3-32 **OPEN** | The Scope 3 page loads every DEFRA travel edition | lib/emissionFactors/defraTravel.ts imports all four travel artefacts (2023 to 2026, about 115 KB each) into the client bundle, and the waste reader all four waste artefacts, although a page prices on one edition. | none | lib/emissionFactors/defraTravel.ts; defraWaste.ts | No (bundle size) | Load only the edition the bound inventory's window selects (dynamic import keyed by year). |
+
 ## 8. Location-count limits and enforcement
 
 **Current state ✔.** Every `GHG_TIERS[*].locationAllowance` is `null` (lib/pricing.ts:180-184), so every

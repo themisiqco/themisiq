@@ -10,6 +10,7 @@ import {
   cat6RfSentence, cat6RfHeader, cat6MethodDescription, cat6Sentences, cat6Basis, RF_CO2_MULTIPLIER, CAT6_RF_FACTORS_PHRASE,
 } from './businessTravelCopy'
 import { publisherGwpSentence } from './gwpSentence'
+import { TW_2026 } from '../testing/defraEditions'
 
 const ROOT = join(__dirname, '..', '..')
 const name = (iso2: string) => iso2
@@ -19,7 +20,7 @@ const sample = evaluateBusinessTravel({
     { id: 'b', origin_iso2: 'GB', destination_iso2: 'MC', cabin_class: 'unknown', count: 1, ...withDistance(1000, 'km') },
   ],
   rail_journeys: [{ id: 'r', country_iso2: 'FR', rail_type: 'National rail', passengers: 1, ...withDistance(100, 'km') }],
-})
+}, TW_2026.travel)
 const ALL = [
   CAT6_SOURCE_SENTENCE, CAT6_CATEGORY_RULE_SENTENCE, CAT6_CLASS_SENTENCE, CAT6_UPLIFT_SENTENCE, CAT6_WTT_SENTENCE,
   CAT6_RAIL_SENTENCE, CAT6_HOTEL_SENTENCE, CAT6_DISTANCE_HELP, CAT6_TAKES, CAT6_ASSISTANT_PHRASE,
@@ -44,7 +45,7 @@ describe('Category 6 sentences', () => {
   })
 
   it('C6C3 ⚠️ the radiative forcing increase is stated as DEFRA\'s, in ONE shared phrase, with the 70% read from A11', () => {
-    expect(DEFRA_TRAVEL_META.guidance.rf_two_sets.text).toMatch(/causing an increase of 70%/)
+    expect(DEFRA_TRAVEL_META.guidance.rf_two_sets!.text).toMatch(/causing an increase of 70%/)
     expect(RF_CO2_MULTIPLIER).toBe(1.7)
     expect(CAT6_RF_FACTORS_PHRASE).toBe("DEFRA's With RF flight factors, which increase the CO2 component by 70% to account for radiative forcing (Business travel- air A11)")
     expect(cat6RfHeader(true)).toBe(`Included: ${CAT6_RF_FACTORS_PHRASE}. Figures without it are in the Cat 6 rows.`)

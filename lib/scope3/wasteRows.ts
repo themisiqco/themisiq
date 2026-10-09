@@ -16,6 +16,7 @@
 // is never counted as zero.
 
 import { priceWasteRow, type WasteRowInput, type WasteRowPricing } from '../emissionFactors/defraWaste'
+import type { DefraEdition } from './defraEditionTypes'
 
 /**
  * One waste stream as stored in cat_data: the activity block beside the waste type, because the block is
@@ -43,9 +44,9 @@ export interface WasteRowsEvaluation<R extends WasteRowInput = WasteRow> {
   mt: number
 }
 
-/** Price one category's rows. `undefined` is an empty list: a category with no rows has none to price. */
-export function evaluateWasteRows<R extends WasteRowInput>(rows: readonly R[] | undefined): WasteRowsEvaluation<R> {
-  const evaluated = (rows ?? []).map((row, i) => ({ row, n: i + 1, pricing: priceWasteRow(row) }))
+/** Price one category's rows on the DEFRA waste edition the window selected (T3e). `undefined` is an empty list. */
+export function evaluateWasteRows<R extends WasteRowInput>(rows: readonly R[] | undefined, ed: DefraEdition): WasteRowsEvaluation<R> {
+  const evaluated = (rows ?? []).map((row, i) => ({ row, n: i + 1, pricing: priceWasteRow(row, ed) }))
   const priced = evaluated.flatMap(e => (e.pricing.status === 'priced' ? [{ ...e, pricing: e.pricing }] : []))
   const notPriced = evaluated.filter(e => e.pricing.status !== 'priced')
   const kg = priced.reduce((sum, e) => sum + e.pricing.kg_co2e, 0)
@@ -56,4 +57,6 @@ export function evaluateWasteRows<R extends WasteRowInput>(rows: readonly R[] | 
 export const wasteRowNotPricedReason = (row: WasteRowInput, pricing: WasteRowPricing): string | null =>
   pricing.status === 'incomplete' ? `${pricing.missing.join(', ')} not entered`
     : pricing.status === 'no_factor' ? `the sheet publishes no ${row.route} factor for ${row.waste_type} (${row.activity}), so it is not counted, and not counted as zero`
+    // T3e: the engine's own sentence, which names the edition, the family and the reporting year.
+    : pricing.status === 'edition_missing' ? pricing.message
     : null

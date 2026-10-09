@@ -27,6 +27,7 @@
 
 import { wasteRoutesFor } from '../emissionFactors/defraWaste'
 import { evaluateWasteRows, type EvaluatedWasteRow, type WasteRow } from './wasteRows'
+import type { DefraEdition } from './defraEditionTypes'
 
 export interface EolMaterial {
   id: string
@@ -59,6 +60,8 @@ export type EolMaterialOutcome =
   | { status: 'split_invalid'; sum: number }
   /** A share on a route the sheet publishes no factor for, for this material. Only saved data can do this. */
   | { status: 'no_factor'; routes: string[] }
+  /** T3e: everything entered, but the DEFRA waste edition the window needs is not held. Never another edition. */
+  | { status: 'edition_missing'; edition: string; message: string }
 
 export interface EvaluatedEolMaterial {
   material: EolMaterial
@@ -83,7 +86,7 @@ export interface EolEvaluation {
 const enteredShares = (m: EolMaterial): [string, number][] =>
   Object.entries(m.shares ?? {}).filter(([, v]) => v !== 0 && v !== undefined && v !== null) as [string, number][]
 
-function evaluateOne(m: EolMaterial, n: number): EvaluatedEolMaterial {
+function evaluateOne(m: EolMaterial, n: number, ed: DefraEdition): EvaluatedEolMaterial {
   const shares = enteredShares(m)
   const shareSum = shares.reduce((s, [, v]) => s + (Number.isFinite(v) ? v : NaN), 0)
   const none = (outcome: EolMaterialOutcome): EvaluatedEolMaterial => ({ material: m, n, outcome, shareSum, routes: [], kg: 0 })
@@ -94,7 +97,8 @@ function evaluateOne(m: EolMaterial, n: number): EvaluatedEolMaterial {
   if (shares.length === 0) missing.push('split')
   if (missing.length > 0) return none({ status: 'incomplete', missing })
 
-  const published = wasteRoutesFor(m.activity, m.waste_type)
+  if ('missing' in ed) return none({ status: 'edition_missing', edition: ed.missing.edition, message: ed.missing.message })
+  const published = wasteRoutesFor(m.activity, m.waste_type, ed.held.year)
   const unpublished = shares.map(([r]) => r).filter(r => !published.includes(r))
   if (unpublished.length > 0) return none({ status: 'no_factor', routes: unpublished })
 
@@ -116,14 +120,14 @@ function evaluateOne(m: EolMaterial, n: number): EvaluatedEolMaterial {
       route,
       tonnes: (m.tonnes * (m.shares[route] as number)) / 100,
     }))
-  const e = evaluateWasteRows(rows)
+  const e = evaluateWasteRows(rows, ed)
   if (e.notPriced.length > 0) return none({ status: 'no_factor', routes: e.notPriced.map(r => r.row.route) })
   return { material: m, n, outcome: { status: 'priced' }, shareSum, routes: e.evaluated, kg: e.kg }
 }
 
 /** Price one category's end-of-life materials. `undefined` is an empty list. */
-export function evaluateEolMaterials(materials: readonly EolMaterial[] | undefined): EolEvaluation {
-  const evaluated = (materials ?? []).map((m, i) => evaluateOne(m, i + 1))
+export function evaluateEolMaterials(materials: readonly EolMaterial[] | undefined, ed: DefraEdition): EolEvaluation {
+  const evaluated = (materials ?? []).map((m, i) => evaluateOne(m, i + 1, ed))
   const priced = evaluated.filter(e => e.outcome.status === 'priced')
   const notPriced = evaluated.filter(e => e.outcome.status !== 'priced')
   const kg = priced.reduce((sum, e) => sum + e.kg, 0)
@@ -146,5 +150,7 @@ export function eolMaterialNotPricedReason(e: EvaluatedEolMaterial): string | nu
         : 'one of its treatment shares is not a number, so it is not priced'
     case 'no_factor':
       return `the sheet publishes no ${o.routes.join(' or ')} factor for ${m.waste_type} (${m.activity}), so it is not counted, and not counted as zero`
+    case 'edition_missing':
+      return o.message
   }
 }

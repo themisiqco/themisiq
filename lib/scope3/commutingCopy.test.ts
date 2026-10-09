@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { TW_2026 } from '../testing/defraEditions'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFRA_TRAVEL_META } from '../emissionFactors/defraTravel'
@@ -13,7 +14,7 @@ const ROOT = join(__dirname, '..', '..')
 const sample = evaluateCommuting({
   commute_rows: [{ id: 'c', mode: 'car', car_size: 'average', car_fuel: 'unknown', country_iso2: 'GB', employees: 1, occupancy: 1, days_per_week: 5, weeks_per_year: 46, ...withDistance(20, 'km') }],
   homeworking_rows: [{ id: 'h', country_iso2: 'US', employees: 2, days_per_week: 2, weeks_per_year: 46, hours_per_day: 8 }],
-})
+}, TW_2026.travel)
 const ALL = [
   CAT7_SOURCE_SENTENCE, CAT7_FORMULA_SENTENCE, CAT7_DAYS_SENTENCE, CAT7_OCCUPANCY_SENTENCE, CAT7_STAND_IN_SENTENCE,
   CAT7_ELECTRIC_SENTENCE, CAT7_WTT_SENTENCE, CAT7_HOMEWORKING_SENTENCE, CAT7_HOMEWORKING_NOT_UK, CAT7_ASSISTANT_PHRASE,
@@ -60,7 +61,7 @@ describe('Category 7 sentences', () => {
 
   it('K6 the distance line shows passenger-km, then the occupancy division for per vehicle-km modes, on panel and CSV alike', () => {
     const carRow = { id: 'c', mode: 'car' as const, car_size: 'average' as const, car_fuel: 'unknown' as const, country_iso2: 'GB', employees: 10, occupancy: 2, days_per_week: 5, weeks_per_year: 46, ...withDistance(20, 'km') }
-    const e = evaluateCommuting({ commute_rows: [carRow, { ...carRow, id: 'b', mode: 'bus', bus_type: 'average_local', occupancy: undefined }] })
+    const e = evaluateCommuting({ commute_rows: [carRow, { ...carRow, id: 'b', mode: 'bus', bus_type: 'average_local', occupancy: undefined }] }, TW_2026.travel)
     const [c, b] = e.pricedCommutes
     // 10 x 9,200 = 92,000 passenger-km; / 2 = 46,000 vehicle-km. A bus stops at passenger-km.
     expect(commuteDistanceText(c.pricing)).toBe('92,000 passenger-km, divided by occupancy 2 = 46,000 vehicle-km')

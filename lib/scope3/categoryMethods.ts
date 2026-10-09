@@ -33,8 +33,10 @@
 // Scope 3 page already ships.
 
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
-import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
-import { DEFRA_ENERGY_META } from '../emissionFactors/defraEnergy'
+import { DEFRA_WASTE_META, DEFRA_WASTE_YEARS } from '../emissionFactors/defraWaste'
+import { defraHeldSource, heldYearsWords } from './defraEditionTypes'
+import { NGA_SCOPE3_EDITIONS } from '../emissionFactors/ngaScope3_2025'
+import { DEFRA_ENERGY_META, DEFRA_ENERGY_YEARS } from '../emissionFactors/defraEnergy'
 import { cat15MethodDescription } from './cat15'
 import { cat6MethodDescription } from './businessTravelCopy'
 import { cat7MethodDescription } from './commutingCopy'
@@ -290,10 +292,11 @@ export function scope3MethodDescription(method: Scope3Method): string {
       )
     case 'waste_factors': {
       const w = DEFRA_WASTE_META
+      // T3e: no window is bound on this line (the hierarchy, the CSV Method cell), so it names the set held.
       return (
         `Activity-based: tonnes of waste by material and treatment route, each multiplied by the kg CO2e ` +
-        `per tonne published for that pair in ${w.source} (${w.factor_set.toLowerCase()} v${w.file_version}, ` +
-        `${w.sheet} sheet, ${w.gwp_basis} GWPs). Only the routes published for a material are offered; ` +
+        `per tonne published for that pair in ${defraHeldSource(DEFRA_WASTE_YEARS, `${w.factor_set.toLowerCase()}, ${w.sheet} sheet, ${w.gwp_basis} GWPs`)}. ` +
+        `Only the routes published for a material are offered; ` +
         `re-use is not a disposal route and has no factor. ${w.attribution_required}`
       )
     }
@@ -307,8 +310,8 @@ export function scope3MethodDescription(method: Scope3Method): string {
       return (
         `Activity-based, per material: the tonnes of sold products and packaging reaching end of life, split ` +
         `by the customer across the treatment routes the sheet publishes for that material, each route's ` +
-        `tonnes multiplied by the kg CO2e per tonne published for that material and route in ${w.source} ` +
-        `(${w.factor_set.toLowerCase()} v${w.file_version}, ${w.sheet} sheet, ${w.gwp_basis} GWPs). This is ` +
+        `tonnes multiplied by the kg CO2e per tonne published for that material and route in ` +
+        `${defraHeldSource(DEFRA_WASTE_YEARS, `${w.factor_set.toLowerCase()}, ${w.sheet} sheet, ${w.gwp_basis} GWPs`)}. This is ` +
         `finer than formula [12.1] of the GHG Protocol's Technical Guidance for Calculating Scope 3 ` +
         `Emissions, which applies one average factor per treatment method. The split and its source are the ` +
         `customer's assumption. The figure is the expected end-of-life emissions of all products sold in the ` +
@@ -336,14 +339,17 @@ export function scope3MethodDescription(method: Scope3Method): string {
         // ⚠️ THE SHEETS THAT DECLARE SCOPE 3, NOT metadata.sheets, WHICH INCLUDES Conversions. That fifth
         // sheet publishes unit conversions and no emission factor, so naming it here would say a factor
         // came from a sheet that has none. scope_cells holds the four that state "Scope 3" at B6.
-        `Factors are ${e.source} (${e.factor_set.toLowerCase()} v${e.file_version}, the ` +
-        `${listSheets(Object.keys(e.scope_cells))} sheets, ${e.gwp_basis} GWPs), published for the ` +
-        `United Kingdom: a ` +
+        // T3e follow-up: no reporting window is bound on this line (the hierarchy, the CSV Method cell), so it names the
+        // DEFRA and NGA editions held, as the travel and waste lines do, never one fixed edition. A bound record's
+        // basis names the editions its window selected (cat3Copy.ts cat3Basis).
+        `Factors are ${defraHeldSource(DEFRA_ENERGY_YEARS, `${e.factor_set.toLowerCase()}, the ${listSheets(Object.keys(e.scope_cells))} sheets, ${e.gwp_basis} GWPs`)}, ` +
+        `published for the United Kingdom: a ` +
         `location in another country is priced from them as a stand-in and its line says so. ` +
         // FI6 (ruling R15, 7 Oct 2026): Australian gas and electricity are priced from the site's own publisher. Every
         // claim here is what lib/scope3/cat3Energy.ts priceAuGas and priceAuElectricity do.
         `At an Australian location, natural gas and electricity are not priced from these: they take the ` +
-        `DCCEEW National Greenhouse Accounts Factors 2025 Scope 3 factors for the site's state, Table 1 for ` +
+        `DCCEEW National Greenhouse Accounts Factors Scope 3 factors of the edition the reporting window's activity ` +
+        `year requires (${heldYearsWords(NGA_SCOPE3_EDITIONS.map(Number))}) for the site's state, Table 1 for ` +
         `electricity as one line that includes the electricity lost in the grid, with no separate transmission ` +
         `and distribution line, and Table 6 for natural gas, by the site's metro or non-metro gas area, converted ` +
         `to gigajoules at NGA's own energy content (Table 5). Other Australian fuels and purchased heat use the ` +

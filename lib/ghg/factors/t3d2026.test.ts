@@ -101,8 +101,11 @@ describe('T3d 2026: the registry', () => {
     }
   })
 
-  it('desnz_travel and desnz_waste carry the T3e requirement: DEFRA 2023, 2024 and 2025 before selection is wired', () => {
-    for (const ds of ['desnz_travel', 'desnz_waste'] as const) expect(DATASETS[ds].note, ds).toContain('T3e MUST LOAD DEFRA 2023, 2024 AND 2025')
+  it('desnz_travel and desnz_waste: the T3e requirement is met (DEFRA 2023, 2024 and 2025 held) and its note removed', () => {
+    for (const ds of ['desnz_travel', 'desnz_waste'] as const) {
+      expect(DATASETS[ds].note, ds).not.toContain('T3e MUST LOAD')
+      expect(FACTOR_EDITION_REGISTRY.filter(e => e.dataset === ds && e.held).map(e => e.label), ds).toEqual(['DEFRA 2023', 'DEFRA 2024', 'DEFRA 2025', 'DEFRA 2026'])
+    }
   })
 })
 

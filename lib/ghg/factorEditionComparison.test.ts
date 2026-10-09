@@ -5,7 +5,7 @@ import { emptyLocation, getGridFactor, selectionFor, type Inventory, type Locati
 import { figuresForSave } from './savePayload'
 import { selectionContextFor } from './factorSelection'
 import { compareFactorEditions, type PriorYearPricing } from './factorEditionComparison'
-import { buildComparabilityDisclosure, buildComparabilityRecord, comparabilitySurfaceLines, factorEditionSurfaceLines, type InventorySummary } from './comparability'
+import { buildComparabilityDisclosure, buildComparabilityRecord, comparabilitySurfaceLines, factorEditionSurfaceLines, FACTOR_EDITION_SCOPE_NOTE, type InventorySummary } from './comparability'
 import { DATASETS } from './factorEditionRegistry'
 import { FACTOR_EDITION_DISCLOSURE } from './factorEditions'
 
@@ -134,13 +134,15 @@ describe('F-06: the disclosure travels with the record to every surface', () => 
     const lines = comparabilitySurfaceLines(rec)
     const edition = editionLines(d)[0].text
     expect(lines.filter(l => l === edition)).toHaveLength(1)
-    expect(lines.at(-1)).toBe(FACTOR_EDITION_DISCLOSURE.changed!.detail)
+    // T3e follow-up: the scope of the comparison closes the factor-edition part, on every surface.
+    expect(lines.slice(-2)).toEqual([FACTOR_EDITION_DISCLOSURE.changed!.detail, FACTOR_EDITION_SCOPE_NOTE])
+    expect(FACTOR_EDITION_SCOPE_NOTE).toBe('This comparison covers Scope 1 and Scope 2 emission factor editions. Scope 3 factor editions (business travel, waste and Category 3 energy) are not yet compared between years.')
     expect(lines[0]).toBe('The company states nothing changed that would affect comparability; the difference reflects normal business activity.')
     // A record answered before F-06 (no edition lines in what was shown) gains them from the save's comparison.
     const old = { ...rec, observations: capture.observations.filter(l => l !== edition) }
-    expect(factorEditionSurfaceLines(old)).toEqual([edition, FACTOR_EDITION_DISCLOSURE.changed!.detail])
+    expect(factorEditionSurfaceLines(old)).toEqual([edition, FACTOR_EDITION_DISCLOSURE.changed!.detail, FACTOR_EDITION_SCOPE_NOTE])
     // No record at all: says so, and the live comparison still prints (export screen and CSV).
-    expect(comparabilitySurfaceLines(null, d.factorEditions)).toEqual(['The comparability question has not been answered for this inventory.', edition, FACTOR_EDITION_DISCLOSURE.changed!.detail])
+    expect(comparabilitySurfaceLines(null, d.factorEditions)).toEqual(['The comparability question has not been answered for this inventory.', edition, FACTOR_EDITION_DISCLOSURE.changed!.detail, FACTOR_EDITION_SCOPE_NOTE])
   })
 
   const ROOT = join(__dirname, '..', '..')
@@ -162,7 +164,7 @@ describe('F-06: the disclosure travels with the record to every surface', () => 
 
   it('unanswered, on the verifier page: the platform comparison prints on its own, with no company answer', () => {
     // The lines the block renders: the edition change and FACTOR_EDITION_DISCLOSURE, from the stored column alone.
-    expect(factorEditionSurfaceLines(null, d.factorEditions)).toEqual([editionLines(d)[0].text, FACTOR_EDITION_DISCLOSURE.changed!.detail])
+    expect(factorEditionSurfaceLines(null, d.factorEditions)).toEqual([editionLines(d)[0].text, FACTOR_EDITION_DISCLOSURE.changed!.detail, FACTOR_EDITION_SCOPE_NOTE])
     expect(factorEditionSurfaceLines(null, { ...d.factorEditions!, changes: [], state: 'consistent', disclosure: null })).toEqual([])
     const v = read('app/verify/[token]/page.tsx')
     expect(v).toContain('{!inv.comparability_disclosure && factorEditionSurfaceLines(null, inv.factor_edition_comparison).length > 0 && (')
@@ -190,6 +192,9 @@ describe('F-06: the disclosure travels with the record to every surface', () => 
   it('the climate-ghg FAQ claims only what is built', () => {
     const cg = read('app/climate-ghg/page.tsx')
     expect(cg).not.toContain('including which factor editions were applied')
-    expect(cg).toContain("When last year\\'s inventory is held on the platform, it names each emission factor edition that changed")
+    // T3e follow-up: narrowed to what the comparison covers, Scope 1 and 2.
+    expect(cg).toContain("When last year\\'s inventory is held on the platform, it names each Scope 1 and Scope 2 emission factor edition that changed")
+    expect(cg).toContain('Scope 3 factor editions are not yet compared.')
+    expect(cg).not.toContain('it names each emission factor edition that changed')
   })
 })

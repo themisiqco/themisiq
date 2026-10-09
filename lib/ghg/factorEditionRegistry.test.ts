@@ -278,8 +278,10 @@ describe('registry integrity', () => {
     for (const e of FACTOR_EDITION_REGISTRY) if (e.sourceFile) expect(SOURCE_FILES, `${e.dataset} ${e.label}`).toContain(e.sourceFile)
   })
 
-  it('R18: DESNZ travel and waste are registered with selection wired in T3e', () => {
-    expect([DATASETS.desnz_travel.selectionWiredIn, DATASETS.desnz_waste.selectionWiredIn]).toEqual(['T3e', 'T3e'])
+  it('R18, T3e: DESNZ travel and waste are selected like every DESNZ dataset, with 2023 to 2026 held', () => {
+    expect([DATASETS.desnz_travel.selectionWiredIn, DATASETS.desnz_waste.selectionWiredIn]).toEqual([undefined, undefined])
+    for (const ds of ['desnz_travel', 'desnz_waste'] as const)
+      expect(FACTOR_EDITION_REGISTRY.filter(e => e.dataset === ds && e.held).map(e => e.label), ds).toEqual(['DEFRA 2023', 'DEFRA 2024', 'DEFRA 2025', 'DEFRA 2026'])
     expect(FACTOR_EDITION_REGISTRY.filter(e => e.dataset === 'desnz_travel').map(e => e.label)).toEqual(['DEFRA 2022', 'DEFRA 2023', 'DEFRA 2024', 'DEFRA 2025', 'DEFRA 2026'])
   })
 

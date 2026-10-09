@@ -50,11 +50,36 @@ import xml.etree.ElementTree as ET
 from datetime import date
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-INPUT = ROOT / "data" / "reference" / "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx"
-OUT = ROOT / "lib" / "emissionFactors" / "defraWaste2026.json"
+
+# ── THE EDITION (T3e, 8 Oct 2026) ──────────────────────────────────────────────────────────────────
+# One script for every edition the registry holds:
+#     python3 scripts/generate-defra-waste.py                       # 2026, from data/reference/ (as before)
+#     python3 scripts/generate-defra-waste.py --year 2025 --input ~/themisiq-sources/defra/<file>.xlsx
+# Output: lib/emissionFactors/defraWaste<YEAR>.json unless --out says otherwise. For 2026 a missing prose quote
+# still aborts; for an older edition it is recorded as null (the edition prints none), never borrowed.
+def _arg(name: str, default=None):
+    if name in sys.argv:
+        i = sys.argv.index(name)
+        if i + 1 >= len(sys.argv):
+            sys.stderr.write(f"{name} needs a value\n"); sys.exit(2)
+        return sys.argv[i + 1]
+    return default
+
+
+YEAR = int(_arg("--year", "2026"))
+INPUT = pathlib.Path(_arg("--input", str(ROOT / "data" / "reference" / "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx"))).expanduser()
+OUT = pathlib.Path(_arg("--out", str(ROOT / "lib" / "emissionFactors" / f"defraWaste{YEAR}.json"))).expanduser()
+STRICT = YEAR == 2026
 
 SHEET = "Waste disposal"
+# The routes in the sheet's column order, under the names the app keys them by (2026's).
 ROUTES = ["Re-use", "Open-loop", "Closed-loop", "Combustion", "Composting", "Landfill", "Anaerobic digestion"]
+# ⚠️ A ROUTE PUBLISHED UNDER ANOTHER NAME (Lisa's ruling, 8 Oct 2026). DEFRA 2025 heads the column "Incineration
+# with energy recovery" where 2023, 2024 and 2026 head it "Combustion", and defines it in the same words
+# (Waste disposal A12). It is read as the Combustion route, and each record keeps the name as published
+# (route_as_published), with the sheet's definition recorded in metadata.route_renames. 2025 also prints no
+# Re-use column. Columns are found by their header label, never by position.
+ROUTE_PUBLISHED_AS = {"Incineration with energy recovery": "Combustion"}
 EXPECTED_BLOCKS = 7
 EXPECTED_UNIT = "tonnes"
 EXPECTED_VALUE_HEADER = "kg CO2e"
@@ -66,7 +91,6 @@ EXPECTED_VALUE_HEADER = "kg CO2e"
 PUBLISHERS = "DEFRA/DESNZ"
 TITLE = "GHG Conversion Factors for Company Reporting"
 TITLE_AS_PUBLISHED = "UK Government GHG Conversion Factors for Company Reporting"
-YEAR = 2026
 CITATION = f"UK {PUBLISHERS} ({YEAR}) {TITLE}"
 EDITION = f"DEFRA {YEAR}"
 
@@ -165,22 +189,43 @@ by_number = {n: cells for n, cells in rows}
 ordered = [n for n, _ in rows]
 
 
+def route_name(v: str):
+    """The app's name for a route header cell (a published name mapped through ROUTE_PUBLISHED_AS), or None."""
+    t = v.strip()
+    t = ROUTE_PUBLISHED_AS.get(t, t)
+    return t if t in ROUTES else None
+
+
 def route_columns(cells: dict):
-    """If this row is a route header, the column of each route in ROUTES order; else None."""
-    starts = [c for c, v in cells.items() if v.strip() == ROUTES[0]]
-    for start in starts:
-        if all(cells.get(start + i, "").strip() == r for i, r in enumerate(ROUTES)):
-            extra = {c: v for c, v in cells.items() if not (start <= c < start + len(ROUTES))}
-            if extra:
-                die(f"route header row carries unexpected cells {extra}")
-            return [start + i for i in range(len(ROUTES))]
-    # A row naming SOME routes but not all, in order, is a changed layout, not a non-header row.
-    named = [v.strip() for v in cells.values() if v.strip() in ROUTES]
-    if len(named) >= 2:
-        die(f"a row names routes {named} but not the expected sequence {ROUTES}; the layout has changed")
-    return None
+    """If this row is a route header, [(column, route, name as published)] in column order; else None.
+
+    Found by LABEL. Every cell of the row must be a route; the routes must sit in contiguous columns and in ROUTES
+    order. For 2026 the full sequence is still required, as before."""
+    named = sorted((c, route_name(v), v.strip()) for c, v in cells.items() if route_name(v))
+    if len(named) < 2:
+        return None
+    extra = {c: v for c, v in cells.items() if not route_name(v)}
+    if extra:
+        die(f"route header row carries unexpected cells {extra}")
+    cols = [c for c, _, _ in named]
+    order = [r for _, r, _ in named]
+    if cols != list(range(cols[0], cols[0] + len(cols))) or order != [r for r in ROUTES if r in order] or len(set(order)) != len(order):
+        die(f"a row names routes {order} in columns {cols}: not contiguous, or not in the order {ROUTES}; the layout has changed")
+    if STRICT and order != ROUTES:
+        die(f"a row names routes {order} but not the expected sequence {ROUTES}; the layout has changed")
+    return named
 
 
+def col_letter(i: int) -> str:
+    s, i = "", i + 1
+    while i:
+        i, rem = divmod(i - 1, 26)
+        s = chr(65 + rem) + s
+    return s
+
+
+renamed = {}
+header_routes = set()
 blocks = []
 records = []
 no_route_materials = []
@@ -202,12 +247,18 @@ for i, n in enumerate(ordered):
     a = act_cols[0]
     if header.get(a + 1, "").strip() != "Waste type" or header.get(a + 2, "").strip() != "Unit":
         die(f"row {h}: expected Activity | Waste type | Unit, found {[header.get(a + k) for k in range(3)]}")
+    route_cols = cols
+    cols = [c for c, _, _ in route_cols]
     if cols[0] != a + 3:
         die(f"row {h}: the first route column ({cols[0]}) is not immediately right of Unit ({a + 2})")
-    for c, route in zip(cols, ROUTES):
+    for c, route, _ in route_cols:
         got = header.get(c, "").strip()
         if got != EXPECTED_VALUE_HEADER:
             die(f"row {h}: the value header under {route!r} reads {got!r}, not {EXPECTED_VALUE_HEADER!r}")
+    header_routes.update(route for _, route, _ in route_cols)
+    for c, route, published in route_cols:
+        if published != route:
+            renamed.setdefault(published, {"as": route, "header_cells": []})["header_cells"].append(f"{col_letter(c)}{n}")
     allowed_header = {a, a + 1, a + 2, *cols}
     stray = {c: v for c, v in header.items() if c not in allowed_header}
     if stray:
@@ -235,7 +286,7 @@ for i, n in enumerate(ordered):
 
         waste_type = cells[a + 1].strip()
         routes_here = []
-        for c, route in zip(cols, ROUTES):
+        for c, route, published in route_cols:
             raw = cells.get(c)
             if raw is None:
                 continue   # ⚠️ AN EMPTY CELL IS AN ABSENT ROUTE, NOT ZERO. No record is written.
@@ -249,6 +300,9 @@ for i, n in enumerate(ordered):
                 "route": route,
                 "unit": f"{EXPECTED_VALUE_HEADER} per tonne",
                 "value": value,
+                # T3e: the value's own cell, and the route's name as published where it differs from the app's.
+                "cell": f"{col_letter(c)}{r}",
+                **({"route_as_published": published} if published != route else {}),
             })
             routes_here.append(route)
         if not routes_here:
@@ -261,6 +315,8 @@ for i, n in enumerate(ordered):
         die(f"route header at row {n} has no data rows")
     blocks.append({"activity": activity, "materials": materials})
 
+# The routes this edition prints a column for, in ROUTES order: all seven for 2026 (as before); no Re-use in 2025.
+present_routes = [r for r in ROUTES if r in header_routes]
 if len(blocks) != EXPECTED_BLOCKS:
     die(f"found {len(blocks)} blocks, expected {EXPECTED_BLOCKS}: {[b['activity'] for b in blocks]}")
 
@@ -280,16 +336,20 @@ reuse_values = [rec for rec in records if rec["route"] == "Re-use"]
 
 # The workbook's own FAQ on Re-use, found by its question text.
 faq_q = [n for n, cells in rows if any('"Re-use"' in v and v.strip().endswith("?") for v in cells.values())]
-if len(faq_q) != 1:
-    die(f"expected one FAQ question about \"Re-use\", found rows {faq_q}")
-faq_question = next(v for v in by_number[faq_q[0]].values()).strip()
-faq_answer_row = by_number.get(faq_q[0] + 1)
-if not faq_answer_row:
-    die("the Re-use FAQ question has no answer row beneath it")
-faq_answer = next(v for v in faq_answer_row.values()).strip()
+if not faq_q and not STRICT:
+    faq_question = faq_answer = None   # this edition prints no Re-use FAQ (2023)
+else:
+    if len(faq_q) != 1:
+        die(f"expected one FAQ question about \"Re-use\", found rows {faq_q}")
+    faq_question = next(v for v in by_number[faq_q[0]].values()).strip()
+    faq_answer_row = by_number.get(faq_q[0] + 1)
+    if not faq_answer_row:
+        die("the Re-use FAQ question has no answer row beneath it")
+    faq_answer = next(v for v in faq_answer_row.values()).strip()
 
 # The sheet's own guidance on what landfill and recycling factors include.
-scope_guidance = [v.strip() for _, cells in rows for v in cells.values() if v.strip().startswith("●  For landfill")]
+scope_guidance_cells = [(n, c, v.strip()) for n, cells in rows for c, v in cells.items() if v.strip().startswith("●  For landfill")]
+scope_guidance = [t for _, _, t in scope_guidance_cells]
 if len(scope_guidance) != 1:
     die(f"expected one landfill-scope guidance line, found {len(scope_guidance)}")
 
@@ -306,6 +366,15 @@ if len(lifecycle_guidance) != 1:
 # generated_on changes every run, which is also what makes it safe to store the digest in metadata.
 payload_rows = json.dumps({"factors": records}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 digest = hashlib.sha256(payload_rows.encode("utf-8")).hexdigest()
+# T3e: the same digest over the values alone (cell and route_as_published removed), which is the convention the
+# 2026 artefact was pinned under before cells were recorded. It shows a regenerated 2026 moved no value.
+values_only = [{k: v for k, v in rec.items() if k not in ("cell", "route_as_published")} for rec in records]
+values_digest = hashlib.sha256(json.dumps({"factors": values_only}, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+if renamed:
+    sg_n, sg_c, _ = scope_guidance_cells[0]
+    for v in renamed.values():
+        v["definition_cell"] = f"{col_letter(sg_c)}{sg_n}"
+        v["definition"] = scope_guidance[0]
 input_digest = hashlib.sha256(INPUT.read_bytes()).hexdigest()
 
 payload = {
@@ -335,6 +404,10 @@ payload = {
         "licence": "Open Government Licence v3.0 (OGL v3.0)",
         "licence_url": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
         "licence_basis": (
+            f"OGL v3.0 is the licence DESNZ states on the gov.uk page for each edition of these factors. For the {YEAR} "
+            "edition that page was not read by this generator; the statement was verified for the 2026 page on 17 Sep "
+            "2026. The workbook itself states no licence."
+        ) if not STRICT else (
             "Stated on the publication page on gov.uk, verified 17 Sep 2026. The workbook itself states no "
             "licence; this comes from the page it is published on. The statement carries an 'except where "
             "otherwise stated' exception, and the workbook draws on external sources, so a particular value "
@@ -363,6 +436,10 @@ payload = {
         "reuse_note": (
             f"Re-use has {len(reuse_values)} published values in this sheet. The workbook's own FAQ: "
             f"{faq_question} {faq_answer}"
+        ) if faq_question else (
+            f"Re-use has {len(reuse_values)} published values in this sheet"
+            + ("" if "Re-use" in present_routes else ", which prints no Re-use column")
+            + ". This edition prints no FAQ on Re-use."
         ),
         "scope_guidance": scope_guidance[0],
         "lifecycle_guidance": lifecycle_guidance[0],
@@ -372,7 +449,10 @@ payload = {
         "generated_from": INPUT.name,
         "generated_from_sha256": input_digest,
         "generated_by": "scripts/generate-defra-waste.py",
-        "routes": ROUTES,
+        "routes": present_routes,
+        # T3e: a route DEFRA published under another name in this edition, read as the app's route, with the
+        # header cells and the sheet's own definition (Lisa's ruling, 8 Oct 2026). Empty where none was renamed.
+        "route_renames": [{"published": k, **v} for k, v in renamed.items()],
         "blocks": [
             {
                 "activity": b["activity"],
@@ -384,6 +464,7 @@ payload = {
         "records": len(records),
         "materials_with_no_routes": no_route_materials,
         "fingerprint_sha256": digest,
+        "values_fingerprint_sha256": values_digest,
     },
     "factors": records,
 }
@@ -391,7 +472,7 @@ payload = {
 OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 # ── PRINT ──────────────────────────────────────────────────────────────────────────────────────────
-print(f"wrote {OUT.relative_to(ROOT)}  ({OUT.stat().st_size:,} bytes)")
+print(f"wrote {OUT}  ({OUT.stat().st_size:,} bytes)")
 print(f"  input {INPUT.name}  sha256 {input_digest}")
 print(f"  {TITLE_AS_PUBLISHED} — {factor_set}, Version {sheet_version}, Year {sheet_year}, sheet {SHEET!r} ({scope})")
 print(f"  citation: {CITATION}   edition: {EDITION}   gwp_basis: AR5")
@@ -410,3 +491,5 @@ if len(cai) != 1:
     die(f"expected one Commercial and industrial waste / Landfill record, found {len(cai)}")
 print(f"  Commercial and industrial waste, Landfill: {cai[0]['value']} {cai[0]['unit']}")
 print(f"\n  factors sha256: {digest}")
+print(f"  values sha256:  {values_digest}")
+print(f"  route renames: {renamed or 'none'}")

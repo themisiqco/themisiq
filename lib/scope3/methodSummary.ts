@@ -17,12 +17,13 @@
 
 import { scope3MethodFor, scope3MethodDescription, METHOD_TAKES_ENTERED_FIGURE, type Scope3Method } from './categoryMethods'
 import { SPEND_EF_SOURCES } from '../emissionFactors/spend'
-import { DEFRA_WASTE_META } from '../emissionFactors/defraWaste'
+import { DEFRA_WASTE_META, DEFRA_WASTE_YEARS } from '../emissionFactors/defraWaste'
+import { heldYearsWords } from './defraEditionTypes'
 import { DEFRA_ENERGY_META, DEFRA_ENERGY_YEARS } from '../emissionFactors/defraEnergy'
 import { CAT15_GWP_TAIL } from './cat15'
 import { CAT6_ASSISTANT_PHRASE } from './businessTravelCopy'
 import { CAT7_ASSISTANT_PHRASE } from './commutingCopy'
-import { DEFRA_TRAVEL_META } from '../emissionFactors/defraTravel'
+import { DEFRA_TRAVEL_META, DEFRA_TRAVEL_YEARS } from '../emissionFactors/defraTravel'
 
 /** T3d: the DEFRA/DESNZ upstream energy editions held, in words: "2024, 2025 or 2026". Read from the record. */
 const editionYears = (): string => {
@@ -163,10 +164,11 @@ const ASSISTANT_METHOD_PHRASE: Readonly<Record<Scope3Method, (ns: readonly numbe
   exiobase_spend: ns =>
     `priced from EXIOBASE ${SPEND_EF_SOURCES.exiobase_38.version} through a named factor edition, by sector or product and country` +
     (ns.includes(1) ? ', and for Category 1 also from supplier-specific figures where the customer enters them' : ''),
+  // T3e: no window is bound here, so the set held is named, as Category 3's phrase does.
   waste_factors: () =>
-    `priced from the UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route`,
+    `priced from the UK DEFRA/DESNZ waste factors of the edition the reporting year requires (${heldYearsWords(DEFRA_WASTE_YEARS)}), per material and treatment route`,
   end_of_life_factors: () =>
-    `priced from the same UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors, per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes`,
+    `priced from the same UK DEFRA/DESNZ waste factors of the edition the reporting year requires (${heldYearsWords(DEFRA_WASTE_YEARS)}), per material and treatment route, applied to the tonnes of sold products reaching end of life as the customer splits them across routes`,
   // Lowercase predicate fragment, like the rest: assistantScope3Basis joins these with semicolons. The
   // year is READ from the record, as the waste and travel phrases read theirs.
   fuel_and_energy_upstream: () =>
@@ -242,7 +244,7 @@ type Scope3GwpSource =
 const DEFRA_WASTE_GWP: Scope3GwpSource = {
   kind: 'publisher',
   basis: DEFRA_WASTE_META.gwp_basis,
-  publisher: `UK DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste factors`,
+  publisher: `UK DEFRA/DESNZ waste factors (${heldYearsWords(DEFRA_WASTE_YEARS)})`,
 }
 
 const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
@@ -253,14 +255,14 @@ const METHOD_GWP: Readonly<Record<Scope3Method, Scope3GwpSource>> = {
   business_travel_factors: {
     kind: 'publisher',
     basis: DEFRA_TRAVEL_META.gwp_basis,
-    publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} business travel factors`,
+    publisher: `UK DEFRA/DESNZ business travel factors (${heldYearsWords(DEFRA_TRAVEL_YEARS)})`,
   },
   // The same DEFRA/DESNZ record as Category 6, named for the sheets Category 7 reads, so the two categories
   // keep their own clauses in the assistant's GWP rule.
   employee_commuting_factors: {
     kind: 'publisher',
     basis: DEFRA_TRAVEL_META.gwp_basis,
-    publisher: `UK DEFRA/DESNZ ${DEFRA_TRAVEL_META.year} land travel and homeworking factors`,
+    publisher: `UK DEFRA/DESNZ land travel and homeworking factors (${heldYearsWords(DEFRA_TRAVEL_YEARS)})`,
   },
   // 'not_recorded' still, and for a stronger reason than before: there is no figure whose GWP basis could
   // be recorded. An entered figure's basis is whatever the customer's own reporting used, which this

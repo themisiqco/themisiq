@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "source": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting",
+    "source": "UK DEFRA/DESNZ (2025) GHG Conversion Factors for Company Reporting",
     "title_as_published": "UK Government GHG Conversion Factors for Company Reporting",
-    "edition": "DEFRA 2026",
+    "edition": "DEFRA 2025",
     "factor_set": "Full set",
     "file_version": "1",
-    "year": "2026",
+    "year": "2025",
     "sheet": "Waste disposal",
     "scope": "Scope 3",
     "gwp_basis": "AR5",
@@ -14,22 +14,21 @@
     "unit_note": "Asserted, not assumed: every data row's Unit cell reads 'tonnes' and every value column header reads 'kg CO2e'. The generator aborts on anything else.",
     "licence": "Open Government Licence v3.0 (OGL v3.0)",
     "licence_url": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
-    "licence_basis": "Stated on the publication page on gov.uk, verified 17 Sep 2026. The workbook itself states no licence; this comes from the page it is published on. The statement carries an 'except where otherwise stated' exception, and the workbook draws on external sources, so a particular value could sit outside it; nothing on the Waste disposal sheet is marked as such.",
+    "licence_basis": "OGL v3.0 is the licence DESNZ states on the gov.uk page for each edition of these factors. For the 2025 edition that page was not read by this generator; the statement was verified for the 2026 page on 17 Sep 2026. The workbook itself states no licence.",
     "attribution_required": "Contains public sector information licensed under the Open Government Licence v3.0.",
     "licence_note": "OGL v3.0 permits copying, publishing, adapting and commercial use, on condition of attribution. It is NOT share-alike, which distinguishes it from the CC BY-SA 4.0 EXIOBASE inputs in the same inventory. It is compatible with CC BY 4.0: complying with that licence automatically satisfies OGL. It grants no right to imply official status, or endorsement by the Information Provider. It excludes third-party rights the Information Provider is not authorised to license.",
     "first_defra_source_file_note": "The first DEFRA/DESNZ source file committed to this repository. Every DEFRA value in lib/ghg/engine.ts was transcribed by hand; these are generated from the workbook.",
     "absent_route_note": "AN EMPTY CELL IS AN ABSENT ROUTE, NOT A ROUTE WITH ZERO EMISSIONS, and no record is written for it. The matrix is sparse: not every material has a published factor for every treatment route. Reading an empty cell as 0 would report a material sent down an unpublished route as emissions-free rather than as unpriceable. The workbook distinguishes 'not available' (light-shaded empty cell) from 'invalid combination of criteria' (dark-shaded empty cell) by fill colour only; this generator does not read cell styles, so both are recorded as absent without that distinction.",
     "reuse_note": "Re-use has 0 published values in this sheet. The workbook's own FAQ: Why there are no conversion factors for the disposal method \"Re-use\"? \"Re-use\" is not within the scope of the GHG conversion factors because it is not a waste disposal method. Only the disposal of waste at the end of its life is within scope.",
-    "scope_guidance": "●  For landfill, the factors in the tables include collection, transportation and landfill emissions (‘gate to grave’). For combustion and recycling, the factors consider transport to an energy recovery or materials reclamation facility only. This is in line with GHG Protocol Guidelines, with subsequent emissions attributed to electricity generation or recycled material production respectively.",
+    "scope_guidance": "●  For landfill, the factors in the tables include collection, transportation and landfill emissions (‘gate to grave’). For incineration with energy recovery and recycling, the factors consider transport to an energy recovery or materials reclamation facility only. This is in line with GHG Protocol Guidelines, with subsequent emissions attributed to electricity generation or recycled material production respectively.",
     "lifecycle_guidance": "●  These factors cannot be used to determine the relative lifecycle merit of different waste management options. This is because the emissions from energy recovery, recycling, composting and anaerobic digestion are attributed to the user of the recycled materials, not the producer of the waste, in line with GHG Protocol Guidelines.",
     "reuse_faq_question": "Why there are no conversion factors for the disposal method \"Re-use\"?",
     "reuse_faq_answer": "\"Re-use\" is not within the scope of the GHG conversion factors because it is not a waste disposal method. Only the disposal of waste at the end of its life is within scope.",
     "generated_on": "2026-10-08",
-    "generated_from": "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx",
-    "generated_from_sha256": "b5c4f2f86cdc74707337b2fb013b44ded189a1b528f5e29ea99856ba65ae0205",
+    "generated_from": "ghg-conversion-factors-2025-full-set.xlsx",
+    "generated_from_sha256": "c08f24dac724a7598f54a7c7b28ad21fa88ca48d8ebd98cb9e172ffc184b5e5a",
     "generated_by": "scripts/generate-defra-waste.py",
     "routes": [
-      "Re-use",
       "Open-loop",
       "Closed-loop",
       "Combustion",
@@ -37,7 +36,23 @@
       "Landfill",
       "Anaerobic digestion"
     ],
-    "route_renames": [],
+    "route_renames": [
+      {
+        "published": "Incineration with energy recovery",
+        "as": "Combustion",
+        "header_cells": [
+          "F22",
+          "F39",
+          "F46",
+          "F55",
+          "F64",
+          "F72",
+          "F85"
+        ],
+        "definition_cell": "A12",
+        "definition": "●  For landfill, the factors in the tables include collection, transportation and landfill emissions (‘gate to grave’). For incineration with energy recovery and recycling, the factors consider transport to an energy recovery or materials reclamation facility only. This is in line with GHG Protocol Guidelines, with subsequent emissions attributed to electricity generation or recycled material production respectively."
+      }
+    ],
     "blocks": [
       {
         "activity": "Construction",
@@ -65,8 +80,6 @@
         "activity": "Refuse",
         "materials": 5,
         "routes_present": [
-          "Open-loop",
-          "Closed-loop",
           "Combustion",
           "Composting",
           "Landfill",
@@ -113,10 +126,10 @@
         ]
       }
     ],
-    "records": 139,
+    "records": 134,
     "materials_with_no_routes": [],
-    "fingerprint_sha256": "1a079a7aef1658474fc03ee7e861d59504c8c6963db069d7cc4c2ce0b5b36b87",
-    "values_fingerprint_sha256": "5b3b7ee79e404acc6652ba0ebea5841160d6b2358aaa3095732d676a6e422473"
+    "fingerprint_sha256": "833514949dbe5952142c1c6c96f63109484b7062f6dfd9f7b32d99e53f4db6ba",
+    "values_fingerprint_sha256": "3f125b72ed6d1139f232b9de54dd4d27671ebcedcd298f847dcf61823864bd9f"
   },
   "factors": [
     {
@@ -124,144 +137,145 @@
       "waste_type": "Aggregates",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "E24"
+      "value": 1.00835,
+      "cell": "D24"
     },
     {
       "activity": "Construction",
       "waste_type": "Aggregates",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F24"
+      "value": 1.00835,
+      "cell": "E24"
     },
     {
       "activity": "Construction",
       "waste_type": "Aggregates",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1.27043,
-      "cell": "I24"
+      "value": 1.26338,
+      "cell": "H24"
     },
     {
       "activity": "Construction",
       "waste_type": "Average construction",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "E25"
+      "value": 1.00835,
+      "cell": "D25"
     },
     {
       "activity": "Construction",
       "waste_type": "Average construction",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F25"
+      "value": 1.00835,
+      "cell": "E25"
     },
     {
       "activity": "Construction",
       "waste_type": "Average construction",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G25"
+      "value": 4.68568,
+      "cell": "F25",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Construction",
       "waste_type": "Asbestos",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 5.94839,
-      "cell": "I26"
+      "value": 5.9416,
+      "cell": "H26"
     },
     {
       "activity": "Construction",
       "waste_type": "Asphalt",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
+      "value": 1.00835,
+      "cell": "D27"
+    },
+    {
+      "activity": "Construction",
+      "waste_type": "Asphalt",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 1.00835,
       "cell": "E27"
     },
     {
       "activity": "Construction",
       "waste_type": "Asphalt",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F27"
-    },
-    {
-      "activity": "Construction",
-      "waste_type": "Asphalt",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1.27043,
-      "cell": "I27"
+      "value": 1.26338,
+      "cell": "H27"
     },
     {
       "activity": "Construction",
       "waste_type": "Bricks",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "E28"
+      "value": 1.00835,
+      "cell": "D28"
     },
     {
       "activity": "Construction",
       "waste_type": "Bricks",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1.27043,
-      "cell": "I28"
+      "value": 1.26338,
+      "cell": "H28"
     },
     {
       "activity": "Construction",
       "waste_type": "Concrete",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
+      "value": 1.00835,
+      "cell": "D29"
+    },
+    {
+      "activity": "Construction",
+      "waste_type": "Concrete",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 1.00835,
       "cell": "E29"
     },
     {
       "activity": "Construction",
       "waste_type": "Concrete",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F29"
-    },
-    {
-      "activity": "Construction",
-      "waste_type": "Concrete",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1.27043,
-      "cell": "I29"
+      "value": 1.26338,
+      "cell": "H29"
     },
     {
       "activity": "Construction",
       "waste_type": "Insulation",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F30"
+      "value": 1.00835,
+      "cell": "E30"
     },
     {
       "activity": "Construction",
       "waste_type": "Insulation",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1.27043,
-      "cell": "I30"
+      "value": 1.26338,
+      "cell": "H30"
     },
     {
       "activity": "Construction",
       "waste_type": "Metals",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F31"
+      "value": 1.00835,
+      "cell": "E31"
     },
     {
       "activity": "Construction",
@@ -269,47 +283,48 @@
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
       "value": 1.26435,
-      "cell": "I31"
+      "cell": "H31"
     },
     {
       "activity": "Construction",
       "waste_type": "Soils",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 1.01398,
-      "cell": "F32"
+      "value": 1.00835,
+      "cell": "E32"
     },
     {
       "activity": "Construction",
       "waste_type": "Soils",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 19.55376,
-      "cell": "I32"
+      "value": 19.54671,
+      "cell": "H32"
     },
     {
       "activity": "Construction",
       "waste_type": "Mineral oil",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F33"
+      "value": 4.68568,
+      "cell": "E33"
     },
     {
       "activity": "Construction",
       "waste_type": "Mineral oil",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G33"
+      "value": 4.68568,
+      "cell": "F33",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Construction",
       "waste_type": "Plasterboard",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F34"
+      "value": 4.68568,
+      "cell": "E34"
     },
     {
       "activity": "Construction",
@@ -317,919 +332,907 @@
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
       "value": 71.95,
-      "cell": "I34"
+      "cell": "H34"
     },
     {
       "activity": "Construction",
       "waste_type": "Tyres",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F35"
+      "value": 4.68568,
+      "cell": "E35"
     },
     {
       "activity": "Construction",
       "waste_type": "Wood",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F36"
+      "value": 4.68568,
+      "cell": "E36"
     },
     {
       "activity": "Construction",
       "waste_type": "Wood",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F36",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Construction",
+      "waste_type": "Wood",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G36"
     },
     {
       "activity": "Construction",
       "waste_type": "Wood",
-      "route": "Composting",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "H36"
-    },
-    {
-      "activity": "Construction",
-      "waste_type": "Wood",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 925.36725,
-      "cell": "I36"
+      "value": 925.34348,
+      "cell": "H36"
     },
     {
       "activity": "Other",
       "waste_type": "Books",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F41"
+      "value": 4.68568,
+      "cell": "E41"
     },
     {
       "activity": "Other",
       "waste_type": "Books",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F41",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Other",
+      "waste_type": "Books",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G41"
     },
     {
       "activity": "Other",
       "waste_type": "Books",
-      "route": "Composting",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "H41"
-    },
-    {
-      "activity": "Other",
-      "waste_type": "Books",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1164.51317,
-      "cell": "I41"
+      "value": 1164.4894,
+      "cell": "H41"
     },
     {
       "activity": "Other",
       "waste_type": "Glass",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D42"
+    },
+    {
+      "activity": "Other",
+      "waste_type": "Glass",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E42"
     },
     {
       "activity": "Other",
       "waste_type": "Glass",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F42"
-    },
-    {
-      "activity": "Other",
-      "waste_type": "Glass",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G42"
+      "value": 4.68568,
+      "cell": "F42",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Other",
       "waste_type": "Glass",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I42"
+      "value": 8.98311,
+      "cell": "H42"
     },
     {
       "activity": "Other",
       "waste_type": "Clothing",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F43"
+      "value": 4.68568,
+      "cell": "E43"
     },
     {
       "activity": "Other",
       "waste_type": "Clothing",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G43"
+      "value": 4.68568,
+      "cell": "F43",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Other",
       "waste_type": "Clothing",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 496.80605,
-      "cell": "I43"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Household residual waste",
-      "route": "Open-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "E48"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Household residual waste",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F48"
+      "value": 496.78228,
+      "cell": "H43"
     },
     {
       "activity": "Refuse",
       "waste_type": "Household residual waste",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G48"
+      "value": 4.68568,
+      "cell": "F48",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Refuse",
       "waste_type": "Household residual waste",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 497.28993,
-      "cell": "I48"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Household residual waste",
-      "route": "Anaerobic digestion",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "J48"
+      "value": 497.24244,
+      "cell": "H48"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: food and drink waste",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F49",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Refuse",
+      "waste_type": "Organic: food and drink waste",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G49"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: food and drink waste",
-      "route": "Composting",
+      "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
+      "value": 700.30886,
       "cell": "H49"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: food and drink waste",
-      "route": "Landfill",
-      "unit": "kg CO2e per tonne",
-      "value": 700.33263,
-      "cell": "I49"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Organic: food and drink waste",
       "route": "Anaerobic digestion",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "J49"
+      "value": 8.98311,
+      "cell": "I49"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: garden waste",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F50",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Refuse",
+      "waste_type": "Organic: garden waste",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G50"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: garden waste",
-      "route": "Composting",
+      "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
+      "value": 646.70557,
       "cell": "H50"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: garden waste",
-      "route": "Landfill",
-      "unit": "kg CO2e per tonne",
-      "value": 646.72934,
-      "cell": "I50"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Organic: garden waste",
       "route": "Anaerobic digestion",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "J50"
+      "value": 8.98311,
+      "cell": "I50"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: mixed food and garden waste",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F51",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Refuse",
+      "waste_type": "Organic: mixed food and garden waste",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G51"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: mixed food and garden waste",
-      "route": "Composting",
+      "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
+      "value": 656.08614,
       "cell": "H51"
     },
     {
       "activity": "Refuse",
       "waste_type": "Organic: mixed food and garden waste",
-      "route": "Landfill",
+      "route": "Anaerobic digestion",
       "unit": "kg CO2e per tonne",
-      "value": 656.10991,
+      "value": 8.98311,
       "cell": "I51"
     },
     {
       "activity": "Refuse",
-      "waste_type": "Organic: mixed food and garden waste",
-      "route": "Anaerobic digestion",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "J51"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Commercial and industrial waste",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F52"
-    },
-    {
-      "activity": "Refuse",
       "waste_type": "Commercial and industrial waste",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G52"
+      "value": 4.68568,
+      "cell": "F52",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Refuse",
       "waste_type": "Commercial and industrial waste",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 520.58023,
-      "cell": "I52"
-    },
-    {
-      "activity": "Refuse",
-      "waste_type": "Commercial and industrial waste",
-      "route": "Anaerobic digestion",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "J52"
+      "value": 520.5327,
+      "cell": "H52"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - fridges and freezers",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "E57"
+      "value": 4.68568,
+      "cell": "D57"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - fridges and freezers",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I57"
+      "value": 8.98311,
+      "cell": "H57"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - large",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "E58"
+      "value": 4.68568,
+      "cell": "D58"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - large",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G58"
+      "value": 4.68568,
+      "cell": "F58",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - large",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I58"
+      "value": 8.98311,
+      "cell": "H58"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - mixed",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "E59"
+      "value": 4.68568,
+      "cell": "D59"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - mixed",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G59"
+      "value": 4.68568,
+      "cell": "F59",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - mixed",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I59"
+      "value": 8.98311,
+      "cell": "H59"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - small",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "E60"
+      "value": 4.68568,
+      "cell": "D60"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - small",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G60"
+      "value": 4.68568,
+      "cell": "F60",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Electrical items",
       "waste_type": "WEEE - small",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I60"
+      "value": 8.98311,
+      "cell": "H60"
     },
     {
       "activity": "Electrical items",
       "waste_type": "Batteries",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "E61"
+      "value": 4.68568,
+      "cell": "D61"
     },
     {
       "activity": "Electrical items",
       "waste_type": "Batteries",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I61"
+      "value": 8.98311,
+      "cell": "H61"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: aluminium cans and foil (excl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D66"
+    },
+    {
+      "activity": "Metal",
+      "waste_type": "Metal: aluminium cans and foil (excl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E66"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: aluminium cans and foil (excl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F66"
-    },
-    {
-      "activity": "Metal",
-      "waste_type": "Metal: aluminium cans and foil (excl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G66"
+      "value": 4.68568,
+      "cell": "F66",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: aluminium cans and foil (excl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I66"
+      "value": 8.98311,
+      "cell": "H66"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: mixed cans",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D67"
+    },
+    {
+      "activity": "Metal",
+      "waste_type": "Metal: mixed cans",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E67"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: mixed cans",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F67"
-    },
-    {
-      "activity": "Metal",
-      "waste_type": "Metal: mixed cans",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G67"
+      "value": 4.68568,
+      "cell": "F67",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: mixed cans",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I67"
+      "value": 8.98311,
+      "cell": "H67"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: scrap metal",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D68"
+    },
+    {
+      "activity": "Metal",
+      "waste_type": "Metal: scrap metal",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E68"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: scrap metal",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F68"
-    },
-    {
-      "activity": "Metal",
-      "waste_type": "Metal: scrap metal",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G68"
+      "value": 4.68568,
+      "cell": "F68",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: scrap metal",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I68"
+      "value": 8.98311,
+      "cell": "H68"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: steel cans",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D69"
+    },
+    {
+      "activity": "Metal",
+      "waste_type": "Metal: steel cans",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E69"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: steel cans",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F69"
-    },
-    {
-      "activity": "Metal",
-      "waste_type": "Metal: steel cans",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G69"
+      "value": 4.68568,
+      "cell": "F69",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Metal",
       "waste_type": "Metal: steel cans",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I69"
+      "value": 8.98311,
+      "cell": "H69"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastics",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D74"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: average plastics",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E74"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastics",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F74"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: average plastics",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G74"
+      "value": 4.68568,
+      "cell": "F74",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastics",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I74"
+      "value": 8.98311,
+      "cell": "H74"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastic film",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D75"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: average plastic film",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E75"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastic film",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F75"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: average plastic film",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G75"
+      "value": 4.68568,
+      "cell": "F75",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastic film",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I75"
+      "value": 8.98311,
+      "cell": "H75"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastic rigid",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D76"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: average plastic rigid",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E76"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastic rigid",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F76"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: average plastic rigid",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G76"
+      "value": 4.68568,
+      "cell": "F76",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: average plastic rigid",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I76"
+      "value": 8.98311,
+      "cell": "H76"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: HDPE (incl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D77"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: HDPE (incl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E77"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: HDPE (incl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F77"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: HDPE (incl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G77"
+      "value": 4.68568,
+      "cell": "F77",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: HDPE (incl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I77"
+      "value": 8.98311,
+      "cell": "H77"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: LDPE and LLDPE (incl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D78"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: LDPE and LLDPE (incl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E78"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: LDPE and LLDPE (incl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F78"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: LDPE and LLDPE (incl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G78"
+      "value": 4.68568,
+      "cell": "F78",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: LDPE and LLDPE (incl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I78"
+      "value": 8.98311,
+      "cell": "H78"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PET (incl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D79"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: PET (incl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E79"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PET (incl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F79"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: PET (incl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G79"
+      "value": 4.68568,
+      "cell": "F79",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PET (incl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I79"
+      "value": 8.98311,
+      "cell": "H79"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PP (incl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D80"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: PP (incl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E80"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PP (incl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F80"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: PP (incl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G80"
+      "value": 4.68568,
+      "cell": "F80",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PP (incl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I80"
+      "value": 8.98311,
+      "cell": "H80"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PS (incl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D81"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: PS (incl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E81"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PS (incl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F81"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: PS (incl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G81"
+      "value": 4.68568,
+      "cell": "F81",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PS (incl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I81"
+      "value": 8.98311,
+      "cell": "H81"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PVC (incl. forming)",
       "route": "Open-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "D82"
+    },
+    {
+      "activity": "Plastic",
+      "waste_type": "Plastics: PVC (incl. forming)",
+      "route": "Closed-loop",
+      "unit": "kg CO2e per tonne",
+      "value": 4.68568,
       "cell": "E82"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PVC (incl. forming)",
-      "route": "Closed-loop",
-      "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F82"
-    },
-    {
-      "activity": "Plastic",
-      "waste_type": "Plastics: PVC (incl. forming)",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G82"
+      "value": 4.68568,
+      "cell": "F82",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Plastic",
       "waste_type": "Plastics: PVC (incl. forming)",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "I82"
+      "value": 8.98311,
+      "cell": "H82"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: board",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F87"
+      "value": 4.68568,
+      "cell": "E87"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: board",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F87",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Paper",
+      "waste_type": "Paper and board: board",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G87"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: board",
-      "route": "Composting",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "H87"
-    },
-    {
-      "activity": "Paper",
-      "waste_type": "Paper and board: board",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1164.51317,
-      "cell": "I87"
+      "value": 1164.4894,
+      "cell": "H87"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: mixed",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F88"
+      "value": 4.68568,
+      "cell": "E88"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: mixed",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
+      "value": 4.68568,
+      "cell": "F88",
+      "route_as_published": "Incineration with energy recovery"
+    },
+    {
+      "activity": "Paper",
+      "waste_type": "Paper and board: mixed",
+      "route": "Composting",
+      "unit": "kg CO2e per tonne",
+      "value": 8.98311,
       "cell": "G88"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: mixed",
-      "route": "Composting",
-      "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "H88"
-    },
-    {
-      "activity": "Paper",
-      "waste_type": "Paper and board: mixed",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1164.51317,
-      "cell": "I88"
+      "value": 1164.4894,
+      "cell": "H88"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: paper",
       "route": "Closed-loop",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "F89"
+      "value": 4.68568,
+      "cell": "E89"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: paper",
       "route": "Combustion",
       "unit": "kg CO2e per tonne",
-      "value": 4.65358,
-      "cell": "G89"
+      "value": 4.68568,
+      "cell": "F89",
+      "route_as_published": "Incineration with energy recovery"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: paper",
       "route": "Composting",
       "unit": "kg CO2e per tonne",
-      "value": 9.00687,
-      "cell": "H89"
+      "value": 8.98311,
+      "cell": "G89"
     },
     {
       "activity": "Paper",
       "waste_type": "Paper and board: paper",
       "route": "Landfill",
       "unit": "kg CO2e per tonne",
-      "value": 1164.51317,
-      "cell": "I89"
+      "value": 1164.4894,
+      "cell": "H89"
     }
   ]
 }

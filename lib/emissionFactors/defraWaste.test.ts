@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { TW_2026 } from '../testing/defraEditions'
 import data from './defraWaste2026.json'
 import {
   WASTE_MATERIAL_GROUPS, wasteRoutesFor, wasteFactor, wasteMethodFor, wasteMaterialKey, parseWasteMaterialKey,
@@ -23,18 +24,18 @@ describe('defraWaste reader', () => {
         expect(offered, m).toEqual(DEFRA_WASTE_META.routes.filter(r => published.includes(r)))
         expect(offered, m).not.toContain(NOT_A_DISPOSAL_ROUTE)
         expect(offered.length, `${m} offers no route`).toBeGreaterThan(0)
-        for (const r of offered) expect(wasteFactor(g.activity, m, r), `${m} / ${r}`).toBeGreaterThan(0)
+        for (const r of offered) expect(wasteFactor(g.activity, m, r, 2026), `${m} / ${r}`).toBeGreaterThan(0)
       }
     }
   })
 
   it('D3 an unpublished route has no factor, not a zero', () => {
     expect(wasteRoutesFor('Construction', 'Tyres')).toEqual(['Closed-loop'])
-    expect(wasteFactor('Construction', 'Tyres', 'Landfill')).toBeNull()
-    expect(wasteFactor('Refuse', 'Commercial and industrial waste', 'Re-use')).toBeNull()
-    expect(wasteFactor('Refuse', 'Commercial and industrial waste', 'Landfill')).toBe(520.58023)
+    expect(wasteFactor('Construction', 'Tyres', 'Landfill', 2026)).toBeNull()
+    expect(wasteFactor('Refuse', 'Commercial and industrial waste', 'Re-use', 2026)).toBeNull()
+    expect(wasteFactor('Refuse', 'Commercial and industrial waste', 'Landfill', 2026)).toBe(520.58023)
     // The activity is part of the identity: a material under the wrong block has no factor.
-    expect(wasteFactor('Other', 'Commercial and industrial waste', 'Landfill')).toBeNull()
+    expect(wasteFactor('Other', 'Commercial and industrial waste', 'Landfill', 2026)).toBeNull()
     expect(wasteRoutesFor('Refuse', 'Nonexistent')).toEqual([])
   })
 
@@ -74,15 +75,15 @@ describe('defraWaste reader', () => {
   })
 
   it('D8 a row is priced only when complete and published: tonnes x factor in kg', () => {
-    expect(priceWasteRow({ activity: 'Refuse', waste_type: 'Commercial and industrial waste', route: 'Landfill', tonnes: 2 }))
-      .toEqual({ status: 'priced', factor_kg_per_tonne: 520.58023, kg_co2e: 1041.16046, method: 'average_data' })
-    expect(priceWasteRow({ activity: 'Plastic', waste_type: 'Plastics: PET (incl. forming)', route: 'Combustion', tonnes: 1 }))
-      .toEqual({ status: 'priced', factor_kg_per_tonne: 4.65358, kg_co2e: 4.65358, method: 'waste_type_specific' })
-    expect(priceWasteRow({ activity: '', waste_type: '', route: '', tonnes: 0 })).toEqual({ status: 'incomplete', missing: ['material', 'treatment route', 'tonnes'] })
-    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: '', tonnes: 5 })).toEqual({ status: 'incomplete', missing: ['treatment route'] })
-    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Closed-loop', tonnes: -1 })).toEqual({ status: 'incomplete', missing: ['tonnes'] })
-    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Closed-loop', tonnes: NaN })).toEqual({ status: 'incomplete', missing: ['tonnes'] })
-    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Landfill', tonnes: 5 })).toEqual({ status: 'no_factor' })
-    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Re-use', tonnes: 5 })).toEqual({ status: 'no_factor' })
+    expect(priceWasteRow({ activity: 'Refuse', waste_type: 'Commercial and industrial waste', route: 'Landfill', tonnes: 2 }, TW_2026.waste))
+      .toMatchObject({ status: 'priced', factor_kg_per_tonne: 520.58023, kg_co2e: 1041.16046, method: 'average_data', cell: 'I52', route_note: null, edition: { label: 'DEFRA 2026', year: 2026 } })
+    expect(priceWasteRow({ activity: 'Plastic', waste_type: 'Plastics: PET (incl. forming)', route: 'Combustion', tonnes: 1 }, TW_2026.waste))
+      .toMatchObject({ status: 'priced', factor_kg_per_tonne: 4.65358, kg_co2e: 4.65358, method: 'waste_type_specific', route_note: null })
+    expect(priceWasteRow({ activity: '', waste_type: '', route: '', tonnes: 0 }, TW_2026.waste)).toEqual({ status: 'incomplete', missing: ['material', 'treatment route', 'tonnes'] })
+    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: '', tonnes: 5 }, TW_2026.waste)).toEqual({ status: 'incomplete', missing: ['treatment route'] })
+    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Closed-loop', tonnes: -1 }, TW_2026.waste)).toEqual({ status: 'incomplete', missing: ['tonnes'] })
+    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Closed-loop', tonnes: NaN }, TW_2026.waste)).toEqual({ status: 'incomplete', missing: ['tonnes'] })
+    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Landfill', tonnes: 5 }, TW_2026.waste)).toEqual({ status: 'no_factor' })
+    expect(priceWasteRow({ activity: 'Construction', waste_type: 'Tyres', route: 'Re-use', tonnes: 5 }, TW_2026.waste)).toEqual({ status: 'no_factor' })
   })
 })

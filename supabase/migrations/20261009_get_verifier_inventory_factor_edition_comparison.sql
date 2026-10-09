@@ -1,10 +1,19 @@
+-- RUN 8 Oct 2026 in the Supabase SQL editor; live body verified.
+--
 -- get_verifier_inventory - factor_edition_comparison added to the verifier projection (F-06, T3c diff 4)
 -- ---------------------------------------------------------------------------
+-- THIS IS THE CURRENT DEFINITION. It supersedes 20260814_get_verifier_inventory_factor_editions.sql.
+--
+-- VERIFIED, 8 Oct 2026 (Lisa). Before running, the live pg_get_functiondef was compared line by line with this file
+-- and differed only by the two additions listed under WHAT CHANGED. After running, 'factor_edition_comparison'
+-- occurs 3 times in the live definition: the projection key, the i. column, and the audit field list.
+-- The first paste attempt failed on a truncated paste (42601, unterminated dollar-quoted string; nothing changed).
+-- The file was then copied from disk with sed and pbcopy, and that paste ran.
+--
 -- RUN AFTER 20261008_ghg_factor_edition_comparison.sql, which adds the column this file projects. Run before it,
 -- the CREATE OR REPLACE fails on an unknown column and changes nothing.
 --
--- When run, this becomes THE CURRENT DEFINITION and supersedes 20260814_get_verifier_inventory_factor_editions.sql.
--- From then on, re-running 20260814 (or any earlier definition) succeeds silently and reverts the projection: the
+-- Re-running 20260814 (or any earlier definition) succeeds silently and reverts the projection: the
 -- verifier would stop seeing which factor editions changed, from a page that looks normal.
 --
 -- ############################################################################

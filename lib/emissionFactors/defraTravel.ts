@@ -21,7 +21,10 @@
 // ⚠️ LOOKUPS GO THROUGH Maps, NOT OBJECT KEYS, so a string such as 'constructor' or '__proto__' finds
 // nothing rather than something from Object.prototype.
 
-import data from './defraTravel2026.json'
+import data2023 from './defraTravel2023.json'
+import data2024 from './defraTravel2024.json'
+import data2025 from './defraTravel2025.json'
+import data2026 from './defraTravel2026.json'
 
 export type AirCategory = 'domestic' | 'short_haul' | 'long_haul' | 'international_non_uk'
 export type CabinClass = 'average_passenger' | 'economy' | 'premium_economy' | 'business' | 'first'
@@ -105,16 +108,25 @@ export interface GuidanceQuote {
   text: string
 }
 
-export const AIR_RECORDS = data.air as AirRecord[]
-export const WTT_AIR_RECORDS = data.wtt_air as WttAirRecord[]
-export const HAUL_RECORDS = data.haul_definition as HaulRecord[]
-export const HOTEL_RECORDS = data.hotel_stay as HotelRecord[]
-export const RAIL_RECORDS = data.rail as RailRecord[]
-export const WTT_RAIL_RECORDS = data.wtt_rail as WttRailRecord[]
+
+// ── ONE READER PER EDITION (T3e, 8 Oct 2026) ───────────────────────────────────────────────────────
+// The editions the registry holds for desnz_travel, each generated from its own workbook by
+// scripts/generate-defra-travel.py --year. Pricing takes the edition selectEdition chose for the window
+// (lib/scope3/defraEditions.ts) and reads it through defraTravelFor(year); nothing prices on another edition.
+// The top-level exports below are the NEWEST edition's, for building selects and lists, whose rows are the same in
+// every edition held (T3e Step 1: every label, unit and row count matches 2023 to 2026). A lookup a figure is priced
+// from always goes through defraTravelFor.
+//   Hotel stay is in 2026 only (Lisa's ruling, 8 Oct 2026): nothing prices hotels.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Artefact = any
+const ARTEFACTS: Readonly<Record<number, Artefact>> = { 2023: data2023, 2024: data2024, 2025: data2025, 2026: data2026 }
+/** The DEFRA travel editions held, oldest first. */
+export const DEFRA_TRAVEL_YEARS: readonly number[] = Object.keys(ARTEFACTS).map(Number).sort((a, b) => a - b)
+export const DEFRA_TRAVEL_NEWEST = DEFRA_TRAVEL_YEARS[DEFRA_TRAVEL_YEARS.length - 1]
 
 /** The artefact's own statements, for disclosure. The guidance texts are quoted from the workbook by the
  *  generator, with the cell each was found in. */
-export const DEFRA_TRAVEL_META = data.metadata as {
+export interface DefraTravelMeta {
   source: string
   title_as_published: string
   edition: string
@@ -134,7 +146,8 @@ export const DEFRA_TRAVEL_META = data.metadata as {
   licence_basis: string
   /** ⚠️ VERBATIM, WHEREVER A FIGURE FROM THESE FACTORS IS SHOWN. Read this field; never type it out. */
   attribution_required: string
-  guidance: Record<string, GuidanceQuote>
+  /** null where this edition prints no such cell (T3e): an Index or What's new note 2023 or 2024 lacks, or a hotel quote before 2026. */
+  guidance: Record<string, GuidanceQuote | null>
   air_categories: AirCategory[]
   cabin_classes: CabinClass[]
   counts: Record<string, unknown>
@@ -151,75 +164,6 @@ export const DEFRA_TRAVEL_META = data.metadata as {
   homeworking_note: string
   fingerprint_scope_note: string
 }
-
-const airKey = (category: string, cabinClass: string) => `${category}\u0000${cabinClass}`
-
-const AIR_BY_KEY = new Map(AIR_RECORDS.map(r => [airKey(r.category, r.cabin_class), r]))
-const WTT_AIR_BY_KEY = new Map(WTT_AIR_RECORDS.map(r => [airKey(r.category, r.cabin_class), r]))
-const HAUL_BY_ISO3 = new Map(HAUL_RECORDS.map(r => [r.iso3, r]))
-const HOTEL_BY_COUNTRY = new Map(HOTEL_RECORDS.map(r => [r.country, r]))
-const RAIL_BY_TYPE = new Map(RAIL_RECORDS.map(r => [r.type as string, r]))
-const WTT_RAIL_BY_TYPE = new Map(WTT_RAIL_RECORDS.map(r => [r.type as string, r]))
-
-/** The air record for a category and class, or null where the sheet publishes none. */
-export function airRecord(category: AirCategory, cabinClass: CabinClass): AirRecord | null {
-  return AIR_BY_KEY.get(airKey(category, cabinClass)) ?? null
-}
-
-/**
- * kg CO2e per passenger.km with its gas split, for the radiative-forcing setting asked for, or null where
- * the sheet publishes no factor for the category and class.
- */
-export function airFactor(category: AirCategory, cabinClass: CabinClass, includeRf: boolean): GasSplit | null {
-  const r = airRecord(category, cabinClass)
-  if (!r) return null
-  return includeRf ? r.with_rf : r.without_rf
-}
-
-/** The WTT air record for a category and class, or null where the sheet publishes none. */
-export function wttAirRecord(category: AirCategory, cabinClass: CabinClass): WttAirRecord | null {
-  return WTT_AIR_BY_KEY.get(airKey(category, cabinClass)) ?? null
-}
-
-/**
- * Well-to-tank kg CO2e per passenger.km, or null. Takes no RF setting: the sheet publishes the two
- * columns with identical values and says so (guidance.wtt_air_rf_identical); the test pins the equality,
- * and this returns the Without RF column.
- */
-export function wttAirFactor(category: AirCategory, cabinClass: CabinClass): number | null {
-  return wttAirRecord(category, cabinClass)?.without_rf ?? null
-}
-
-/** The Haul definition sheet's haul for an ISO3 code (case and surrounding space ignored), or null. */
-export function haulForIso3(iso3: string): Haul | null {
-  return HAUL_BY_ISO3.get(iso3.trim().toUpperCase())?.haul ?? null
-}
-
-/** The hotel record for a country exactly as the sheet names it ('UK', 'UK (London)', 'Hong Kong, China'…),
- *  or null if the sheet does not list it. A listed country may still have a null factor. */
-export function hotelRecord(country: string): HotelRecord | null {
-  return HOTEL_BY_COUNTRY.get(country) ?? null
-}
-
-/** kg CO2e per room per night, or null: for a country not listed AND for one listed without a factor.
- *  hotelRecord() tells the two apart. */
-export function hotelFactor(country: string): number | null {
-  return hotelRecord(country)?.kg_co2e_per_room_night ?? null
-}
-
-/** kg CO2e per passenger.km with its gas split for a rail type, or null. UK factors (see rail_scope_note). */
-export function railFactor(type: string): GasSplit | null {
-  const r = RAIL_BY_TYPE.get(type)
-  return r ? { kg_co2e: r.kg_co2e, co2: r.co2, ch4: r.ch4, n2o: r.n2o } : null
-}
-
-/** Well-to-tank kg CO2e per passenger.km for a rail type, or null. */
-export function wttRailFactor(type: string): number | null {
-  return WTT_RAIL_BY_TYPE.get(type)?.kg_co2e ?? null
-}
-
-/** The rail types, in the sheet's order. */
-export const RAIL_TYPES: readonly RailType[] = RAIL_RECORDS.map(r => r.type)
 
 // ── CATEGORY 7: EMPLOYEE COMMUTING (added 19 Sep 2026) ──────────────────────────────────────────────
 //
@@ -273,86 +217,128 @@ export interface BusRecord extends GasSplit { type: BusType; type_as_published: 
 export interface WttBusRecord { type: BusType; type_as_published: string; basis: 'passenger_km'; unit: string; kg_co2e: number; sheet: string; row: number; cells: Cells }
 export interface HomeworkingRecord { component: HomeworkingComponent; activity_as_published: string; unit: string; kg_co2e: number; sheet: string; row: number; cells: Cells }
 
-export const CAR_RECORDS = data.cars as CarRecord[]
-export const WTT_CAR_RECORDS = data.wtt_cars as WttCarRecord[]
-export const MOTORBIKE_RECORDS = data.motorbikes as MotorbikeRecord[]
-export const WTT_MOTORBIKE_RECORDS = data.wtt_motorbikes as WttMotorbikeRecord[]
-export const TAXI_RECORDS = data.taxis as TaxiRecord[]
-export const WTT_TAXI_RECORDS = data.wtt_taxis as WttTaxiRecord[]
-export const BUS_RECORDS = data.buses as BusRecord[]
-export const WTT_BUS_RECORDS = data.wtt_buses as WttBusRecord[]
-export const HOMEWORKING_RECORDS = data.homeworking as HomeworkingRecord[]
 
 const k2 = (a: string, b: string) => `${a}\u0000${b}`
 const split = (r: GasSplit): GasSplit => ({ kg_co2e: r.kg_co2e, co2: r.co2, ch4: r.ch4, n2o: r.n2o })
-
-const CAR_BY_KEY = new Map(CAR_RECORDS.map(r => [k2(r.size, r.fuel), r]))
-const WTT_CAR_BY_KEY = new Map(WTT_CAR_RECORDS.map(r => [k2(r.size, r.fuel), r]))
-const MOTORBIKE_BY_SIZE = new Map(MOTORBIKE_RECORDS.map(r => [r.size as string, r]))
-const WTT_MOTORBIKE_BY_SIZE = new Map(WTT_MOTORBIKE_RECORDS.map(r => [r.size as string, r]))
-const TAXI_BY_KEY = new Map(TAXI_RECORDS.map(r => [k2(r.type, r.basis), r]))
-const WTT_TAXI_BY_KEY = new Map(WTT_TAXI_RECORDS.map(r => [k2(r.type, r.basis), r]))
-const BUS_BY_TYPE = new Map(BUS_RECORDS.map(r => [r.type as string, r]))
-const WTT_BUS_BY_TYPE = new Map(WTT_BUS_RECORDS.map(r => [r.type as string, r]))
-const HOMEWORKING_BY_COMPONENT = new Map(HOMEWORKING_RECORDS.map(r => [r.component as string, r]))
-
-/** The car record for a size and fuel, or null where the sheet publishes none (e.g. small CNG). */
-export function carRecord(size: string, fuel: string): CarRecord | null {
-  return CAR_BY_KEY.get(k2(size, fuel)) ?? null
-}
-/** kg CO2e per VEHICLE-km with its gas split, or null. Electric and plug-in hybrid include UK electricity. */
-export function carFactor(size: string, fuel: string): GasSplit | null {
-  const r = carRecord(size, fuel)
-  return r ? split(r) : null
-}
-/** Well-to-tank kg CO2e per vehicle-km for a size and fuel, or null. */
-export function wttCarFactor(size: string, fuel: string): number | null {
-  return WTT_CAR_BY_KEY.get(k2(size, fuel))?.kg_co2e ?? null
-}
-
-/** kg CO2e per VEHICLE-km with its gas split for a motorbike size, or null. The sheet's motorbikes are petrol. */
-export function motorbikeFactor(size: string): GasSplit | null {
-  const r = MOTORBIKE_BY_SIZE.get(size)
-  return r ? split(r) : null
-}
-/** Well-to-tank kg CO2e per vehicle-km for a motorbike size, or null. */
-export function wttMotorbikeFactor(size: string): number | null {
-  return WTT_MOTORBIKE_BY_SIZE.get(size)?.kg_co2e ?? null
-}
-
-/** kg CO2e per passenger-km or per vehicle-km, as asked, with its gas split for a taxi type, or null. */
-export function taxiFactor(type: string, basis: TaxiBasis): GasSplit | null {
-  const r = TAXI_BY_KEY.get(k2(type, basis))
-  return r ? split(r) : null
-}
-/** Well-to-tank kg CO2e per passenger-km or per vehicle-km for a taxi type, or null. */
-export function wttTaxiFactor(type: string, basis: TaxiBasis): number | null {
-  return WTT_TAXI_BY_KEY.get(k2(type, basis))?.kg_co2e ?? null
-}
-
-/** kg CO2e per PASSENGER-km with its gas split for a bus type or the coach, or null. */
-export function busFactor(type: string): GasSplit | null {
-  const r = BUS_BY_TYPE.get(type)
-  return r ? split(r) : null
-}
-/** Well-to-tank kg CO2e per passenger-km for a bus type or the coach, or null. */
-export function wttBusFactor(type: string): number | null {
-  return WTT_BUS_BY_TYPE.get(type)?.kg_co2e ?? null
-}
-
-/** kg CO2e per FTE working hour for a homeworking component, or null. A UK average (homeworking_note). */
-export function homeworkingFactor(component: string): number | null {
-  return HOMEWORKING_BY_COMPONENT.get(component)?.kg_co2e ?? null
-}
-
-/** The sizes, fuels and types the sheets publish, in the sheets' order, for building selects. */
-export const CAR_SIZES: readonly CarSize[] = [...new Set(CAR_RECORDS.map(r => r.size))]
 /** Column number of a cell reference's letters ("AF53" -> 32), to order fuels as the sheet's columns do. */
 const colOf = (ref: string): number => [...ref.replace(/\d+$/, '')].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0)
-/** In the sheet's column order: CNG and LPG are not published for every size, so first appearance would
- *  put them last. */
-export const CAR_FUELS: readonly CarFuel[] = [...new Map(CAR_RECORDS.map(r => [r.fuel, colOf(r.cells.fuel)] as const))]
-  .sort((x, y) => x[1] - y[1]).map(([f]) => f)
-export const MOTORBIKE_SIZES: readonly MotorbikeSize[] = MOTORBIKE_RECORDS.map(r => r.size)
-export const TAXI_TYPES: readonly TaxiType[] = [...new Set(TAXI_RECORDS.map(r => r.type))]
-export const BUS_TYPES: readonly BusType[] = BUS_RECORDS.map(r => r.type)
+
+function build(data: Artefact) {
+  const AIR_RECORDS = data.air as AirRecord[]
+  const WTT_AIR_RECORDS = data.wtt_air as WttAirRecord[]
+  const HAUL_RECORDS = data.haul_definition as HaulRecord[]
+  const HOTEL_RECORDS = data.hotel_stay as HotelRecord[]
+  const RAIL_RECORDS = data.rail as RailRecord[]
+  const WTT_RAIL_RECORDS = data.wtt_rail as WttRailRecord[]
+  const CAR_RECORDS = data.cars as CarRecord[]
+  const WTT_CAR_RECORDS = data.wtt_cars as WttCarRecord[]
+  const MOTORBIKE_RECORDS = data.motorbikes as MotorbikeRecord[]
+  const WTT_MOTORBIKE_RECORDS = data.wtt_motorbikes as WttMotorbikeRecord[]
+  const TAXI_RECORDS = data.taxis as TaxiRecord[]
+  const WTT_TAXI_RECORDS = data.wtt_taxis as WttTaxiRecord[]
+  const BUS_RECORDS = data.buses as BusRecord[]
+  const WTT_BUS_RECORDS = data.wtt_buses as WttBusRecord[]
+  const HOMEWORKING_RECORDS = data.homeworking as HomeworkingRecord[]
+  const META = data.metadata as DefraTravelMeta
+
+  const AIR_BY_KEY = new Map(AIR_RECORDS.map(r => [k2(r.category, r.cabin_class), r]))
+  const WTT_AIR_BY_KEY = new Map(WTT_AIR_RECORDS.map(r => [k2(r.category, r.cabin_class), r]))
+  const HAUL_BY_ISO3 = new Map(HAUL_RECORDS.map(r => [r.iso3, r]))
+  const HOTEL_BY_COUNTRY = new Map(HOTEL_RECORDS.map(r => [r.country, r]))
+  const RAIL_BY_TYPE = new Map(RAIL_RECORDS.map(r => [r.type as string, r]))
+  const WTT_RAIL_BY_TYPE = new Map(WTT_RAIL_RECORDS.map(r => [r.type as string, r]))
+  const CAR_BY_KEY = new Map(CAR_RECORDS.map(r => [k2(r.size, r.fuel), r]))
+  const WTT_CAR_BY_KEY = new Map(WTT_CAR_RECORDS.map(r => [k2(r.size, r.fuel), r]))
+  const MOTORBIKE_BY_SIZE = new Map(MOTORBIKE_RECORDS.map(r => [r.size as string, r]))
+  const WTT_MOTORBIKE_BY_SIZE = new Map(WTT_MOTORBIKE_RECORDS.map(r => [r.size as string, r]))
+  const TAXI_BY_KEY = new Map(TAXI_RECORDS.map(r => [k2(r.type, r.basis), r]))
+  const WTT_TAXI_BY_KEY = new Map(WTT_TAXI_RECORDS.map(r => [k2(r.type, r.basis), r]))
+  const BUS_BY_TYPE = new Map(BUS_RECORDS.map(r => [r.type as string, r]))
+  const WTT_BUS_BY_TYPE = new Map(WTT_BUS_RECORDS.map(r => [r.type as string, r]))
+  const HOMEWORKING_BY_COMPONENT = new Map(HOMEWORKING_RECORDS.map(r => [r.component as string, r]))
+
+  const airRecord = (category: AirCategory, cabinClass: CabinClass): AirRecord | null => AIR_BY_KEY.get(k2(category, cabinClass)) ?? null
+  const wttAirRecord = (category: AirCategory, cabinClass: CabinClass): WttAirRecord | null => WTT_AIR_BY_KEY.get(k2(category, cabinClass)) ?? null
+  const hotelRecord = (country: string): HotelRecord | null => HOTEL_BY_COUNTRY.get(country) ?? null
+  const carRecord = (size: string, fuel: string): CarRecord | null => CAR_BY_KEY.get(k2(size, fuel)) ?? null
+  return {
+    META, AIR_RECORDS, WTT_AIR_RECORDS, HAUL_RECORDS, HOTEL_RECORDS, RAIL_RECORDS, WTT_RAIL_RECORDS,
+    CAR_RECORDS, WTT_CAR_RECORDS, MOTORBIKE_RECORDS, WTT_MOTORBIKE_RECORDS, TAXI_RECORDS, WTT_TAXI_RECORDS,
+    BUS_RECORDS, WTT_BUS_RECORDS, HOMEWORKING_RECORDS,
+    /** The air record for a category and class, or null where the sheet publishes none. */
+    airRecord,
+    /** kg CO2e per passenger.km with its gas split, for the RF setting asked for, or null where the sheet publishes none. */
+    airFactor: (category: AirCategory, cabinClass: CabinClass, includeRf: boolean): GasSplit | null => {
+      const r = airRecord(category, cabinClass)
+      return r ? (includeRf ? r.with_rf : r.without_rf) : null
+    },
+    wttAirRecord,
+    /** Well-to-tank kg CO2e per passenger.km, or null. The sheet publishes the two RF columns identically
+     *  (guidance.wtt_air_rf_identical); this returns the Without RF column. */
+    wttAirFactor: (category: AirCategory, cabinClass: CabinClass): number | null => wttAirRecord(category, cabinClass)?.without_rf ?? null,
+    /** The Haul definition sheet's haul for an ISO3 code (case and surrounding space ignored), or null. */
+    haulForIso3: (iso3: string): Haul | null => HAUL_BY_ISO3.get(iso3.trim().toUpperCase())?.haul ?? null,
+    /** The hotel record for a country exactly as the sheet names it, or null. 2026 only. */
+    hotelRecord,
+    hotelFactor: (country: string): number | null => hotelRecord(country)?.kg_co2e_per_room_night ?? null,
+    /** kg CO2e per passenger.km with its gas split for a rail type, or null. UK factors (rail_scope_note). */
+    railFactor: (type: string): GasSplit | null => { const r = RAIL_BY_TYPE.get(type); return r ? split(r) : null },
+    railRecord: (type: string): RailRecord | null => RAIL_BY_TYPE.get(type) ?? null,
+    wttRailFactor: (type: string): number | null => WTT_RAIL_BY_TYPE.get(type)?.kg_co2e ?? null,
+    wttRailRecord: (type: string): WttRailRecord | null => WTT_RAIL_BY_TYPE.get(type) ?? null,
+    /** The car record for a size and fuel, or null where the sheet publishes none (e.g. small CNG). */
+    carRecord,
+    /** kg CO2e per VEHICLE-km with its gas split, or null. Electric and plug-in hybrid include UK electricity. */
+    carFactor: (size: string, fuel: string): GasSplit | null => { const r = carRecord(size, fuel); return r ? split(r) : null },
+    wttCarFactor: (size: string, fuel: string): number | null => WTT_CAR_BY_KEY.get(k2(size, fuel))?.kg_co2e ?? null,
+    wttCarRecord: (size: string, fuel: string): WttCarRecord | null => WTT_CAR_BY_KEY.get(k2(size, fuel)) ?? null,
+    motorbikeFactor: (size: string): GasSplit | null => { const r = MOTORBIKE_BY_SIZE.get(size); return r ? split(r) : null },
+    motorbikeRecord: (size: string): MotorbikeRecord | null => MOTORBIKE_BY_SIZE.get(size) ?? null,
+    wttMotorbikeFactor: (size: string): number | null => WTT_MOTORBIKE_BY_SIZE.get(size)?.kg_co2e ?? null,
+    taxiFactor: (type: string, basis: TaxiBasis): GasSplit | null => { const r = TAXI_BY_KEY.get(k2(type, basis)); return r ? split(r) : null },
+    taxiRecord: (type: string, basis: TaxiBasis): TaxiRecord | null => TAXI_BY_KEY.get(k2(type, basis)) ?? null,
+    wttTaxiFactor: (type: string, basis: TaxiBasis): number | null => WTT_TAXI_BY_KEY.get(k2(type, basis))?.kg_co2e ?? null,
+    busFactor: (type: string): GasSplit | null => { const r = BUS_BY_TYPE.get(type); return r ? split(r) : null },
+    busRecord: (type: string): BusRecord | null => BUS_BY_TYPE.get(type) ?? null,
+    wttBusFactor: (type: string): number | null => WTT_BUS_BY_TYPE.get(type)?.kg_co2e ?? null,
+    /** kg CO2e per FTE working hour for a homeworking component, or null. A UK average (homeworking_note). */
+    homeworkingFactor: (component: string): number | null => HOMEWORKING_BY_COMPONENT.get(component)?.kg_co2e ?? null,
+    homeworkingRecord: (component: string): HomeworkingRecord | null => HOMEWORKING_BY_COMPONENT.get(component) ?? null,
+    RAIL_TYPES: RAIL_RECORDS.map(r => r.type) as readonly RailType[],
+    CAR_SIZES: [...new Set(CAR_RECORDS.map(r => r.size))] as readonly CarSize[],
+    /** In the sheet's column order: CNG and LPG are not published for every size, so first appearance would put them last. */
+    CAR_FUELS: [...new Map(CAR_RECORDS.map(r => [r.fuel, colOf(r.cells.fuel)] as const))].sort((x, y) => x[1] - y[1]).map(([f]) => f) as readonly CarFuel[],
+    MOTORBIKE_SIZES: MOTORBIKE_RECORDS.map(r => r.size) as readonly MotorbikeSize[],
+    TAXI_TYPES: [...new Set(TAXI_RECORDS.map(r => r.type))] as readonly TaxiType[],
+    BUS_TYPES: BUS_RECORDS.map(r => r.type) as readonly BusType[],
+  }
+}
+export type DefraTravelTables = ReturnType<typeof build>
+
+const BY_YEAR = new Map(DEFRA_TRAVEL_YEARS.map(y => [y, build(ARTEFACTS[y])]))
+/** The travel tables of one held edition (its year), or null for an edition not held. Pricing reads only this. */
+export function defraTravelFor(year: number): DefraTravelTables | null {
+  return BY_YEAR.get(year) ?? null
+}
+
+// ── THE NEWEST EDITION, FOR SELECTS AND LISTS ──────────────────────────────────────────────────────
+const NEWEST = BY_YEAR.get(DEFRA_TRAVEL_NEWEST)!
+export const DEFRA_TRAVEL_META = NEWEST.META
+export const AIR_RECORDS = NEWEST.AIR_RECORDS
+export const WTT_AIR_RECORDS = NEWEST.WTT_AIR_RECORDS
+export const HAUL_RECORDS = NEWEST.HAUL_RECORDS
+export const HOTEL_RECORDS = NEWEST.HOTEL_RECORDS
+export const RAIL_RECORDS = NEWEST.RAIL_RECORDS
+export const WTT_RAIL_RECORDS = NEWEST.WTT_RAIL_RECORDS
+export const CAR_RECORDS = NEWEST.CAR_RECORDS
+export const WTT_CAR_RECORDS = NEWEST.WTT_CAR_RECORDS
+export const MOTORBIKE_RECORDS = NEWEST.MOTORBIKE_RECORDS
+export const WTT_MOTORBIKE_RECORDS = NEWEST.WTT_MOTORBIKE_RECORDS
+export const TAXI_RECORDS = NEWEST.TAXI_RECORDS
+export const WTT_TAXI_RECORDS = NEWEST.WTT_TAXI_RECORDS
+export const BUS_RECORDS = NEWEST.BUS_RECORDS
+export const WTT_BUS_RECORDS = NEWEST.WTT_BUS_RECORDS
+export const HOMEWORKING_RECORDS = NEWEST.HOMEWORKING_RECORDS
+export const { airRecord, airFactor, wttAirRecord, wttAirFactor, haulForIso3, hotelRecord, hotelFactor, railFactor, wttRailFactor,
+  carRecord, carFactor, wttCarFactor, motorbikeFactor, wttMotorbikeFactor, taxiFactor, wttTaxiFactor, busFactor, wttBusFactor,
+  homeworkingFactor, RAIL_TYPES, CAR_SIZES, CAR_FUELS, MOTORBIKE_SIZES, TAXI_TYPES, BUS_TYPES } = NEWEST

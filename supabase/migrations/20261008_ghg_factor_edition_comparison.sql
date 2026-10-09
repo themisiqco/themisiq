@@ -1,3 +1,5 @@
+-- RUN 8 Oct 2026 in the Supabase SQL editor; grants verified.
+--
 -- ghg_inventories.factor_edition_comparison: the factor editions that changed since the prior year (F-06, T3c diff 4)
 -- ---------------------------------------------------------------------------
 -- WHAT IT DOES
@@ -51,6 +53,10 @@
 --   order by grantee, column_name, privilege_type;
 -- PROCEED if the result is as it was on 8 Oct 2026: every role holds its privileges on every column alike, except
 -- service_role's UPDATE on free_tier. STOP and report any other column-level grant.
+-- RESULT, 8 Oct 2026 (Lisa): the pre-check matched 8 Oct's for 20261008_ghg_factor_selection.sql: every role held
+--   its privileges on all 34 columns alike, except service_role, which holds UPDATE on free_tier only.
+-- VERIFIED, 8 Oct 2026 (Lisa), after running: factor_edition_comparison shows authenticated INSERT, SELECT, UPDATE;
+--   service_role REFERENCES and SELECT; anon nothing.
 -- VERIFY, after: the same query filtered to column_name = 'factor_edition_comparison' should show authenticated
 -- with INSERT, SELECT, UPDATE; service_role with SELECT (and REFERENCES, as on factor_selection); anon with nothing.
 --

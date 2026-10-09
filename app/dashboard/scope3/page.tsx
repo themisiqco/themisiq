@@ -29,7 +29,7 @@ import {
 import { matchCountries, countryByIso2 } from '../../../lib/emissionFactors/countryOptions'
 import { regionName, regionLabel, countryLabel } from '../../../lib/emissionFactors/regionNames'
 import {
-  DEFRA_WASTE_META, WASTE_MATERIAL_GROUPS, WASTE_METHOD_LABEL, wasteRoutesFor, wasteMaterialKey, parseWasteMaterialKey,
+  DEFRA_WASTE_META, DEFRA_WASTE_NEWEST, defraWasteMetaFor, WASTE_MATERIAL_GROUPS, WASTE_METHOD_LABEL, wasteRoutesFor, wasteMaterialKey, parseWasteMaterialKey,
   wasteMethodFor, withoutListMarker,
 } from '../../../lib/emissionFactors/defraWaste'
 import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow, type EvaluatedWasteRow } from '../../../lib/scope3/wasteRows'
@@ -48,22 +48,23 @@ import {
   type CommuteRow, type HomeworkingRow, type EvaluatedCommute, type EvaluatedHomeworking,
 } from '../../../lib/scope3/commuting'
 import {
-  CAT7_STAND_IN_SENTENCE, CAT7_ELECTRIC_SENTENCE, CAT7_OCCUPANCY_SENTENCE, CAT7_DAYS_SENTENCE, CAT7_HOMEWORKING_SENTENCE,
   cat7Sentences, cat7WorkingsSummary, cat7Basis, cat7LegacyNotice, commuteCsvRow, homeworkingCsvRow,
   commuteNotPricedReason, homeworkingNotPricedReason, commuteFlags, commuteDistanceText, CAR_FUEL_LABEL, COMMUTE_BUS_LABEL, TAXI_LABEL,
+  cat7CopyFor,
 } from '../../../lib/scope3/commutingCopy'
 import { CAR_SIZES, CAR_FUELS, MOTORBIKE_SIZES, TAXI_TYPES, BUS_TYPES, carFactor } from '../../../lib/emissionFactors/defraTravel'
 import { publisherGwpSentence } from '../../../lib/scope3/gwpSentence'
-import { DEFRA_TRAVEL_META, RAIL_TYPES } from '../../../lib/emissionFactors/defraTravel'
+import { DEFRA_TRAVEL_META, DEFRA_TRAVEL_NEWEST, RAIL_TYPES, defraTravelFor } from '../../../lib/emissionFactors/defraTravel'
+import { travelWasteEditionsFor } from '../../../lib/scope3/defraEditions'
+import { defraEditionSentence } from '../../../lib/scope3/defraEditionTypes'
 import { COUNTRY_OPTIONS } from '../../../lib/emissionFactors/countryOptions'
 import {
   evaluateBusinessTravel, withDistance, CABIN_CHOICES,
   type FlightRow, type RailJourney, type DistanceUnit, type EvaluatedFlight, type EvaluatedRail,
 } from '../../../lib/scope3/businessTravel'
 import {
-  CAT6_HOTEL_SENTENCE, CAT6_UPLIFT_SENTENCE, CAT6_DISTANCE_HELP, CAT6_RAIL_SENTENCE,
-  cat6Sentences, cat6WorkingsSummary, cat6Basis, cat6RfHeader, cat6RfSentence, flightCsvRow, railCsvRow,
-  flightRuleText, flightClassText, flightNotPricedReason, railNotPricedReason, AIR_CATEGORY_LABEL,
+  cat6Sentences, cat6WorkingsSummary, cat6Basis, flightCsvRow, railCsvRow,
+  flightRuleText, flightClassText, flightNotPricedReason, railNotPricedReason, AIR_CATEGORY_LABEL, cat6CopyFor,
 } from '../../../lib/scope3/businessTravelCopy'
 // ── CATEGORY 3 ────────────────────────────────────────────────────────────────────────────────────
 // The adapter reads the bound GHG inventory's saved workings and locations; the pricing module turns
@@ -487,8 +488,10 @@ const WASTE_EDITOR_COPY: Readonly<Record<WasteRowsCategoryId, { empty: string; s
  * PROPORTION treated by each method (Technical Guidance p. 126), and the proportion is an assumption the
  * customer must be able to see and state. The material select and the route list are the same reader.
  */
-function EolMaterialsEditor({ evaluated, onAdd, onRemove, onSetMaterial, onUpdate, onSetShare }: {
+function EolMaterialsEditor({ evaluated, wasteYear, onAdd, onRemove, onSetMaterial, onUpdate, onSetShare }: {
   evaluated: readonly EvaluatedEolMaterial[]
+  /** T3e: the DEFRA waste edition the window selected (the newest when it is missing), for the routes offered. */
+  wasteYear: number
   onAdd: () => void
   onRemove: (id: string) => void
   onSetMaterial: (id: string, key: string) => void
@@ -505,7 +508,7 @@ function EolMaterialsEditor({ evaluated, onAdd, onRemove, onSetMaterial, onUpdat
       {evaluated.map(e => {
         const m = e.material
         const hasMaterial = !!m.activity && !!m.waste_type
-        const routes = hasMaterial ? wasteRoutesFor(m.activity, m.waste_type) : []
+        const routes = hasMaterial ? wasteRoutesFor(m.activity, m.waste_type, wasteYear) : []
         const materialKey = hasMaterial && WASTE_MATERIAL_GROUPS.some(g => g.activity === m.activity && g.materials.includes(m.waste_type))
           ? wasteMaterialKey(m.activity, m.waste_type) : ''
         const fieldId = (f: string) => `cat12-${m.id}-${f}`
@@ -568,9 +571,11 @@ function EolMaterialsEditor({ evaluated, onAdd, onRemove, onSetMaterial, onUpdat
   )
 }
 
-function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMaterial }: {
+function WasteRowsEditor({ catId, evaluated, wasteYear, onAdd, onRemove, onUpdate, onSetMaterial }: {
   catId: WasteRowsCategoryId
   evaluated: readonly EvaluatedWasteRow[]
+  /** T3e: the DEFRA waste edition the window selected (the newest when it is missing), for the routes offered. */
+  wasteYear: number
   onAdd: () => void
   onRemove: (id: string) => void
   onUpdate: (id: string, patch: Partial<WasteRow>) => void
@@ -586,7 +591,7 @@ function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMat
     )}
     {evaluated.map(({ row, n, pricing }) => {
       const hasMaterial = !!row.activity && !!row.waste_type
-      const routes = hasMaterial ? wasteRoutesFor(row.activity, row.waste_type) : []
+      const routes = hasMaterial ? wasteRoutesFor(row.activity, row.waste_type, wasteYear) : []
       const materialKey = hasMaterial && WASTE_MATERIAL_GROUPS.some(g => g.activity === row.activity && g.materials.includes(row.waste_type))
         ? wasteMaterialKey(row.activity, row.waste_type) : ''
       const fieldId = (f: string) => `${catId}-${row.id}-${f}`
@@ -627,6 +632,8 @@ function WasteRowsEditor({ catId, evaluated, onAdd, onRemove, onUpdate, onSetMat
               </span>
             ) : pricing.status === 'no_factor' ? (
               <span style={{ color: '#92400e' }}>⚠ Not counted: {wasteRowNotPricedReason(row, pricing)}. Choose the waste type and route again.</span>
+            ) : pricing.status === 'edition_missing' ? (
+              <span style={{ color: '#92400e' }}>⚠ Not counted: {pricing.message}</span>
             ) : (
               <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
             )}
@@ -676,9 +683,11 @@ const amountText = (n: number) => n.toLocaleString('en', { maximumFractionDigits
  * Cat 6 flight legs: one row per leg, priced from lib/scope3/businessTravel.ts. Every figure shown here is
  * the evaluation's, and every sentence is built in businessTravelCopy.ts.
  */
-function FlightsEditor({ evaluated, includeRf, onAdd, onRemove, onUpdate }: {
+function FlightsEditor({ evaluated, includeRf, distanceHelp, onAdd, onRemove, onUpdate }: {
   evaluated: readonly EvaluatedFlight[]
   includeRf: boolean
+  /** T3e: CAT6_DISTANCE_HELP of the edition the window selected. */
+  distanceHelp: string
   onAdd: () => void
   onRemove: (id: string) => void
   onUpdate: (id: string, patch: Partial<FlightRow>) => void
@@ -721,7 +730,7 @@ function FlightsEditor({ evaluated, includeRf, onAdd, onRemove, onUpdate }: {
             <div style={{ gridColumn: '1 / -1' }}>
               <label htmlFor={fieldId('distance')} style={labelStyle}>Distance, one way</label>
               <DistanceField fieldId={fieldId('distance')} distance={row.distance} unit={row.distance_unit} onChange={next => onUpdate(row.id, next)} />
-              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>{CAT6_DISTANCE_HELP}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>{distanceHelp}</div>
             </div>
             <div style={{ gridColumn: '1 / -1', fontSize: 11, lineHeight: 1.5 }}>
               {pricing.status === 'priced' ? (
@@ -730,7 +739,7 @@ function FlightsEditor({ evaluated, includeRf, onAdd, onRemove, onUpdate }: {
                   <br />
                   Combustion {kgText(includeRf ? pricing.kg.with_rf.kg_co2e : pricing.kg.without_rf.kg_co2e)} kg CO₂e ({includeRf ? `without radiative forcing ${kgText(pricing.kg.without_rf.kg_co2e)}` : `with radiative forcing ${kgText(pricing.kg.with_rf.kg_co2e)}`}) + well-to-tank {kgText(pricing.kg.wtt)} = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg.total)} kg CO₂e</strong>
                 </span>
-              ) : pricing.status === 'no_haul' || pricing.status === 'distance_mismatch' ? (
+              ) : pricing.status === 'no_haul' || pricing.status === 'distance_mismatch' || pricing.status === 'edition_missing' ? (
                 <span style={{ color: '#92400e' }}>⚠ Not counted: {flightNotPricedReason(pricing, countryLabel)}.</span>
               ) : (
                 <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
@@ -792,7 +801,7 @@ function RailJourneysEditor({ evaluated, onAdd, onRemove, onUpdate }: {
                   {kgText(pricing.km)} km · combustion {kgText(pricing.kg.combustion)} kg CO₂e + well-to-tank {kgText(pricing.kg.wtt)} = <strong style={{ fontWeight: 600 }}>{kgText(pricing.kg.total)} kg CO₂e</strong>
                   {pricing.uk_stand_in && <><br /><span style={{ color: '#92400e' }}>⚠ UK rail factor used as a stand-in outside the UK.</span></>}
                 </span>
-              ) : pricing.status === 'no_factor' || pricing.status === 'distance_mismatch' ? (
+              ) : pricing.status === 'no_factor' || pricing.status === 'distance_mismatch' || pricing.status === 'edition_missing' ? (
                 <span style={{ color: '#92400e' }}>⚠ Not counted: {railNotPricedReason(pricing)}.</span>
               ) : (
                 <span style={{ color: 'var(--color-ink-muted)' }}>Not priced until entered: {pricing.missing.join(', ')}.</span>
@@ -816,8 +825,10 @@ function NumberField({ id, value, onChange, placeholder }: { id: string; value: 
  * Cat 7 commuting groups: one row per group of employees who commute the same way, priced by
  * lib/scope3/commuting.ts. No mode is preselected, and nothing is defaulted: a blank field is missing.
  */
-function CommuteRowsEditor({ evaluated, onAdd, onRemove, onUpdate }: {
+function CommuteRowsEditor({ evaluated, travelYear, onAdd, onRemove, onUpdate }: {
   evaluated: readonly EvaluatedCommute[]
+  /** T3e: the DEFRA travel edition the window selected (the newest when it is missing), for the fuels offered. */
+  travelYear: number
   onAdd: () => void
   onRemove: (id: string) => void
   onUpdate: (id: string, patch: Partial<CommuteRow>) => void
@@ -832,7 +843,8 @@ function CommuteRowsEditor({ evaluated, onAdd, onRemove, onUpdate }: {
       )}
       {evaluated.map(({ row, n, pricing }) => {
         const fieldId = (f: string) => `cat7-commute-${row.id}-${f}`
-        const fuels = row.car_size ? CAR_FUELS.filter(f => carFactor(row.car_size!, f) !== null) : CAR_FUELS
+        const carFactorAt = defraTravelFor(travelYear)?.carFactor ?? carFactor
+        const fuels = row.car_size ? CAR_FUELS.filter(f => carFactorAt(row.car_size!, f) !== null) : CAR_FUELS
         const perVehicle = row.mode === 'car' || row.mode === 'motorbike'
         return (
           <div key={row.id} style={{ border: '1px solid #e8e7e4', borderRadius: 10, padding: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -856,7 +868,7 @@ function CommuteRowsEditor({ evaluated, onAdd, onRemove, onUpdate }: {
                 <label htmlFor={fieldId('car-size')} style={labelStyle}>Car size</label>
                 <select id={fieldId('car-size')} style={inputStyle} value={row.car_size ?? ''} onChange={e => {
                   const size = e.target.value as CommuteRow['car_size']
-                  onUpdate(row.id, { car_size: size, car_fuel: size && row.car_fuel && carFactor(size, row.car_fuel) === null ? '' : row.car_fuel })
+                  onUpdate(row.id, { car_size: size, car_fuel: size && row.car_fuel && carFactorAt(size, row.car_fuel) === null ? '' : row.car_fuel })
                 }}>
                   <option value="">Select size</option>
                   {CAR_SIZES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
@@ -1776,7 +1788,7 @@ export default function Scope3Dashboard() {
     const m = parseWasteMaterialKey(key)
     if (!m) { updateEolMaterial(id, { activity: '', waste_type: '', shares: {} }); return }
     updateEolMaterial(id, row => {
-      const routes = wasteRoutesFor(m.activity, m.waste_type)
+      const routes = wasteRoutesFor(m.activity, m.waste_type, wasteYear)
       return { activity: m.activity, waste_type: m.waste_type, shares: Object.fromEntries(Object.entries(row.shares).filter(([r]) => routes.includes(r))) }
     })
   }
@@ -1844,7 +1856,7 @@ export default function Scope3Dashboard() {
     updateWasteRow(catId, id, row => ({
       activity: m.activity,
       waste_type: m.waste_type,
-      route: wasteRoutesFor(m.activity, m.waste_type).includes(row.route) ? row.route : '',
+      route: wasteRoutesFor(m.activity, m.waste_type, wasteYear).includes(row.route) ? row.route : '',
     }))
   }
 
@@ -1877,7 +1889,16 @@ export default function Scope3Dashboard() {
   // workings, the CSV and factor_basis, so none of them can price a row differently. It is
   // lib/scope3/wasteRows.ts over Cat 5's OWN rows: the page no longer prices rows itself, which is what
   // lets a second row-priced category run the same evaluation without reading Category 5's.
-  const cat5Waste = evaluateWasteRows(wasteRows('cat5'))
+  // T3e (R18): the DEFRA travel and waste editions the reporting window selects, by the DESNZ rule, as Category 3's are.
+  // Every Category 5, 6, 7 and 12 line is priced on these and cites them; a missing one is an unpriced line.
+  const twEds = travelWasteEditionsFor(selectionFor(reportingYear, yearEndMonth))
+  const wasteYear = 'held' in twEds.waste ? twEds.waste.held.year : DEFRA_WASTE_NEWEST
+  const travelYear = 'held' in twEds.travel ? twEds.travel.held.year : DEFRA_TRAVEL_NEWEST
+  const wasteMeta = defraWasteMetaFor(wasteYear) ?? DEFRA_WASTE_META
+  const travelMeta = defraTravelFor(travelYear)?.META ?? DEFRA_TRAVEL_META
+  const cat6Copy = cat6CopyFor(twEds.travel)
+  const cat7Copy = cat7CopyFor(twEds.travel)
+  const cat5Waste = evaluateWasteRows(wasteRows('cat5'), twEds.waste)
   const cat5Evaluated = cat5Waste.evaluated
   const cat5Priced = cat5Waste.priced
   const cat5NotPriced = cat5Waste.notPriced
@@ -1903,7 +1924,7 @@ export default function Scope3Dashboard() {
     const tonnages = [hasLandfill && `${landfill} t to landfill`, hasRecycled && `${recycled} t recycled`]
       .filter((x): x is string => typeof x === 'string').join(' and ')
     const both = hasLandfill && hasRecycled
-    const sheet = `the ${DEFRA_WASTE_META.sheet} sheet of ${DEFRA_WASTE_META.source}`
+    const sheet = `the ${wasteMeta.sheet} sheet of ${wasteMeta.source}`
     const sentences = [
       `This inventory was saved with the previous Cat 5 form, which recorded ${tonnages}.`,
       `${both ? 'These tonnages are' : 'This tonnage is'} not priced and not in the Cat 5 figure.`,
@@ -1929,19 +1950,25 @@ export default function Scope3Dashboard() {
    */
   /** The GWP sentence both waste categories carry: the sheet's AR5 basis, and whether the bound GHG inventory
    *  shares it. Cat 5's wording, unchanged, now built once so Cat 12 cannot word it differently. */
-  const wasteGwpSentence: string = publisherGwpSentence(DEFRA_WASTE_META, !!boundInventoryId, ghgGwpVersion)
+  const wasteGwpSentence: string = publisherGwpSentence(wasteMeta, !!boundInventoryId, ghgGwpVersion)
+  /** T3e: each renamed-route sentence once (DEFRA 2025's "Incineration with energy recovery"), from the priced rows. */
+  const renamedRouteNotes = (notes: readonly (string | null)[]): string[] => [...new Set(notes.filter((n): n is string => !!n))]
 
   const cat5Sentences: string[] = (() => {
-    const m = DEFRA_WASTE_META
+    const m = wasteMeta
     const out: string[] = []
-    out.push(
+    // T3e: a missing edition prices nothing, so no sentence claims a source; the engine's sentence says why.
+    if ('missing' in twEds.waste) out.push(twEds.waste.missing.message)
+    else out.push(
       `Priced from ${m.source} (${m.factor_set.toLowerCase()} v${m.file_version}, ${m.sheet} sheet, factor edition ${m.edition}). ` +
       `Each row is its tonnes multiplied by the kg CO2e per tonne the sheet publishes for that material and treatment route, and the rows are summed.`,
+      defraEditionSentence(twEds.waste.held),
+      ...renamedRouteNotes(cat5Priced.map(e => e.pricing.route_note)),
     )
     // ⚠️ VERBATIM FROM THE ARTEFACT: the attribution OGL v3.0 requires, then the licence and its link, which
     // the licence asks for where possible. Never reworded here.
-    out.push(DEFRA_WASTE_META.attribution_required)
-    out.push(`Licence: ${DEFRA_WASTE_META.licence}, ${DEFRA_WASTE_META.licence_url}`)
+    out.push(wasteMeta.attribution_required)
+    out.push(`Licence: ${wasteMeta.licence}, ${wasteMeta.licence_url}`)
     const specific = cat5Priced.filter(e => e.pricing.method === 'waste_type_specific')
     const average = cat5Priced.filter(e => e.pricing.method === 'average_data')
     const methodParts = [
@@ -1955,7 +1982,9 @@ export default function Scope3Dashboard() {
     out.push(withoutListMarker(m.scope_guidance))
     out.push(withoutListMarker(m.lifecycle_guidance))
     out.push('Each material is offered only the treatment routes the sheet publishes a factor for. A route it does not publish is not offered, and is not treated as zero.')
-    out.push(`Re-use is not offered. The workbook's FAQ, "${m.reuse_faq_question}": ${m.reuse_faq_answer}`)
+    out.push(m.reuse_faq_question
+      ? `Re-use is not offered. The workbook's FAQ, "${m.reuse_faq_question}": ${m.reuse_faq_answer}`
+      : 'Re-use is not offered: the sheet publishes no Re-use factor.')
     out.push('The sheet publishes no wastewater factors, so wastewater treatment is not in this figure.')
     for (const e of cat5NotPriced) {
       out.push(`Row ${e.n} is not in this figure: ${wasteRowNotPricedReason(e.row, e.pricing)}.`)
@@ -1966,19 +1995,22 @@ export default function Scope3Dashboard() {
   // ─── Cat 12: end-of-life treatment of sold products ─────────────────────────────────────────
   // ONE evaluation read by the panel, the workings, the CSV and factor_basis, as for Cat 5. The figure and
   // the calculated flag come from rowPricedResult, which reads this category's own data only.
-  const cat12Eol = evaluateEolMaterials(catData['cat12']?.eolMaterials)
+  const cat12Eol = evaluateEolMaterials(catData['cat12']?.eolMaterials, twEds.waste)
   const cat12SplitSource = (catData['cat12']?.eol_split_source ?? '').trim()
   /**
    * The Cat 12 workings and CSV disclosures: the same sentences in both. ⚠️ NO EM-DASHES, and the method is
    * described as finer than the Technical Guidance's formula [12.1], never as that formula.
    */
   const cat12Sentences: string[] = (() => {
-    const m = DEFRA_WASTE_META
+    const m = wasteMeta
     const out: string[] = []
-    out.push(
+    if ('missing' in twEds.waste) out.push(twEds.waste.missing.message)
+    else out.push(
       `Priced from ${m.source} (${m.factor_set.toLowerCase()} v${m.file_version}, ${m.sheet} sheet, factor edition ${m.edition}). ` +
       `For each material, the tonnes of sold products and packaging reaching end of life are split across treatment routes by the customer's shares, ` +
       `and each route's tonnes are multiplied by the kg CO2e per tonne the sheet publishes for that material and route; the results are summed.`,
+      defraEditionSentence(twEds.waste.held),
+      ...renamedRouteNotes(cat12Eol.priced.flatMap(e => e.routes.map(rt => rt.pricing.status === 'priced' ? rt.pricing.route_note : null))),
     )
     out.push(m.attribution_required)
     out.push(`Licence: ${m.licence}, ${m.licence_url}`)
@@ -1994,7 +2026,8 @@ export default function Scope3Dashboard() {
     out.push(wasteGwpSentence)
     out.push(withoutListMarker(m.scope_guidance))
     out.push(withoutListMarker(m.lifecycle_guidance))
-    out.push(`Re-use is not offered as a route: a re-used product still reaches end of life later. The workbook's FAQ, "${m.reuse_faq_question}": ${m.reuse_faq_answer}`)
+    out.push(`Re-use is not offered as a route: a re-used product still reaches end of life later.` +
+      (m.reuse_faq_question ? ` The workbook's FAQ, "${m.reuse_faq_question}": ${m.reuse_faq_answer}` : ' The sheet publishes no Re-use factor.'))
     for (const e of cat12Eol.notPriced) out.push(`Material ${e.n} is not in this figure: ${eolMaterialNotPricedReason(e)}.`)
     return out
   })()
@@ -2002,15 +2035,15 @@ export default function Scope3Dashboard() {
   // ─── Cat 6: business travel ─────────────────────────────────────────────────────────────────────
   // ONE evaluation read by the panel, the workings, the CSV and factor_basis. The figure and the calculated
   // flag come from rowPricedResult, which evaluates this category's own record the same way.
-  const cat6Travel = evaluateBusinessTravel(catData['cat6'])
+  const cat6Travel = evaluateBusinessTravel(catData['cat6'], twEds.travel)
   /** The Cat 6 workings and CSV disclosures: the same sentences in both, built in businessTravelCopy.ts. */
-  const cat6SentenceList: string[] = cat6Sentences(cat6Travel, publisherGwpSentence(DEFRA_TRAVEL_META, !!boundInventoryId, ghgGwpVersion), countryLabel)
+  const cat6SentenceList: string[] = cat6Sentences(cat6Travel, publisherGwpSentence(travelMeta, !!boundInventoryId, ghgGwpVersion), countryLabel)
 
   // ─── Cat 7: employee commuting ───────────────────────────────────────────────────────────────────
   // ONE evaluation read by the panel, the workings, the CSV and factor_basis; the figure and the calculated
   // flag come from rowPricedResult, which evaluates this category's own record the same way.
-  const cat7Commuting = evaluateCommuting(catData['cat7'])
-  const cat7SentenceList: string[] = cat7Sentences(cat7Commuting, publisherGwpSentence(DEFRA_TRAVEL_META, !!boundInventoryId, ghgGwpVersion))
+  const cat7Commuting = evaluateCommuting(catData['cat7'], twEds.travel)
+  const cat7SentenceList: string[] = cat7Sentences(cat7Commuting, publisherGwpSentence(travelMeta, !!boundInventoryId, ghgGwpVersion))
   /** A record saved under the previous form: shown, not priced. null when there is none. */
   const cat7Legacy = hasLegacyCommuting(catData['cat7']) ? cat7LegacyNotice(catData['cat7']) : null
 
@@ -2112,7 +2145,7 @@ export default function Scope3Dashboard() {
       case 'waste_factors':
       case 'end_of_life_factors':
       case 'business_travel_factors':
-      case 'employee_commuting_factors': return rowPricedResult(catData, id)?.mt ?? 0
+      case 'employee_commuting_factors': return rowPricedResult(catData, id, twEds)?.mt ?? 0
       case 'pcaf': return calcCat15()
       // ⚠️ AN ENTERED FIGURE OR NOTHING. No factor is applied, and a saved annual_spend is deliberately
       // NOT read: it was the input to a calculation that no longer exists, and for five of these six it
@@ -2164,7 +2197,7 @@ export default function Scope3Dashboard() {
       case 'waste_factors':
       case 'end_of_life_factors':
       case 'business_travel_factors':
-      case 'employee_commuting_factors': return rowPricedResult(catData, id)?.calculated ?? false
+      case 'employee_commuting_factors': return rowPricedResult(catData, id, twEds)?.calculated ?? false
       // ⚠️ mt !== null, NOT > 0. An entered zero — a portfolio that finances no emissions — is a
       // calculated answer, and the note above about a genuine zero reading as not-calculated no longer
       // applies to this path.
@@ -2391,10 +2424,10 @@ export default function Scope3Dashboard() {
     if ((d.emissions_override && takesEnteredFigure(id)) || d.has_supplier_data) return 'high'
     // ⚠️ ANY PRICED FLIGHT OR RAIL ROW, NOT FLIGHTS ALONE. This tested flight counts only, so a Cat 6 with
     // hotel nights or rail km and no flights was calculated but labelled "Flat spend", a method it never used.
-    if (scope3MethodFor(id) === 'business_travel_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
+    if (scope3MethodFor(id) === 'business_travel_factors' && rowPricedResult(catData, id, twEds)?.calculated) return 'medium'
     // ⚠️ A PRICED GROUP, NOT A HEADCOUNT. This returned 'medium' whenever employee_count was set, so a figure
     // built on the 15 km and petrol-car defaults was labelled activity data.
-    if (scope3MethodFor(id) === 'employee_commuting_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
+    if (scope3MethodFor(id) === 'employee_commuting_factors' && rowPricedResult(catData, id, twEds)?.calculated) return 'medium'
     // ⚠️ 'medium' (Activity data), THE SAME LABEL CATS 5, 6, 7 AND 12 CARRY WHEN THEY PRICE, because
     // Category 3's figure is activity data of the same kind: metered consumption from the bound GHG
     // inventory times a published factor. Without this branch a DEFRA-priced Category 3 would fall
@@ -2405,7 +2438,7 @@ export default function Scope3Dashboard() {
     // figure cannot arrive without its label.
     if (scope3MethodFor(id) === 'fuel_and_energy_upstream' && isCalculated(id)) return 'medium'
     if (id === 'cat5' && cat5Priced.length > 0) return 'medium'
-    if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id)?.calculated) return 'medium'
+    if (scope3MethodFor(id) === 'end_of_life_factors' && rowPricedResult(catData, id, twEds)?.calculated) return 'medium'
     // ⚠️ A PER-ASSET PCAF ASSESSMENT IS NOT A SPEND ESTIMATE, and it used to fall through to 'Flat spend'
     // — the weakest label in the product — for want of a branch. It rests on each investee's own reported
     // emissions, attributed by a balance-sheet ratio. 'Primary data' only while the score says so: the
@@ -2524,7 +2557,7 @@ export default function Scope3Dashboard() {
     }
 
     if (method === 'end_of_life_factors') {
-      const e = evaluateEolMaterials(d?.eolMaterials)
+      const e = evaluateEolMaterials(d?.eolMaterials, twEds.waste)
       const skipped = e.notPriced.length > 0
         ? ` ${e.notPriced.length} ${e.notPriced.length === 1 ? 'material was' : 'materials were'} not priced: ${e.notPriced.map(x => `material ${x.n}, ${eolMaterialNotPricedReason(x)}`).join('; ')}.`
         : ''
@@ -2533,7 +2566,7 @@ export default function Scope3Dashboard() {
       }
       const source = (d?.eol_split_source ?? '').trim()
       return {
-        basis: `${DEFRA_WASTE_META.source}, ${DEFRA_WASTE_META.sheet} sheet, per material and route, on the customer's split`,
+        basis: `${wasteMeta.source}, ${wasteMeta.sheet} sheet, per material and route, on the customer's split`,
         detail: `${scope3MethodDescription('end_of_life_factors')} ${e.priced.length} ${e.priced.length === 1 ? 'material' : 'materials'} priced.` +
           ` Source of the split: ${source || 'not recorded'}.${skipped}`,
       }
@@ -2548,7 +2581,7 @@ export default function Scope3Dashboard() {
       }
       const methods = Array.from(new Set(cat5Priced.map(e => WASTE_METHOD_LABEL[e.pricing.method]))).join(' and ')
       return {
-        basis: `${DEFRA_WASTE_META.source}, ${DEFRA_WASTE_META.sheet} sheet, ${methods}`,
+        basis: `${wasteMeta.source}, ${wasteMeta.sheet} sheet, ${methods}`,
         detail: `${scope3MethodDescription('waste_factors')} ${cat5Priced.length} ${cat5Priced.length === 1 ? 'row' : 'rows'} priced.${skipped}`,
       }
     }
@@ -2557,8 +2590,8 @@ export default function Scope3Dashboard() {
     // Method column and the saved factor_basis line, and until 20 Sep 2026 Category 3 fell through to
     // "No data. No activity data was entered", which would have been recorded beside a real figure.
     if (method === 'fuel_and_energy_upstream') return cat3Basis(cat3Priced, cat3Read, d?.emissions_override, cat3ExcludedFor3d)
-    if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d), countryLabel)
-    if (method === 'employee_commuting_factors') return cat7Basis(evaluateCommuting(d))
+    if (method === 'business_travel_factors') return cat6Basis(evaluateBusinessTravel(d, twEds.travel), countryLabel)
+    if (method === 'employee_commuting_factors') return cat7Basis(evaluateCommuting(d, twEds.travel))
 
     // No method reaches here today: every one returns above. Kept so a method added to the map without a
     // branch reports "no data" rather than a basis it does not have.
@@ -2897,12 +2930,12 @@ export default function Scope3Dashboard() {
     // and the cells each factor was read from. Then the hotel exclusion and the disclosures.
     const c6 = catData['cat6']
     if (c6 && isReportable('cat6')) {
-      out.push(['Cat 6', 'Radiative forcing', cat6Travel.includeRf ? 'Included' : 'Not included', cat6RfSentence(cat6Travel.includeRf)])
+      out.push(['Cat 6', 'Radiative forcing', cat6Travel.includeRf ? 'Included' : 'Not included', cat6Copy.cat6RfSentence(cat6Travel.includeRf)])
       for (const f of cat6Travel.flights) out.push(['Cat 6', ...flightCsvRow(f, countryLabel, cat6Travel.includeRf)])
       if (cat6Travel.flights.length === 0) out.push(['Cat 6', 'Flight legs', '', 'None entered.'])
       for (const r of cat6Travel.rail) out.push(['Cat 6', ...railCsvRow(r, countryLabel)])
       if (cat6Travel.rail.length === 0) out.push(['Cat 6', 'Rail journeys', '', 'None entered.'])
-      out.push(['Cat 6', 'Hotel stays', 'Not included', CAT6_HOTEL_SENTENCE])
+      out.push(['Cat 6', 'Hotel stays', 'Not included', cat6Copy.CAT6_HOTEL_SENTENCE])
       for (const d of cat6SentenceList) out.push(['Cat 6', 'Disclosure', d, ''])
     }
 
@@ -3004,7 +3037,7 @@ export default function Scope3Dashboard() {
         ? [['End-of-life split without a source', 'Category 12 is priced from a treatment split with no source recorded. The GHG Protocol asks for the assumptions behind end-of-life treatment to be reported.']]
         : []),
       // ⚠️ THE CAT 6 RADIATIVE FORCING SETTING, WHERE A READER MEETS THE FILE: it changes every flight figure.
-      ...(isReportable('cat6') ? [['Cat 6 radiative forcing', cat6RfHeader(cat6Travel.includeRf)]] : []),
+      ...(isReportable('cat6') ? [['Cat 6 radiative forcing', cat6Copy.cat6RfHeader(cat6Travel.includeRf)]] : []),
       ['Generated', new Date().toLocaleDateString()],
       [],
       ['SCOPE 3 BY CATEGORY'],
@@ -3633,12 +3666,12 @@ export default function Scope3Dashboard() {
                   {cat.id === 'cat6' && <>
                     <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>How this is priced</div>
-                      <p style={{ margin: '0 0 6px' }}>{CAT6_UPLIFT_SENTENCE}</p>
-                      <p style={{ margin: '0 0 6px' }}>{CAT6_RAIL_SENTENCE}</p>
-                      <p style={{ margin: '0 0 6px' }}>{CAT6_HOTEL_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{cat6Copy.CAT6_UPLIFT_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{cat6Copy.CAT6_RAIL_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{cat6Copy.CAT6_HOTEL_SENTENCE}</p>
                       <p style={{ margin: '6px 0 0', fontSize: 10 }}>
-                        {DEFRA_TRAVEL_META.attribution_required}{' '}
-                        <a href={DEFRA_TRAVEL_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_TRAVEL_META.licence}</a>
+                        {travelMeta.attribution_required}{' '}
+                        <a href={travelMeta.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{travelMeta.licence}</a>
                       </p>
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
@@ -3648,11 +3681,12 @@ export default function Scope3Dashboard() {
                           <button key={String(opt.val)} type="button" aria-pressed={cat6Travel.includeRf === opt.val} onClick={() => updateCat('cat6', 'include_rf', opt.val)} style={{ flex: 1, padding: '8px', borderRadius: 8, fontSize: 12, ...(cat6Travel.includeRf === opt.val ? toggleOn : toggleOff), cursor: 'pointer' }}>{opt.label}</button>
                         ))}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>{cat6RfSentence(cat6Travel.includeRf)}</div>
+                      <div style={{ fontSize: 10, color: 'var(--color-ink-muted)', marginTop: 6, lineHeight: 1.5 }}>{cat6Copy.cat6RfSentence(cat6Travel.includeRf)}</div>
                     </div>
                     <FlightsEditor
                       evaluated={cat6Travel.flights}
                       includeRf={cat6Travel.includeRf}
+                      distanceHelp={cat6Copy.CAT6_DISTANCE_HELP}
                       onAdd={addFlight}
                       onRemove={removeFlight}
                       onUpdate={updateFlight}
@@ -3687,21 +3721,22 @@ export default function Scope3Dashboard() {
                     )}
                     <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>How this is priced</div>
-                      <p style={{ margin: '0 0 6px' }}>{CAT7_DAYS_SENTENCE}</p>
-                      <p style={{ margin: '0 0 6px' }}>{CAT7_OCCUPANCY_SENTENCE}</p>
-                      <p style={{ margin: '0 0 6px' }}>{CAT7_STAND_IN_SENTENCE} {CAT7_ELECTRIC_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{cat7Copy.CAT7_DAYS_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{cat7Copy.CAT7_OCCUPANCY_SENTENCE}</p>
+                      <p style={{ margin: '0 0 6px' }}>{cat7Copy.CAT7_STAND_IN_SENTENCE} {cat7Copy.CAT7_ELECTRIC_SENTENCE}</p>
                       <p style={{ margin: '6px 0 0', fontSize: 10 }}>
-                        {DEFRA_TRAVEL_META.attribution_required}{' '}
-                        <a href={DEFRA_TRAVEL_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_TRAVEL_META.licence}</a>
+                        {travelMeta.attribution_required}{' '}
+                        <a href={travelMeta.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{travelMeta.licence}</a>
                       </p>
                     </div>
                     <CommuteRowsEditor
+                      travelYear={travelYear}
                       evaluated={cat7Commuting.commutes}
                       onAdd={addCommuteRow}
                       onRemove={removeCommuteRow}
                       onUpdate={updateCommuteRow}
                     />
-                    <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>{CAT7_HOMEWORKING_SENTENCE}</div>
+                    <div style={{ gridColumn: '1 / -1', fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6 }}>{cat7Copy.CAT7_HOMEWORKING_SENTENCE}</div>
                     <HomeworkingRowsEditor
                       evaluated={cat7Commuting.homeworking}
                       onAdd={addHomeworkingRow}
@@ -3737,19 +3772,20 @@ export default function Scope3Dashboard() {
                         artefact's own, verbatim but for the list marker. */}
                     <div style={{ gridColumn: '1 / -1', background: '#E6F1FB', borderRadius: 8, padding: '0.75rem', fontSize: 11, color: '#0C447C', lineHeight: 1.6 }}>
                       <div style={{ fontWeight: 700, marginBottom: 4 }}>Before comparing treatment routes</div>
-                      <p style={{ margin: '0 0 6px' }}>{withoutListMarker(DEFRA_WASTE_META.lifecycle_guidance)}</p>
-                      <p style={{ margin: 0 }}>{withoutListMarker(DEFRA_WASTE_META.scope_guidance)}</p>
+                      <p style={{ margin: '0 0 6px' }}>{withoutListMarker(wasteMeta.lifecycle_guidance)}</p>
+                      <p style={{ margin: 0 }}>{withoutListMarker(wasteMeta.scope_guidance)}</p>
                       {/* This box quotes the workbook whether or not any row is priced, so it carries the
                           required attribution itself rather than relying on the workings card below. */}
                       <p style={{ margin: '6px 0 0', fontSize: 10 }}>
-                        {DEFRA_WASTE_META.attribution_required}{' '}
-                        <a href={DEFRA_WASTE_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_WASTE_META.licence}</a>
+                        {wasteMeta.attribution_required}{' '}
+                        <a href={wasteMeta.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{wasteMeta.licence}</a>
                       </p>
                     </div>
 
                     <WasteRowsEditor
                       catId="cat5"
                       evaluated={cat5Evaluated}
+                      wasteYear={wasteYear}
                       onAdd={() => addWasteRow('cat5')}
                       onRemove={id => removeWasteRow('cat5', id)}
                       onUpdate={(id, patch) => updateWasteRow('cat5', id, patch)}
@@ -3761,7 +3797,7 @@ export default function Scope3Dashboard() {
                         <SpendFactorWorkings
                           id="cat5-waste"
                           figureMt={calcCat5()}
-                          summary={`${cat5Priced.length} waste ${cat5Priced.length === 1 ? 'stream' : 'streams'} priced from the DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste disposal factors`}
+                          summary={`${cat5Priced.length} waste ${cat5Priced.length === 1 ? 'stream' : 'streams'} priced from the ${wasteMeta.edition} waste disposal factors`}
                           sentences={cat5Sentences}
                         />
                       </div>
@@ -3777,8 +3813,8 @@ export default function Scope3Dashboard() {
                       <p style={{ margin: '0 0 6px' }}>The expected end-of-life emissions of everything you sold in the reporting year. Most of them have not happened yet.</p>
                       <p style={{ margin: '0 0 6px' }}>The split across treatment routes is your assumption, and the export says so. The factors are UK factors, applied wherever your products were sold.</p>
                       <p style={{ margin: '6px 0 0', fontSize: 10 }}>
-                        {DEFRA_WASTE_META.attribution_required}{' '}
-                        <a href={DEFRA_WASTE_META.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{DEFRA_WASTE_META.licence}</a>
+                        {wasteMeta.attribution_required}{' '}
+                        <a href={wasteMeta.licence_url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>{wasteMeta.licence}</a>
                       </p>
                     </div>
                     <div style={{ gridColumn: '1 / -1' }}>
@@ -3795,6 +3831,7 @@ export default function Scope3Dashboard() {
                     </div>
                     <EolMaterialsEditor
                       evaluated={cat12Eol.evaluated}
+                      wasteYear={wasteYear}
                       onAdd={addEolMaterial}
                       onRemove={removeEolMaterial}
                       onSetMaterial={setEolMaterialType}
@@ -3806,7 +3843,7 @@ export default function Scope3Dashboard() {
                         <SpendFactorWorkings
                           id="cat12-eol"
                           figureMt={cat12Eol.mt}
-                          summary={`${cat12Eol.priced.length} ${cat12Eol.priced.length === 1 ? 'material' : 'materials'} priced from the DEFRA/DESNZ ${DEFRA_WASTE_META.year} waste disposal factors, on your split across routes`}
+                          summary={`${cat12Eol.priced.length} ${cat12Eol.priced.length === 1 ? 'material' : 'materials'} priced from the ${wasteMeta.edition} waste disposal factors, on your split across routes`}
                           sentences={cat12Sentences}
                         />
                       </div>

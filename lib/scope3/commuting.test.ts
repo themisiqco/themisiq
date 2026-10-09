@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { priceCommute, priceHomeworking, evaluateCommuting, withDistance, type CommuteRow, type HomeworkingRow, type PricedCommute } from './commuting'
+import { TW_2026 } from '../testing/defraEditions'
 
 // ⚠️ SEVERAL OF THESE DO NOT COME FROM THE READER'S OWN LOGIC: CC1 is worked by hand from two published
 // cells; CC4's band is the fuel-chemistry band of defraTravel2026.commuting.test.ts CT4, and its
@@ -12,7 +13,7 @@ const car = (over: Partial<CommuteRow> = {}): CommuteRow => ({
   days_per_week: 5, weeks_per_year: 46, ...withDistance(20, 'km'), ...over,
 })
 const priced = (row: CommuteRow): PricedCommute => {
-  const p = priceCommute(row)
+  const p = priceCommute(row, TW_2026.travel)
   if (p.status !== 'priced') throw new Error(`not priced: ${JSON.stringify(p)}`)
   return p
 }
@@ -58,17 +59,17 @@ describe('Cat 7 commuting', () => {
       [{ car_fuel: '' }, 'car fuel'],
     ]
     for (const [over, name] of cases) {
-      const p = priceCommute(car(over))
+      const p = priceCommute(car(over), TW_2026.travel)
       expect(p.status, name).toBe('incomplete')
       expect(p.status === 'incomplete' && p.missing, name).toContain(name)
     }
     // Nothing is defaulted: no 15 km, no petrol car, no 235 days.
     const blank: CommuteRow = { id: 'b', mode: '', country_iso2: '', employees: undefined, days_per_week: undefined, weeks_per_year: undefined, ...withDistance(undefined, 'km') }
-    expect(priceCommute(blank)).toEqual({ status: 'incomplete', missing: ['mode', 'country', 'employees', 'distance', 'days per week', 'weeks per year'] })
-    expect(evaluateCommuting({ commute_rows: [blank] })).toMatchObject({ calculated: false, mt: 0 })
+    expect(priceCommute(blank, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['mode', 'country', 'employees', 'distance', 'days per week', 'weeks per year'] })
+    expect(evaluateCommuting({ commute_rows: [blank] }, TW_2026.travel)).toMatchObject({ calculated: false, mt: 0 })
     // Occupancy is needed for cars and motorbikes only.
     expect(priced(car({ mode: 'taxi', taxi_type: 'regular', occupancy: undefined })).vehicle_km).toBeNull()
-    expect(priceCommute(car({ mode: 'motorbike', motorbike_size: 'average', occupancy: undefined }))).toMatchObject({ status: 'incomplete', missing: ['occupancy'] })
+    expect(priceCommute(car({ mode: 'motorbike', motorbike_size: 'average', occupancy: undefined }), TW_2026.travel)).toMatchObject({ status: 'incomplete', missing: ['occupancy'] })
   })
 
   it('CC3c occupancy may be a decimal average, for cars and motorbikes', () => {
@@ -81,16 +82,16 @@ describe('Cat 7 commuting', () => {
   })
 
   it('CC3b figures outside what their label can mean are not priced, and say which', () => {
-    expect(priceCommute(car({ days_per_week: 8 }))).toEqual({ status: 'invalid', field: 'days per week', limit: 'at most 7' })
-    expect(priceCommute(car({ weeks_per_year: 235 }))).toEqual({ status: 'invalid', field: 'weeks per year', limit: 'at most 53' })
-    expect(priceCommute(car({ occupancy: 0.5 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
+    expect(priceCommute(car({ days_per_week: 8 }), TW_2026.travel)).toEqual({ status: 'invalid', field: 'days per week', limit: 'at most 7' })
+    expect(priceCommute(car({ weeks_per_year: 235 }), TW_2026.travel)).toEqual({ status: 'invalid', field: 'weeks per year', limit: 'at most 53' })
+    expect(priceCommute(car({ occupancy: 0.5 }), TW_2026.travel)).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
     // The click test's typo: 10 people per car is not a car.
-    expect(priceCommute(car({ occupancy: 10 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
-    expect(priceCommute(car({ occupancy: 7.1 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
-    expect(priceCommute(car({ occupancy: 7 })).status).toBe('priced')
-    expect(priceCommute(car({ occupancy: 6.5 })).status).toBe('priced')
-    expect(priceCommute(car({ mode: 'motorbike', motorbike_size: 'small', occupancy: 3 }))).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 2' })
-    expect(priceCommute(car({ distance_km: 99 }))).toEqual({ status: 'distance_mismatch' })
+    expect(priceCommute(car({ occupancy: 10 }), TW_2026.travel)).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
+    expect(priceCommute(car({ occupancy: 7.1 }), TW_2026.travel)).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 7' })
+    expect(priceCommute(car({ occupancy: 7 }), TW_2026.travel).status).toBe('priced')
+    expect(priceCommute(car({ occupancy: 6.5 }), TW_2026.travel).status).toBe('priced')
+    expect(priceCommute(car({ mode: 'motorbike', motorbike_size: 'small', occupancy: 3 }), TW_2026.travel)).toEqual({ status: 'invalid', field: 'occupancy', limit: 'between 1 and 2' })
+    expect(priceCommute(car({ distance_km: 99 }), TW_2026.travel)).toEqual({ status: 'distance_mismatch' })
   })
 
   it('CC4 magnitude: one employee, average car of unknown fuel, alone, 20 km, 5 days, 46 weeks', () => {
@@ -124,23 +125,23 @@ describe('Cat 7 commuting', () => {
 
   it('CC6 homeworking: a UK row is the combined factor times hours; a row outside the UK is not priced', () => {
     const row: HomeworkingRow = { id: 'h', country_iso2: 'GB', employees: 10, days_per_week: 2, weeks_per_year: 46, hours_per_day: 7.5 }
-    const uk = priceHomeworking(row)
+    const uk = priceHomeworking(row, TW_2026.travel)
     // 10 x 2 x 46 x 7.5 = 6,900 FTE hours x 0.32393 (Homeworking C24) = 2,235.117 kg
     expect(uk).toMatchObject({ status: 'priced', hours: 6900, factor: 0.32393, cell: 'Homeworking!C24' })
     expect(uk.status === 'priced' && uk.kg).toBeCloseTo(2235.117, 6)
-    expect(priceHomeworking({ ...row, country_iso2: 'US' })).toEqual({ status: 'not_uk', country_iso2: 'US' })
+    expect(priceHomeworking({ ...row, country_iso2: 'US' }, TW_2026.travel)).toEqual({ status: 'not_uk', country_iso2: 'US' })
     // The country reason comes first: a non-UK row says so before anything else is entered, and whatever
     // else is missing or out of range.
     const bareUs: HomeworkingRow = { id: 'b', country_iso2: 'US', employees: undefined, days_per_week: undefined, weeks_per_year: undefined, hours_per_day: undefined }
-    expect(priceHomeworking(bareUs)).toEqual({ status: 'not_uk', country_iso2: 'US' })
-    expect(priceHomeworking({ ...row, country_iso2: 'CA', hours_per_day: 30 })).toEqual({ status: 'not_uk', country_iso2: 'CA' })
+    expect(priceHomeworking(bareUs, TW_2026.travel)).toEqual({ status: 'not_uk', country_iso2: 'US' })
+    expect(priceHomeworking({ ...row, country_iso2: 'CA', hours_per_day: 30 }, TW_2026.travel)).toEqual({ status: 'not_uk', country_iso2: 'CA' })
     // With no country yet, the row still lists what is missing, country first.
-    expect(priceHomeworking({ ...bareUs, country_iso2: '' })).toEqual({ status: 'incomplete', missing: ['country', 'employees', 'homeworking days per week', 'weeks per year', 'hours per day'] })
-    expect(priceHomeworking({ ...row, hours_per_day: undefined })).toEqual({ status: 'incomplete', missing: ['hours per day'] })
-    expect(priceHomeworking({ ...row, hours_per_day: 30 })).toMatchObject({ status: 'invalid', field: 'hours per day' })
+    expect(priceHomeworking({ ...bareUs, country_iso2: '' }, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['country', 'employees', 'homeworking days per week', 'weeks per year', 'hours per day'] })
+    expect(priceHomeworking({ ...row, hours_per_day: undefined }, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['hours per day'] })
+    expect(priceHomeworking({ ...row, hours_per_day: 30 }, TW_2026.travel)).toMatchObject({ status: 'invalid', field: 'hours per day' })
     // Only a US homeworking row: nothing is priced, so the category is not calculated.
-    expect(evaluateCommuting({ homeworking_rows: [{ ...row, country_iso2: 'US' }] })).toMatchObject({ calculated: false, mt: 0 })
-    const both = evaluateCommuting({ commute_rows: [car()], homeworking_rows: [row] })
+    expect(evaluateCommuting({ homeworking_rows: [{ ...row, country_iso2: 'US' }] }, TW_2026.travel)).toMatchObject({ calculated: false, mt: 0 })
+    const both = evaluateCommuting({ commute_rows: [car()], homeworking_rows: [row] }, TW_2026.travel)
     expect(both.kg.total).toBeCloseTo(both.kg.combustion + both.kg.wtt + both.kg.homeworking, 9)
     expect(both.mt).toBeCloseTo(both.kg.total / 1000, 12)
   })

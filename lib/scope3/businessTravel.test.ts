@@ -5,6 +5,7 @@ import {
   type FlightRow, type RailJourney, type PricedFlight,
 } from './businessTravel'
 import { RF_CO2_MULTIPLIER } from './businessTravelCopy'
+import { TW_2026 } from '../testing/defraEditions'
 
 // ⚠️ SEVERAL OF THESE DO NOT COME FROM THE READER'S OWN LOGIC: the boundaries are the EPA Hub's 300 and
 // 2,300 miles at the international mile, the radiative forcing multiplier is the sheet's own "increase of
@@ -13,7 +14,7 @@ import { RF_CO2_MULTIPLIER } from './businessTravelCopy'
 const flight = (o: string, d: string, km: number, cabin: FlightRow['cabin_class'] = 'economy', count = 1): FlightRow =>
   ({ id: `${o}-${d}-${km}`, origin_iso2: o, destination_iso2: d, cabin_class: cabin, count, ...withDistance(km, 'km') })
 const priced = (row: FlightRow, rf = true): PricedFlight => {
-  const p = priceFlight(row, rf)
+  const p = priceFlight(row, rf, TW_2026.travel)
   if (p.status !== 'priced') throw new Error(`not priced: ${JSON.stringify(p)}`)
   return p
 }
@@ -47,7 +48,7 @@ describe('Cat 6 business travel pricing', () => {
     expect(flightCategory('GB', 'GB', 600)).toEqual({ ok: true, category: 'domestic', rule: 'both_uk' })
     expect(priced(flight('GB', 'GB', 600, 'unknown')).cells.air_with_rf).toBe('Business travel- air!E23:H23')
     // Monaco is in the country picker but not on the Haul definition sheet.
-    expect(priceFlight(flight('GB', 'MC', 1000), true)).toEqual({ status: 'no_haul', unlisted_iso2: 'MC' })
+    expect(priceFlight(flight('GB', 'MC', 1000), true, TW_2026.travel)).toEqual({ status: 'no_haul', unlisted_iso2: 'MC' })
     // Without a UK end the sheet is not needed, so the same country prices by distance.
     expect(priced(flight('FR', 'MC', 700)).category).toBe('short_haul')
   })
@@ -117,42 +118,42 @@ describe('Cat 6 business travel pricing', () => {
   })
 
   it('BT10 a row missing a country, a distance, a count or a class is not priced, and names what is missing', () => {
-    expect(priceFlight({ ...flight('', 'US', 1000), cabin_class: '' }, true)).toEqual({ status: 'incomplete', missing: ['origin', 'cabin class'] })
-    expect(priceFlight({ ...flight('GB', 'US', 1000), count: 0 }, true)).toEqual({ status: 'incomplete', missing: ['passengers or trips'] })
-    expect(priceFlight({ ...flight('GB', 'US', 1000), ...withDistance(undefined, 'km') }, true)).toEqual({ status: 'incomplete', missing: ['distance'] })
-    const e = evaluateBusinessTravel({ flights: [{ ...flight('GB', '', 1000) }] })
+    expect(priceFlight({ ...flight('', 'US', 1000), cabin_class: '' }, true, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['origin', 'cabin class'] })
+    expect(priceFlight({ ...flight('GB', 'US', 1000), count: 0 }, true, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['passengers or trips'] })
+    expect(priceFlight({ ...flight('GB', 'US', 1000), ...withDistance(undefined, 'km') }, true, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['distance'] })
+    const e = evaluateBusinessTravel({ flights: [{ ...flight('GB', '', 1000) }] }, TW_2026.travel)
     expect(e.calculated).toBe(false)
     expect(e.mt).toBe(0)
   })
 
   it('BT13 a stored km figure that is missing or does not match the entered distance is not priced, and says so', () => {
     const base = flight('US', 'CA', 1000)
-    expect(priceFlight({ ...base, distance_km: undefined }, true)).toEqual({ status: 'distance_mismatch' })
-    expect(priceFlight({ ...base, distance: 1000, distance_unit: 'mi', distance_km: 1000 }, true)).toEqual({ status: 'distance_mismatch' })
-    expect(priceFlight({ ...base, ...withDistance(1000, 'mi') }, true).status).toBe('priced')
+    expect(priceFlight({ ...base, distance_km: undefined }, true, TW_2026.travel)).toEqual({ status: 'distance_mismatch' })
+    expect(priceFlight({ ...base, distance: 1000, distance_unit: 'mi', distance_km: 1000 }, true, TW_2026.travel)).toEqual({ status: 'distance_mismatch' })
+    expect(priceFlight({ ...base, ...withDistance(1000, 'mi') }, true, TW_2026.travel).status).toBe('priced')
     const rail: RailJourney = { id: 'r', country_iso2: 'GB', rail_type: 'National rail', passengers: 1, distance: 50, distance_unit: 'km', distance_km: undefined }
-    expect(priceRail(rail)).toEqual({ status: 'distance_mismatch' })
+    expect(priceRail(rail, TW_2026.travel)).toEqual({ status: 'distance_mismatch' })
   })
 
   it('BT11 rail: UK factors everywhere, flagged as a stand-in outside the UK, with well-to-tank added', () => {
     const rail = (c: string, type: string): RailJourney => ({ id: c, country_iso2: c, rail_type: type, passengers: 2, ...withDistance(100, 'km') })
-    const fr = priceRail(rail('FR', 'National rail'))
-    const gb = priceRail(rail('GB', 'National rail'))
+    const fr = priceRail(rail('FR', 'National rail'), TW_2026.travel)
+    const gb = priceRail(rail('GB', 'National rail'), TW_2026.travel)
     if (fr.status !== 'priced' || gb.status !== 'priced') throw new Error('rail not priced')
     expect(fr.uk_stand_in).toBe(true)
     expect(gb.uk_stand_in).toBe(false)
     expect(fr.kg.combustion).toBeCloseTo(0.03092 * 200, 9)
     expect(fr.kg.wtt).toBeCloseTo(0.00897 * 200, 9)
     expect(fr.cells).toEqual({ rail: 'Business travel- land!D87:G87', wtt: 'WTT- pass vehs & travel- land!D84' })
-    expect(priceRail({ ...rail('GB', 'Maglev') })).toEqual({ status: 'no_factor' })
-    expect(priceRail({ ...rail('GB', '') })).toEqual({ status: 'incomplete', missing: ['rail type'] })
+    expect(priceRail({ ...rail('GB', 'Maglev') }, TW_2026.travel)).toEqual({ status: 'no_factor' })
+    expect(priceRail({ ...rail('GB', '') }, TW_2026.travel)).toEqual({ status: 'incomplete', missing: ['rail type'] })
   })
 
   it('BT12 the record: RF is included by default, the setting chooses the total, both air figures are kept', () => {
     const flights = [flight('GB', 'US', 5570, 'economy', 2), flight('US', 'CA', 400, 'business')]
     const rail_journeys = [{ id: 'r', country_iso2: 'FR', rail_type: 'International rail', passengers: 1, ...withDistance(300, 'km') }]
-    const on = evaluateBusinessTravel({ flights, rail_journeys })
-    const off = evaluateBusinessTravel({ flights, rail_journeys, include_rf: false })
+    const on = evaluateBusinessTravel({ flights, rail_journeys }, TW_2026.travel)
+    const off = evaluateBusinessTravel({ flights, rail_journeys, include_rf: false }, TW_2026.travel)
     expect(on.includeRf).toBe(true)
     expect(off.includeRf).toBe(false)
     expect(on.kg.air_with_rf).toBe(off.kg.air_with_rf)

@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { evaluateWasteRows, wasteRowNotPricedReason, type WasteRow } from './wasteRows'
+import { TW_2026 } from '../testing/defraEditions'
 
 const row = (id: string, activity: string, waste_type: string, route: string, tonnes: number): WasteRow =>
   ({ id, activity, waste_type, route, tonnes })
 
 describe('evaluateWasteRows', () => {
-  it('WR1 takes rows as its only input and reads no page state', () => {
-    expect(evaluateWasteRows.length).toBe(1)
-    const empty = evaluateWasteRows(undefined)
+  it('WR1 takes rows and the DEFRA edition the window selected (T3e) as its only inputs, and reads no page state', () => {
+    expect(evaluateWasteRows.length).toBe(2)
+    const empty = evaluateWasteRows(undefined, TW_2026.waste)
     expect(empty).toEqual({ evaluated: [], priced: [], notPriced: [], kg: 0, mt: 0 })
-    expect(evaluateWasteRows([])).toEqual(empty)
+    expect(evaluateWasteRows([], TW_2026.waste)).toEqual(empty)
   })
 
   it('WR2 numbers rows from 1 in entry order and partitions them into priced and not priced', () => {
@@ -18,7 +19,7 @@ describe('evaluateWasteRows', () => {
       row('b', 'Construction', 'Wood', '', 3),
       row('c', 'Construction', 'Asbestos', 'Open-loop', 1),
       row('d', 'Paper', 'Paper and board: board', 'Composting', 0),
-    ])
+    ], TW_2026.waste)
     expect(r.evaluated.map(e => [e.row.id, e.n, e.pricing.status])).toEqual([
       ['a', 1, 'priced'], ['b', 2, 'incomplete'], ['c', 3, 'no_factor'], ['d', 4, 'incomplete'],
     ])
@@ -27,11 +28,11 @@ describe('evaluateWasteRows', () => {
   })
 
   it('WR3 ⚠️ a row that cannot be priced is not in the figure, and is not counted as zero', () => {
-    const one = evaluateWasteRows([row('a', 'Metal', 'Metal: scrap metal', 'Closed-loop', 5)])
+    const one = evaluateWasteRows([row('a', 'Metal', 'Metal: scrap metal', 'Closed-loop', 5)], TW_2026.waste)
     const withJunk = evaluateWasteRows([
       row('a', 'Metal', 'Metal: scrap metal', 'Closed-loop', 5),
       row('b', 'Construction', 'Asbestos', 'Open-loop', 1000),
-    ])
+    ], TW_2026.waste)
     expect(withJunk.kg).toBe(one.kg)
     expect(withJunk.notPriced).toHaveLength(1)
     expect(wasteRowNotPricedReason(withJunk.notPriced[0].row, withJunk.notPriced[0].pricing))
@@ -42,7 +43,7 @@ describe('evaluateWasteRows', () => {
     const r = evaluateWasteRows([
       row('a', 'Paper', 'Paper and board: paper', 'Landfill', 10),
       row('b', 'Plastic', 'Plastics: average plastics', 'Combustion', 2),
-    ])
+    ], TW_2026.waste)
     expect(r.kg).toBe(r.priced[0].pricing.kg_co2e + r.priced[1].pricing.kg_co2e)
     expect(r.mt).toBe(r.kg / 1000)
   })
@@ -59,7 +60,7 @@ describe('evaluateWasteRows', () => {
     //   90% of the gas captured and 10% of the rest oxidised, 0.336 t remains. x 10 t = 3.36.
     // What it catches: a kg/t slip either way (x1000 -> ~11,645 t; /1000 -> ~0.012 t), and a route read
     // from the wrong column (paper's combustion and closed-loop factors are ~4.7 kg/t -> ~0.047 t).
-    const r = evaluateWasteRows([row('a', 'Paper', 'Paper and board: paper', 'Landfill', 10)])
+    const r = evaluateWasteRows([row('a', 'Paper', 'Paper and board: paper', 'Landfill', 10)], TW_2026.waste)
     expect(r.mt).toBeGreaterThan(3.36)
     expect(r.mt).toBeLessThan(83.1)
   })

@@ -1,6 +1,6 @@
 -- get_verifier_inventory — narrow the inventory whitelist, strip the audit value blobs
 -- ---------------------------------------------------------------------------
--- ⚠️ APPLIED, AND SUPERSEDED TWICE SINCE. THIS FILE IS HISTORY, NOT A PENDING CHANGE.
+-- ⚠️ APPLIED, AND SUPERSEDED THREE TIMES SINCE (20260806, 20260814, then 20261009, run 8 Oct 2026). THIS FILE IS HISTORY, NOT A PENDING CHANGE.
 --
 -- VERIFIED LIVE on 16 Sep 2026 by pg_get_functiondef on public.get_verifier_inventory(uuid):
 -- 'changed_fields' present and 'to_jsonb(a)' absent, which is this file's audit change; and

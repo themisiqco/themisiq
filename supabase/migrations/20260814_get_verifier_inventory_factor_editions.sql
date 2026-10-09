@@ -1,6 +1,8 @@
 -- get_verifier_inventory - factor_editions added to the verifier projection
 -- ---------------------------------------------------------------------------
--- APPLIED. THIS IS THE CURRENT DEFINITION.
+-- APPLIED, AND SUPERSEDED ONCE SINCE. NOT the current definition: 20261009_get_verifier_inventory_factor_edition_comparison.sql
+-- (run 8 Oct 2026) is. Running this file would revert factor_edition_comparison out of the verifier projection.
+-- The paragraphs below are as written when this file was current.
 --
 -- VERIFIED LIVE on 16 Sep 2026 by pg_get_functiondef on public.get_verifier_inventory(uuid):
 -- 'changed_fields' present, 'to_jsonb(a)' absent, 'comparability_disclosure' present, and

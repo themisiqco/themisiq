@@ -13,6 +13,7 @@ import { evaluateWasteRows, type WasteRow } from './wasteRows'
 import { evaluateEolMaterials, type EolMaterial } from './endOfLife'
 import { evaluateBusinessTravel, type BusinessTravelData } from './businessTravel'
 import { evaluateCommuting, type CommutingData } from './commuting'
+import type { TravelWasteEditions } from './defraEditionTypes'
 
 export interface RowPricedData extends BusinessTravelData, CommutingData {
   wasteRows?: WasteRow[]
@@ -29,22 +30,24 @@ export interface RowPricedResult {
 export function rowPricedResult(
   catData: Readonly<Record<string, RowPricedData | undefined>>,
   catId: string,
+  /** T3e: the DEFRA travel and waste editions the reporting window selected (lib/scope3/defraEditions.ts). */
+  eds: TravelWasteEditions,
 ): RowPricedResult | null {
   switch (scope3MethodFor(catId)) {
     case 'waste_factors': {
-      const e = evaluateWasteRows(catData[catId]?.wasteRows)
+      const e = evaluateWasteRows(catData[catId]?.wasteRows, eds.waste)
       return { mt: e.mt, calculated: e.priced.length > 0 }
     }
     case 'end_of_life_factors': {
-      const e = evaluateEolMaterials(catData[catId]?.eolMaterials)
+      const e = evaluateEolMaterials(catData[catId]?.eolMaterials, eds.waste)
       return { mt: e.mt, calculated: e.priced.length > 0 }
     }
     case 'business_travel_factors': {
-      const e = evaluateBusinessTravel(catData[catId])
+      const e = evaluateBusinessTravel(catData[catId], eds.travel)
       return { mt: e.mt, calculated: e.calculated }
     }
     case 'employee_commuting_factors': {
-      const e = evaluateCommuting(catData[catId])
+      const e = evaluateCommuting(catData[catId], eds.travel)
       return { mt: e.mt, calculated: e.calculated }
     }
     default:

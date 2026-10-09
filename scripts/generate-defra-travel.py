@@ -51,8 +51,31 @@ import xml.etree.ElementTree as ET
 from datetime import date
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-INPUT = ROOT / "data" / "reference" / "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx"
-OUT = ROOT / "lib" / "emissionFactors" / "defraTravel2026.json"
+
+# ── THE EDITION (T3e, 8 Oct 2026) ──────────────────────────────────────────────────────────────────
+# One script for every edition the registry holds:
+#     python3 scripts/generate-defra-travel.py                      # 2026, from data/reference/ (as before)
+#     python3 scripts/generate-defra-travel.py --year 2025 --input ~/themisiq-sources/defra/<file>.xlsx
+# The output is lib/emissionFactors/defraTravel<YEAR>.json unless --out says otherwise. The input for 2023 to 2025
+# is the file factorEditionRegistry.ts names for that edition (SOURCE_FILES); it is not committed.
+#   ⚠️ 2026 IS AS STRICT AS IT WAS. For an older edition, a prose quote, an Index note or the What's new line the
+# workbook does not print is recorded as null (the edition prints none), never borrowed from another edition; for
+# 2026 a missing one still aborts. Hotel stay is read for 2026 only (Lisa's ruling, 8 Oct 2026: nothing prices
+# hotels, and the methodology page says they are not included).
+def _arg(name: str, default=None):
+    if name in sys.argv:
+        i = sys.argv.index(name)
+        if i + 1 >= len(sys.argv):
+            sys.stderr.write(f"{name} needs a value\n"); sys.exit(2)
+        return sys.argv[i + 1]
+    return default
+
+
+YEAR = int(_arg("--year", "2026"))
+INPUT = pathlib.Path(_arg("--input", str(ROOT / "data" / "reference" / "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx"))).expanduser()
+OUT = pathlib.Path(_arg("--out", str(ROOT / "lib" / "emissionFactors" / f"defraTravel{YEAR}.json"))).expanduser()
+STRICT = YEAR == 2026
+READ_HOTELS = YEAR == 2026
 
 AIR = "Business travel- air"
 WTT_AIR = "WTT- business travel- air"
@@ -94,7 +117,6 @@ GAS_HEADERS = ["kg CO2e", "kg CO2e of CO2 per unit", "kg CO2e of CH4 per unit", 
 PUBLISHERS = "DEFRA/DESNZ"
 TITLE = "GHG Conversion Factors for Company Reporting"
 TITLE_AS_PUBLISHED = "UK Government GHG Conversion Factors for Company Reporting"
-YEAR = 2026
 CITATION = f"UK {PUBLISHERS} ({YEAR}) {TITLE}"
 EDITION = f"DEFRA {YEAR}"
 
@@ -214,7 +236,7 @@ if not any("Fifth Assessment Report (AR5)" in v for cells in intro.values() for 
 
 SHEETS = {}
 sheet_meta = {}
-for name in (AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHICLES):
+for name in (AIR, WTT_AIR, HAUL, *([HOTEL] if READ_HOTELS else []), LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHICLES):
     rows = read_sheet(z, shared, sheets, name)
     if rows.get(1, {}).get(0) != TITLE_AS_PUBLISHED:
         die(f"{name!r} row 1 is not {TITLE_AS_PUBLISHED!r}")
@@ -227,6 +249,16 @@ for name in (AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHI
             die(f"{name!r} Year cell reads {meta['Year']!r}; this generator is for {YEAR}")
         sheet_meta[name] = meta
 
+def version_text(v: str) -> str:
+    """A Version cell as printed: 2024's v1.1 is stored as the float 1.1000000000000001."""
+    try:
+        return "%g" % float(v)
+    except ValueError:
+        return v
+
+
+for m in sheet_meta.values():
+    m["Version"] = version_text(m["Version"])
 versions = {m["Version"] for m in sheet_meta.values()}
 factor_sets = {m["Factor set"] for m in sheet_meta.values()}
 # The Passenger vehicles sheet is Scope 1 (company-controlled vehicles) and is read for one guidance cell
@@ -234,8 +266,12 @@ factor_sets = {m["Factor set"] for m in sheet_meta.values()}
 scopes = {m["Scope"] for n, m in sheet_meta.items() if n != PASSENGER_VEHICLES}
 if sheet_meta[PASSENGER_VEHICLES]["Scope"] != "Scope 1":
     die(f"{PASSENGER_VEHICLES!r} Scope cell reads {sheet_meta[PASSENGER_VEHICLES]['Scope']!r}; expected 'Scope 1'")
-if len(versions) != 1 or len(factor_sets) != 1 or scopes != {"Scope 3"}:
+# ⚠️ ONE SHEET MAY CARRY AN OLDER VERSION THAN THE REST: a correction re-issues the sheets it revises. DEFRA
+# 2024 v1.1 left Homeworking at version 1. Each sheet's version is recorded (metadata.sheet_versions); the file
+# version is the air sheet's. 2026 still requires one version throughout, as before.
+if (STRICT and len(versions) != 1) or len(factor_sets) != 1 or scopes != {"Scope 3"}:
     die(f"sheets disagree on version/factor set, or are not all Scope 3: {sheet_meta}")
+FILE_VERSION = sheet_meta[AIR]["Version"]
 
 
 # ── AIR AND WTT AIR ────────────────────────────────────────────────────────────────────────────────
@@ -372,35 +408,38 @@ if dups:
     die(f"{HAUL!r}: ISO3 codes listed more than once: {dups}")
 
 
-# ── HOTEL STAY ─────────────────────────────────────────────────────────────────────────────────────
-
-rows = SHEETS[HOTEL]
-hdrs = header_rows(rows, HOTEL, ["Activity", "Country", "Unit", "kg CO2e"])
-if not hdrs:
-    die(f"{HOTEL!r}: no Activity | Country | Unit | kg CO2e header row")
+# ── HOTEL STAY ───────────────────────────────────────────────────────────────────────────────────────
+# 2026 only (READ_HOTELS): nothing prices hotels.
 hotels = []
-for h, a in hdrs:
-    r = h + 1
-    while r in rows and rows[r].get(a + 1, "").strip():
-        cells = rows[r]
-        if set(cells) - {a, a + 1, a + 2, a + 3}:
-            die(f"{HOTEL!r} row {r}: cells outside the table {cells}")
-        if cells.get(a, "").strip() not in ("", "Hotel stay"):
-            die(f"{HOTEL!r} row {r}: Activity reads {cells[a]!r}")
-        if cells.get(a + 2, "").strip() != ROOM_NIGHT:
-            die(f"{HOTEL!r} row {r}: Unit reads {cells.get(a + 2)!r}, not {ROOM_NIGHT!r}")
-        raw = cells.get(a + 3)
-        # ⚠️ EXPECTED EMPTY CELLS: the sheet lists countries it publishes no factor for. null, never 0.
-        value = None if raw is None else number(raw, f"{HOTEL!r} {cell(a + 3, r)}")
-        hotels.append({"country": cells[a + 1].strip(), "kg_co2e_per_room_night": value,
-                       "sheet": HOTEL, "row": r, "cells": {"country": cell(a + 1, r), "value": cell(a + 3, r)}})
-        r += 1
-names = [x["country"] for x in hotels]
-if len(names) != len(set(names)):
-    die(f"{HOTEL!r}: a country is listed twice")
-room_rows = {n for n, cells in rows.items() if any(v.strip() == ROOM_NIGHT for v in cells.values())}
-if room_rows != {x["row"] for x in hotels}:
-    die(f"{HOTEL!r}: '{ROOM_NIGHT}' rows outside the recognised tables: {sorted(room_rows - {x['row'] for x in hotels})}")
+if READ_HOTELS:
+
+    rows = SHEETS[HOTEL]
+    hdrs = header_rows(rows, HOTEL, ["Activity", "Country", "Unit", "kg CO2e"])
+    if not hdrs:
+        die(f"{HOTEL!r}: no Activity | Country | Unit | kg CO2e header row")
+    hotels = []
+    for h, a in hdrs:
+        r = h + 1
+        while r in rows and rows[r].get(a + 1, "").strip():
+            cells = rows[r]
+            if set(cells) - {a, a + 1, a + 2, a + 3}:
+                die(f"{HOTEL!r} row {r}: cells outside the table {cells}")
+            if cells.get(a, "").strip() not in ("", "Hotel stay"):
+                die(f"{HOTEL!r} row {r}: Activity reads {cells[a]!r}")
+            if cells.get(a + 2, "").strip() != ROOM_NIGHT:
+                die(f"{HOTEL!r} row {r}: Unit reads {cells.get(a + 2)!r}, not {ROOM_NIGHT!r}")
+            raw = cells.get(a + 3)
+            # ⚠️ EXPECTED EMPTY CELLS: the sheet lists countries it publishes no factor for. null, never 0.
+            value = None if raw is None else number(raw, f"{HOTEL!r} {cell(a + 3, r)}")
+            hotels.append({"country": cells[a + 1].strip(), "kg_co2e_per_room_night": value,
+                           "sheet": HOTEL, "row": r, "cells": {"country": cell(a + 1, r), "value": cell(a + 3, r)}})
+            r += 1
+    names = [x["country"] for x in hotels]
+    if len(names) != len(set(names)):
+        die(f"{HOTEL!r}: a country is listed twice")
+    room_rows = {n for n, cells in rows.items() if any(v.strip() == ROOM_NIGHT for v in cells.values())}
+    if room_rows != {x["row"] for x in hotels}:
+        die(f"{HOTEL!r}: '{ROOM_NIGHT}' rows outside the recognised tables: {sorted(room_rows - {x['row'] for x in hotels})}")
 
 
 # ── RAIL AND WTT RAIL ──────────────────────────────────────────────────────────────────────────────
@@ -476,10 +515,18 @@ UNIT_LABEL = {"km": "kg CO2e per km (vehicle)", "passenger.km": "kg CO2e per pas
 MILES_TOLERANCE_KG = 5e-5
 
 
+MILES_STATS = {"pairs": 0, "above_rounding": 0, "max_diff": 0.0}
+ROUNDING_BOUND_KG = 1.3e-5
+
+
 def miles_check(km_vals: list, mile_vals: list, where: str) -> None:
     """A mile value is its km value x 1.609344, to within MILES_TOLERANCE_KG."""
     for k, m in zip(km_vals, mile_vals):
-        if abs(m - k * KM_PER_MILE) > MILES_TOLERANCE_KG:
+        d = abs(m - k * KM_PER_MILE)
+        MILES_STATS["pairs"] += 1
+        MILES_STATS["above_rounding"] += d > ROUNDING_BOUND_KG
+        MILES_STATS["max_diff"] = max(MILES_STATS["max_diff"], d)
+        if d > MILES_TOLERANCE_KG:
             die(f"{where}: mile value {m} is not {k} per km x {KM_PER_MILE}")
 
 
@@ -659,7 +706,11 @@ if [x["component"] for x in homeworking] != list(HOMEWORK_ACTIVITY.values()):
 # ── GUIDANCE, QUOTED VERBATIM, FOUND BY ITS OPENING WORDS ───────────────────────────────────────────
 
 def quote(sheet: str, opening: str) -> dict:
+    if sheet not in SHEETS:
+        return None   # Hotel stay before 2026: not read
     found = [(n, c, v.strip()) for n, cells in SHEETS[sheet].items() for c, v in cells.items() if v.strip().startswith(opening)]
+    if not found and not STRICT:
+        return None   # this edition prints no such sentence; none is borrowed from another
     if len(found) != 1:
         die(f"{sheet!r}: expected one cell opening {opening!r}, found {[(cell(c, n)) for n, c, _ in found]}")
     n, c, text = found[0]
@@ -708,12 +759,19 @@ guidance = {
 index_rows = read_sheet(z, shared, sheets, "Index")
 periodic = [(n, c) for n, cells in index_rows.items() for c, v in cells.items() if v.strip() == "Factors Updated Periodically"]
 # One header per scope section; all in the same column, or the layout has changed.
-if not periodic or len({c for _, c in periodic}) != 1:
+# ⚠️ 2023 AND 2024 PRINT NO SUCH COLUMN: their Index sheets carry no "Factors Updated Periodically" or "Annually"
+# header at all. Their notes are null (the edition prints none), not taken from a later edition.
+if not periodic and not STRICT:
+    pcol = None
+elif not periodic or len({c for _, c in periodic}) != 1:
     die(f"Index: expected every 'Factors Updated Periodically' header in one column, found {periodic}")
-pcol = periodic[0][1]
+else:
+    pcol = periodic[0][1]
 
 
-def index_note(sheet_name: str) -> dict:
+def index_note(sheet_name: str):
+    if pcol is None:
+        return None
     found = [n for n, cells in index_rows.items() if cells.get(0, "").strip() == sheet_name]
     if len(found) != 1:
         die(f"Index: expected one row naming {sheet_name!r}, found {found}")
@@ -730,12 +788,17 @@ guidance["index_wtt_air_last_updated"] = index_note(WTT_AIR)
 # what the current publication changed; "Periodically" says what was last changed in an earlier one. Found
 # by each column's own header, as above; "-" is what the sheet prints where nothing applies.
 annual = [(n, c) for n, cells in index_rows.items() for c, v in cells.items() if v.strip() == "Factors Updated Annually"]
-if not annual or len({c for _, c in annual}) != 1:
+if not annual and not STRICT:
+    acol = None
+elif not annual or len({c for _, c in annual}) != 1:
     die(f"Index: expected every 'Factors Updated Annually' header in one column, found {annual}")
-acol = annual[0][1]
+else:
+    acol = annual[0][1]
 
 
-def index_annual(sheet_name: str) -> dict:
+def index_annual(sheet_name: str):
+    if acol is None:
+        return None
     found = [n for n, cells in index_rows.items() if cells.get(0, "").strip() == sheet_name]
     if len(found) != 1:
         die(f"Index: expected one row naming {sheet_name!r}, found {found}")
@@ -749,13 +812,22 @@ def index_annual(sheet_name: str) -> dict:
 # cars of Business travel- land A14: "Rail, xEVs and Homeworking". Category 7 cites it for rail.
 whats_new = read_sheet(z, shared, sheets, "What's new")
 wn = [(n, c, v.strip()) for n, cells in whats_new.items() for c, v in cells.items() if v.strip().startswith("Revision to the calculation method for UK electricity")]
-if len(wn) != 1:
+# 2026 only: the UK electricity revision is that edition's; an older edition prints no such line (null).
+if not wn and not STRICT:
+    guidance["whats_new_uk_electricity_knock_on"] = None
+elif len(wn) != 1:
     die(f"What's new: expected one cell opening 'Revision to the calculation method for UK electricity', found {len(wn)}")
-guidance["whats_new_uk_electricity_knock_on"] = {"sheet": "What's new", "cell": cell(wn[0][1], wn[0][0]), "text": wn[0][2]}
+else:
+    guidance["whats_new_uk_electricity_knock_on"] = {"sheet": "What's new", "cell": cell(wn[0][1], wn[0][0]), "text": wn[0][2]}
 
 for key, name in (("homeworking", HOMEWORK), ("land", LAND), ("wtt_land", WTT_LAND)):
     guidance[f"index_{key}_updated_annually"] = index_annual(name)
     guidance[f"index_{key}_last_updated"] = index_note(name)
+# T3e: the air sheets' "Factors Updated Annually" cells too. DEFRA 2025 records the flights' CO2 update there (G40,
+# "Factors updated in 2025 publication") while its "last updated" cell names only CH4 and N2O (2021); a sentence on
+# when the flight factors were last updated needs both cells to be true for every edition.
+guidance["index_air_updated_annually"] = index_annual(AIR)
+guidance["index_wtt_air_updated_annually"] = index_annual(WTT_AIR)
 
 
 # ── FINGERPRINT — rows only, as defraWaste2026.json ────────────────────────────────────────────────
@@ -815,9 +887,10 @@ payload = {
         "title_as_published": TITLE_AS_PUBLISHED,
         "edition": EDITION,
         "factor_set": factor_sets.pop(),
-        "file_version": versions.pop(),
+        "file_version": FILE_VERSION,
+        **({} if len(versions) == 1 else {"sheet_versions": {n: m["Version"] for n, m in sheet_meta.items()}}),
         "year": str(YEAR),
-        "sheets": [AIR, WTT_AIR, HAUL, HOTEL, LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHICLES],
+        "sheets": [AIR, WTT_AIR, HAUL, *([HOTEL] if READ_HOTELS else []), LAND, WTT_LAND, HOMEWORK, PASSENGER_VEHICLES],
         "scope": "Scope 3",
         "gwp_basis": "AR5",
         "gwp_basis_note": (
@@ -834,6 +907,7 @@ payload = {
             "whole indirect effect on the CO2 component (guidance.rf_two_sets); CH4 and N2O are the same in both. "
             "The WTT air sheet publishes both columns with identical values (guidance.wtt_air_rf_identical)."
         ),
+        **({"hotels_not_read_note": "Hotel stay is not read for this edition (Lisa's ruling, 8 Oct 2026): nothing prices hotels, and the methodology page says they are not included."} if not READ_HOTELS else {}),
         "absent_hotel_note": (
             "A COUNTRY LISTED WITH AN EMPTY VALUE CELL HAS NO FACTOR, NOT A FACTOR OF ZERO. Its record carries "
             "kg_co2e_per_room_night: null. Reading it as 0 would report a hotel stay as emissions-free rather "
@@ -856,6 +930,11 @@ payload = {
             "the 390 pairs (19 Sep 2026) differ by slightly more than the rounding of two 5 d.p. figures allows, "
             "at most 2.7e-5 kg (about 0.01%), which suggests the sheet derives both from unrounded values. Only "
             "the km rows are stored."
+        ) if STRICT else (
+            f"Every car and motorbike mile row was checked against its km row x 1.609344 to within 5e-5 kg. "
+            f"{MILES_STATS['above_rounding']} of the {MILES_STATS['pairs']} pairs in this edition differ by more than "
+            f"the rounding of two 5 d.p. figures allows, at most {MILES_STATS['max_diff']:.1e} kg. Only the km rows "
+            "are stored."
         ),
         "absent_car_note": (
             "A SIZE AND FUEL THE SHEET LEAVES BLANK HAS NO RECORD, NOT A FACTOR OF ZERO (for example small or "
@@ -883,6 +962,10 @@ payload = {
         "licence": "Open Government Licence v3.0 (OGL v3.0)",
         "licence_url": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
         "licence_basis": (
+            f"OGL v3.0 is the licence DESNZ states on the gov.uk page for each edition of these factors. For the {YEAR} "
+            "edition that page was not read by this generator; the statement was verified for the 2026 page on 17 Sep "
+            "2026 (lib/ghg/defraPublication.ts). The workbook itself states no licence."
+        ) if not STRICT else (
             "Stated on the 2026 publication page on gov.uk, as verified on 17 Sep 2026 for this same workbook "
             "(lib/ghg/defraPublication.ts); the page was not re-read for this artefact. The workbook itself states "
             "no licence. The statement carries an 'except where otherwise stated' exception. The Hotel stay sheet "
@@ -918,7 +1001,7 @@ payload = {
 OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 # ── PRINT ──────────────────────────────────────────────────────────────────────────────────────────
-print(f"wrote {OUT.relative_to(ROOT)}  ({OUT.stat().st_size:,} bytes)")
+print(f"wrote {OUT}  ({OUT.stat().st_size:,} bytes)")
 print(f"  input {INPUT.name}  sha256 {input_digest}")
 print(f"  citation: {CITATION}   edition: {EDITION}   gwp_basis: AR5")
 print(f"\n  air rows: {len(air)}   WTT air rows: {len(wtt_air)}")
@@ -930,7 +1013,7 @@ print(f"  rail: {[(x['type'], x['kg_co2e']) for x in rail]}")
 print(f"  WTT rail: {[(x['type'], x['kg_co2e']) for x in wtt_rail]}")
 print("\n  guidance cells:")
 for k, g in guidance.items():
-    print(f"    {k:<30} {g['sheet']}!{g['cell']}")
+    print(f"    {k:<30} {g['sheet'] + '!' + g['cell'] if g else '(not printed in this edition)'}")
 print(f"\n  cars: {len(cars)}  WTT cars: {len(wtt_cars)}")
 for x in cars:
     print(f"    {x['size']:<8} {x['fuel']:<17} {x['kg_co2e']:<9} {x['sheet']}!{x['cells']['values']}")

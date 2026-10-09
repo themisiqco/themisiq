@@ -1,16 +1,15 @@
 {
   "metadata": {
-    "source": "UK DEFRA/DESNZ (2026) GHG Conversion Factors for Company Reporting",
+    "source": "UK DEFRA/DESNZ (2023) GHG Conversion Factors for Company Reporting",
     "title_as_published": "UK Government GHG Conversion Factors for Company Reporting",
-    "edition": "DEFRA 2026",
+    "edition": "DEFRA 2023",
     "factor_set": "Full set",
-    "file_version": "1",
-    "year": "2026",
+    "file_version": "1.1",
+    "year": "2023",
     "sheets": [
       "Business travel- air",
       "WTT- business travel- air",
       "Haul definition",
-      "Hotel stay",
       "Business travel- land",
       "WTT- pass vehs & travel- land",
       "Homeworking",
@@ -21,10 +20,11 @@
     "gwp_basis_note": "Stated by the workbook's Introduction sheet: the CO2e figures use IPCC Fifth Assessment Report (AR5) 100-year GWPs. The CO2, CH4 and N2O components are published already in kg CO2e (the sheet's headers read 'kg CO2e of CH4 per unit' and so on) and are stored as published, not re-based.",
     "unit_note": "Asserted, not assumed: every air, WTT air and rail row's Unit cell reads 'passenger.km', and every Hotel stay row's reads 'Room per night'. The generator aborts on anything else.",
     "rf_note": "Air rows carry both the 'With RF' and 'Without RF' column sets as published. The sheet puts the whole indirect effect on the CO2 component (guidance.rf_two_sets); CH4 and N2O are the same in both. The WTT air sheet publishes both columns with identical values (guidance.wtt_air_rf_identical).",
+    "hotels_not_read_note": "Hotel stay is not read for this edition (Lisa's ruling, 8 Oct 2026): nothing prices hotels, and the methodology page says they are not included.",
     "absent_hotel_note": "A COUNTRY LISTED WITH AN EMPTY VALUE CELL HAS NO FACTOR, NOT A FACTOR OF ZERO. Its record carries kg_co2e_per_room_night: null. Reading it as 0 would report a hotel stay as emissions-free rather than as unpriceable. The sheet's own FAQ on missing countries is guidance.hotel_missing_country.",
     "market_segment_note": "The 'Cars (by market segment)' rows (Mini to MPV) of 'Business travel- land' and 'WTT- pass vehs & travel- land' are NOT read. The segments are the UK Society of Motor Manufacturers and Traders' (guidance.land_market_segments_smmt): a commuter can say whether a car is small, medium or large, not which SMMT segment it belongs to, and the by-size rows carry every fuel the segment rows do.",
     "commuting_units_note": "Cars and motorbikes are per vehicle-km: a whole vehicle, so a car shared by several commuters is divided by its occupancy by the caller (guidance.land_vehicle_vs_passenger_km). Taxis are stored both per passenger-km and per vehicle-km, as published. Buses and the coach are per passenger-km. Only km rows are stored: every mile row was checked against its km row x 1.609344 and not kept.",
-    "miles_check_note": "Every car and motorbike mile row was checked against its km row x 1.609344 to within 5e-5 kg. 21 of the 390 pairs (19 Sep 2026) differ by slightly more than the rounding of two 5 d.p. figures allows, at most 2.7e-5 kg (about 0.01%), which suggests the sheet derives both from unrounded values. Only the km rows are stored.",
+    "miles_check_note": "Every car and motorbike mile row was checked against its km row x 1.609344 to within 5e-5 kg. 4 of the 170 pairs in this edition differ by more than the rounding of two 5 d.p. figures allows, at most 2.0e-05 kg. Only the km rows are stored.",
     "absent_car_note": "A SIZE AND FUEL THE SHEET LEAVES BLANK HAS NO RECORD, NOT A FACTOR OF ZERO (for example small or large CNG, and small LPG). The reader returns null for it.",
     "electric_car_note": "The battery electric and plug-in hybrid car factors on 'Business travel- land' include the electricity consumed, at the UK grid's intensity (guidance.land_electric_cars_include_electricity). Outside the UK they stand in for a grid they do not describe.",
     "homeworking_note": "Per FTE working hour, a UK average (guidance.homeworking_uk_average), from the EcoAct 2020 methodology (guidance.homeworking_method). Heating is the larger component and was last updated in an earlier publication than office equipment (guidance.index_homeworking_last_updated). There is no cooling component.",
@@ -32,7 +32,7 @@
     "rail_scope_note": "Only the four Rail rows of 'Business travel- land' and the four WTT- rail rows are read. The rail factors are UK figures; applied outside the UK they are a stand-in, which the calculation must say.",
     "licence": "Open Government Licence v3.0 (OGL v3.0)",
     "licence_url": "http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/",
-    "licence_basis": "Stated on the 2026 publication page on gov.uk, as verified on 17 Sep 2026 for this same workbook (lib/ghg/defraPublication.ts); the page was not re-read for this artefact. The workbook itself states no licence. The statement carries an 'except where otherwise stated' exception. The Hotel stay sheet says its factors are taken from the Hotel Footprinting Tool (International Tourism Partnership and Greenview; guidance.hotel_source): third-party data, which the workbook marks with no different licence, but which OGL v3.0 does not cover to the extent the provider was not authorised to license it.",
+    "licence_basis": "OGL v3.0 is the licence DESNZ states on the gov.uk page for each edition of these factors. For the 2023 edition that page was not read by this generator; the statement was verified for the 2026 page on 17 Sep 2026 (lib/ghg/defraPublication.ts). The workbook itself states no licence.",
     "attribution_required": "Contains public sector information licensed under the Open Government Licence v3.0.",
     "guidance": {
       "rf_two_sets": {
@@ -68,11 +68,11 @@
       "international_and_non_stop": {
         "sheet": "Business travel- air",
         "cell": "A53",
-        "text": "In the 2015 update, a brand new set of aviation factors were introduced where aviation factors are now being presented for international flights between non-UK destinations. This is a relatively high-level analysis and allows users to choose a different factor for air travel if flying between countries outside of the UK. All factors presented are for direct (non-stop) flights only. This analysis was only possible for passenger air travel. However, in the interests of consistency with the air freight travel, international freight factors have been included. International freight factors have been set equal to the current UK, long-haul freight factors.  \nFor these factors, see sheets:"
+        "text": "In the 2015 update, a brand new set of aviation factors were introduced where aviation factors are now being presented for international flights between non-UK destinations. This is a relatively high-level analysis and allows users to choose a different factor for air travel if flying between countries outside of the UK. All factors presented are for direct (non-stop) flights only. This analysis was only possible for passenger air travel. However, in the interests of consistency with the air freight travel, international freight factors have been included. International freight factors have been set equal to the current UK, long-haul freight factors.  See the 'Freighting goods' and 'WTT- delivery vehs & freight' tabs for these factors."
       },
       "international_is_average": {
         "sheet": "Business travel- air",
-        "cell": "A56",
+        "cell": "A54",
         "text": "Please note - the international business travel factors are an average of short and long-haul flights to/from UK."
       },
       "class_unknown_use_average": {
@@ -83,37 +83,17 @@
       "wtt_air_rf_identical": {
         "sheet": "WTT- business travel- air",
         "cell": "A12",
-        "text": "●  Factors are provided including/excluding the indirect effects of non-CO2 emissions for consistency with the ‘Business travel- air’ factors. However, for WTT- business travel- air the indirect effects do not change the emissions and the two sets of factors are therefore the same."
+        "text": "●  Factors are provided including/excluding the indirect effects of non-CO2  emissions for consistency with the ‘Business travel- air’ factors. However, for WTT- business travel- air the indirect effects do not change the emissions and the two sets of factors are therefore the same."
       },
-      "hotel_average_class": {
-        "sheet": "Hotel stay",
-        "cell": "A11",
-        "text": "●  The conversion factors provided are for an average class of hotel and can be applied to a stay at any type of hotel."
-      },
-      "hotel_country_average": {
-        "sheet": "Hotel stay",
-        "cell": "A12",
-        "text": "●  Unless otherwise stated, conversion factors provided are an average for the specified country."
-      },
-      "hotel_per_room": {
-        "sheet": "Hotel stay",
-        "cell": "A13",
-        "text": "●  The conversion factors are provided on a 'room per night' basis and should be applied to each room that is occupied during the stay.  The conversion factor does not differentiate for number of travellers staying in the room."
-      },
-      "hotel_source": {
-        "sheet": "Hotel stay",
-        "cell": "A86",
-        "text": "The hotel stay conversion factors are taken from the Hotel Footprinting Tool, produced by the International Tourism Partnership and Greenview, which have been derived from the Cornell Hotel Sustainability Benchmarking Index that uses annual data from international hotel companies and a standardized industry methodology."
-      },
-      "hotel_missing_country": {
-        "sheet": "Hotel stay",
-        "cell": "A90",
-        "text": "The provision of conversion factors is limited by the availability of data in different parts of the world. If the hotel stay conversion factor for a certain country is not available in the current set, users may continue to use factors from the last available set, or visit https://www.hotelfootprints.org where more granular data is available by city and segment."
-      },
+      "hotel_average_class": null,
+      "hotel_country_average": null,
+      "hotel_per_room": null,
+      "hotel_source": null,
+      "hotel_missing_country": null,
       "land_vehicle_vs_passenger_km": {
         "sheet": "Business travel- land",
         "cell": "A12",
-        "text": "●  Users should be mindful of the difference between vehicle km conversion factors and passenger km conversion factors. Vehicle km conversion factors should be applied to a whole vehicle (such as a car or taxi) being used for business purposes. Passenger km factors should be used when single passengers are travelling by means of mass transport (such as by train) and the aim is to report emissions on a single-person basis, not account for the whole vehicle."
+        "text": "●  Users should be mindful of the difference between vehicle km conversion factors and passenger km conversion factors. Vehicle km conversion factors should be applied to a whole vehicle (such as a car or taxi) being used for business purposes. Passenger km factors should be used when single passengers are travelling by means of mass transport (such as by train ) and the aim is to report emissions on a single-person basis, not account for the whole vehicle."
       },
       "land_electric_cars_include_electricity": {
         "sheet": "Business travel- land",
@@ -160,65 +140,21 @@
         "cell": "A29",
         "text": "The homeworking conversion factors are calculated using the methodology from the Homeworking emission Whitepaper (EcoAct, 2020)"
       },
-      "index_air_last_updated": {
-        "sheet": "Index",
-        "cell": "H40",
-        "text": "Factors last updated in 2025 publication: \n- CO2 and CO2e factors of Flights\nFactors last updated in 2021 publication:\n- CH4 and N2O (aligned with AR5 GWPs)"
-      },
-      "index_wtt_air_last_updated": {
-        "sheet": "Index",
-        "cell": "H41",
-        "text": "Factors last updated in 2023 publication: \nAll factors."
-      },
-      "whats_new_uk_electricity_knock_on": {
-        "sheet": "What's new",
-        "cell": "B22",
-        "text": "Revision to the calculation method for UK electricity\n(affected tabs: UK electricity; Transmission and distribution; indirect knock-on effects on other factors that include electricity including Rail, xEVs and Homeworking)"
-      },
-      "index_homeworking_updated_annually": {
-        "sheet": "Index",
-        "cell": "G51",
-        "text": "Factors updated in 2026 publication: \n- CO2e factors of Office Equipment\n- Total CO2e factors have changed due to the change in office equipment; emissions from heating are unchanged"
-      },
-      "index_homeworking_last_updated": {
-        "sheet": "Index",
-        "cell": "H51",
-        "text": "Factors last updated in 2022 publication: \n- Heating"
-      },
-      "index_land_updated_annually": {
-        "sheet": "Index",
-        "cell": "G44",
-        "text": "Factors updated in 2026 publication: \n- CO2 and CO2e factors of Cars, Buses, Rail"
-      },
-      "index_land_last_updated": {
-        "sheet": "Index",
-        "cell": "H44",
-        "text": "Factors last updated in 2021 publication: \n- Motorbikes, Taxis\n- CH4 and N2O (aligned with AR5 GWPs)"
-      },
-      "index_wtt_land_updated_annually": {
-        "sheet": "Index",
-        "cell": "G45",
-        "text": "-"
-      },
-      "index_wtt_land_last_updated": {
-        "sheet": "Index",
-        "cell": "H45",
-        "text": "Factors last updated in 2024 publication: \nAll factors"
-      },
-      "index_air_updated_annually": {
-        "sheet": "Index",
-        "cell": "G40",
-        "text": "-"
-      },
-      "index_wtt_air_updated_annually": {
-        "sheet": "Index",
-        "cell": "G41",
-        "text": "-"
-      }
+      "index_air_last_updated": null,
+      "index_wtt_air_last_updated": null,
+      "whats_new_uk_electricity_knock_on": null,
+      "index_homeworking_updated_annually": null,
+      "index_homeworking_last_updated": null,
+      "index_land_updated_annually": null,
+      "index_land_last_updated": null,
+      "index_wtt_land_updated_annually": null,
+      "index_wtt_land_last_updated": null,
+      "index_air_updated_annually": null,
+      "index_wtt_air_updated_annually": null
     },
     "generated_on": "2026-10-08",
-    "generated_from": "defra-desnz-ghg-conversion-factors-2026-full-set-v1.xlsx",
-    "generated_from_sha256": "b5c4f2f86cdc74707337b2fb013b44ded189a1b528f5e29ea99856ba65ae0205",
+    "generated_from": "ghg-conversion-factors-2023-full-file-update.xlsx",
+    "generated_from_sha256": "432aaf00c84276dd8b8c938d83a1ddeba4dc2bda424dc60ab80b16f0e88dcf32",
     "generated_by": "scripts/generate-defra-travel.py",
     "air_categories": [
       "domestic",
@@ -242,9 +178,9 @@
         "short_haul": 47,
         "long_haul": 164
       },
-      "hotel_countries": 55,
-      "hotel_priced": 39,
-      "hotel_absent": 16,
+      "hotel_countries": 0,
+      "hotel_priced": 0,
+      "hotel_absent": 0,
       "rail": 4,
       "wtt_rail": 4,
       "cars": 30,
@@ -257,26 +193,9 @@
       "wtt_buses": 4,
       "homeworking": 3
     },
-    "hotel_countries_without_factor": [
-      "Argentina",
-      "Austria",
-      "Czech Republic",
-      "Fiji",
-      "Finland",
-      "Greece",
-      "Ireland",
-      "Israel",
-      "Kazakhstan",
-      "Macau, China",
-      "New Zealand",
-      "Panama",
-      "Peru",
-      "Poland",
-      "Romania",
-      "Taiwan, China"
-    ],
-    "fingerprint_sha256": "164b481fe08447aeed2e812ff87eecb31ddcc2885fec3713c3ca671de71fc5ab",
-    "commuting_fingerprint_sha256": "283b55c47e3b87457b4b27f59d35da41694a8d55a93219bc539bde4c3c807277"
+    "hotel_countries_without_factor": [],
+    "fingerprint_sha256": "a94627b557795bd84647a22fc6a9e0989268dce31166cd9034e58f7008c88f01",
+    "commuting_fingerprint_sha256": "50e0ff7be531e007128ff01d89c3634f2ab6cf56a1f1f2f95c171d3060e5fe84"
   },
   "air": [
     {
@@ -286,16 +205,16 @@
       "class_as_published": "Average passenger",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.22928,
-        "co2": 0.22771,
-        "ch4": 0.00022,
-        "n2o": 0.00134
+        "kg_co2e": 0.2725767852348993,
+        "co2": 0.27101,
+        "ch4": 0.00022400000000000002,
+        "n2o": 0.001342785234899329
       },
       "without_rf": {
-        "kg_co2e": 0.13552,
-        "co2": 0.13395,
-        "ch4": 0.00022,
-        "n2o": 0.00134
+        "kg_co2e": 0.16098678523489934,
+        "co2": 0.15942,
+        "ch4": 0.00022400000000000002,
+        "n2o": 0.001342785234899329
       },
       "sheet": "Business travel- air",
       "row": 23,
@@ -314,16 +233,16 @@
       "class_as_published": "Average passenger",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.12786,
-        "co2": 0.12693,
-        "ch4": 1e-05,
-        "n2o": 0.00092
+        "kg_co2e": 0.1859171395973154,
+        "co2": 0.18499,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0009159395973154363
       },
       "without_rf": {
-        "kg_co2e": 0.07559,
-        "co2": 0.07466,
-        "ch4": 1e-05,
-        "n2o": 0.00092
+        "kg_co2e": 0.10973713959731544,
+        "co2": 0.10881,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0009159395973154363
       },
       "sheet": "Business travel- air",
       "row": 24,
@@ -342,16 +261,16 @@
       "class_as_published": "Economy class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.12576,
-        "co2": 0.12485,
-        "ch4": 1e-05,
-        "n2o": 0.0009
+        "kg_co2e": 0.1828693543624161,
+        "co2": 0.18196,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0008981543624161074
       },
       "without_rf": {
-        "kg_co2e": 0.07435,
-        "co2": 0.07344,
-        "ch4": 1e-05,
-        "n2o": 0.0009
+        "kg_co2e": 0.10793935436241611,
+        "co2": 0.10703,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0008981543624161074
       },
       "sheet": "Business travel- air",
       "row": 25,
@@ -370,16 +289,16 @@
       "class_as_published": "Business class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.18863,
-        "co2": 0.18727,
-        "ch4": 1e-05,
-        "n2o": 0.00135
+        "kg_co2e": 0.274302877852349,
+        "co2": 0.27294,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0013516778523489934
       },
       "without_rf": {
-        "kg_co2e": 0.11152,
-        "co2": 0.11016,
-        "ch4": 1e-05,
-        "n2o": 0.00135
+        "kg_co2e": 0.16191287785234898,
+        "co2": 0.16055,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0013516778523489934
       },
       "sheet": "Business travel- air",
       "row": 26,
@@ -398,16 +317,16 @@
       "class_as_published": "Average passenger",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.15282,
-        "co2": 0.15152,
-        "ch4": 1e-05,
-        "n2o": 0.00129
+        "kg_co2e": 0.2612806295302013,
+        "co2": 0.25998,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0012894295302013422
       },
       "without_rf": {
-        "kg_co2e": 0.09043,
-        "co2": 0.08913,
-        "ch4": 1e-05,
-        "n2o": 0.00129
+        "kg_co2e": 0.15423062953020134,
+        "co2": 0.15293,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0012894295302013422
       },
       "sheet": "Business travel- air",
       "row": 27,
@@ -426,16 +345,16 @@
       "class_as_published": "Economy class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.11704,
-        "co2": 0.11604,
-        "ch4": 1e-05,
-        "n2o": 0.00099
+        "kg_co2e": 0.20010828053691276,
+        "co2": 0.19911,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0009870805369127517
       },
       "without_rf": {
-        "kg_co2e": 0.06926,
-        "co2": 0.06826,
-        "ch4": 1e-05,
-        "n2o": 0.00099
+        "kg_co2e": 0.11811828053691276,
+        "co2": 0.11712,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0009870805369127517
       },
       "sheet": "Business travel- air",
       "row": 28,
@@ -454,16 +373,16 @@
       "class_as_published": "Premium economy class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.18726,
-        "co2": 0.18567,
-        "ch4": 1e-05,
-        "n2o": 0.00157
+        "kg_co2e": 0.3201551932885906,
+        "co2": 0.31857,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0015739932885906042
       },
       "without_rf": {
-        "kg_co2e": 0.11081,
-        "co2": 0.10922,
-        "ch4": 1e-05,
-        "n2o": 0.00157
+        "kg_co2e": 0.18897519328859058,
+        "co2": 0.18739,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0015739932885906042
       },
       "sheet": "Business travel- air",
       "row": 29,
@@ -482,16 +401,16 @@
       "class_as_published": "Business class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.3394,
-        "co2": 0.33652,
-        "ch4": 2e-05,
-        "n2o": 0.00285
+        "kg_co2e": 0.5802869302013423,
+        "co2": 0.57741,
+        "ch4": 2.2400000000000002e-05,
+        "n2o": 0.002854530201342282
       },
       "without_rf": {
-        "kg_co2e": 0.20083,
-        "co2": 0.19795,
-        "ch4": 2e-05,
-        "n2o": 0.00285
+        "kg_co2e": 0.3425269302013423,
+        "co2": 0.33965,
+        "ch4": 2.2400000000000002e-05,
+        "n2o": 0.002854530201342282
       },
       "sheet": "Business travel- air",
       "row": 30,
@@ -510,16 +429,16 @@
       "class_as_published": "First class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.46814,
-        "co2": 0.46417,
-        "ch4": 3e-05,
-        "n2o": 0.00394
+        "kg_co2e": 0.8004030295302013,
+        "co2": 0.79643,
+        "ch4": 3.3600000000000004e-05,
+        "n2o": 0.003939429530201342
       },
       "without_rf": {
-        "kg_co2e": 0.27701,
-        "co2": 0.27304,
-        "ch4": 3e-05,
-        "n2o": 0.00394
+        "kg_co2e": 0.47246302953020136,
+        "co2": 0.46849,
+        "ch4": 3.3600000000000004e-05,
+        "n2o": 0.003939429530201342
       },
       "sheet": "Business travel- air",
       "row": 31,
@@ -538,16 +457,16 @@
       "class_as_published": "Average passenger",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.14253,
-        "co2": 0.14166,
-        "ch4": 1e-05,
-        "n2o": 0.00086
+        "kg_co2e": 0.17580378389261744,
+        "co2": 0.17493,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0008625838926174497
       },
       "without_rf": {
-        "kg_co2e": 0.0842,
-        "co2": 0.08333,
-        "ch4": 1e-05,
-        "n2o": 0.00086
+        "kg_co2e": 0.10377378389261746,
+        "co2": 0.1029,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0008625838926174497
       },
       "sheet": "Business travel- air",
       "row": 32,
@@ -566,16 +485,16 @@
       "class_as_published": "Economy class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.10916,
-        "co2": 0.10849,
-        "ch4": 1e-05,
-        "n2o": 0.00067
+        "kg_co2e": 0.13464333030872483,
+        "co2": 0.13397,
+        "ch4": 6.384e-06,
+        "n2o": 0.0006669463087248322
       },
       "without_rf": {
-        "kg_co2e": 0.06449,
-        "co2": 0.06382,
-        "ch4": 1e-05,
-        "n2o": 0.00067
+        "kg_co2e": 0.07947333030872483,
+        "co2": 0.0788,
+        "ch4": 6.384e-06,
+        "n2o": 0.0006669463087248322
       },
       "sheet": "Business travel- air",
       "row": 33,
@@ -594,16 +513,16 @@
       "class_as_published": "Premium economy class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.17465,
-        "co2": 0.17358,
-        "ch4": 1e-05,
-        "n2o": 0.00106
+        "kg_co2e": 0.21541942147651008,
+        "co2": 0.21435,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0010582214765100671
       },
       "without_rf": {
-        "kg_co2e": 0.10318,
-        "co2": 0.10211,
-        "ch4": 1e-05,
-        "n2o": 0.00106
+        "kg_co2e": 0.12715942147651008,
+        "co2": 0.12609,
+        "ch4": 1.1200000000000001e-05,
+        "n2o": 0.0010582214765100671
       },
       "sheet": "Business travel- air",
       "row": 34,
@@ -622,16 +541,16 @@
       "class_as_published": "Business class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.31656,
-        "co2": 0.31462,
-        "ch4": 2e-05,
-        "n2o": 0.00192
+        "kg_co2e": 0.3904432053691275,
+        "co2": 0.3885,
+        "ch4": 2.2400000000000002e-05,
+        "n2o": 0.0019208053691275168
       },
       "without_rf": {
-        "kg_co2e": 0.18701,
-        "co2": 0.18507,
-        "ch4": 2e-05,
-        "n2o": 0.00192
+        "kg_co2e": 0.23047320536912752,
+        "co2": 0.22853,
+        "ch4": 2.2400000000000002e-05,
+        "n2o": 0.0019208053691275168
       },
       "sheet": "Business travel- air",
       "row": 35,
@@ -650,15 +569,15 @@
       "class_as_published": "First class",
       "unit": "kg CO2e per passenger.km",
       "with_rf": {
-        "kg_co2e": 0.43663,
-        "co2": 0.43396,
-        "ch4": 2e-05,
+        "kg_co2e": 0.5385424,
+        "co2": 0.53587,
+        "ch4": 2.2400000000000002e-05,
         "n2o": 0.00265
       },
       "without_rf": {
-        "kg_co2e": 0.25794,
-        "co2": 0.25527,
-        "ch4": 2e-05,
+        "kg_co2e": 0.31789239999999996,
+        "co2": 0.31522,
+        "ch4": 2.2400000000000002e-05,
         "n2o": 0.00265
       },
       "sheet": "Business travel- air",
@@ -2863,566 +2782,15 @@
       "cells": "A220:C220"
     }
   ],
-  "hotel_stay": [
-    {
-      "country": "UK",
-      "kg_co2e_per_room_night": 10.4,
-      "sheet": "Hotel stay",
-      "row": 22,
-      "cells": {
-        "country": "B22",
-        "value": "D22"
-      }
-    },
-    {
-      "country": "UK (London)",
-      "kg_co2e_per_room_night": 11.5,
-      "sheet": "Hotel stay",
-      "row": 23,
-      "cells": {
-        "country": "B23",
-        "value": "D23"
-      }
-    },
-    {
-      "country": "Argentina",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 28,
-      "cells": {
-        "country": "B28",
-        "value": "D28"
-      }
-    },
-    {
-      "country": "Australia",
-      "kg_co2e_per_room_night": 35.0,
-      "sheet": "Hotel stay",
-      "row": 29,
-      "cells": {
-        "country": "B29",
-        "value": "D29"
-      }
-    },
-    {
-      "country": "Austria",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 30,
-      "cells": {
-        "country": "B30",
-        "value": "D30"
-      }
-    },
-    {
-      "country": "Belgium",
-      "kg_co2e_per_room_night": 12.2,
-      "sheet": "Hotel stay",
-      "row": 31,
-      "cells": {
-        "country": "B31",
-        "value": "D31"
-      }
-    },
-    {
-      "country": "Brazil",
-      "kg_co2e_per_room_night": 8.7,
-      "sheet": "Hotel stay",
-      "row": 32,
-      "cells": {
-        "country": "B32",
-        "value": "D32"
-      }
-    },
-    {
-      "country": "Canada",
-      "kg_co2e_per_room_night": 7.4,
-      "sheet": "Hotel stay",
-      "row": 33,
-      "cells": {
-        "country": "B33",
-        "value": "D33"
-      }
-    },
-    {
-      "country": "Chile",
-      "kg_co2e_per_room_night": 27.6,
-      "sheet": "Hotel stay",
-      "row": 34,
-      "cells": {
-        "country": "B34",
-        "value": "D34"
-      }
-    },
-    {
-      "country": "China",
-      "kg_co2e_per_room_night": 53.5,
-      "sheet": "Hotel stay",
-      "row": 35,
-      "cells": {
-        "country": "B35",
-        "value": "D35"
-      }
-    },
-    {
-      "country": "Colombia",
-      "kg_co2e_per_room_night": 14.7,
-      "sheet": "Hotel stay",
-      "row": 36,
-      "cells": {
-        "country": "B36",
-        "value": "D36"
-      }
-    },
-    {
-      "country": "Costa Rica",
-      "kg_co2e_per_room_night": 4.7,
-      "sheet": "Hotel stay",
-      "row": 37,
-      "cells": {
-        "country": "B37",
-        "value": "D37"
-      }
-    },
-    {
-      "country": "Czech Republic",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 38,
-      "cells": {
-        "country": "B38",
-        "value": "D38"
-      }
-    },
-    {
-      "country": "Egypt",
-      "kg_co2e_per_room_night": 44.2,
-      "sheet": "Hotel stay",
-      "row": 39,
-      "cells": {
-        "country": "B39",
-        "value": "D39"
-      }
-    },
-    {
-      "country": "Fiji",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 40,
-      "cells": {
-        "country": "B40",
-        "value": "D40"
-      }
-    },
-    {
-      "country": "Finland",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 41,
-      "cells": {
-        "country": "B41",
-        "value": "D41"
-      }
-    },
-    {
-      "country": "France",
-      "kg_co2e_per_room_night": 6.7,
-      "sheet": "Hotel stay",
-      "row": 42,
-      "cells": {
-        "country": "B42",
-        "value": "D42"
-      }
-    },
-    {
-      "country": "Germany",
-      "kg_co2e_per_room_night": 13.2,
-      "sheet": "Hotel stay",
-      "row": 43,
-      "cells": {
-        "country": "B43",
-        "value": "D43"
-      }
-    },
-    {
-      "country": "Greece",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 44,
-      "cells": {
-        "country": "B44",
-        "value": "D44"
-      }
-    },
-    {
-      "country": "Hong Kong, China",
-      "kg_co2e_per_room_night": 51.5,
-      "sheet": "Hotel stay",
-      "row": 45,
-      "cells": {
-        "country": "B45",
-        "value": "D45"
-      }
-    },
-    {
-      "country": "India",
-      "kg_co2e_per_room_night": 58.9,
-      "sheet": "Hotel stay",
-      "row": 46,
-      "cells": {
-        "country": "B46",
-        "value": "D46"
-      }
-    },
-    {
-      "country": "Indonesia",
-      "kg_co2e_per_room_night": 62.7,
-      "sheet": "Hotel stay",
-      "row": 47,
-      "cells": {
-        "country": "B47",
-        "value": "D47"
-      }
-    },
-    {
-      "country": "Ireland",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 48,
-      "cells": {
-        "country": "B48",
-        "value": "D48"
-      }
-    },
-    {
-      "country": "Israel",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 49,
-      "cells": {
-        "country": "B49",
-        "value": "D49"
-      }
-    },
-    {
-      "country": "Italy",
-      "kg_co2e_per_room_night": 14.3,
-      "sheet": "Hotel stay",
-      "row": 50,
-      "cells": {
-        "country": "B50",
-        "value": "D50"
-      }
-    },
-    {
-      "country": "Japan",
-      "kg_co2e_per_room_night": 39.0,
-      "sheet": "Hotel stay",
-      "row": 51,
-      "cells": {
-        "country": "B51",
-        "value": "D51"
-      }
-    },
-    {
-      "country": "Jordan",
-      "kg_co2e_per_room_night": 68.9,
-      "sheet": "Hotel stay",
-      "row": 52,
-      "cells": {
-        "country": "B52",
-        "value": "D52"
-      }
-    },
-    {
-      "country": "Kazakhstan",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 53,
-      "cells": {
-        "country": "B53",
-        "value": "D53"
-      }
-    },
-    {
-      "country": "Korea",
-      "kg_co2e_per_room_night": 55.8,
-      "sheet": "Hotel stay",
-      "row": 54,
-      "cells": {
-        "country": "B54",
-        "value": "D54"
-      }
-    },
-    {
-      "country": "Macau, China",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 55,
-      "cells": {
-        "country": "B55",
-        "value": "D55"
-      }
-    },
-    {
-      "country": "Malaysia",
-      "kg_co2e_per_room_night": 61.5,
-      "sheet": "Hotel stay",
-      "row": 56,
-      "cells": {
-        "country": "B56",
-        "value": "D56"
-      }
-    },
-    {
-      "country": "Maldives",
-      "kg_co2e_per_room_night": 152.2,
-      "sheet": "Hotel stay",
-      "row": 57,
-      "cells": {
-        "country": "B57",
-        "value": "D57"
-      }
-    },
-    {
-      "country": "Mexico",
-      "kg_co2e_per_room_night": 19.3,
-      "sheet": "Hotel stay",
-      "row": 58,
-      "cells": {
-        "country": "B58",
-        "value": "D58"
-      }
-    },
-    {
-      "country": "Netherlands",
-      "kg_co2e_per_room_night": 14.8,
-      "sheet": "Hotel stay",
-      "row": 59,
-      "cells": {
-        "country": "B59",
-        "value": "D59"
-      }
-    },
-    {
-      "country": "New Zealand",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 60,
-      "cells": {
-        "country": "B60",
-        "value": "D60"
-      }
-    },
-    {
-      "country": "Oman",
-      "kg_co2e_per_room_night": 90.3,
-      "sheet": "Hotel stay",
-      "row": 61,
-      "cells": {
-        "country": "B61",
-        "value": "D61"
-      }
-    },
-    {
-      "country": "Panama",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 62,
-      "cells": {
-        "country": "B62",
-        "value": "D62"
-      }
-    },
-    {
-      "country": "Peru",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 63,
-      "cells": {
-        "country": "B63",
-        "value": "D63"
-      }
-    },
-    {
-      "country": "Philippines",
-      "kg_co2e_per_room_night": 54.3,
-      "sheet": "Hotel stay",
-      "row": 64,
-      "cells": {
-        "country": "B64",
-        "value": "D64"
-      }
-    },
-    {
-      "country": "Poland",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 65,
-      "cells": {
-        "country": "B65",
-        "value": "D65"
-      }
-    },
-    {
-      "country": "Portugal",
-      "kg_co2e_per_room_night": 19.0,
-      "sheet": "Hotel stay",
-      "row": 66,
-      "cells": {
-        "country": "B66",
-        "value": "D66"
-      }
-    },
-    {
-      "country": "Qatar",
-      "kg_co2e_per_room_night": 86.2,
-      "sheet": "Hotel stay",
-      "row": 67,
-      "cells": {
-        "country": "B67",
-        "value": "D67"
-      }
-    },
-    {
-      "country": "Romania",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 68,
-      "cells": {
-        "country": "B68",
-        "value": "D68"
-      }
-    },
-    {
-      "country": "Russian Federation",
-      "kg_co2e_per_room_night": 24.2,
-      "sheet": "Hotel stay",
-      "row": 69,
-      "cells": {
-        "country": "B69",
-        "value": "D69"
-      }
-    },
-    {
-      "country": "Saudi Arabia",
-      "kg_co2e_per_room_night": 106.4,
-      "sheet": "Hotel stay",
-      "row": 70,
-      "cells": {
-        "country": "B70",
-        "value": "D70"
-      }
-    },
-    {
-      "country": "Singapore",
-      "kg_co2e_per_room_night": 24.5,
-      "sheet": "Hotel stay",
-      "row": 71,
-      "cells": {
-        "country": "B71",
-        "value": "D71"
-      }
-    },
-    {
-      "country": "South Africa",
-      "kg_co2e_per_room_night": 51.4,
-      "sheet": "Hotel stay",
-      "row": 72,
-      "cells": {
-        "country": "B72",
-        "value": "D72"
-      }
-    },
-    {
-      "country": "Spain",
-      "kg_co2e_per_room_night": 7.0,
-      "sheet": "Hotel stay",
-      "row": 73,
-      "cells": {
-        "country": "B73",
-        "value": "D73"
-      }
-    },
-    {
-      "country": "Switzerland",
-      "kg_co2e_per_room_night": 6.6,
-      "sheet": "Hotel stay",
-      "row": 74,
-      "cells": {
-        "country": "B74",
-        "value": "D74"
-      }
-    },
-    {
-      "country": "Taiwan, China",
-      "kg_co2e_per_room_night": null,
-      "sheet": "Hotel stay",
-      "row": 75,
-      "cells": {
-        "country": "B75",
-        "value": "D75"
-      }
-    },
-    {
-      "country": "Thailand",
-      "kg_co2e_per_room_night": 43.4,
-      "sheet": "Hotel stay",
-      "row": 76,
-      "cells": {
-        "country": "B76",
-        "value": "D76"
-      }
-    },
-    {
-      "country": "Turkey",
-      "kg_co2e_per_room_night": 32.1,
-      "sheet": "Hotel stay",
-      "row": 77,
-      "cells": {
-        "country": "B77",
-        "value": "D77"
-      }
-    },
-    {
-      "country": "United Arab Emirates",
-      "kg_co2e_per_room_night": 63.8,
-      "sheet": "Hotel stay",
-      "row": 78,
-      "cells": {
-        "country": "B78",
-        "value": "D78"
-      }
-    },
-    {
-      "country": "United States",
-      "kg_co2e_per_room_night": 16.1,
-      "sheet": "Hotel stay",
-      "row": 79,
-      "cells": {
-        "country": "B79",
-        "value": "D79"
-      }
-    },
-    {
-      "country": "Vietnam",
-      "kg_co2e_per_room_night": 38.5,
-      "sheet": "Hotel stay",
-      "row": 80,
-      "cells": {
-        "country": "B80",
-        "value": "D80"
-      }
-    }
-  ],
+  "hotel_stay": [],
   "rail": [
     {
       "type": "National rail",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.03092,
-      "co2": 0.03056,
-      "ch4": 8e-05,
-      "n2o": 0.00028,
+      "kg_co2e": 0.03546296375838926,
+      "co2": 0.0351,
+      "ch4": 7.84e-05,
+      "n2o": 0.00028456375838926176,
       "sheet": "Business travel- land",
       "row": 87,
       "cells": {
@@ -3433,10 +2801,10 @@
     {
       "type": "International rail",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.01135,
-      "co2": 0.0113,
-      "ch4": 2e-05,
-      "n2o": 3e-05,
+      "kg_co2e": 0.004459077852348993,
+      "co2": 0.00441,
+      "ch4": 2.2400000000000002e-05,
+      "n2o": 2.6677852348993288e-05,
       "sheet": "Business travel- land",
       "row": 88,
       "cells": {
@@ -3447,10 +2815,10 @@
     {
       "type": "Light rail and tram",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.02121,
-      "co2": 0.02093,
-      "ch4": 0.00012,
-      "n2o": 0.00016,
+      "kg_co2e": 0.02860326711409396,
+      "co2": 0.02832,
+      "ch4": 0.0001232,
+      "n2o": 0.00016006711409395974,
       "sheet": "Business travel- land",
       "row": 89,
       "cells": {
@@ -3461,10 +2829,10 @@
     {
       "type": "London Underground",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.01549,
-      "co2": 0.01522,
-      "ch4": 0.00011,
-      "n2o": 0.00016,
+      "kg_co2e": 0.02780206711409396,
+      "co2": 0.02753,
+      "ch4": 0.00011200000000000001,
+      "n2o": 0.00016006711409395974,
       "sheet": "Business travel- land",
       "row": 90,
       "cells": {
@@ -3477,7 +2845,18 @@
     {
       "type": "National rail",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.00897,
+      "kg_co2e": 0.008966173915660059,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 83,
+      "cells": {
+        "type": "B83",
+        "value": "D83"
+      }
+    },
+    {
+      "type": "International rail",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.0011660046796149852,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 84,
       "cells": {
@@ -3486,9 +2865,9 @@
       }
     },
     {
-      "type": "International rail",
+      "type": "Light rail and tram",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.00117,
+      "kg_co2e": 0.0074885645371824475,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 85,
       "cells": {
@@ -3497,25 +2876,14 @@
       }
     },
     {
-      "type": "Light rail and tram",
+      "type": "London Underground",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.00749,
+      "kg_co2e": 0.007277477483114217,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 86,
       "cells": {
         "type": "B86",
         "value": "D86"
-      }
-    },
-    {
-      "type": "London Underground",
-      "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.00728,
-      "sheet": "WTT- pass vehs & travel- land",
-      "row": 87,
-      "cells": {
-        "type": "B87",
-        "value": "D87"
       }
     }
   ],
@@ -3526,10 +2894,10 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.14327,
-      "co2": 0.14159,
+      "kg_co2e": 0.13930644888053692,
+      "co2": 0.13763,
       "ch4": 4.6368e-06,
-      "n2o": 0.00167,
+      "n2o": 0.0016718120805369126,
       "sheet": "Business travel- land",
       "row": 47,
       "cells": {
@@ -3544,10 +2912,10 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.14257,
-      "co2": 0.14189,
-      "ch4": 0.00036,
-      "n2o": 0.00032,
+      "kg_co2e": 0.14079853422818792,
+      "co2": 0.14012,
+      "ch4": 0.00035840000000000004,
+      "n2o": 0.0003201342281879195,
       "sheet": "Business travel- land",
       "row": 47,
       "cells": {
@@ -3562,10 +2930,10 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.1138,
-      "co2": 0.11279,
-      "ch4": 0.00024,
-      "n2o": 0.00077,
+      "kg_co2e": 0.10149885771812081,
+      "co2": 0.10049,
+      "ch4": 0.00023520000000000002,
+      "n2o": 0.0007736577181208054,
       "sheet": "Business travel- land",
       "row": 47,
       "cells": {
@@ -3580,10 +2948,10 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.14282,
-      "co2": 0.14181,
-      "ch4": 0.00024,
-      "n2o": 0.00077,
+      "kg_co2e": 0.1403688577181208,
+      "co2": 0.13936,
+      "ch4": 0.00023520000000000002,
+      "n2o": 0.0007736577181208054,
       "sheet": "Business travel- land",
       "row": 47,
       "cells": {
@@ -3598,10 +2966,10 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04969,
-      "co2": 0.04922,
-      "ch4": 0.00022,
-      "n2o": 0.00025,
+      "kg_co2e": 0.05402299328859061,
+      "co2": 0.05355,
+      "ch4": 0.00022400000000000002,
+      "n2o": 0.00024899328859060403,
       "sheet": "Business travel- land",
       "row": 47,
       "cells": {
@@ -3616,10 +2984,10 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02712,
-      "co2": 0.02667,
-      "ch4": 0.00019,
-      "n2o": 0.00026,
+      "kg_co2e": 0.04822828590604027,
+      "co2": 0.04778,
+      "ch4": 0.00019040000000000002,
+      "n2o": 0.00025788590604026843,
       "sheet": "Business travel- land",
       "row": 47,
       "cells": {
@@ -3634,10 +3002,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.17209,
-      "co2": 0.17041,
+      "kg_co2e": 0.1671564488805369,
+      "co2": 0.16548,
       "ch4": 4.6368e-06,
-      "n2o": 0.00167,
+      "n2o": 0.0016718120805369126,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3652,10 +3020,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.17411,
-      "co2": 0.17343,
-      "ch4": 0.00036,
-      "n2o": 0.00032,
+      "kg_co2e": 0.17818853422818792,
+      "co2": 0.17751,
+      "ch4": 0.00035840000000000004,
+      "n2o": 0.0003201342281879195,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3670,10 +3038,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.11678,
-      "co2": 0.11557,
-      "ch4": 0.00017,
-      "n2o": 0.00104,
+      "kg_co2e": 0.10903843624161073,
+      "co2": 0.10783,
+      "ch4": 0.000168,
+      "n2o": 0.0010404362416107382,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3688,10 +3056,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "CNG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.15407,
-      "co2": 0.15194,
-      "ch4": 0.00177,
-      "n2o": 0.00036,
+      "kg_co2e": 0.15660419731543626,
+      "co2": 0.15447,
+      "ch4": 0.0017696000000000003,
+      "n2o": 0.0003645973154362416,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3706,10 +3074,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "LPG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.17378,
-      "co2": 0.17336,
-      "ch4": 6e-05,
-      "n2o": 0.00036,
+      "kg_co2e": 0.17607059731543626,
+      "co2": 0.17565,
+      "ch4": 5.6000000000000006e-05,
+      "n2o": 0.0003645973154362416,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3724,10 +3092,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.17322,
-      "co2": 0.17201,
-      "ch4": 0.00017,
-      "n2o": 0.00104,
+      "kg_co2e": 0.17245843624161075,
+      "co2": 0.17125,
+      "ch4": 0.000168,
+      "n2o": 0.0010404362416107382,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3742,10 +3110,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.08109,
-      "co2": 0.08042,
-      "ch4": 0.00035,
-      "n2o": 0.00032,
+      "kg_co2e": 0.08500733422818792,
+      "co2": 0.08434,
+      "ch4": 0.00034720000000000004,
+      "n2o": 0.0003201342281879195,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3760,10 +3128,10 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02816,
-      "co2": 0.02763,
-      "ch4": 0.00022,
-      "n2o": 0.0003,
+      "kg_co2e": 0.05266634899328859,
+      "co2": 0.05214,
+      "ch4": 0.00022400000000000002,
+      "n2o": 0.0003023489932885906,
       "sheet": "Business travel- land",
       "row": 49,
       "cells": {
@@ -3778,10 +3146,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.20905,
-      "co2": 0.20737,
+      "kg_co2e": 0.20858644888053693,
+      "co2": 0.20691,
       "ch4": 4.6368e-06,
-      "n2o": 0.00167,
+      "n2o": 0.0016718120805369126,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3796,10 +3164,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.26606,
-      "co2": 0.26538,
-      "ch4": 0.00036,
-      "n2o": 0.00032,
+      "kg_co2e": 0.27223853422818795,
+      "co2": 0.27156,
+      "ch4": 0.00035840000000000004,
+      "n2o": 0.0003201342281879195,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3814,10 +3182,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.15846,
-      "co2": 0.15703,
-      "ch4": 0.0001,
-      "n2o": 0.00133,
+      "kg_co2e": 0.1524358,
+      "co2": 0.15101,
+      "ch4": 0.00010080000000000001,
+      "n2o": 0.001325,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3832,10 +3200,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "CNG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.23463,
-      "co2": 0.2325,
-      "ch4": 0.00177,
-      "n2o": 0.00036,
+      "kg_co2e": 0.23845419731543627,
+      "co2": 0.23632,
+      "ch4": 0.0017696000000000003,
+      "n2o": 0.0003645973154362416,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3850,10 +3218,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "LPG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.26569,
-      "co2": 0.26527,
-      "ch4": 6e-05,
-      "n2o": 0.00036,
+      "kg_co2e": 0.26914059731543627,
+      "co2": 0.26872,
+      "ch4": 5.6000000000000006e-05,
+      "n2o": 0.0003645973154362416,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3868,10 +3236,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.2277,
-      "co2": 0.22627,
-      "ch4": 0.0001,
-      "n2o": 0.00133,
+      "kg_co2e": 0.2261158,
+      "co2": 0.22469,
+      "ch4": 0.00010080000000000001,
+      "n2o": 0.001325,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3886,10 +3254,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.10877,
-      "co2": 0.108,
-      "ch4": 0.00039,
-      "n2o": 0.00038,
+      "kg_co2e": 0.10158438255033557,
+      "co2": 0.10081,
+      "ch4": 0.00039200000000000004,
+      "n2o": 0.0003823825503355705,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3904,10 +3272,10 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03065,
-      "co2": 0.03005,
-      "ch4": 0.00026,
-      "n2o": 0.00035,
+      "kg_co2e": 0.057974412080536906,
+      "co2": 0.05737,
+      "ch4": 0.00025760000000000003,
+      "n2o": 0.00034681208053691275,
       "sheet": "Business travel- land",
       "row": 51,
       "cells": {
@@ -3922,10 +3290,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.17265,
-      "co2": 0.17097,
+      "kg_co2e": 0.1698264488805369,
+      "co2": 0.16815,
       "ch4": 4.6368e-06,
-      "n2o": 0.00167,
+      "n2o": 0.0016718120805369126,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -3940,10 +3308,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.16152,
-      "co2": 0.16084,
-      "ch4": 0.00036,
-      "n2o": 0.00032,
+      "kg_co2e": 0.1639085342281879,
+      "co2": 0.16323,
+      "ch4": 0.00035840000000000004,
+      "n2o": 0.0003201342281879195,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -3958,10 +3326,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.12961,
-      "co2": 0.12844,
-      "ch4": 0.00019,
-      "n2o": 0.00098,
+      "kg_co2e": 0.11897858791946307,
+      "co2": 0.11781,
+      "ch4": 0.00019040000000000002,
+      "n2o": 0.0009781879194630872,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -3976,10 +3344,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "CNG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.17314,
-      "co2": 0.17101,
-      "ch4": 0.00177,
-      "n2o": 0.00036,
+      "kg_co2e": 0.17504419731543627,
+      "co2": 0.17291,
+      "ch4": 0.0017696000000000003,
+      "n2o": 0.0003645973154362416,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -3994,10 +3362,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "LPG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.19553,
-      "co2": 0.19511,
-      "ch4": 6e-05,
-      "n2o": 0.00036,
+      "kg_co2e": 0.19704059731543624,
+      "co2": 0.19662,
+      "ch4": 5.6000000000000006e-05,
+      "n2o": 0.0003645973154362416,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -4012,10 +3380,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.16591,
-      "co2": 0.16474,
-      "ch4": 0.00019,
-      "n2o": 0.00098,
+      "kg_co2e": 0.1666385879194631,
+      "co2": 0.16547,
+      "ch4": 0.00019040000000000002,
+      "n2o": 0.0009781879194630872,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -4030,10 +3398,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.09918,
-      "co2": 0.09846,
-      "ch4": 0.00037,
-      "n2o": 0.00035,
+      "kg_co2e": 0.09391641208053692,
+      "co2": 0.0932,
+      "ch4": 0.00036960000000000004,
+      "n2o": 0.00034681208053691275,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -4048,10 +3416,10 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02951,
-      "co2": 0.02896,
-      "ch4": 0.00024,
-      "n2o": 0.00031,
+      "kg_co2e": 0.05479644161073825,
+      "co2": 0.05425,
+      "ch4": 0.00023520000000000002,
+      "n2o": 0.000311241610738255,
       "sheet": "Business travel- land",
       "row": 53,
       "cells": {
@@ -4068,13 +3436,13 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03409,
+      "kg_co2e": 0.03392,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 44,
+      "row": 43,
       "cells": {
-        "size": "B44",
-        "fuel": "D42",
-        "values": "D44"
+        "size": "B43",
+        "fuel": "D41",
+        "values": "D43"
       }
     },
     {
@@ -4083,13 +3451,13 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04015,
+      "kg_co2e": 0.03907,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 44,
+      "row": 43,
       "cells": {
-        "size": "B44",
-        "fuel": "E42",
-        "values": "E44"
+        "size": "B43",
+        "fuel": "E41",
+        "values": "E43"
       }
     },
     {
@@ -4098,13 +3466,13 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03026,
+      "kg_co2e": 0.02703,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 44,
+      "row": 43,
       "cells": {
-        "size": "B44",
-        "fuel": "F42",
-        "values": "F44"
+        "size": "B43",
+        "fuel": "F41",
+        "values": "F43"
       }
     },
     {
@@ -4113,13 +3481,13 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03836,
+      "kg_co2e": 0.03749,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 44,
+      "row": 43,
       "cells": {
-        "size": "B44",
-        "fuel": "I42",
-        "values": "I44"
+        "size": "B43",
+        "fuel": "I41",
+        "values": "I43"
       }
     },
     {
@@ -4128,13 +3496,13 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.0152,
+      "kg_co2e": 0.01317,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 44,
+      "row": 43,
       "cells": {
-        "size": "B44",
-        "fuel": "J42",
-        "values": "J44"
+        "size": "B43",
+        "fuel": "J41",
+        "values": "J43"
       }
     },
     {
@@ -4143,13 +3511,13 @@
       "size_as_published": "Small car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.00948,
+      "kg_co2e": 0.0107,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 44,
+      "row": 43,
       "cells": {
-        "size": "B44",
-        "fuel": "K42",
-        "values": "K44"
+        "size": "B43",
+        "fuel": "K41",
+        "values": "K43"
       }
     },
     {
@@ -4158,13 +3526,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04103,
+      "kg_co2e": 0.04079,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "D42",
-        "values": "D46"
+        "size": "B45",
+        "fuel": "D41",
+        "values": "D45"
       }
     },
     {
@@ -4173,13 +3541,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04957,
+      "kg_co2e": 0.04949,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "E42",
-        "values": "E46"
+        "size": "B45",
+        "fuel": "E41",
+        "values": "E45"
       }
     },
     {
@@ -4188,13 +3556,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02998,
+      "kg_co2e": 0.02831,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "F42",
-        "values": "F46"
+        "size": "B45",
+        "fuel": "F41",
+        "values": "F45"
       }
     },
     {
@@ -4203,13 +3571,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "CNG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03211,
+      "kg_co2e": 0.03206,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "G42",
-        "values": "G46"
+        "size": "B45",
+        "fuel": "G41",
+        "values": "G45"
       }
     },
     {
@@ -4218,13 +3586,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "LPG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02093,
+      "kg_co2e": 0.0209,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "H42",
-        "values": "H46"
+        "size": "B45",
+        "fuel": "H41",
+        "values": "H45"
       }
     },
     {
@@ -4233,13 +3601,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04518,
+      "kg_co2e": 0.04496,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "I42",
-        "values": "I46"
+        "size": "B45",
+        "fuel": "I41",
+        "values": "I45"
       }
     },
     {
@@ -4248,13 +3616,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02524,
+      "kg_co2e": 0.0222,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "J42",
-        "values": "J46"
+        "size": "B45",
+        "fuel": "J41",
+        "values": "J45"
       }
     },
     {
@@ -4263,13 +3631,13 @@
       "size_as_published": "Medium car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.01022,
+      "kg_co2e": 0.01167,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 46,
+      "row": 45,
       "cells": {
-        "size": "B46",
-        "fuel": "K42",
-        "values": "K46"
+        "size": "B45",
+        "fuel": "K41",
+        "values": "K45"
       }
     },
     {
@@ -4278,13 +3646,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.0507,
+      "kg_co2e": 0.051,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "D42",
-        "values": "D48"
+        "size": "B47",
+        "fuel": "D41",
+        "values": "D47"
       }
     },
     {
@@ -4293,13 +3661,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.07528,
+      "kg_co2e": 0.07572,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "E42",
-        "values": "E48"
+        "size": "B47",
+        "fuel": "E41",
+        "values": "E47"
       }
     },
     {
@@ -4308,13 +3676,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03961,
+      "kg_co2e": 0.03884,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "F42",
-        "values": "F48"
+        "size": "B47",
+        "fuel": "F41",
+        "values": "F47"
       }
     },
     {
@@ -4323,13 +3691,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "CNG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04876,
+      "kg_co2e": 0.04904,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "G42",
-        "values": "G48"
+        "size": "B47",
+        "fuel": "G41",
+        "values": "G47"
       }
     },
     {
@@ -4338,13 +3706,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "LPG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03179,
+      "kg_co2e": 0.03197,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "H42",
-        "values": "H48"
+        "size": "B47",
+        "fuel": "H41",
+        "values": "H47"
       }
     },
     {
@@ -4353,13 +3721,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.05764,
+      "kg_co2e": 0.0578,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "I42",
-        "values": "I48"
+        "size": "B47",
+        "fuel": "I41",
+        "values": "I47"
       }
     },
     {
@@ -4368,13 +3736,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03221,
+      "kg_co2e": 0.02635,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "J42",
-        "values": "J48"
+        "size": "B47",
+        "fuel": "J41",
+        "values": "J47"
       }
     },
     {
@@ -4383,13 +3751,13 @@
       "size_as_published": "Large car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.01088,
+      "kg_co2e": 0.01285,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 48,
+      "row": 47,
       "cells": {
-        "size": "B48",
-        "fuel": "K42",
-        "values": "K48"
+        "size": "B47",
+        "fuel": "K41",
+        "values": "K47"
       }
     },
     {
@@ -4398,13 +3766,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Diesel",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04146,
+      "kg_co2e": 0.04145,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "D42",
-        "values": "D50"
+        "size": "B49",
+        "fuel": "D41",
+        "values": "D49"
       }
     },
     {
@@ -4413,13 +3781,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Petrol",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04599,
+      "kg_co2e": 0.04551,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "E42",
-        "values": "E50"
+        "size": "B49",
+        "fuel": "E41",
+        "values": "E49"
       }
     },
     {
@@ -4428,13 +3796,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Hybrid",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03315,
+      "kg_co2e": 0.03109,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "F42",
-        "values": "F50"
+        "size": "B49",
+        "fuel": "F41",
+        "values": "F49"
       }
     },
     {
@@ -4443,13 +3811,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "CNG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03591,
+      "kg_co2e": 0.03589,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "G42",
-        "values": "G50"
+        "size": "B49",
+        "fuel": "G41",
+        "values": "G49"
       }
     },
     {
@@ -4458,13 +3826,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "LPG",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02341,
+      "kg_co2e": 0.02339,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "H42",
-        "values": "H50"
+        "size": "B49",
+        "fuel": "H41",
+        "values": "H49"
       }
     },
     {
@@ -4473,13 +3841,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Unknown",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.04399,
+      "kg_co2e": 0.04366,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "I42",
-        "values": "I50"
+        "size": "B49",
+        "fuel": "I41",
+        "values": "I49"
       }
     },
     {
@@ -4488,13 +3856,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Plug-in Hybrid Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02934,
+      "kg_co2e": 0.0244,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "J42",
-        "values": "J50"
+        "size": "B49",
+        "fuel": "J41",
+        "values": "J49"
       }
     },
     {
@@ -4503,13 +3871,13 @@
       "size_as_published": "Average car",
       "fuel_as_published": "Battery Electric Vehicle",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.01049,
+      "kg_co2e": 0.01215,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 50,
+      "row": 49,
       "cells": {
-        "size": "B50",
-        "fuel": "K42",
-        "values": "K50"
+        "size": "B49",
+        "fuel": "K41",
+        "values": "K49"
       }
     }
   ],
@@ -4519,10 +3887,10 @@
       "size_as_published": "Small",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.08319,
+      "kg_co2e": 0.08318518657718121,
       "co2": 0.08094,
-      "ch4": 0.00175,
-      "n2o": 0.0005,
+      "ch4": 0.0017472000000000002,
+      "n2o": 0.0004979865771812081,
       "sheet": "Business travel- land",
       "row": 59,
       "cells": {
@@ -4536,10 +3904,10 @@
       "size_as_published": "Medium",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.10108,
+      "kg_co2e": 0.10107835704697987,
       "co2": 0.09826,
-      "ch4": 0.00228,
-      "n2o": 0.00053,
+      "ch4": 0.0022848000000000005,
+      "n2o": 0.0005335570469798657,
       "sheet": "Business travel- land",
       "row": 61,
       "cells": {
@@ -4553,10 +3921,10 @@
       "size_as_published": "Large",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.13252,
+      "kg_co2e": 0.13251915704697986,
       "co2": 0.13072,
-      "ch4": 0.00127,
-      "n2o": 0.00053,
+      "ch4": 0.0012656,
+      "n2o": 0.0005335570469798657,
       "sheet": "Business travel- land",
       "row": 63,
       "cells": {
@@ -4570,10 +3938,10 @@
       "size_as_published": "Average",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.11367,
+      "kg_co2e": 0.1136742644295302,
       "co2": 0.11138,
-      "ch4": 0.00177,
-      "n2o": 0.00052,
+      "ch4": 0.0017696000000000003,
+      "n2o": 0.0005246644295302013,
       "sheet": "Business travel- land",
       "row": 65,
       "cells": {
@@ -4589,13 +3957,13 @@
       "size_as_published": "Small",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02148,
+      "kg_co2e": 0.02147728364163735,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 56,
+      "row": 55,
       "cells": {
-        "type": "B56",
-        "unit": "C56",
-        "values": "D56"
+        "type": "B55",
+        "unit": "C55",
+        "values": "D55"
       }
     },
     {
@@ -4603,13 +3971,13 @@
       "size_as_published": "Medium",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02608,
+      "kg_co2e": 0.026080232441426123,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 58,
+      "row": 57,
       "cells": {
-        "type": "B58",
-        "unit": "C58",
-        "values": "D58"
+        "type": "B57",
+        "unit": "C57",
+        "values": "D57"
       }
     },
     {
@@ -4617,13 +3985,13 @@
       "size_as_published": "Large",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.03469,
+      "kg_co2e": 0.03469189689676864,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 60,
+      "row": 59,
       "cells": {
-        "type": "B60",
-        "unit": "C60",
-        "values": "D60"
+        "type": "B59",
+        "unit": "C59",
+        "values": "D59"
       }
     },
     {
@@ -4631,13 +3999,13 @@
       "size_as_published": "Average",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.02956,
+      "kg_co2e": 0.029560740857659844,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 62,
+      "row": 61,
       "cells": {
-        "type": "B62",
-        "unit": "C62",
-        "values": "D62"
+        "type": "B61",
+        "unit": "C61",
+        "values": "D61"
       }
     }
   ],
@@ -4647,10 +4015,10 @@
       "type_as_published": "Regular taxi",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.14861,
+      "kg_co2e": 0.148614925938255,
       "co2": 0.14742,
       "ch4": 3.3152000000000005e-06,
-      "n2o": 0.00119,
+      "n2o": 0.0011916107382550336,
       "sheet": "Business travel- land",
       "row": 71,
       "cells": {
@@ -4664,10 +4032,10 @@
       "type_as_published": "Regular taxi",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.20806,
+      "kg_co2e": 0.20805644888053693,
       "co2": 0.20638,
       "ch4": 4.6368e-06,
-      "n2o": 0.00167,
+      "n2o": 0.0016718120805369126,
       "sheet": "Business travel- land",
       "row": 72,
       "cells": {
@@ -4681,10 +4049,10 @@
       "type_as_published": "Black cab",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.20402,
+      "kg_co2e": 0.20402466838120806,
       "co2": 0.20291,
       "ch4": 3.0912e-06,
-      "n2o": 0.00111,
+      "n2o": 0.0011115771812080536,
       "sheet": "Business travel- land",
       "row": 73,
       "cells": {
@@ -4698,10 +4066,10 @@
       "type_as_published": "Black cab",
       "basis": "vehicle_km",
       "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.30604,
+      "kg_co2e": 0.30603644888053694,
       "co2": 0.30436,
       "ch4": 4.6368e-06,
-      "n2o": 0.00167,
+      "n2o": 0.0016718120805369126,
       "sheet": "Business travel- land",
       "row": 74,
       "cells": {
@@ -4717,7 +4085,21 @@
       "type_as_published": "Regular taxi",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.03697,
+      "kg_co2e": 0.03697087123270276,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 67,
+      "cells": {
+        "type": "B67",
+        "unit": "C67",
+        "values": "D67"
+      }
+    },
+    {
+      "type": "regular",
+      "type_as_published": "Regular taxi",
+      "basis": "vehicle_km",
+      "unit": "kg CO2e per km (vehicle)",
+      "kg_co2e": 0.05176125556671078,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 68,
       "cells": {
@@ -4727,11 +4109,11 @@
       }
     },
     {
-      "type": "regular",
-      "type_as_published": "Regular taxi",
-      "basis": "vehicle_km",
-      "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.05176,
+      "type": "black_cab",
+      "type_as_published": "Black cab",
+      "basis": "passenger_km",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.050896023172773634,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 69,
       "cells": {
@@ -4743,29 +4125,15 @@
     {
       "type": "black_cab",
       "type_as_published": "Black cab",
-      "basis": "passenger_km",
-      "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.0509,
+      "basis": "vehicle_km",
+      "unit": "kg CO2e per km (vehicle)",
+      "kg_co2e": 0.07634403475916045,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 70,
       "cells": {
         "type": "B70",
         "unit": "C70",
         "values": "D70"
-      }
-    },
-    {
-      "type": "black_cab",
-      "type_as_published": "Black cab",
-      "basis": "vehicle_km",
-      "unit": "kg CO2e per km (vehicle)",
-      "kg_co2e": 0.07634,
-      "sheet": "WTT- pass vehs & travel- land",
-      "row": 71,
-      "cells": {
-        "type": "B71",
-        "unit": "C71",
-        "values": "D71"
       }
     }
   ],
@@ -4775,10 +4143,10 @@
       "type_as_published": "Local bus (not London)",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.12552,
-      "co2": 0.12462,
-      "ch4": 2e-05,
-      "n2o": 0.00088,
+      "kg_co2e": 0.11836276912751678,
+      "co2": 0.11746,
+      "ch4": 2.2400000000000002e-05,
+      "n2o": 0.0008803691275167785,
       "sheet": "Business travel- land",
       "row": 79,
       "cells": {
@@ -4792,10 +4160,10 @@
       "type_as_published": "Local London bus",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.0636,
-      "co2": 0.06312,
-      "ch4": 1e-05,
-      "n2o": 0.00047,
+      "kg_co2e": 0.07832250872483222,
+      "co2": 0.07784,
+      "ch4": 1.1200000000000001e-05,
+      "n2o": 0.00047130872483221474,
       "sheet": "Business travel- land",
       "row": 80,
       "cells": {
@@ -4809,10 +4177,10 @@
       "type_as_published": "Average local bus",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.10151,
-      "co2": 0.10077,
-      "ch4": 1e-05,
-      "n2o": 0.00073,
+      "kg_co2e": 0.10215039463087248,
+      "co2": 0.10141,
+      "ch4": 1.1200000000000001e-05,
+      "n2o": 0.0007291946308724832,
       "sheet": "Business travel- land",
       "row": 81,
       "cells": {
@@ -4826,10 +4194,10 @@
       "type_as_published": "Coach",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.03948,
-      "co2": 0.03899,
-      "ch4": 1e-05,
-      "n2o": 0.00048,
+      "kg_co2e": 0.027181401342281877,
+      "co2": 0.02669,
+      "ch4": 1.1200000000000001e-05,
+      "n2o": 0.0004802013422818792,
       "sheet": "Business travel- land",
       "row": 82,
       "cells": {
@@ -4845,7 +4213,21 @@
       "type_as_published": "Local bus (not London)",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.03174,
+      "kg_co2e": 0.02887,
+      "sheet": "WTT- pass vehs & travel- land",
+      "row": 75,
+      "cells": {
+        "type": "B75",
+        "unit": "C75",
+        "values": "D75"
+      }
+    },
+    {
+      "type": "local_london",
+      "type_as_published": "Local London bus",
+      "basis": "passenger_km",
+      "unit": "kg CO2e per passenger.km",
+      "kg_co2e": 0.01916,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 76,
       "cells": {
@@ -4855,11 +4237,11 @@
       }
     },
     {
-      "type": "local_london",
-      "type_as_published": "Local London bus",
+      "type": "average_local",
+      "type_as_published": "Average local bus",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.01821,
+      "kg_co2e": 0.02493,
       "sheet": "WTT- pass vehs & travel- land",
       "row": 77,
       "cells": {
@@ -4869,31 +4251,17 @@
       }
     },
     {
-      "type": "average_local",
-      "type_as_published": "Average local bus",
-      "basis": "passenger_km",
-      "unit": "kg CO2e per passenger.km",
-      "kg_co2e": 0.02649,
-      "sheet": "WTT- pass vehs & travel- land",
-      "row": 78,
-      "cells": {
-        "type": "B78",
-        "unit": "C78",
-        "values": "D78"
-      }
-    },
-    {
       "type": "coach",
       "type_as_published": "Coach",
       "basis": "passenger_km",
       "unit": "kg CO2e per passenger.km",
       "kg_co2e": 0.00656,
       "sheet": "WTT- pass vehs & travel- land",
-      "row": 79,
+      "row": 78,
       "cells": {
-        "type": "B79",
-        "unit": "C79",
-        "values": "D79"
+        "type": "B78",
+        "unit": "C78",
+        "values": "D78"
       }
     }
   ],
@@ -4902,7 +4270,7 @@
       "component": "office_equipment",
       "activity_as_published": "Office Equipment",
       "unit": "kg CO2e per FTE working hour",
-      "kg_co2e": 0.02159,
+      "kg_co2e": 0.03143942434902952,
       "sheet": "Homeworking",
       "row": 22,
       "cells": {
@@ -4914,7 +4282,7 @@
       "component": "heating",
       "activity_as_published": "Heating",
       "unit": "kg CO2e per FTE working hour",
-      "kg_co2e": 0.30234,
+      "kg_co2e": 0.3023417802176726,
       "sheet": "Homeworking",
       "row": 23,
       "cells": {
@@ -4926,7 +4294,7 @@
       "component": "combined",
       "activity_as_published": "Homeworking (office equipment + heating)",
       "unit": "kg CO2e per FTE working hour",
-      "kg_co2e": 0.32393,
+      "kg_co2e": 0.3337812045667021,
       "sheet": "Homeworking",
       "row": 24,
       "cells": {

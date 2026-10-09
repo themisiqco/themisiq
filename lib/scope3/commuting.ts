@@ -33,13 +33,11 @@
 // UK average, mostly heating, and is not priced outside the UK at all.
 
 import {
-  carFactor, wttCarFactor, carRecord, motorbikeFactor, wttMotorbikeFactor, taxiFactor, wttTaxiFactor,
-  busFactor, wttBusFactor, railFactor, wttRailFactor, homeworkingFactor,
-  WTT_CAR_RECORDS, MOTORBIKE_RECORDS, WTT_MOTORBIKE_RECORDS, TAXI_RECORDS, WTT_TAXI_RECORDS,
-  BUS_RECORDS, WTT_BUS_RECORDS, RAIL_RECORDS, WTT_RAIL_RECORDS, HOMEWORKING_RECORDS,
+  defraTravelFor, DEFRA_TRAVEL_NEWEST, type DefraTravelTables,
   type CarSize, type CarFuel, type MotorbikeSize, type TaxiType, type BusType, type GasSplit,
 } from '../emissionFactors/defraTravel'
-import { withDistance, type DistanceUnit } from './businessTravel'
+import { withDistance, travelTables, type DistanceUnit, type TravelEditionMissing } from './businessTravel'
+import type { DefraEdition, DefraEditionCell } from './defraEditionTypes'
 import { isUkIso2 } from './travelCountries'
 
 export { withDistance }
@@ -147,54 +145,58 @@ interface Factors {
 const cellsOf = (r: { sheet: string; row: number; cells: Record<string, string> } | undefined, key: string) =>
   r ? `${r.sheet}!${r.cells[key]}` : ''
 
-function factorsFor(row: CommuteRow): Factors | { missing: CommuteMissing[] } | { no_factor: true } {
+/** The newest edition's tables, used only to say which fields a row still needs when its edition is missing. */
+const FIELD_CHECK_TABLES = defraTravelFor(DEFRA_TRAVEL_NEWEST)!
+
+function factorsFor(row: CommuteRow, T: DefraTravelTables): Factors | { missing: CommuteMissing[] } | { no_factor: true } {
   switch (row.mode) {
     case 'car': {
       const missing: CommuteMissing[] = []
       if (!row.car_size) missing.push('car size')
       if (!row.car_fuel) missing.push('car fuel')
       if (missing.length) return { missing }
-      const f = carFactor(row.car_size!, row.car_fuel!)
-      const w = wttCarFactor(row.car_size!, row.car_fuel!)
+      const f = T.carFactor(row.car_size!, row.car_fuel!)
+      const w = T.wttCarFactor(row.car_size!, row.car_fuel!)
       if (!f || w === null) return { no_factor: true }
-      const rec = carRecord(row.car_size!, row.car_fuel!)!
-      const wrec = WTT_CAR_RECORDS.find(r => r.size === row.car_size && r.fuel === row.car_fuel)
+      const rec = T.carRecord(row.car_size!, row.car_fuel!)!
+      const wrec = T.WTT_CAR_RECORDS.find(r => r.size === row.car_size && r.fuel === row.car_fuel)
       return { basis: 'vehicle_km', combustion: f, wtt: w, cells: { factor: cellsOf(rec, 'values'), wtt: cellsOf(wrec, 'values') },
         uk_electricity: row.car_fuel === 'battery_electric' || row.car_fuel === 'plug_in_hybrid' }
     }
     case 'motorbike': {
       if (!row.motorbike_size) return { missing: ['motorbike size'] }
-      const f = motorbikeFactor(row.motorbike_size), w = wttMotorbikeFactor(row.motorbike_size)
+      const f = T.motorbikeFactor(row.motorbike_size), w = T.wttMotorbikeFactor(row.motorbike_size)
       if (!f || w === null) return { no_factor: true }
       return { basis: 'vehicle_km', combustion: f, wtt: w, uk_electricity: false,
-        cells: { factor: cellsOf(MOTORBIKE_RECORDS.find(r => r.size === row.motorbike_size), 'values'),
-                 wtt: cellsOf(WTT_MOTORBIKE_RECORDS.find(r => r.size === row.motorbike_size), 'values') } }
+        cells: { factor: cellsOf(T.MOTORBIKE_RECORDS.find(r => r.size === row.motorbike_size), 'values'),
+                 wtt: cellsOf(T.WTT_MOTORBIKE_RECORDS.find(r => r.size === row.motorbike_size), 'values') } }
     }
     case 'taxi': {
       if (!row.taxi_type) return { missing: ['taxi type'] }
-      const f = taxiFactor(row.taxi_type, 'passenger_km'), w = wttTaxiFactor(row.taxi_type, 'passenger_km')
+      const f = T.taxiFactor(row.taxi_type, 'passenger_km'), w = T.wttTaxiFactor(row.taxi_type, 'passenger_km')
       if (!f || w === null) return { no_factor: true }
       return { basis: 'passenger_km', combustion: f, wtt: w, uk_electricity: false,
-        cells: { factor: cellsOf(TAXI_RECORDS.find(r => r.type === row.taxi_type && r.basis === 'passenger_km'), 'values'),
-                 wtt: cellsOf(WTT_TAXI_RECORDS.find(r => r.type === row.taxi_type && r.basis === 'passenger_km'), 'values') } }
+        cells: { factor: cellsOf(T.TAXI_RECORDS.find(r => r.type === row.taxi_type && r.basis === 'passenger_km'), 'values'),
+                 wtt: cellsOf(T.WTT_TAXI_RECORDS.find(r => r.type === row.taxi_type && r.basis === 'passenger_km'), 'values') } }
     }
     case 'bus':
     case 'coach': {
       const type: BusType | '' = row.mode === 'coach' ? 'coach' : (row.bus_type ?? '')
       if (!type) return { missing: ['bus type'] }
-      const f = busFactor(type), w = wttBusFactor(type)
+      const f = T.busFactor(type), w = T.wttBusFactor(type)
       if (!f || w === null) return { no_factor: true }
       return { basis: 'passenger_km', combustion: f, wtt: w, uk_electricity: false,
-        cells: { factor: cellsOf(BUS_RECORDS.find(r => r.type === type), 'values'), wtt: cellsOf(WTT_BUS_RECORDS.find(r => r.type === type), 'values') } }
+        cells: { factor: cellsOf(T.BUS_RECORDS.find(r => r.type === type), 'values'), wtt: cellsOf(T.WTT_BUS_RECORDS.find(r => r.type === type), 'values') } }
     }
     case 'rail': {
       if (!row.rail_type) return { missing: ['rail type'] }
       if (!COMMUTE_RAIL_TYPES.includes(row.rail_type)) return { no_factor: true }
-      const f = railFactor(row.rail_type), w = wttRailFactor(row.rail_type)
+      const f = T.railFactor(row.rail_type), w = T.wttRailFactor(row.rail_type)
       if (!f || w === null) return { no_factor: true }
-      return { basis: 'passenger_km', combustion: f, wtt: w, uk_electricity: true,
-        cells: { factor: cellsOf(RAIL_RECORDS.find(r => r.type === row.rail_type), 'values'),
-                 wtt: cellsOf(WTT_RAIL_RECORDS.find(r => r.type === row.rail_type), 'value') } }
+      // T3e: claimed only where the edition says so (What's new B22, 2026); older editions state it nowhere read.
+      return { basis: 'passenger_km', combustion: f, wtt: w, uk_electricity: !!T.META.guidance.whats_new_uk_electricity_knock_on,
+        cells: { factor: cellsOf(T.RAIL_RECORDS.find(r => r.type === row.rail_type), 'values'),
+                 wtt: cellsOf(T.WTT_RAIL_RECORDS.find(r => r.type === row.rail_type), 'value') } }
     }
     case 'walk_cycle':
       return { basis: 'none', combustion: { kg_co2e: 0, co2: 0, ch4: 0, n2o: 0 }, wtt: 0, cells: null, uk_electricity: false }
@@ -219,6 +221,8 @@ export interface PricedCommute {
   uk_stand_in: boolean
   uk_electricity: boolean
   cells: { factor: string; wtt: string } | null
+  /** T3e: the DEFRA edition the window selected. */
+  edition: DefraEditionCell
 }
 
 export type CommutePricing =
@@ -229,8 +233,13 @@ export type CommutePricing =
   | { status: 'distance_mismatch' }
   /** A saved choice the artefact does not hold. The controls cannot produce this. */
   | { status: 'no_factor' }
+  | TravelEditionMissing
 
-export function priceCommute(row: CommuteRow): CommutePricing {
+/** Price one row on the DEFRA travel edition the window selected (T3e). A missing edition is checked after the
+ *  row's own fields, so a half-entered row still asks for what is missing first. */
+export function priceCommute(row: CommuteRow, ed: DefraEdition): CommutePricing {
+  const t = travelTables(ed)
+  const T = 'status' in t ? null : t.tables
   const missing: CommuteMissing[] = []
   if (!row.mode) missing.push('mode')
   if (!row.country_iso2) missing.push('country')
@@ -241,10 +250,13 @@ export function priceCommute(row: CommuteRow): CommutePricing {
   if (!positive(row.weeks_per_year)) missing.push('weeks per year')
   const perVehicle = row.mode === 'car' || row.mode === 'motorbike'
   if (perVehicle && !positive(row.occupancy)) missing.push('occupancy')
-  const f = row.mode ? factorsFor(row) : null
+  // The fields a factor needs are the same in every edition, so a missing edition still lists them; the newest
+  // edition's tables stand in for that check only, and price nothing (the edition check below returns first).
+  const f = row.mode ? factorsFor(row, T ?? FIELD_CHECK_TABLES) : null
   if (f && 'missing' in f) missing.push(...f.missing.filter(m => !missing.includes(m)))
   if (missing.length > 0 || km === 'missing') return { status: 'incomplete', missing }
   if (km === 'mismatch') return { status: 'distance_mismatch' }
+  if ('status' in t) return t
   if (row.days_per_week! > LIMITS.days_per_week) return { status: 'invalid', field: 'days per week', limit: `at most ${LIMITS.days_per_week}` }
   if (row.weeks_per_year! > LIMITS.weeks_per_year) return { status: 'invalid', field: 'weeks per year', limit: `at most ${LIMITS.weeks_per_year}` }
   if (row.mode === 'car' && (row.occupancy! < LIMITS.car_occupancy_min || row.occupancy! > LIMITS.car_occupancy_max)) {
@@ -274,6 +286,7 @@ export function priceCommute(row: CommuteRow): CommutePricing {
     uk_stand_in: fx.basis !== 'none' && !isUkIso2(row.country_iso2),
     uk_electricity: fx.uk_electricity,
     cells: fx.cells,
+    edition: t.edition,
   }
 }
 
@@ -288,6 +301,8 @@ export interface PricedHomeworking {
   factor: number
   kg: number
   cell: string
+  /** T3e: the DEFRA edition the window selected. */
+  edition: DefraEditionCell
 }
 
 export type HomeworkingPricing =
@@ -296,10 +311,10 @@ export type HomeworkingPricing =
   | { status: 'invalid'; field: 'homeworking days per week' | 'weeks per year' | 'hours per day'; limit: string }
   /** Outside the UK: DEFRA's factor is a UK average, mostly heating, with no cooling. Not priced. */
   | { status: 'not_uk'; country_iso2: string }
+  | TravelEditionMissing
 
-const HOMEWORKING_COMBINED = HOMEWORKING_RECORDS.find(r => r.component === 'combined')!
-
-export function priceHomeworking(row: HomeworkingRow): HomeworkingPricing {
+/** Price one row on the DEFRA travel edition the window selected (T3e). */
+export function priceHomeworking(row: HomeworkingRow, ed: DefraEdition): HomeworkingPricing {
   // ⚠️ THE COUNTRY FIRST. A row outside the UK can never be priced, whatever else is entered, so it says so
   // the moment the country is chosen, rather than asking for employees, days and hours it will not use.
   if (row.country_iso2 && !isUkIso2(row.country_iso2)) return { status: 'not_uk', country_iso2: row.country_iso2 }
@@ -313,9 +328,12 @@ export function priceHomeworking(row: HomeworkingRow): HomeworkingPricing {
   if (row.days_per_week! > LIMITS.days_per_week) return { status: 'invalid', field: 'homeworking days per week', limit: `at most ${LIMITS.days_per_week}` }
   if (row.weeks_per_year! > LIMITS.weeks_per_year) return { status: 'invalid', field: 'weeks per year', limit: `at most ${LIMITS.weeks_per_year}` }
   if (row.hours_per_day! > LIMITS.hours_per_day) return { status: 'invalid', field: 'hours per day', limit: `at most ${LIMITS.hours_per_day}` }
-  const factor = homeworkingFactor('combined')!
+  const t = travelTables(ed)
+  if ('status' in t) return t
+  const rec = t.tables.homeworkingRecord('combined')!
+  const factor = rec.kg_co2e
   const hours = row.employees! * row.days_per_week! * row.weeks_per_year! * row.hours_per_day!
-  return { status: 'priced', hours, factor, kg: hours * factor, cell: `${HOMEWORKING_COMBINED.sheet}!${HOMEWORKING_COMBINED.cells.value}` }
+  return { status: 'priced', hours, factor, kg: hours * factor, cell: `${rec.sheet}!${rec.cells.value}`, edition: t.edition }
 }
 
 // ── THE WHOLE RECORD ─────────────────────────────────────────────────────────────────────────────
@@ -332,11 +350,14 @@ export interface CommutingEvaluation {
   mt: number
   /** At least one commuting or homeworking row priced. An entered figure never makes it so. */
   calculated: boolean
+  /** T3e: the DEFRA travel edition the window selected, or why it is missing. Every row was priced on it. */
+  edition: DefraEdition
 }
 
-export function evaluateCommuting(d: CommutingData | undefined): CommutingEvaluation {
-  const commutes = (d?.commute_rows ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceCommute(row) }))
-  const homeworking = (d?.homeworking_rows ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceHomeworking(row) }))
+/** Price the record on the DEFRA travel edition the window selected (T3e). */
+export function evaluateCommuting(d: CommutingData | undefined, ed: DefraEdition): CommutingEvaluation {
+  const commutes = (d?.commute_rows ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceCommute(row, ed) }))
+  const homeworking = (d?.homeworking_rows ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceHomeworking(row, ed) }))
   const pricedCommutes = commutes.filter((e): e is EvaluatedCommute & { pricing: PricedCommute } => e.pricing.status === 'priced')
   const pricedHomeworking = homeworking.filter((e): e is EvaluatedHomeworking & { pricing: PricedHomeworking } => e.pricing.status === 'priced')
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
@@ -349,6 +370,7 @@ export function evaluateCommuting(d: CommutingData | undefined): CommutingEvalua
     kg: { combustion, wtt, homeworking: home, total },
     mt: total / 1000,
     calculated: pricedCommutes.length + pricedHomeworking.length > 0,
+    edition: ed,
   }
 }
 

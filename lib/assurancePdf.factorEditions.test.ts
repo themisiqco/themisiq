@@ -25,7 +25,7 @@ import { EF_SOURCES, emptyLocation, type Location } from './ghg/engine'
 import { figuresForSave } from './ghg/savePayload'
 import { FACTOR_YEAR_NO_SUBSTITUTION, FACTOR_YEAR_RULE_CLASS_B } from './ghg/factorEditionRegistry'
 import { FACTOR_EDITION_DISCLOSURE } from './ghg/factorEditions'
-import { buildComparabilityDisclosure, buildComparabilityRecord } from './ghg/comparability'
+import { buildComparabilityDisclosure, buildComparabilityRecord, FACTOR_EDITION_SCOPE_NOTE } from './ghg/comparability'
 import { compareFactorEditions } from './ghg/factorEditionComparison'
 import { selectionContextFor } from './ghg/factorSelection'
 
@@ -91,7 +91,7 @@ describe('assurance PDF: factor editions (T3c diff 3)', () => {
     const t = tablesOf({ ...cur, comparability_disclosure: rec }).find(x => x.head?.[0]?.[0]?.startsWith('Year-on-year comparability'))!
     const rows = t.body!.map(r => r[0])
     expect(rows.some(r => r.startsWith('Emission factors changed between reporting year 2025 and reporting year 2026: UK DESNZ grid electricity factors, DEFRA 2025 to DEFRA 2026.'))).toBe(true)
-    expect(rows.at(-1)).toBe(FACTOR_EDITION_DISCLOSURE.changed!.detail)
+    expect(rows.slice(-2)).toEqual([FACTOR_EDITION_DISCLOSURE.changed!.detail, FACTOR_EDITION_SCOPE_NOTE])
     expect(rows.join(' ')).not.toContain('₂')
     expect(text.mock.calls.map(c => String(c[0]))).toContain('Comparability with 2025')
     expect(tablesOf(cur).some(x => x.head?.[0]?.[0]?.startsWith('Year-on-year comparability'))).toBe(false)
@@ -114,6 +114,7 @@ describe('assurance PDF: factor editions (T3c diff 3)', () => {
       'Emission factors changed between reporting year 2025 and reporting year 2026: UK DESNZ grid electricity factors, DEFRA 2025 to DEFRA 2026. ' +
         `Pricing this year's activity at last year's factors would give ${rows[0].match(/give ([\d.]+) tCO2e/)![1]} tCO2e more in Scope 2 (location-based) and ${rows[0].match(/and ([\d.]+) tCO2e/)![1]} tCO2e more in Scope 2 (market-based).`,
       FACTOR_EDITION_DISCLOSURE.changed!.detail,
+      FACTOR_EDITION_SCOPE_NOTE,
     ])
     expect(rows.join(' ')).not.toMatch(/The company states|has not been answered/)
     expect(tables.some(x => x.head?.[0]?.[0]?.startsWith('Year-on-year comparability'))).toBe(false)

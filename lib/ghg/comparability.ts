@@ -780,6 +780,14 @@ export const COMPARABILITY_ANSWER_WORDS: Record<ComparabilityAnswer, string> = {
   something_changed: 'The company states something changed that would affect comparability.',
 }
 
+/**
+ * F-06's scope, stated wherever the edition comparison is (T3e follow-up, Lisa, 8 Oct 2026). The comparison reruns the
+ * Scope 1 and 2 calculation; the Scope 3 module selects its own editions, which nothing compares between years yet.
+ */
+export const FACTOR_EDITION_SCOPE_NOTE =
+  'This comparison covers Scope 1 and Scope 2 emission factor editions. Scope 3 factor editions (business travel, ' +
+  'waste and Category 3 energy) are not yet compared between years.'
+
 /** The heading every surface uses for the block: "Comparability with {prior year}". */
 export const comparabilityHeading = (priorHeading: string): string => `Comparability with ${priorHeading}`
 
@@ -795,7 +803,9 @@ export function factorEditionSurfaceLines(record: ComparabilityRecord | null | u
   if (!fe) return []
   const shown = new Set([...(record?.observations ?? []), ...(record?.observationsAtSave ?? [])])
   const lines = fe.unrecordedBecause ? [fe.unrecordedBecause] : fe.changes.map(c => factorEditionChangeText(c, fe))
-  return [...lines.filter(l => !shown.has(l)), ...(fe.disclosure ? [fe.disclosure] : [])]
+  const out = [...lines.filter(l => !shown.has(l)), ...(fe.disclosure ? [fe.disclosure] : [])]
+  // The scope note goes with the edition lines, on every surface that prints them, and only where there are some.
+  return out.length > 0 || lines.length > 0 ? [...out, FACTOR_EDITION_SCOPE_NOTE] : []
 }
 
 /** The whole block as lines: the answer, what was shown, how it moved since, the basis, then the factor editions. */

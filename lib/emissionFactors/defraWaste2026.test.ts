@@ -10,7 +10,10 @@ import { defraCitation, DEFRA_DESNZ_PUBLICATION } from '../ghg/engine'
 // TO CHANGE THE DATA: run the generator, not an editor.
 //   python3 scripts/generate-defra-waste.py
 
-const ROWS_SHA256 = '5b3b7ee79e404acc6652ba0ebea5841160d6b2358aaa3095732d676a6e422473'
+// T3e (8 Oct 2026): each record now carries its own cell, so the rows digest moved. VALUES_SHA256 is the digest the
+// rows were pinned under before (cell removed): it shows the regeneration moved no 2026 value.
+const ROWS_SHA256 = '1a079a7aef1658474fc03ee7e861d59504c8c6963db069d7cc4c2ce0b5b36b87'
+const VALUES_SHA256 = '5b3b7ee79e404acc6652ba0ebea5841160d6b2358aaa3095732d676a6e422473'
 
 type Row = Record<string, unknown>
 const factors = data.factors as Row[]
@@ -33,6 +36,10 @@ describe('defraWaste2026.json', () => {
     const digest = createHash('sha256').update(canonical, 'utf8').digest('hex')
     expect(digest, 'defraWaste2026.json does not match its fingerprint. Regenerate it; do not edit it.').toBe(ROWS_SHA256)
     expect(meta.fingerprint_sha256).toBe(ROWS_SHA256)
+    const values = factors.map(f => Object.fromEntries(Object.entries(f).filter(([k]) => k !== 'cell' && k !== 'route_as_published')))
+    const valuesDigest = createHash('sha256').update(JSON.stringify(sortDeep({ factors: values })), 'utf8').digest('hex')
+    expect(valuesDigest, 'a 2026 value moved').toBe(VALUES_SHA256)
+    expect(meta.values_fingerprint_sha256).toBe(VALUES_SHA256)
   })
 
   it('W2 it cites the publication exactly as lib/ghg/engine.ts does, with the same edition label', () => {
@@ -68,7 +75,7 @@ describe('defraWaste2026.json', () => {
 
   it('W4 the landfill factor for commercial and industrial waste is 520.58023 kg CO2e per tonne', () => {
     const cai = factors.filter(f => f.waste_type === 'Commercial and industrial waste' && f.route === 'Landfill')
-    expect(cai).toEqual([{ activity: 'Refuse', waste_type: 'Commercial and industrial waste', route: 'Landfill', unit: 'kg CO2e per tonne', value: 520.58023 }])
+    expect(cai).toEqual([{ activity: 'Refuse', waste_type: 'Commercial and industrial waste', route: 'Landfill', unit: 'kg CO2e per tonne', value: 520.58023, cell: 'I52' }])
     // The calculator's former EMISSION_FACTORS.waste_landfill was 0.467 "kg CO2e per tonne", about 1,115
     // times smaller than this figure. Pinned here as the published figure, not as a fix.
   })

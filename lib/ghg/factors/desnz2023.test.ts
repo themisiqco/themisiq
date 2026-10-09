@@ -27,7 +27,7 @@ describe('T3d DESNZ 2023', () => {
     expect(DEFRA_ENERGY_BY_EDITION[2023].metadata.file_version).toBe('1.1')
     for (const e of FACTOR_EDITION_REGISTRY.filter(x => x.label === 'DEFRA 2023' && x.held)) expect(e.heldCorrection, e.dataset).toBe('2023-06-28')
     expect(FACTOR_EDITION_REGISTRY.filter(x => x.label === 'DEFRA 2023' && x.held).map(x => x.dataset).sort())
-      .toEqual(['desnz_combustion', 'desnz_grid', 'desnz_mobile', 'desnz_scope3_energy', 'desnz_steam'])
+      .toEqual(['desnz_combustion', 'desnz_grid', 'desnz_mobile', 'desnz_scope3_energy', 'desnz_steam', 'desnz_travel', 'desnz_waste'])
   })
 
   it('spot values, one or more per table, as stored in the 2023 workbook', () => {

@@ -57,7 +57,7 @@ export interface DatasetMeta {
   /** The label of an edition year not in the registry: "DESNZ 2021". */
   short: string
   /** R18: registered now, selection wired in a later task; until then today's behaviour stands. */
-  selectionWiredIn?: 'T3c' | 'T3e'
+  selectionWiredIn?: 'T3c'
   note?: string
 }
 
@@ -67,8 +67,11 @@ export const DATASETS: Readonly<Record<DatasetId, DatasetMeta>> = {
   desnz_steam: { publisher: 'DESNZ', family: 'heat and steam', class: 'a', rule: 'desnz', short: 'DEFRA' },
   desnz_mobile: { publisher: 'DESNZ', family: 'vehicle fuel', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R17: the Fuels rows DESNZ states apply to vehicles (FI9).' },
   desnz_scope3_energy: { publisher: 'DESNZ', family: 'well-to-tank and transmission and distribution', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R17, R18: Category 3 energy, selected with the DESNZ rule beside the GHG factor.' },
-  desnz_travel: { publisher: 'DESNZ', family: 'business travel', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions. T3e MUST LOAD DEFRA 2023, 2024 AND 2025 for this dataset before wiring selection (T3d 2026, Lisa, 8 Oct 2026): a year ending March 2026 needs DEFRA 2025, and reporting years 2024 and 2025 need 2023 and 2024 (their March and June year ends). Only 2026 is held.' },
-  desnz_waste: { publisher: 'DESNZ', family: 'waste disposal', class: 'a', rule: 'desnz', short: 'DEFRA', selectionWiredIn: 'T3e', note: 'R18: registered now; selection wired in T3e, after T3d loads the older editions. T3e MUST LOAD DEFRA 2023, 2024 AND 2025 for this dataset before wiring selection (T3d 2026, Lisa, 8 Oct 2026): a year ending March 2026 needs DEFRA 2025, and reporting years 2024 and 2025 need 2023 and 2024 (their March and June year ends). Only 2026 is held.' },
+  // T3e (R18, 8 Oct 2026): selected by the DESNZ rule like every other DESNZ dataset, and priced in Scope 3 (Categories 6
+  // and 7 for travel, 5 and 12 for waste) through lib/scope3/defraEditions.ts. 2023 to 2026 held, each generated from its
+  // own workbook (scripts/generate-defra-travel.py and generate-defra-waste.py --year).
+  desnz_travel: { publisher: 'DESNZ', family: 'business travel', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R18, T3e: Business travel- air, WTT- business travel- air, Haul definition, Business travel- land, WTT- pass vehs & travel- land and Homeworking (Hotel stay read for 2026 only; nothing prices hotels). 2023 and 2024 print no Index update notes; 2025 states its electric car factors include T&D losses (Business travel- land A14).' },
+  desnz_waste: { publisher: 'DESNZ', family: 'waste disposal', class: 'a', rule: 'desnz', short: 'DEFRA', note: 'R18, T3e: Waste disposal. DEFRA 2025 heads the Combustion column "Incineration with energy recovery" and defines it in the same words (A12); read as Combustion and disclosed on each row (Lisa, 8 Oct 2026). Five Refuse routes are published in 2026 only.' },
   epa_hub_combustion: { publisher: 'US EPA', family: 'combustion', class: 'a', rule: 'majority', short: 'US EPA', note: 'H1 (8.5): Hub edition N is read as intended for activity year N; EPA does not state it.' },
   epa_hub_steam: { publisher: 'US EPA', family: 'steam and heat', class: 'a', rule: 'majority', short: 'US EPA' },
   epa_hub_mobile: { publisher: 'US EPA', family: 'vehicle fuel', class: 'a', rule: 'majority', short: 'US EPA', note: 'R17: Tables 2 to 5.' },
@@ -269,8 +272,8 @@ export const FACTOR_EDITION_REGISTRY: readonly FactorEditionEntry[] = [
   ...desnz('desnz_steam', [2023, 2024, 2025, 2026]),
   ...desnz('desnz_mobile', [2023, 2024, 2025, 2026]),
   ...desnz('desnz_scope3_energy', [2023, 2024, 2025, 2026]),
-  ...desnz('desnz_travel', [2026]),
-  ...desnz('desnz_waste', [2026]),
+  ...desnz('desnz_travel', [2023, 2024, 2025, 2026]),
+  ...desnz('desnz_waste', [2023, 2024, 2025, 2026]),
   // US EPA Hub (class (a), majority). Held 2023 and 2024 (T3d: lib/ghg/factors/epa-{2023,2024}.ts, mobile/epa{2023,2024}.ts)
   // and 2025.
   ...epa('epa_hub_combustion', [2023, 2024, 2025], 'Held values were read from the 2025 workbook. The engine labelled them "US EPA 2024" until T3c, which reads this registry and labels them US EPA 2025.'),

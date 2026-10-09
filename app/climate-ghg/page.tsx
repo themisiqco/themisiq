@@ -312,7 +312,7 @@ const FAQ: readonly Faq[] = [
   { q: 'What if you do not hold factors for one of our countries?',
     a: 'Six jurisdictions have their own published factor editions: the US, Canada, the UK, the EU, Australia and New Zealand. A location in a country we do not hold factors for is not priced: it is left out of every total, and it is named wherever the figures appear, so nothing is quietly missing. We never price it with another country\'s factors. Anything that cannot be converted confidently is flagged for review instead of being estimated, and refrigerants are a declared gap rather than a silent one.' },
   { q: 'Can we compare this year against last year?',
-    a: 'Yes, and the comparison carries its own disclosure of what changed between the years. When last year\'s inventory is held on the platform, it names each emission factor edition that changed and what that change alone does to this year\'s figures, or says why that could not be calculated. A year-on-year movement can come from your emissions or from a factor revision, and a verifier needs to know which.' },
+    a: 'Yes, and the comparison carries its own disclosure of what changed between the years. When last year\'s inventory is held on the platform, it names each Scope 1 and Scope 2 emission factor edition that changed and what that change alone does to this year\'s figures, or says why that could not be calculated; Scope 3 factor editions are not yet compared. A year-on-year movement can come from your emissions or from a factor revision, and a verifier needs to know which.' },
   { q: 'When is the first California SB 253 report due?',
     a: `${sbDateAnswer()} The status word is not decoration: this date has already moved once.`,
     extra: SB253_STATUS_SENTENCE },

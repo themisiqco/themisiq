@@ -25,9 +25,10 @@
 // says so. Neither contributes 0 to the figure, and neither makes the category "calculated".
 
 import {
-  airFactor, airRecord, wttAirFactor, wttAirRecord, railFactor, wttRailFactor, RAIL_RECORDS, WTT_RAIL_RECORDS,
-  type AirCategory, type CabinClass, type GasSplit, type HaulRecord, HAUL_RECORDS,
+  airRecord, HAUL_RECORDS, defraTravelFor,
+  type AirCategory, type CabinClass, type GasSplit, type HaulRecord, type DefraTravelTables,
 } from '../emissionFactors/defraTravel'
+import type { DefraEdition, DefraEditionCell } from './defraEditionTypes'
 import { haulIso3ForIso2, isUkIso2 } from './travelCountries'
 
 // ── DISTANCE ─────────────────────────────────────────────────────────────────────────────────────
@@ -127,14 +128,16 @@ export type FlightCategory =
 
 const HAUL_BY_ISO3 = new Map(HAUL_RECORDS.map(r => [r.iso3, r]))
 
-export function flightCategory(originIso2: string, destinationIso2: string, km: number): FlightCategory {
+/** The category rule. `hauls` is the Haul definition of the edition the flight is priced on (T3e), so the haul cell a
+ *  row cites is that edition's; the newest edition's by default, for a caller with no edition (the panel's preview). */
+export function flightCategory(originIso2: string, destinationIso2: string, km: number, hauls: ReadonlyMap<string, HaulRecord> = HAUL_BY_ISO3): FlightCategory {
   const ukO = isUkIso2(originIso2)
   const ukD = isUkIso2(destinationIso2)
   if (ukO && ukD) return { ok: true, category: 'domestic', rule: 'both_uk' }
   if (ukO || ukD) {
     const other = ukO ? destinationIso2 : originIso2
     const iso3 = haulIso3ForIso2(other)
-    const haul = iso3 ? HAUL_BY_ISO3.get(iso3) : undefined
+    const haul = iso3 ? hauls.get(iso3) : undefined
     if (!haul) return { ok: false, unlisted_iso2: other }
     return { ok: true, category: haul.haul, rule: 'uk_end', haul }
   }
@@ -148,9 +151,9 @@ export type ClassNote = 'as_entered' | 'unknown' | 'not_published'
 
 /** The class the factor is read for: the one entered where the sheet publishes it for the category,
  *  otherwise average passenger, with why. */
-export function resolveClass(category: AirCategory, choice: CabinChoice): { used: CabinClass; note: ClassNote } {
+export function resolveClass(category: AirCategory, choice: CabinChoice, records: Pick<DefraTravelTables, 'airRecord'> = { airRecord }): { used: CabinClass; note: ClassNote } {
   if (choice === 'unknown') return { used: 'average_passenger', note: 'unknown' }
-  if (airRecord(category, choice)) return { used: choice, note: 'as_entered' }
+  if (records.airRecord(category, choice)) return { used: choice, note: 'as_entered' }
   return { used: 'average_passenger', note: 'not_published' }
 }
 
@@ -174,6 +177,20 @@ export interface PricedFlight {
   /** kg for this leg. Both combustion figures always; `combustion` is the one the RF setting chose. */
   kg: { with_rf: GasSplit; without_rf: GasSplit; combustion: number; wtt: number; total: number }
   cells: { air_with_rf: string; air_without_rf: string; wtt: string; haul?: string }
+  /** T3e: the DEFRA edition the window selected, with its rule, basis and dates. */
+  edition: DefraEditionCell
+}
+
+/** T3e: every field is entered, but the DEFRA travel edition the reporting window needs is not held. Not priced, and
+ *  never priced on another edition; `message` is the engine's sentence. */
+export interface TravelEditionMissing { status: 'edition_missing'; edition: string; message: string }
+
+/** The tables of the held edition, or the unpriced line for a missing one. */
+export function travelTables(ed: DefraEdition): { tables: DefraTravelTables; edition: DefraEditionCell } | TravelEditionMissing {
+  if ('missing' in ed) return { status: 'edition_missing', edition: ed.missing.edition, message: ed.missing.message }
+  const tables = defraTravelFor(ed.held.year)
+  if (!tables) throw new Error(`businessTravel: DEFRA ${ed.held.year} is selected but its travel artefact is not loaded`)
+  return { tables, edition: ed.held }
 }
 
 export type FlightPricing =
@@ -182,8 +199,9 @@ export type FlightPricing =
   | { status: 'no_haul'; unlisted_iso2: string }
   /** The stored km figure is missing, or is not what the entered distance and unit give. */
   | { status: 'distance_mismatch' }
+  | TravelEditionMissing
 
-export function priceFlight(row: FlightRow, includeRf: boolean): FlightPricing {
+export function priceFlight(row: FlightRow, includeRf: boolean, ed: DefraEdition): FlightPricing {
   const missing: FlightMissing[] = []
   if (!row.origin_iso2) missing.push('origin')
   if (!row.destination_iso2) missing.push('destination')
@@ -193,18 +211,21 @@ export function priceFlight(row: FlightRow, includeRf: boolean): FlightPricing {
   if (km === 'missing') missing.push('distance')
   if (km === 'missing' || missing.length > 0) return { status: 'incomplete', missing }
   if (km === 'mismatch') return { status: 'distance_mismatch' }
+  const t = travelTables(ed)
+  if ('status' in t) return t
+  const T = t.tables
 
-  const cat = flightCategory(row.origin_iso2, row.destination_iso2, km)
+  const cat = flightCategory(row.origin_iso2, row.destination_iso2, km, new Map(T.HAUL_RECORDS.map(r => [r.iso3, r])))
   if (!cat.ok) return { status: 'no_haul', unlisted_iso2: cat.unlisted_iso2 }
-  const cls = resolveClass(cat.category, row.cabin_class as CabinChoice)
+  const cls = resolveClass(cat.category, row.cabin_class as CabinChoice, T)
   // resolveClass only returns a class the sheet publishes for the category, and every category publishes
   // average passenger, so these lookups cannot miss; the non-null assertions say so rather than a 0.
-  const rec = airRecord(cat.category, cls.used)!
-  const wtt = wttAirRecord(cat.category, cls.used)!
+  const rec = T.airRecord(cat.category, cls.used)!
+  const wtt = T.wttAirRecord(cat.category, cls.used)!
   const pkm = km * row.count!
-  const withRf = scale(airFactor(cat.category, cls.used, true)!, pkm)
-  const withoutRf = scale(airFactor(cat.category, cls.used, false)!, pkm)
-  const wttKg = wttAirFactor(cat.category, cls.used)! * pkm
+  const withRf = scale(T.airFactor(cat.category, cls.used, true)!, pkm)
+  const withoutRf = scale(T.airFactor(cat.category, cls.used, false)!, pkm)
+  const wttKg = T.wttAirFactor(cat.category, cls.used)! * pkm
   const combustion = includeRf ? withRf.kg_co2e : withoutRf.kg_co2e
   return {
     status: 'priced',
@@ -223,6 +244,7 @@ export function priceFlight(row: FlightRow, includeRf: boolean): FlightPricing {
       wtt: `${wtt.sheet}!${wtt.cells.without_rf}`,
       ...(cat.haul ? { haul: `${cat.haul.sheet}!${cat.haul.cells}` } : {}),
     },
+    edition: t.edition,
   }
 }
 
@@ -230,8 +252,6 @@ export function priceFlight(row: FlightRow, includeRf: boolean): FlightPricing {
 
 export type RailMissing = 'country' | 'rail type' | 'distance' | 'passengers'
 
-const RAIL_BY_TYPE = new Map(RAIL_RECORDS.map(r => [r.type as string, r]))
-const WTT_RAIL_BY_TYPE = new Map(WTT_RAIL_RECORDS.map(r => [r.type as string, r]))
 
 export interface PricedRail {
   status: 'priced'
@@ -242,6 +262,8 @@ export interface PricedRail {
   factor: { combustion: GasSplit; wtt: number }
   kg: { combustion: number; wtt: number; total: number }
   cells: { rail: string; wtt: string }
+  /** T3e: the DEFRA edition the window selected. */
+  edition: DefraEditionCell
 }
 
 export type RailPricing =
@@ -250,8 +272,9 @@ export type RailPricing =
   /** A saved type the artefact does not hold. The control cannot produce this. */
   | { status: 'no_factor' }
   | { status: 'distance_mismatch' }
+  | TravelEditionMissing
 
-export function priceRail(row: RailJourney): RailPricing {
+export function priceRail(row: RailJourney, ed: DefraEdition): RailPricing {
   const missing: RailMissing[] = []
   if (!row.country_iso2) missing.push('country')
   if (!row.rail_type) missing.push('rail type')
@@ -260,10 +283,13 @@ export function priceRail(row: RailJourney): RailPricing {
   if (!positive(row.passengers)) missing.push('passengers')
   if (storedDistance === 'missing' || missing.length > 0) return { status: 'incomplete', missing }
   if (storedDistance === 'mismatch') return { status: 'distance_mismatch' }
-  const f = railFactor(row.rail_type)
-  const w = wttRailFactor(row.rail_type)
-  const rec = RAIL_BY_TYPE.get(row.rail_type)
-  const wrec = WTT_RAIL_BY_TYPE.get(row.rail_type)
+  const t = travelTables(ed)
+  if ('status' in t) return t
+  const T = t.tables
+  const f = T.railFactor(row.rail_type)
+  const w = T.wttRailFactor(row.rail_type)
+  const rec = T.railRecord(row.rail_type)
+  const wrec = T.wttRailRecord(row.rail_type)
   if (!f || w === null || !rec || !wrec) return { status: 'no_factor' }
   const km = storedDistance
   const pkm = km * row.passengers!
@@ -277,6 +303,7 @@ export function priceRail(row: RailJourney): RailPricing {
     factor: { combustion: f, wtt: w },
     kg: { combustion, wtt, total: combustion + wtt },
     cells: { rail: `${rec.sheet}!${rec.cells.values}`, wtt: `${wrec.sheet}!${wrec.cells.value}` },
+    edition: t.edition,
   }
 }
 
@@ -296,12 +323,15 @@ export interface BusinessTravelEvaluation {
   mt: number
   /** At least one flight or rail row priced. An entered figure never makes it so. */
   calculated: boolean
+  /** T3e: the DEFRA travel edition the window selected, or why it is missing. Every row was priced on it. */
+  edition: DefraEdition
 }
 
-export function evaluateBusinessTravel(d: BusinessTravelData | undefined): BusinessTravelEvaluation {
+/** Price the record on the DEFRA travel edition the window selected (T3e). */
+export function evaluateBusinessTravel(d: BusinessTravelData | undefined, ed: DefraEdition): BusinessTravelEvaluation {
   const includeRf = includesRf(d)
-  const flights = (d?.flights ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceFlight(row, includeRf) }))
-  const rail = (d?.rail_journeys ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceRail(row) }))
+  const flights = (d?.flights ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceFlight(row, includeRf, ed) }))
+  const rail = (d?.rail_journeys ?? []).map((row, i) => ({ n: i + 1, row, pricing: priceRail(row, ed) }))
   const pricedFlights = flights.filter((e): e is EvaluatedFlight & { pricing: PricedFlight } => e.pricing.status === 'priced')
   const pricedRail = rail.filter((e): e is EvaluatedRail & { pricing: PricedRail } => e.pricing.status === 'priced')
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
@@ -320,5 +350,6 @@ export function evaluateBusinessTravel(d: BusinessTravelData | undefined): Busin
     kg: { air_with_rf: airWith, air_without_rf: airWithout, combustion, wtt, total },
     mt: total / 1000,
     calculated: pricedFlights.length + pricedRail.length > 0,
+    edition: ed,
   }
 }

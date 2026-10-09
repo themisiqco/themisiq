@@ -17,6 +17,8 @@ import {
 import { publisherGwpSentence } from './gwpSentence'
 import { SCOPE3_FIXTURE_GHG } from './scope3SurfacesFixture'
 import { CAT3_EDS } from '../testing/heldSelection'
+import { cat3EditionsFor } from './cat3Editions'
+import { selectionFor, defraCitation } from '../ghg/engine'
 
 // ── CATEGORY 3'S CUSTOMER TEXT ───────────────────────────────────────────────────────────────────
 //
@@ -576,5 +578,18 @@ describe('Category 3 copy', () => {
     expect(text).toBe('UK site, propane: not priced, the workbook publishes no upstream factor for propane measured in barrels.')
     expect(cat3Sentences(priced, read, GWP)).toContain(text)
     expect(priced.kg_co2e).toBeCloseTo(19_572.329976, 6)
+  })
+})
+
+// T3e follow-up (Lisa, 8 Oct 2026): a bound Category 3 record names the editions its window selected; the method line
+// it carries names the set held. Never a fixed "DEFRA 2026" or "NGA 2025".
+describe('Category 3 names the editions selected for the window', () => {
+  it('a 2024 inventory: the basis names DEFRA 2024, and nothing in the line names a fixed 2026 or 2025 edition', () => {
+    const read = cat3InputsFrom(SCOPE3_FIXTURE_GHG.workings, SCOPE3_FIXTURE_GHG.locations)
+    const priced = priceCat3(read.inputs!, cat3EditionsFor(selectionFor(2024, 12, { preparedOn: new Date(2026, 9, 8) })))
+    const b = cat3Basis(priced, read, null)
+    expect(priced.meta.edition).toBe('DEFRA 2024')
+    expect(b.basis).toContain(defraCitation(2024))
+    for (const fixed of [defraCitation(2026), 'DEFRA 2026', 'National Greenhouse Accounts Factors 2025', 'NGA 2025']) expect(`${b.basis} ${b.detail}`, fixed).not.toContain(fixed)
   })
 })

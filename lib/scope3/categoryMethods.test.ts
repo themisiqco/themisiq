@@ -1,3 +1,5 @@
+import { defraHeldSource } from './defraEditionTypes'
+import { DEFRA_WASTE_YEARS } from '../emissionFactors/defraWaste'
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -83,7 +85,9 @@ describe('Scope 3 category methods', () => {
     expect(scope3MethodDescription('no_method'), 'no singular claim under a plural heading')
       .not.toMatch(/this category/i)
     expect(scope3MethodDescription('no_method'), 'no factor may be named').not.toMatch(/\bfactor of\b|\bkg CO2e per\b/)
-    expect(scope3MethodDescription('waste_factors')).toContain(`published for that pair in ${defraCitation(2026)} (full set v1, Waste disposal sheet, AR5 GWPs)`)
+    // T3e: no reporting window is bound on this line, so it names the DEFRA editions held, not one of them.
+    expect(scope3MethodDescription('waste_factors')).toContain(`published for that pair in ${defraHeldSource(DEFRA_WASTE_YEARS, 'full set, Waste disposal sheet, AR5 GWPs')}.`)
+    expect(defraHeldSource(DEFRA_WASTE_YEARS, 'x')).toBe('UK DEFRA/DESNZ GHG Conversion Factors for Company Reporting (x), the edition the reporting year requires (2023, 2024, 2025 or 2026)')
     // The OGL v3.0 attribution, verbatim, closes the description the methodology page and the CSV carry.
     expect(scope3MethodDescription('waste_factors').endsWith(` ${DEFRA_WASTE_META.attribution_required}`)).toBe(true)
     expect(scope3MethodDescription('exiobase_spend')).toMatch(/^Spend-based, priced from EXIOBASE 3 version 3\.8\.2 \(EXIOBASE consortium, licensed CC BY-SA 4\.0\)/)
@@ -106,7 +110,15 @@ describe('Scope 3 category methods', () => {
     // since a second wording of one publication is the defect defraCitation exists to prevent.
     const defra: Scope3Method[] = ['waste_factors', 'end_of_life_factors', 'business_travel_factors', 'employee_commuting_factors', 'fuel_and_energy_upstream']
     for (const m of METHODS.filter(x => !defra.includes(x))) expect(scope3MethodDescription(m), m).not.toMatch(/DEFRA/i)
-    for (const m of defra) expect(scope3MethodDescription(m), m).toContain(defraCitation(2026))
+    // T3e: Categories 5, 6, 7 and 12 select their edition by the reporting window, and this line has none bound, so it
+    // names the set held through defraHeldSource, one builder; Category 3's line still carries the engine's citation.
+    // T3e follow-up: Category 3's line too names the set held (DEFRA and NGA), never one fixed edition.
+    for (const m of defra) {
+      expect(scope3MethodDescription(m), m).toMatch(/UK DEFRA\/DESNZ GHG Conversion Factors for Company Reporting \([^)]*\), the edition the reporting year requires \(2023, 2024, 2025 or 2026\)/)
+      expect(scope3MethodDescription(m), m).not.toContain(defraCitation(2026))
+    }
+    expect(scope3MethodDescription('fuel_and_energy_upstream')).not.toMatch(/National Greenhouse Accounts Factors 20\d\d/)
+    expect(scope3MethodDescription('fuel_and_energy_upstream')).toContain('National Greenhouse Accounts Factors Scope 3 factors of the edition the reporting window\'s activity year requires (2023, 2024, 2025 or 2026)')
   })
 
   it('M5 ⚠️ no source file under app/ claims DEFRA and Exiobase together', () => {
@@ -137,7 +149,8 @@ describe('Scope 3 category methods', () => {
     // methodology note and the methodology page read scope3MethodDescription, pinned in M2. A typed copy
     // anywhere under app/ could drift from the wording the licence prescribes, so none is allowed.
     const page = readFileSync(join(__dirname, '../../app/dashboard/scope3/page.tsx'), 'utf8')
-    expect(page.match(/DEFRA_WASTE_META\.attribution_required/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    // T3e: read through wasteMeta, the window's edition's record (the attribution is the same in every edition).
+    expect(page.match(/(DEFRA_WASTE_META|wasteMeta)\.attribution_required/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
     // ⚠️ BEHAVIOURAL, NOT A SOURCE STRING, SINCE THE HIERARCHY WAS DERIVED. This asserted that the
     // methodology page's source CONTAINED scope3MethodDescription('waste_factors'). The page now renders
     // methodologyHierarchyLines(), which calls it once per method group, so the literal is gone while the

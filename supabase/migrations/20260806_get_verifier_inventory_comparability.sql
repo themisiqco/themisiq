@@ -1,6 +1,6 @@
 -- get_verifier_inventory — comparability disclosure added to the verifier projection
 -- ---------------------------------------------------------------------------
--- ⚠️ APPLIED, AND SUPERSEDED ONCE SINCE. NOT the current definition.
+-- ⚠️ APPLIED, AND SUPERSEDED TWICE SINCE (20260814, then 20261009, run 8 Oct 2026). NOT the current definition.
 --
 -- VERIFIED LIVE on 16 Sep 2026 by pg_get_functiondef on public.get_verifier_inventory(uuid):
 -- 'changed_fields' present, 'to_jsonb(a)' absent, 'comparability_disclosure' present — this file's
