@@ -334,7 +334,7 @@ export default function SurveyResults() {
           “asked and skipped”: that would report a delivery problem as a finding about
           {' '}{agg.round.company_name || 'your company'}.
           {p.never_opened > 0 && <> {p.never_opened} {p.never_opened === 1 ? 'person has' : 'people have'} not
-          opened it yet: that gap is about your invitations, and it is chased from the{' '}
+          opened it yet: that gap is about your invitations, and you follow it up from the{' '}
           <Link href={`/dashboard/materiality/survey/${roundId}`} style={{ color: BLUE }}>progress screen</Link>.</>}
         </div>
 

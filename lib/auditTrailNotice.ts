@@ -56,9 +56,9 @@ export function auditTrailLine(changeCount: number): string {
  */
 export const AUDIT_TRAIL_NOTE =
   'Every saved change to a GHG inventory, CBAM disclosure or concierge record is written to an audit '
-  + 'log by a database trigger, not by the application — with the user, the timestamp and the row as it '
-  + 'was before. It covers those modules, and it records each save rather than each keystroke. You can '
-  + 'read your own entries; you cannot edit or delete them.'
+  + 'log by a database trigger, not by the application. Each entry records the user, the timestamp and '
+  + 'the row as it was before. It covers those modules, and it records each save rather than each '
+  + 'keystroke. You can read your own entries; you cannot edit or delete them.'
 
 /**
  * The homepage-length form, for app/page.tsx's trust section. Shorter, and it leads with the workings
@@ -67,6 +67,6 @@ export const AUDIT_TRAIL_NOTE =
  */
 export const AUDIT_TRAIL_NOTE_SHORT =
   'Every figure carries its factor citation and its workings. In the GHG, CBAM and concierge modules, '
-  + 'each saved change is written to an audit log by a database trigger — who, when, and the row as it '
-  + 'was before — and you can read your own entries but not alter them.'
+  + 'each saved change is written to an audit log by a database trigger, recording who, when and the row '
+  + 'as it was before. You can read your own entries but not alter them.'
 
