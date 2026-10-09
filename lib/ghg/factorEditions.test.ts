@@ -487,6 +487,8 @@ describe('factor_editions survives the load-then-save round trip', () => {
       'locations_data:', 'coverage_resolutions:', 'pct_estimated:', 'scope1_total:',
       'scope2_location_total:', 'scope2_market_total:', 'scope1_intensity:', 'scope2_intensity:',
       'gwp_version:', 'status:', 'workings:', 'updated_at:', 'derivation_version:',
+      // T18 section D: the deleted-location record.
+      'location_log:',
     ]
     for (const k of REQUIRED) expect(block, `payload key ${k} was dropped`).toContain(k)
     expect(block).toContain('factor_editions:')
@@ -499,7 +501,7 @@ describe('factor_editions survives the load-then-save round trip', () => {
     const keyCount = block.split('\n').filter(l => /^\s*[a-z0-9_]+:/.test(l)).length
     // 27 since T7 added derivation_version; 28 since T3c diff 3 added factor_selection; 29 since F-06 (T3c diff 4)
     // added factor_edition_comparison.
-    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(29)
+    expect(keyCount, 'payload key count moved — update REQUIRED and this number together').toBe(30)
   })
 
   it('F25 scans a real file — a moved call site fails loudly instead of passing vacuously', () => {

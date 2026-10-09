@@ -17,7 +17,7 @@
 //     versions still contain what was read. A purge of that history is handled outside the app (docs/review/ghg-register.md, DOC-01).
 //   - Every action records who and when in the location's document_log, which a save may only append to.
 
-import { acceptanceProblem, valueProblem, type DocumentEvent, type ExtractedProposal, type Location, type SourceDoc, EARLIER_VERSIONS_SENTENCE } from './engine'
+import { acceptanceProblem, valueProblem, type DocumentEvent, type ExtractedProposal, type Location, type LocationEvent, type SourceDoc, EARLIER_VERSIONS_SENTENCE } from './engine'
 
 type Who = { userId: string; email: string }
 type Patch = Pick<Location, 'source_docs' | 'document_log'>
@@ -123,4 +123,37 @@ export function deleteDocument(loc: Location, docId: string, a: { by: Who; at: s
     ? { kind: 'deleted_unused', ...base }
     : { kind: 'deleted', ...base, reason: (a.reason ?? '').trim() }
   return { source_docs: loc.source_docs.filter(x => x.id !== docId), document_log: withEvent(loc, e) }
+}
+
+// ── T18 section D: deleting a location ───────────────────────────────────────────────────────────────────────────
+// A location holding any document needs a reason, and leaves an inventory-level record (ghg_inventories.location_log)
+// with who, when, the reason, its name and country, and a tombstone for each document in the shape a document
+// deletion leaves. A location with no documents leaves the lighter record: who and when, its name and country. Its own
+// document log and typed entries are carried in the record, so nothing written earlier is lost with the location.
+
+/** The question asked after the location delete confirmation, when the location holds documents. Plain, no em dash. */
+export const LOCATION_DELETE_REASON_PROMPT = (name: string, documents: number) =>
+  `Give a reason for deleting ${name || 'this location'}. Its ${documents === 1 ? 'document and what was read from it are' : `${documents} documents and what was read from them are`} removed. A record that ${documents === 1 ? 'it' : 'they'} existed, who deleted ${documents === 1 ? 'it' : 'them'}, when and why is kept. Earlier saved versions of this inventory still contain what was read from ${documents === 1 ? 'it' : 'them'}.`
+
+/** Why the location cannot be deleted as asked, or null. A location with documents needs who and a reason. */
+export function locationDeleteProblem(loc: Location, a: { by?: Who | null; reason?: string }): string | null {
+  if (!a.by?.userId || !a.by?.email) return 'Sign in to delete a location, so the record shows who did it.'
+  if ((loc.source_docs ?? []).length > 0 && !(a.reason ?? '').trim()) return 'Give a reason.'
+  return null
+}
+
+/** The record a deleted location leaves. Throws, as the document actions do, when who or a needed reason is missing. */
+export function locationDeleteRecord(loc: Location, a: { by: Who; at: string; reason?: string }): LocationEvent {
+  const problem = locationDeleteProblem(loc, a)
+  if (problem) throw new Error(problem)
+  const docs = loc.source_docs ?? []
+  const reason = (a.reason ?? '').trim()
+  return {
+    kind: 'location_deleted', locationId: loc.id, name: loc.name ?? '', country: loc.country ?? '', at: a.at, by: a.by,
+    ...(docs.length > 0 ? { reason } : {}),
+    documents: docs.map(d => ({ kind: 'deleted' as const, docId: d.id, file: d.file_name, documentType: d.document_type, uploadedAt: d.uploaded_at,
+      sha256: d.sha256 ?? null, at: a.at, by: a.by, reason })),
+    ...(loc.document_log?.length ? { document_log: loc.document_log } : {}),
+    ...(loc.typed_entries?.length ? { typed_entries: loc.typed_entries } : {}),
+  }
 }

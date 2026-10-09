@@ -10,7 +10,7 @@ import { yearLabel, periodWords } from '../../../lib/ghg/engine'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import { workingsActivityCell, workingsVintageCell, workingsEditionLines, workingsScope2MethodCell, workingsResultCell,
-  workingsFactorSourceCell, COVERAGE_ROW_BASIS } from '../../../lib/ghg/workingsCells'
+  workingsFactorSourceCell, COVERAGE_ROW_BASIS, eventRowsOf } from '../../../lib/ghg/workingsCells'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
@@ -1282,6 +1282,27 @@ export default function VerifierPage() {
               <SourceDocRow key={d.id ?? `no-id-${i}`} doc={d} token={token} />
             ))}
           </div>
+        )}
+
+        {/* ── T18: THE DOCUMENT AND LOCATION RECORD (pulled forward from T11, as ruled 9 Oct 2026) ──────────
+            Every document withdrawn, restored, deleted or deleted unused, and every location deleted from the
+            inventory, each with who, when and why. Read from the saved workings rows (eventRowsOf), which carry
+            the same sentence the operator's evidence list and the assurance PDF show. Drawn only when there is
+            one: no record means none of these happened, and the section says nothing it cannot show. */}
+        {eventRowsOf(inv.workings).length > 0 && (
+          <>
+            <SectionHead>Document and location record</SectionHead>
+            <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', fontWeight: 400, lineHeight: 1.6, marginBottom: '1rem' }}>
+              Documents withdrawn, restored or deleted, and locations deleted from this inventory, with who did it, when and why. A deletion record holds no reading from the file.
+            </p>
+            <ul style={{ margin: '0 0 2rem', paddingLeft: 18 }}>
+              {eventRowsOf(inv.workings).map((w, i) => (
+                <li key={i} style={{ fontSize: 12, color: '#0d0d0d', lineHeight: 1.6, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--color-ink-muted)' }}>{w.location}: </span>{w.note}
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         {/* ── SCOPE 3 ─────────────────────────────────────────────────────────────────────────────

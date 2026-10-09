@@ -220,7 +220,7 @@ describe('T3c diff 3: the surfaces word the selection', () => {
     const page = read('app/dashboard/ghg/page.tsx')
     expect(page).toContain('factor_selection: data.factor_selection ?? {}')
     expect(page).toContain('factor_selection: saved.factor_selection,')
-    expect(page).toContain('const factorCtx = selectionContextFor(inventory)')
+    expect(page).toContain('const factorCtx = { ...selectionContextFor(inventory), ...(inventoryId ? {} : { unsaved: true as const }) }')
     expect(page).toContain('coverageResolutions, factorCtx)')
     expect(page).toContain("findUnpriceableLocations(derivedLocations, 'AR6', inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)")
     expect(page).toContain('inventory.fiscal_year_end_month, factorCtx)\n')

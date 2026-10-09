@@ -1352,7 +1352,7 @@ describe('P9. residual mix editions are selected by data year, never substituted
 // that honest: it declares each table's storage style as a literal and fails if any table stops being
 // uniform, which is the only way the shape test could start disagreeing with the tables.
 describe('X. combustion rows stamp the GWP basis that actually applied', () => {
-  const AS_PUBLISHED = 'as-published — see factor source';
+  const AS_PUBLISHED = 'as published: see factor source';
   const SETS = ['AR4', 'AR5', 'AR6'] as const;
 
   // diesel exists in every table; US takes gallons, the metric jurisdictions litres.
@@ -1464,11 +1464,11 @@ describe('X. combustion rows stamp the GWP basis that actually applied', () => {
   it('X5 the factor cell says the publisher combined the gases, not that they are zero', () => {
     // "CO2 2.71, CH4 0, N2O 0" reads as a measurement — this fuel emits no methane. It is not one.
     const au = row('AU', 'AR6');
-    expect(au.emission_factor).toBe('CO₂e 2.70972 kg/litres — CH₄/N₂O included');
+    expect(au.emission_factor).toBe('CO₂e 2.70972 kg/litres, CH₄ and N₂O included');
     expect(au.emission_factor, 'a zero that means "already counted" must not print as a measured zero')
       .not.toContain('CH4 0');
     // Gas-split rows keep the split verbatim — the verifier path depends on it.
-    expect(row('US', 'AR6').emission_factor).toBe('CO2 10.21, CH4 0.00041, N2O 0.00008 kg/gallons');
+    expect(row('US', 'AR6').emission_factor).toBe('CO2 10.21, CH4 0.00041, N2O 0.00008 kg/US gallons');
   });
 });
 
@@ -1860,7 +1860,7 @@ describe('Z. fuel oil grades are seeded per table', () => {
     const row = (g: 'AR4' | 'AR6') =>
       (buildWorkings([loc({ country: 'GB', has_diesel_stationary: true, diesel_stationary_amount: 1000, diesel_stationary_unit: 'litres' })],
         g, 2026, [], 12) as any[]).find(r => r.stream === 'diesel_stationary' && !r.declaration);
-    expect(row('AR6').gwp_basis).toBe('as-published — see factor source');
+    expect(row('AR6').gwp_basis).toBe('as published: see factor source');
     expect(row('AR4').result_tco2e, 'a combined factor cannot move with the AR toggle').toBe(row('AR6').result_tco2e);
   });
 
@@ -2155,7 +2155,7 @@ describe('S. purchased steam — EPA Hub 2025 Table 7, all three columns', () =>
     // once more or the detection was replaced by an assertion.
     for (const g of ['AR4', 'AR5', 'AR6'] as const) {
       expect(steamRow(g).gwp_basis, `${g}: EPA splits the gases — we combine them, so we own the basis`).toBe(g);
-      expect(steamRow(g).gwp_basis, `${g}`).not.toBe('as-published — see factor source');
+      expect(steamRow(g).gwp_basis, `${g}`).not.toBe('as published: see factor source');
     }
   });
 
@@ -2191,11 +2191,11 @@ describe('S. purchased steam — EPA Hub 2025 Table 7, all three columns', () =>
     const row = steamRow('AR6');
     // THE ORIGINAL MISLABEL: 66.33 is CO2 only. It must never again appear under a CO₂e label.
     expect(row.emission_factor_display, 'a CO2-only figure labelled CO₂e is the defect').not.toBe('66.33 kg CO₂e/mmbtu');
-    expect(row.emission_factor_display).toBe('66.401375 kg CO₂e/mmbtu');
+    expect(row.emission_factor_display).toBe('66.401375 kg CO₂e/MMBtu');
     // The raw cell shows the three published columns, so a verifier can see what was combined.
-    expect(row.emission_factor).toBe('CO2 66.33, CH4 0.00125, N2O 0.000125 kg/mmbtu');
+    expect(row.emission_factor).toBe('CO2 66.33, CH4 0.00125, N2O 0.000125 kg/MMBtu');
     // And it must NOT claim the publisher pre-combined them — that wording belongs to DEFRA/MfE rows.
-    expect(row.emission_factor).not.toContain('CH₄/N₂O included');
+    expect(row.emission_factor).not.toContain('CH₄ and N₂O included');
   });
 
   it('S7 a GJ-entered location converts first, then prices on the full triple', () => {
@@ -2256,7 +2256,7 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     // DEFRA combines the gases at AR5 and stores them in `co2` with zeros; EPA Table 7 publishes a
     // real split. factorCells reads ch4 === 0 && n2o === 0, so neither stamp is written by hand.
     for (const g of ['AR4', 'AR5', 'AR6'] as const) {
-      expect(steamRow(steamLoc({ country: 'GB' }), g).gwp_basis, `GB ${g}`).toBe('as-published — see factor source');
+      expect(steamRow(steamLoc({ country: 'GB' }), g).gwp_basis, `GB ${g}`).toBe('as published: see factor source');
       expect(steamRow(steamLoc({ country: 'US', purchased_steam_unit: 'mmbtu' }), g).gwp_basis, `US ${g}`).toBe(g);
     }
   });
@@ -2345,7 +2345,7 @@ describe('T. purchased steam — per jurisdiction, with no US fallback', () => {
     expect(row.ef_source).toContain('Enwave Toronto');
     expect(row.entry_method).toBe('supplier-specific');
     // A supplier figure is one combined CO2e on the provider's own GWP basis — same convention as DEFRA.
-    expect(row.gwp_basis).toBe('as-published — see factor source');
+    expect(row.gwp_basis).toBe('as published: see factor source');
     // It also beats the published GB default, because it is primary data for the network that supplied it.
     const gb = steamLoc({ country: 'GB', purchased_steam_supplier_ef: 0.198, purchased_steam_supplier_ef_basis: 'kwh' });
     expect(steamRow(gb).result_tco2e).toBeCloseTo(55, 6);
@@ -6795,7 +6795,7 @@ import {
   assignLegacyFleet as fi9dAssign,
 } from './engine';
 import { heldSel, testSel, heldYearFor, TEST_PREPARED_ON, CAT3_EDS } from '../testing/heldSelection'
-import { selectionFor, editionFor } from './engine'
+import { selectionFor, editionFor, locationEventSentence } from './engine'
 
 describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
   const BY = { userId: 'u1', email: 'a@b.co' };
@@ -7255,5 +7255,43 @@ describe('T18 diff 3: who on every coverage-resolution row', () => {
     const legacy = { locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'], note: 'Same bill.', acknowledgedAt: AT } as CoverageResolution;
     expect(validateResolution(legacy, pair)).toBeNull();
     expect(resRows([legacy])).toEqual([expect.objectContaining({ resolved_by: null, resolved_by_text: 'Who: not recorded', ef_source: 'Same bill.' })]);
+  });
+});
+
+describe('T18 diff 4: the workings cells, the unsaved wording and the deleted-location rows', () => {
+  const BY = { userId: 'u-1', email: 'jo@acme.example' };
+  const AT = '2026-10-09T10:00:00.000Z';
+
+  it('units print as unitLabel writes them, and no cell has an em dash', () => {
+    const on = loc({ country: 'CA', province: 'ON', grid_region: 'ON', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'gj' });
+    const rows = buildWorkings([on], 'AR6', 2025, [], 12, { preparedOn: TEST_PREPARED_ON }) as { stream?: string; emission_factor?: string; emission_factor_display?: string; gwp_basis?: string }[];
+    const gas = rows.find(r => r.stream === 'natural_gas')!;
+    expect(gas.emission_factor_display).toMatch(/ kg CO₂e\/GJ$/);
+    expect(gas.emission_factor).toMatch(/ kg\/GJ$/);
+    const uk = (buildWorkings([loc({ country: 'GB', grid_region: 'UK', has_natural_gas: true, natural_gas_amount: 100, natural_gas_unit: 'kwh' })], 'AR6', 2026, [], 12) as
+      { stream?: string; emission_factor?: string; gwp_basis?: string }[]).find(r => r.stream === 'natural_gas')!;
+    expect(uk.gwp_basis).toBe('as published: see factor source');
+    expect(uk.emission_factor).toMatch(/^CO₂e [\d.]+ kg\/kWh, CH₄ and N₂O included$/);
+    for (const c of [gas.emission_factor, gas.emission_factor_display, uk.emission_factor, uk.gwp_basis]) expect(c).not.toContain('—');
+  });
+
+  it('the selection context carries unsaved to the edition basis, and a saved context never does', () => {
+    const PREP = new Date(2026, 9, 8);
+    expect(editionFor('egrid', selectionFor(2025, 12, { preparedOn: PREP, unsaved: true })).basis).toContain('selected today, 8 October 2026, for this calculation');
+    expect(editionFor('egrid', selectionFor(2025, 12, { preparedOn: PREP })).basis).toContain('when this inventory was first prepared on 8 October 2026');
+  });
+
+  it('each deleted location is a row in the workings, with its sentence and the record itself', () => {
+    const tomb = { kind: 'deleted' as const, docId: 'd1', file: 'gas-jan.pdf', documentType: 'utility_bill_gas', uploadedAt: AT, sha256: null, at: AT, by: BY, reason: 'Site closed' };
+    const withDocs = { kind: 'location_deleted' as const, locationId: 'L2', name: 'Leeds', country: 'GB', at: AT, by: BY, reason: 'Site closed', documents: [tomb] };
+    const bare = { kind: 'location_deleted' as const, locationId: 'L3', name: 'Annex', country: 'US', at: AT, by: BY, documents: [] };
+    const rows = (buildWorkings([loc({})], 'AR6', 2025, [], 12, {}, [withDocs, bare]) as { gwp_basis?: string; source?: string; note?: string; location_event?: unknown }[])
+      .filter(r => r.gwp_basis === 'location_event');
+    expect(rows.map(r => r.source)).toEqual(['Location deleted: Leeds', 'Location deleted: Annex']);
+    expect(rows[0].note).toBe('Leeds (United Kingdom) was deleted by jo@acme.example on 9 October 2026: Site closed. Its document was deleted with it: gas-jan.pdf. The file and what was read from it were removed. Earlier saved versions of this inventory still contain what was read from it.');
+    expect(rows[1].note).toBe('Annex (United States) was deleted by jo@acme.example on 9 October 2026. It held no documents.');
+    expect(rows[0].location_event).toEqual(withDocs);
+    const two = locationEventSentence({ ...withDocs, documents: [tomb, { ...tomb, docId: 'd2', file: 'gas-feb.pdf' }] });
+    expect(two).toContain('Its 2 documents were deleted with it: gas-jan.pdf, gas-feb.pdf. The files and what was read from them were removed. Earlier saved versions of this inventory still contain what was read from them.');
   });
 });

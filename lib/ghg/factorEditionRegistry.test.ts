@@ -295,3 +295,13 @@ describe('registry integrity', () => {
     for (const e of FACTOR_EDITION_REGISTRY) expect(JSON.stringify(e)).not.toContain('\u2014')
   })
 })
+
+describe('T18 diff 4: an unsaved calculation says its edition was selected today, for this calculation', () => {
+  it('the newest-edition basis, unsaved and saved; a data-year match reads the same either way', () => {
+    const unsaved = chosen(selectEdition('egrid', win(2025, 12), 2025, PREPARED, undefined, undefined, { unsaved: true }))
+    expect(unsaved.basis).toBe('eGRID2023 (published 15 January 2025, revision 2 of 12 June 2025): the newest edition published, selected today, 8 October 2026, for this calculation; no 2025 data year was published. Values as corrected on 12 June 2025.')
+    expect(chosen(sel('egrid', 2025, 12)).basis, 'saved wording unchanged').toMatch(/: the newest edition when this inventory was first prepared on 8 October 2026;/)
+    expect(chosen(selectEdition('egrid', win(2023, 12), 2023, PREPARED, undefined, undefined, { unsaved: true })).basis).toMatch(/^eGRID2023: data year 2023 matches reporting year 2023\./)
+    expect(unsaved.basis).not.toContain('—')
+  })
+})

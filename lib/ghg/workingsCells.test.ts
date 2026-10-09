@@ -229,3 +229,42 @@ describe('the share cell for a delivery (T10b)', () => {
       .toBe('Delivered 14 March 2025, counted in full')
   })
 })
+
+// ── T18 diff 4: every who-and-when on a row, in words ─────────────────────────────────────────────────────────────
+import { workingsWhoWhenLines } from './workingsCells'
+describe('workingsWhoWhenLines', () => {
+  const jo = { email: 'jo@acme.example' }, sam = { email: 'sam@acme.example' }
+  const AT = '2026-10-02T09:00:00.000Z', LATER = '2026-10-03T09:00:00.000Z'
+  it('a typed row: each entry, with any note and override reason, and an override removed', () => {
+    expect(workingsWhoWhenLines({
+      typed_entries: [{ field: 'natural_gas_amount', value: 420, unit: 'mcf', at: AT, by: jo, note: 'entered before sign-in' },
+        { field: 'natural_gas_amount', value: 96, unit: 'mcf', at: LATER, by: sam, overrideReason: 'Bills estimated' }],
+      manual_override: { reason: 'Bills estimated', at: LATER, by: sam },
+      manual_overrides_removed: [{ reason: 'Wrong meter', removedAt: AT, removedBy: jo }],
+    })).toEqual([
+      'Entered as 420 Mcf by jo@acme.example on 2 October 2026 (entered before sign-in).',
+      'Entered as 96 Mcf by sam@acme.example on 3 October 2026, by hand instead of from the bills: Bills estimated.',
+      'Entered by hand instead of from the bills by sam@acme.example on 3 October 2026: Bills estimated.',
+      'Hand-entered figure removed by jo@acme.example on 2 October 2026 (it had been entered because: Wrong meter).',
+    ])
+  })
+  it('a row from bills: each bill\'s confirmations, corrections, date confirmation, vehicle type, status changes and withdrawal', () => {
+    const lines = workingsWhoWhenLines({ contributions: [{ docId: 'd1',
+      confirmations: [{ at: LATER, by: jo }], corrections: [{ fields: ['value', 'unit'], at: AT, by: sam }],
+      periodConfirmedAt: AT, periodConfirmedBy: jo, fleetTypeLog: [{ to: 'non_road', at: AT, by: jo }],
+      statusLog: [{ action: 'flagged', at: AT, by: sam }], withdrawal: { at: LATER, by: sam, reason: 'Duplicate' } }] }, id => `${id}.pdf`)
+    expect(lines).toEqual([
+      'd1.pdf: confirmed by jo@acme.example on 3 October 2026.',
+      'd1.pdf: figure and unit changed by sam@acme.example on 2 October 2026.',
+      'd1.pdf: billing dates confirmed by jo@acme.example on 2 October 2026.',
+      'd1.pdf: vehicle type set to non-road by jo@acme.example on 2 October 2026.',
+      'd1.pdf: Flagged for review by sam@acme.example on 2 October 2026.',
+      'd1.pdf: withdrawn by sam@acme.example on 3 October 2026: Duplicate.',
+    ])
+    for (const l of lines) expect(l).not.toContain('—')
+  })
+  it('a coverage resolution says who, or that nobody was recorded; a row with no record says nothing', () => {
+    expect(workingsWhoWhenLines({ resolved_by_text: 'Who: not recorded', resolved_at: AT })).toEqual(['Who: not recorded, on 2 October 2026.'])
+    expect(workingsWhoWhenLines({})).toEqual([])
+  })
+})

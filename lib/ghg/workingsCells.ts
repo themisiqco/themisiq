@@ -223,6 +223,8 @@ export const COVERAGE_ROW_BASIS = 'coverage_resolution'
 /** T18: the `gwp_basis` of a document-event row (withdrawn, restored, deleted, deleted unused). No factor applies;
  * the event's sentence is the row's note. */
 export const DOCUMENT_EVENT_ROW_BASIS = 'document_event'
+/** T18 section D: the `gwp_basis` of a deleted-location row. No factor applies; the record's sentence is the note. */
+export const LOCATION_EVENT_ROW_BASIS = 'location_event'
 
 /**
  * The Factor source column: the row's citation.
@@ -268,4 +270,57 @@ export function contributionShareCell(c: ShareCellContribution): string {
   if (c.reason !== 'counted' && c.reason !== 'prorated') return NOT_COUNTED
   const days = `${c.inWindowDays} of ${c.totalDays} days`
   return c.reason === 'prorated' ? `${days}, ×${(c.share ?? 0).toFixed(3)}` : days
+}
+
+// ── T18 diff 4: WHO DID WHAT TO A ROW, AND WHEN, IN WORDS ──────────────────────────────────────────────────────────
+// One reader for every who-and-when record a workings row carries, so the page's workings table, the verifier page
+// (T11) and the PDF (T17) word the same record the same way. Each line is a plain sentence with no em dash. Shapes are
+// declared loosely here (this file imports nothing from the engine), and a field a row does not carry adds nothing.
+type WhoRec = { email: string }
+type WhoWhenRow = {
+  entered_by?: WhoRec; entered_at?: string
+  typed_entries?: { field: string; value: number; unit: string | null; at: string; by: WhoRec; overrideReason?: string; note?: string }[]
+  manual_override?: { reason: string; at: string; by: WhoRec }
+  manual_overrides_removed?: { reason: string; removedAt: string; removedBy: WhoRec }[]
+  resolved_by_text?: string; resolved_at?: string
+  reading_cleared?: { file: string; at: string; by: WhoRec }
+  contributions?: {
+    docId: string
+    confirmations?: { at: string; by: WhoRec }[]
+    corrections?: { fields: string[]; at: string; by: WhoRec }[]
+    statusLog?: { action: string; at: string; by: WhoRec }[]
+    periodConfirmedAt?: string; periodConfirmedBy?: WhoRec
+    fleetTypeLog?: { to: string; at: string; by: WhoRec }[]
+    withdrawal?: { at: string; by: WhoRec; reason: string }
+  }[]
+}
+const on = (at: string) => isoDateInWords(at.slice(0, 10))
+const STATUS_WORDS: Record<string, string> = { rejected: 'Rejected', undone: 'Rejection undone', flagged: 'Flagged for review', withdrawn: 'Withdrawn', restored: 'Restored' }
+const FIELD_WORDS: Record<string, string> = { period: 'billing dates', unit: 'unit', value: 'figure' }
+
+/** Every who-and-when on a workings row, oldest first within each kind, as plain sentences. Empty when it has none. */
+export function workingsWhoWhenLines(r: WhoWhenRow, fileOf: (docId: string) => string = id => id): string[] {
+  const out: string[] = []
+  for (const e of r.typed_entries ?? []) {
+    out.push(`Entered as ${e.value.toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: !e.field.endsWith('_model_year') })}${e.unit ? ` ${unitLabel(e.unit)}` : ''} by ${e.by.email} on ${on(e.at)}${e.note ? ` (${e.note})` : ''}${e.overrideReason ? `, by hand instead of from the bills: ${e.overrideReason}` : ''}.`)
+  }
+  if (r.manual_override) out.push(`Entered by hand instead of from the bills by ${r.manual_override.by.email} on ${on(r.manual_override.at)}: ${r.manual_override.reason}.`)
+  for (const o of r.manual_overrides_removed ?? []) out.push(`Hand-entered figure removed by ${o.removedBy.email} on ${on(o.removedAt)} (it had been entered because: ${o.reason}).`)
+  for (const c of r.contributions ?? []) {
+    const file = fileOf(c.docId)
+    for (const k of c.confirmations ?? []) out.push(`${file}: confirmed by ${k.by.email} on ${on(k.at)}.`)
+    for (const k of c.corrections ?? []) out.push(`${file}: ${k.fields.map(f => FIELD_WORDS[f] ?? f).join(' and ')} changed by ${k.by.email} on ${on(k.at)}.`)
+    if (c.periodConfirmedAt && c.periodConfirmedBy) out.push(`${file}: billing dates confirmed by ${c.periodConfirmedBy.email} on ${on(c.periodConfirmedAt)}.`)
+    for (const k of c.fleetTypeLog ?? []) out.push(`${file}: vehicle type set to ${k.to.replace('_', '-')} by ${k.by.email} on ${on(k.at)}.`)
+    for (const k of c.statusLog ?? []) out.push(`${file}: ${STATUS_WORDS[k.action] ?? k.action} by ${k.by.email} on ${on(k.at)}.`)
+    if (c.withdrawal) out.push(`${file}: withdrawn by ${c.withdrawal.by.email} on ${on(c.withdrawal.at)}: ${c.withdrawal.reason}.`)
+  }
+  if (r.reading_cleared) out.push(`${r.reading_cleared.file}: unit changed by ${r.reading_cleared.by.email} on ${on(r.reading_cleared.at)}, so the figure typed for it was cleared.`)
+  if (r.resolved_by_text && r.resolved_at) out.push(`${r.resolved_by_text}, on ${on(r.resolved_at)}.`)
+  return out
+}
+
+/** T18 diff 4: the saved workings rows that record a document event or a deleted location, in the order saved. */
+export function eventRowsOf<R extends { gwp_basis?: string }>(rows: readonly R[] | null | undefined): R[] {
+  return (rows ?? []).filter(r => r.gwp_basis === DOCUMENT_EVENT_ROW_BASIS || r.gwp_basis === LOCATION_EVENT_ROW_BASIS)
 }

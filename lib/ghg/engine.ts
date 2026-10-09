@@ -27,7 +27,7 @@ import { selectEdition, registryDateInWords, DATASETS, type DatasetId, type Froz
 // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
 // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
 import { NOT_PROVIDED } from '../notProvided'
-import { ALL_LOCATIONS, NOT_APPLICABLE, DOCUMENT_EVENT_ROW_BASIS } from './workingsCells'
+import { ALL_LOCATIONS, NOT_APPLICABLE, DOCUMENT_EVENT_ROW_BASIS, LOCATION_EVENT_ROW_BASIS } from './workingsCells'
 // Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
 // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
 // shape stays in one place. See lib/ghg/comparability.ts.
@@ -1034,11 +1034,15 @@ export interface SelectionContext {
    *  calculation selected it, to measure what a change of edition alone does to this year's figures. Never set by
    *  a save or a surface: no figure anyone reports is priced through it. */
   override?: Partial<Record<DatasetId, EditionUse>>
+  /** T18 diff 4: a calculation with nothing saved (the free calculator, or a new inventory before its first save). A
+   *  class (b) edition chosen as the newest is then worded as selected today for this calculation, since nothing is
+   *  kept until a save. Set only by the page for an inventory with no id; a save and every saved surface never set it. */
+  unsaved?: true
 }
 /** The resolved context every selector takes: the reporting window, its year and the preparation date. */
 export interface Sel {
   year: number; win: { start: Date; end: Date }; preparedOn: string; frozen?: FactorSelection; record?: Map<DatasetId, EditionUse>
-  recordMissing?: Map<DatasetId, string>; override?: Partial<Record<DatasetId, EditionUse>>
+  recordMissing?: Map<DatasetId, string>; override?: Partial<Record<DatasetId, EditionUse>>; unsaved?: true
 }
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 /** The selection context for a reporting year and year end, prepared on `ctx.preparedOn` (today when not given). */
@@ -1046,7 +1050,7 @@ export function selectionFor(year: number, fiscalYearEndMonth: number | null | u
   const w = periodFromYearAndEnd(year, fiscalYearEndMonth ?? 12)
   return { year, win: { start: w.start, end: w.end }, preparedOn: isoDay(ctx.preparedOn ?? new Date()), ...(ctx.frozen ? { frozen: ctx.frozen } : {}),
     ...(ctx.record ? { record: ctx.record } : {}), ...(ctx.recordMissing ? { recordMissing: ctx.recordMissing } : {}),
-    ...(ctx.override ? { override: ctx.override } : {}) }
+    ...(ctx.override ? { override: ctx.override } : {}), ...(ctx.unsaved ? { unsaved: true as const } : {}) }
 }
 /** The edition a line was priced with, and what its workings row says about it. `key` is the table key: the data year
  *  for class (b), the edition year for class (a), null for an exempt default. */
@@ -1070,10 +1074,10 @@ export function editionFor(dataset: DatasetId, sel: Sel): EditionUse {
   const forced = sel.override?.[dataset]
   if (forced) { sel.record?.set(dataset, forced); return forced }
   const frozen = sel.frozen?.[dataset]
-  const k = [dataset, isoDay(sel.win.start), isoDay(sel.win.end), sel.year, sel.preparedOn, frozen ? `${frozen.label}@${frozen.selected_on}` : ''].join('|')
+  const k = [dataset, isoDay(sel.win.start), isoDay(sel.win.end), sel.year, sel.preparedOn, frozen ? `${frozen.label}@${frozen.selected_on}` : '', sel.unsaved ? 'unsaved' : ''].join('|')
   let hit = EDITION_MEMO.get(k)
   if (!hit) {
-    const r = selectEdition(dataset, sel.win, sel.year, sel.preparedOn, frozen)
+    const r = selectEdition(dataset, sel.win, sel.year, sel.preparedOn, frozen, undefined, { unsaved: !!sel.unsaved })
     if ('missing' in r) hit = new MissingEditionError(dataset, r.missing.edition, r.missing.reason, r.missing.basis)
     else {
       const c = 'provisional' in r ? r.provisional : r
@@ -1168,7 +1172,8 @@ const STEAM_EDITION: Partial<Record<EfJurisdiction, string>> = {
 // factors stored verbatim, no AR re-basing". This generalises it to every row we did not combine.
 // TO RESOLVE PROPERLY: store the vintage beside each factor table and stamp it here. Until then this
 // string points the verifier at the citation, which is where the answer actually is.
-const GWP_AS_PUBLISHED = 'as-published — see factor source'
+// T18 diff 4: no em dash in a cell a customer and a verifier read.
+const GWP_AS_PUBLISHED = 'as published: see factor source'
 
 const GRID_EF: Record<string, Record<number, number>> = {
   // Canadian provinces / territories — ECCC "Emission factors and reference values" v3.0 (Oct 2025) Tables 5.1 to 5.3.
@@ -1994,6 +1999,35 @@ export function isTypedFigure(loc: Location, field: keyof Location | string): bo
  * validates (pre-launch, section 4) and says so rather than naming nobody silently. */
 export const resolvedByText = (r: { by?: { email: string } | null }): string => r.by?.email ? `Who: ${r.by.email}` : 'Who: not recorded'
 
+/**
+ * T18 section D: the record a deleted location leaves at inventory level. Who, when, the location's name and country,
+ * and, when it held documents, the reason and a tombstone for each document (the same shape a document deletion
+ * leaves) with the earlier saved versions wording. The location's own document log and typed entries go with it, so
+ * a tombstone or a who-and-when written earlier is not lost when its location is. A location with no documents leaves
+ * the lighter record: no reason and no tombstones.
+ */
+export interface LocationEvent {
+  kind: 'location_deleted'
+  locationId: string
+  name: string
+  country: string
+  at: string
+  by: { userId: string; email: string }
+  reason?: string
+  documents: Extract<DocumentEvent, { kind: 'deleted' }>[]
+  document_log?: DocumentEvent[]
+  typed_entries?: TypedEntry[]
+}
+
+/** T18 section D: one sentence for a deleted location, the same on every surface that shows it. No em dash. */
+export function locationEventSentence(e: LocationEvent): string {
+  const when = isoDateInWords(e.at.slice(0, 10))
+  const where = `${e.name || 'A location'}${e.country ? ` (${countryNameEn(e.country) || e.country})` : ''}`
+  if (e.documents.length === 0) return `${where} was deleted by ${e.by.email} on ${when}. It held no documents.`
+  const n = e.documents.length
+  return `${where} was deleted by ${e.by.email} on ${when}: ${e.reason ?? 'no reason recorded'}. Its ${n === 1 ? 'document was' : `${n} documents were`} deleted with it: ${e.documents.map(d => d.file).join(', ')}. The ${n === 1 ? 'file' : 'files'} and what was read from ${n === 1 ? 'it' : 'them'} were removed. ${n === 1 ? EARLIER_VERSIONS_SENTENCE : EARLIER_VERSIONS_SENTENCE.replace('from it.', 'from them.')}`
+}
+
 /** T18: what a deletion leaves of what was read (ruling of 9 Oct 2026, option (a)). "Earlier saved versions", not a
  * named store, so it stays true when pinned verifier versions (T16) keep copies too. */
 export const EARLIER_VERSIONS_SENTENCE = 'Earlier saved versions of this inventory still contain what was read from it.'
@@ -2515,6 +2549,10 @@ interface Inventory {
   selected_frameworks: string[]
 locations: Location[]
   coverage_resolutions?: CoverageResolution[]
+  // T18 section D: every location deleted from this inventory, append-only, in its own column
+  // (ghg_inventories.location_log, supabase/migrations/20261009_ghg_location_log.sql). It sits outside
+  // locations_data because the location it describes is no longer there.
+  location_log?: LocationEvent[]
   /**
    * The year-over-year comparability disclosure — `ghg_inventories.comparability_disclosure`.
    *
@@ -5271,7 +5309,7 @@ const ZERO_ROW_FIELDS: { field: keyof Location; source: string; scope: number; u
   { field: 'electricity_kwh', source: 'Electricity', scope: 2, unit: 'kWh' },
 ]
 
-function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12, ctx: SelectionContext = {}) {
+function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', year: number = 2024, resolutions: CoverageResolution[] = [], fiscalYearEndMonth: number = 12, ctx: SelectionContext = {}, locationLog: readonly LocationEvent[] = []) {
   const rows: any[] = []
   const win = periodFromYearAndEnd(year, fiscalYearEndMonth)
   // T3c: one selection context for every row: the reporting window, prepared on ctx.preparedOn (today by default).
@@ -5288,7 +5326,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
   // the electricity rows beside it already do. 'mmbtu' is deliberately NOT prettified to 'MMBtu' here:
   // it is the pre-existing rendering on every stored US steam snapshot, and changing it would make
   // saved workings differ from freshly computed ones for no gain in correctness.
-  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : u === 'm3' ? 'm³' : u === 'kwh' ? 'kWh' : u
+  // T18 diff 4: every other unit as unitLabel writes it ("GJ", "Mcf", "MMBtu"), never as stored ("gj").
+  const abbrevUnit = (u: string) => u === 'gallons' ? 'gal' : (u === 'litres' || u === 'liters') ? 'L' : unitLabel(u)
   // RECOMPUTABLE, NOT TIDY — and this is the whole point of a workings table. toFixed(3) printed a
   // factor of 1.9316576 as "1.932", so a verifier retyping the row got 231,840 kg where we stated
   // 231,798.9: a 41 kg divergence on one line, and EVERY priced row failed the same way. A workings
@@ -5325,9 +5364,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const combinedCo2e = ef.ch4 === 0 && ef.n2o === 0
     const gwp = GWP[gwpVersion]
     return {
+      // T18 diff 4: the unit as unitLabel writes it, and no em dash.
       emission_factor: combinedCo2e
-        ? `CO₂e ${ef.co2} kg/${unit} — CH₄/N₂O included`
-        : `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unit}`,
+        ? `CO₂e ${ef.co2} kg/${unitLabel(unit)}, CH₄ and N₂O included`
+        : `CO2 ${ef.co2}, CH4 ${ef.ch4}, N2O ${ef.n2o} kg/${unitLabel(unit)}`,
       emission_factor_display: `${efDisplay(ef.co2 + ef.ch4 * gwp.CH4_fossil + ef.n2o * gwp.N2O)} kg CO₂e/${abbrevUnit(unit)}`,
       gwp_basis: combinedCo2e ? GWP_AS_PUBLISHED : gwpVersion,
     }
@@ -5757,6 +5797,24 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       result_tco2e: null,
       note: documentEventSentence(e),
       document_event: e,
+    })
+  }
+  // ── T18 section D: deleted locations ──────────────────────────────────────
+  // One row per location deleted from the inventory (ghg_inventories.location_log). The location is not in
+  // `locations`, so this record is the only trace of it and its documents in the saved workings.
+  for (const e of locationLog) {
+    rows.push({
+      location: e.name || 'Location',
+      source: `Location deleted: ${e.name || 'Location'}`,
+      scope: 0,
+      activity_data: null,
+      activity_unit: e.kind,
+      emission_factor: NOT_APPLICABLE,
+      ef_source: NOT_APPLICABLE,
+      gwp_basis: LOCATION_EVENT_ROW_BASIS,
+      result_tco2e: null,
+      note: locationEventSentence(e),
+      location_event: e,
     })
   }
   // Rows with no gas split (electricity, refrigerant, steam, market-based, T&D, coverage resolutions)

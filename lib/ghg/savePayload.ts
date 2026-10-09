@@ -16,7 +16,7 @@
 // figure below as `frozen`, and written back with any choice this save made (lib/ghg/factorSelection.ts). The
 // column is added by supabase/migrations/20261008_ghg_factor_selection.sql, which must likewise exist first.
 
-import { deriveLocations, calcInventory, buildWorkings, pctEstimated, selectionFor, type Inventory, type GwpVersion, type SelectionContext, type Location } from './engine'
+import { deriveLocations, calcInventory, buildWorkings, pctEstimated, selectionFor, type Inventory, type GwpVersion, type SelectionContext, type Location, type LocationEvent } from './engine'
 import { factorEditionsForSave } from './factorEditions'
 import { factorSelectionForSave, selectionContextFor } from './factorSelection'
 import { withTypedEntries, type TypedBaseline } from './typedEntries'
@@ -42,7 +42,8 @@ export function figuresForSave(inventory0: Inventory, gwpVersion: GwpVersion = '
   const c = { ...selectionContextFor(inventory, ctx.preparedOn ?? new Date()), record: used }
   const sel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, c)
   const totals = calcInventory(derived, gwpVersion, inventory.reporting_year, sel)
-  const workings = buildWorkings(derived, gwpVersion, inventory.reporting_year, resolutions, inventory.fiscal_year_end_month, c)
+  // T18 section D: the deleted-location record is part of what a save writes to the workings.
+  const workings = buildWorkings(derived, gwpVersion, inventory.reporting_year, resolutions, inventory.fiscal_year_end_month, c, inventory.location_log ?? [])
   return {
     locations_data: inventory.locations,
     totals,
@@ -111,4 +112,20 @@ export const typedEntriesBaseline = (locations: readonly Pick<Location, 'id' | '
 export function typedEntriesProblem(baseline: AppendOnlyBaseline, locations: readonly Pick<Location, 'id' | 'name' | 'typed_entries'>[]): string | null {
   const l = appendOnlyBreach(baseline, locations as readonly Pick<Location, 'id' | 'name' | AppendOnlyKey>[], 'typed_entries')
   return l ? `This save would remove or change the record of who entered a figure at ${l.name || 'a location'}, and when. That record is kept permanently, so nothing was saved. Reload the inventory and try again.` : null
+}
+
+// ── T18 section D: THE DELETED-LOCATION RECORD CANNOT BE REWRITTEN BY A SAVE EITHER ───────────────────────────────
+// ghg_inventories.location_log is inventory-level and append-only. The page keeps it as loaded and refuses a save
+// whose log lacks an entry that record had, compared whole and with sorted keys, as above. New entries may only be
+// added.
+
+/** The deleted-location record as loaded, each entry as canonical JSON text. */
+export const locationLogBaseline = (log: readonly LocationEvent[] | null | undefined): string[] => (log ?? []).map(canonical)
+
+/** Why a save would drop or change a deleted-location record the loaded inventory had, or null. Plain, no em dash. */
+export function locationLogProblem(baseline: readonly string[], log: readonly LocationEvent[] | null | undefined): string | null {
+  const now = new Set((log ?? []).map(canonical))
+  return baseline.some(e => !now.has(e))
+    ? 'This save would remove or change the record of a location deleted from this inventory. That record is kept permanently, so nothing was saved. Reload the inventory and try again.'
+    : null
 }

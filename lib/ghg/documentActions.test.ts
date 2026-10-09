@@ -216,3 +216,49 @@ describe('the document log is append-only on save', () => {
     expect(page.indexOf('if (logProblem)'), 'refused before the payload is written').toBeLessThan(page.indexOf(".from('ghg_inventories').update(payload)"))
   })
 })
+
+// ── T18 section D: deleting a location ───────────────────────────────────────────────────────────────────────────
+import { locationDeleteRecord, locationDeleteProblem, LOCATION_DELETE_REASON_PROMPT } from './documentActions'
+import { locationLogBaseline, locationLogProblem } from './savePayload'
+
+describe('the record a deleted location leaves', () => {
+  const l = applyPatch(twoBills(), { name: 'Leeds', country: 'GB' })
+  const withHistory = applyPatch(l, withdrawDocument(l, 'feb', { by: BY, at: AT, reason: 'Duplicate' }))
+
+  it('a location with documents needs who and a reason, and leaves a tombstone per document with no reading', () => {
+    expect(locationDeleteProblem(l, { by: BY, reason: ' ' })).toBe('Give a reason.')
+    expect(locationDeleteProblem(l, { by: null, reason: 'x' })).toBe('Sign in to delete a location, so the record shows who did it.')
+    const r = locationDeleteRecord(withHistory, { by: BY2, at: LATER, reason: 'Site closed in 2024' })
+    expect(r).toMatchObject({ kind: 'location_deleted', locationId: 'L1', name: 'Leeds', country: 'GB', at: LATER, by: BY2, reason: 'Site closed in 2024' })
+    expect(r.documents).toEqual(['jan', 'feb'].map(id => ({ kind: 'deleted', docId: id, file: `${id}.pdf`, documentType: 'utility_bill_gas',
+      uploadedAt: '2025-06-01T10:00:00.000Z', sha256: null, at: LATER, by: BY2, reason: 'Site closed in 2024' })))
+    expect(JSON.stringify(r.documents)).not.toMatch(/Gas used|sourceQuote|"value"/)
+    expect(r.document_log, 'the location\'s earlier tombstones and withdrawals go with it').toEqual(withHistory.document_log)
+  })
+  it('a location with no documents leaves the lighter record: who, when, name and country', () => {
+    const empty = { ...emptyLocation('L9', 'Annex'), country: 'US', source_docs: [] }
+    expect(locationDeleteRecord(empty, { by: BY, at: AT })).toEqual({ kind: 'location_deleted', locationId: 'L9', name: 'Annex', country: 'US', at: AT, by: BY, documents: [] })
+    expect(() => locationDeleteRecord(empty, { by: null as never, at: AT })).toThrow('Sign in to delete a location')
+  })
+  it('the reason prompt uses the earlier saved versions wording, singular and plural', () => {
+    expect(LOCATION_DELETE_REASON_PROMPT('Leeds', 2)).toBe('Give a reason for deleting Leeds. Its 2 documents and what was read from them are removed. A record that they existed, who deleted them, when and why is kept. Earlier saved versions of this inventory still contain what was read from them.')
+    expect(LOCATION_DELETE_REASON_PROMPT('Leeds', 1)).toContain('Its document and what was read from it are removed.')
+    expect(LOCATION_DELETE_REASON_PROMPT('Leeds', 2)).not.toMatch(/audit log|—/i)
+  })
+})
+
+describe('the deleted-location record is append-only on save', () => {
+  const r1 = locationDeleteRecord(twoBills(), { by: BY, at: AT, reason: 'Closed' })
+  const r2 = locationDeleteRecord({ ...emptyLocation('L9', 'Annex'), source_docs: [] }, { by: BY2, at: LATER })
+  const baseline = locationLogBaseline([r1])
+  const MSG = 'This save would remove or change the record of a location deleted from this inventory. That record is kept permanently, so nothing was saved. Reload the inventory and try again.'
+  it('dropping or editing an entry is refused; appending passes; key order does not matter', () => {
+    expect(locationLogProblem(baseline, [])).toBe(MSG)
+    expect(locationLogProblem(baseline, undefined)).toBe(MSG)
+    expect(locationLogProblem(baseline, [{ ...r1, reason: 'Changed' }])).toBe(MSG)
+    expect(locationLogProblem(baseline, [{ ...r1, by: BY2 }])).toBe(MSG)
+    expect(locationLogProblem(baseline, [r1, r2])).toBeNull()
+    expect(locationLogProblem(baseline, [Object.fromEntries(Object.entries(r1).reverse()) as typeof r1])).toBeNull()
+    expect(locationLogProblem([], undefined)).toBeNull()
+  })
+})

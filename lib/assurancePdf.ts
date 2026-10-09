@@ -3,7 +3,8 @@ import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
 import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
-import { countryRefusal, yearLabel, periodWords, selectionFor, buildWorkings, type CoverageResolution, type Location, type StoredFactorSelection } from './ghg/engine'
+import { countryRefusal, yearLabel, periodWords, selectionFor, buildWorkings, type CoverageResolution, type Location, type LocationEvent, type StoredFactorSelection } from './ghg/engine'
+import { evidenceRecordRows } from './ghg/evidenceRecord'
 import { selectionContextFor } from './ghg/factorSelection'
 import { FACTOR_YEAR_NO_SUBSTITUTION, FACTOR_YEAR_RULE_CLASS_B } from './ghg/factorEditionRegistry'
 import { SELECTION_RULE_WORDS } from './ghg/workingsCells'
@@ -46,6 +47,8 @@ export interface PdfInventory {
   // F-06: the platform's factor-edition comparison (the page's live one, else the stored column). Printed whether or
   // not the comparability question was answered.
   factor_edition_comparison?: FactorEditionComparison | null
+  // T18 section D: every location deleted from the inventory; each location's own document_log rides on PdfLocation.
+  location_log?: LocationEvent[] | null
 }
 export interface PdfTotals { s1_total: number; s2_location: number; s2_market: number; co2: number; ch4: number; n2o: number; biogenic: number }
 export interface PdfFramework { id: string; name: string; full: string; gwp: string; deadline: string }
@@ -406,6 +409,23 @@ export function generateAssurancePDF(
     bodyStyles: { fontSize: 8, textColor: TABLE_INK },
     margin: { left: M, right: M },
   })
+
+  // T18 (pulled forward from T17, as ruled 9 Oct 2026): every document withdrawn, restored, deleted or deleted unused,
+  // and every location deleted from the inventory, with who, when and why: the sentences the verifier page and the
+  // saved workings carry. Printed only when there is one; a deletion record holds no reading from the file.
+  const record = evidenceRecordRows(inventory)
+  if (record.length > 0) {
+    autoTable(doc, {
+      startY: ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 92) + 14,
+      head: [['Location', 'Document and location record']],
+      body: record,
+      theme: 'grid',
+      headStyles: { fillColor: INK, textColor: ON_COVER, fontSize: 9 },
+      bodyStyles: { fontSize: 8, textColor: TABLE_INK },
+      columnStyles: { 0: { cellWidth: 110 } },
+      margin: { left: M, right: M },
+    })
+  }
 
   // ── PAGE 5 — AUDIT TRAIL ──
   doc.addPage()

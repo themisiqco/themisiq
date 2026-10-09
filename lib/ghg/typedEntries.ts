@@ -17,7 +17,8 @@
 // The workings row for a typed figure carries the latest entry as entered_by and entered_at, with the history
 // (buildWorkings, typedOf).
 
-import { UNIT_FIELDS, activeOverride, isTypedFigure, type Location, type TypedEntry } from './engine'
+import { UNIT_FIELDS, FIELD_NAME, activeOverride, isTypedFigure, isoDateInWords, type Location, type TypedEntry } from './engine'
+import { unitLabel } from './unitLabels'
 
 type Who = { userId: string; email: string }
 
@@ -82,4 +83,26 @@ export function withTypedEntries(loc: Location, a: { by: Who; at: string; baseli
     added.push({ field, value, unit, at: a.at, by: a.by, ...(override ? { overrideReason: override.reason } : {}), ...(a.note ? { note: a.note } : {}) })
   }
   return added.length ? { ...loc, typed_entries: [...(loc.typed_entries ?? []), ...added] } : loc
+}
+
+// T18 diff 4: the names of the typed figures FIELD_NAME (the activity fields) does not cover.
+const EXTRA_FIELD_NAME: Record<string, string> = {
+  purchased_steam_supplier_ef: "the steam supplier's emission factor",
+  light_petrol_miles: 'miles driven, petrol light vehicles', light_diesel_miles: 'miles driven, diesel light vehicles',
+  heavy_petrol_miles: 'miles driven, petrol heavy vehicles', heavy_diesel_miles: 'miles driven, diesel heavy vehicles',
+  light_model_year: 'light vehicle model year', heavy_model_year: 'heavy vehicle model year',
+}
+/** A typed figure's field in words: "natural gas", "miles driven, petrol light vehicles". */
+export const typedFieldName = (field: string): string => FIELD_NAME[field] ?? EXTRA_FIELD_NAME[field] ?? field.replace(/_/g, ' ')
+
+/**
+ * T18 diff 4: one typed entry as the evidence list shows it. Plain, no em dash.
+ * "Natural gas entered as 420 Mcf by jo@acme.example on 2 October 2026."
+ */
+export function typedEntrySentence(e: TypedEntry): string {
+  const name = typedFieldName(e.field)
+  // A model year is a year, so it takes no thousands separator.
+  const figure = `${e.value.toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: !e.field.endsWith('_model_year') })}${e.unit ? ` ${unitLabel(e.unit)}` : ''}`
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} entered as ${figure} by ${e.by.email} on ${isoDateInWords(e.at.slice(0, 10))}`
+    + `${e.note ? ` (${e.note})` : ''}${e.overrideReason ? `, by hand instead of from the bills: ${e.overrideReason}` : ''}.`
 }

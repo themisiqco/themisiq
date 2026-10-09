@@ -6,7 +6,8 @@
 // match cannot come from another action's record.
 //
 // Diff 1 covers the proposal actions; diff 2 the document lifecycle (withdraw, restore, delete permanently, delete
-// unused); diff 3 typed entries (at a save, and at a free-calculator claim) and every coverage resolution.
+// unused); diff 3 typed entries (at a save, and at a free-calculator claim) and every coverage resolution; diff 4
+// location deletion, with documents and without (T18 section D).
 
 import { describe, it, expect } from 'vitest'
 import { figuresForSave, typedEntriesBaseline, typedEntriesProblem, documentLogBaseline, documentLogProblem } from './savePayload'
@@ -14,7 +15,7 @@ import {
   confirmProposal, editFigure, flagProposal, editPeriod, editUnit, rejectProposal, undoRejection, chooseFleetType, guardConfirm,
 } from './proposalEdits'
 import { addOverride, removeOverride } from './overrides'
-import { withdrawDocument, restoreDocument, deleteDocument } from './documentActions'
+import { withdrawDocument, restoreDocument, deleteDocument, locationDeleteRecord } from './documentActions'
 import {
   sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution, deliveriesCompleteResolution,
   exactDuplicateCountOnce, exactDuplicateNotSame,
@@ -133,6 +134,18 @@ const ACTIONS: Action[] = [
     exactDuplicateCountOnce({ locId: 'L1', fuelType: 'diesel', counted: TANK, excluded: FLEET, by, at })) },
   { name: 'exact duplicate, not the same', act: (by, at) => withResolution(dieselTwins(),
     exactDuplicateNotSame({ locId: 'L1', fuelType: 'diesel', docs: [TANK, FLEET], by, at })) },
+  // T18 diff 4 (section D): a second location is deleted. Its record is the inventory's location_log; the location
+  // itself is gone from locations_data.
+  { name: 'delete location with documents', act: (by, at) => {
+    const keep = gasSite(prop({ ...FEB }))
+    const gone: Location = { ...gasSite(prop({ ...FEB })), id: 'L2', name: 'Leeds', country: 'GB' }
+    return { ...inv(keep), location_log: [locationDeleteRecord(gone, { by, at, reason: 'Site closed in 2024' })] } as Inventory
+  } },
+  { name: 'delete location without documents', act: (by, at) => {
+    const keep = gasSite(prop({ ...FEB }))
+    const gone: Location = { ...emptyLocation('L3', 'Annex'), country: 'US', source_docs: [] }
+    return { ...inv(keep), location_log: [locationDeleteRecord(gone, { by, at })] } as Inventory
+  } },
   { name: 'fleet type', act: (by, at) => {
     const diesel = (o: Partial<ExtractedProposal>) => prop({ fuelType: 'diesel', rawValue: 500, rawUnit: 'litres', value: 500, unit: 'litres', sourceQuote: '500 litres', ...o })
     // A confirmed heavy-vehicle bill for January to June, so the row exists; the choice is made on July to December's.
@@ -149,7 +162,7 @@ const EXPECTED = [
   'confirm', 'edit figure', 'flag', 'edit dates', 'confirm dates', 'edit unit', 'edit unit after edit figure', 'reject', 'undo', 'override', 'remove override',
   'withdraw', 'restore', 'delete permanently', 'delete unused',
   'typed entry', 'typed entry at claim', 'same bill', 'different meters', 'estimate', 'used none', 'deliveries complete',
-  'exact duplicate, count once', 'exact duplicate, not the same', 'fleet type',
+  'exact duplicate, count once', 'exact duplicate, not the same', 'delete location with documents', 'delete location without documents', 'fleet type',
 ]
 
 /** True when some object in `node` holds `at` as one value and a person with `email` as another. */
@@ -177,7 +190,8 @@ describe('T18: every review action leaves who and when in the saved workings', (
       expect(holdsWhoAndWhen(workings, by.email, at), `${a.name}: who and when in the saved workings`).toBe(true)
       // The raw locations are saved too; the record is there as well as in the workings. A coverage resolution is
       // saved in its own column, not in locations_data, so it is checked there instead.
-      const elsewhere = a.save ? locations_data : [locations_data, i0.coverage_resolutions]
+      // A deleted location's record is saved in its own column (location_log), so it is checked there too.
+      const elsewhere = a.save ? locations_data : [locations_data, i0.coverage_resolutions, i0.location_log]
       expect(holdsWhoAndWhen(elsewhere, by.email, at), `${a.name}: who and when in what is saved beside the workings`).toBe(true)
     })
   })

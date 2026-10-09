@@ -97,7 +97,7 @@ describe('removing a stored document (RM1)', () => {
 
 describe('the page wires it (source)', () => {
   const PAGE = stripTsComments(readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8'))
-  const body = (fn: string) => PAGE.slice(PAGE.indexOf(fn), PAGE.indexOf(fn) + 2600)
+  const body = (fn: string) => PAGE.slice(PAGE.indexOf(fn), PAGE.indexOf(fn) + 4000)
 
   it('removeDoc ignores a second call, and judges an empty result on the current state', () => {
     const b = body('const removeDoc = async')
@@ -108,8 +108,9 @@ describe('the page wires it (source)', () => {
   })
 
   it("a document's Remove control is disabled while its delete is in flight, and so is a location's", () => {
-    expect(PAGE).toContain('disabled={removingDocIds.has(doc.id)}')
-    expect(PAGE.split('onRemove={removeDoc} removingDocIds={removing}').length - 1, 'every upload slot').toBe(11)
+    // T18 diff 4: while a delete is in flight the document's actions give way to "Removing…".
+    expect(PAGE).toContain("{removingDocIds.has(doc.id) ? <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Removing…</span>")
+    expect(PAGE.split('onDocumentAction={documentAction} removingDocIds={removing}').length - 1, 'every upload slot').toBe(11)
     expect(PAGE).toContain('disabled={removing.has(`location:${loc.id}`)}')
     const loc = body('const removeLocation = async')
     expect(loc).toContain('if (removeInFlight.current.has(key)) return')
@@ -118,6 +119,6 @@ describe('the page wires it (source)', () => {
 
   it('no em dash in the new copy', () => {
     for (const s of [REMOVE_DOC_REFUSED, 'Removing…']) expect(s).not.toContain('\u2014')
-    expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain("'Removing…'")
+    expect(readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain('Removing…')
   })
 })

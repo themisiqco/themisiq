@@ -59,7 +59,10 @@ describe('the wizard upload control', () => {
 
   it('UR5b: no Remove control without an active plan, one plain line instead, and both delete paths are guarded', () => {
     // RM1: the control is also disabled while its own delete is in flight.
-    expect(PAGE).toContain("{!uploadsOff && <button disabled={removingDocIds.has(doc.id)} onClick={() => onRemove(locId, doc.id, doc.file_path, `${locIdx}:${docType}`)}")
+    // T18 diff 4: Remove became the document actions, still only with an active plan.
+    expect(PAGE).toContain('{!uploadsOff && (')
+    expect(PAGE).toContain('documentActionsFor(doc).map(a => (')
+    expect(PAGE).toContain('onClick={() => onDocumentAction(locId, doc.id, a, `${locIdx}:${docType}`)}')
     expect(PAGE).toContain('{uploadsOff && docs.length > 0 && (')
     // removeDoc: refuses without a plan, and treats an empty remove as not deleted while the document is still
     // listed (RM1: lib/ghg/removeStored.ts, which compares what was asked for with what Storage reports removing).

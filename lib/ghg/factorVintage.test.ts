@@ -222,7 +222,7 @@ describe('H. step 1 labels the grid factor for every resolved location', () => {
     expect(labelLine()).toContain('gridShown(loc.grid_region)')
     expect(pageSrc).toContain('try { return String(getGridFactor(region, factorSel).ef) }')
     // T3c diff 3: with the inventory's frozen class (b) choices for its window.
-    expect(pageSrc).toContain('const factorCtx = selectionContextFor(inventory)')
+    expect(pageSrc).toContain('const factorCtx = { ...selectionContextFor(inventory), ...(inventoryId ? {} : { unsaved: true as const }) }')
     expect(pageSrc).toContain('const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)')
   })
 

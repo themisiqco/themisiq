@@ -512,6 +512,8 @@ function corrected(e: FactorEditionEntry, preparedOn: string): { correction: Cor
 export function selectEdition(
   dataset: DatasetId, window: Window, reportingYear: number, preparedOn: string, frozen?: FrozenSelection,
   registry: readonly FactorEditionEntry[] = FACTOR_EDITION_REGISTRY,
+  // T18 diff 4: nothing is saved yet, so a newest-edition choice is worded as made today for this calculation.
+  opts: { unsaved?: boolean } = {},
 ): SelectEditionResult {
   const meta = DATASETS[dataset]
   const entries = registry.filter(e => e.dataset === dataset)
@@ -556,7 +558,10 @@ export function selectEdition(
     const revs = newest.corrections.filter(c => c.date <= preparedOn).at(-1)
     const rev = !revs ? '' : /^Revision \d+\.$/.test(revs.note)
       ? `, ${revs.note.replace(/\.$/, '').toLowerCase()} of ${registryDateInWords(revs.date)}` : `, corrected on ${registryDateInWords(revs.date)}`
-    const basis = `${newest.label} (${publishedWords(newest)}${rev}): the newest edition when this inventory was first prepared on ${dateInWords(new Date(preparedOn + 'T00:00:00'))}; no ${m.year} data year was published.`
+    const on = dateInWords(new Date(preparedOn + 'T00:00:00'))
+    const basis = opts.unsaved
+      ? `${newest.label} (${publishedWords(newest)}${rev}): the newest edition published, selected today, ${on}, for this calculation; no ${m.year} data year was published.`
+      : `${newest.label} (${publishedWords(newest)}${rev}): the newest edition when this inventory was first prepared on ${on}; no ${m.year} data year was published.`
     return newest.held ? choose(newest, 'data_year_newest', basis, { selected_on: preparedOn }) : missing(newest.label, 'data_year_newest', 'not_held', notLoaded(newest.label))
   }
 

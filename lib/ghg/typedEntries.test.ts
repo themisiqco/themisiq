@@ -177,3 +177,19 @@ describe('typed entries are append-only on save', () => {
       'loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(saved.locations_data), entries: typedEntriesBaseline(saved.locations_data) }']) expect(page).toContain(s)
   })
 })
+
+// ── T18 diff 4: the evidence list's sentence for each typed entry ──────────────────────────────────────────────────
+import { typedEntrySentence, typedFieldName } from './typedEntries'
+describe('a typed entry in words', () => {
+  it('names the figure, the value and unit as the customer reads them, who and when, and any note or override reason', () => {
+    expect(typedEntrySentence({ field: 'natural_gas_amount', value: 4200, unit: 'mcf', at: T1, by: BY })).toBe('Natural gas entered as 4,200 Mcf by jo@acme.example on 2 October 2026.')
+    expect(typedEntrySentence({ field: 'electricity_kwh', value: 12000, unit: 'kWh', at: T1, by: BY, note: ENTERED_BEFORE_SIGN_IN }))
+      .toBe('Electricity entered as 12,000 kWh by jo@acme.example on 2 October 2026 (entered before sign-in).')
+    expect(typedEntrySentence({ field: 'natural_gas_amount', value: 96, unit: 'gj', at: T2, by: BY2, overrideReason: 'Bills were estimated' }))
+      .toBe('Natural gas entered as 96 GJ by sam@acme.example on 3 October 2026, by hand instead of from the bills: Bills were estimated.')
+    expect(typedEntrySentence({ field: 'light_model_year', value: 2019, unit: null, at: T1, by: BY })).toBe('Light vehicle model year entered as 2019 by jo@acme.example on 2 October 2026.')
+  })
+  it('every typed field has a name, not its key', () => {
+    for (const f of TYPED_FIGURE_FIELDS) expect(typedFieldName(String(f.field)), String(f.field)).not.toContain('_')
+  })
+})
