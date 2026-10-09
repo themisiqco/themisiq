@@ -15,15 +15,18 @@
 //     therefore the ONLY isolation, and it is shared with the sign route so the two cannot drift.
 //   • The inventory id comes from the validated grant, NEVER from the request body. The client
 //     sends only { token }.
-//   • file_path is NOT returned. STATED HONESTLY: that does not mean paths stay server-side the way
-//     they do for CBAM. get_verifier_inventory returns to_jsonb(i) — the WHOLE inventory row — so
-//     locations_data[].source_docs[].file_path and workings[].source_file_paths still reach the
-//     verifier's browser through that RPC. Closing that means rewriting a live SECURITY DEFINER
-//     function that feeds the entire page, which is a separate change. What IS achieved here is the
-//     property that matters: the client never NAMES a path, so there is no traversal surface.
+//   • file_path is NOT returned. STATED HONESTLY: paths still reach the verifier's browser another
+//     way. get_verifier_inventory returns the pinned version's snapshot (ghg_verifier_projection),
+//     which keeps locations_data[].source_docs[] whole, file_path included, and workings rows'
+//     source_file_paths. What IS achieved here is the property that matters: the client never NAMES
+//     a path, so there is no traversal surface.
+//   • T16: THE DOCUMENTS ARE THE PINNED VERSION'S, not today's (loadPinnedDocuments). A document the
+//     version names that has been deleted since is still listed, with status 'deleted' and a note
+//     saying who deleted it and when, so the verifier sees why it cannot be opened rather than a gap.
 
 import { createServerClient } from '../../../lib/supabase'
-import { validateVerifierGrant, flattenSourceDocs } from '../../../lib/ghg/verifierGrant'
+import { validateVerifierGrant } from '../../../lib/ghg/verifierGrant'
+import { loadPinnedDocuments } from '../../../lib/ghg/verifierPinned'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -44,25 +47,20 @@ export async function POST(req: NextRequest) {
   const grant = await validateVerifierGrant(admin, token)
   if (!grant.ok) return NextResponse.json({ error: grant.reason }, { status: 403 })
 
-  // 2. Load ONLY this inventory's locations_data.
-  const { data: inv, error: invErr } = await admin
-    .from('ghg_inventories')
-    .select('locations_data')
-    .eq('id', grant.inventoryId)
-    .single()
+  // 2. Load ONLY the pinned version's documents, each checked against the live inventory.
+  const pinned = await loadPinnedDocuments(admin, grant)
+  if (!pinned.ok) return NextResponse.json({ error: pinned.reason }, { status: 404 })
 
-  if (invErr || !inv) {
-    return NextResponse.json({ error: 'inventory_not_found' }, { status: 404 })
-  }
-
-  // 3. Metadata only. `id` is the key the sign route resolves back to a path; a document with no id
-  // cannot be signed at all, so it comes back as null and the row renders unavailable rather than
-  // as a button guaranteed to fail.
-  const documents = flattenSourceDocs(inv.locations_data).map(({ doc, location }) => ({
-    id: doc.id ?? null,
-    file_name: doc.file_name || 'document',
-    document_type: doc.document_type || 'document',
-    location,
+  // 3. Metadata only, never file_path. `id` is the key the sign route resolves back to a path; a
+  // document with no id cannot be signed at all, so it comes back as null and the row renders
+  // unavailable rather than as a button guaranteed to fail.
+  const documents = pinned.documents.map(d => ({
+    id: d.id,
+    file_name: d.file_name,
+    document_type: d.document_type,
+    location: d.location,
+    status: d.status,
+    ...(d.deleted_note ? { deleted_note: d.deleted_note } : {}),
   }))
 
   return NextResponse.json({ documents })

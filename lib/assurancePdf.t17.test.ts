@@ -30,6 +30,7 @@ import { t17Fixture } from './testing/t17Fixture'
 import { storedRows, derivationsFromRows, residualRowsFromRows, WORKINGS_NOT_KEPT } from './ghg/storedWorkings'
 import { workingsSourceParts, sourcePartsLines, workingsGwpBasisCell } from './ghg/workingsCells'
 import { WorkingsSourceCell } from '../app/verify/[token]/_components/WorkingsSourceCell'
+import { verifierVersionLines } from './ghg/versionWords'
 
 type Table = { head?: string[][]; body?: string[][]; showHead?: string; rowPageBreak?: string }
 const fw = (ids: string[]) => ids.map(id => ({ id, name: id.toUpperCase(), full: id, gwp: 'AR6', deadline: '2026' }))
@@ -123,6 +124,24 @@ describe('T17: the other pages read the stored row', () => {
     const { texts, tables } = run(saved())
     expect(texts).toContain('Prints this inventory as saved on 9 October 2026 at 14:32 UTC.')
     expect(tables.find(t => t.head?.[0]?.[1] === 'GWP')!.body![0][1]).toBe('IPCC AR6')
+  })
+  it('T16: the cover prints the version line, then the save it prints; with no version, the save line alone', () => {
+    const { texts } = run(saved({ version_no: 3, version_saved_at: '2026-10-09T14:32:05.123Z' }))
+    const v = texts.indexOf('Version 3, saved on 9 October 2026 at 14:32 UTC.')
+    expect(v).toBeGreaterThan(-1)
+    expect(texts[v + 1]).toBe('Prints this inventory as saved on 9 October 2026 at 14:32 UTC.')
+    expect(run(saved()).texts.some(t => typeof t === 'string' && t.startsWith('Version '))).toBe(false)
+  })
+  it('T16: the PDF and the verifier page give the same version line for one version, a reused one included', () => {
+    // A reused version: snapshotted on 1 October, the inventory re-saved on 9 October with nothing a verifier sees changed.
+    const version = { version_no: 3, saved_at: '2026-10-01T08:15:42Z', shared_at: '2026-10-02T09:00:00Z', shared_by_customer: true }
+    const { texts } = run(saved({ version_no: 3, version_saved_at: version.saved_at }))
+    const [pageLine] = verifierVersionLines(version)
+    expect(pageLine).toBe('Version 3, saved on 1 October 2026 at 08:15 UTC.')
+    expect(texts).toContain(pageLine)
+    // The save printed is the later one, on its own line; the version line never takes updated_at.
+    expect(texts[texts.indexOf(pageLine) + 1]).toBe('Prints this inventory as saved on 9 October 2026 at 14:32 UTC.')
+    expect(texts).not.toContain('Version 3, saved on 9 October 2026 at 14:32 UTC.')
   })
   it('the old GWP basis token prints the current wording, as the verifier page shows it', () => {
     const old = `as-published ${String.fromCharCode(0x2014)} see factor source`

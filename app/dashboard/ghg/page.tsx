@@ -46,6 +46,7 @@ import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
+import { grantVersionLine } from '../../../lib/ghg/versionWords'
 import { SB253_SCOPE3_FROM, SB253_WINDOW_STATUS_WORDS, SB253_ELECTION_BANNER, sb253FirstReportBanner } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -3748,7 +3749,7 @@ workings: saved.workings,
               )
             })}
           </div>
-          <VerifierInvite inventoryId={inventoryId} />
+          <VerifierInvite inventoryId={inventoryId} dirty={dirty || baseline === undefined} />
           {/* SBTi nudge — shown once the inventory is saved AND its figures confirmed (a settled
               baseline). Affirmative next-step, not a warning. Always shows when gated (no sbti_targets
               read); copy reads fine whether or not targets already exist. GHG-gated page ⇒ no entitlement check. */}
@@ -3800,9 +3801,16 @@ workings: saved.workings,
       alert('The assurance package was not generated.\n\n' + (rowErr ? `The saved inventory could not be read: ${rowErr.message}` : 'The saved inventory was not found.') + '\n\nNothing has been downloaded.')
       return
     }
+    // T16 (ruling C): the package names the saved version it prints. Snapshot the saved row (an unchanged one reuses
+    // the latest version) and print its number on the cover. No version, no package: it would otherwise name none.
+    const snap = await snapshotSavedVersion(inventoryId)
+    if (!snap.ok) {
+      alert('The assurance package was not generated.\n\n' + `The saved version could not be recorded: ${snap.message}` + '\n\nNothing has been downloaded.')
+      return
+    }
     const storedFrameworks = FRAMEWORKS.filter(f => (row.selected_frameworks ?? []).includes(f.id))
     generateAssurancePDF(
-      { ...row, locations: Array.isArray(row.locations_data) ? row.locations_data : [], location_log: Array.isArray(row.location_log) ? row.location_log : [] },
+      { ...row, locations: Array.isArray(row.locations_data) ? row.locations_data : [], location_log: Array.isArray(row.location_log) ? row.location_log : [], version_no: snap.version_no, version_saved_at: snap.saved_at },
       { s1_total: Number(row.scope1_total ?? 0), s2_location: Number(row.scope2_location_total ?? 0), s2_market: Number(row.scope2_market_total ?? 0) },
       storedFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES)
   }
@@ -4193,7 +4201,7 @@ workings: saved.workings,
             customer_user_id = auth.uid(), there is no trigger on the table, and a minted token then
             reads the inventory for its own 90 days with no entitlement check anywhere downstream.
             The audit trail stays: reading is not withdrawn by expiry (see the ENTRY GATE note). */}
-        {step === 6 && <><AuditTrail inventoryId={inventoryId} step={step} />{ghgAccess === 'active' && <VerifierInvite inventoryId={inventoryId} />}</>}
+        {step === 6 && <><AuditTrail inventoryId={inventoryId} step={step} />{ghgAccess === 'active' && <VerifierInvite inventoryId={inventoryId} dirty={dirty || baseline === undefined} />}</>}
 
         {step === 2 && !gridReady && (
           <div style={{ background: '#FEF3E2', border: '0.5px solid color-mix(in srgb, var(--color-state-warn) 30%, transparent)', borderRadius: 8, padding: '12px 16px', marginTop: '1.5rem', fontSize: 12, fontWeight: 600, color: 'var(--color-state-warn)' }}>⚠ {unresolvedGridLocations.length} location{unresolvedGridLocations.length > 1 ? 's' : ''} need{unresolvedGridLocations.length > 1 ? '' : 's'} a grid region before you can continue: {unresolvedGridLocations.map(l => l.name).join(', ')}</div>
@@ -4691,9 +4699,31 @@ interface VerifierGrant {
   status: string
   expires_at: string
   created_at: string
+  // T16: the saved version the link shows, and when it was shared on it.
+  inventory_version_id: string | null
+  version_shared_at: string | null
+  ghg_inventory_versions: { version_no: number; saved_at: string } | null
 }
 
-function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
+/**
+ * T16: the owner snapshots the SAVED inventory (ghg_snapshot_inventory_version). An unchanged projection reuses the
+ * latest version; a changed one writes the next. Used at link issue, at "Share the latest saved version" and at
+ * assurance PDF export (ruling C), never on save.
+ */
+// Returns the version id with its number and its own saved_at, read from the version row the snapshot returned, so the
+// PDF cover prints the same "Version {n}, saved on ..." the verifier page shows for that version.
+type SavedVersion = { ok: true; id: string; version_no: number; saved_at: string } | { ok: false; message: string }
+async function snapshotSavedVersion(inventoryId: string): Promise<SavedVersion> {
+  const { data, error } = await supabase.rpc('ghg_snapshot_inventory_version', { p_inventory_id: inventoryId })
+  if (error) return { ok: false, message: error.message }
+  if (!data || typeof data !== 'string') return { ok: false, message: 'The request returned no version.' }
+  const { data: ver, error: verErr } = await supabase.from('ghg_inventory_versions').select('version_no, saved_at').eq('id', data).maybeSingle()
+  if (verErr) return { ok: false, message: `The version was recorded but could not be read: ${verErr.message}` }
+  if (!ver) return { ok: false, message: 'The version was recorded but was not found.' }
+  return { ok: true, id: data, version_no: ver.version_no, saved_at: ver.saved_at }
+}
+
+function VerifierInvite({ inventoryId, dirty }: { inventoryId: string | null; dirty: boolean }) {
   const [grants, setGrants] = useState<VerifierGrant[]>([])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -4706,12 +4736,13 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
   const [includeScope3, setIncludeScope3] = useState(false)
   const [creating, setCreating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [sharingId, setSharingId] = useState<string | null>(null)
 
   const load = () => {
     if (!inventoryId) return
     supabase
       .from('verifier_access')
-      .select('*')
+      .select('*, ghg_inventory_versions(version_no, saved_at)')
       .eq('inventory_id', inventoryId)
       .order('created_at', { ascending: false })
       .then((res: { data: VerifierGrant[] | null }) => setGrants(res.data || []))
@@ -4741,8 +4772,14 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
       window.location.href = `/login?next=${encodeURIComponent('/dashboard/ghg')}`
       return
     }
+    // T16: SNAPSHOT FIRST. A link shows the version it was issued against, never the live row. The insert trigger
+    // (trg_verifier_access_pin_version) would snapshot too if this were skipped, and refuses a version of another
+    // inventory; taking it here means a failure is reported before any link exists.
+    const snap = await snapshotSavedVersion(inventoryId)
+    if (!snap.ok) { setCreating(false); alert('Could not create invitation: the saved inventory could not be snapshotted: ' + snap.message); return }
     const { error } = await supabase.from('verifier_access').insert({
       inventory_id: inventoryId,
+      inventory_version_id: snap.id,
       customer_user_id: session.user.id,
       verifier_name: name || null,
       verifier_email: email || null,
@@ -4759,6 +4796,28 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
       .update({ status: 'revoked', revoked_at: new Date().toISOString() })
       .eq('id', id)
     if (error) { alert('Could not revoke: ' + error.message); return }
+    load()
+  }
+
+  // T16 (ruling B): the same link, the same verifier and their consent, now showing the latest saved version. The
+  // trigger records who shared it and when, and refuses a version that is not this inventory's.
+  const shareLatest = async (g: VerifierGrant) => {
+    if (!inventoryId) return
+    if (dirty) {
+      alert('Save the inventory first. A verifier is shown the inventory as saved, and this page has changes that are not saved.')
+      return
+    }
+    setSharingId(g.id)
+    const snap = await snapshotSavedVersion(inventoryId)
+    if (!snap.ok) { setSharingId(null); alert('The latest version was not shared: the saved inventory could not be snapshotted: ' + snap.message); return }
+    if (snap.id === g.inventory_version_id) {
+      setSharingId(null)
+      alert('This verifier already has the latest saved version. Nothing was changed.')
+      return
+    }
+    const { error } = await supabase.from('verifier_access').update({ inventory_version_id: snap.id }).eq('id', g.id)
+    setSharingId(null)
+    if (error) { alert('The latest version was not shared: ' + error.message); return }
     load()
   }
 
@@ -4824,8 +4883,10 @@ function VerifierInvite({ inventoryId }: { inventoryId: string | null }) {
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#0d0d0d' }}>{g.verifier_name || 'Verifier'}{g.verifier_email ? ` · ${g.verifier_email}` : ''}</div>
               <div style={{ fontSize: 11, color: 'var(--color-ink-muted)', marginTop: 2 }}>Expires {new Date(g.expires_at).toLocaleDateString()}</div>
+              <div style={{ fontSize: 11, color: '#555553', marginTop: 2 }}>{grantVersionLine(g.ghg_inventory_versions?.version_no, g.version_shared_at)}</div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => shareLatest(g)} disabled={sharingId === g.id} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: sharingId === g.id ? 'wait' : 'pointer', color: '#555553' }}>{sharingId === g.id ? 'Sharing…' : 'Share the latest saved version'}</button>
               <button onClick={() => copy(g.token, g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: '#fff', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#555553' }}>{copiedId === g.id ? '✓ Copied' : 'Copy link'}</button>
               <button onClick={() => revoke(g.id)} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 6, background: 'none', border: '0.5px solid #e8e7e4', cursor: 'pointer', color: '#B91C1C' }}>Revoke</button>
             </div>

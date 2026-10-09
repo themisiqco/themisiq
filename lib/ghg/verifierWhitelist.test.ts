@@ -46,14 +46,35 @@ function latestRpcMigration(): { name: string; sql: string } {
 const stripSql = (sql: string) =>
   sql.split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
 
-/** The keys of the INVENTORY jsonb_build_object — the projection whitelist. */
+/**
+ * T16: the newest migration defining public.ghg_verifier_projection, the one function both get_verifier_inventory and
+ * the version snapshot read the inventory keys from. Before T16 the keys were built inside the RPC itself.
+ */
+function latestProjectionMigration(): { name: string; sql: string } {
+  const files = readdirSync(MIGRATIONS).filter(f => f.endsWith('.sql') && /ghg_verifier_projection/i.test(f)).sort();
+  expect(files.length, 'no ghg_verifier_projection migration found').toBeGreaterThan(0);
+  const name = files[files.length - 1];
+  return { name, sql: readFileSync(join(MIGRATIONS, name), 'utf8') };
+}
+
+/** The keys of the INVENTORY jsonb_build_object — the projection whitelist. T16: in ghg_verifier_projection. A key's
+ *  value is a column (`i.x`) or, for locations_data, the CASE that strips the quantity keys. */
 function projectionKeys(sql: string): string[] {
   const body = stripSql(sql);
   const start = body.indexOf('select jsonb_build_object(');
   expect(start, 'inventory projection not found').toBeGreaterThan(-1);
-  const end = body.indexOf(') into v_inventory', start);
+  const end = body.indexOf('$$;', start);
   expect(end, 'end of inventory projection not found').toBeGreaterThan(start);
-  return [...body.slice(start, end).matchAll(/'([a-z0-9_]+)'\s*,\s*i\./g)].map(m => m[1]);
+  return [...body.slice(start, end).matchAll(/'([a-z0-9_]+)'\s*,\s*(?:i\.|case\b)/g)].map(m => m[1]);
+}
+
+/** T16: the location-level keys the projection strips from each locations_data element. */
+function strippedKeys(sql: string): string[] {
+  const body = stripSql(sql);
+  const start = body.indexOf('e.value - array[');
+  expect(start, 'the stripped-key array was not found').toBeGreaterThan(-1);
+  const end = body.indexOf(']::text[]', start);
+  return [...body.slice(start, end).matchAll(/'([a-z0-9_]+)'/g)].map(m => m[1]);
 }
 
 /** The field names inside the changed_fields unnest(array[...]). */
@@ -81,7 +102,8 @@ function auditLabels(): { keys: string[]; fallback: string } {
 
 describe('the verifier whitelist is coherent across its three coupled sites', () => {
   const { name, sql } = latestRpcMigration();
-  const projection = projectionKeys(sql);
+  const proj = latestProjectionMigration();
+  const projection = projectionKeys(proj.sql);
   const changed = changedFields(sql);
   const { keys: labels, fallback } = auditLabels();
 
@@ -153,12 +175,28 @@ describe('the verifier whitelist is coherent across its three coupled sites', ()
     }
   });
 
+  it('W-9 (T16) the projection strips all thirteen bill-backed quantity keys from each location, and keeps source_docs', () => {
+    // Since T7 locations_data holds what was typed, usually 0, where the figure comes from bills; the figure is in
+    // workings. The thirteen are every field lib/ghg/engine.ts fieldFor maps documents to, the six FI9 fleet fields
+    // included (the design's list of seven predated them).
+    expect(strippedKeys(proj.sql).sort()).toEqual([
+      'diesel_mobile_amount', 'diesel_stationary_amount', 'electricity_kwh', 'gasoline_amount', 'heavy_diesel_amount',
+      'heavy_petrol_amount', 'light_diesel_amount', 'light_petrol_amount', 'natural_gas_amount', 'nonroad_diesel_amount',
+      'nonroad_petrol_amount', 'propane_amount', 'renewable_electricity_kwh',
+    ])
+    expect(strippedKeys(proj.sql)).not.toContain('source_docs')
+    expect(projection, 'the RPC still projects sixteen keys').toHaveLength(16)
+    // The RPC reads the pinned snapshot and the live projection through the same function, so the two cannot differ.
+    expect(stripSql(sql)).toContain('ghg_verifier_projection(i)')
+    expect(stripSql(sql)).toContain('v_inventory := v_version.snapshot;')
+  });
+
   it('W-6 the migration is ASCII-only — the 13 Aug paste failure', () => {
     // The factor_editions column migration did not paste cleanly into the Supabase SQL editor: only
     // its `alter table` ran, and the comment and grants had to be run separately. Non-ASCII in the
     // header block is the suspected cause. A migration that cannot be pasted whole is a migration
     // that lands in pieces, which is how a live function drifts from the file that claims to define it.
-    const nonAscii = [...sql].map((ch, i) => ({ ch, i })).filter(x => x.ch.charCodeAt(0) > 127);
+    const nonAscii = [...sql + proj.sql].map((ch, i) => ({ ch, i })).filter(x => x.ch.charCodeAt(0) > 127);
     const where = nonAscii.slice(0, 5).map(x => {
       const line = sql.slice(0, x.i).split('\n').length;
       return `line ${line}: ${JSON.stringify(x.ch)} (U+${x.ch.charCodeAt(0).toString(16).toUpperCase()})`;

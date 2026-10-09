@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../../lib/verifierDocNotice'
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
+import { verifierVersionLines, NEWER_VERSION_NOTICE, DELETED_FILE_QUOTE_SUFFIX, type VerifierVersion } from '../../../lib/ghg/versionWords'
 import { COMPARABILITY_ANSWER_WORDS, comparabilityHeading, factorEditionSurfaceLines, type ComparabilityRecord, type FactorEditionComparison } from '../../../lib/ghg/comparability'
 import type { CountryRefusal } from '../../../lib/ghg/engine'
 // T11: the year labels from their own module, not the engine.
@@ -44,7 +45,9 @@ interface AuditEntry {
 // METADATA ONLY. No signed_url and no file_path: URLs are minted per-document on click (see
 // openVerifierDoc below), so nothing on this page carries a clock the verifier cannot see. `id` is
 // null for a legacy document uploaded before ids existed — it cannot be signed, so its row says so.
-interface VerifierDoc { id: string | null; file_name: string; document_type: string; location: string }
+// T16: the documents are the pinned version's. One deleted since carries status 'deleted' and the note that says who
+// deleted it and when, and gets no link: the file is no longer held.
+interface VerifierDoc { id: string | null; file_name: string; document_type: string; location: string; status?: 'available' | 'deleted'; deleted_note?: string }
 interface WorkingRow {
   location: string; source: string; scope: number
   // NULLABLE, because the engine emits null and always has. These were declared `number`, the RPC
@@ -156,8 +159,8 @@ interface InventoryData {
   // ISO 14064-3 7.1.4.9(b): the verifier must be able to confirm which GWP set the figures use.
   // Optional because a row saved before the RPC carried it will not have one — see the header render.
   gwp_version?: string | null
-  // get_verifier_inventory returns to_jsonb(i) — the whole inventory row — so source_docs come down
-  // with it. Declared here because the inline quote links need the path→id correlation, and taking
+  // get_verifier_inventory returns the pinned version's snapshot (T16), which keeps source_docs whole, so they come
+  // down with it. Declared here because the inline quote links need the path→id correlation, and taking
   // it from data already in the payload avoids asking the documents route for paths as well.
   // T11: and each document's file name and the quote read off each reading, so the bills behind a figure are named.
   locations_data: { name: string; source_docs?: { id?: string; file_path?: string; file_name?: string; extracted?: { sourceQuote?: string | null }[] }[] }[]
@@ -249,6 +252,11 @@ interface VerifierPayload {
   verifier?: { name: string | null; email: string | null }
   expires_at?: string
   accepted_at?: string | null
+  // T16: the saved version this link shows, and whether the inventory has been saved with changes since.
+  version?: VerifierVersion
+  newer_version_exists?: boolean
+  // T16: with error 'consent_required', the company's name for the consent step, and no figures.
+  company_name?: string | null
   error?: string
 }
 
@@ -412,7 +420,11 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
             <a href={manualUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>Open document</a>
           </span>
         )}
-        {doc.id ? (
+        {doc.status === 'deleted' ? (
+          // T16: in the version shared, deleted since. Listed with who deleted it and when; no button, because there
+          // is no file left to open.
+          <span style={{ fontSize: 11, color: '#92400e', maxWidth: 420, lineHeight: 1.5 }}>{doc.deleted_note}</span>
+        ) : doc.id ? (
           <button onClick={() => open(doc.id!)} disabled={busy} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, border: 'none', background: '#0d0d0d', color: '#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Opening…' : 'View'}
           </button>
@@ -485,6 +497,10 @@ export default function VerifierPage() {
   const [submitting, setSubmitting] = useState(false)
   const [gateError, setGateError] = useState<string | null>(null)
 
+  // Bumped after the verifier consents: get_verifier_inventory returns no figures before consent (T16, ruling E), so
+  // the inventory is read again once it has been given.
+  const [loadKey, setLoadKey] = useState(0)
+
   useEffect(() => {
     if (!token) return
     supabase.rpc('get_verifier_inventory', { p_token: token }).then(
@@ -505,7 +521,7 @@ export default function VerifierPage() {
         setLoading(false)
       },
     )
-  }, [token])
+  }, [token, loadKey])
 
   // Seed the consent-gate email from the grant's stored verifier email, once,
   // without clobbering anything the verifier has typed. (Does not touch the load effect.)
@@ -525,8 +541,8 @@ export default function VerifierPage() {
   // ⚠️ GATED ON THE SAME hasAccess THE DOCUMENTS FETCH USES, and the RPC gates on consent again in its
   // own body. Two gates on purpose: the client one keeps the ordinary flow from ever producing a
   // consent_required, and the server one is the actual boundary, because a direct RPC call ignores this
-  // component entirely. That is exactly the gap get_verifier_inventory has, where consent is checked
-  // only here and a valid token calling the RPC directly bypasses it.
+  // component entirely. get_verifier_inventory had exactly that gap, consent checked only here, until T16 (ruling E)
+  // added the same check to its body.
   //
   // ⚠️ consent_required AND scope3_not_granted ARE NOT ERRORS AND MUST NOT RENDER AS ONE. The page
   // already returns the accept-terms screen before any of this renders when the token has not been
@@ -629,8 +645,23 @@ export default function VerifierPage() {
     )
   }
 
+  // T16: the link names a saved version that cannot be found. Not an expired link, and not the verifier's to fix.
+  if (data?.error === 'version_missing') {
+    return (
+      <Shell>
+        <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#0d0d0d', marginBottom: 12 }}>The version shared with you could not be found</h1>
+          <p style={{ fontSize: 14, color: '#555553', lineHeight: 1.7, fontWeight: 400 }}>This link is valid, but the saved version of the inventory it was shared with is not on record, so nothing is shown in its place. Please contact the company that shared it with you and ask them to share the latest version.</p>
+        </div>
+      </Shell>
+    )
+  }
+
+  // T16 (ruling E): before consent the RPC returns consent_required and no figures; the consent step below handles it.
+  const consentPending = data?.error === 'consent_required'
+
   // Reachable only on the RPC's own verdict — see the effect above.
-  if (!data || data.error || !data.inventory) {
+  if (!data || (data.error && !consentPending) || (!data.inventory && !consentPending)) {
     return (
       <Shell>
         <div style={{ maxWidth: 540, margin: '4rem auto', textAlign: 'center', padding: '0 1.5rem' }}>
@@ -658,6 +689,8 @@ export default function VerifierPage() {
     }
     if (res.status === 'accepted' || res.status === 'already_accepted') {
       setAccepted(true)
+      // The figures were not returned before consent; read the inventory now that it has been given.
+      setLoadKey(k => k + 1)
       return
     }
     // 'invalid' (or anything unexpected): leave the gate up.
@@ -665,8 +698,13 @@ export default function VerifierPage() {
     setSubmitting(false)
   }
 
-  if (!alreadyAccepted && !accepted) {
-    const gateCompany = data.inventory?.company_name
+  if (consentPending && accepted) {
+    // Consent given; the inventory is being read again (loadKey). Nothing to show until it arrives.
+    return <Shell><div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>Loading verification review…</div></Shell>
+  }
+
+  if ((!alreadyAccepted && !accepted) || consentPending || !data.inventory) {
+    const gateCompany = data.inventory?.company_name ?? data.company_name
     return (
       <Shell>
         <div style={{ maxWidth: 540, margin: '3.5rem auto', padding: '0 1.5rem' }}>
@@ -740,6 +778,8 @@ export default function VerifierPage() {
       if (d.id) docById[d.id] = d
     }
   }
+  // T16: bills in the version shared that have been deleted since. Their quotes still read, with no link.
+  const deletedDocIds = new Set(docs.filter(d => d.status === 'deleted' && d.id).map(d => d.id as string))
   const fileOfDoc = (id: string) => docById[id]?.file_name || 'A document no longer on this inventory'
   const quoteOfDoc = (id: string, pi: number | undefined) => (pi == null ? null : docById[id]?.extracted?.[pi]?.sourceQuote?.trim() || null)
   // The reporting year in words, as every other label on this page names it.
@@ -760,6 +800,18 @@ export default function VerifierPage() {
         <div style={{ background: 'var(--color-brand-wash)', border: '0.5px solid color-mix(in srgb, var(--color-brand) 25%, transparent)', borderRadius: 10, padding: '10px 16px', marginBottom: '1.5rem', fontSize: 12, color: 'var(--color-brand)', fontWeight: 500 }}>
           Read-only verifier view · You are reviewing a GHG inventory shared for independent assurance{data.expires_at ? ` · Access expires ${new Date(data.expires_at).toLocaleDateString()}` : ''}
         </div>
+        {/* T16: the saved version this link shows, and a notice when a newer one has been saved since. */}
+        {data.version && (
+          // The first line is the assurance PDF cover's version line, word for word (versionSavedLine).
+          <div style={{ fontSize: 13, color: '#0d0d0d', marginBottom: data.newer_version_exists ? '0.75rem' : '1.5rem' }}>
+            {verifierVersionLines(data.version).map((l, i) => <div key={i}>{l}</div>)}
+          </div>
+        )}
+        {data.newer_version_exists && (
+          <div className="tq-callout tq-callout-note" style={{ '--tq-state': '#92400e', '--tq-state-wash': '#FEF3E2', marginBottom: '1.5rem' } as React.CSSProperties}>
+            <div className="tq-callout-text">{NEWER_VERSION_NOTICE}</div>
+          </div>
+        )}
 
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 8 }}>Independent Verification Review</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem,3vw,2.4rem)', fontWeight: 400, color: '#0d0d0d', marginBottom: 4 }}>{inv.company_name || 'GHG Inventory'}</h1>
@@ -1070,7 +1122,8 @@ export default function VerifierPage() {
                       {/* T11: the figure, how it was entered, every bill behind it (counted, then not counted, each
                           with its reason), and who did what to it and when. From the stored row only. */}
                       <WorkingsSourceCell w={w as unknown as SourceCellRow} fileOf={fileOfDoc} quoteOf={quoteOfDoc} yearText={yearText}
-                        renderQuote={(q, docId) => docId ? <SourceQuoteLink quote={q} docId={docId} token={token} /> : `"${q}"`}
+                        renderQuote={(q, docId) => docId && deletedDocIds.has(docId) ? `"${q}" ${DELETED_FILE_QUOTE_SUFFIX}`
+                          : docId ? <SourceQuoteLink quote={q} docId={docId} token={token} /> : `"${q}"`}
                         legacyDocIdOfPath={p => p ? pathToDocId[p] : undefined} />
                       {/* Written for a verifier, not reused from the operator's wizard. The operator
                           is being told what to do next; a verifier is deciding what they can rely on,

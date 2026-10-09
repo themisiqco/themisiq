@@ -16,6 +16,7 @@ import {
   workingsGwpBasisCell, workingsConversionFactorLine, workingsSourceParts, sourcePartsLines, workingsNoteCell, workingsEmissionFactorCell,
   displayStoredText,
 } from './ghg/workingsCells'
+import { versionSavedLine } from './ghg/versionWords'
 import {
   storedRows, workingsPageRows, savedAtLine, excludedFromRows, citationsFromRows, derivationsFromRows, editionRowsFromRows,
   residualRowsFromRows, documentIndexRows, WORKINGS_NOT_KEPT, type StoredRow,
@@ -56,6 +57,10 @@ export interface PdfInventory {
   workings?: unknown
   // T17: when the printed inventory was saved (ghg_inventories.updated_at), for the cover. Never the export time.
   updated_at?: string | null
+  // T16: the saved version this package prints, as the export's snapshot recorded it (ghg_inventory_versions
+  // version_no and saved_at). saved_at is the version's, which for a reused version is older than updated_at.
+  version_no?: number | null
+  version_saved_at?: string | null
   // T17 (PDF-02): the GWP set the stored figures are on (ghg_inventories.gwp_version).
   gwp_version?: string | null
   // F-06: the year-on-year record, printed in its own section with the factor editions that changed.
@@ -184,6 +189,9 @@ export function generateAssurancePDF(
   ]
   // T17: the save this package prints, from the stored row's own updated_at, in UTC. Never the time of export.
   const savedLine = savedAtLine(inventory.updated_at) ?? 'Prints this inventory as saved; the time of that save was not recorded.'
+  // T16 (T16 review, 9 Oct 2026): above it, the version line exactly as the verifier page shows it, from the version's
+  // own saved_at. Two lines, because a reused version can be older than the save printed.
+  const versionLine = inventory.version_no ? versionSavedLine(inventory.version_no, inventory.version_saved_at) : null
   meta.forEach(([k, v]) => {
     doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal')
     doc.text(k.toUpperCase(), M, y)
@@ -193,6 +201,7 @@ export function generateAssurancePDF(
   })
 
   doc.setTextColor(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
+  if (versionLine) { doc.text(versionLine, M, y); y += 13 }
   doc.text(savedLine, M, y)
   y += 16
   doc.setDrawColor(HAIRLINE); doc.line(M, y, W - M, y); y += 24

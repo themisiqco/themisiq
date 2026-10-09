@@ -12,10 +12,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type GrantDenial = 'invalid_or_expired' | 'consent_required'
+export type GrantDenial = 'invalid_or_expired' | 'consent_required' | 'version_missing'
 
+// T16: a grant also names the saved version its link is pinned to. The routes read documents from that version only.
 export type GrantResult =
-  | { ok: true; inventoryId: string }
+  | { ok: true; inventoryId: string; inventoryVersionId: string }
   | { ok: false; reason: GrantDenial }
 
 // Validates the grant AND the consent hard-gate. Callers must not issue a signed URL, or disclose
@@ -26,7 +27,7 @@ export async function validateVerifierGrant(
 ): Promise<GrantResult> {
   const { data: access, error } = await admin
     .from('verifier_access')
-    .select('inventory_id, status, expires_at, revoked_at, accepted_at')
+    .select('inventory_id, inventory_version_id, status, expires_at, revoked_at, accepted_at')
     .eq('token', token)
     .eq('status', 'active')
     .single()
@@ -41,7 +42,11 @@ export async function validateVerifierGrant(
   // accepted_at, never on anything the client sends.
   if (access.accepted_at == null) return { ok: false, reason: 'consent_required' }
 
-  return { ok: true, inventoryId: access.inventory_id as string }
+  // T16 (ruling A): every link is pinned, and get_verifier_inventory refuses one that is not. So do these routes:
+  // there is no live fallback.
+  if (!access.inventory_version_id) return { ok: false, reason: 'version_missing' }
+
+  return { ok: true, inventoryId: access.inventory_id as string, inventoryVersionId: access.inventory_version_id as string }
 }
 
 // The stored shape of one uploaded evidence document, as it sits inside ghg_inventories.locations_data.
