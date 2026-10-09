@@ -37,7 +37,7 @@ const fw = [{ id: 'sb253', name: 'SB 253', full: 'SB 253', gwp: 'AR6', deadline:
 const srcs = { combustion: EF_SOURCES.combustion, electricity: EF_SOURCES.electricity_us, gwp_ar6: EF_SOURCES.gwp_ar6 }
 const recordTable = (i: object) => {
   autoTable.mockClear()
-  generateAssurancePDF(i as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never, [])
+  generateAssurancePDF(i as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never)
   return autoTable.mock.calls.map(c => c[1] as { head?: string[][]; body?: string[][] }).find(t => t.head?.[0]?.[1] === 'Document and location record')
 }
 

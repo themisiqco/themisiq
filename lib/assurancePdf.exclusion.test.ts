@@ -25,7 +25,7 @@ vi.mock('jspdf', () => ({
 vi.mock('jspdf-autotable', () => ({ default: vi.fn() }))
 
 import { generateAssurancePDF } from './assurancePdf'
-import { EF_SOURCES } from './ghg/engine'
+import { EF_SOURCES, buildWorkings, emptyLocation, type Location } from './ghg/engine'
 
 const loc = (name: string, country: string) => ({ name, country, source_docs: [] })
 const inv = (locs: ReturnType<typeof loc>[]) => ({
@@ -37,7 +37,9 @@ const fw = [{ id: 'sb253', name: 'SB 253', full: 'SB 253', gwp: 'AR6', deadline:
 const srcs = { combustion: EF_SOURCES.combustion, electricity: EF_SOURCES.electricity_us, gwp_ar6: EF_SOURCES.gwp_ar6 }
 const run = (locs: ReturnType<typeof loc>[]) => {
   text.mockClear()
-  generateAssurancePDF(inv(locs) as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never, [])
+  // T17: the package reads exclusions from the stored workings, so the inventory carries them, as a save writes them.
+  const workings = buildWorkings(locs.map((l, i) => ({ ...emptyLocation(`l${i}`, l.name), country: l.country }) as Location), 'AR6', 2025, [], 12)
+  generateAssurancePDF({ ...inv(locs), workings } as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never)
   return text.mock.calls.map(c => (Array.isArray(c[0]) ? c[0].join(' ') : String(c[0]))).join('\n')
 }
 

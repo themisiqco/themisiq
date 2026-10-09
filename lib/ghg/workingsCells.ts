@@ -2,6 +2,32 @@ import { NOT_PROVIDED } from '../notProvided'
 import { unitLabel } from './unitLabels'
 import { isoDateInWords } from './dateWords'
 import { fuelName } from './fuelNames'
+import { gridRegionName, residualRegionName } from './gridRegionNames'
+
+// The dash older stored text carries (labels, notes, citations and tokens the engine wrote with one). Matched, never
+// printed: every surface words stored engine text through displayStoredText below.
+const EM_DASH = String.fromCharCode(0x2014)
+
+/**
+ * T17 review (DCL-01): stored ENGINE text, as a customer and a verifier read it: no em dash, on every surface. The
+ * engine still writes these with a dash (rewording them there is DCL-01); rows saved earlier keep the stored text, and
+ * this words both alike. Explicit phrases first, then one rule for any other engine string: a spaced dash becomes a
+ * colon ("Table 7: Steam and Heat"), a dash standing alone is "Not provided". No word is changed.
+ * Never applied to what a customer typed (a file name, a reason, a company name): that prints as typed.
+ */
+export const STORED_PHRASES: readonly [RegExp, string][] = [
+  [new RegExp(`^NOT DECLARED ${EM_DASH} completeness cannot be asserted for this stream\\.$`), 'NOT DECLARED: completeness cannot be asserted for this stream.'],
+  [new RegExp(`^DECLARED, NOT QUANTIFIED ${EM_DASH} `), 'DECLARED, NOT QUANTIFIED: '],
+  [new RegExp(`^Electricity T&D losses \\(NZ\\) ${EM_DASH} Scope 3 Cat 3$`), 'Electricity transmission and distribution losses (New Zealand), Scope 3 Category 3'],
+  [new RegExp(`^as-published ${EM_DASH} see factor source$`), 'as published: see factor source'],
+]
+export function displayStoredText(s: string | null | undefined): string {
+  if (s == null) return ''
+  let out = s
+  for (const [re, to] of STORED_PHRASES) out = out.replace(re, to)
+  if (out.trim() === EM_DASH) return 'Not provided'
+  return out.replace(new RegExp(`\\s*${EM_DASH}\\s*`, 'g'), ': ')
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONE RENDERER FOR THE WORKINGS TABLE'S ACTIVITY CELL, READ BY BOTH SURFACES.
@@ -186,7 +212,7 @@ export function workingsEditionLines(r: WorkingsEditionRow): string[] {
   const out: string[] = []
   if (r.provisional) out.push('Provisional: the edition this year needs has not been published yet')
   if (r.selection_rule) out.push(`Rule: ${SELECTION_RULE_WORDS[r.selection_rule] ?? r.selection_rule}`)
-  if (r.selection_basis) out.push(r.selection_basis)
+  if (r.selection_basis) out.push(displayStoredText(r.selection_basis))
   if (r.edition_published) out.push(`Published ${r.edition_published}`)
   if (r.edition_corrected) out.push(`Values as corrected on ${r.edition_corrected}`)
   if (r.selected_on) out.push(`Selected on ${isoDateInWords(r.selected_on)}`)
@@ -243,9 +269,16 @@ export const LOCATION_EVENT_ROW_BASIS = 'location_event'
 export function workingsFactorSourceCell(r: { gwp_basis?: string; ef_source?: string | null; factor_variant?: string | null }): string {
   if (r.gwp_basis === COVERAGE_ROW_BASIS) return NOT_APPLICABLE
   // FI10: the variant of the table that priced the row (an MfE use class), so a verifier can see which table it was.
-  if (r.ef_source && r.factor_variant) return `${r.ef_source}, ${r.factor_variant}`
-  return r.ef_source || NOT_PROVIDED
+  // T17 review: the citation as stored, worded without a dash (displayStoredText).
+  if (r.ef_source && r.factor_variant) return `${displayStoredText(r.ef_source)}, ${r.factor_variant}`
+  return r.ef_source ? displayStoredText(r.ef_source) : NOT_PROVIDED
 }
+
+/** T17 review: a row's stored note (or a coverage row's explanation), worded without a dash, on every surface. */
+export const workingsNoteCell = (r: { gwp_basis?: string; ef_source?: string | null; note?: unknown }): string =>
+  displayStoredText(r.gwp_basis === COVERAGE_ROW_BASIS ? (r.ef_source ?? '') : typeof r.note === 'string' ? r.note : '')
+/** T17 review: the stored emission-factor cell, worded without a dash. */
+export const workingsEmissionFactorCell = (r: { emission_factor?: unknown; source?: unknown }): string => displayStoredText(typeof r.emission_factor === 'string' ? r.emission_factor : '')
 
 /**
  * The share cell for one bill on a document-backed workings row (T5 ruling). It reads as T2's proration
@@ -314,9 +347,10 @@ export function workingsWhoWhenLines(r: WhoWhenRow, fileOf: (docId: string) => s
   }
   if (r.manual_override) out.push(`Entered by hand by ${r.manual_override.by.email} on ${on(r.manual_override.at)}, instead of from the bills. Reason: ${r.manual_override.reason}.`)
   for (const o of r.manual_overrides_removed ?? []) out.push(`Hand entry removed by ${o.removedBy.email} on ${on(o.removedAt)}, so the bills count again. Reason it had been entered by hand: ${o.reason}.`)
-  for (const c of r.contributions ?? []) {
+  // T17 review: where each bill has its own line (billLines), every action on a bill is said there, once; none below.
+  for (const c of opts.billLines ? [] : r.contributions ?? []) {
     const file = fileOf(c.docId)
-    if (!opts.billLines) for (const k of c.confirmations ?? []) out.push(`${file}: confirmed by ${k.by.email} on ${on(k.at)}.`)
+    for (const k of c.confirmations ?? []) out.push(`${file}: confirmed by ${k.by.email} on ${on(k.at)}.`)
     for (const k of c.corrections ?? []) out.push(`${file}: ${k.fields.map(f => FIELD_WORDS[f] ?? f).join(' and ')} changed by ${k.by.email} on ${on(k.at)}.`)
     if (c.periodConfirmedAt && c.periodConfirmedBy) out.push(`${file}: billing dates confirmed by ${c.periodConfirmedBy.email} on ${on(c.periodConfirmedAt)}.`)
     for (const k of c.fleetTypeLog ?? []) out.push(`${file}: vehicle type set to ${k.to.replace('_', '-')} by ${k.by.email} on ${on(k.at)}.`)
@@ -347,8 +381,13 @@ type ContributionRow = {
   periodProblem?: string; periodOrigin?: string | null; totalDays?: number | null; inWindowDays?: number | null; share?: number | null
   value?: number; unit?: string | null; deliveryDate?: string
   asRead?: { unit?: string | null; value?: number | null; rawValue?: number | null } | null
-  corrections?: { fields: string[] }[]
+  corrections?: { fields: string[]; at?: string; by?: { email: string } }[]
   confirmations?: { at: string; by: { email: string } }[]
+  // T17 review: every action taken on the bill is said on its own line, once.
+  statusLog?: { action: string; at: string; by: { email: string } }[]
+  periodConfirmedAt?: string; periodConfirmedBy?: { email: string }
+  fleetTypeLog?: { to: string; at: string; by: { email: string } }[]
+  withdrawal?: { at: string; by: { email: string }; reason: string }
 }
 export type DocumentLine = { docId: string; counted: boolean; text: string }
 
@@ -358,7 +397,8 @@ const NOT_COUNTED_BECAUSE: Record<string, (c: ContributionRow, fileOf: (id: stri
   same_bill_as: (c, f) => `The same bill as ${c.reasonRef ? f(c.reasonRef) : 'another bill'}, which is counted`,
   exact_duplicate_of: (c, f) => `The same document as ${c.reasonRef ? f(c.reasonRef) : 'another document'}, counted once`,
   manual_override: () => 'The figure was entered by hand instead',
-  withdrawn: () => 'The document was withdrawn',
+  // T17 review: who withdrew it, when and why, on the bill's own line.
+  withdrawn: c => c.withdrawal ? `Withdrawn by ${c.withdrawal.by.email} on ${on(c.withdrawal.at)}. Reason: ${c.withdrawal.reason}` : 'The document was withdrawn',
   mixed_units: () => 'The bills for this figure are in different units',
   invalid_period: c => c.periodProblem === 'reversed' ? 'Its billing period ends before it starts' : 'Its billing period could not be read as dates',
   undated: () => 'It has no billing period',
@@ -384,11 +424,19 @@ export function workingsDocumentLines(r: { contributions?: ContributionRow[] }, 
       parts.push('not counted', why ? why(c, fileOf, yearText) : 'No reason was recorded')
     }
     if (c.periodOrigin === 'billing_month') parts.push('dates estimated from the billing month')
-    if (c.periodOrigin === 'customer_confirmed') parts.push('dates confirmed by the customer')
+    // T17 review: who confirmed the dates and when, where recorded, in place of the bare statement.
+    if (c.periodOrigin === 'customer_confirmed') {
+      parts.push(c.periodConfirmedAt && c.periodConfirmedBy ? `Billing dates confirmed by ${c.periodConfirmedBy.email} on ${on(c.periodConfirmedAt)}` : 'dates confirmed by the customer')
+    }
     // The figure as read, beside an edited figure (T18): the reading as printed on the bill.
     if ((c.corrections ?? []).some(k => k.fields.includes('value')) && c.asRead?.rawValue != null) {
       parts.push(`read from the bill as ${formatActivity(c.asRead.rawValue)} ${unitLabel(c.asRead.unit)}; the figure used is ${c.value != null ? formatActivity(c.value) : 'not set'} ${unitLabel(c.unit)}`)
     }
+    // T17 review: every other action on this bill, once, here: each edit, the vehicle type, flags, rejections and undos,
+    // restorations. The lines under the bills do not repeat them (workingsWhoWhenLines, billLines).
+    for (const k of c.corrections ?? []) if (k.by && k.at) parts.push(`${k.fields.map(f => FIELD_WORDS[f] ?? f).join(' and ')} changed by ${k.by.email} on ${on(k.at)}`)
+    for (const k of c.fleetTypeLog ?? []) parts.push(`vehicle type set to ${k.to.replace('_', '-')} by ${k.by.email} on ${on(k.at)}`)
+    for (const k of c.statusLog ?? []) if (!(k.action === 'withdrawn' && c.withdrawal)) parts.push(`${STATUS_WORDS[k.action] ?? k.action} by ${k.by.email} on ${on(k.at)}`)
     // The bill's confirmation, always on its own line (T11 review): who and when, or, for a reading confirmed before
     // who and when were recorded (T18 diff 1), that they were not. Never blank, never guessed.
     const confirmed = c.reason !== 'not_confirmed' && c.reason !== 'withdrawn'
@@ -401,11 +449,25 @@ export function workingsDocumentLines(r: { contributions?: ContributionRow[] }, 
   return [...lines.filter(l => l.counted), ...lines.filter(l => !l.counted)]
 }
 
-/** A stored row's Source cell: a coverage row saved before T11 named its fuel by key ("natural_gas"); said in words. */
-export function workingsSourceCell(r: { source: string; gwp_basis?: string }): string {
-  if (r.gwp_basis !== COVERAGE_ROW_BASIS) return r.source
-  return r.source.replace(/^Coverage resolution: ([a-z_]+)$/, (_m, k: string) => `Coverage resolution: ${fuelName(k)}`)
+/**
+ * T17 (LBL-01): a stored row's source label as a customer and a verifier read it, on every surface that shows it. The
+ * STORED label is not changed: lib/ghg/resultsEmail.ts and lib/scope3/cat3Inputs.ts read it as written. This only
+ * words it for display:
+ *   - a grid region code, "Electricity (US_CA)", by its name, "Electricity (California)";
+ *   - a residual-mix region code, "residual mix CAMX", by its name;
+ *   - the New Zealand transmission and distribution row, which was stored with a code and an em dash;
+ *   - a coverage row saved before T11 with its fuel key ("natural_gas") (T11).
+ * A code the region map does not know is left as stored, never guessed.
+ */
+export function displaySourceLabel(r: { source: string; gwp_basis?: string }): string {
+  let s = r.source
+  if (r.gwp_basis === COVERAGE_ROW_BASIS) s = s.replace(/^Coverage resolution: ([a-z_]+)$/, (_m, k: string) => `Coverage resolution: ${fuelName(k)}`)
+  s = s.replace(/^Electricity \(([^,()]+)\)$/, (m, code: string) => { const n = gridRegionName(code); return n ? `Electricity (${n})` : m })
+  s = s.replace(/residual mix ([^)]+)\)$/, (m, code: string) => { const n = residualRegionName(code); return n ? `residual mix ${n})` : m })
+  return displayStoredText(s)
 }
+/** The name T11 gave the same reader; one function, so the two cannot drift. */
+export const workingsSourceCell = displaySourceLabel
 
 // The words for every gwp_basis the engine writes that is not a GWP set. A GWP set (AR4, AR5, AR6) and "as published:
 // see factor source" read as stored.
@@ -418,10 +480,13 @@ const GWP_BASIS_WORDS: Record<string, string> = {
   excluded: 'Not applicable: location excluded',
   all_bills_excluded: 'Not applicable: no bill counted',
   'scope3-cat3': 'As published: see factor source',
+  // T17: the wording rows were stored with before T18 diff 4, so an older row reads as a newer one does. The key is
+  // the stored text exactly, so it holds the old dash; built from its code so no dash is written as copy here.
+  [`as-published ${EM_DASH} see factor source`]: 'as published: see factor source',   // also in STORED_PHRASES
 }
 /** The GWP basis column, in words. Never an engine token. */
 export const workingsGwpBasisCell = (r: { gwp_basis?: string | null }): string =>
-  !r.gwp_basis ? NOT_PROVIDED : GWP_BASIS_WORDS[r.gwp_basis] ?? r.gwp_basis
+  !r.gwp_basis ? NOT_PROVIDED : GWP_BASIS_WORDS[r.gwp_basis] ?? displayStoredText(r.gwp_basis)
 
 // The unit a factor is published in, named from the last part of its key. Only the unit's label is ever printed.
 const KEY_UNIT_WORDS: Record<string, string> = {
@@ -438,4 +503,57 @@ export function workingsConversionFactorLine(r: { conversion_factor?: number | n
   const to = KEY_UNIT_WORDS[(r.factor_key ?? '').split(/[_:]/).pop()?.toLowerCase() ?? '']
   const from = unitLabel(r.activity_unit)
   return to ? `Conversion factor: 1 ${from.replace(/s$/, '')} = ${n} ${to}` : `Conversion factor: each ${from.replace(/s$/, '')} is ${n} of the unit the factor is published in`
+}
+
+// ── T17: ONE SOURCE CELL, TWO SURFACES ─────────────────────────────────────────────────────────────────────────────
+// The verifier page (app/verify/[token]/_components/WorkingsSourceCell.tsx) renders these parts with its quote links;
+// the assurance PDF prints them as text (sourcePartsLines). Both build them here, so a row says the same sentences in
+// both places. From the stored row only.
+export type SourceParts = {
+  label: string
+  badges: string[]
+  bills: { docId: string; counted: boolean; text: string; quote: string | null }[]
+  /** Rows saved before per-bill contributions: the quotes the row stored, with their paths for the verifier's links. */
+  legacyQuotes: { quote: string; path?: string }[]
+  notes: string[]
+  who: string[]
+}
+type SourcePartsRow = {
+  source: string; gwp_basis?: string; entry_method?: string
+  source_quotes?: string[]; source_file_paths?: string[]
+  proration_note?: string; extrapolation_note?: string; ch4_n2o_note?: string
+  manual_override?: unknown
+  contributions?: (ContributionRow & { proposalIndex?: number })[]
+}
+const ENTRY_BADGE: Record<string, string> = { concierge: 'Bill-sourced', 'concierge-prorated': 'Bill-sourced, prorated', 'concierge-extrapolated': 'Estimated' }
+
+export function workingsSourceParts(r: SourcePartsRow, fileOf: (docId: string) => string,
+  quoteOf: (docId: string, proposalIndex: number | undefined) => string | null, yearText: string): SourceParts {
+  const lines = workingsDocumentLines(r, fileOf, yearText)
+  const indexOf = new Map((r.contributions ?? []).map(c => [c.docId, c.proposalIndex]))
+  const badges = [ENTRY_BADGE[r.entry_method ?? ''], r.manual_override ? 'Entered by hand' : ''].filter(Boolean) as string[]
+  return {
+    label: displaySourceLabel(r),
+    badges,
+    bills: lines.map(l => ({ ...l, quote: quoteOf(l.docId, indexOf.get(l.docId)) })),
+    legacyQuotes: lines.length > 0 ? [] : (r.source_quotes ?? []).map((quote, i) => ({ quote, path: r.source_file_paths?.[i] })),
+    notes: [
+      r.proration_note ? `Prorated by billing days: ${displayStoredText(r.proration_note)}` : '',
+      r.extrapolation_note ? `Estimated, ${displayStoredText(r.extrapolation_note)}` : '',
+      displayStoredText(r.ch4_n2o_note),
+    ].filter(Boolean),
+    // Each bill's confirmation is on its own bill line, so it is not repeated among these.
+    who: workingsWhoWhenLines(r as WhoWhenRow, fileOf, { billLines: lines.length > 0 }),
+  }
+}
+
+/** The parts as the lines of text the PDF prints, in the verifier page's order and words. */
+export function sourcePartsLines(p: SourceParts): string[] {
+  return [
+    [p.label, ...p.badges].join(' · '),
+    ...(p.bills.length > 0 ? ['Bills behind this figure', ...p.bills.map(b => `${b.text}${b.quote ? ` Read: "${b.quote}"` : ''}`)] : []),
+    ...(p.legacyQuotes.length > 0 ? [`From source: ${p.legacyQuotes.map(q => `"${q.quote}"`).join('; ')}`] : []),
+    ...p.notes,
+    ...p.who,
+  ]
 }

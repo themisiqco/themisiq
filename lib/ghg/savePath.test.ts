@@ -49,8 +49,7 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
   })
   it('totals, gates and exports read the derived locations', () => {
     for (const s of ['calcInventory(derivedLocations,', 'findUndeclaredStreams(derivedLocations,', 'findUnpriceableLocations(derivedLocations,',
-      'findSteamFactorGaps(derivedLocations, factorSel)', 'buildWorkings(derivedLocations,', 'const loc = derivedLocations[activeLocation]',
-      'generateAssurancePDF({ ...inventory, locations: derivedLocations, factor_edition_comparison:']) {
+      'findSteamFactorGaps(derivedLocations, factorSel)', 'buildWorkings(derivedLocations,', 'const loc = derivedLocations[activeLocation]']) {
       expect(pageSrc, s).toContain(s)
     }
   })

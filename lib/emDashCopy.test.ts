@@ -308,7 +308,10 @@ export function renderedDashes(file: string): number {
  */
 // 73 on 27 Sep 2026. 72 on 30 Sep 2026: the Supply Chain register's total spend now reads 'No spend
 // entered' or 'Not available' where it printed the glyph.
-const GLYPH_COUNT = 72
+// T17: 72 to 67. The assurance PDF's document index and residual rows no longer print a blank cell as a glyph;
+// each cell now says what is there (lib/ghg/storedWorkings.ts). 67 to 60 in the T17 review: the cover, summary and
+// audit-trail cells say "Not recorded", "None selected", "Not applicable", "No revenue entered" or "None" instead.
+const GLYPH_COUNT = 60
 
 const SWEEP_BUDGET: Record<string, number> = {
   // ⚠️ WHAT IS LEFT UNDER app/api/ IS READ BY NOBODY, 27 Sep 2026. The prefix exemption is gone; the six
@@ -355,7 +358,6 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/survey/[token]/page.tsx': 11,
   'app/verify-cbam/[token]/page.tsx': 19,
   'app/verify/[token]/page.tsx': 13,
-  'lib/assurancePdf.ts': 3,
   'lib/cbam/boundaries.ts': 17,
   'lib/cbam/readiness.ts': 20,
   'lib/cbam/report/build.ts': 7,
@@ -364,7 +366,9 @@ const SWEEP_BUDGET: Record<string, number> = {
   'lib/flag/estimate.ts': 9,
   // Printed by a PDF. Put back on 27 Sep 2026 after the shared-lib sweep had already taken them; the reason each
   // survives is in the header above, per file. (lib/ghg/comparability.ts left on 8 Oct 2026, T3c diff 4.)
-  'lib/ghg/engine.ts': 56,
+  'lib/ghg/engine.ts': 29,
+  // T17: the eGRID subregion picker labels, moved here from lib/ghg/engine.ts unchanged (27 of the engine's 56).
+  'lib/ghg/gridRegionWords.ts': 27,
   'lib/materiality/boardReport.ts': 17,
   'lib/materiality/boardReportPdf.ts': 6,
   'lib/materiality/register.ts': 3,

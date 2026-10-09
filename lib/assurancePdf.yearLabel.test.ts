@@ -34,7 +34,7 @@ const fw = [{ id: 'sb253', name: 'SB 253', full: 'SB 253', gwp: 'AR6', deadline:
 const srcs = { combustion: EF_SOURCES.combustion, electricity: EF_SOURCES.electricity_us, gwp_ar6: EF_SOURCES.gwp_ar6 }
 const run = (m: number) => {
   text.mockClear(); save.mockClear(); autoTable.mockClear()
-  generateAssurancePDF(inv(m) as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never, [])
+  generateAssurancePDF(inv(m) as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never)
   const cover = text.mock.calls.map(c => (Array.isArray(c[0]) ? c[0].join(' ') : String(c[0])))
   const tables = autoTable.mock.calls.flatMap(c => ((c[1] as { body?: unknown[][] }).body ?? []).map(r => r.map(String)))
   return { cover, tables, file: String(save.mock.calls[0]?.[0]) }

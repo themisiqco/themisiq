@@ -12,7 +12,8 @@ import { WorkingsSourceCell, type SourceCellRow } from './_components/WorkingsSo
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import { workingsActivityCell, workingsVintageCell, workingsEditionLines, workingsScope2MethodCell, workingsResultCell,
-  workingsFactorSourceCell, COVERAGE_ROW_BASIS, eventRowsOf, workingsGwpBasisCell, workingsConversionFactorLine } from '../../../lib/ghg/workingsCells'
+  workingsFactorSourceCell, eventRowsOf, workingsGwpBasisCell, workingsConversionFactorLine,
+  workingsNoteCell, workingsEmissionFactorCell, displayStoredText } from '../../../lib/ghg/workingsCells'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
@@ -289,15 +290,14 @@ const boundaryLabel = (b: string) =>
 // estimation note is a published factor. Dropping it would be worse: it is a required disclosure
 // under ISO 14064-3 6.1.3.6.3, and coverage rows set no `note`, so nothing else on this page carries
 // it. So it moves to the activity-data cell, where free-text row notes already render, and the
-// Factor source cell says the column does not apply to that row.
-const COVERAGE_ROW = COVERAGE_ROW_BASIS
+// Factor source cell says the column does not apply to that row. (workingsNoteCell makes that move, for both surfaces.)
 
 /** The citation for the Factor source column, via the helper both surfaces' cells go through. */
 const factorSourceOf = (w: WorkingRow): string => workingsFactorSourceCell(w)
 
 /** The free text that belongs beside the activity figure — including a coverage row's explanation. */
-const rowNoteOf = (w: WorkingRow): string | undefined =>
-  w.gwp_basis === COVERAGE_ROW ? (w.ef_source || undefined) : w.note
+// T17 review: through workingsNoteCell, so stored engine text reads without a dash here as in the PDF.
+const rowNoteOf = (w: WorkingRow): string | undefined => workingsNoteCell(w) || undefined
 
 // Consent wording version stamped onto the verifier's ToS/Privacy acceptance.
 // Bump this whenever the Terms or Privacy Policy are materially revised.
@@ -1186,7 +1186,7 @@ export default function VerifierPage() {
                         <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{workingsConversionFactorLine(w)}</div>
                       )}
                     </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--color-ink-muted)', fontSize: 11 }}>{w.emission_factor}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-ink-muted)', fontSize: 11 }}>{workingsEmissionFactorCell(w)}</td>
                     {/* WIDTH-CAPPED, WRAPPED, NEVER TRUNCATED. The longest citation on file runs to
                         349 characters (Green-e residual mix, with vintage and note appended), so the
                         row grows tall rather than the citation being cut — a shortened citation is
@@ -1217,7 +1217,7 @@ export default function VerifierPage() {
                       {/* T11: in words, never an engine token ("coverage_resolution", "unpriced"). */}
                       <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{workingsGwpBasisCell(w)}</div>
                       {w.quantification_method && (
-                        <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{w.quantification_method}</div>
+                        <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{displayStoredText(w.quantification_method)}</div>
                       )}
                     </td>
                     <td style={{ padding: '8px 10px', color: 'var(--color-brand)', fontWeight: 600, whiteSpace: 'nowrap' }}>{workingsResultCell(w)}</td>

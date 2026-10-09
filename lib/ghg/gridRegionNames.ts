@@ -6,16 +6,15 @@
 //
 // ⚠️ THERE WAS NO SUCH MAP BEFORE THIS FILE. lib/emissionFactors/regionNames.ts names EXIOBASE spend regions for
 // Scope 3, which are a different set of codes, and the wizard's step 2 shows the grid code itself. The eGRID subregion
-// names are the wizard's own (US_SUBREGIONS in lib/ghg/engine.ts, after its code); everything else is a plain place
+// names are the wizard's own (US_SUBREGIONS, now in lib/ghg/gridRegionWords.ts, after its code); everything else is a plain place
 // name. What each average is comes from the comment on GRID_EF: US_AVG is the eGRID2023 US figure, EU_AVG the EEA
 // EU-27 aggregate, AU_AVG the DCCEEW national figure; AU WA and NT are the SWIS and DKIS grids.
 //
 // lib/ghg/gridRegionNames.test.ts holds every key of GRID_EF and every residual region to a name, so a region added
 // to the engine without one fails a test rather than reaching an email as a code.
 
-import { US_SUBREGIONS } from './engine'
-import { COUNTRY_WORDS } from './series'
-import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES } from './gridRegionWords'
+// T17: everything from lib/ghg/gridRegionWords.ts, which has no imports, so this file loads nothing from the engine.
+import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES, US_SUBREGIONS, COUNTRY_WORDS } from './gridRegionWords'
 
 const CA = GRID_REGION_CA
 const US = GRID_REGION_US

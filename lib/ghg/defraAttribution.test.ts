@@ -69,8 +69,9 @@ describe('DEFRA/DESNZ licence attribution', () => {
     // derivedLocations since T7 (the CSV); the PDF still reads inventory.locations, which the page now
     // passes as the derived locations.
     expect(ghg, 'framework CSV').toContain('...sourceAttributionsForLocations(derivedLocations, factorSel).flatMap(a => [')
-    expect(ghg, 'the PDF is given the derived locations').toContain('generateAssurancePDF({ ...inventory, locations: derivedLocations, factor_edition_comparison:')
-    expect(read('lib/assurancePdf.ts'), 'assurance PDF').toContain('...sourceAttributionsForLocations(inventory.locations, factorSel).flatMap(a => [')
+    // T17: the PDF is given the stored row, and its attributions come from the stored rows' citations.
+    expect(ghg, 'the PDF is given the stored row').toContain("{ ...row, locations: Array.isArray(row.locations_data) ? row.locations_data : []")
+    expect(read('lib/assurancePdf.ts'), 'assurance PDF').toContain('...sourceAttributionsFor(rows.map(r => r.ef_source)).flatMap(a => [')
     expect(read('app/verify/[token]/page.tsx'), 'verifier page').toContain('<SourceAttributions attributions={sourceAttributionsFor(inv.workings.map(factorSourceOf))}')
     expect(read('app/methodology/page.tsx'), 'methodology').toContain('${DEFRA_DESNZ_PUBLICATION.attribution_required}')
     expect(read('app/components/SourceAttributions.tsx'), 'renderer').toContain('{a.attribution}')

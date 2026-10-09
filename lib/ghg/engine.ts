@@ -39,7 +39,7 @@ import type { FactorEditions } from './factorEditions'
 // reads in an export and the sentence the customer reads on screen come from ONE module and cannot
 // drift. countryRefusalCopy imports only the TYPE back from here, so there is no runtime cycle.
 import { countryRefusalText, countryNameEn } from './countryRefusalCopy'
-import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES } from './gridRegionWords'
+import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES, US_SUBREGIONS } from './gridRegionWords'
 import { DELIVERY_DOC_TYPES, docTypeLabel } from './conciergeDocTypes'
 import { unitLabel } from './unitLabels'
 // T11: the fuel names every coverage message uses, in their own module so the verifier helpers can read them too.
@@ -1542,22 +1542,7 @@ const CA_PROVINCES = ['ON', 'BC', 'AB', 'QC', 'MB', 'SK', 'NS', 'NB', 'NL', 'PE'
 // eGRID subregions for the US market-based residual-mix picker (item 5). Code -> readable label.
 // Users select their exact subregion via EPA Power Profiler (ZIP lookup) rather than inferring from state,
 // because several states span multiple subregions (e.g. TX = ERCT + SPP; NY = NYCW/NYLI/NYUP).
-const US_SUBREGIONS: Array<[string, string]> = [
-  ['AKGD', 'AKGD — ASCC Alaska Grid'], ['AKMS', 'AKMS — ASCC Miscellaneous'],
-  ['AZNM', 'AZNM — WECC Southwest'], ['CAMX', 'CAMX — WECC California'],
-  ['ERCT', 'ERCT — ERCOT All'], ['FRCC', 'FRCC — FRCC All'],
-  ['HIMS', 'HIMS — HICC Miscellaneous'], ['HIOA', 'HIOA — HICC Oahu'],
-  ['MROE', 'MROE — MRO East'], ['MROW', 'MROW — MRO West'],
-  ['NEWE', 'NEWE — NPCC New England'], ['NWPP', 'NWPP — WECC Northwest'],
-  ['NYCW', 'NYCW — NPCC NYC/Westchester'], ['NYLI', 'NYLI — NPCC Long Island'],
-  ['NYUP', 'NYUP — NPCC Upstate NY'], ['PRMS', 'PRMS — Puerto Rico Miscellaneous'],
-  ['RFCE', 'RFCE — RFC East'], ['RFCM', 'RFCM — RFC Michigan'],
-  ['RFCW', 'RFCW — RFC West'], ['RMPA', 'RMPA — WECC Rockies'],
-  ['SPNO', 'SPNO — SPP North'], ['SPSO', 'SPSO — SPP South'],
-  ['SRMV', 'SRMV — SERC Mississippi Valley'], ['SRMW', 'SRMW — SERC Midwest'],
-  ['SRSO', 'SRSO — SERC South'], ['SRTV', 'SRTV — SERC Tennessee Valley'],
-  ['SRVC', 'SRVC — SERC Virginia/Carolina'],
-]
+// T17: the list lives in lib/ghg/gridRegionWords.ts (no imports), so the region names can be read without the engine.
 const US_STATES = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY']
 // Australian states/territories offered for grid selection. ACT shares the NSW grid factor, and
 // WA/NT auto-map to their main interconnected grids (SWIS/DKIS) — both handled in detectGridRegion.

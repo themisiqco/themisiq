@@ -11,9 +11,9 @@
 // All text is read by a verifier: plain language, no em dash, no internal key.
 
 import type { ReactNode } from 'react'
-import { workingsDocumentLines, workingsSourceCell, workingsWhoWhenLines, type DocumentLine } from '../../../../lib/ghg/workingsCells'
+import { workingsSourceParts, type DocumentLine } from '../../../../lib/ghg/workingsCells'
 
-type Contribution = Parameters<typeof workingsDocumentLines>[0]['contributions'] extends (infer C)[] | undefined ? C : never
+type Contribution = NonNullable<Parameters<typeof workingsSourceParts>[0]['contributions']>[number]
 export interface SourceCellRow {
   source: string; gwp_basis?: string
   entry_method?: string
@@ -21,14 +21,23 @@ export interface SourceCellRow {
   proration_note?: string; extrapolation_note?: string
   ch4_n2o_note?: string
   manual_override?: { reason: string; at: string; by: { email: string } }
-  contributions?: (Contribution & { proposalIndex?: number })[]
+  contributions?: Contribution[]
   [k: string]: unknown
 }
 
 const badge = { marginLeft: 6, fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' as const }
 const plain = { ...badge, color: 'var(--color-ink-muted)', background: '#efeeec' }
 const small = { marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)', lineHeight: 1.45 } as const
+// The colours each badge has always had on this page. The words come from workingsSourceParts.
+const BADGE_STYLE: Record<string, React.CSSProperties> = {
+  'Bill-sourced': { ...badge, color: 'var(--color-brand)', background: 'color-mix(in srgb, var(--color-brand) 8%, transparent)' },
+  'Entered by hand': { ...plain, color: '#0d0d0d' },
+}
 
+/**
+ * T17: the parts are built by workingsSourceParts (lib/ghg/workingsCells.ts), the same function the assurance PDF prints
+ * from (sourcePartsLines), so a row says the same sentences on both. This renders them, with quote links.
+ */
 export function WorkingsSourceCell({ w, fileOf, quoteOf, yearText, renderQuote, legacyDocIdOfPath }: {
   w: SourceCellRow
   /** A document's file name from its id, from the projected locations_data. */
@@ -41,45 +50,32 @@ export function WorkingsSourceCell({ w, fileOf, quoteOf, yearText, renderQuote, 
   /** Rows saved before contributions: the document behind a quote's storage path, for its link. */
   legacyDocIdOfPath: (path: string | undefined) => string | undefined
 }) {
-  const lines: DocumentLine[] = workingsDocumentLines(w as Parameters<typeof workingsDocumentLines>[0], fileOf, yearText)
-  const indexOf = new Map((w.contributions ?? []).map(c => [c.docId, c.proposalIndex]))
-  // Each bill's confirmation is on its own bill line above, so it is not repeated among these.
-  const who = workingsWhoWhenLines(w as Parameters<typeof workingsWhoWhenLines>[0], fileOf, { billLines: lines.length > 0 })
+  const p = workingsSourceParts(w as Parameters<typeof workingsSourceParts>[0], fileOf, quoteOf, yearText)
+  const bills: (DocumentLine & { quote: string | null })[] = p.bills
   return (
     <>
-      <span>{workingsSourceCell(w)}</span>
-      {w.entry_method === 'concierge' && (
-        <span style={{ ...badge, color: 'var(--color-brand)', background: 'color-mix(in srgb, var(--color-brand) 8%, transparent)' }}>Bill-sourced</span>
-      )}
-      {w.entry_method === 'concierge-prorated' && <span style={plain}>Bill-sourced, prorated</span>}
-      {w.entry_method === 'concierge-extrapolated' && <span style={plain}>Estimated</span>}
-      {/* T11: a figure entered by hand instead of from its bills. The reason, who and when are in the lines below. */}
-      {w.manual_override && <span style={{ ...plain, color: '#0d0d0d' }}>Entered by hand</span>}
-      {lines.length > 0 ? (
+      {/* The stored label, with any region named in words (displaySourceLabel, LBL-01). */}
+      <span>{p.label}</span>
+      {p.badges.map(b => <span key={b} style={BADGE_STYLE[b] ?? plain}>{b}</span>)}
+      {bills.length > 0 ? (
         <div style={{ marginTop: 4 }}>
           <div style={{ ...small, fontWeight: 600 }}>Bills behind this figure</div>
-          {lines.map(l => {
-            const quote = quoteOf(l.docId, indexOf.get(l.docId))
-            return (
-              <div key={l.docId} style={{ ...small, color: l.counted ? 'var(--color-ink)' : 'var(--color-ink-muted)' }}>
-                {l.text}
-                {quote && <span style={{ fontStyle: 'italic' }}> Read: {renderQuote(quote, l.docId)}</span>}
-              </div>
-            )
-          })}
+          {bills.map(l => (
+            <div key={l.docId} style={{ ...small, color: l.counted ? 'var(--color-ink)' : 'var(--color-ink-muted)' }}>
+              {l.text}
+              {l.quote && <span style={{ fontStyle: 'italic' }}> Read: {renderQuote(l.quote, l.docId)}</span>}
+            </div>
+          ))}
         </div>
-      ) : w.source_quotes && w.source_quotes.length > 0 && (
-        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: 'var(--color-ink-muted)' }}>From source: {w.source_quotes.map((q, qi) => (
-          <span key={qi}>{qi > 0 && '; '}{renderQuote(q, legacyDocIdOfPath(w.source_file_paths?.[qi]))}</span>
+      ) : p.legacyQuotes.length > 0 && (
+        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: 'var(--color-ink-muted)' }}>From source: {p.legacyQuotes.map((q, qi) => (
+          <span key={qi}>{qi > 0 && '; '}{renderQuote(q.quote, legacyDocIdOfPath(q.path))}</span>
         ))}</div>
       )}
-      {w.proration_note && <div style={small}>Prorated by billing days: {w.proration_note}</div>}
-      {w.extrapolation_note && <div style={small}>Estimated, {w.extrapolation_note}</div>}
-      {/* FI9: methane and nitrous oxide a US road line could not count (no miles entered). */}
-      {w.ch4_n2o_note && <div style={small}>{w.ch4_n2o_note}</div>}
-      {who.length > 0 && (
+      {p.notes.map((n, i) => <div key={`n${i}`} style={small}>{n}</div>)}
+      {p.who.length > 0 && (
         <div style={{ marginTop: 4 }}>
-          {who.map((l, i) => <div key={i} style={small}>{l}</div>)}
+          {p.who.map((l, i) => <div key={i} style={small}>{l}</div>)}
         </div>
       )}
     </>

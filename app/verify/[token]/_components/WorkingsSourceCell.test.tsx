@@ -85,9 +85,9 @@ describe('T11: the rest of what a row carries', () => {
     const w = { source: 'Natural gas', entry_method: 'concierge', contributions: [{ docId: 'a', proposalIndex: 0, counted: false, reason: 'withdrawn',
       statusLog: [{ action: 'withdrawn', at: '2026-10-05T09:00:00.000Z', by: BY }], withdrawal: { at: '2026-10-05T09:00:00.000Z', by: BY, reason: 'Duplicate upload' } }] } as unknown as SourceCellRow
     const t = render(w, {})
-    expect(t).toContain('A document no longer on this inventory: not counted. The document was withdrawn.')
-    expect(t.match(/withdrawn by jo@acme\.example/g)).toHaveLength(1)
-    expect(t).toContain('withdrawn by jo@acme.example on 5 October 2026. Reason: Duplicate upload.')
+    // T17 review: on the bill's own line, once, with who, when and why; nothing repeated below.
+    expect(t).toContain('A document no longer on this inventory: not counted. Withdrawn by jo@acme.example on 5 October 2026. Reason: Duplicate upload.')
+    expect(t.match(/[Ww]ithdrawn by jo@acme\.example/g)).toHaveLength(1)
   })
   it('a row saved before per-bill contributions keeps "From source"', () => {
     const t = render({ source: 'Natural gas', entry_method: 'concierge', source_quotes: ['Total 120 therms'], source_file_paths: ['/a.pdf'] }, {})

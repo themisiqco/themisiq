@@ -314,14 +314,9 @@ const num = (v: number | null | undefined): number | null =>
 //
 // UNIT_WORDS is exported ONLY because the wizard needs it; nothing else reads it yet. COUNTRY_WORDS
 // and FUEL_WORDS are read by lib/ghg/comparability.ts as well.
-export const COUNTRY_WORDS: Record<string, string> = {
-  US: "United States", CA: "Canada", GB: "the UK", UK: "the UK", AU: "Australia", NZ: "New Zealand",
-  AT: "Austria", BE: "Belgium", BG: "Bulgaria", HR: "Croatia", CY: "Cyprus", CZ: "Czechia",
-  DK: "Denmark", EE: "Estonia", FI: "Finland", FR: "France", DE: "Germany", EL: "Greece",
-  HU: "Hungary", IE: "Ireland", IT: "Italy", LV: "Latvia", LT: "Lithuania", LU: "Luxembourg",
-  MT: "Malta", NL: "the Netherlands", PL: "Poland", PT: "Portugal", RO: "Romania", SK: "Slovakia",
-  SI: "Slovenia", ES: "Spain", SE: "Sweden",
-};
+// T17: moved to lib/ghg/gridRegionWords.ts (no imports) and re-exported here, so every reader keeps this name.
+import { COUNTRY_WORDS } from './gridRegionWords';
+export { COUNTRY_WORDS };
 export const UNIT_WORDS: Record<string, string> = {
   m3: "cubic metres", kwh: "kilowatt-hours", mcf: "thousand cubic feet", therms: "therms",
   mmbtu: "MMBtu", gj: "gigajoules", litres: "litres", gallons: "US gallons", kg: "kilograms",

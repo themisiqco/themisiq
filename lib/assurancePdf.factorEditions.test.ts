@@ -40,7 +40,7 @@ const fw = [{ id: 'sb253', name: 'SB 253', full: 'SB 253', gwp: 'AR6', deadline:
 const srcs = { combustion: EF_SOURCES.combustion, electricity: EF_SOURCES.electricity_us, gwp_ar6: EF_SOURCES.gwp_ar6 }
 const tablesOf = (inv: object) => {
   autoTable.mockClear()
-  generateAssurancePDF(inv as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never, [])
+  generateAssurancePDF(inv as never, totals as never, fw as never, { ok: true, rows: [] } as never, srcs as never)
   return autoTable.mock.calls.map(c => c[1] as { head?: string[][]; body?: string[][] })
 }
 
@@ -48,8 +48,11 @@ describe('assurance PDF: factor editions (T3c diff 3)', () => {
   // First saved on 1 June 2026, so the ECCC grid edition frozen is Table 5.3 (Table 5.4 was published 9 Sep 2026).
   const frozen = figuresForSave(base as never, 'AR6', { preparedOn: new Date(2026, 5, 1) }).factor_selection
 
+  // T17: the package prints the editions the STORED workings record, as a save writes them; it selects nothing itself.
+  const stored = (inv: object) => ({ ...inv, workings: figuresForSave(inv as never, 'AR6').workings })
+
   it('a Factor Editions table names the frozen edition, its rule, basis, dates and the day it was selected', () => {
-    const t = tablesOf({ ...base, factor_selection: frozen }).find(x => x.head?.[0]?.[0] === 'Edition')!
+    const t = tablesOf(stored({ ...base, factor_selection: frozen })).find(x => x.head?.[0]?.[0] === 'Edition')!
     expect(t.head).toEqual([['Edition', 'Rule', 'Basis', 'Published', 'Corrected', 'Selected on']])
     const grid = t.body!.find(r => r[0] === 'ECCC Table 5.3 (NIR 1990-2023)')!
     expect([grid[1], grid[3], grid[5]]).toEqual(['Kept as selected when the inventory was first prepared', '24 October 2025', '1 June 2026'])
@@ -58,14 +61,14 @@ describe('assurance PDF: factor editions (T3c diff 3)', () => {
     expect(new Set(t.body!.map(r => r.join('|'))).size).toBe(t.body!.length)
   })
 
-  it('with nothing frozen, the edition is the one selected today, never the frozen one', () => {
-    const t = tablesOf(base).find(x => x.head?.[0]?.[0] === 'Edition')!
+  it('with nothing frozen, the edition is the one the save selected, never the frozen one', () => {
+    const t = tablesOf(stored(base)).find(x => x.head?.[0]?.[0] === 'Edition')!
     expect(t.body!.map(r => r[0])).toContain('ECCC Table 5.4 (NIR 1990-2024)')
     expect(t.body!.map(r => r[0])).not.toContain('ECCC Table 5.3 (NIR 1990-2023)')
   })
 
   it('the methods table carries the window and the factor-year rule, in the methodology page\'s words', () => {
-    const rows = tablesOf({ ...base, factor_selection: frozen }).flatMap(x => x.body ?? [])
+    const rows = tablesOf(stored({ ...base, factor_selection: frozen })).flatMap(x => x.body ?? [])
     const rule = rows.find(r => r[0] === 'Factor-year rule')!
     expect(rule[1]).toContain('the reporting window, 1 January 2026 to 31 December 2026')
     expect(rule[1]).toContain(FACTOR_YEAR_RULE_CLASS_B)

@@ -227,7 +227,9 @@ describe('T3c diff 3: the surfaces word the selection', () => {
     expect(page).toContain('selectionContextFor({ ...inventory, factor_selection: saved.factor_selection })')
     // Row 7b: no fixed edition name beside a grid value.
     for (const s of ["'ECCC v3.0'", "'US EPA eGRID2023'", "(DCCEEW NGA 2025)", "'EEA 2023'", "'NZ MfE 2026'", '(eGRID 2023)']) expect(page, s).not.toContain(s)
-    expect(read('lib/assurancePdf.ts')).toContain('const factorCtx = selectionContextFor(inventory)')
+    // T17: the PDF prints the editions the stored rows record; it selects nothing itself.
+    expect(read('lib/assurancePdf.ts')).toContain('const body = editionRowsFromRows(rows)')
+    expect(read('lib/assurancePdf.ts')).not.toContain('selectionContextFor')
   })
 
   it('the migration is the file as run: the column, the column-scoped grants, the departure, the pre-check and its result', () => {

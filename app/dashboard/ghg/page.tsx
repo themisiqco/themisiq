@@ -3558,7 +3558,9 @@ workings: saved.workings,
                 // which is the two halves of one line contradicting each other. A checklist item
                 // whose tick cannot be false is not a checklist item.
                 { label: 'Emission factors cited with source and year', done: inventoryPublishers.length > 0, note: inventoryPublishers.length > 0 ? inventoryPublishers.join(' · ') : 'No figures are priced yet' },
-                { label: 'Calculation workings documented per source', done: true, note: 'Full formula shown for every emission source' },
+                // T17: ticked only for an inventory that is saved with nothing unsaved, because every save writes its
+                // workings with it; before then there is nothing kept for the package or a verifier to show.
+                { label: 'Calculation workings documented per source', done: !!inventoryId && !dirty, note: inventoryId && !dirty ? "Each figure's workings print in the assurance package and show on the verifier page" : 'Save the inventory to keep its workings with it' },
                 { label: 'Organizational boundary documented', done: !!inventory.boundary_approach, note: inventory.boundary_approach.replace(/_/g, ' ') },
                 { label: 'Source documents uploaded', done: isPaid && inventory.locations.some(l => l.source_docs.length > 0), note: isPaid ? `${inventory.locations.reduce((a, l) => a + l.source_docs.length, 0)} documents` : 'Available on paid plan' },
                 { label: 'All locations included in boundary', done: inventory.locations.length > 0, note: `${inventory.locations.length} location(s)` },
@@ -3767,11 +3769,13 @@ workings: saved.workings,
   }
 
   const generateAssurance = async () => {
-    // ⚠️ THE ERROR IS READ, NOT DISCARDED. This previously destructured `data` only and passed
-    // `auditRows || []` onward, so a REFUSED READ became an empty trail and the package printed
-    // "0 change(s) logged" for an inventory with live verifier links against it. The read was
-    // failing in production because `authenticated` holds no SELECT grant on audit_log, so
-    // PostgREST refused it before RLS was ever consulted — a failure the client never saw.
+    // T17: THE PACKAGE PRINTS THE INVENTORY AS SAVED, so it is refused while this page holds changes that are not saved.
+    // `dirty` is the page's unsaved-changes signal (the inventory against the fingerprint taken at load and at each save,
+    // lib/ghg/unsavedChanges.ts); a baseline not yet taken counts as unsaved, so nothing unconfirmed reads as saved.
+    if (!inventoryId || dirty || baseline === undefined) {
+      alert('Save the inventory first. The assurance package prints the inventory as saved, and this page has changes that are not saved.')
+      return
+    }
     const { data: auditRows, error: auditErr } = await supabase
       .from('audit_log').select('*')
       .eq('table_name', 'ghg_inventories').eq('record_id', inventoryId)
@@ -3786,28 +3790,21 @@ workings: saved.workings,
       )
       return
     }
-    // Per-location residual-mix citation for the PDF (only when a market-based framework is in scope).
-    const needsMkt = activeFrameworks.some(f => f.id === 'esrs' || f.id === 'gri')
-    const residualRows: string[][] = needsMkt
-      ? derivedLocations.filter(l => l.electricity_kwh > 0).map(l => {
-          const resRegion = residualRegionFor(l)
-          void resRegion
-          const res = residualShown(l, 'AR6')
-          return [
-            l.name || 'Location',
-            res.applicable ? res.source : 'Location-factor fallback',
-            res.applicable ? `${res.vintage}${res.note ? `: ${res.note}` : ''}` : (res.note || '—'),
-          ]
-        })
-      : []
-    // ⚠️ NOT `as any`. Every other argument here is cast, and that is why changing the audit
-    // parameter's TYPE did not break this call site on its own — `as any` defeats the check that
-    // would have caught it. This one argument is passed typed so the union actually binds.
-    // DERIVED LOCATIONS (T7): the PDF's citations, exclusions and document index read the locations, and
-    // the citations choose publishers by which streams have figures, so it must see the derived ones.
-    // F-06: the live factor-edition comparison when there is one, else the stored one, so the package prints an edition
-    // change whether or not the comparability question was answered.
-    generateAssurancePDF({ ...inventory, locations: derivedLocations, factor_edition_comparison: comparability?.factorEditions ?? inventory.factor_edition_comparison ?? null } as any, totals_ar6 as any, activeFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES, residualRows)
+    // T17 (PDF-03): the stored row, read now, is what the package prints: its workings, totals, locations_data and
+    // logs, location_log, gwp_version, comparability record and factor-edition comparison, and its own updated_at for
+    // the cover. Nothing calculated on this page is passed: no live totals, no derived locations, no residual-mix
+    // lookup, no live comparison.
+    const { data: row, error: rowErr } = await supabase.from('ghg_inventories').select('*').eq('id', inventoryId).maybeSingle()
+    if (rowErr || !row) {
+      // State what was observed. Do not guess at a cause (CLAUDE.md, the empty-result rule).
+      alert('The assurance package was not generated.\n\n' + (rowErr ? `The saved inventory could not be read: ${rowErr.message}` : 'The saved inventory was not found.') + '\n\nNothing has been downloaded.')
+      return
+    }
+    const storedFrameworks = FRAMEWORKS.filter(f => (row.selected_frameworks ?? []).includes(f.id))
+    generateAssurancePDF(
+      { ...row, locations: Array.isArray(row.locations_data) ? row.locations_data : [], location_log: Array.isArray(row.location_log) ? row.location_log : [] },
+      { s1_total: Number(row.scope1_total ?? 0), s2_location: Number(row.scope2_location_total ?? 0), s2_market: Number(row.scope2_market_total ?? 0) },
+      storedFrameworks as any, { ok: true, rows: auditRows ?? [] }, EF_SOURCES)
   }
 
   const generateExport = async (frameworkId: string) => {

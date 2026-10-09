@@ -2,13 +2,26 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { disclaimerParas } from './disclaimer'
 import { auditTrailLine } from './auditTrailNotice'
-import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'
-import { countryRefusal, yearLabel, periodWords, selectionFor, buildWorkings, type CoverageResolution, type Location, type LocationEvent, type StoredFactorSelection } from './ghg/engine'
+// T17 (PDF-03, ruled 9 Oct 2026): THE PACKAGE PRINTS THE INVENTORY AS SAVED. Every figure, citation, edition, exclusion,
+// residual factor and document status below is read from the stored row (its `workings`, totals, locations_data and its
+// logs), through lib/ghg/storedWorkings.ts and the T11 helpers, so the PDF and the verifier page, which read the same
+// row, cannot differ. Nothing here prices, selects an edition, derives a location or rebuilds a workings row: no
+// engine calculation is imported (lib/assurancePdf.t17.test.ts). Types only from the engine.
+import type { CountryRefusal, LocationEvent } from './ghg/engine'
+import { yearLabel, periodWords, reportingYearLabel, periodFromYearAndEnd } from './ghg/reportingYear'
 import { evidenceRecordRows } from './ghg/evidenceRecord'
-import { selectionContextFor } from './ghg/factorSelection'
 import { FACTOR_YEAR_NO_SUBSTITUTION, FACTOR_YEAR_RULE_CLASS_B } from './ghg/factorEditionRegistry'
-import { SELECTION_RULE_WORDS } from './ghg/workingsCells'
-import { isoDateInWords } from './ghg/dateWords'
+import {
+  workingsActivityCell, workingsVintageCell, workingsEditionLines, workingsScope2MethodCell, workingsResultCell, workingsFactorSourceCell,
+  workingsGwpBasisCell, workingsConversionFactorLine, workingsSourceParts, sourcePartsLines, workingsNoteCell, workingsEmissionFactorCell,
+  displayStoredText,
+} from './ghg/workingsCells'
+import {
+  storedRows, workingsPageRows, savedAtLine, excludedFromRows, citationsFromRows, derivationsFromRows, editionRowsFromRows,
+  residualRowsFromRows, documentIndexRows, WORKINGS_NOT_KEPT, type StoredRow,
+} from './ghg/storedWorkings'
+import { sourceAttributionsFor } from './ghg/defraPublication'
+import { docTypeLabel } from './ghg/conciergeDocTypes'
 import { comparabilityHeading, comparabilitySurfaceLines, factorEditionSurfaceLines, type ComparabilityRecord, type FactorEditionComparison } from './ghg/comparability'
 import { countryRefusalText } from './ghg/countryRefusalCopy'
 // ⚠️ BRAND IS DELIBERATELY NOT IMPORTED HERE ANY MORE (25 Sep 2026). Two calls in this file set it as
@@ -39,9 +52,12 @@ export interface PdfInventory {
   employee_count: number; boundary_approach: string
   selected_frameworks: string[]
   locations: PdfLocation[]
-  // T3c diff 3: what the workings read, so the PDF's editions are the ones the inventory was priced with.
-  coverage_resolutions?: CoverageResolution[]
-  factor_selection?: StoredFactorSelection | null
+  // T17: the stored workings rows, exactly as saved. Absent, null or empty: saved before they were kept (WORKINGS_NOT_KEPT).
+  workings?: unknown
+  // T17: when the printed inventory was saved (ghg_inventories.updated_at), for the cover. Never the export time.
+  updated_at?: string | null
+  // T17 (PDF-02): the GWP set the stored figures are on (ghg_inventories.gwp_version).
+  gwp_version?: string | null
   // F-06: the year-on-year record, printed in its own section with the factor editions that changed.
   comparability_disclosure?: ComparabilityRecord | null
   // F-06: the platform's factor-edition comparison (the page's live one, else the stored column). Printed whether or
@@ -50,7 +66,8 @@ export interface PdfInventory {
   // T18 section D: every location deleted from the inventory; each location's own document_log rides on PdfLocation.
   location_log?: LocationEvent[] | null
 }
-export interface PdfTotals { s1_total: number; s2_location: number; s2_market: number; co2: number; ch4: number; n2o: number; biogenic: number }
+// T17: the three totals the package prints, as stored. Nothing else is passed, so nothing is filled in.
+export interface PdfTotals { s1_total: number; s2_location: number; s2_market: number }
 export interface PdfFramework { id: string; name: string; full: string; gwp: string; deadline: string }
 export interface PdfAuditRow { action: string; old_values: any; new_values: any; user_email: string | null; created_at: string }
 
@@ -106,13 +123,13 @@ export function generateAssurancePDF(
   inventory: PdfInventory,
   // AR6 totals only. This took totalsAR4, totalsAR5 and totalsAR6 and chose per framework, a branch no
   // framework has reached since 20 Jun 2026. lib/ghg/gwpBasis.test.ts pins every framework to AR6.
+  // T17: the STORED totals (ghg_inventories.scope1_total, scope2_location_total, scope2_market_total), never a recompute.
   totalsAR6: PdfTotals,
   frameworks: PdfFramework[],
   audit: PdfAuditTrail,
   // gwp_ar6 is required now: it is the only GWP row, and a package with no GWP row at all would be worse
   // than one that fails to compile.
   efSources: { combustion: string; electricity: string; gwp_ar6: string },
-  residualRows: string[][] = []
 ) {
   // ⚠️ REFUSE, DO NOT DEGRADE. A package missing its audit trail is recoverable — the user retries.
   // A package ASSERTING an empty audit trail is not: it goes to a verifier as evidence. Throwing
@@ -156,15 +173,17 @@ export function generateAssurancePDF(
   let y = 248
   doc.setTextColor(INK); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
   const meta: [string, string][] = [
-    ['Company', inventory.company_name || '—'],
+    ['Company', inventory.company_name || 'Not recorded'],
     ['Reporting year', yl.heading],
     ['Reporting period', period],
-    ['Frameworks', frameworks.map(f => f.name).join(', ') || '—'],
+    ['Frameworks', frameworks.map(f => f.name).join(', ') || 'None selected'],
     ['Boundary approach', boundaryLabel(inventory.boundary_approach)],
     ['Locations', String(inventory.locations.length)],
     ['Generated', today],
     ['Document ref', refId],
   ]
+  // T17: the save this package prints, from the stored row's own updated_at, in UTC. Never the time of export.
+  const savedLine = savedAtLine(inventory.updated_at) ?? 'Prints this inventory as saved; the time of that save was not recorded.'
   meta.forEach(([k, v]) => {
     doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal')
     doc.text(k.toUpperCase(), M, y)
@@ -173,6 +192,8 @@ export function generateAssurancePDF(
     y += 26
   })
 
+  doc.setTextColor(INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(9)
+  doc.text(savedLine, M, y)
   y += 16
   doc.setDrawColor(HAIRLINE); doc.line(M, y, W - M, y); y += 24
   doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
@@ -187,7 +208,8 @@ export function generateAssurancePDF(
     const rev = inventory.revenue_millions
     return [
       f.name,
-      `IPCC ${f.gwp}`,
+      // T17 (PDF-02): the GWP set the stored figures are on, from the row; never a constant per framework.
+      inventory.gwp_version ? `IPCC ${inventory.gwp_version}` : 'Not recorded',
       // ⚠️ ROUNDED ON PURPOSE, AND THIS DOCUMENT IS THE EXCEPTION. The CSV exports write unrounded
       // figures because a verifier recomputes from a spreadsheet; this is a typeset page a person reads,
       // where 12 significant figures in a table cell are noise. Three decimals for a total is 1 kg and
@@ -195,8 +217,8 @@ export function generateAssurancePDF(
       // tCO₂e per $M can sit below 1. Decided 27 Sep 2026. Do not "align" these with the CSVs.
       t.s1_total.toFixed(3),
       t.s2_location.toFixed(3),
-      (f.id === 'esrs' || f.id === 'gri') ? t.s2_market.toFixed(3) : '—',
-      rev > 0 ? (t.s1_total / rev).toFixed(4) : '—',
+      (f.id === 'esrs' || f.id === 'gri') ? t.s2_market.toFixed(3) : 'Not applicable',
+      rev > 0 ? (t.s1_total / rev).toFixed(4) : 'No revenue entered',
     ]
   })
   autoTable(doc, {
@@ -219,9 +241,9 @@ export function generateAssurancePDF(
   //   The exclusion being STATED is what makes that safe, and this is the surface where it matters
   // most: a verifier reading a short Scope 1 with nothing to explain it has been misled by omission.
   // Same sentences as the wizard, the CSV and the verifier page, from the one copy module.
-  const excludedLocs = inventory.locations
-    .map(loc => ({ loc, refusal: countryRefusal(loc) }))
-    .filter(x => x.refusal !== null)
+  // T17: from the stored rows' country declarations, each with the refusal it recorded; nothing is re-decided here.
+  const rows: StoredRow[] = storedRows(inventory.workings)
+  const excludedLocs = excludedFromRows(rows).map(x => ({ loc: { name: x.location }, refusal: x.refusal as CountryRefusal }))
   if (excludedLocs.length > 0) {
     let y = (((doc as any).lastAutoTable?.finalY as number) ?? 92) + 16
     doc.setFontSize(9); doc.setTextColor(INK); doc.setFont('helvetica', 'bold')
@@ -246,11 +268,8 @@ export function generateAssurancePDF(
   sectionTitle(doc, 'Methodology & Emission Factors', M)
   // Bound once each. Both are read twice below (length check, then map), and calling them twice would
   // walk the locations twice to build a value that cannot change between the two calls.
-  // T3c: the citations name the editions the inventory's own window selects, with its frozen class (b) choices.
-  const factorCtx = selectionContextFor(inventory)
-  const factorSel = selectionFor(inventory.reporting_year, inventory.fiscal_year_end_month, factorCtx)
-  const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)
-  const gridCitations = gridSourcesFor(inventory.locations, factorSel)
+  // T17: the citations the stored rows were priced with, not a fresh selection made on the day of export.
+  const { combustion: combustionCitations, electricity: gridCitations } = citationsFromRows(rows)
   autoTable(doc, {
     startY: 92,
     head: [['Element', 'Basis']],
@@ -270,19 +289,19 @@ export function generateAssurancePDF(
       // a locations-less inventory and is unreachable today — emptyLocation() is always seeded — so
       // this is about which way to be wrong if it ever happens, and inventing a citation is the worse
       // way. Both exports now behave the same, which is also one less thing to explain.
-      ...combustionCitations.map(src => ['Combustion factors', src]),
-      // T10a: how a cited factor became the per-unit figure applied, where we derived it (Australian gas).
-      ...factorDerivationsFor(inventory.locations, factorSel).map(d => ['Factor derivation', d]),
-      ...gridCitations.map(src => ['Electricity factors', src]),
+      ...combustionCitations.map(src => ['Combustion factors', displayStoredText(src)]),
+      // T17 (ruling 9 Oct 2026): the distinct conversion notes and conversion factors the stored rows carry, by source.
+      ...derivationsFromRows(rows).map(([source, line]) => [`Factor derivation: ${source}`, line]),
+      ...gridCitations.map(src => ['Electricity factors', displayStoredText(src)]),
       // The attribution each cited source's licence requires, verbatim, then the licence and its link.
       // From the same locations as the two citation lists above, so it appears exactly when they cite it.
-      ...sourceAttributionsForLocations(inventory.locations, factorSel).flatMap(a => [
-        [`Licence attribution — ${a.publisher}`, a.attribution],
-        [`Licence — ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
+      ...sourceAttributionsFor(rows.map(r => r.ef_source)).flatMap(a => [
+        [`Licence attribution: ${a.publisher}`, a.attribution],
+        [`Licence: ${a.publisher}`, `${a.licence}, ${a.licence_url}`],
       ]),
       // "GWP values (AR4)" and "(AR5)" rows were removed on 17 Sep 2026. They cited AR4 and AR5 as
       // "selectable alternate", and no inventory has ever been able to select either.
-      ['GWP values (AR6)', efSources.gwp_ar6],
+      ['GWP values (AR6)', displayStoredText(efSources.gwp_ar6)],
       ['Reporting year', yl.heading],
       ['Reporting period', period],
       // T3c: the window the editions were chosen for, and the rule, in the methodology page's words.
@@ -296,13 +315,14 @@ export function generateAssurancePDF(
     margin: { left: M, right: M },
   })
 
-  // Market-based Scope 2 residual-mix citation (only when ESRS/GRI is in scope).
+  // Market-based Scope 2 residual-mix citation (only when ESRS/GRI is in scope). T17: the stored market-based rows.
+  const residualRows = frameworks.some(f => f.id === 'esrs' || f.id === 'gri') ? residualRowsFromRows(rows) : []
   if (residualRows.length > 0) {
     const afterMethods = (doc as any).lastAutoTable?.finalY ?? 92
     // INK, like every other subheading in this document (see the two at the methods and locations
     // tables). It was BRAND, which made this one heading the only brand-coloured text in the package.
     doc.setTextColor(INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
-    doc.text('Market-based Scope 2 — Residual Mix', M, afterMethods + 30)
+    doc.text('Market-based Scope 2: Residual Mix', M, afterMethods + 30)
     doc.setTextColor(MUTE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
     doc.text(
       doc.splitTextToSize('Residual-mix factor applied to uncovered load, or, where no residual mix is loaded, the location-based grid average (named per location below); contractual (covered) kWh counted at zero. Per-location source and vintage below.', W - 2 * M),
@@ -323,30 +343,10 @@ export function generateAssurancePDF(
   }
 
   // ── PAGE 3b: FACTOR EDITIONS (T3c) ──
-  // One row per edition as the workings record it: the edition, the rule that chose it and why, its publication and
-  // correction dates, and for class (b) the day it was selected. From the engine's own rows, on the same selection
-  // context as the citations above, so this table and the workings cannot name different editions.
+  // One row per edition as the stored workings record it: the edition, the rule that chose it and why, its publication
+  // and correction dates, and for class (b) the day it was selected. T17: from the stored rows, never a rebuild.
   {
-    const rows = buildWorkings(inventory.locations as unknown as Location[], 'AR6', inventory.reporting_year,
-      inventory.coverage_resolutions ?? [], inventory.fiscal_year_end_month ?? 12, factorCtx) as {
-      factor_edition?: string; selection_rule?: string; selection_basis?: string; edition_published?: string
-      edition_corrected?: string; selected_on?: string; provisional?: boolean }[]
-    const seen = new Set<string>()
-    const body: string[][] = []
-    for (const w of rows) {
-      if (!w.factor_edition) continue
-      const row = [
-        w.provisional ? `${w.factor_edition} (provisional)` : w.factor_edition,
-        w.selection_rule ? (SELECTION_RULE_WORDS[w.selection_rule] ?? w.selection_rule) : '',
-        w.selection_basis ?? '',
-        w.edition_published ?? '',
-        w.edition_corrected ?? '',
-        w.selected_on ? isoDateInWords(w.selected_on) : '',
-      ].map(cell => cell.replace(/₂/g, '2').replace(/₃/g, '3').replace(/₄/g, '4'))
-      const key = row.join('|')
-      if (seen.has(key)) continue
-      seen.add(key); body.push(row)
-    }
+    const body = editionRowsFromRows(rows).map(row => row.map(cell => cell.replace(/₂/g, '2').replace(/₃/g, '3').replace(/₄/g, '4')))
     if (body.length > 0) {
       doc.addPage()
       sectionTitle(doc, 'Factor Editions', M)
@@ -363,7 +363,59 @@ export function generateAssurancePDF(
     }
   }
 
-  // ── PAGE 3c: COMPARABILITY (F-06) ──
+  // ── PAGE 3c: CALCULATION WORKINGS (T17) ──
+  // Every stored workings row, worded as the verifier page words it (the T11 helpers): the bills that counted and
+  // those that did not and why, estimated and month-only dates, hand entries, who and when, typed entries, the
+  // conversion factor, the edition and its rule, and the GWP basis in words. The document and location records print
+  // in the document index. On landscape pages, because nine columns do not fit across portrait letter.
+  //   PAGE BREAKS: the header row repeats on every page, and a row is never split across a page (rowPageBreak
+  // 'avoid'), so one figure's bills stay together; a single row taller than a page is the only one autoTable splits.
+  {
+    const sub = (cell: string) => cell.replace(/₂/g, '2').replace(/₃/g, '3').replace(/₄/g, '4')
+    const docById = new Map<string, { file_name?: string; extracted?: { sourceQuote?: string | null }[] }>()
+    for (const l of inventory.locations) for (const d of (l.source_docs ?? []) as { id: string; file_name?: string; extracted?: { sourceQuote?: string | null }[] }[]) docById.set(d.id, d)
+    const fileOf = (id: string) => docById.get(id)?.file_name || 'A document no longer on this inventory'
+    const quoteOf = (id: string, pi: number | undefined) => (pi == null ? null : docById.get(id)?.extracted?.[pi]?.sourceQuote?.trim() || null)
+    const yearText = reportingYearLabel(periodFromYearAndEnd(inventory.reporting_year, inventory.fiscal_year_end_month ?? 12)).inText
+    const pageRows = workingsPageRows(rows)
+    doc.addPage('letter', 'landscape')
+    sectionTitle(doc, 'Calculation Workings', M)
+    if (pageRows.length === 0) {
+      doc.setFontSize(10); doc.setTextColor(INK); doc.setFont('helvetica', 'normal')
+      doc.text(doc.splitTextToSize(WORKINGS_NOT_KEPT, doc.internal.pageSize.getWidth() - 2 * M), M, 100)
+    } else {
+      autoTable(doc, {
+        startY: 92,
+        head: [['Location', 'Source', 'Activity data', 'Emission factor', 'Factor source', 'Factor vintage', 'Scope 2 method', 'GWP basis', 'Result (tCO2e)']],
+        body: pageRows.map(r => {
+          const w = r as StoredRow & Record<string, never>
+          // T17 review: stored engine text (the note, the factor cell, the quantification method) through the shared
+          // wording, so the package prints no dash and says what the verifier page says.
+          const activity = [workingsActivityCell(w), workingsNoteCell(r), workingsConversionFactorLine(r) ?? '']
+          return [
+            r.location || 'Location',
+            sourcePartsLines(workingsSourceParts(r as Parameters<typeof workingsSourceParts>[0], fileOf, quoteOf, yearText)).join('\n'),
+            activity.filter(Boolean).join('\n'),
+            workingsEmissionFactorCell(r),
+            workingsFactorSourceCell(w),
+            [workingsVintageCell(w), ...workingsEditionLines(w)].filter(Boolean).join('\n'),
+            workingsScope2MethodCell(w),
+            [workingsGwpBasisCell(r), displayStoredText(String(r.quantification_method ?? ''))].filter(Boolean).join('\n'),
+            workingsResultCell(w),
+          ].map(sub)
+        }),
+        theme: 'grid',
+        showHead: 'everyPage',
+        rowPageBreak: 'avoid',
+        headStyles: { fillColor: INK, textColor: ON_COVER, fontSize: 7 },
+        bodyStyles: { fontSize: 6.5, textColor: TABLE_INK, valign: 'top' },
+        columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: 210 }, 2: { cellWidth: 80 }, 4: { cellWidth: 90 }, 5: { cellWidth: 80 } },
+        margin: { left: M, right: M },
+      })
+    }
+  }
+
+  // ── PAGE 3d: COMPARABILITY (F-06) ──
   // The year-on-year record as the verifier page shows it, from the same lines (comparability.ts): the company's
   // answer, what it was shown, the basis, then the factor editions that changed and the effect, and
   // FACTOR_EDITION_DISCLOSURE. The edition change is the platform's finding, not the company's, so it prints even when
@@ -393,20 +445,24 @@ export function generateAssurancePDF(
   // ── PAGE 4 — SOURCE DOCUMENT INDEX ──
   doc.addPage()
   sectionTitle(doc, 'Source Document Index', M)
-  const docRows: string[][] = []
-  inventory.locations.forEach(loc => {
-    (loc.source_docs || []).forEach(d => {
-      docRows.push([loc.name || '—', d.document_type, d.file_name, (d.uploaded_at || '').slice(0, 10)])
-    })
-  })
-  if (docRows.length === 0) docRows.push(['—', 'No documents uploaded', '—', '—'])
+  // T17: every document on file, deleted, or on a deleted location, with its Status from the stored record: counted,
+  // or not counted and why (each bill's stored contributions), withdrawn (who, when, why), or deleted (the tombstone:
+  // file, SHA-256 where known, who, when, why).
+  const docRows: string[][] = documentIndexRows(
+    inventory.locations as unknown as Parameters<typeof documentIndexRows>[0], rows, (inventory.location_log ?? []) as Parameters<typeof documentIndexRows>[2],
+    reportingYearLabel(periodFromYearAndEnd(inventory.reporting_year, inventory.fiscal_year_end_month ?? 12)).inText, docTypeLabel,
+  )
+  if (docRows.length === 0) docRows.push(['None', 'No documents uploaded', '', '', ''])
   autoTable(doc, {
     startY: 92,
-    head: [['Location', 'Document type', 'File name', 'Uploaded']],
+    head: [['Location', 'Document type', 'File name', 'Uploaded', 'Status']],
     body: docRows,
     theme: 'grid',
+    showHead: 'everyPage',
+    rowPageBreak: 'avoid',
     headStyles: { fillColor: INK, textColor: ON_COVER, fontSize: 9 },
-    bodyStyles: { fontSize: 8, textColor: TABLE_INK },
+    bodyStyles: { fontSize: 8, textColor: TABLE_INK, valign: 'top' },
+    columnStyles: { 0: { cellWidth: 70 }, 1: { cellWidth: 75 }, 2: { cellWidth: 90 }, 3: { cellWidth: 55 } },
     margin: { left: M, right: M },
   })
 
@@ -455,7 +511,7 @@ export function generateAssurancePDF(
   })
   // Reachable only on a SUCCESSFUL read that returned nothing, which is a true statement about
   // a saved-but-never-edited inventory. A failed read cannot reach this line — see the throw above.
-  if (auditBody.length === 0) auditBody.push(['—', 'No entries recorded', '—', '—'])
+  if (auditBody.length === 0) auditBody.push(['None', 'No entries recorded', '', ''])
   autoTable(doc, {
     startY: 98,
     head: [['Timestamp', 'Action', 'User', 'Change']],

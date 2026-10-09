@@ -82,8 +82,9 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
       .not.toContain('combustionCitations.length ? combustionCitations')
     expect(pdfSrc, 'nor an electricity one')
       .not.toContain('gridCitations.length ? gridCitations')
-    expect(pdfSrc).toContain("...combustionCitations.map(src => ['Combustion factors', src]),")
-    expect(pdfSrc).toContain("...gridCitations.map(src => ['Electricity factors', src]),")
+    // T17 review: the stored citation is printed through displayStoredText (no dash), the same wording as every surface.
+    expect(pdfSrc).toContain("...combustionCitations.map(src => ['Combustion factors', displayStoredText(src)]),")
+    expect(pdfSrc).toContain("...gridCitations.map(src => ['Electricity factors', displayStoredText(src)]),")
   })
 
   // ── THE TWO EXPORTS MUST NOT DISAGREE ─────────────────────────────────────────────────────────
@@ -91,23 +92,21 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
     // Each row line now carries its const directly — the fallback ternary that used to wrap them, and
     // to split the expression across two lines, is gone (see V5). lineIn still guards existence and
     // non-ambiguity: '.map(src =>' alone matches TWO lines here and would throw by design.
-    expect(lineIn(pdfSrc, PDF, "['Combustion factors', src]"), 'the PDF must map the resolved set')
+    expect(lineIn(pdfSrc, PDF, "['Combustion factors', displayStoredText(src)]"), 'the PDF must map the resolved set')
       .toContain('combustionCitations.map(src =>')
-    expect(lineIn(pdfSrc, PDF, "['Electricity factors', src]"), 'same for electricity')
+    expect(lineIn(pdfSrc, PDF, "['Electricity factors', displayStoredText(src)]"), 'same for electricity')
       .toContain('gridCitations.map(src =>')
     // sourceAttributionsForLocations joined this import on 17 Sep 2026: the licence attribution is derived
     // from the same locations as the citation rows.
     // factorDerivationsFor joined it on 2 Oct 2026 (T10a): the Australian gas derivation, from the same locations.
-    expect(pdfSrc).toContain("import { combustionSourcesFor, gridSourcesFor, sourceAttributionsForLocations, factorDerivationsFor } from './ghg/engine'")
+    // T17 (PDF-03): the PDF prints the citations the STORED rows were priced with, not a selection made at export.
+    expect(pdfSrc).not.toContain('combustionSourcesFor')
+    expect(pdfSrc).toContain('const { combustion: combustionCitations, electricity: gridCitations } = citationsFromRows(rows)')
     expect(pdfSrc, 'the country-blind constant must not be the combustion row again')
       .not.toContain("['Combustion factors', efSources.combustion]")
     expect(pdfSrc, 'the six-jurisdiction catalogue must not be the electricity row again')
       .not.toContain("['Electricity factors', efSources.electricity]")
-    expect(pdfSrc).toContain('gridSourcesFor(inventory.locations, factorSel)')
-    // Bound once each, not called twice in one expression.
-    expect(pdfSrc).toContain('const combustionCitations = combustionSourcesFor(inventory.locations, factorSel)')
-    // T3d: with the inventory's selection, so each location cites the edition that priced it.
-    expect(pdfSrc).toContain('const gridCitations = gridSourcesFor(inventory.locations, factorSel)')
+    expect(pdfSrc).not.toContain('gridSourcesFor')
   })
 
   it('V7 the XLSX calls the SAME helpers as the PDF — agreement is structural, not asserted', () => {
@@ -158,8 +157,8 @@ describe('combustion citations follow the jurisdiction that priced them', () => 
   it('V9 scans real files — a moved call site fails loudly instead of passing vacuously', () => {
     expect(pdfSrc.length, `${PDF} looks empty`).toBeGreaterThan(5_000)
     expect(pageSrc.length, `${PAGE} looks empty`).toBeGreaterThan(10_000)
-    expect(() => lineIn(pdfSrc, PDF, "['Combustion factors', src]")).not.toThrow()
-    expect(() => lineIn(pdfSrc, PDF, "['Electricity factors', src]")).not.toThrow()
+    expect(() => lineIn(pdfSrc, PDF, "['Combustion factors', displayStoredText(src)]")).not.toThrow()
+    expect(() => lineIn(pdfSrc, PDF, "['Electricity factors', displayStoredText(src)]")).not.toThrow()
     expect(() => lineIn(pageSrc, PAGE, "['Combustion factors', src]")).not.toThrow()
     expect(() => lineIn(pageSrc, PAGE, "['Electricity factors', src]")).not.toThrow()
   })

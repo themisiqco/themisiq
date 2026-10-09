@@ -52,7 +52,7 @@ import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
 import { stripTsComments } from '../testing/stripComments';
 import { unitOptionsShowing } from './unitLabels';
-import { workingsFactorSourceCell } from './workingsCells';
+import { workingsFactorSourceCell, displayStoredText } from './workingsCells';
 import { buildFactorEditions, sameFactorEditions } from './factorEditions';
 import { contributionShareCell } from './workingsCells';
 import { convertToCanonical, convertibleUnits, exactConversion, SELECTOR_UNITS, EXACT_CONVERSIONS, L_PER_GAL, GJ_PER_MMBTU, KWH_PER_GJ, M3_PER_MCF as M3_PER_MCF_EXACT } from '../unitConversions';
@@ -1596,7 +1596,8 @@ describe('Y. Australia has a published residual mix', () => {
       expect(src, `${f} must not keep a stray copy of the inline rule`)
         .not.toContain("grid_region.startsWith('EU_') ? ");
     }
-    expect(seen, `expected four resRegion sites, found: ${seen.join(', ')}`).toHaveLength(4);
+    // T17: three. The assurance PDF's caller no longer looks a residual factor up; it prints the stored market-based rows.
+    expect(seen, `expected three resRegion sites, found: ${seen.join(', ')}`).toHaveLength(3);
   });
 
   it('Y10 workings, assurance PDF and XLSX resolve the SAME residual region', () => {
@@ -4747,7 +4748,8 @@ describe('T10a no figure, and MJ gas', () => {
     expect(factorDerivationsFor([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })], heldSel(([loc({ has_natural_gas: true, natural_gas_amount: 5, natural_gas_unit: 'mcf' })])[0] ?? {}))).toEqual([]);
     const root = join(__dirname, '..', '..');
     expect(readFileSync(join(root, 'app/verify/[token]/page.tsx'), 'utf8')).toContain('{rowNoteOf(w) && (');
-    expect(readFileSync(join(root, 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations, factorSel).map(d => ['Factor derivation', d]),");
+    // T17: the PDF lists the conversions the STORED rows carry (derivationsFromRows), never a fresh pickEF at export.
+    expect(readFileSync(join(root, 'lib/assurancePdf.ts'), 'utf8')).toContain('...derivationsFromRows(rows).map(([source, line]) => [`Factor derivation: ${source}`, line]),');
     expect(readFileSync(join(root, 'app/dashboard/ghg/page.tsx'), 'utf8')).toContain("...factorDerivationsFor(derivedLocations, factorSel).map(d => ['Factor derivation', d]),");
   });
 
@@ -6434,7 +6436,8 @@ describe('FI7. steam or district heat with no published factor (FI7b: priced on 
     expect(STEAM_ESTIMATE_SHORT).toBe("Estimated from natural gas at 80% efficiency. Enter your provider's figure below to replace it.")
     const verify = readFileSync(join(process.cwd(), 'app/verify/[token]/page.tsx'), 'utf8')
     expect(verify).toContain('{rowNoteOf(w) && (')
-    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain("...factorDerivationsFor(inventory.locations, factorSel).map(d => ['Factor derivation', d]),")
+    // T17: from the stored rows, whose notes carry the estimate.
+    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain('...derivationsFromRows(rows).map(([source, line]) => [`Factor derivation: ${source}`, line]),')
   })
 
   it('FI7-3 a supplier figure clears the issue and prices, unchanged', () => {
@@ -6513,7 +6516,9 @@ describe('FI10. NZ use class on every row', () => {
 
   it('FI10-4 it renders in the Factor source cell (workings, review, verifier) and in the PDF and XLSX citation text', () => {
     const r = rowsOf(nz('industrial'))[0]
-    expect(workingsFactorSourceCell(r)).toBe(`${EF_SOURCES.combustion_nz}, Industrial use class`)
+    // T17 review: the stored citation reads without its dash on every surface (displayStoredText, DCL-01); the use class follows.
+    expect(workingsFactorSourceCell(r)).toBe(`${displayStoredText(EF_SOURCES.combustion_nz)}, Industrial use class`)
+    expect(workingsFactorSourceCell(r)).toBe('NZ MfE Measuring Emissions 2026 v2 (as-published basis: factors stored verbatim, no AR re-basing), Industrial use class')
     expect(combustionSourcesFor([nz('industrial')], heldSel(([nz('industrial')])[0] ?? {}))).toEqual([`${EF_SOURCES.combustion_nz}, Industrial use class`])
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
     expect(page).toContain('{workingsFactorSourceCell(r)}')
@@ -6521,7 +6526,7 @@ describe('FI10. NZ use class on every row', () => {
     const verify = readFileSync(join(process.cwd(), 'app/verify/[token]/page.tsx'), 'utf8')
     expect(verify).toContain('const factorSourceOf = (w: WorkingRow): string => workingsFactorSourceCell(w)')
     expect(verify).toContain('factor_variant?: string')
-    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain('...combustionCitations.map(src => [\'Combustion factors\', src]),')
+    expect(readFileSync(join(process.cwd(), 'lib/assurancePdf.ts'), 'utf8')).toContain('...combustionCitations.map(src => [\'Combustion factors\', displayStoredText(src)]),')
   })
 
   it('FI10-5 no non-NZ row carries factor_variant', () => {
