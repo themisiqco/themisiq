@@ -46,7 +46,7 @@ import {
   M3_PER_MCF, EF_CA_NG_CO2_M3, NZ_GAS_BASIS_NOTE,
 } from './engine';
 import { guardConfirm, editPeriod } from './proposalEdits';
-import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution } from './coverageActions';
+import { deliveriesCompleteResolution, estimateResolution, NO_MONTHS_TO_ESTIMATE, exactDuplicateCountOnce, exactDuplicateNotSame, upsertResolution, sameBillResolution } from './coverageActions';
 import { buildMonthlyEmissions, reconcile, type MonthlySlice } from './monthlyEmissions';
 import { NOT_PROVIDED } from '../notProvided';
 import { countryRefusalText } from './countryRefusalCopy';
@@ -4885,7 +4885,7 @@ describe('T10b delivery-based fuels', () => {
 
   it('the 0-months guard: no estimate is built from zero covered months, and a stored one changes nothing', () => {
     expect(() => estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
-      monthsCovered: 0, pctEstimated: 100, at: '2026-10-02T09:00:00Z' })).toThrow(NO_MONTHS_TO_ESTIMATE);
+      monthsCovered: 0, pctEstimated: 100, by: { userId: 'u1', email: 'a@b.co' }, at: '2026-10-02T09:00:00Z' })).toThrow(NO_MONTHS_TO_ESTIMATE);
     const gas = loc({ has_natural_gas: true, source_docs: [doc('utility_bill_gas', [prop({ value: 50, periodStart: '2026-03-10', periodEnd: '2026-03-20' })], 'g')] });
     const zero = { locId: 'L1', fuelType: 'natural_gas', kind: 'extrapolate', documentType: 'utility_bill_gas', monthsCovered: 0, pctEstimated: 100,
       note: 'n', acknowledgedAt: '2026-10-02T09:00:00Z' } as CoverageResolution;
@@ -4893,7 +4893,7 @@ describe('T10b delivery-based fuels', () => {
     expect(applyResolutions(gas, [zero], new Date(2026, 0, 1), new Date(2026, 11, 31)).natural_gas_amount?.value).toBe(50);
     expect(findUnresolvedCoverage([gas], 2026, 12, [zero]).map(i => i.status)).toContain('gap');
     const one = estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null,
-      monthsCovered: 1, pctEstimated: 91.7, at: '2026-10-02T09:00:00Z' });
+      monthsCovered: 1, pctEstimated: 91.7, by: { userId: 'u1', email: 'a@b.co' }, at: '2026-10-02T09:00:00Z' });
     expect(validateResolution(one, gas)).toBeNull();
   });
 
@@ -7233,5 +7233,27 @@ describe('T18 diff 2: a withdrawn document in the engine', () => {
     expect(findUnresolvedCoverage([w], 2024, 12, []).find(i => i.status === 'all_rejected')?.message).toContain('was rejected or withdrawn and no figure');
     const r = gas([doc('utility_bill_gas', [prop({ status: 'rejected' })], 'r')]);
     expect(findUnresolvedCoverage([r], 2024, 12, []).find(i => i.status === 'all_rejected')?.message).toContain('was rejected and no figure');
+  });
+});
+
+describe('T18 diff 3: who on every coverage-resolution row', () => {
+  const by = { userId: 'u-1', email: 'jo@acme.example' };
+  const AT = '2026-10-02T09:00:00.000Z';
+  const pair = loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [
+    doc('utility_bill_gas', [prop({ periodStart: '2024-01-01', periodEnd: '2024-06-30' })], 'a'),
+    doc('utility_bill_gas', [prop({ periodStart: '2024-01-01', periodEnd: '2024-06-30' })], 'b')] });
+  const resRows = (r: CoverageResolution[]) => (buildWorkings([pair], 'AR6', 2024, r, 12) as { gwp_basis?: string; resolved_by?: unknown; resolved_by_text?: string; ef_source?: string }[])
+    .filter(x => x.gwp_basis === 'coverage_resolution');
+
+  it('a resolution with a person carries resolved_by, structured, and its note keeps its own words', () => {
+    const r = sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: { id: 'a', file: 'a.pdf' }, excluded: { id: 'b', file: 'b.pdf' }, by, at: AT });
+    expect(resRows([r])).toEqual([expect.objectContaining({ resolved_by: by, resolved_by_text: 'Who: jo@acme.example',
+      ef_source: 'a.pdf and b.pdf are the same bill, so it is counted once, from a.pdf. Recorded by jo@acme.example on 2 October 2026.' })]);
+  });
+
+  it('a stored resolution without a person still validates, and says "Who: not recorded"', () => {
+    const legacy = { locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'a', excludedDocIds: ['b'], note: 'Same bill.', acknowledgedAt: AT } as CoverageResolution;
+    expect(validateResolution(legacy, pair)).toBeNull();
+    expect(resRows([legacy])).toEqual([expect.objectContaining({ resolved_by: null, resolved_by_text: 'Who: not recorded', ef_source: 'Same bill.' })]);
   });
 });

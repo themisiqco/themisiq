@@ -25,7 +25,8 @@ import { removeStored } from '../../../lib/ghg/removeStored'
 import { saveFailedText } from '../../../lib/planGateError'
 import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
-import { figuresForSave, documentLogBaseline, documentLogProblem, type DocumentLogBaseline } from '../../../lib/ghg/savePayload'
+import { figuresForSave, documentLogBaseline, documentLogProblem, typedEntriesBaseline, typedEntriesProblem, type DocumentLogBaseline, type AppendOnlyBaseline } from '../../../lib/ghg/savePayload'
+import { typedBaseline, type TypedBaseline } from '../../../lib/ghg/typedEntries'
 import { selectionContextFor } from '../../../lib/ghg/factorSelection'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
 import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
@@ -682,6 +683,10 @@ const searchParams = useSearchParams()
   // entry is refused (lib/ghg/savePayload.ts, documentLogProblem). Keyed by id so a log from another inventory
   // open earlier in this page is never compared with this one.
   const loadedDocumentLog = useRef<{ inventoryId: string | null; log: DocumentLogBaseline }>({ inventoryId: null, log: {} })
+  // T18: each location's typed figures and typed entries as loaded or last saved, for this inventory id. A field with
+  // no typed entry yet is compared with `typed`, so a figure saved before T18 and left unchanged is not attributed to
+  // the next saver. `entries` is the append-only record: a save that drops or changes one is refused.
+  const loadedTypedFigures = useRef<{ inventoryId: string | null; typed: TypedBaseline; entries: AppendOnlyBaseline }>({ inventoryId: null, typed: {}, entries: {} })
   const skipSavedReset = useRef(true)
   // RM1: removals in flight, by key (a document id, or `location:${id}`). The ref is the guard, read and
   // written synchronously, so a second click in the same tick is ignored; the state disables the control.
@@ -1116,6 +1121,7 @@ const searchParams = useSearchParams()
        skipSavedReset.current = true 
         setInventoryId(data.id)
         loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(data.locations_data) }
+        loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(data.locations_data), entries: typedEntriesBaseline(data.locations_data) }
         // LEAD1 L4: the free calculation saves as itself and shows its own banner.
         setEditingFree(data.free_tier === true)
         // L8-fix1: the purchase landing starts from the row as loaded.
@@ -2075,11 +2081,20 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
     // One derivation for every figure the save writes (T7): totals, workings, pct_estimated and
     // factor_editions from derived locations, locations_data as edited. See lib/ghg/savePayload.ts.
-    const saved = figuresForSave(inventory, 'AR6')
+    // T18: each typed figure changed since the last saved record gets an entry naming who saved it and when.
+    const savedAt = new Date().toISOString()
+    const saved = figuresForSave(inventory, 'AR6', {}, session.user.email ? {
+      by: { userId: session.user.id, email: session.user.email }, at: savedAt,
+      baseline: inventoryId && loadedTypedFigures.current.inventoryId === inventoryId ? loadedTypedFigures.current.typed : undefined,
+    } : undefined)
     // T18: the document log is append-only. Compared only with the log loaded for this same inventory.
     const logProblem = inventoryId && loadedDocumentLog.current.inventoryId === inventoryId
       ? documentLogProblem(loadedDocumentLog.current.log, saved.locations_data) : null
     if (logProblem) { lastSaveError.current = logProblem; alert(logProblem); return }
+    // T18: so are the typed entries: a save that drops or changes one is refused, before anything is written.
+    const entriesProblem = inventoryId && loadedTypedFigures.current.inventoryId === inventoryId
+      ? typedEntriesProblem(loadedTypedFigures.current.entries, saved.locations_data) : null
+    if (entriesProblem) { lastSaveError.current = entriesProblem; alert(entriesProblem); return }
     const savedEditionComparison = priorYear.status === 'found' ? (comparability?.factorEditions ?? null)
       : priorYear.status === 'none' ? null : (inventory.factor_edition_comparison ?? null)
     const payload = {
@@ -2147,13 +2162,18 @@ workings: saved.workings,
       const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
       loadedDocumentLog.current = { inventoryId, log: documentLogBaseline(saved.locations_data) }
+      loadedTypedFigures.current = { inventoryId, typed: typedBaseline(saved.locations_data), entries: typedEntriesBaseline(saved.locations_data) }
     } else {
       const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
       const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
       if (dup) { lastSaveError.current = 'An inventory for that company and year already exists.'; alert(`You already have an inventory for ${yl.inText} for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
-      if (data) { savedId = data.id; setInventoryId(data.id); loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(saved.locations_data) } }
+      if (data) {
+        savedId = data.id; setInventoryId(data.id)
+        loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(saved.locations_data) }
+        loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(saved.locations_data), entries: typedEntriesBaseline(saved.locations_data) }
+      }
       loadCompanies() // refresh dropdown in case resolve-or-create added a new company
     }
     // Additive monthly-emissions write. Annual save above is already committed and
@@ -2204,7 +2224,12 @@ workings: saved.workings,
     // flight the baseline moves with it; when something did, the page stays dirty, as it should.
     setInventory(i => {
       if (inventoryFingerprint(i) === savingFingerprint) skipSavedReset.current = true
-      return { ...i, factor_selection: saved.factor_selection, factor_edition_comparison: savedEditionComparison }
+      // T18: the typed entries this save appended, so the next save writes them again rather than dropping them.
+      const locations = i.locations.map(l => {
+        const entries = saved.locations_data.find(x => x.id === l.id)?.typed_entries
+        return entries ? { ...l, typed_entries: entries } : l
+      })
+      return { ...i, locations, factor_selection: saved.factor_selection, factor_edition_comparison: savedEditionComparison }
     })
     setSaved(true)
     setBaseline(savingFingerprint)

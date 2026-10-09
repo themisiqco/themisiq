@@ -172,7 +172,8 @@ export async function claimFreeCalc(body: unknown, deps: ClaimDeps): Promise<Rou
   // 4. Write, as the user (RLS and the M2 trigger apply), with figures computed here.
   const co = await deps.resolveCompany(inv.company_name)
   if ('error' in co) return dbFail(co.error)
-  const row = inventoryRow(inv, deps.user.id, co.id, !active, deps.now)
+  // T18: the claiming person is who the figures typed before sign-in are attributed to.
+  const row = inventoryRow(inv, deps.user.id, co.id, !active, deps.now, { userId: deps.user.id, email: deps.user.email })
   let savedId: string
   if (decision.action === 'replace_free') {
     const r = await deps.replaceFreeInventory(decision.id, row)

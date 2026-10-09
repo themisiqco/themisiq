@@ -53,26 +53,30 @@ export function upsertResolution(list: readonly CoverageResolution[], res: Cover
   return [...list.filter(r => resolutionKey(r) !== key), res]
 }
 
-/** "Same bill, count it once": `counted` is kept, `excluded` is retained as evidence but not counted. */
+/** T18: the sentence that ends a resolution note naming who recorded it, for the kinds whose note did not already. */
+const recordedBy = (by: Who, at: string) => ` Recorded by ${by.email} on ${plainDate(at)}.`
+type Who = { userId: string; email: string }
+
+/** "Same bill, count it once": `counted` is kept, `excluded` is retained as evidence but not counted. T18: who chose it. */
 export function sameBillResolution(a: {
-  locId: string; fuelType: string; counted: { id: string; file: string }; excluded: { id: string; file: string }; at: string
+  locId: string; fuelType: string; counted: { id: string; file: string }; excluded: { id: string; file: string }; by: Who; at: string
 }): CoverageResolution {
   return {
     locId: a.locId, fuelType: a.fuelType, kind: 'same_bill',
-    countedDocId: a.counted.id, excludedDocIds: [a.excluded.id],
-    note: `${a.counted.file} and ${a.excluded.file} are the same bill, so it is counted once, from ${a.counted.file}.`,
+    countedDocId: a.counted.id, excludedDocIds: [a.excluded.id], by: a.by,
+    note: `${a.counted.file} and ${a.excluded.file} are the same bill, so it is counted once, from ${a.counted.file}.${recordedBy(a.by, a.at)}`,
     acknowledgedAt: a.at,
   }
 }
 
 /** "Different meters or accounts": the second document's own meter label, which must match (T3 ruling). */
 export function differentMetersResolution(a: {
-  locId: string; fuelType: string; doc: { id: string; file: string }; meterLabel: string; at: string
+  locId: string; fuelType: string; doc: { id: string; file: string }; meterLabel: string; by: Who; at: string
 }): CoverageResolution {
   const label = a.meterLabel.trim()
   return {
-    locId: a.locId, fuelType: a.fuelType, kind: 'different_meters', docId: a.doc.id, meterLabel: label,
-    note: `${a.doc.file} is for a different meter or account: ${label}.`,
+    locId: a.locId, fuelType: a.fuelType, kind: 'different_meters', docId: a.doc.id, meterLabel: label, by: a.by,
+    note: `${a.doc.file} is for a different meter or account: ${label}.${recordedBy(a.by, a.at)}`,
     acknowledgedAt: a.at,
   }
 }
@@ -89,7 +93,7 @@ export const NO_MONTHS_TO_ESTIMATE =
  */
 export function estimateResolution(a: {
   locId: string; fuelType: string; documentType: string; meterLabel: string | null
-  monthsCovered: number; pctEstimated: number; at: string
+  monthsCovered: number; pctEstimated: number; by: Who; at: string
   /** FI9 diff 4: a fleet-fuel gap's vehicle type. */
   fleetType?: FleetType
 }): CoverageResolution {
@@ -100,8 +104,8 @@ export function estimateResolution(a: {
     locId: a.locId, fuelType: a.fuelType, kind: 'extrapolate', documentType: a.documentType,
     ...(a.meterLabel ? { meterLabel: a.meterLabel } : {}),
     ...(a.fleetType ? { fleetType: a.fleetType } : {}),
-    monthsCovered: m, pctEstimated: a.pctEstimated,
-    note: `${meter}${m} of 12 months evidenced by bills; remaining ${12 - m} month${12 - m === 1 ? '' : 's'} estimated by scaling metered data ×12/${m} (${a.pctEstimated}% estimated).`,
+    monthsCovered: m, pctEstimated: a.pctEstimated, by: a.by,
+    note: `${meter}${m} of 12 months evidenced by bills; remaining ${12 - m} month${12 - m === 1 ? '' : 's'} estimated by scaling metered data ×12/${m} (${a.pctEstimated}% estimated).${recordedBy(a.by, a.at)}`,
     acknowledgedAt: a.at,
   }
 }

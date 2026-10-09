@@ -41,7 +41,7 @@ describe('T7 source guard: the page writes no document-backed figure', () => {
       .not.toMatch(/status:\s*'needs_manual_review'\s*as ConciergeStatus/)
   })
   it('the payload is built from figuresForSave, with raw locations and derivation_version', () => {
-    expect(pageSrc).toContain('const saved = figuresForSave(inventory, \'AR6\')')
+    expect(pageSrc).toContain('const saved = figuresForSave(inventory, \'AR6\', {}, session.user.email ? {')
     for (const line of ['locations_data: saved.locations_data,', 'workings: saved.workings,', 'pct_estimated: saved.pct_estimated,',
       'scope1_total: saved.totals.s1_total,', 'factor_editions: saved.factor_editions,', 'derivation_version: saved.derivation_version,']) {
       expect(pageSrc, line).toContain(line)

@@ -19,12 +19,20 @@
 import { deriveLocations, calcInventory, buildWorkings, pctEstimated, selectionFor, type Inventory, type GwpVersion, type SelectionContext, type Location } from './engine'
 import { factorEditionsForSave } from './factorEditions'
 import { factorSelectionForSave, selectionContextFor } from './factorSelection'
+import { withTypedEntries, type TypedBaseline } from './typedEntries'
 import type { DatasetId } from './factorEditionRegistry'
 import type { EditionUse } from './engine'
 
 export const DERIVATION_VERSION = 2
 
-export function figuresForSave(inventory: Inventory, gwpVersion: GwpVersion = 'AR6', ctx: SelectionContext = {}) {
+/**
+ * T18: `typed`, when given, is who is saving and when. Each typed figure that changed since the last saved record
+ * gets an entry (lib/ghg/typedEntries.ts) in the locations_data written, and the workings rows carry it. Omitted, no
+ * entry is added: a caller that is not a save (a preview, a test of the figures) records nobody.
+ */
+export function figuresForSave(inventory0: Inventory, gwpVersion: GwpVersion = 'AR6', ctx: SelectionContext = {},
+  typed?: { by: { userId: string; email: string }; at: string; baseline?: TypedBaseline; note?: string }) {
+  const inventory = typed ? { ...inventory0, locations: inventory0.locations.map(l => withTypedEntries(l, typed)) } : inventory0
   const derived = deriveLocations(inventory)
   const resolutions = inventory.coverage_resolutions ?? []
   // T3c: ONE selection context for every figure in the payload. calcInventory was called without the year end until
@@ -46,34 +54,61 @@ export function figuresForSave(inventory: Inventory, gwpVersion: GwpVersion = 'A
   }
 }
 
-// ── T18: THE DOCUMENT LOG CANNOT BE REWRITTEN BY A SAVE ──────────────────────────────────────────────────────────
-// Each location's document_log (withdrawals, restorations, deletions; lib/ghg/documentActions.ts) is append-only.
-// The page keeps the log as loaded (documentLogBaseline) and refuses a save whose locations_data lacks an entry
-// that record had (documentLogProblem), so no edit, stale draft or bug can drop a tombstone. Entries are compared
-// whole, so an entry edited in place counts as missing.
+// ── T18: THE DOCUMENT LOG AND THE TYPED ENTRIES CANNOT BE REWRITTEN BY A SAVE ─────────────────────────────────
+// Each location's document_log (withdrawals, restorations, deletions; lib/ghg/documentActions.ts) and typed_entries
+// (who entered each typed figure, and when; lib/ghg/typedEntries.ts) are append-only. The page keeps both as loaded
+// (documentLogBaseline, typedEntriesBaseline) and refuses a save whose locations_data lacks an entry that record had
+// (documentLogProblem, typedEntriesProblem), so no edit, stale draft or bug can drop a tombstone or rewrite who
+// entered a figure. New entries may only be added. Entries are compared whole, so an entry edited in place (its
+// value, who or when) counts as missing. They are compared with their keys in sorted order, because a jsonb column
+// does not keep the order an entry was written in.
 //
-// ⚠️ A LOCATION NO LONGER IN THE PAYLOAD IS NOT CHECKED. Deleting a location removes its documents and its log
-// together, and refusing that here would refuse every location delete once a document had been withdrawn. That
-// path leaves no record of the documents it removes; it is reported as a gap, not solved here.
+// ⚠️ A LOCATION NO LONGER IN THE PAYLOAD IS NOT CHECKED. Deleting a location removes its documents, its log and its
+// typed entries together, and refusing that here would refuse every location delete. Location deletion's own record
+// is T18 section D (diff 4).
 
-/** The log as loaded: per location id, each entry as its JSON text. */
-export type DocumentLogBaseline = Record<string, string[]>
+/** An append-only list as loaded: per location id, each entry as canonical JSON text. */
+export type AppendOnlyBaseline = Record<string, string[]>
+export type DocumentLogBaseline = AppendOnlyBaseline
 
-export function documentLogBaseline(locations: readonly Pick<Location, 'id' | 'document_log'>[] | null | undefined): DocumentLogBaseline {
-  const out: DocumentLogBaseline = {}
-  for (const l of locations ?? []) if (l.document_log?.length) out[l.id] = l.document_log.map(e => JSON.stringify(e))
-  return out
+/** JSON with object keys sorted at every level, so two copies of one entry compare equal however they were stored. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`).join(',')}}`
+  return JSON.stringify(v) ?? 'null'
 }
 
-/** Why a save would drop a document-log entry the loaded record had, or null. Plain, no em dash. */
-export function documentLogProblem(baseline: DocumentLogBaseline, locations: readonly Pick<Location, 'id' | 'name' | 'document_log'>[]): string | null {
+type AppendOnlyKey = 'document_log' | 'typed_entries'
+function appendOnlyBaseline(locations: readonly Pick<Location, 'id' | AppendOnlyKey>[] | null | undefined, key: AppendOnlyKey): AppendOnlyBaseline {
+  const out: AppendOnlyBaseline = {}
+  for (const l of locations ?? []) { const list = l[key] ?? []; if (list.length) out[l.id] = list.map(canonical) }
+  return out
+}
+/** The first location, still in the payload, whose list lacks an entry the loaded record had. */
+function appendOnlyBreach(baseline: AppendOnlyBaseline, locations: readonly Pick<Location, 'id' | 'name' | AppendOnlyKey>[], key: AppendOnlyKey) {
   for (const l of locations) {
     const had = baseline[l.id]
     if (!had?.length) continue
-    const now = new Set((l.document_log ?? []).map(e => JSON.stringify(e)))
-    if (had.some(e => !now.has(e))) {
-      return `This save would remove the record of a document withdrawn, restored or deleted at ${l.name || 'a location'}. That record is kept permanently, so nothing was saved. Reload the inventory and try again.`
-    }
+    const now = new Set((l[key] ?? []).map(canonical))
+    if (had.some(e => !now.has(e))) return l
   }
   return null
+}
+
+export const documentLogBaseline = (locations: readonly Pick<Location, 'id' | 'document_log'>[] | null | undefined): DocumentLogBaseline =>
+  appendOnlyBaseline(locations as readonly Pick<Location, 'id' | AppendOnlyKey>[], 'document_log')
+
+/** Why a save would drop a document-log entry the loaded record had, or null. Plain, no em dash. */
+export function documentLogProblem(baseline: DocumentLogBaseline, locations: readonly Pick<Location, 'id' | 'name' | 'document_log'>[]): string | null {
+  const l = appendOnlyBreach(baseline, locations as readonly Pick<Location, 'id' | 'name' | AppendOnlyKey>[], 'document_log')
+  return l ? `This save would remove the record of a document withdrawn, restored or deleted at ${l.name || 'a location'}. That record is kept permanently, so nothing was saved. Reload the inventory and try again.` : null
+}
+
+export const typedEntriesBaseline = (locations: readonly Pick<Location, 'id' | 'typed_entries'>[] | null | undefined): AppendOnlyBaseline =>
+  appendOnlyBaseline(locations as readonly Pick<Location, 'id' | AppendOnlyKey>[], 'typed_entries')
+
+/** Why a save would drop or change a typed-figure entry the loaded record had, or null. Plain, no em dash. */
+export function typedEntriesProblem(baseline: AppendOnlyBaseline, locations: readonly Pick<Location, 'id' | 'name' | 'typed_entries'>[]): string | null {
+  const l = appendOnlyBreach(baseline, locations as readonly Pick<Location, 'id' | 'name' | AppendOnlyKey>[], 'typed_entries')
+  return l ? `This save would remove or change the record of who entered a figure at ${l.name || 'a location'}, and when. That record is kept permanently, so nothing was saved. Reload the inventory and try again.` : null
 }

@@ -6,16 +6,21 @@
 // match cannot come from another action's record.
 //
 // Diff 1 covers the proposal actions; diff 2 the document lifecycle (withdraw, restore, delete permanently, delete
-// unused). Diff 3 adds typed entries and the coverage resolutions to ACTIONS, and to EXPECTED below.
+// unused); diff 3 typed entries (at a save, and at a free-calculator claim) and every coverage resolution.
 
 import { describe, it, expect } from 'vitest'
-import { figuresForSave } from './savePayload'
+import { figuresForSave, typedEntriesBaseline, typedEntriesProblem, documentLogBaseline, documentLogProblem } from './savePayload'
 import {
   confirmProposal, editFigure, flagProposal, editPeriod, editUnit, rejectProposal, undoRejection, chooseFleetType, guardConfirm,
 } from './proposalEdits'
 import { addOverride, removeOverride } from './overrides'
 import { withdrawDocument, restoreDocument, deleteDocument } from './documentActions'
-import { emptyLocation, deriveLocations, withFleetTypeTicked, type Location, type Inventory, type SourceDoc, type ExtractedProposal } from './engine'
+import {
+  sameBillResolution, differentMetersResolution, estimateResolution, usedNoneResolution, deliveriesCompleteResolution,
+  exactDuplicateCountOnce, exactDuplicateNotSame,
+} from './coverageActions'
+import { inventoryRow } from './freeCalc'
+import { emptyLocation, deriveLocations, withFleetTypeTicked, type Location, type Inventory, type SourceDoc, type ExtractedProposal, type CoverageResolution } from './engine'
 import { TEST_PREPARED_ON } from '../testing/heldSelection'
 
 type Who = { userId: string; email: string }
@@ -45,7 +50,18 @@ const onTarget = (l: Location, patchFor: (p: ExtractedProposal) => Partial<Extra
 })
 const typedFigure = (l: Location) => deriveLocations(inv(l))[0].natural_gas_amount
 
-type Action = { name: string; act: (by: Who, at: string) => Inventory }
+// `save`, when given, is how the action reaches the record: a save that names who is saving (typed entries), or the
+// free-calculator claim. Otherwise the inventory is saved as figuresForSave alone.
+type Saved = { workings: unknown; locations_data: unknown }
+type Action = { name: string; act: (by: Who, at: string) => Inventory; save?: (i: Inventory, by: Who, at: string) => Saved }
+// T18 diff 3: an inventory whose coverage resolutions include `r`, and the fixtures each kind validates against.
+const withResolution = (l: Location, r: CoverageResolution, year = 2025): Inventory => ({ ...inv(l, year), coverage_resolutions: [r] } as Inventory)
+const doc = (id: string, document_type: string, p: ExtractedProposal, o: Partial<SourceDoc> = {}): SourceDoc => ({ ...gdoc(id, p, document_type), ...o })
+const dieselTwins = (): Location => ({ ...emptyLocation('L1', 'Depot'), has_diesel_stationary: true, has_mobile: true, source_docs: [
+  doc('tank', 'fuel_diesel', prop({ fuelType: 'diesel', rawUnit: 'gallons', unit: 'gallons', ...FEB })),
+  doc('fleet', 'fleet_fuel', prop({ fuelType: 'diesel', rawUnit: 'gallons', unit: 'gallons', ...FEB }))] })
+const TANK = { id: 'tank', file: 'tank.pdf', documentType: 'fuel_diesel' }, FLEET = { id: 'fleet', file: 'fleet.pdf', documentType: 'fleet_fuel' }
+const typedGas = (): Location => ({ ...emptyLocation('L1', 'Site A'), has_natural_gas: true, natural_gas_unit: 'mcf', natural_gas_amount: 420, source_docs: [] })
 const ACTIONS: Action[] = [
   { name: 'confirm', act: (by, at) => inv(onTarget(gasSite(prop({ ...FEB, status: 'extracted' })), p => confirmProposal(p, { by, at }))) },
   { name: 'edit figure', act: (by, at) => inv(onTarget(gasSite(prop({ ...FEB, status: 'extracted' })), p => editFigure(p, { value: 90, by, at }))) },
@@ -93,6 +109,30 @@ const ACTIONS: Action[] = [
     const l = gasSite(prop({ ...FEB, status: 'extracted' }))
     return inv({ ...l, ...deleteDocument(l, 'feb', { by, at, mode: 'unused' }) })
   } },
+  // T18 diff 3: a typed figure, saved by the person saving; and one typed before sign-in, claimed.
+  { name: 'typed entry', act: () => inv(typedGas()), save: (i, by, at) => figuresForSave(i, 'AR6', { preparedOn: TEST_PREPARED_ON }, { by, at }) },
+  { name: 'typed entry at claim', act: () => inv(typedGas()), save: (i, by, at) => inventoryRow(i, by.userId, 'co-1', true, new Date(at), by) },
+  // T18 diff 3: every coverage resolution, as the strip builds it.
+  { name: 'same bill', act: (by, at) => withResolution(gasSite(prop({ ...FEB })),
+    sameBillResolution({ locId: 'L1', fuelType: 'natural_gas', counted: { id: 'jan', file: 'jan.pdf' }, excluded: { id: 'feb', file: 'feb.pdf' }, by, at })) },
+  { name: 'different meters', act: (by, at) => {
+    const l = gasSite(prop({ ...FEB }))
+    const labelled = { ...l, source_docs: l.source_docs.map(d => d.id === 'feb' ? { ...d, meter_label: 'Meter 2' } : d) }
+    return withResolution(labelled, differentMetersResolution({ locId: 'L1', fuelType: 'natural_gas', doc: { id: 'feb', file: 'feb.pdf' }, meterLabel: 'Meter 2', by, at }))
+  } },
+  { name: 'estimate', act: (by, at) => withResolution(gasSite(prop({ ...FEB })),
+    estimateResolution({ locId: 'L1', fuelType: 'natural_gas', documentType: 'utility_bill_gas', meterLabel: null, monthsCovered: 2, pctEstimated: 83.3, by, at })) },
+  { name: 'used none', act: (by, at) => withResolution(gasSite(prop({ ...FEB })),
+    usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas', by, at })) },
+  { name: 'deliveries complete', act: (by, at) => {
+    const lpg = (id: string, date: string) => doc(id, 'fuel_propane', prop({ fuelType: 'propane', rawUnit: 'gallons', unit: 'gallons', periodStart: date, periodEnd: date }))
+    const l: Location = { ...emptyLocation('L1', 'Site A'), has_propane: true, propane_unit: 'gallons', source_docs: [lpg('d1', '2025-03-04'), lpg('d2', '2025-09-10')] }
+    return withResolution(l, deliveriesCompleteResolution({ locId: 'L1', fuelType: 'propane', documentType: 'fuel_propane', docIds: ['d1', 'd2'], statement: 'All deliveries.', by, at }))
+  } },
+  { name: 'exact duplicate, count once', act: (by, at) => withResolution(dieselTwins(),
+    exactDuplicateCountOnce({ locId: 'L1', fuelType: 'diesel', counted: TANK, excluded: FLEET, by, at })) },
+  { name: 'exact duplicate, not the same', act: (by, at) => withResolution(dieselTwins(),
+    exactDuplicateNotSame({ locId: 'L1', fuelType: 'diesel', docs: [TANK, FLEET], by, at })) },
   { name: 'fleet type', act: (by, at) => {
     const diesel = (o: Partial<ExtractedProposal>) => prop({ fuelType: 'diesel', rawValue: 500, rawUnit: 'litres', value: 500, unit: 'litres', sourceQuote: '500 litres', ...o })
     // A confirmed heavy-vehicle bill for January to June, so the row exists; the choice is made on July to December's.
@@ -107,7 +147,9 @@ const ACTIONS: Action[] = [
 // Every action diff 1 builds or closes, and those recorded before T18. Diffs 2 and 3 extend this list.
 const EXPECTED = [
   'confirm', 'edit figure', 'flag', 'edit dates', 'confirm dates', 'edit unit', 'edit unit after edit figure', 'reject', 'undo', 'override', 'remove override',
-  'withdraw', 'restore', 'delete permanently', 'delete unused', 'fleet type',
+  'withdraw', 'restore', 'delete permanently', 'delete unused',
+  'typed entry', 'typed entry at claim', 'same bill', 'different meters', 'estimate', 'used none', 'deliveries complete',
+  'exact duplicate, count once', 'exact duplicate, not the same', 'fleet type',
 ]
 
 /** True when some object in `node` holds `at` as one value and a person with `email` as another. */
@@ -130,10 +172,13 @@ describe('T18: every review action leaves who and when in the saved workings', (
     it(a.name, () => {
       const by: Who = { userId: `u-${i}`, email: `${a.name.replace(/ /g, '-')}@acme.example` }
       const at = `2026-10-0${1 + (i % 9)}T${String(i % 24).padStart(2, '0')}:${String(i).padStart(2, '0')}:00.000Z`
-      const { workings, locations_data } = saved(a.act(by, at))
+      const i0 = a.act(by, at)
+      const { workings, locations_data } = a.save ? a.save(i0, by, at) : saved(i0)
       expect(holdsWhoAndWhen(workings, by.email, at), `${a.name}: who and when in the saved workings`).toBe(true)
-      // The raw locations are saved too; the record is there as well as in the workings.
-      expect(holdsWhoAndWhen(locations_data, by.email, at), `${a.name}: who and when in locations_data`).toBe(true)
+      // The raw locations are saved too; the record is there as well as in the workings. A coverage resolution is
+      // saved in its own column, not in locations_data, so it is checked there instead.
+      const elsewhere = a.save ? locations_data : [locations_data, i0.coverage_resolutions]
+      expect(holdsWhoAndWhen(elsewhere, by.email, at), `${a.name}: who and when in what is saved beside the workings`).toBe(true)
     })
   })
 
@@ -146,6 +191,23 @@ describe('T18: every review action leaves who and when in the saved workings', (
     expect(line[0].reading_cleared?.figureCleared).toEqual({ value: 112, unit: 'therms', toUnit: 'mcf' })
     expect(rows.some(r => r.stream === 'natural_gas' && (r.result_tco2e ?? 0) > 0), 'January is priced').toBe(true)
     expect(totals.s1_total).toBeGreaterThan(0)
+  })
+
+  // T18: the save only ever appends. For every action, the saved record keeps every typed entry and document-log
+  // entry the inventory held going into the save, so the page's append-only guard never refuses a real action.
+  it('no action\'s save drops or changes an earlier typed entry or document-log entry', () => {
+    ACTIONS.forEach((a, i) => {
+      const by: Who = { userId: `u-${i}`, email: 'later@acme.example' }
+      const i0 = a.act(by, OTHER_AT)
+      const once = (a.save ? a.save(i0, by, OTHER_AT) : saved(i0)).locations_data as Location[]
+      const again = saved({ ...i0, locations: once }).locations_data as Location[]
+      const after = figuresForSave({ ...i0, locations: once.map(l => ({ ...l, natural_gas_amount: 999 })) }, 'AR6', { preparedOn: TEST_PREPARED_ON },
+        { by, at: '2026-10-08T00:00:00.000Z' }).locations_data as Location[]
+      for (const out of [again, after]) {
+        expect(typedEntriesProblem(typedEntriesBaseline(once), out), a.name).toBeNull()
+        expect(documentLogProblem(documentLogBaseline(once), out), a.name).toBeNull()
+      }
+    })
   })
 
   it('the matcher finds nothing where nothing was recorded', () => {

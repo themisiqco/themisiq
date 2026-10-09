@@ -1970,6 +1970,30 @@ export type DocumentEvent =
   | { kind: 'deleted'; docId: string; file: string; documentType: string; uploadedAt: string; sha256: string | null; at: string; by: { userId: string; email: string }; reason: string }
   | { kind: 'deleted_unused'; docId: string; file: string; documentType: string; uploadedAt: string; sha256: string | null; at: string; by: { userId: string; email: string } }
 
+/**
+ * T18: one typed figure as saved: the field, its value and unit, who saved it and when. `overrideReason` when the
+ * figure was entered by hand instead of from the field's documents (T10). `note` when it was not entered by the
+ * person it is attributed to: "entered before sign-in" for a free calculation claimed by that person.
+ */
+export interface TypedEntry {
+  field: string
+  value: number
+  unit: string | null
+  at: string
+  by: { userId: string; email: string }
+  overrideReason?: string
+  note?: string
+}
+
+/** T18: a field whose figure is typed: no document backs it, or the customer entered it by hand instead (T10). */
+export function isTypedFigure(loc: Location, field: keyof Location | string): boolean {
+  return documentsBacking(loc, field as keyof Location) === 0 || !!activeOverride(loc, field)
+}
+
+/** T18: what a coverage-resolution row says about who made the choice. A stored resolution without a person still
+ * validates (pre-launch, section 4) and says so rather than naming nobody silently. */
+export const resolvedByText = (r: { by?: { email: string } | null }): string => r.by?.email ? `Who: ${r.by.email}` : 'Who: not recorded'
+
 /** T18: what a deletion leaves of what was read (ruling of 9 Oct 2026, option (a)). "Earlier saved versions", not a
  * named store, so it stays true when pinned verifier versions (T16) keep copies too. */
 export const EARLIER_VERSIONS_SENTENCE = 'Earlier saved versions of this inventory still contain what was read from it.'
@@ -2050,6 +2074,9 @@ interface Location {
   // T18: every withdrawal, restoration and deletion of a document at this location, in order. Append-only; lives in
   // locations_data (no SQL). Written by lib/ghg/documentActions.ts.
   document_log?: DocumentEvent[]
+  // T18: who entered or changed each typed figure, and when: one entry per change per save, in order
+  // (lib/ghg/typedEntries.ts). Lives in locations_data (no SQL).
+  typed_entries?: TypedEntry[]
   // ── FI9 (ruling R16): FLEET FUEL BY VEHICLE TYPE ──────────────────────────────────────────────────────
   // Light (cars, vans, utes), Heavy (trucks, buses), Non-road (forklifts, plant, machinery), each with its own petrol and
   // diesel quantity. The three ticks are saved (R16 choice 5): a type ticked with no figure yet is a real state. All
@@ -5220,6 +5247,10 @@ interface Provenance {
   contributions?: BillContribution[]
   // T10: the reason this document-backed figure was entered by hand instead, with who and when.
   manual_override?: { reason: string; at: string; by: { userId: string; email: string } }
+  // T18: on a typed figure's row, who entered the figure last and when, and every entry for it in order.
+  entered_by?: { userId: string; email: string }
+  entered_at?: string
+  typed_entries?: TypedEntry[]
   // T18: on a reading's own unpriced row, the reading whose typed figure a unit change cleared, with who and when.
   reading_cleared?: UnpricedLine['reading']
   // T18: earlier overrides of this field the customer removed ("Use the bills instead"), with the reason they gave,
@@ -5441,6 +5472,14 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // Every bill for this location and what became of it, the same rows applyResolutions folded.
     const contributions = billContributions(loc, acceptedResolutions(loc, resolutions), win)
     const contributionsFor = (field: keyof Location) => contributions.filter(c => String(c.field) === String(field))
+    // T18: the typed entries behind a row whose figure is typed (no document backs it, or it is overridden): the
+    // latest entry as entered_by and entered_at, and the history. Nothing for a figure read from documents.
+    const typedOf = (...fields: (keyof Location)[]): Pick<Provenance, 'entered_by' | 'entered_at' | 'typed_entries'> => {
+      const typedFields = fields.filter(f => isTypedFigure(loc, f)).map(String)
+      const h = (loc.typed_entries ?? []).filter(e => typedFields.includes(e.field))
+      const last = h.at(-1)
+      return last ? { entered_by: last.by, entered_at: last.at, typed_entries: h } : {}
+    }
     // Figure for a field: the location's own value, which deriveLocations has already set from the
     // documents for every document-backed field. A typed figure is used only where no document backs it.
     const figure = (field: keyof Location): number => (loc as unknown as Record<string, number>)[String(field)]
@@ -5458,8 +5497,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // T10: entered by hand instead of from its documents. Manual, with the reason, who and when; the
       // documents are listed as contributions not counted, reason manual_override.
       const override = activeOverride(loc, field)
-      if (override) return withContrib({ entry_method: 'manual', manual_override: { reason: override.reason, at: override.at, by: override.by } })
-      if (!a || a.docIds.length === 0) return withContrib({ entry_method: 'manual' })
+      // T18: a fleet figure's miles and model year are typed with it and priced with it, so their entries go on its row.
+      const fleet = FLEET_FIELDS.find(f => f.amount === field)
+      const typed = typedOf(field, ...(fleet?.miles ? [fleet.miles] : []), ...(fleet?.modelYear ? [fleet.modelYear] : []))
+      if (override) return withContrib({ entry_method: 'manual', manual_override: { reason: override.reason, at: override.at, by: override.by }, ...typed })
+      if (!a || a.docIds.length === 0) return withContrib({ entry_method: 'manual', ...typed })
       const quotes = a.quotes
       if (a.adjustment && a.adjustment.kind === 'prorate') {
         return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
@@ -5496,8 +5538,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     if (hasRefrigerantLine(loc)) {
       const ref_gwp = refrigerantGwp(loc.refrigerant_type, gwpVersion)
       const u = unpriced.get('refrigerant_purchased_kg')
-      if (u || ref_gwp === null) pushUnpriced(u as UnpricedLine)
-      else rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual' })
+      if (u || ref_gwp === null) pushUnpriced(u as UnpricedLine, { entry_method: 'manual', ...typedOf('refrigerant_purchased_kg') })
+      else rows.push({ location: loc.name || 'Location', stream: 'refrigerants', source: `Refrigerant (${loc.refrigerant_type})`, scope: 1, activity_data: loc.refrigerant_purchased_kg, activity_unit: 'kg', emission_factor: `GWP₁₀₀ ${ref_gwp}`, ef_source: EF_SOURCES[`gwp_${gwpVersion.toLowerCase()}` as 'gwp_ar6'], gwp_basis: gwpVersion, quantification_method: 'Recharge quantity treated as emitted (IPCC Tier 1 simplified material balance)', result_tco2e: loc.refrigerant_purchased_kg * ref_gwp / 1000, entry_method: 'manual', ...typedOf('refrigerant_purchased_kg') })
     }
     // Grid-region gate: unresolved grid_region → OMIT the electricity Scope 2 rows entirely (no
     // getGridFactor call, no US_AVG row). The NZ T&D row below sits inside this gate too, so it needs grid_region 'NZ',
@@ -5535,13 +5577,13 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
         const vintage = res.applicable && res.edition && res.vintage !== res.edition.label ? { factor_vintage: res.vintage } : {}
         const provisional = res.applicable ? res.edition?.provisional : gf!.edition.provisional
         // Market-based row is a derived (uncovered = grid − renewable) figure, not a verbatim bill read → manual.
-        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${mktApplied.src}${res.note ? ` · ${res.note}` : ''}`, ...mktApplied.cells, ...vintage, scope2_method: 'market-based', gwp_basis: res.applicable && !res.usedRegion.startsWith('EU_') ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, ...(provisional ? { note: (res.applicable ? res.edition! : gf!.edition).basis } : {}), entry_method: 'manual' })
+        rows.push({ location: loc.name || 'Location', stream: 'electricity', source: `Electricity (S2 market-based${res.applicable ? `, residual mix ${res.usedRegion}` : ', location-factor fallback'})`, scope: 2, activity_data: uncovered, activity_unit: 'kWh uncovered', emission_factor: `${efDisplay(mktEf)} kg CO₂e/kWh`, ef_source: `${mktApplied.src}${res.note ? ` · ${res.note}` : ''}`, ...mktApplied.cells, ...vintage, scope2_method: 'market-based', gwp_basis: res.applicable && !res.usedRegion.startsWith('EU_') ? gwpVersion : GWP_AS_PUBLISHED, result_tco2e: uncovered * mktEf / 1000, ...(provisional ? { note: (res.applicable ? res.edition! : gf!.edition).basis } : {}), entry_method: 'manual', ...typedOf('electricity_kwh', 'renewable_electricity_kwh') })
       }
       // NZ T&D losses — Scope 3 Category 3, NOT Scope 2. Distinct row (scope 3) so it never reads as
       // part of the S2 figure; opt-in per NZ location. Kept in lock-step with calcLocation via nzTdLoss.
       if (loc.country === 'NZ' && loc.nz_td_losses) {
         const td = orMissing(() => nzTdLoss(sel))
-        if (td) rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td.ef)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)`, ...editionCells(td.edition), gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td.ef / 1000, ...(td.edition.provisional ? { note: td.edition.basis } : {}), entry_method: 'manual' })
+        if (td) rows.push({ location: loc.name || 'Location', stream: 'electricity', source: 'Electricity T&D losses (NZ) — Scope 3 Cat 3', scope: 3, activity_data: loc.electricity_kwh, activity_unit: 'kWh', emission_factor: `${efDisplay(td.ef)} kg CO₂e/kWh`, ef_source: `${EF_SOURCES.electricity_nz} · T&D losses (Scope 3 Cat 3)`, ...editionCells(td.edition), gwp_basis: 'scope3-cat3', result_tco2e: loc.electricity_kwh * td.ef / 1000, ...(td.edition.provisional ? { note: td.edition.basis } : {}), entry_method: 'manual', ...typedOf('electricity_kwh') })
         else pushUnpriced(elecUnpriced('nz_td')!, { entry_method: 'manual' }, 3)
       }
     }
@@ -5564,7 +5606,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
         const entry = steamFactorFor(loc)
         const absent = entry === null || entry.kind === 'published' ? null : entry
         const steamLine = unpriced.get('purchased_steam_mmbtu')
-        rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2,
+        rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: 'Purchased steam', scope: 2, ...typedOf('purchased_steam_mmbtu'),
           activity_data: loc.purchased_steam_mmbtu, activity_unit: loc.purchased_steam_unit ?? 'mmbtu',
           emission_factor: NOT_PROVIDED, emission_factor_display: NOT_PROVIDED, ef_source: NOT_PROVIDED, scope2_method: NOT_PROVIDED,
           gwp_basis: 'declaration', result_tco2e: null,
@@ -5605,7 +5647,7 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       // R14: an estimated row records the edition of the gas table it was computed from.
       // T3c: a published factor or an estimate carries its selected edition (the estimate, its gas factor's).
       const steamVintage = priced.supplier ? undefined : priced.edition ? editionCells(priced.edition) : priced.estimated ? { factor_vintage: priced.estimated.vintage } : vintageOf(STEAM_EDITION, loc)
-      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ?? {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(priced.estimated && efJurisdiction(loc) === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}) })
+      rows.push({ location: loc.name || 'Location', stream: 'purchased_steam', source: `Purchased steam${priced.supplier ? ' (supplier-specific factor)' : ''}`, scope: 2, activity_data: loc.purchased_steam_mmbtu, activity_unit: enteredUnit, ...factorCells(steamEfShown, enteredUnit), ef_source: priced.source, ...(steamVintage ?? {}), scope2_method: 'location-based', result_tco2e: calcGas(priced.ef, st.amount, gwpVersion).total, entry_method: priced.supplier ? SUPPLIER_SPECIFIC_ENTRY_METHOD : 'manual', ...(priced.estimated ? { estimated: STEAM_ESTIMATE_FLAG } : {}), ...(priced.estimated && efJurisdiction(loc) === 'NZ' ? { factor_variant: nzUseClassVariant(loc) } : {}), ...(steamNote ? { note: steamNote } : {}), ...(steamChange ? { conversion_note: unitChangeNote(steamChange), unit_change: steamChange } : {}), ...typedOf('purchased_steam_mmbtu', 'purchased_steam_supplier_ef') })
       }
     }
     // ── All-excluded fields: a zero row carrying the contributions (T5 ruling) ─────────────────────
@@ -5692,6 +5734,10 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       gwp_basis: 'coverage_resolution',
       result_tco2e: null,
       resolved_at: r.acknowledgedAt,
+      // T18: who made the choice, structured, on every kind; null for a stored resolution that never recorded one,
+      // which still validates and says "Who: not recorded". The note keeps its own wording.
+      resolved_by: r.by?.userId && r.by?.email ? { userId: r.by.userId, email: r.by.email } : null,
+      resolved_by_text: resolvedByText(r),
     })
   }
   // ── T18: document events ─────────────────────────────────────────────────

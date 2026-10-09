@@ -11,6 +11,7 @@
 
 import { emptyLocation, type Inventory, type Location } from './engine'
 import { figuresForSave } from './savePayload'
+import { ENTERED_BEFORE_SIGN_IN } from './typedEntries'
 import { parseGhgDraft, type GhgDraft } from './draftParse'
 import { defaultReportingYear } from '../reportingYears'
 import { emailKey } from '../emailKey'
@@ -108,9 +109,12 @@ export function inventoryFromDraft(draft: GhgDraft, company: string, now: Date =
  * The ghg_inventories row, the same columns the wizard's Save writes, with every figure computed HERE by
  * figuresForSave (lib/ghg/savePayload.ts). Nothing the client calculated is stored as a figure.
  */
-export function inventoryRow(inv: Inventory, userId: string, companyId: string, freeTier: boolean, now: Date = new Date()) {
+export function inventoryRow(inv: Inventory, userId: string, companyId: string, freeTier: boolean, now: Date = new Date(), claimedBy?: { userId: string; email: string }) {
   // T3c: prepared on `now`, the same date the row records, so the editions it selects are the ones that applied then.
-  const saved = figuresForSave(inv, 'AR6', { preparedOn: now })
+  // T18: the figures were typed before sign-in, so each gets one entry, attributed to the person claiming the
+  // calculation, dated the claim day, and saying it was entered before sign-in. No loaded record: compared with zero.
+  const saved = figuresForSave(inv, 'AR6', { preparedOn: now },
+    claimedBy ? { by: claimedBy, at: now.toISOString(), note: ENTERED_BEFORE_SIGN_IN } : undefined)
   const rev = inv.revenue_millions
   return {
     user_id: userId,

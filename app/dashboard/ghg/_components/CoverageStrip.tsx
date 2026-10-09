@@ -47,7 +47,7 @@ export type CoverageStripProps = {
   reportingYear: number
   fiscalYearEndMonth: number
   resolutions: CoverageResolution[]
-  currentUser: CurrentUser | null  // who confirms "used none"; the control is disabled without one
+  currentUser: CurrentUser | null  // who made each choice (T18); every control that records one is disabled without it
   onAdd: (res: CoverageResolution) => void
   // Writes the document's meter label and its different_meters resolution in ONE update, so the
   // resolution never exists without the label it must match.
@@ -87,14 +87,14 @@ function DeliveriesConfirm({ statement, enabled, onConfirm }: { statement: strin
 }
 
 /** The meter-name input for one overlap. Its own component so each overlap keeps its own text. */
-function DifferentMeters({ fileB, onSave }: { fileB: string; onSave: (label: string) => void }) {
+function DifferentMeters({ fileB, enabled, onSave }: { fileB: string; enabled: boolean; onSave: (label: string) => void }) {
   const [label, setLabel] = useState('')
   return (
     <div style={row}>
       <span style={prompt}>If they&apos;re for different meters or accounts, name the second one:</span>
       <input value={label} onChange={e => setLabel(e.target.value)} placeholder={`Meter or account for ${fileB}`}
         style={{ fontSize: 11, padding: '4px 8px', borderRadius: 6, border: '0.5px solid #e8e7e4', minWidth: 180 }} />
-      <button disabled={!label.trim()} onClick={() => onSave(label.trim())} style={{ ...plainButton, opacity: label.trim() ? 1 : 0.5 }}>Save</button>
+      <button disabled={!label.trim() || !enabled} onClick={() => enabled && onSave(label.trim())} style={{ ...plainButton, opacity: label.trim() && enabled ? 1 : 0.5 }}>Save</button>
     </div>
   )
 }
@@ -198,10 +198,11 @@ export function CoverageStrip(p: CoverageStripProps) {
             {gap && cov.monthsCovered >= 1 && (
               <div style={row}>
                 <span style={prompt}>Upload the missing bill above, or:</span>
-                <button style={warnButton} onClick={() => p.onAdd(estimateResolution({
+                {/* T18: each of these three choices records who made it, so it needs a signed-in user. */}
+                <button style={{ ...warnButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser} onClick={() => p.currentUser && p.onAdd(estimateResolution({
                   locId: location.id, fuelType: g.fuelType, documentType: docType, meterLabel: g.meterLabel,
                   ...(g.fleetType ? { fleetType: g.fleetType } : {}),
-                  monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, at: now(),
+                  monthsCovered: cov.monthsCovered, pctEstimated: cov.pctEstimated, by: p.currentUser, at: now(),
                 }))}>Estimate the missing months</button>
                 {unsettled(g.fuelType) && <span style={prompt}>Fix any bills marked above before estimating.</span>}
               </div>
@@ -217,14 +218,14 @@ export function CoverageStrip(p: CoverageStripProps) {
                   <div style={row}>
                     <span style={prompt}>If these are the same bill, count it once:</span>
                     {[[a, b], [b, a]].map(([counted, excluded]) => (
-                      <button key={counted} style={plainButton} onClick={() => p.onAdd(sameBillResolution({
-                        locId: location.id, fuelType: g.fuelType, at: now(),
+                      <button key={counted} style={{ ...plainButton, opacity: p.currentUser ? 1 : 0.5 }} disabled={!p.currentUser} onClick={() => p.currentUser && p.onAdd(sameBillResolution({
+                        locId: location.id, fuelType: g.fuelType, by: p.currentUser, at: now(),
                         counted: { id: counted, file: fileOf(counted) }, excluded: { id: excluded, file: fileOf(excluded) },
                       }))}>Count {fileOf(counted)}</button>
                     ))}
                   </div>
-                  <DifferentMeters fileB={fileOf(b)} onSave={label => p.onLabelMeter(b, label, differentMetersResolution({
-                    locId: location.id, fuelType: g.fuelType, doc: { id: b, file: fileOf(b) }, meterLabel: label, at: now(),
+                  <DifferentMeters fileB={fileOf(b)} enabled={!!p.currentUser} onSave={label => p.currentUser && p.onLabelMeter(b, label, differentMetersResolution({
+                    locId: location.id, fuelType: g.fuelType, doc: { id: b, file: fileOf(b) }, meterLabel: label, by: p.currentUser, at: now(),
                   }))} />
                 </div>
               )

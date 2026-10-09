@@ -2164,7 +2164,7 @@ supplies every year label below. Follows T3b on the same branch.
   1. proposal records: confirm, edit figure and flag, carried onto contributions;
   2. the document lifecycle: withdraw, restore, delete with tombstone, and free deletion of unused uploads;
   3. typed-figure entries, and who on the coverage resolutions;
-  4. page wiring, the evidence list and the on-screen workings.
+  4. page wiring, the evidence list and the on-screen workings; and location deletion (D below, ruled 9 Oct 2026).
   The verifier page and PDF rendering of these records is in T11 and T17.
 - **Gaps closed** (report in section 10, "Review actions: who and when"): Confirm, Edit figure and Flag for
   review recorded no who or when; Edit figure overwrote the read value; date confirmations and override removals
@@ -2274,6 +2274,19 @@ supplies every year label below. Follows T3b on the same branch.
   - The coverage-resolution workings row (engine.ts:4069) carries `resolved_by`.
   - A stored resolution without `by` still validates, and shows "Who: not recorded" (pre-launch, section 4).
 - `labelMeter` (page.tsx:1282-1291) passes `by` through to the different-meters resolution.
+
+**D. Location deletion** (Lisa, 9 Oct 2026; in diff 4)
+- Found in T18 diff 2: deleting a location removes its documents and their files, and its document log goes with
+  it, so "no document with an acted-on reading can disappear without a tombstone" did not hold on that path. The
+  diff 2 save guard skips a location no longer in the payload, so as not to refuse every location delete.
+- **A location holding any document:**
+  - Deleting it requires a reason.
+  - It leaves an inventory-level, append-only record: who, when, the reason, the location's name and country, and
+    a tombstone for each of its documents, in the same shape as a document deletion's, with the same "earlier saved
+    versions" wording (EARLIER_VERSIONS_SENTENCE).
+  - The save guard refuses a save that drops or edits that record, as it does the document log.
+  - It reaches the saved workings, the verifier page and the PDF like the document log.
+- **A location with no documents** deletes as today, with a lighter record of who and when.
 
 - **Files:**
   - lib/ghg/proposalEdits.ts;
