@@ -7183,3 +7183,31 @@ describe('T3c diff 2b: fleet, R12 heat content, R14 steam estimate and Category 
       message: 'DEFRA 2022 well-to-tank and transmission and distribution factors are needed for reporting year 2022 and are not loaded, so this line at Leeds is not counted.' }]);
   });
 });
+
+describe('T18 diff 1: who and when reach the contributions and the workings row', () => {
+  const BY = { userId: 'u-1', email: 'jo@acme.example' };
+  const AT = '2026-10-02T09:00:00.000Z';
+  const reading = { value: 100, unit: 'mcf', rawValue: 100, rawUnit: 'mcf', periodStart: '2024-01-01', periodEnd: '2024-12-31', sourceQuote: 'Total gas: 100 mcf' };
+  const gas = (o: Partial<Location>, p: Partial<ExtractedProposal> = {}) =>
+    loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [doc('utility_bill_gas', [prop(p)])], ...o });
+  const gasRow = (l: Location) => (buildWorkings([deriveLocations({ locations: [l], reporting_year: 2024, fiscal_year_end_month: 12, coverage_resolutions: [] })[0]], 'AR6', 2024, [], 12) as
+    { stream?: string; contributions?: BillContribution[]; manual_overrides_removed?: unknown[]; manual_override?: unknown }[]).find(r => r.stream === 'natural_gas')!;
+
+  it('a contribution carries the confirmations, the date confirmation and the vehicle type choice', () => {
+    const l = gas({}, { confirmations: [{ at: AT, by: BY, reading }], periodOrigin: 'customer_confirmed', periodConfirmedAt: AT, periodConfirmedBy: BY,
+      fleetTypeLog: [{ from: null, to: 'heavy', at: AT, by: BY }] });
+    const c = billContributions(l, [], periodFromYearAndEnd(2024, 12))[0];
+    expect(c).toMatchObject({ confirmations: [{ at: AT, by: BY, reading }], periodConfirmedAt: AT, periodConfirmedBy: BY, fleetTypeLog: [{ from: null, to: 'heavy', at: AT, by: BY }] });
+    const bare = billContributions(gas({}), [], periodFromYearAndEnd(2024, 12))[0];
+    expect(['confirmations', 'periodConfirmedAt', 'periodConfirmedBy', 'fleetTypeLog'].filter(k => k in bare), 'absent when nothing was recorded').toEqual([]);
+    expect(gasRow(l).contributions?.[0].confirmations).toEqual([{ at: AT, by: BY, reading }]);
+  });
+
+  it('an override the customer removed stays on its row, with who entered it, who removed it and when', () => {
+    const removed = { field: 'natural_gas_amount', reason: 'Bill was estimated', at: AT, by: BY, removedAt: '2026-10-03T09:00:00.000Z', removedBy: { userId: 'u-2', email: 'sam@acme.example' } };
+    const row = gasRow(gas({ manual_overrides_removed: [removed, { ...removed, field: 'electricity_kwh' }] }));
+    expect(row.manual_override).toBeUndefined();
+    expect(row.manual_overrides_removed, 'only this field\'s').toEqual([{ reason: 'Bill was estimated', at: AT, by: BY, removedAt: removed.removedAt, removedBy: removed.removedBy }]);
+    expect(gasRow(gas({})).manual_overrides_removed).toBeUndefined();
+  });
+});

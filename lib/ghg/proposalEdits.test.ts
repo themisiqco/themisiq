@@ -10,8 +10,11 @@ import { editPeriod, editUnit, guardConfirm, rejectProposal, undoRejection } fro
 import {
   emptyLocation, acceptanceProblem, periodOriginOf, billContributions, findUnresolvedCoverage, periodFromYearAndEnd,
   deriveLocations, buildWorkings, BILLING_MONTH_CONFIRM_MESSAGE, NO_VALUE_MESSAGE,
+  valueProblem, clearedFigureOf, unpricedLines, acceptedResolutions,
   type Location, type SourceDoc, type ExtractedProposal,
 } from './engine'
+import { heldSel } from '../testing/heldSelection'
+import { usedNoneResolution } from './coverageActions'
 import { convertibleUnits } from '../unitConversions'
 
 const AT = '2026-10-02T09:00:00.000Z'
@@ -48,7 +51,7 @@ describe('month-only bills (rule R5)', () => {
   it('correcting the dates while confirming keeps the month as read', () => {
     const after = apply(monthOnly, editPeriod(monthOnly, { start: '2025-01-05', end: '2025-02-04', by: BY, at: AT, confirm: true }))
     expect(after).toMatchObject({ status: 'confirmed', periodStart: '2025-01-05', periodEnd: '2025-02-04' })
-    expect(after.asRead).toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'mcf' })
+    expect(after.asRead).toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'mcf', value: 100, rawValue: 100 })
     expect(after.corrections).toEqual([{ fields: ['period'], at: AT, by: BY }])
   })
 
@@ -87,7 +90,7 @@ describe('undated or invalid period: entering valid dates counts the bill and cl
       const fixed = apply(p, editPeriod(p, { start: '2025-03-01', end: '2025-03-31', by: BY, at: AT }))
       expect(contrib(fixed)).toMatchObject({ counted: true, reason: 'counted' })
       expect(statuses(site([gdoc('a', fixed)]))).not.toContain(before)
-      expect(fixed.asRead).toEqual({ periodStart: o.periodStart, periodEnd: o.periodEnd, unit: 'mcf' })
+      expect(fixed.asRead).toEqual({ periodStart: o.periodStart, periodEnd: o.periodEnd, unit: 'mcf', value: 100, rawValue: 100 })
     })
   }
   it('dates across the year boundary are prorated', () => {
@@ -107,7 +110,7 @@ describe('mixed units: correcting the bill\'s unit re-converts and counts every 
     const l = site([gdoc('a', a), gdoc('b', fixed)])
     expect(statuses(l)).not.toContain('mixed_units')
     expect(deriveLocations({ locations: [l], reporting_year: 2025 })[0].natural_gas_amount).toBe(300)
-    expect(fixed.asRead).toEqual({ periodStart: '2025-02-01', periodEnd: '2025-02-28', unit: 'therms' })
+    expect(fixed.asRead).toEqual({ periodStart: '2025-02-01', periodEnd: '2025-02-28', unit: 'therms', value: 200, rawValue: 200 })
     expect(fixed.corrections).toEqual([{ fields: ['unit'], at: AT, by: BY }])
   })
   it('the number is the bill\'s, re-converted, never relabelled: 100 Ccf becomes 10 Mcf', () => {
@@ -134,7 +137,7 @@ describe('records', () => {
     const p = prop({ rawUnit: 'therms', unit: 'therms' })
     const once = apply(p, editUnit(p, { unit: 'mcf', by: BY, at: AT }))
     const twice = apply(once, editPeriod(once, { start: '2025-01-02', end: '2025-01-31', by: { userId: 'u-2', email: 'sam@acme.example' }, at: '2026-10-03T10:00:00.000Z' }))
-    expect(twice.asRead, 'the first reading, not the corrected one').toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms' })
+    expect(twice.asRead, 'the first reading, not the corrected one').toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms', value: 100, rawValue: 100 })
     expect(twice.corrections?.map(c => [c.fields, c.by.email])).toEqual([[['unit'], 'jo@acme.example'], [['period'], 'sam@acme.example']])
   })
   it('the workings row shows the bill was corrected by the customer, with the reading', () => {
@@ -142,7 +145,7 @@ describe('records', () => {
     const fixed = apply(p, editUnit(p, { unit: 'mcf', by: BY, at: AT }))
     const rows = buildWorkings([site([gdoc('a', fixed)])], 'AR6', 2025, [], 12) as { stream?: string; contributions?: { asRead?: unknown; corrections?: unknown[] }[] }[]
     const c = rows.find(r => r.stream === 'natural_gas')!.contributions![0]
-    expect(c.asRead).toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms' })
+    expect(c.asRead).toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms', value: 100, rawValue: 100 })
     expect(c.corrections).toHaveLength(1)
   })
   it('an edit touches only its own proposal (the patch carries no other bill)', () => {
@@ -241,7 +244,7 @@ describe('T10a: a proposal with no figure can never be confirmed', () => {
   })
   it('the page disables Confirm and says what to do', () => {
     const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
-    expect(page).toContain('<button disabled={valueProblem(p) !== null || fleetTypeProblem(doc.document_type, p) !== null}')
+    expect(page).toContain('<button disabled={!currentUser || valueProblem(p) !== null || fleetTypeProblem(doc.document_type, p) !== null}')
     expect(page).toContain("{p.status !== 'rejected' && valueProblem(p) && (")
     expect(NO_VALUE_MESSAGE).toBe("We couldn't find a usable figure on this bill. Check the unit or enter the figure yourself, or reject the bill if it shouldn't be included.")
   })
@@ -302,5 +305,143 @@ describe('FI9 diff 4: the vehicle type of a fleet-fuel reading', () => {
     expect(page).toContain("{doc.document_type === 'fleet_fuel' && p.status !== 'rejected' && (p.fuelType === 'diesel' || p.fuelType === 'gasoline') && (")
     expect(page).toContain('<FleetTypeChooser p={p} by={currentUser} onChoose={patch => onUpdateProposal(locIdx, doc.id, pi, patch)} />')
     expect(page).toContain('if (patch.fleetType) locs[locIdx] = withFleetTypeTicked(locs[locIdx], patch.fleetType)')
+  })
+})
+
+// ── T18 diff 1: Confirm, Edit figure and Flag for review record who and when ─────────────────────────────────────
+import { confirmProposal, editFigure, flagProposal } from './proposalEdits'
+
+describe('T18: Confirm records who, when and the reading exactly as shown', () => {
+  const BY2 = { userId: 'u-2', email: 'sam@acme.example' }
+  const LATER = '2026-10-03T10:00:00.000Z'
+  const read = prop({ rawValue: 3.2, rawUnit: 'MCF', value: 3.2, unit: 'mcf', status: 'extracted', sourceQuote: 'Gas used 3.2 MCF' })
+
+  it('the reading as printed on the bill and as converted, with its dates and source quote', () => {
+    const after = apply(read, confirmProposal(read, { by: BY, at: AT }))
+    expect(after.status).toBe('confirmed')
+    expect(after.confirmations).toEqual([{ at: AT, by: BY, reading: {
+      value: 3.2, unit: 'mcf', rawValue: 3.2, rawUnit: 'MCF', periodStart: '2025-01-01', periodEnd: '2025-01-31', sourceQuote: 'Gas used 3.2 MCF' } }])
+  })
+  it('a delivery records its delivery date too, the date shown for it', () => {
+    const d = prop({ status: 'extracted', periodStart: null, periodEnd: null, deliveryDate: '2025-03-04' })
+    expect(confirmProposal(d, { by: BY, at: AT }).confirmations![0].reading).toMatchObject({ periodStart: null, periodEnd: null, deliveryDate: '2025-03-04' })
+  })
+  it('a confirmation after Undo is appended; the first is never overwritten', () => {
+    const once = apply(read, confirmProposal(read, { by: BY, at: AT }))
+    const rejected = apply(once, rejectProposal(once, { by: BY, at: AT }))
+    const undone = apply(rejected, undoRejection(rejected, { by: BY, at: AT }))
+    const back = apply({ ...undone, status: 'extracted' }, confirmProposal({ ...undone, status: 'extracted' }, { by: BY2, at: LATER }))
+    expect(back.confirmations?.map(c => [c.by.email, c.at])).toEqual([['jo@acme.example', AT], ['sam@acme.example', LATER]])
+  })
+  it('a confirmation the guard refuses is not recorded: month-only dates, no figure, no vehicle type', () => {
+    const monthOnly = prop({ status: 'extracted', periodConfidence: 'medium' })
+    const m = apply(monthOnly, confirmProposal(monthOnly, { by: BY, at: AT }))
+    expect([m.status, m.confirmations]).toEqual(['extracted', undefined])
+    const blank = prop({ status: 'needs_manual_review', value: null, unit: null })
+    const b = apply(blank, confirmProposal(blank, { by: BY, at: AT }))
+    expect([b.status, b.confirmations]).toEqual(['needs_manual_review', undefined])
+    const fleet = prop({ fuelType: 'diesel', status: 'extracted', unit: 'litres', rawUnit: 'litres' })
+    const patch = confirmProposal(fleet, { by: BY, at: AT })
+    expect(guardConfirm(fleet, patch, 'fleet_fuel')).toEqual({})
+  })
+  it('confirming month-only dates records the confirmation with the dates just confirmed', () => {
+    const monthOnly = prop({ status: 'extracted', periodConfidence: 'medium' })
+    const after = apply(monthOnly, editPeriod(monthOnly, { start: '2025-01-05', end: '2025-02-04', by: BY, at: AT, confirm: true }))
+    expect(after.status).toBe('confirmed')
+    expect(after.confirmations?.map(c => [c.by.email, c.reading.periodStart, c.reading.periodEnd])).toEqual([['jo@acme.example', '2025-01-05', '2025-02-04']])
+    const unconfirmed = apply(monthOnly, editPeriod(monthOnly, { start: '2025-01-05', end: '2025-02-04', by: BY, at: AT }))
+    expect(unconfirmed.confirmations, 'entering dates alone confirms nothing').toBeUndefined()
+  })
+})
+
+describe('T18: Edit figure keeps the figure as read and records the correction', () => {
+  it('asRead keeps the value as printed and as converted; the correction and the confirmation carry who and when', () => {
+    const p = prop({ rawValue: 120, rawUnit: 'therms', value: 120, unit: 'therms', status: 'extracted', sourceQuote: 'Total 120 therms' })
+    const after = apply(p, editFigure(p, { value: 112, by: BY, at: AT }))
+    expect(after).toMatchObject({ value: 112, rawValue: 120, status: 'confirmed' })
+    expect(after.asRead).toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms', value: 120, rawValue: 120 })
+    expect(after.corrections).toEqual([{ fields: ['value'], at: AT, by: BY }])
+    expect(after.confirmations?.[0]).toEqual({ at: AT, by: BY, reading: {
+      value: 112, unit: 'therms', rawValue: 120, rawUnit: 'therms', periodStart: '2025-01-01', periodEnd: '2025-01-31', sourceQuote: 'Total 120 therms' } })
+  })
+  it('a second edit keeps the first reading, not the first edit', () => {
+    const p = prop({ status: 'extracted' })
+    const once = apply(p, editFigure(p, { value: 90, by: BY, at: AT }))
+    const twice = apply(once, editFigure(once, { value: 95, by: BY, at: AT }))
+    expect(twice.asRead).toMatchObject({ value: 100, rawValue: 100 })
+    expect(twice.corrections).toHaveLength(2)
+  })
+  it('an edit to a reading with no figure confirms it, as Save always did (T10a)', () => {
+    const blank = prop({ rawValue: 6944, rawUnit: 'MJ', value: null, unit: null, status: 'needs_manual_review' })
+    const after = apply(blank, editFigure(blank, { value: 6.58, by: BY, at: AT }))
+    expect(after).toMatchObject({ value: 6.58, status: 'confirmed', asRead: { value: null, rawValue: 6944, unit: 'MJ' } })
+  })
+  it('an asRead kept before T18 gains the value as read; after a unit correction it is the as-read unit converted', () => {
+    const legacy = prop({ rawValue: 200, rawUnit: 'mcf', value: 200, unit: 'mcf', asRead: { periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms' },
+      corrections: [{ fields: ['unit'], at: AT, by: BY }] })
+    const after = apply(legacy, editFigure(legacy, { value: 190, by: BY, at: AT }))
+    expect(after.asRead).toEqual({ periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms', value: 200, rawValue: 200 })
+    const noUnitChange = prop({ value: 100, asRead: { periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'mcf' }, corrections: [{ fields: ['period'], at: AT, by: BY }] })
+    expect(apply(noUnitChange, editFigure(noUnitChange, { value: 99, by: BY, at: AT })).asRead).toMatchObject({ value: 100, rawValue: 100 })
+  })
+})
+
+describe('T18: Flag for review records who, when and the status before', () => {
+  it('appends to statusLog; Undo still finds the last rejection', () => {
+    const p = prop({ status: 'confirmed' })
+    const flagged = apply(p, flagProposal(p, { by: BY, at: AT }))
+    expect(flagged.status).toBe('needs_manual_review')
+    expect(flagged.statusLog).toEqual([{ action: 'flagged', at: AT, by: BY, statusBefore: 'confirmed' }])
+    const r = apply(flagged, rejectProposal(flagged, { by: BY, at: AT }))
+    expect(apply(r, undoRejection(r, { by: BY, at: AT })).status).toBe('needs_manual_review')
+  })
+  it('the page wires Confirm, Edit figure and Flag to the builders, and disables them without a signed-in user', () => {
+    const page = readFileSync(join(process.cwd(), 'app/dashboard/ghg/page.tsx'), 'utf8')
+    expect(page).toContain('onUpdateProposal(locIdx, doc.id, pi, confirmProposal(p, { by: currentUser, at: new Date().toISOString() }))')
+    expect(page).toContain('onUpdateProposal(locIdx, doc.id, pi, editFigure(p, { value: v, by: currentUser, at: new Date().toISOString() }))')
+    expect(page).toContain('<button disabled={!currentUser} onClick={() => currentUser && onUpdateProposal(locIdx, doc.id, pi, flagProposal(p, { by: currentUser, at: new Date().toISOString() }))}')
+    expect(page).toContain("<button disabled={!currentUser} onClick={() => { if (!currentUser) return; setEditing(`${doc.id}:${pi}`)")
+    expect(page, 'no status written straight from a review button').not.toMatch(/onUpdateProposal\(locIdx, doc\.id, pi, \{ (value: v, )?status: '(confirmed|needs_manual_review)' \}\)/)
+  })
+})
+
+describe('T18: Edit unit on a typed figure clears it and asks again, never replaces or relabels it', () => {
+  const BY2 = { userId: 'u-2', email: 'sam@acme.example' }
+  const LATER = '2026-10-03T10:00:00.000Z'
+  const MSG = 'This figure was entered in therms. The unit has been changed to Mcf, so the figure has been cleared. Enter it again in Mcf.'
+  const read = prop({ ...{ periodStart: '2025-02-01', periodEnd: '2025-02-28' }, rawValue: 120, rawUnit: 'therms', value: 120, unit: 'therms', status: 'extracted' })
+  const typed = apply(read, editFigure(read, { value: 112, by: BY, at: AT }))
+  const changed = apply(typed, editUnit(typed, { unit: 'mcf', by: BY2, at: LATER }))
+
+  it('the figure is cleared, the reading goes back to To confirm, and the change records who, when and what was cleared', () => {
+    expect(changed).toMatchObject({ value: null, unit: 'mcf', rawUnit: 'mcf', rawValue: 120, status: 'extracted' })
+    expect(changed.corrections?.at(-1)).toEqual({ fields: ['unit'], at: LATER, by: BY2, figureCleared: { value: 112, unit: 'therms', toUnit: 'mcf' } })
+    expect(changed.asRead, 'the reading as printed is still kept').toMatchObject({ value: 120, rawValue: 120, unit: 'therms' })
+    expect(valueProblem(changed)).toBe(MSG)
+    expect(MSG).not.toContain('—')
+  })
+  it('it cannot be confirmed until the figure is entered again; entering it ends the clear', () => {
+    expect(apply(changed, confirmProposal(changed, { by: BY, at: LATER })).status).toBe('extracted')
+    const again = apply(changed, editFigure(changed, { value: 3.4, by: BY, at: LATER }))
+    expect(again).toMatchObject({ value: 3.4, unit: 'mcf', status: 'confirmed' })
+    expect(clearedFigureOf(again)).toBeNull()
+  })
+  it('until then it is an unpriced line naming the document, and export is blocked; the other bills still count', () => {
+    const l = site([gdoc('jan', prop({})), gdoc('feb', changed)])
+    const lines = unpricedLines(l, 'AR6', heldSel(l))
+    expect(lines.map(u => [u.reason, u.field, u.reading?.docId, u.message])).toEqual([['figure_cleared', 'natural_gas_amount', 'feb',
+      `feb.pdf at Site A: ${MSG} It is not counted, and export is blocked until it is entered or the bill is rejected.`]])
+    expect(statuses(l)).toContain('figure_cleared')
+    expect(deriveLocations({ locations: [l], reporting_year: 2025 })[0].natural_gas_amount, 'January is still counted').toBe(100)
+    const usedNone = usedNoneResolution({ locId: 'L1', fuelType: 'natural_gas', field: 'natural_gas_amount', fuelName: 'natural gas', by: BY, at: AT })
+    expect(acceptedResolutions(l, [usedNone]), 'the resolution itself is accepted').toEqual([usedNone])
+    expect(findUnresolvedCoverage([l], 2025, 12, [usedNone]).map(i => i.status), 'a bill on file is not answered by "used none"').toContain('figure_cleared')
+    const rejected = apply(changed, rejectProposal(changed, { by: BY, at: LATER }))
+    expect(unpricedLines(site([gdoc('jan', prop({})), gdoc('feb', rejected)]), 'AR6', heldSel(l)), 'a rejected bill is not a line').toEqual([])
+  })
+  it('a reading with no figure correction keeps the old behaviour: recomputed from the printed figure', () => {
+    const fixed = apply(read, editUnit(read, { unit: 'mcf', by: BY, at: AT }))
+    expect(fixed).toMatchObject({ value: 120, unit: 'mcf', rawUnit: 'mcf' })
+    expect(fixed.corrections?.at(-1)?.figureCleared).toBeUndefined()
   })
 })

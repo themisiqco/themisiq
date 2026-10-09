@@ -10,18 +10,37 @@
 //   - Correcting the unit corrects the BILL's unit (rawUnit) and re-converts the unchanged rawValue through
 //     convertToCanonical, the same audited conversion as at extraction. It never relabels the converted unit.
 //   - Rule R5: a month-only proposal cannot be confirmed until the customer confirms or corrects its dates.
+//
+// T18 (design section 10, "T18" rows): Confirm, Edit figure and Flag for review record who and when too.
+//   - Every confirmation appends to `confirmations` the reading exactly as it was shown when accepted, both as
+//     printed on the bill (rawValue, rawUnit) and as converted (value, unit), with its dates and source quote.
+//   - Edit figure keeps the value as read in `asRead` and appends a correction `{ fields: ['value'] }`.
+//   - Flag for review appends `{ action: 'flagged' }` to `statusLog`.
+//   - Edit unit on a reading whose figure the customer typed clears that figure and asks for it in the new unit.
 
-import { acceptanceProblem, valueProblem, fleetTypeProblem, type ExtractedProposal } from './engine'
+import { acceptanceProblem, valueProblem, fleetTypeProblem, type ExtractedProposal, type Confirmation } from './engine'
 import type { FleetType } from '../emissionFactors/mobile/types'
-import { convertToCanonical, type FuelType } from '../unitConversions'
+import { convertToCanonical, normalizeUnit, type FuelType } from '../unitConversions'
 
 export type Editor = { userId: string; email: string }
 type Patch = Partial<ExtractedProposal>
 
-const asReadOf = (p: ExtractedProposal): ExtractedProposal['asRead'] =>
-  p.asRead ?? { periodStart: p.periodStart, periodEnd: p.periodEnd, unit: p.rawUnit }
+/**
+ * What was read from the bill, kept the first time anything is changed. T18 adds the value as read, both as
+ * printed (rawValue) and as converted (value). An asRead kept before T18 has the dates and unit only; it gains
+ * them on its next change. rawValue is never edited, so it is still the value as read. The converted value is
+ * the current one unless the unit was corrected, in which case it is recomputed from the unit as read, through
+ * the same conversion as at extraction.
+ */
+const asReadOf = (p: ExtractedProposal): NonNullable<ExtractedProposal['asRead']> => {
+  const r = p.asRead ?? { periodStart: p.periodStart, periodEnd: p.periodEnd, unit: p.rawUnit }
+  if (r.value !== undefined) return r
+  const unitCorrected = (p.corrections ?? []).some(c => c.fields.includes('unit'))
+  const value = unitCorrected ? convertToCanonical(p.fuelType as FuelType, p.rawValue, r.unit).value : p.value
+  return { ...r, value, rawValue: p.rawValue }
+}
 
-const withCorrection = (p: ExtractedProposal, fields: ('period' | 'unit')[], by: Editor, at: string): Patch => ({
+const withCorrection = (p: ExtractedProposal, fields: ('period' | 'unit' | 'value')[], by: Editor, at: string): Patch => ({
   asRead: asReadOf(p),
   corrections: [...(p.corrections ?? []), { fields, at, by }],
 })
@@ -33,14 +52,49 @@ const withCorrection = (p: ExtractedProposal, fields: ('period' | 'unit')[], by:
  */
 export function editPeriod(p: ExtractedProposal, a: { start: string; end: string; by: Editor; at: string; confirm?: boolean }): Patch {
   const changed = a.start !== p.periodStart || a.end !== p.periodEnd
-  return {
+  const patch: Patch = {
     periodStart: a.start,
     periodEnd: a.end,
     periodOrigin: 'customer_confirmed',
     periodConfirmedAt: a.at,
     periodConfirmedBy: a.by,
     ...(changed ? withCorrection(p, ['period'], a.by, a.at) : {}),
-    ...(a.confirm ? { status: 'confirmed' as const } : {}),
+  }
+  // T18: confirming here is a confirmation like any other, recorded with the dates just confirmed.
+  return a.confirm ? { ...patch, ...confirmProposal({ ...p, ...patch }, { by: a.by, at: a.at }) } : patch
+}
+
+/**
+ * T18: "Confirm". Sets the status and appends to `confirmations` the reading exactly as shown when accepted.
+ * The page passes the patch through guardConfirm, which drops the confirmation with the status when the
+ * proposal cannot be confirmed (R5, T10a, FI9), so no confirmation is recorded that did not happen. Undo and a
+ * later confirmation append; nothing is overwritten. A delivery records its delivery date as well, since that is
+ * the date shown for it.
+ */
+export function confirmProposal(p: ExtractedProposal, a: { by: Editor; at: string }): Patch {
+  const reading: Confirmation['reading'] = {
+    value: p.value, unit: p.unit, rawValue: p.rawValue, rawUnit: p.rawUnit,
+    periodStart: p.periodStart, periodEnd: p.periodEnd, sourceQuote: p.sourceQuote,
+    ...(p.deliveryDate ? { deliveryDate: p.deliveryDate } : {}),
+  }
+  return { status: 'confirmed', confirmations: [...(p.confirmations ?? []), { at: a.at, by: a.by, reading }] }
+}
+
+/**
+ * T18: "Edit figure". The customer's figure replaces the converted value, in the unit shown beside it. The value
+ * as read is kept in `asRead` the first time, a correction `{ fields: ['value'] }` is appended, and the proposal is
+ * confirmed with the edited reading, as the Save button always did.
+ */
+export function editFigure(p: ExtractedProposal, a: { value: number; by: Editor; at: string }): Patch {
+  const patch: Patch = { value: a.value, ...withCorrection(p, ['value'], a.by, a.at) }
+  return { ...patch, ...confirmProposal({ ...p, ...patch }, { by: a.by, at: a.at }) }
+}
+
+/** T18: "Flag for review". The reading needs a second look; who flagged it, when and its status before are kept. */
+export function flagProposal(p: ExtractedProposal, a: { by: Editor; at: string }): Patch {
+  return {
+    status: 'needs_manual_review',
+    statusLog: [...(p.statusLog ?? []), { action: 'flagged', at: a.at, by: a.by, statusBefore: p.status }],
   }
 }
 
@@ -51,6 +105,22 @@ export function editPeriod(p: ExtractedProposal, a: { start: string; end: string
  */
 export function editUnit(p: ExtractedProposal, a: { unit: string; by: Editor; at: string }): Patch {
   const conv = convertToCanonical(p.fuelType as FuelType, p.rawValue ?? p.value, a.unit)
+  // T18: the figure was typed by the customer (a value correction), so recomputing from the printed figure would
+  // replace it, and keeping it would relabel it. As for any unit change (CLAUDE.md), the figure is cleared and
+  // asked for again in the new unit: the reading goes back to "To confirm" with no figure, and is an unpriced line
+  // naming the document until the figure is entered or the bill is rejected.
+  if ((p.corrections ?? []).some(c => c.fields.includes('value'))) {
+    const figureCleared = { value: p.value, unit: p.unit, toUnit: conv.unit ?? normalizeUnit(a.unit) ?? a.unit }
+    return {
+      rawUnit: a.unit,
+      value: null,
+      unit: figureCleared.toUnit,
+      conversionNote: undefined,
+      status: 'extracted',
+      asRead: asReadOf(p),
+      corrections: [...(p.corrections ?? []), { fields: ['unit'], at: a.at, by: a.by, figureCleared }],
+    }
+  }
   return {
     rawUnit: a.unit,
     value: conv.value,
@@ -99,8 +169,10 @@ export function guardConfirm(p: ExtractedProposal, patch: Patch, docType = ''): 
   // FI9 diff 4: nor a fleet-fuel reading with no vehicle type.
   if (acceptanceProblem({ ...p, ...patch }) === null && valueProblem({ ...p, ...patch }) === null
     && fleetTypeProblem(docType, { ...p, ...patch }) === null) return patch
+  // T18: the confirmation record goes with the status, so a refused confirmation is never recorded as made.
   const rest = { ...patch }
   delete rest.status
+  delete rest.confirmations
   return rest
 }
 

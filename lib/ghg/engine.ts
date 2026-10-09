@@ -1867,19 +1867,67 @@ interface ExtractedProposal {
   periodOrigin?: PeriodOrigin | null
   periodConfirmedAt?: string
   periodConfirmedBy?: { userId: string; email: string }
-  // T9 ruling: what was READ from the bill, kept the first time the dates or unit are changed, so a verifier
-  // can see the original beside the correction (verbatim source values are never lost).
-  asRead?: { periodStart: string | null; periodEnd: string | null; unit: string | null }
-  // T9: every change the customer made to the dates or unit, with who and when, in order.
-  corrections?: { fields: ('period' | 'unit')[]; at: string; by: { userId: string; email: string } }[]
+  // T9 ruling: what was READ from the bill, kept the first time the dates, unit or figure are changed, so a
+  // verifier can see the original beside the correction (verbatim source values are never lost). `unit` is the
+  // unit as printed (rawUnit). T18: `rawValue` is the figure as printed and `value` the figure as converted;
+  // both are absent on an asRead kept before T18 and filled on its next change.
+  asRead?: { periodStart: string | null; periodEnd: string | null; unit: string | null; value?: number | null; rawValue?: number | null }
+  // T9: every change the customer made to the dates or unit, with who and when, in order. T18: and the figure.
+  // T18: a unit change on a reading whose figure the customer had typed clears that figure (the unit-change
+  // invariant: never relabel), recording the figure cleared and the unit it must be entered again in.
+  corrections?: { fields: ('period' | 'unit' | 'value')[]; at: string; by: { userId: string; email: string }; figureCleared?: FigureCleared }[]
   // T9 (Reject and Undo): every rejection and every undo, with who, when and the status before it, in order.
-  // A rejected proposal stays on its document as evidence; it is simply not counted.
-  statusLog?: { action: 'rejected' | 'undone'; at: string; by: { userId: string; email: string }; statusBefore: ConciergeStatus }[]
+  // A rejected proposal stays on its document as evidence; it is simply not counted. T18: Flag for review
+  // ('flagged'), and a document's withdrawal and restoration ('withdrawn', 'restored', T18 diff 2).
+  statusLog?: { action: 'rejected' | 'undone' | 'flagged' | 'withdrawn' | 'restored'; at: string; by: { userId: string; email: string }; statusBefore: ConciergeStatus }[]
+  // T18: every confirmation, with who, when and the reading exactly as shown when it was accepted. Appended on each
+  // confirmation (after an Undo, or a date confirmation), never overwritten. Absent on proposals confirmed before T18.
+  confirmations?: Confirmation[]
   // FI9 diff 4 (ruling R16): a fleet-fuel reading's vehicle type, chosen by the customer at review (never inferred by the
   // reader), with every choice recorded. Absent on a fleet reading made before FI9: it lands on the legacy field until a
   // type is chosen, which moves it.
   fleetType?: FleetType
   fleetTypeLog?: { from: FleetType | null; to: FleetType; at: string; by: { userId: string; email: string } }[]
+}
+
+/** T18: the figure a unit change cleared from a reading: the typed figure and its unit, and the unit to enter it in. */
+export interface FigureCleared {
+  value: number | null
+  unit: string | null
+  toUnit: string | null
+}
+
+/**
+ * T18: the figure a unit change cleared, while it is still to be entered again: the reading has no figure, is not
+ * rejected, and its latest correction is that clear. Entering the figure (Edit figure) appends a later correction,
+ * which ends it.
+ */
+export function clearedFigureOf(p: Pick<ExtractedProposal, 'value' | 'status' | 'corrections'>): FigureCleared | null {
+  if (p.value != null || p.status === 'rejected') return null
+  return (p.corrections ?? []).at(-1)?.figureCleared ?? null
+}
+
+/** T18: what a reading whose typed figure was cleared by a unit change says, on the reading and (with the file
+ * and the site) on its unpriced line. Plain language, no em dash. */
+export const READING_FIGURE_CLEARED_MESSAGE = (c: FigureCleared): string => {
+  const from = unitLabel(c.unit), to = unitLabel(c.toUnit)
+  return `This figure was entered in ${from}. The unit has been changed to ${to}, so the figure has been cleared. Enter it again in ${to}.`
+}
+
+/** T18: one confirmation of a reading: who, when, and the reading as printed on the bill and as converted. */
+export interface Confirmation {
+  at: string
+  by: { userId: string; email: string }
+  reading: {
+    value: number | null
+    unit: string | null
+    rawValue: number | null
+    rawUnit: string | null
+    periodStart: string | null
+    periodEnd: string | null
+    sourceQuote: string | null
+    deliveryDate?: string
+  }
 }
 
 interface SourceDoc {
@@ -3728,6 +3776,9 @@ export interface UnpricedLine {
   /** factor_missing: the units this location's publisher does price this fuel in, in words. */
   supportedUnits: string[]
   message: string
+  /** T18: a line for ONE reading, not for the field: a typed figure on a document cleared by a unit change. The
+   * field's other bills are still priced; this line names the document and records who changed the unit, and when. */
+  reading?: { docId: string; proposalIndex: number; file: string; fuelType: string; figureCleared: FigureCleared; at: string; by: { userId: string; email: string } }
 }
 
 // The plain-language messages (FI1). No em dash: they reach the customer and the verifier.
@@ -3880,7 +3931,27 @@ export function unpricedLines(loc: Location, gwpVersion: GwpVersion, sel: Sel): 
       amount: 0, unit: heldUnit(loc as never, f.field) ?? c.to, country: canonicalCountryCode(loc.country), factorKey: '',
       factor: { publisher, value: null }, supportedUnits: [], message: unitChangeMessage(c) })
   }
+  // T18: a reading whose typed figure a unit change cleared is a line with no figure until it is entered again or
+  // the bill is rejected. One line per reading, never for the field: the field's other bills are still counted.
+  loc.source_docs.forEach(d => (d.extracted ?? []).forEach((p, pi) => {
+    const cleared = clearedFigureOf(p)
+    const map = cleared && fieldFor(d.document_type, p.fuelType, p.fleetType)
+    if (!cleared || !map) return
+    const field = String(map.amount)
+    const line = READING_LINE[field] ?? { stream: CLEARED_FIELD_STREAM[field]?.stream ?? 'mobile', source: CLEARED_FIELD_STREAM[field]?.source ?? field }
+    const last = p.corrections!.at(-1)!
+    out.push({ reason: 'figure_cleared', locId: loc.id, site, field: map.amount, stream: line.stream, source: line.source,
+      amount: 0, unit: cleared.toUnit ?? '', country: canonicalCountryCode(loc.country), factorKey: '',
+      factor: { publisher, value: null }, supportedUnits: [],
+      message: `${d.file_name} at ${site}: ${READING_FIGURE_CLEARED_MESSAGE(cleared)} It is not counted, and export is blocked until it is entered or the bill is rejected.`,
+      reading: { docId: d.id, proposalIndex: pi, file: d.file_name, fuelType: p.fuelType, figureCleared: cleared, at: last.at, by: last.by } })
+  }))
   return out
+}
+/** T18: the stream and line name of a reading's field where CLEARED_FIELD_STREAM (typed figures) has none. */
+const READING_LINE: Record<string, { stream: DeclarableStream; source: string }> = {
+  electricity_kwh: { stream: 'electricity', source: 'Electricity' },
+  renewable_electricity_kwh: { stream: 'electricity', source: 'Renewable electricity' },
 }
 /** FI5: the stream and line name of each unit field's figure, for a cleared figure's line. */
 const CLEARED_FIELD_STREAM: Record<string, { stream: DeclarableStream; source: string }> = {
@@ -4568,8 +4639,15 @@ export interface BillContribution {
   asRead?: ExtractedProposal['asRead']
   /** T9: the customer's changes to the dates or unit, with who and when. */
   corrections?: ExtractedProposal['corrections']
-  /** T9: who rejected the bill, or undid a rejection, and when. */
+  /** T9: who rejected the bill, or undid a rejection, and when. T18: and who flagged it. */
   statusLog?: ExtractedProposal['statusLog']
+  /** T18: who confirmed the reading, when, and the reading as shown then. */
+  confirmations?: ExtractedProposal['confirmations']
+  /** T18: who confirmed or entered the billing dates, and when (periodOrigin customer_confirmed). */
+  periodConfirmedAt?: string
+  periodConfirmedBy?: ExtractedProposal['periodConfirmedBy']
+  /** T18: who chose the vehicle type of a fleet-fuel reading, and when (FI9). */
+  fleetTypeLog?: ExtractedProposal['fleetTypeLog']
   /** T10b: the delivery date, when this reading is a delivery (counted in full if inside the year). */
   deliveryDate?: string
 }
@@ -4635,9 +4713,12 @@ export const NO_VALUE_UNIT_MESSAGE = (quote: string, fuel: string): string =>
  * figure empty at extraction), the message names the quote and the fuel.
  */
 export function valueProblem(
-  p: Pick<ExtractedProposal, 'value'> & Partial<Pick<ExtractedProposal, 'sourceQuote' | 'fuelType' | 'rawValue' | 'rawUnit'>>,
+  p: Pick<ExtractedProposal, 'value'> & Partial<Pick<ExtractedProposal, 'sourceQuote' | 'fuelType' | 'rawValue' | 'rawUnit' | 'status' | 'corrections'>>,
 ): string | null {
   if (p.value != null) return null
+  // T18: a typed figure cleared by a unit change asks for the figure again, in the new unit.
+  const cleared = clearedFigureOf({ value: p.value, status: p.status ?? 'extracted', corrections: p.corrections })
+  if (cleared) return READING_FIGURE_CLEARED_MESSAGE(cleared)
   const quote = (p.sourceQuote ?? '').trim()
   if (quote && p.rawUnit && p.fuelType && convertToCanonical(p.fuelType as FuelType, p.rawValue ?? null, p.rawUnit).tier === 3) {
     return NO_VALUE_UNIT_MESSAGE(quote, FUEL_NAME[p.fuelType] ?? p.fuelType.replace(/_/g, ' '))
@@ -4794,6 +4875,10 @@ export function billContributions(
       ...(p.asRead ? { asRead: p.asRead } : {}),
       ...(p.corrections?.length ? { corrections: p.corrections } : {}),
       ...(p.statusLog?.length ? { statusLog: p.statusLog } : {}),
+      // T18: who confirmed it, its dates and its vehicle type, and when, travel the same way.
+      ...(p.confirmations?.length ? { confirmations: p.confirmations } : {}),
+      ...(p.periodConfirmedAt && p.periodConfirmedBy ? { periodConfirmedAt: p.periodConfirmedAt, periodConfirmedBy: p.periodConfirmedBy } : {}),
+      ...(p.fleetTypeLog?.length ? { fleetTypeLog: p.fleetTypeLog } : {}),
     })
   }))
   return out
@@ -5093,6 +5178,11 @@ interface Provenance {
   contributions?: BillContribution[]
   // T10: the reason this document-backed figure was entered by hand instead, with who and when.
   manual_override?: { reason: string; at: string; by: { userId: string; email: string } }
+  // T18: on a reading's own unpriced row, the reading whose typed figure a unit change cleared, with who and when.
+  reading_cleared?: UnpricedLine['reading']
+  // T18: earlier overrides of this field the customer removed ("Use the bills instead"), with the reason they gave,
+  // who entered and who removed each, and when, in order.
+  manual_overrides_removed?: { reason: string; at: string; by: { userId: string; email: string }; removedAt: string; removedBy: { userId: string; email: string } }[]
 }
 
 // Document-backed fields that get a zero row when every confirmed bill is silently excluded (T5 ruling).
@@ -5318,7 +5408,11 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     const provOf = (field: keyof Location): Provenance => {
       const a = applied[String(field)]
       const contrib = contributionsFor(field)
-      const withContrib = (p: Provenance): Provenance => contrib.length ? { ...p, contributions: contrib } : p
+      // T18: an override removed from this field stays on its row, whether the row is now from the bills or typed.
+      const removed = (loc.manual_overrides_removed ?? []).filter(o => o.field === String(field))
+        .map(o => ({ reason: o.reason, at: o.at, by: o.by, removedAt: o.removedAt, removedBy: o.removedBy }))
+      const withContrib = (p: Provenance): Provenance => ({
+        ...p, ...(contrib.length ? { contributions: contrib } : {}), ...(removed.length ? { manual_overrides_removed: removed } : {}) })
       // T10: entered by hand instead of from its documents. Manual, with the reason, who and when; the
       // documents are listed as contributions not counted, reason manual_override.
       const override = activeOverride(loc, field)
@@ -5343,13 +5437,15 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // the note, so all three steps are on one row (pickEF converts to the publisher's unit, FI2).
     const unpricedAll = unpricedLines(loc, gwpVersion, sel)
     // Combustion and steam lines by field. The electricity edition lines are read by source below (three per field).
-    const unpriced = new Map(unpricedAll.filter(u => u.stream !== 'electricity').map(u => [String(u.field), u]))
+    // T18: a reading's own line (a cleared typed figure) never stands in for its field's row; it is a row of its own.
+    const unpriced = new Map(unpricedAll.filter(u => u.stream !== 'electricity' && !u.reading).map(u => [String(u.field), u]))
     const pushUnpriced = (u: UnpricedLine, prov?: Provenance, scope = 1) => rows.push({ location: loc.name || 'Location', stream: u.stream,
       source: u.source, scope, activity_data: u.amount, activity_unit: u.unit, emission_factor: NOT_PROVIDED,
       emission_factor_display: NOT_PROVIDED, ef_source: NOT_PROVIDED, gwp_basis: 'unpriced', result_tco2e: null,
       declaration: 'unpriced', entry_method: prov?.entry_method ?? 'manual',
       unpriced: { reason: u.reason, field: String(u.field), factor_key: u.factorKey, publisher: u.factor.publisher, value: null },
-      note: `NOT PRICED: ${u.message}`, ...(prov ?? {}) })
+      note: `NOT PRICED: ${u.message}`, ...(u.reading ? { reading_cleared: u.reading } : {}), ...(prov ?? {}) })
+    for (const u of unpricedAll) if (u.reading) pushUnpriced(u, { entry_method: 'concierge' }, u.stream === 'electricity' ? 2 : 1)
     for (const line of combustionLines(loc)) {
       const u = unpriced.get(String(line.field))
       if (u) { pushUnpriced(u, provOf(line.field)); continue }
@@ -5747,7 +5843,8 @@ export function findUnresolvedCoverage(
     // status is the reason: factor_missing, refrigerant_unknown, province_missing ... or edition_missing (T3c).
     for (const u of unpricedLines(derivedHere, 'AR6', sel)) {
       // FI5: a cleared figure confirmed as none (an accepted used_none for the field) is answered.
-      if (u.reason === 'figure_cleared' && resolutions.some(r => r.kind === 'used_none' && r.field === String(u.field))) continue
+      // T18: not a reading's own line. A bill on file says the fuel was used, so it is entered again or rejected.
+      if (u.reason === 'figure_cleared' && !u.reading && resolutions.some(r => r.kind === 'used_none' && r.field === String(u.field))) continue
       out.push({ locId: loc.id, fuelType: FIELD_FUEL[String(u.field)] ?? String(u.field), status: u.reason, field: String(u.field), message: u.message })
     }
 

@@ -86,3 +86,30 @@ describe('notes under a proposal', () => {
     expect(all).not.toContain('—')
   })
 })
+
+describe('T18: notes for Confirm, Edit figure and Flag for review', () => {
+  const AT = '2026-10-02T12:00:00.000Z'
+  const reading = { value: 112, unit: 'therms', rawValue: 120, rawUnit: 'therms', periodStart: '2025-01-01', periodEnd: '2025-01-31', sourceQuote: 'q' }
+  it('a confirmed reading says who confirmed it and when; an unconfirmed one does not', () => {
+    const p = prop({ status: 'confirmed', confirmations: [{ at: AT, by: BY, reading }] })
+    expect(text(renderToStaticMarkup(<ProposalNotes p={p} />))).toContain('Confirmed by jo@acme.example on 2 October 2026.')
+    expect(renderToStaticMarkup(<ProposalNotes p={{ ...p, status: 'extracted' }} />)).not.toContain('Confirmed by')
+  })
+  it('an edited figure says what changed and shows the figure as printed on the bill', () => {
+    const p = prop({ status: 'confirmed', value: 112, rawUnit: 'therms', unit: 'therms',
+      asRead: { periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'therms', value: 120, rawValue: 120 },
+      corrections: [{ fields: ['value'], at: AT, by: BY }], confirmations: [{ at: AT, by: BY, reading }] })
+    const t = text(renderToStaticMarkup(<ProposalNotes p={p} />))
+    expect(t).toContain('Changed by jo@acme.example on 2 October 2026: figure.')
+    expect(t).toContain('Read from the bill: 1 January 2025 to 31 January 2025, 120 therms.')
+    expect(t).not.toContain('—')
+  })
+  it('several fields in one change are listed in order', () => {
+    const p = prop({ asRead: { periodStart: '2025-01-01', periodEnd: '2025-01-31', unit: 'mcf' }, corrections: [{ fields: ['value', 'period', 'unit'], at: AT, by: BY }] })
+    expect(text(renderToStaticMarkup(<ProposalNotes p={p} />))).toContain('Changed by jo@acme.example on 2 October 2026: billing dates, unit and figure.')
+  })
+  it('a flagged reading says who flagged it and when', () => {
+    const p = prop({ status: 'needs_manual_review', statusLog: [{ action: 'flagged', at: AT, by: BY, statusBefore: 'extracted' }] })
+    expect(text(renderToStaticMarkup(<ProposalNotes p={p} />))).toContain('Flagged for review by jo@acme.example on 2 October 2026.')
+  })
+})

@@ -39,7 +39,7 @@ import { FleetBlock } from './_components/FleetBlock'
 import { fieldsOf, typeHasFigures, untickFleetType, modelYearValue, fleetForCountryChange, assignLegacy, legacyFleetFigures } from '../../../lib/ghg/fleetForm'
 import type { FleetType } from '../../../lib/emissionFactors/mobile/types'
 import { addOverride, removeOverride } from '../../../lib/ghg/overrides'
-import { guardConfirm, rejectProposal, undoRejection } from '../../../lib/ghg/proposalEdits'
+import { guardConfirm, rejectProposal, undoRejection, confirmProposal, editFigure, flagProposal } from '../../../lib/ghg/proposalEdits'
 import { sha256Hex } from '../../../lib/ghg/fileHash'
 import { assessCompleteness } from '../../../lib/ghg/loadSeries'
 import type { YearDataStatus } from '../../../lib/ghg/series'
@@ -4222,7 +4222,8 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemov
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       <input type="number" value={editVal} onChange={e => setEditVal(e.target.value)} placeholder="corrected value" style={{ fontSize: 12, padding: '4px 8px', border: '0.5px solid #e8e7e4', borderRadius: 6, width: 130 }} />
                       <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>{p.unit ?? ''}</span>
-                      <button onClick={() => { const v = Number(editVal); if (Number.isFinite(v)) { onUpdateProposal(locIdx, doc.id, pi, { value: v, status: 'confirmed' }); setEditing(null) } }} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer' }}>Save</button>
+                      {/* T18: the figure as read is kept, and the edit and the confirmation record who and when. */}
+                      <button disabled={!currentUser} onClick={() => { const v = Number(editVal); if (currentUser && Number.isFinite(v)) { onUpdateProposal(locIdx, doc.id, pi, editFigure(p, { value: v, by: currentUser, at: new Date().toISOString() })); setEditing(null) } }} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Save</button>
                       <button onClick={() => setEditing(null)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#f8f7f5', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Cancel</button>
                     </div>
                   ) : p.status === 'rejected' ? (
@@ -4237,16 +4238,17 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onRemov
                       ) : periodEditing?.key === `${doc.id}:${pi}` && periodEditing.confirm ? null : (
                         // T10c: hidden while the month-only date confirmation is open; that step has its own button.
                         // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.
-                        <button disabled={valueProblem(p) !== null || fleetTypeProblem(doc.document_type, p) !== null} onClick={() => valueProblem(p) || fleetTypeProblem(doc.document_type, p) ? undefined : acceptanceProblem(p)
+                        // T18: a confirmation records who, when and the reading as shown, so it needs a signed-in user.
+                        <button disabled={!currentUser || valueProblem(p) !== null || fleetTypeProblem(doc.document_type, p) !== null} onClick={() => !currentUser || valueProblem(p) || fleetTypeProblem(doc.document_type, p) ? undefined : acceptanceProblem(p)
                           ? (setUnitEditing(null), setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: true }))
-                          : onUpdateProposal(locIdx, doc.id, pi, { status: 'confirmed' })} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: valueProblem(p) || fleetTypeProblem(doc.document_type, p) ? 0.5 : 1 }}>Confirm</button>
+                          : onUpdateProposal(locIdx, doc.id, pi, confirmProposal(p, { by: currentUser, at: new Date().toISOString() }))} style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: !currentUser || valueProblem(p) || fleetTypeProblem(doc.document_type, p) ? 0.5 : 1 }}>Confirm</button>
                       )}
-                      <button onClick={() => { setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit figure</button>
+                      <button disabled={!currentUser} onClick={() => { if (!currentUser) return; setEditing(`${doc.id}:${pi}`); setEditVal(p.value != null ? String(p.value) : '') }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Edit figure</button>
                       <button onClick={() => { setUnitEditing(null); setPeriodEditing({ key: `${doc.id}:${pi}`, confirm: false }) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit dates</button>
                       {unitEditable(p) && (
                         <button onClick={() => { setPeriodEditing(null); setUnitEditing(`${doc.id}:${pi}`) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#555553', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Edit unit</button>
                       )}
-                      <button onClick={() => onUpdateProposal(locIdx, doc.id, pi, { status: 'needs_manual_review' })} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: 'var(--color-state-warn)', border: '0.5px solid #e8e7e4', cursor: 'pointer' }}>Flag for review</button>
+                      <button disabled={!currentUser} onClick={() => currentUser && onUpdateProposal(locIdx, doc.id, pi, flagProposal(p, { by: currentUser, at: new Date().toISOString() }))} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: 'var(--color-state-warn)', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Flag for review</button>
                       <button disabled={!currentUser} onClick={() => { if (!currentUser) return; setPeriodEditing(null); setUnitEditing(null); onUpdateProposal(locIdx, doc.id, pi, rejectProposal(p, { by: currentUser, at: new Date().toISOString() })) }} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, background: '#fff', color: '#B91C1C', border: '0.5px solid #e8e7e4', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Reject</button>
                     </div>
                   )}

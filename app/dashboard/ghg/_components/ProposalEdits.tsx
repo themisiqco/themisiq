@@ -15,6 +15,7 @@ import { convertibleUnits, normalizeUnit, type FuelType } from '../../../../lib/
 import { plainDate } from '../../../../lib/ghg/coverageActions'
 import { unitLabel } from '../../../../lib/ghg/unitLabels'
 import { isoDateInWords } from '../../../../lib/ghg/dateWords'
+import { formatActivity } from '../../../../lib/ghg/workingsCells'
 
 // How each unit is written for the customer: one map, shared with every other surface (T10c).
 export { UNIT_LABEL } from '../../../../lib/ghg/unitLabels'
@@ -80,24 +81,32 @@ export function UnitEditor({ p, by, onSave, onCancel }: {
 /** True when the fuel can be read in more than one unit, so a unit control is worth offering. */
 export const unitEditable = (p: ExtractedProposal) => convertibleUnits(p.fuelType as FuelType).length > 1
 
+const CORRECTED_FIELD: Record<'period' | 'unit' | 'value', string> = { period: 'billing dates', unit: 'unit', value: 'figure' }
+
 /**
  * What the review says about where a proposal's dates and unit came from: a confirmed month-only bill whose
- * days were never confirmed (R5), and every change the customer made, with the original reading.
+ * days were never confirmed (R5), and every change the customer made, with the original reading. T18: who
+ * confirmed it and when, who flagged it, and the figure as read once the figure was edited.
  */
 export function ProposalNotes({ p }: { p: ExtractedProposal }) {
   const lines: string[] = []
   const lastLog = (p.statusLog ?? [])[(p.statusLog ?? []).length - 1]
+  const lastConfirmation = (p.confirmations ?? []).at(-1)
   if (p.status === 'rejected' && lastLog?.action === 'rejected') lines.push(`Rejected by ${lastLog.by.email} on ${plainDate(lastLog.at)}.`)
   if (p.status !== 'rejected' && lastLog?.action === 'undone') lines.push(`Rejection undone by ${lastLog.by.email} on ${plainDate(lastLog.at)}.`)
+  if (p.status === 'needs_manual_review' && lastLog?.action === 'flagged') lines.push(`Flagged for review by ${lastLog.by.email} on ${plainDate(lastLog.at)}.`)
+  if (p.status === 'confirmed' && lastConfirmation) lines.push(`Confirmed by ${lastConfirmation.by.email} on ${plainDate(lastConfirmation.at)}.`)
   if (p.status === 'confirmed' && periodOriginOf(p) === 'billing_month') lines.push('Dates estimated from the billing month')
   for (const c of p.corrections ?? []) {
-    const what = c.fields.includes('period') && c.fields.includes('unit') ? 'billing dates and unit'
-      : c.fields.includes('period') ? 'billing dates' : 'unit'
+    const names = (['period', 'unit', 'value'] as const).filter(f => c.fields.includes(f)).map(f => CORRECTED_FIELD[f])
+    const what = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
     lines.push(`Changed by ${c.by.email} on ${plainDate(c.at)}: ${what}.`)
   }
   if (p.asRead && (p.corrections ?? []).length > 0) {
     const r = p.asRead
-    lines.push(`Read from the bill: ${r.periodStart ? isoDateInWords(r.periodStart) : 'no start date'} to ${r.periodEnd ? isoDateInWords(r.periodEnd) : 'no end date'}, ${unitLabel(r.unit)}.`)
+    // T18: the figure as printed, where it was kept (asRead from T18 on); the unit as printed either way.
+    const figure = r.rawValue != null ? `${formatActivity(r.rawValue)} ${unitLabel(r.unit)}` : unitLabel(r.unit)
+    lines.push(`Read from the bill: ${r.periodStart ? isoDateInWords(r.periodStart) : 'no start date'} to ${r.periodEnd ? isoDateInWords(r.periodEnd) : 'no end date'}, ${figure}.`)
   }
   if (p.periodOrigin === 'customer_confirmed' && p.periodConfirmedBy && p.periodConfirmedAt && !(p.corrections ?? []).some(c => c.fields.includes('period'))) {
     lines.push(`Dates confirmed by ${p.periodConfirmedBy.email} on ${plainDate(p.periodConfirmedAt)}.`)
