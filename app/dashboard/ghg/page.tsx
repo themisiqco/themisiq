@@ -25,7 +25,7 @@ import { removeStored } from '../../../lib/ghg/removeStored'
 import { saveFailedText } from '../../../lib/planGateError'
 import { GHG_FREE_USE_SENTENCE, GHG_PLAN_USE_SENTENCE } from '../../../lib/pricingCopy'
 import type { PriorYearState, InventorySummary, ComparabilityCapture, ComparabilityAnswer, ComparabilityRecord } from '../../../lib/ghg/comparability'
-import { figuresForSave } from '../../../lib/ghg/savePayload'
+import { figuresForSave, documentLogBaseline, documentLogProblem, type DocumentLogBaseline } from '../../../lib/ghg/savePayload'
 import { selectionContextFor } from '../../../lib/ghg/factorSelection'
 import { upsertResolution, resolutionKey } from '../../../lib/ghg/coverageActions'
 import { inventoryFingerprint, hasUnsavedChanges, showUnsavedNudge } from '../../../lib/ghg/unsavedChanges'
@@ -678,6 +678,10 @@ const searchParams = useSearchParams()
   // existing alert, cleared when a save begins, read synchronously by removeLocation after its
   // await. No existing failure behaviour changes, and a caller that does not read it sees nothing.
   const lastSaveError = useRef<string | null>(null)
+  // T18: each location's document log as loaded or last saved, for this inventory id. A save that would drop an
+  // entry is refused (lib/ghg/savePayload.ts, documentLogProblem). Keyed by id so a log from another inventory
+  // open earlier in this page is never compared with this one.
+  const loadedDocumentLog = useRef<{ inventoryId: string | null; log: DocumentLogBaseline }>({ inventoryId: null, log: {} })
   const skipSavedReset = useRef(true)
   // RM1: removals in flight, by key (a document id, or `location:${id}`). The ref is the guard, read and
   // written synchronously, so a second click in the same tick is ignored; the state disables the control.
@@ -1111,6 +1115,7 @@ const searchParams = useSearchParams()
       if (data) {
        skipSavedReset.current = true 
         setInventoryId(data.id)
+        loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(data.locations_data) }
         // LEAD1 L4: the free calculation saves as itself and shows its own banner.
         setEditingFree(data.free_tier === true)
         // L8-fix1: the purchase landing starts from the row as loaded.
@@ -2071,6 +2076,10 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     // One derivation for every figure the save writes (T7): totals, workings, pct_estimated and
     // factor_editions from derived locations, locations_data as edited. See lib/ghg/savePayload.ts.
     const saved = figuresForSave(inventory, 'AR6')
+    // T18: the document log is append-only. Compared only with the log loaded for this same inventory.
+    const logProblem = inventoryId && loadedDocumentLog.current.inventoryId === inventoryId
+      ? documentLogProblem(loadedDocumentLog.current.log, saved.locations_data) : null
+    if (logProblem) { lastSaveError.current = logProblem; alert(logProblem); return }
     const savedEditionComparison = priorYear.status === 'found' ? (comparability?.factorEditions ?? null)
       : priorYear.status === 'none' ? null : (inventory.factor_edition_comparison ?? null)
     const payload = {
@@ -2137,13 +2146,14 @@ workings: saved.workings,
     if (inventoryId) {
       const { error } = await supabase.from('ghg_inventories').update(payload).eq('id', inventoryId)
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
+      loadedDocumentLog.current = { inventoryId, log: documentLogBaseline(saved.locations_data) }
     } else {
       const dupQuery = supabase.from('ghg_inventories').select('id').eq('reporting_year', inventory.reporting_year)
       const { data: dup } = await (resolvedCompanyId ? dupQuery.eq('company_id', resolvedCompanyId) : dupQuery.eq('company_name', inventory.company_name)).maybeSingle()
       if (dup) { lastSaveError.current = 'An inventory for that company and year already exists.'; alert(`You already have an inventory for ${yl.inText} for "${inventory.company_name}". Open it from "Your inventories" instead of creating a duplicate.`); return }
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
-      if (data) { savedId = data.id; setInventoryId(data.id) }
+      if (data) { savedId = data.id; setInventoryId(data.id); loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(saved.locations_data) } }
       loadCompanies() // refresh dropdown in case resolve-or-create added a new company
     }
     // Additive monthly-emissions write. Annual save above is already committed and

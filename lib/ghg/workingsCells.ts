@@ -220,6 +220,10 @@ export function workingsResultCell(r: { result_tco2e?: number | null }): string 
  */
 export const COVERAGE_ROW_BASIS = 'coverage_resolution'
 
+/** T18: the `gwp_basis` of a document-event row (withdrawn, restored, deleted, deleted unused). No factor applies;
+ * the event's sentence is the row's note. */
+export const DOCUMENT_EVENT_ROW_BASIS = 'document_event'
+
 /**
  * The Factor source column: the row's citation.
  *

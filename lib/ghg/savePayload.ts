@@ -16,7 +16,7 @@
 // figure below as `frozen`, and written back with any choice this save made (lib/ghg/factorSelection.ts). The
 // column is added by supabase/migrations/20261008_ghg_factor_selection.sql, which must likewise exist first.
 
-import { deriveLocations, calcInventory, buildWorkings, pctEstimated, selectionFor, type Inventory, type GwpVersion, type SelectionContext } from './engine'
+import { deriveLocations, calcInventory, buildWorkings, pctEstimated, selectionFor, type Inventory, type GwpVersion, type SelectionContext, type Location } from './engine'
 import { factorEditionsForSave } from './factorEditions'
 import { factorSelectionForSave, selectionContextFor } from './factorSelection'
 import type { DatasetId } from './factorEditionRegistry'
@@ -44,4 +44,36 @@ export function figuresForSave(inventory: Inventory, gwpVersion: GwpVersion = 'A
     factor_selection: factorSelectionForSave(inventory.factor_selection, used, sel),
     derivation_version: DERIVATION_VERSION,
   }
+}
+
+// ── T18: THE DOCUMENT LOG CANNOT BE REWRITTEN BY A SAVE ──────────────────────────────────────────────────────────
+// Each location's document_log (withdrawals, restorations, deletions; lib/ghg/documentActions.ts) is append-only.
+// The page keeps the log as loaded (documentLogBaseline) and refuses a save whose locations_data lacks an entry
+// that record had (documentLogProblem), so no edit, stale draft or bug can drop a tombstone. Entries are compared
+// whole, so an entry edited in place counts as missing.
+//
+// ⚠️ A LOCATION NO LONGER IN THE PAYLOAD IS NOT CHECKED. Deleting a location removes its documents and its log
+// together, and refusing that here would refuse every location delete once a document had been withdrawn. That
+// path leaves no record of the documents it removes; it is reported as a gap, not solved here.
+
+/** The log as loaded: per location id, each entry as its JSON text. */
+export type DocumentLogBaseline = Record<string, string[]>
+
+export function documentLogBaseline(locations: readonly Pick<Location, 'id' | 'document_log'>[] | null | undefined): DocumentLogBaseline {
+  const out: DocumentLogBaseline = {}
+  for (const l of locations ?? []) if (l.document_log?.length) out[l.id] = l.document_log.map(e => JSON.stringify(e))
+  return out
+}
+
+/** Why a save would drop a document-log entry the loaded record had, or null. Plain, no em dash. */
+export function documentLogProblem(baseline: DocumentLogBaseline, locations: readonly Pick<Location, 'id' | 'name' | 'document_log'>[]): string | null {
+  for (const l of locations) {
+    const had = baseline[l.id]
+    if (!had?.length) continue
+    const now = new Set((l.document_log ?? []).map(e => JSON.stringify(e)))
+    if (had.some(e => !now.has(e))) {
+      return `This save would remove the record of a document withdrawn, restored or deleted at ${l.name || 'a location'}. That record is kept permanently, so nothing was saved. Reload the inventory and try again.`
+    }
+  }
+  return null
 }

@@ -7211,3 +7211,27 @@ describe('T18 diff 1: who and when reach the contributions and the workings row'
     expect(gasRow(gas({})).manual_overrides_removed).toBeUndefined();
   });
 });
+
+describe('T18 diff 2: a withdrawn document in the engine', () => {
+  const BY = { userId: 'u-1', email: 'jo@acme.example' };
+  const AT = '2026-10-02T09:00:00.000Z';
+  const withdrawn = { at: AT, by: BY, reason: 'Wrong site' };
+  const gas = (docs: SourceDoc[], o: Partial<Location> = {}) => loc({ has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: docs, ...o });
+  const W24 = periodFromYearAndEnd(2024, 12);
+
+  it('its readings contribute with reason withdrawn, never not_confirmed, and carry the withdrawal', () => {
+    const l = gas([doc('utility_bill_gas', [prop({ status: 'rejected' })], 'w')]);
+    expect(billContributions(l, [], W24)[0].reason, 'a plain rejection').toBe('not_confirmed');
+    const w = gas([{ ...doc('utility_bill_gas', [prop({ status: 'rejected' })], 'w'), withdrawn }]);
+    expect(billContributions(w, [], W24)[0]).toMatchObject({ reason: 'withdrawn', counted: false, withdrawal: withdrawn });
+  });
+
+  it('it raises no unread issue, and an all-withdrawn field says "rejected or withdrawn"; a plain rejection keeps its wording', () => {
+    const unread = gas([{ ...doc('utility_bill_gas', [], 'u'), withdrawn }]);
+    expect(findUnresolvedCoverage([unread], 2024, 12, []).filter(i => i.status === 'none')).toEqual([]);
+    const w = gas([{ ...doc('utility_bill_gas', [prop({ status: 'rejected' })], 'w'), withdrawn }]);
+    expect(findUnresolvedCoverage([w], 2024, 12, []).find(i => i.status === 'all_rejected')?.message).toContain('was rejected or withdrawn and no figure');
+    const r = gas([doc('utility_bill_gas', [prop({ status: 'rejected' })], 'r')]);
+    expect(findUnresolvedCoverage([r], 2024, 12, []).find(i => i.status === 'all_rejected')?.message).toContain('was rejected and no figure');
+  });
+});

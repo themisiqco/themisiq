@@ -5,8 +5,8 @@
 // entry naming that person beside that moment. Each action is taken by its own person at its own time, so a
 // match cannot come from another action's record.
 //
-// Diff 1 covers the proposal actions. Diffs 2 and 3 add the document lifecycle (withdraw, restore, delete
-// permanently, delete unused), typed entries and the coverage resolutions to ACTIONS, and to EXPECTED below.
+// Diff 1 covers the proposal actions; diff 2 the document lifecycle (withdraw, restore, delete permanently, delete
+// unused). Diff 3 adds typed entries and the coverage resolutions to ACTIONS, and to EXPECTED below.
 
 import { describe, it, expect } from 'vitest'
 import { figuresForSave } from './savePayload'
@@ -14,6 +14,7 @@ import {
   confirmProposal, editFigure, flagProposal, editPeriod, editUnit, rejectProposal, undoRejection, chooseFleetType, guardConfirm,
 } from './proposalEdits'
 import { addOverride, removeOverride } from './overrides'
+import { withdrawDocument, restoreDocument, deleteDocument } from './documentActions'
 import { emptyLocation, deriveLocations, withFleetTypeTicked, type Location, type Inventory, type SourceDoc, type ExtractedProposal } from './engine'
 import { TEST_PREPARED_ON } from '../testing/heldSelection'
 
@@ -74,6 +75,24 @@ const ACTIONS: Action[] = [
     const l = { ...l0, ...addOverride(l0, { field: 'natural_gas_amount', reason: 'Bills were estimated', by: OTHER, at: OTHER_AT, startFrom: typedFigure(l0) }) }
     return inv({ ...l, ...removeOverride(l, { field: 'natural_gas_amount', by, at }) })
   } },
+  // T18 diff 2: the document lifecycle. Each acts on the February document; the location's patch is applied whole.
+  { name: 'withdraw', act: (by, at) => {
+    const l = gasSite(prop({ ...FEB }))
+    return inv({ ...l, ...withdrawDocument(l, 'feb', { by, at, reason: 'Duplicate upload' }) })
+  } },
+  { name: 'restore', act: (by, at) => {
+    const l0 = gasSite(prop({ ...FEB }))
+    const l = { ...l0, ...withdrawDocument(l0, 'feb', { by: OTHER, at: OTHER_AT, reason: 'Checking it' }) }
+    return inv({ ...l, ...restoreDocument(l, 'feb', { by, at, reason: 'Checked' }) })
+  } },
+  { name: 'delete permanently', act: (by, at) => {
+    const l = gasSite(prop({ ...FEB }))
+    return inv({ ...l, ...deleteDocument(l, 'feb', { by, at, mode: 'permanently', reason: 'Wrong customer' }) })
+  } },
+  { name: 'delete unused', act: (by, at) => {
+    const l = gasSite(prop({ ...FEB, status: 'extracted' }))
+    return inv({ ...l, ...deleteDocument(l, 'feb', { by, at, mode: 'unused' }) })
+  } },
   { name: 'fleet type', act: (by, at) => {
     const diesel = (o: Partial<ExtractedProposal>) => prop({ fuelType: 'diesel', rawValue: 500, rawUnit: 'litres', value: 500, unit: 'litres', sourceQuote: '500 litres', ...o })
     // A confirmed heavy-vehicle bill for January to June, so the row exists; the choice is made on July to December's.
@@ -87,7 +106,8 @@ const ACTIONS: Action[] = [
 
 // Every action diff 1 builds or closes, and those recorded before T18. Diffs 2 and 3 extend this list.
 const EXPECTED = [
-  'confirm', 'edit figure', 'flag', 'edit dates', 'confirm dates', 'edit unit', 'edit unit after edit figure', 'reject', 'undo', 'override', 'remove override', 'fleet type',
+  'confirm', 'edit figure', 'flag', 'edit dates', 'confirm dates', 'edit unit', 'edit unit after edit figure', 'reject', 'undo', 'override', 'remove override',
+  'withdraw', 'restore', 'delete permanently', 'delete unused', 'fleet type',
 ]
 
 /** True when some object in `node` holds `at` as one value and a person with `email` as another. */
@@ -109,7 +129,7 @@ describe('T18: every review action leaves who and when in the saved workings', (
   ACTIONS.forEach((a, i) => {
     it(a.name, () => {
       const by: Who = { userId: `u-${i}`, email: `${a.name.replace(/ /g, '-')}@acme.example` }
-      const at = `2026-10-0${1 + (i % 9)}T${String(10 + i).padStart(2, '0')}:00:00.000Z`
+      const at = `2026-10-0${1 + (i % 9)}T${String(i % 24).padStart(2, '0')}:${String(i).padStart(2, '0')}:00.000Z`
       const { workings, locations_data } = saved(a.act(by, at))
       expect(holdsWhoAndWhen(workings, by.email, at), `${a.name}: who and when in the saved workings`).toBe(true)
       // The raw locations are saved too; the record is there as well as in the workings.

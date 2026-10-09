@@ -27,7 +27,7 @@ import { selectEdition, registryDateInWords, DATASETS, type DatasetId, type Froz
 // The empty-value words for every workings cell that has no value. See lib/notProvided.ts for why the
 // glyph was retired; the row's own `note` says WHY the cell is empty, this says only that it is.
 import { NOT_PROVIDED } from '../notProvided'
-import { ALL_LOCATIONS, NOT_APPLICABLE } from './workingsCells'
+import { ALL_LOCATIONS, NOT_APPLICABLE, DOCUMENT_EVENT_ROW_BASIS } from './workingsCells'
 // Type only — erased at compile, no runtime dependency and nothing added to the bundle. The engine
 // neither builds nor reads a comparability disclosure; it carries the field so the stored inventory
 // shape stays in one place. See lib/ghg/comparability.ts.
@@ -1954,6 +1954,38 @@ interface SourceDoc {
   // ONLY: it is supplied by the client, so it is not an integrity guarantee. Absent on documents uploaded before
   // T15, or when hashing failed; a missing hash never matches (findExactDuplicates).
   sha256?: string
+  // T18: withdrawn by the customer. The file and its readings stay as evidence; every reading is set to rejected,
+  // with its status before kept in its statusLog, and contributes with reason `withdrawn`. Cleared on restore.
+  withdrawn?: { at: string; by: { userId: string; email: string }; reason: string }
+}
+
+/**
+ * T18: one entry in a location's document log: a withdrawal, a restoration, or a deletion. Append-only: a save
+ * whose log lacks an entry the loaded record had is refused (lib/ghg/savePayload.ts, documentLogProblem). A
+ * deletion entry is a tombstone: the file, its type, when it was uploaded, its SHA-256 where known, who, when and
+ * why. It holds no reading and no source quote, since the point of a deletion may be that they are not kept.
+ */
+export type DocumentEvent =
+  | { kind: 'withdrawn' | 'restored'; docId: string; file: string; at: string; by: { userId: string; email: string }; reason: string }
+  | { kind: 'deleted'; docId: string; file: string; documentType: string; uploadedAt: string; sha256: string | null; at: string; by: { userId: string; email: string }; reason: string }
+  | { kind: 'deleted_unused'; docId: string; file: string; documentType: string; uploadedAt: string; sha256: string | null; at: string; by: { userId: string; email: string } }
+
+/** T18: what a deletion leaves of what was read (ruling of 9 Oct 2026, option (a)). "Earlier saved versions", not a
+ * named store, so it stays true when pinned verifier versions (T16) keep copies too. */
+export const EARLIER_VERSIONS_SENTENCE = 'Earlier saved versions of this inventory still contain what was read from it.'
+
+/**
+ * T18: one sentence per document event, the same on every surface that shows it: the evidence list, the saved
+ * workings, the verifier page and the PDF. Plain language, no em dash.
+ */
+export function documentEventSentence(e: DocumentEvent): string {
+  const when = isoDateInWords(e.at.slice(0, 10))
+  switch (e.kind) {
+    case 'withdrawn': return `${e.file} was withdrawn by ${e.by.email} on ${when}: ${e.reason}. It is kept as evidence and not counted.`
+    case 'restored': return `${e.file} was restored by ${e.by.email} on ${when}: ${e.reason}.`
+    case 'deleted': return `${e.file} was deleted by ${e.by.email} on ${when}: ${e.reason}. The file and what was read from it were removed. ${EARLIER_VERSIONS_SENTENCE}`
+    case 'deleted_unused': return `${e.file} was deleted by ${e.by.email} on ${when}. Nothing from it had been used.`
+  }
 }
 
 interface Location {
@@ -2015,6 +2047,9 @@ interface Location {
   // T10 ruling: overrides the customer removed ("Use the bills instead"), with who and when, so the history
   // stays in the record.
   manual_overrides_removed?: (ManualOverride & { removedAt: string; removedBy: { userId: string; email: string } })[]
+  // T18: every withdrawal, restoration and deletion of a document at this location, in order. Append-only; lives in
+  // locations_data (no SQL). Written by lib/ghg/documentActions.ts.
+  document_log?: DocumentEvent[]
   // ── FI9 (ruling R16): FLEET FUEL BY VEHICLE TYPE ──────────────────────────────────────────────────────
   // Light (cars, vans, utes), Heavy (trucks, buses), Non-road (forklifts, plant, machinery), each with its own petrol and
   // diesel quantity. The three ticks are saved (R16 choice 5): a type ticked with no figure yet is a real state. All
@@ -4523,8 +4558,9 @@ export const COVERAGE_MESSAGE = {
     `The ${fuel} bills for ${site} are in different units (${units.join(', ')}: ${files.join(', ')}), so none of them is counted. ${FIX_UNITS}`,
   overlap: (fileA: string, fileB: string, from: string, to: string) =>
     `${fileA} and ${fileB} cover the same days (${from} to ${to}). Choose Same bill, count it once, or Different meters or accounts.`,
-  all_rejected: (fuel: string, site: string) =>
-    `Every ${fuel} document for ${site} was rejected and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
+  // T18: a withdrawn document counts as rejected here, and the message says "rejected or withdrawn" when one is.
+  all_rejected: (fuel: string, site: string, withdrawn = false) =>
+    `Every ${fuel} document for ${site} was ${withdrawn ? 'rejected or withdrawn' : 'rejected'} and no figure has been entered. Enter the figure manually, or confirm this site used no ${fuel}.`,
   // T6 ruling. `stream` and `verb` are the declarable stream's own wording (STREAM_META).
   // T10a: a proposal confirmed with no figure (saved before confirming one was refused).
   no_value: (file: string) =>
@@ -4614,7 +4650,7 @@ export function streamSwitchOff(loc: Location, field: keyof Location | string): 
 export type PeriodOrigin = 'printed' | 'billing_month' | 'customer_confirmed' | 'delivery'
 export type ContributionReason =
   | 'counted' | 'prorated' | 'outside_year' | 'undated' | 'invalid_period' | 'not_confirmed' | 'mixed_units'
-  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override' | 'delivered'
+  | 'same_bill_as' | 'exact_duplicate_of' | 'manual_override' | 'delivered' | 'withdrawn'
 export interface BillContribution {
   docId: string
   proposalIndex: number
@@ -4648,6 +4684,8 @@ export interface BillContribution {
   periodConfirmedBy?: ExtractedProposal['periodConfirmedBy']
   /** T18: who chose the vehicle type of a fleet-fuel reading, and when (FI9). */
   fleetTypeLog?: ExtractedProposal['fleetTypeLog']
+  /** T18: set when reason is withdrawn: who withdrew the document, when and why. */
+  withdrawal?: SourceDoc['withdrawn']
   /** T10b: the delivery date, when this reading is a delivery (counted in full if inside the year). */
   deliveryDate?: string
 }
@@ -4838,7 +4876,9 @@ export function billContributions(
     const sameBillAs = excludedBy.get(`${d.id}|${p.fuelType}`)
     const exactDuplicateOf = duplicateOf.get(`${d.id}|${p.fuelType}`)
     const reason: ContributionReason =
-      p.status !== 'confirmed' ? 'not_confirmed'
+      // T18: a withdrawn document's readings are all set to rejected; the reason says why, not merely that.
+      d.withdrawn ? 'withdrawn'
+      : p.status !== 'confirmed' ? 'not_confirmed'
       // T10: the customer entered this figure by hand instead; the bill stays as evidence, not counted.
       : activeOverride(loc, map.amount) ? 'manual_override'
       : sameBillAs ? 'same_bill_as'
@@ -4879,6 +4919,7 @@ export function billContributions(
       ...(p.confirmations?.length ? { confirmations: p.confirmations } : {}),
       ...(p.periodConfirmedAt && p.periodConfirmedBy ? { periodConfirmedAt: p.periodConfirmedAt, periodConfirmedBy: p.periodConfirmedBy } : {}),
       ...(p.fleetTypeLog?.length ? { fleetTypeLog: p.fleetTypeLog } : {}),
+      ...(d.withdrawn ? { withdrawal: d.withdrawn } : {}),
     })
   }))
   return out
@@ -4916,6 +4957,7 @@ export function notCountedLines(loc: Location, allResolutions: CoverageResolutio
       case 'same_bill_as': line = `Not counted: this is the same bill as ${sameBillName(self, docOf(c.reasonRef))}, which is counted.`; break
       case 'outside_year': line = `Not counted: ${c.deliveryDate ? 'delivered' : 'billed'} outside ${yearText}.`; break
       case 'manual_override': line = 'Not counted: you entered this figure by hand instead.'; break
+      case 'withdrawn': line = c.withdrawal ? `Not counted: this document was withdrawn by ${c.withdrawal.by.email} on ${isoDateInWords(c.withdrawal.at.slice(0, 10))}.` : 'Not counted: this document was withdrawn.'; break
       case 'mixed_units': line = `Not counted until resolved: the ${FUEL_NAME[c.fuelType] ?? c.fuelType} bills for this site are in different units. ${FIX_UNITS}`; break
       case 'invalid_period': line = c.periodProblem === 'reversed'
         ? `Not counted until resolved: the billing period ends before it starts. ${FIX_REVERSED}`
@@ -5652,6 +5694,25 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       resolved_at: r.acknowledgedAt,
     })
   }
+  // ── T18: document events ─────────────────────────────────────────────────
+  // One row per entry in each location's document log: withdrawn, restored, deleted (a tombstone) and deleted
+  // unused, beside the coverage-resolution rows, so a verifier sees every upload that existed and what became of
+  // it. The sentence is the row's note (shown beside the activity on every surface); no factor applies.
+  for (const loc of locations) for (const e of loc.document_log ?? []) {
+    rows.push({
+      location: loc.name || 'Location',
+      source: `Document ${e.kind === 'deleted_unused' ? 'deleted, unused' : e.kind}: ${e.file}`,
+      scope: 0,
+      activity_data: null,
+      activity_unit: e.kind,
+      emission_factor: NOT_APPLICABLE,
+      ef_source: NOT_APPLICABLE,
+      gwp_basis: DOCUMENT_EVENT_ROW_BASIS,
+      result_tco2e: null,
+      note: documentEventSentence(e),
+      document_event: e,
+    })
+  }
   // Rows with no gas split (electricity, refrigerant, steam, market-based, T&D, coverage resolutions)
   // have no combined-factor form — their emission_factor IS already the display string. Declaration
   // rows set their own NOT_PROVIDED. Fill the rest so every row carries a display field for the table.
@@ -5791,7 +5852,7 @@ export function findUnresolvedCoverage(
     const hasFigure = (f: keyof Location) => Number((derivedHere as unknown as Record<string, unknown>)[String(f)] ?? 0) > 0
       || resolutions.some(r => r.kind === 'used_none' && r.field === String(f))
     loc.source_docs.forEach(d => {
-      if ((d.extracted?.length ?? 0) > 0) return
+      if ((d.extracted?.length ?? 0) > 0 || d.withdrawn) return
       // FI9 diff 4: an unread fleet-fuel upload names the ticked vehicle types' fields (all six when none is ticked).
       const fields = d.document_type === 'fleet_fuel' ? unreadFleetFields(loc) : DOC_TYPE_FIELDS[d.document_type] ?? []
       if (fields.length === 0 || fields.some(hasFigure)) return
@@ -5820,14 +5881,16 @@ export function findUnresolvedCoverage(
     }
 
     // All documents for a field rejected, no figure entered, no used_none.
-    const byField = new Map<string, { fuelType: string; statuses: string[] }>()
+    const byField = new Map<string, { fuelType: string; statuses: string[]; withdrawn: boolean }>()
     loc.source_docs.forEach(d => (d.extracted ?? []).forEach(p => {
       // T10a: a proposal with no figure is still a document for its field. Skipping it let a field whose only
       // bills had no figure and were rejected fall to zero with no issue (found by the property test).
       const map = fieldFor(d.document_type, p.fuelType, p.fleetType)
       if (!map) return
-      const e = byField.get(String(map.amount)) ?? { fuelType: p.fuelType, statuses: [] }
+      const e = byField.get(String(map.amount)) ?? { fuelType: p.fuelType, statuses: [], withdrawn: false }
       e.statuses.push(p.status)
+      // T18: a withdrawn document's readings are rejected, so they count as rejected here; the message says so.
+      if (d.withdrawn) e.withdrawn = true
       byField.set(String(map.amount), e)
     }))
     for (const [field, e] of byField) {
@@ -5835,7 +5898,7 @@ export function findUnresolvedCoverage(
       const entered = Number((loc as unknown as Record<string, unknown>)[field] ?? 0) > 0
       const usedNone = resolutions.some(r => r.kind === 'used_none' && r.field === field)
       if (!entered && !usedNone) out.push({ locId: loc.id, fuelType: e.fuelType, status: 'all_rejected', field,
-        message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site) })
+        message: COVERAGE_MESSAGE.all_rejected(FUEL_NAME[e.fuelType] ?? e.fuelType, site, e.withdrawn) })
     }
 
     // FI1: every line that cannot be priced blocks export, keyed (location, field), with its own message.

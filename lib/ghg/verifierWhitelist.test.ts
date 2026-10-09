@@ -142,6 +142,17 @@ describe('the verifier whitelist is coherent across its three coupled sites', ()
     expect(page).toContain('periodWords(inv.reporting_year, inv.fiscal_year_end_month).period');
   });
 
+  it('W-8 workings and locations_data are projected and named, because T18 records travel inside them', () => {
+    // T18 adds no column. Who and when on each review action ride on contributions and rows in `workings`; the
+    // document log (withdrawn, restored, deleted, deleted unused) lives in `locations_data` and is a row in
+    // `workings`. Both must reach the verifier, and a revision of either must be named in the audit trail.
+    for (const c of ['workings', 'locations_data']) {
+      expect(projection, `${c} is not projected to the verifier`).toContain(c);
+      expect(changed, `a revised ${c} would not be named in the audit trail`).toContain(c);
+      expect(labels, `${c} would render as the fallback`).toContain(c);
+    }
+  });
+
   it('W-6 the migration is ASCII-only — the 13 Aug paste failure', () => {
     // The factor_editions column migration did not paste cleanly into the Supabase SQL editor: only
     // its `alter table` ran, and the comment and grants had to be run separately. Non-ASCII in the
