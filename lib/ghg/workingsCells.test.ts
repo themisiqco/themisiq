@@ -242,10 +242,10 @@ describe('workingsWhoWhenLines', () => {
       manual_override: { reason: 'Bills estimated', at: LATER, by: sam },
       manual_overrides_removed: [{ reason: 'Wrong meter', removedAt: AT, removedBy: jo }],
     })).toEqual([
-      'Entered as 420 Mcf by jo@acme.example on 2 October 2026 (entered before sign-in).',
-      'Entered as 96 Mcf by sam@acme.example on 3 October 2026, by hand instead of from the bills: Bills estimated.',
-      'Entered by hand instead of from the bills by sam@acme.example on 3 October 2026: Bills estimated.',
-      'Hand-entered figure removed by jo@acme.example on 2 October 2026 (it had been entered because: Wrong meter).',
+      'Entered as 420 Mcf by jo@acme.example on 2 October 2026, entered before sign-in.',
+      'Entered as 96 Mcf by sam@acme.example on 3 October 2026, by hand instead of from the bills. Reason: Bills estimated.',
+      'Entered by hand by sam@acme.example on 3 October 2026, instead of from the bills. Reason: Bills estimated.',
+      'Hand entry removed by jo@acme.example on 2 October 2026, so the bills count again. Reason it had been entered by hand: Wrong meter.',
     ])
   })
   it('a row from bills: each bill\'s confirmations, corrections, date confirmation, vehicle type, status changes and withdrawal', () => {
@@ -258,13 +258,59 @@ describe('workingsWhoWhenLines', () => {
       'd1.pdf: figure and unit changed by sam@acme.example on 2 October 2026.',
       'd1.pdf: billing dates confirmed by jo@acme.example on 2 October 2026.',
       'd1.pdf: vehicle type set to non-road by jo@acme.example on 2 October 2026.',
-      'd1.pdf: Flagged for review by sam@acme.example on 2 October 2026.',
-      'd1.pdf: withdrawn by sam@acme.example on 3 October 2026: Duplicate.',
+      'd1.pdf: flagged for review by sam@acme.example on 2 October 2026.',
+      'd1.pdf: withdrawn by sam@acme.example on 3 October 2026. Reason: Duplicate.',
     ])
     for (const l of lines) expect(l).not.toContain('—')
   })
   it('a coverage resolution says who, or that nobody was recorded; a row with no record says nothing', () => {
-    expect(workingsWhoWhenLines({ resolved_by_text: 'Who: not recorded', resolved_at: AT })).toEqual(['Who: not recorded, on 2 October 2026.'])
+    expect(workingsWhoWhenLines({ resolved_by_text: 'Who: not recorded', resolved_by: null, resolved_at: AT })).toEqual(['Recorded on 2 October 2026; who made this choice was not recorded at the time.'])
+    expect(workingsWhoWhenLines({ resolved_by_text: 'Who: jo@acme.example', resolved_by: jo, resolved_at: AT })).toEqual(['Recorded by jo@acme.example on 2 October 2026.'])
     expect(workingsWhoWhenLines({})).toEqual([])
+  })
+})
+
+// ── T11: each bill's line, for every reason a bill can have ───────────────────────────────────────────────────────
+// The file name, then full sentences (T11 review): "gas-dec24.pdf: not counted. Billed outside reporting year 2025."
+import { workingsDocumentLines } from './workingsCells'
+describe('workingsDocumentLines', () => {
+  const f = (id: string) => `${id}.pdf`
+  const Y = 'reporting year 2025'
+  const CONF = [{ at: '2026-10-02T09:00:00.000Z', by: { email: 'jo@acme.example' } }]
+  const line = (c: Record<string, unknown>) => workingsDocumentLines({ contributions: [{ docId: 'a', counted: false, confirmations: [], ...c } as never] }, f, Y)[0].text
+  const NR = 'Confirmed; who and when were not recorded at the time.'
+  it('every reason a bill is not counted, as a sentence after "not counted."', () => {
+    expect(line({ reason: 'outside_year', deliveryDate: '2024-12-03' })).toBe(`a.pdf: not counted. Delivered outside reporting year 2025. ${NR}`)
+    expect(line({ reason: 'outside_year' })).toBe(`a.pdf: not counted. Billed outside reporting year 2025. ${NR}`)
+    expect(line({ reason: 'same_bill_as', reasonRef: 'b' })).toBe(`a.pdf: not counted. The same bill as b.pdf, which is counted. ${NR}`)
+    expect(line({ reason: 'exact_duplicate_of', reasonRef: 'b' })).toBe(`a.pdf: not counted. The same document as b.pdf, counted once. ${NR}`)
+    expect(line({ reason: 'manual_override' })).toBe(`a.pdf: not counted. The figure was entered by hand instead. ${NR}`)
+    expect(line({ reason: 'withdrawn' })).toBe('a.pdf: not counted. The document was withdrawn.')
+    expect(line({ reason: 'mixed_units' })).toBe(`a.pdf: not counted. The bills for this figure are in different units. ${NR}`)
+    expect(line({ reason: 'invalid_period', periodProblem: 'reversed' })).toBe(`a.pdf: not counted. Its billing period ends before it starts. ${NR}`)
+    expect(line({ reason: 'invalid_period', periodProblem: 'unparseable' })).toBe(`a.pdf: not counted. Its billing period could not be read as dates. ${NR}`)
+    expect(line({ reason: 'undated' })).toBe(`a.pdf: not counted. It has no billing period. ${NR}`)
+    expect(line({ reason: 'not_confirmed' })).toBe('a.pdf: not counted. It was not confirmed.')
+    expect(line({ reason: 'something_new' })).toBe(`a.pdf: not counted. No reason was recorded. ${NR}`)
+    for (const r of ['outside_year', 'same_bill_as', 'withdrawn', 'undated']) expect(line({ reason: r }).split(':').length, r).toBe(2)
+  })
+  it('the bill\'s confirmation is on its own line: who and when, every time it was confirmed', () => {
+    expect(line({ counted: true, reason: 'counted', confirmations: CONF })).toBe('a.pdf: counted. Confirmed by jo@acme.example on 2 October 2026.')
+    expect(line({ counted: true, reason: 'counted', confirmations: [...CONF, { at: '2026-10-05T09:00:00.000Z', by: { email: 'sam@acme.example' } }] }))
+      .toBe('a.pdf: counted. Confirmed by jo@acme.example on 2 October 2026, and again by sam@acme.example on 5 October 2026.')
+    expect(line({ counted: true, reason: 'counted' })).toBe(`a.pdf: counted. ${NR}`)
+  })
+  it('counted, prorated and delivered bills; dates confirmed by the customer; an edited figure beside the reading', () => {
+    expect(line({ counted: true, reason: 'prorated', inWindowDays: 19, totalDays: 31, share: 19 / 31, confirmations: CONF }))
+      .toBe('a.pdf: counted in part. 19 of its 31 days are in reporting year 2025, so 61.3% of the bill is counted. Confirmed by jo@acme.example on 2 October 2026.')
+    expect(line({ counted: true, reason: 'delivered', deliveryDate: '2025-03-04', confirmations: CONF })).toBe('a.pdf: counted. Delivered on 4 March 2025. Confirmed by jo@acme.example on 2 October 2026.')
+    expect(line({ counted: true, reason: 'counted', periodOrigin: 'customer_confirmed', confirmations: CONF })).toBe('a.pdf: counted. Dates confirmed by the customer. Confirmed by jo@acme.example on 2 October 2026.')
+    expect(line({ counted: true, reason: 'counted', periodOrigin: 'billing_month', confirmations: CONF })).toBe('a.pdf: counted. Dates estimated from the billing month. Confirmed by jo@acme.example on 2 October 2026.')
+    expect(line({ counted: true, reason: 'counted', value: 112, unit: 'therms', corrections: [{ fields: ['value'] }], asRead: { unit: 'therms', rawValue: 120 }, confirmations: CONF }))
+      .toBe('a.pdf: counted. Read from the bill as 120 therms; the figure used is 112 therms. Confirmed by jo@acme.example on 2 October 2026.')
+  })
+  it('counted bills are listed first, whatever order they were stored in', () => {
+    const out = workingsDocumentLines({ contributions: [{ docId: 'x', counted: false, reason: 'undated' }, { docId: 'y', counted: true, reason: 'counted' }] as never }, f, Y)
+    expect(out.map(l => l.docId)).toEqual(['y', 'x'])
   })
 })

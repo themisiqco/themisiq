@@ -6,11 +6,13 @@ import { VERIFIER_DOC_LINK_NOTICE, VERIFIER_DOC_TAB_DID_NOT_OPEN } from '../../.
 import { docTypeLabel } from '../../../lib/ghg/conciergeDocTypes'
 import { COMPARABILITY_ANSWER_WORDS, comparabilityHeading, factorEditionSurfaceLines, type ComparabilityRecord, type FactorEditionComparison } from '../../../lib/ghg/comparability'
 import type { CountryRefusal } from '../../../lib/ghg/engine'
-import { yearLabel, periodWords } from '../../../lib/ghg/engine'
+// T11: the year labels from their own module, not the engine.
+import { yearLabel, periodWords, reportingYearLabel, periodFromYearAndEnd } from '../../../lib/ghg/reportingYear'
+import { WorkingsSourceCell, type SourceCellRow } from './_components/WorkingsSourceCell'
 import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countryRefusalCopy'
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import { workingsActivityCell, workingsVintageCell, workingsEditionLines, workingsScope2MethodCell, workingsResultCell,
-  workingsFactorSourceCell, COVERAGE_ROW_BASIS, eventRowsOf } from '../../../lib/ghg/workingsCells'
+  workingsFactorSourceCell, COVERAGE_ROW_BASIS, eventRowsOf, workingsGwpBasisCell, workingsConversionFactorLine } from '../../../lib/ghg/workingsCells'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
@@ -156,7 +158,8 @@ interface InventoryData {
   // get_verifier_inventory returns to_jsonb(i) — the whole inventory row — so source_docs come down
   // with it. Declared here because the inline quote links need the path→id correlation, and taking
   // it from data already in the payload avoids asking the documents route for paths as well.
-  locations_data: { name: string; source_docs?: { id?: string; file_path?: string }[] }[]
+  // T11: and each document's file name and the quote read off each reading, so the bills behind a figure are named.
+  locations_data: { name: string; source_docs?: { id?: string; file_path?: string; file_name?: string; extracted?: { sourceQuote?: string | null }[] }[] }[]
   workings?: WorkingRow[]
   // ISO 14064-3 6.3.1.5: the verifier determines whether changes from prior periods that make the
   // periods incomparable have been disclosed. This is that disclosure. Inventory-level, so it is
@@ -729,11 +732,18 @@ export default function VerifierPage() {
   // paths as well. An unmatched path falls back to plain text — a quote a verifier can still read,
   // never a link that fails.
   const pathToDocId: Record<string, string> = {}
+  // T11: the same data names each bill behind a figure and gives the quote read off it.
+  const docById: Record<string, { file_name?: string; extracted?: { sourceQuote?: string | null }[] }> = {}
   for (const loc of inv.locations_data || []) {
     for (const d of loc.source_docs || []) {
       if (d.file_path && d.id) pathToDocId[d.file_path] = d.id
+      if (d.id) docById[d.id] = d
     }
   }
+  const fileOfDoc = (id: string) => docById[id]?.file_name || 'A document no longer on this inventory'
+  const quoteOfDoc = (id: string, pi: number | undefined) => (pi == null ? null : docById[id]?.extracted?.[pi]?.sourceQuote?.trim() || null)
+  // The reporting year in words, as every other label on this page names it.
+  const yearText = reportingYearLabel(periodFromYearAndEnd(inv.reporting_year, inv.fiscal_year_end_month ?? 12)).inText
   const frameworks = (inv.selected_frameworks || []).map(f => FRAMEWORK_NAMES[f] || f)
 
   // Scopes whose magnitude comparison was NOT made, in the order their lines would have appeared.
@@ -1057,34 +1067,11 @@ export default function VerifierPage() {
                   }}>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>{w.location}</td>
                     <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 500 }}>
-                      <span>{w.source}</span>
-                      {w.entry_method === 'concierge' && (
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-brand)', background: 'color-mix(in srgb, var(--color-brand) 8%, transparent)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced</span>
-                      )}
-                      {w.entry_method === 'concierge-prorated' && (
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Bill-sourced, prorated</span>
-                      )}
-                      {w.entry_method === 'concierge-extrapolated' && (
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, color: 'var(--color-ink-muted)', background: '#efeeec', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>Estimated</span>
-                      )}
-                      {w.source_quotes && w.source_quotes.length > 0 && (
-                        <div style={{ marginTop: 4, fontSize: 11, fontStyle: 'italic', fontWeight: 400, color: 'var(--color-ink-muted)' }}>From source: {w.source_quotes.map((q, qi) => {
-                          const p = w.source_file_paths?.[qi]
-                          const docId = p ? pathToDocId[p] : undefined
-                          return (
-                            <span key={qi}>
-                              {qi > 0 && '; '}
-                              {docId ? <SourceQuoteLink quote={q} docId={docId} token={token} /> : `"${q}"`}
-                            </span>
-                          )
-                        })}</div>
-                      )}
-                      {w.proration_note && (
-                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Prorated by billing days: {w.proration_note}</div>
-                      )}
-                      {w.extrapolation_note && (
-                        <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)' }}>Estimated — {w.extrapolation_note}</div>
-                      )}
+                      {/* T11: the figure, how it was entered, every bill behind it (counted, then not counted, each
+                          with its reason), and who did what to it and when. From the stored row only. */}
+                      <WorkingsSourceCell w={w as unknown as SourceCellRow} fileOf={fileOfDoc} quoteOf={quoteOfDoc} yearText={yearText}
+                        renderQuote={(q, docId) => docId ? <SourceQuoteLink quote={q} docId={docId} token={token} /> : `"${q}"`}
+                        legacyDocIdOfPath={p => p ? pathToDocId[p] : undefined} />
                       {/* Written for a verifier, not reused from the operator's wizard. The operator
                           is being told what to do next; a verifier is deciding what they can rely on,
                           so each line says what the row IS as evidence. The engine's own note (which
@@ -1194,6 +1181,10 @@ export default function VerifierPage() {
                       {rowNoteOf(w) && (
                         <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{rowNoteOf(w)}</div>
                       )}
+                      {/* T11 (FI2): the conversion factor the row applied, in words; never its factor key. */}
+                      {workingsConversionFactorLine(w) && (
+                        <div style={{ marginTop: 3, fontSize: 11, fontWeight: 400, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{workingsConversionFactorLine(w)}</div>
+                      )}
                     </td>
                     <td style={{ padding: '8px 10px', color: 'var(--color-ink-muted)', fontSize: 11 }}>{w.emission_factor}</td>
                     {/* WIDTH-CAPPED, WRAPPED, NEVER TRUNCATED. The longest citation on file runs to
@@ -1223,7 +1214,8 @@ export default function VerifierPage() {
                     </td>
                     <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{workingsScope2MethodCell(w)}</td>
                     <td style={{ padding: '8px 10px', color: '#555553' }}>
-                      <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{w.gwp_basis}</div>
+                      {/* T11: in words, never an engine token ("coverage_resolution", "unpriced"). */}
+                      <div style={{ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{workingsGwpBasisCell(w)}</div>
                       {w.quantification_method && (
                         <div style={{ marginTop: 3, fontSize: 10, color: 'var(--color-ink-muted)', lineHeight: 1.4 }}>{w.quantification_method}</div>
                       )}

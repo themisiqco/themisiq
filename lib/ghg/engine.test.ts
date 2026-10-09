@@ -6796,6 +6796,7 @@ import {
 } from './engine';
 import { heldSel, testSel, heldYearFor, TEST_PREPARED_ON, CAT3_EDS } from '../testing/heldSelection'
 import { selectionFor, editionFor, locationEventSentence } from './engine'
+import { addOverride as addT11Override } from './overrides'
 
 describe('FI9 diff 4: fleet-fuel documents by vehicle type', () => {
   const BY = { userId: 'u1', email: 'a@b.co' };
@@ -7293,5 +7294,40 @@ describe('T18 diff 4: the workings cells, the unsaved wording and the deleted-lo
     expect(rows[0].location_event).toEqual(withDocs);
     const two = locationEventSentence({ ...withDocs, documents: [tomb, { ...tomb, docId: 'd2', file: 'gas-feb.pdf' }] });
     expect(two).toContain('Its 2 documents were deleted with it: gas-jan.pdf, gas-feb.pdf. The files and what was read from them were removed. Earlier saved versions of this inventory still contain what was read from them.');
+  });
+});
+
+describe('T11 (problem 1): a row claims as its sources only the bills that counted', () => {
+  const BY = { userId: 'u-1', email: 'jo@acme.example' };
+  const p = (o: Partial<ExtractedProposal>) => prop({ rawValue: 100, rawUnit: 'mcf', periodStart: '2025-01-01', periodEnd: '2025-01-31', periodConfidence: 'high', sourceQuote: 'Gas used 100 MCF', ...o });
+  const site = () => {
+    const l = loc({ name: 'Site A', country: 'US', state: 'CA', grid_region: 'US_CA', has_natural_gas: true, natural_gas_unit: 'mcf', source_docs: [
+      doc('utility_bill_gas', [p({ sourceQuote: 'January: 100 MCF' })], 'gas-jan'),
+      doc('utility_bill_gas', [p({ periodStart: '2024-12-01', periodEnd: '2024-12-31', value: 90, sourceQuote: 'December 2024: 90 MCF' })], 'gas-dec24'),
+      doc('utility_bill_gas', [p({ periodStart: '2025-02-01', periodEnd: '2025-02-28', periodConfidence: 'medium', value: 80, sourceQuote: 'February: 80 MCF' })], 'gas-feb'),
+      doc('utility_bill_gas', [p({ periodStart: '2025-02-01', periodEnd: '2025-02-28', periodConfidence: 'medium', value: 80, sourceQuote: 'February copy: 80 MCF' })], 'gas-feb-copy'),
+      doc('utility_electricity', [p({ fuelType: 'electricity', rawUnit: 'kwh', unit: 'kwh', value: 5000, rawValue: 5000, periodEnd: '2025-03-31', sourceQuote: 'Q1: 5,000 kWh' })], 'elec-q1'),
+    ] });
+    return { ...l, ...addT11Override(l, { field: 'electricity_kwh', reason: 'Bill covers two tenants; our share is 40%', by: BY, at: '2026-10-03T09:00:00.000Z', startFrom: 5000 }), electricity_kwh: 2000 } as Location;
+  };
+  const res = [{ locId: 'L1', fuelType: 'natural_gas', kind: 'same_bill', countedDocId: 'gas-feb', excludedDocIds: ['gas-feb-copy'], by: BY,
+    note: 'gas-feb.pdf and gas-feb-copy.pdf are the same bill.', acknowledgedAt: '2026-10-04T09:00:00.000Z' }] as CoverageResolution[];
+  const rows = () => buildWorkings(deriveLocations({ locations: [site()], reporting_year: 2025, fiscal_year_end_month: 12, coverage_resolutions: res }), 'AR6', 2025, res, 12, { preparedOn: TEST_PREPARED_ON }) as
+    { stream?: string; scope?: number; gwp_basis?: string; source?: string; source_quotes?: string[]; source_doc_ids?: string[]; source_file_paths?: string[]; contributions?: BillContribution[] }[];
+
+  it('the gas row carries the two counted bills\' quotes, not four; the others are its contributions, with reasons', () => {
+    const gas = rows().find(r => r.stream === 'natural_gas')!;
+    expect(gas.source_quotes).toEqual(['January: 100 MCF', 'February: 80 MCF']);
+    expect(gas.source_doc_ids).toEqual(['gas-jan', 'gas-feb']);
+    expect(gas.source_file_paths).toEqual(['/gas-jan.pdf', '/gas-feb.pdf']);
+    expect(gas.contributions?.map(c => [c.docId, c.reason])).toEqual([['gas-jan', 'counted'], ['gas-dec24', 'outside_year'], ['gas-feb', 'counted'], ['gas-feb-copy', 'same_bill_as']]);
+  });
+  it('a manual override row carries no source from the bill it set aside', () => {
+    const elec = rows().find(r => r.stream === 'electricity' && r.scope === 2 && r.source?.startsWith('Electricity (US'))!;
+    expect([elec.source_quotes, elec.source_doc_ids, elec.source_file_paths]).toEqual([undefined, undefined, undefined]);
+    expect(elec.contributions?.map(c => [c.docId, c.reason])).toEqual([['elec-q1', 'manual_override']]);
+  });
+  it('the coverage row names the fuel in words', () => {
+    expect(rows().filter(r => r.gwp_basis === 'coverage_resolution').map(r => r.source)).toEqual(['Coverage resolution: natural gas']);
   });
 });

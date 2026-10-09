@@ -1,6 +1,7 @@
 import { NOT_PROVIDED } from '../notProvided'
 import { unitLabel } from './unitLabels'
 import { isoDateInWords } from './dateWords'
+import { fuelName } from './fuelNames'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONE RENDERER FOR THE WORKINGS TABLE'S ACTIVITY CELL, READ BY BOTH SURFACES.
@@ -282,7 +283,7 @@ type WhoWhenRow = {
   typed_entries?: { field: string; value: number; unit: string | null; at: string; by: WhoRec; overrideReason?: string; note?: string }[]
   manual_override?: { reason: string; at: string; by: WhoRec }
   manual_overrides_removed?: { reason: string; removedAt: string; removedBy: WhoRec }[]
-  resolved_by_text?: string; resolved_at?: string
+  resolved_by_text?: string; resolved_at?: string; resolved_by?: WhoRec | null
   reading_cleared?: { file: string; at: string; by: WhoRec }
   contributions?: {
     docId: string
@@ -295,32 +296,146 @@ type WhoWhenRow = {
   }[]
 }
 const on = (at: string) => isoDateInWords(at.slice(0, 10))
-const STATUS_WORDS: Record<string, string> = { rejected: 'Rejected', undone: 'Rejection undone', flagged: 'Flagged for review', withdrawn: 'Withdrawn', restored: 'Restored' }
+// Lower case: each follows "{file}: ".
+const STATUS_WORDS: Record<string, string> = { rejected: 'rejected', undone: 'rejection undone', flagged: 'flagged for review', withdrawn: 'withdrawn', restored: 'restored' }
 const FIELD_WORDS: Record<string, string> = { period: 'billing dates', unit: 'unit', value: 'figure' }
 
-/** Every who-and-when on a workings row, oldest first within each kind, as plain sentences. Empty when it has none. */
-export function workingsWhoWhenLines(r: WhoWhenRow, fileOf: (docId: string) => string = id => id): string[] {
+/**
+ * Every who-and-when on a workings row, oldest first within each kind, as plain sentences. Empty when it has none.
+ * T11: one pattern for every line: the action, by whom, on what date, then "Reason: ..." where there is one.
+ * `billLines`: the caller already shows each bill's confirmation on that bill's own line (workingsDocumentLines, the
+ * verifier page), so the confirmations are not repeated here.
+ */
+export function workingsWhoWhenLines(r: WhoWhenRow, fileOf: (docId: string) => string = id => id, opts: { billLines?: boolean } = {}): string[] {
   const out: string[] = []
   for (const e of r.typed_entries ?? []) {
-    out.push(`Entered as ${e.value.toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: !e.field.endsWith('_model_year') })}${e.unit ? ` ${unitLabel(e.unit)}` : ''} by ${e.by.email} on ${on(e.at)}${e.note ? ` (${e.note})` : ''}${e.overrideReason ? `, by hand instead of from the bills: ${e.overrideReason}` : ''}.`)
+    const figure = `${e.value.toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: !e.field.endsWith('_model_year') })}${e.unit ? ` ${unitLabel(e.unit)}` : ''}`
+    out.push(`Entered as ${figure} by ${e.by.email} on ${on(e.at)}${e.note ? `, ${e.note}` : ''}${e.overrideReason ? `, by hand instead of from the bills. Reason: ${e.overrideReason}` : ''}.`)
   }
-  if (r.manual_override) out.push(`Entered by hand instead of from the bills by ${r.manual_override.by.email} on ${on(r.manual_override.at)}: ${r.manual_override.reason}.`)
-  for (const o of r.manual_overrides_removed ?? []) out.push(`Hand-entered figure removed by ${o.removedBy.email} on ${on(o.removedAt)} (it had been entered because: ${o.reason}).`)
+  if (r.manual_override) out.push(`Entered by hand by ${r.manual_override.by.email} on ${on(r.manual_override.at)}, instead of from the bills. Reason: ${r.manual_override.reason}.`)
+  for (const o of r.manual_overrides_removed ?? []) out.push(`Hand entry removed by ${o.removedBy.email} on ${on(o.removedAt)}, so the bills count again. Reason it had been entered by hand: ${o.reason}.`)
   for (const c of r.contributions ?? []) {
     const file = fileOf(c.docId)
-    for (const k of c.confirmations ?? []) out.push(`${file}: confirmed by ${k.by.email} on ${on(k.at)}.`)
+    if (!opts.billLines) for (const k of c.confirmations ?? []) out.push(`${file}: confirmed by ${k.by.email} on ${on(k.at)}.`)
     for (const k of c.corrections ?? []) out.push(`${file}: ${k.fields.map(f => FIELD_WORDS[f] ?? f).join(' and ')} changed by ${k.by.email} on ${on(k.at)}.`)
     if (c.periodConfirmedAt && c.periodConfirmedBy) out.push(`${file}: billing dates confirmed by ${c.periodConfirmedBy.email} on ${on(c.periodConfirmedAt)}.`)
     for (const k of c.fleetTypeLog ?? []) out.push(`${file}: vehicle type set to ${k.to.replace('_', '-')} by ${k.by.email} on ${on(k.at)}.`)
-    for (const k of c.statusLog ?? []) out.push(`${file}: ${STATUS_WORDS[k.action] ?? k.action} by ${k.by.email} on ${on(k.at)}.`)
-    if (c.withdrawal) out.push(`${file}: withdrawn by ${c.withdrawal.by.email} on ${on(c.withdrawal.at)}: ${c.withdrawal.reason}.`)
+    // A withdrawal is said once, with its reason, from the document's record below; not again from each reading's log.
+    for (const k of c.statusLog ?? []) if (!(k.action === 'withdrawn' && c.withdrawal)) out.push(`${file}: ${STATUS_WORDS[k.action] ?? k.action} by ${k.by.email} on ${on(k.at)}.`)
+    if (c.withdrawal) out.push(`${file}: withdrawn by ${c.withdrawal.by.email} on ${on(c.withdrawal.at)}. Reason: ${c.withdrawal.reason}.`)
   }
   if (r.reading_cleared) out.push(`${r.reading_cleared.file}: unit changed by ${r.reading_cleared.by.email} on ${on(r.reading_cleared.at)}, so the figure typed for it was cleared.`)
-  if (r.resolved_by_text && r.resolved_at) out.push(`${r.resolved_by_text}, on ${on(r.resolved_at)}.`)
+  if (r.resolved_at) {
+    out.push(r.resolved_by?.email ? `Recorded by ${r.resolved_by.email} on ${on(r.resolved_at)}.`
+      : r.resolved_by_text?.startsWith('Who: ') && r.resolved_by_text !== 'Who: not recorded' ? `Recorded by ${r.resolved_by_text.slice(5)} on ${on(r.resolved_at)}.`
+      : `Recorded on ${on(r.resolved_at)}; who made this choice was not recorded at the time.`)
+  }
   return out
 }
 
 /** T18 diff 4: the saved workings rows that record a document event or a deleted location, in the order saved. */
 export function eventRowsOf<R extends { gwp_basis?: string }>(rows: readonly R[] | null | undefined): R[] {
   return (rows ?? []).filter(r => r.gwp_basis === DOCUMENT_EVENT_ROW_BASIS || r.gwp_basis === LOCATION_EVENT_ROW_BASIS)
+}
+
+// ── T11: PER FIGURE, WHICH BILLS COUNTED, WHICH DID NOT, AND WHY ────────────────────────────────────────────────────
+// Read by the verifier page from the stored workings row's `contributions` (T5), and by the PDF in T17, so the two say
+// the same thing about the same bill. Plain words a verifier reads: never a reason key, a fuel key or a factor key. No
+// em dash. Shapes are declared loosely, as above: this file imports nothing from the engine.
+type ContributionRow = {
+  docId: string; proposalIndex?: number; fuelType?: string; counted: boolean; reason: string; reasonRef?: string
+  periodProblem?: string; periodOrigin?: string | null; totalDays?: number | null; inWindowDays?: number | null; share?: number | null
+  value?: number; unit?: string | null; deliveryDate?: string
+  asRead?: { unit?: string | null; value?: number | null; rawValue?: number | null } | null
+  corrections?: { fields: string[] }[]
+  confirmations?: { at: string; by: { email: string } }[]
+}
+export type DocumentLine = { docId: string; counted: boolean; text: string }
+
+// Each reason is a full sentence after "not counted." (T11 review: the file name, then sentences, no second colon).
+const NOT_COUNTED_BECAUSE: Record<string, (c: ContributionRow, fileOf: (id: string) => string, yearText: string) => string> = {
+  outside_year: (c, _f, y) => `${c.deliveryDate ? 'Delivered' : 'Billed'} outside ${y}`,
+  same_bill_as: (c, f) => `The same bill as ${c.reasonRef ? f(c.reasonRef) : 'another bill'}, which is counted`,
+  exact_duplicate_of: (c, f) => `The same document as ${c.reasonRef ? f(c.reasonRef) : 'another document'}, counted once`,
+  manual_override: () => 'The figure was entered by hand instead',
+  withdrawn: () => 'The document was withdrawn',
+  mixed_units: () => 'The bills for this figure are in different units',
+  invalid_period: c => c.periodProblem === 'reversed' ? 'Its billing period ends before it starts' : 'Its billing period could not be read as dates',
+  undated: () => 'It has no billing period',
+  not_confirmed: () => 'It was not confirmed',
+}
+
+/**
+ * One line per bill behind a figure: the bills that counted first, then those that did not, each with its reason and
+ * how its dates were set. `fileOf` names a document from its id; `yearText` is the reporting year in words
+ * (reportingYearLabel(...).inText, "reporting year 2025" or "the year ending 31 March 2026").
+ */
+export function workingsDocumentLines(r: { contributions?: ContributionRow[] }, fileOf: (docId: string) => string, yearText: string): DocumentLine[] {
+  const lines = (r.contributions ?? []).map((c): DocumentLine => {
+    const file = fileOf(c.docId)
+    const parts: string[] = []
+    if (c.counted) {
+      if (c.reason === 'delivered' && c.deliveryDate) parts.push('counted', `Delivered on ${on(c.deliveryDate)}`)
+      else if (c.reason === 'prorated' && c.inWindowDays != null && c.totalDays) {
+        parts.push('counted in part', `${c.inWindowDays} of its ${c.totalDays} days are in ${yearText}, so ${((c.share ?? 0) * 100).toFixed(1)}% of the bill is counted`)
+      } else parts.push('counted')
+    } else {
+      const why = NOT_COUNTED_BECAUSE[c.reason]
+      parts.push('not counted', why ? why(c, fileOf, yearText) : 'No reason was recorded')
+    }
+    if (c.periodOrigin === 'billing_month') parts.push('dates estimated from the billing month')
+    if (c.periodOrigin === 'customer_confirmed') parts.push('dates confirmed by the customer')
+    // The figure as read, beside an edited figure (T18): the reading as printed on the bill.
+    if ((c.corrections ?? []).some(k => k.fields.includes('value')) && c.asRead?.rawValue != null) {
+      parts.push(`read from the bill as ${formatActivity(c.asRead.rawValue)} ${unitLabel(c.asRead.unit)}; the figure used is ${c.value != null ? formatActivity(c.value) : 'not set'} ${unitLabel(c.unit)}`)
+    }
+    // The bill's confirmation, always on its own line (T11 review): who and when, or, for a reading confirmed before
+    // who and when were recorded (T18 diff 1), that they were not. Never blank, never guessed.
+    const confirmed = c.reason !== 'not_confirmed' && c.reason !== 'withdrawn'
+    const confs = c.confirmations ?? []
+    if (confs.length > 0) parts.push(`Confirmed by ${confs.map((k, i) => `${i > 0 ? 'again by ' : ''}${k.by.email} on ${on(k.at)}`).join(', and ')}`)
+    else if (confirmed) parts.push('Confirmed; who and when were not recorded at the time')
+    // Each part after the first is its own sentence, so it starts with a capital.
+    return { docId: c.docId, counted: c.counted, text: `${file}: ${parts.map((x, i) => (i === 0 ? x : x.charAt(0).toUpperCase() + x.slice(1))).join('. ')}.` }
+  })
+  return [...lines.filter(l => l.counted), ...lines.filter(l => !l.counted)]
+}
+
+/** A stored row's Source cell: a coverage row saved before T11 named its fuel by key ("natural_gas"); said in words. */
+export function workingsSourceCell(r: { source: string; gwp_basis?: string }): string {
+  if (r.gwp_basis !== COVERAGE_ROW_BASIS) return r.source
+  return r.source.replace(/^Coverage resolution: ([a-z_]+)$/, (_m, k: string) => `Coverage resolution: ${fuelName(k)}`)
+}
+
+// The words for every gwp_basis the engine writes that is not a GWP set. A GWP set (AR4, AR5, AR6) and "as published:
+// see factor source" read as stored.
+const GWP_BASIS_WORDS: Record<string, string> = {
+  coverage_resolution: 'Not applicable: a coverage decision',
+  document_event: 'Not applicable: a document record',
+  location_event: 'Not applicable: a location record',
+  unpriced: 'Not applicable: not priced',
+  declaration: 'Not applicable: no figure',
+  excluded: 'Not applicable: location excluded',
+  all_bills_excluded: 'Not applicable: no bill counted',
+  'scope3-cat3': 'As published: see factor source',
+}
+/** The GWP basis column, in words. Never an engine token. */
+export const workingsGwpBasisCell = (r: { gwp_basis?: string | null }): string =>
+  !r.gwp_basis ? NOT_PROVIDED : GWP_BASIS_WORDS[r.gwp_basis] ?? r.gwp_basis
+
+// The unit a factor is published in, named from the last part of its key. Only the unit's label is ever printed.
+const KEY_UNIT_WORDS: Record<string, string> = {
+  litre: 'litres', litres: 'litres', gallon: 'US gallons', gallons: 'US gallons', kg: 'kg', tonne: 'tonnes', tonnes: 'tonnes',
+  m3: 'm³', mcf: 'Mcf', ccf: 'Ccf', kwh: 'kWh', gj: 'GJ', mj: 'MJ', mmbtu: 'MMBtu', therm: 'therms', therms: 'therms', scf: 'scf',
+}
+/**
+ * FI2: the conversion factor a row applied, in words: "Conversion factor: 1 US gallon = 3.785411784 litres". From
+ * conversion_factor (units the factor is published in, per unit entered). Null for a row with none. Never the key.
+ */
+export function workingsConversionFactorLine(r: { conversion_factor?: number | null; factor_key?: string | null; activity_unit?: string | null }): string | null {
+  if (r.conversion_factor == null || !Number.isFinite(r.conversion_factor)) return null
+  const n = String(Number(r.conversion_factor.toPrecision(10)))
+  const to = KEY_UNIT_WORDS[(r.factor_key ?? '').split(/[_:]/).pop()?.toLowerCase() ?? '']
+  const from = unitLabel(r.activity_unit)
+  return to ? `Conversion factor: 1 ${from.replace(/s$/, '')} = ${n} ${to}` : `Conversion factor: each ${from.replace(/s$/, '')} is ${n} of the unit the factor is published in`
 }

@@ -354,7 +354,7 @@ const SWEEP_BUDGET: Record<string, number> = {
   'app/supplier/[token]/page.tsx': 1,
   'app/survey/[token]/page.tsx': 11,
   'app/verify-cbam/[token]/page.tsx': 19,
-  'app/verify/[token]/page.tsx': 14,
+  'app/verify/[token]/page.tsx': 13,
   'lib/assurancePdf.ts': 3,
   'lib/cbam/boundaries.ts': 17,
   'lib/cbam/readiness.ts': 20,

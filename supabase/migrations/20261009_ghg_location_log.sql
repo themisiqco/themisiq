@@ -1,4 +1,4 @@
--- NOT YET RUN. Written 9 Oct 2026 for T18 diff 4; Lisa runs it in the Supabase SQL editor and records the run here.
+-- RUN 9 Oct 2026 in the Supabase SQL editor; grants verified.
 --
 -- ghg_inventories.location_log: the record each deleted location leaves (T18 section D)
 -- ---------------------------------------------------------------------------
@@ -49,8 +49,13 @@
 --   order by grantee, column_name, privilege_type;
 -- PROCEED if every role holds its privileges on every column alike, except service_role's UPDATE on free_tier (the
 -- 8 Oct 2026 result). STOP and report any other column-level grant.
+-- RESULT, 9 Oct 2026 (Lisa): every role held its privileges on all 34 columns alike, except service_role, which holds
+--   UPDATE on free_tier only (the 8 Oct 2026 result).
 -- VERIFY, after: the same query filtered to column_name = 'location_log' should show authenticated with INSERT,
 -- SELECT, UPDATE; service_role with SELECT (and REFERENCES, as on factor_selection); anon with nothing.
+-- VERIFIED, 9 Oct 2026 (Lisa), after running: all 35 columns alike for authenticated (INSERT, SELECT, UPDATE) and
+--   service_role (REFERENCES, SELECT); service_role UPDATE still on 1 column (free_tier); anon holds nothing on
+--   ghg_inventories.
 --
 -- Idempotent: ADD COLUMN IF NOT EXISTS; the comment is restated and the grants re-issued (a no-op) on every run.
 -- ASCII only, so it pastes whole into the SQL editor (lib/ghg/verifierWhitelist.test.ts W-6).

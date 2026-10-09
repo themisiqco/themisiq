@@ -42,6 +42,8 @@ import { countryRefusalText, countryNameEn } from './countryRefusalCopy'
 import { GRID_REGION_CA, GRID_REGION_US, GRID_REGION_AU, GRID_REGION_AVERAGES } from './gridRegionWords'
 import { DELIVERY_DOC_TYPES, docTypeLabel } from './conciergeDocTypes'
 import { unitLabel } from './unitLabels'
+// T11: the fuel names every coverage message uses, in their own module so the verifier helpers can read them too.
+import { FUEL_NAME, fuelName } from './fuelNames'
 // ⚠️ THE ONLY QUESTION THE ENGINE ASKS THIS MODULE IS "CAN WE NAME THIS CODE?", AND THAT IS ALSO
 // WHY IT IS THE RIGHT AUTHORITY. countryByIso2 answers over the 212-country concordance that the
 // country control is built from, so "a country this platform can express" has ONE definition and
@@ -4580,9 +4582,6 @@ export const FIELD_NAME: Record<string, string> = {
 export const listInWords = (xs: string[]): string =>
   xs.length <= 2 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
 const USED_NONE_FIELDS = new Set(Object.values(DOC_TYPE_FIELDS).flat().map(String))
-const FUEL_NAME: Record<string, string> = {
-  natural_gas: 'natural gas', propane: 'propane', diesel: 'diesel', gasoline: 'gasoline', electricity: 'electricity',
-}
 
 // The plain-language messages behind the export-blocking coverage issues (T3 ruling "no silent zero", and
 // "all documents rejected"). Shown by the strip in T8. invalid_period uses INVALID_PERIOD_MESSAGE (T1).
@@ -5073,6 +5072,9 @@ export interface AppliedField {
   docIds: string[]
   filePaths: string[]
   refs: { docId: string; pi: number }[]   // (docId, proposal index) feeding this field — for the write path's mixed-unit flip
+  /** T11: the quotes, document ids and paths of the bills that COUNTED toward `value`, the row's source_* fields. The
+   *  three lists above are every confirmed bill for the field, whether counted or not. */
+  evidence: { quotes: string[]; docIds: string[]; filePaths: string[] }
 }
 
 // The method label on a figure prorated by billing days. One string, so the figure's adjustment and the
@@ -5123,6 +5125,18 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
     // the figure — not a bill outside the year, not an undated or invalid-period bill, not a stored
     // straddle choice, not a bill excluded as the same bill as another.
     const counted = contributions.filter(c => String(c.field) === key && c.counted)
+    // T11 (problem 1): what the row claims as its evidence is the bills that counted, and only those. A bill outside the
+    // year, the same bill as another, an exact duplicate, mixed units or undated is a contribution not counted: the row
+    // lists it there, with its reason, and never as a source of the figure. (Withdrawn, not confirmed and overridden
+    // bills never reach `acc`.) a.docIds stays every confirmed bill: it is what makes the field document-backed (T5).
+    const evidence = { quotes: [] as string[], docIds: [] as string[], filePaths: [] as string[] }
+    for (const c of counted) {
+      const d = loc.source_docs.find(x => x.id === c.docId)
+      const p = d?.extracted?.[c.proposalIndex]
+      if (!d || !p) continue
+      if (p.sourceQuote) { evidence.quotes.push(p.sourceQuote); evidence.filePaths.push(d.file_path) }
+      if (!evidence.docIds.includes(d.id)) evidence.docIds.push(d.id)
+    }
     // EXTRAPOLATION gross-up applies AFTER the fold, PER METER (T3 ruling): each meter's counted sum is
     // grossed up by that meter's own acknowledged coverage. An extrapolate resolution names its meter
     // (absent or null = the default single meter).
@@ -5154,7 +5168,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
       adjustment = { kind, method, basis: parts.join('; then '), factor: a.rawSum > 0 ? value / a.rawSum : 1 }
     }
 
-    out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs }
+    out[key] = { field: a.field, unitField: a.unitField, rawSum: a.rawSum, value, unit, adjustment, mixedUnits, fuelTypes: [...a.fuelTypes], quotes: a.quotes, docIds: a.docIds, filePaths: a.filePaths, refs: a.refs, evidence }
   }
   // used_none (T3 ruling "all documents rejected"): a field confirmed as zero, with no confirmed document,
   // is written as 0, so a figure left from earlier bills cannot stand. A confirmed document outranks it.
@@ -5164,7 +5178,7 @@ export function applyResolutions(loc: Location, allResolutions: CoverageResoluti
     if (r.kind !== 'used_none' || !r.field || out[r.field] || activeOverride(loc, r.field)
       || Number((loc as unknown as Record<string, unknown>)[r.field] ?? 0) > 0) continue
     out[r.field] = { field: r.field as keyof Location, rawSum: 0, value: 0, adjustment: null, mixedUnits: false,
-      fuelTypes: [r.fuelType], quotes: [], docIds: [], filePaths: [], refs: [] }
+      fuelTypes: [r.fuelType], quotes: [], docIds: [], filePaths: [], refs: [], evidence: { quotes: [], docIds: [], filePaths: [] } }
   }
   return out
 }
@@ -5542,16 +5556,17 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
       const typed = typedOf(field, ...(fleet?.miles ? [fleet.miles] : []), ...(fleet?.modelYear ? [fleet.modelYear] : []))
       if (override) return withContrib({ entry_method: 'manual', manual_override: { reason: override.reason, at: override.at, by: override.by }, ...typed })
       if (!a || a.docIds.length === 0) return withContrib({ entry_method: 'manual', ...typed })
-      const quotes = a.quotes
+      // T11: the row's sources are the bills that counted (a.evidence); the others are in its contributions, with reasons.
+      const { quotes, docIds, filePaths } = a.evidence
       if (a.adjustment && a.adjustment.kind === 'prorate') {
-        return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+        return withContrib({ source_quotes: quotes, source_doc_ids: docIds, source_file_paths: filePaths,
           entry_method: 'concierge-prorated', proration_note: a.adjustment.basis })
       }
       if (a.adjustment) {
-        return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths,
+        return withContrib({ source_quotes: quotes, source_doc_ids: docIds, source_file_paths: filePaths,
           entry_method: 'concierge-extrapolated', extrapolation_note: `${a.adjustment.method} — ${a.adjustment.basis}` })
       }
-      return withContrib({ source_quotes: quotes, source_doc_ids: a.docIds, source_file_paths: a.filePaths, entry_method: 'concierge' })
+      return withContrib({ source_quotes: quotes, source_doc_ids: docIds, source_file_paths: filePaths, entry_method: 'concierge' })
     }
     // FI1: every combustion line, from the same list calcLocation prices. A line with a factor is a priced
     // row, as before. A line with none is ONE 'unpriced' row: its activity as entered, result null, the
@@ -5765,7 +5780,8 @@ function buildWorkings(locations: Location[], gwpVersion: GwpVersion = 'AR6', ye
     // so the audit row and the figure's provenance stamp can never claim different things.
     rows.push({
       location: ALL_LOCATIONS,
-      source: `Coverage resolution: ${r.fuelType || 'fuel'}`,
+      // T11: the fuel in words ("natural gas"), as the coverage messages name it, never its key.
+      source: `Coverage resolution: ${fuelName(r.fuelType)}`,
       scope: 0,
       activity_data: null,
       activity_unit: r.kind,
