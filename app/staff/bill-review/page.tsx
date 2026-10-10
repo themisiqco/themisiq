@@ -20,6 +20,9 @@ type Bill = { id: string; status: string; fileName: string; documentTypeLabel: s
 type SavedReading = { id: string; fuel_type: string; raw_value: number; raw_unit: string; period_start: string | null; period_end: string | null; delivery_date: string | null; source_quote: string | null; notes: string | null; supersedes: string | null; read_at: string }
 type Draft = { fuelType: string; value: string; unit: string; dates: 'period' | 'delivery'; periodStart: string; periodEnd: string; deliveryDate: string; sourceQuote: string; notes: string; supersedes: string | null }
 
+// The outbox's kinds, in words (BR7, and the staff notifications of 10 Oct 2026).
+const NOTICE_KIND_WORDS: Record<string, string> = { ready: 'Ready to confirm, to the customer', overdue: 'Running late, to the customer',
+  staff_new_batch: 'New bills, to a specialist', staff_digest: 'Morning digest, to a specialist' }
 const FUEL_WORDS: Record<string, string> = { electricity: 'Electricity', natural_gas: 'Natural gas', diesel: 'Diesel', propane: 'Propane', gasoline: 'Petrol (gasoline)' }
 const words = (d: string | null | undefined) => (d ? isoDateInWords(d.slice(0, 10)) : 'not set')
 const box = { background: '#fff', border: '0.5px solid #e8e7e4', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1rem' } as const
@@ -83,7 +86,7 @@ function QueueView({ queue, reload }: { queue: Queue; reload: () => void }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Emails not sent</div>
           {queue.failedEmails.map(e => (
             <div key={e.id} style={{ fontSize: 12, color: '#555553' }}>
-              {e.kind === 'ready' ? 'Ready to confirm' : 'Running late'} for {e.company ?? 'an inventory'}: {e.attempts} attempt{e.attempts === 1 ? '' : 's'}, last on {words(e.last_attempt_at)}. Last error: {e.last_error ?? 'not recorded'}.
+              {NOTICE_KIND_WORDS[e.kind] ?? e.kind}{e.company ? ` for ${e.company}` : ''}: {e.attempts} attempt{e.attempts === 1 ? '' : 's'}, last on {words(e.last_attempt_at)}. Last error: {e.last_error ?? 'not recorded'}.
             </div>
           ))}
         </div>

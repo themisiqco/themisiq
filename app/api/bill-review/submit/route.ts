@@ -23,6 +23,7 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 import { createServerClient } from '../../../../lib/supabase'
 import { billReviewEntitlement, checkStoredBill } from '../../../../lib/ghg/billReviewGuard'
 import { expectedBy } from '../../../../lib/billReview/businessDays'
+import { notifyStaffNewBatch } from '../../../../lib/billReview/notices'
 
 function refuse(status: number, reason: string, error: string, inventoryId: string | null): NextResponse {
   console.warn('[bill-review/submit] refused', { status, reason, inventoryId })
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
     if (insErr) return refuse(503, 'record_failed', 'The bill was not recorded for our team. Please try again.', inventoryId)
     const { data: rec, error: readErr } = await admin
       .from('bill_review_documents')
-      .select('user_id, inventory_id, source_doc_id, status, expected_by, expected_by_refusal')
+      .select('id, user_id, inventory_id, source_doc_id, status, expected_by, expected_by_refusal')
       .eq('file_path', filePath as string)
       .maybeSingle()
     if (readErr || !rec) return refuse(503, 'record_failed', 'The bill was not recorded for our team. Please try again.', inventoryId)
@@ -77,6 +78,10 @@ export async function POST(req: NextRequest) {
     if (rec.user_id !== userId || rec.inventory_id !== inventoryId || rec.source_doc_id !== sourceDocId) {
       return refuse(409, 'recorded_elsewhere', 'That stored bill is already recorded for another document.', inventoryId)
     }
+    // Staff notifications (ruled 10 Oct 2026): a bill that starts a batch emails every bill_reader, once per batch. The
+    // database decides (bill_review_enqueue_staff_new_batch); a repeat or a second bill of the batch sends nothing. An
+    // email that fails is kept in the outbox for the daily retry, and never fails the submission.
+    try { await notifyStaffNewBatch(admin, rec.id as string) } catch { console.error('[bill-review/submit] staff notice failed', { inventoryId }) }
     return NextResponse.json({ status: rec.status, expectedBy: rec.expected_by ?? null, expectedByRefusal: rec.expected_by_refusal ?? null })
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 })

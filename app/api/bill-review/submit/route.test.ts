@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   records: [] as Record<string, unknown>[],
   upserts: 0,
   upsertError: null as { message: string } | null,
+  staffNotified: [] as string[],
 }))
 
 vi.mock('../../../../lib/supabaseAuthed', () => {
@@ -57,7 +58,7 @@ vi.mock('../../../../lib/supabase', () => ({
           h.upserts++
           if (h.upsertError) return { error: h.upsertError }
           expect(opts).toEqual({ onConflict: 'file_path', ignoreDuplicates: true })
-          if (!h.records.some(r => r.file_path === row.file_path)) h.records.push({ ...row, status: 'waiting' })
+          if (!h.records.some(r => r.file_path === row.file_path)) h.records.push({ ...row, id: `rec-${h.records.length + 1}`, status: 'waiting' })
           return { error: null }
         },
         select: () => q,
@@ -69,6 +70,8 @@ vi.mock('../../../../lib/supabase', () => ({
   }),
 }))
 
+vi.mock('../../../../lib/billReview/notices', () => ({ notifyStaffNewBatch: async (_a: unknown, id: string) => { h.staffNotified.push(id); return [] } }))
+
 import { POST } from './route'
 import { buildUploadPath } from '../../../../lib/ghg/uploadPath'
 
@@ -77,7 +80,7 @@ const body = (o: Rec = {}) => ({ filePath: path(), inventoryId: INV, sourceDocId
 const call = (o: Rec = {}) => POST(new Request('http://x/api/bill-review/submit', { method: 'POST', body: JSON.stringify(body(o)) }) as never)
 
 beforeEach(() => {
-  h.reading = 'human'; h.entitled = true; h.records = []; h.upserts = 0; h.upsertError = null
+  h.reading = 'human'; h.entitled = true; h.records = []; h.upserts = 0; h.upsertError = null; h.staffNotified = []
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -91,6 +94,13 @@ describe('BR4 submit: a human-read inventory’s bill is recorded as waiting', (
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ status: 'waiting', expectedBy: '2026-10-21', expectedByRefusal: null })
     expect(h.records[0]).toMatchObject({ user_id: USER, inventory_id: INV, source_doc_id: 'doc-1', file_path: path(), expected_by: '2026-10-21', expected_by_refusal: null })
+  })
+  it('staff notifications: a recorded bill asks for the new-batch email with its record id; a refusal does not', async () => {
+    await call()
+    expect(h.staffNotified).toEqual(['rec-1'])
+    h.reading = 'ai'
+    await call({ filePath: path(), sourceDocId: 'doc-2' })
+    expect(h.staffNotified).toEqual(['rec-1'])
   })
   it('a submission for an AI-read inventory is refused: 409, nothing recorded', async () => {
     h.reading = 'ai'

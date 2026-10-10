@@ -8,7 +8,7 @@
 type Row = Record<string, unknown>
 export type FakeAdmin = ReturnType<typeof fakeAdmin>
 
-export function fakeAdmin(tables: Record<string, Row[]>, opts: { failInsertInto?: Set<string>; rpc?: (fn: string, args: Row) => { data: unknown; error: unknown } } = {}) {
+export function fakeAdmin(tables: Record<string, Row[]>, opts: { failInsertInto?: Set<string>; rpc?: (fn: string, args: Row) => { data: unknown; error: unknown }; emails?: Record<string, string> } = {}) {
   const calls: string[] = []
   const query = (table: string) => {
     const filters: ((r: Row) => boolean)[] = []
@@ -35,6 +35,7 @@ export function fakeAdmin(tables: Record<string, Row[]>, opts: { failInsertInto?
       update: (p: Row) => { mode = 'update'; patch = p; return q },
       eq: (k: string, v: unknown) => { filters.push(r => r[k] === v); return q },
       neq: (k: string, v: unknown) => { filters.push(r => r[k] !== v); return q },
+      lt: (k: string, v: number) => { filters.push(r => Number(r[k]) < v); return q },
       in: (k: string, v: unknown[]) => { filters.push(r => v.includes(r[k])); return q },
       is: (k: string, v: unknown) => { filters.push(r => (r[k] ?? null) === v); return q },
       order: (col: string, o?: { ascending?: boolean }) => { orderBy = { col, asc: o?.ascending !== false }; return q },
@@ -49,6 +50,7 @@ export function fakeAdmin(tables: Record<string, Row[]>, opts: { failInsertInto?
     tables,
     from: (table: string) => query(table),
     rpc: async (fn: string, args: Row) => { calls.push(`rpc:${fn}`); return opts.rpc ? opts.rpc(fn, args) : { data: null, error: null } },
+    auth: { admin: { getUserById: async (id: string) => ({ data: { user: opts.emails?.[id] ? { email: opts.emails[id] } : null }, error: null }) } },
     storage: { from: () => ({ createSignedUrl: async (path: string, ttl: number) => { calls.push(`sign:${path}:${ttl}`); return { data: { signedUrl: `https://signed/${path}` }, error: null } } }) },
   }
 }
