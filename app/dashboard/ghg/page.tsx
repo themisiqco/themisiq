@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, useContext, Suspense } from 'react'
 import { CONCIERGE_UNREAD_DOC_TYPES, SUPPORTED_FUELS } from '../../../lib/ghg/conciergeDocTypes'
 import { WIZARD_STEP_NAMES } from '../../../lib/ghg/wizardSteps'
 import { editRows } from '../../../lib/rowList'
@@ -49,6 +49,9 @@ import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { grantVersionLine } from '../../../lib/ghg/versionWords'
 import { buildUploadPath } from '../../../lib/ghg/uploadPath'
 import { readingOf, HUMAN_READ_NOTE, READING_UNKNOWN_NOTE, ASSISTANT_AI_NOTICE, UPLOAD_NEEDS_SAVED_INVENTORY } from '../../../lib/ghg/billReviewReading'
+import { mergeReadings, type ReadingRow } from '../../../lib/billReview/mergeReadings'
+import { withTeamFor, type BillReviewRow } from '../../../lib/billReview/billState'
+import { BillReviewContext, BillReviewDocNotes, billReviewLine, type BillReviewState } from './_components/BillReviewNote'
 import type { BillReviewReading } from '../../../lib/pricing'
 import { SB253_SCOPE3_FROM, SB253_WINDOW_STATUS_WORDS, SB253_ELECTION_BANNER, sb253FirstReportBanner } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
@@ -724,6 +727,9 @@ const searchParams = useSearchParams()
   const [billReviewReading, setBillReviewReadingState] = useState<BillReviewReading | null>(null)
   const billReviewReadingRef = useRef<BillReviewReading | null>(null)
   const setBillReviewReading = (r: BillReviewReading | null) => { billReviewReadingRef.current = r; setBillReviewReadingState(r) }
+  // BR4: the Bill Review team's records for this inventory's bills (by stored path), read on load and when the page
+  // becomes visible again, and the bills whose submission did not land (by document id), sent again on the next load.
+  const [billReview, setBillReview] = useState<BillReviewState>({ rows: {}, submitFailed: {} })
   const [uploading, setUploading] = useState(false)
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
@@ -1327,6 +1333,71 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     }))
   }
 
+  // BR4: send one bill of a human-read inventory to the Bill Review team. The route records it as waiting with its
+  // expected date (computed on the server) and never sends it to the AI. False when the request did not land.
+  const submitBill = async (accessToken: string, invId: string, loc: Location, doc: SourceDoc): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/bill-review/submit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ filePath: doc.file_path, inventoryId: invId, sourceDocId: doc.id, fileName: doc.file_name,
+          documentType: doc.document_type, locationId: loc.id, locationName: loc.name }),
+      })
+      if (!res.ok) console.error('[bill-review] submit refused', { status: res.status })
+      return res.ok
+    } catch {
+      console.error('[bill-review] submit did not complete')
+      return false
+    }
+  }
+
+  // BR4: the team's records and finished readings for this inventory, read with the customer's own client (RLS: own
+  // rows; read_by is not among the columns a customer can read). Readings merge into the bills' proposals
+  // (lib/billReview/mergeReadings.ts), which the customer confirms like an AI reading, and the merge makes the page
+  // unsaved, as an AI reading does. A bill sent while human-read with no record yet is sent again, once per refresh.
+  const refreshBillReview = async (invId: string, retry = true) => {
+    const cur = inventoryRef.current
+    const humanDocs = cur.locations.flatMap(l => l.source_docs.map(d => ({ l, d }))).filter(x => x.d.bill_review?.reading === 'human')
+    if (humanDocs.length === 0) return
+    const { data: rows, error } = await supabase.from('bill_review_documents')
+      .select('id, source_doc_id, file_path, location_id, status, expected_by, expected_by_refusal, unreadable_note, read_at')
+      .eq('inventory_id', invId)
+    if (error || !rows) { console.error('[bill-review] records could not be read'); return }
+    const readIds = rows.filter(r => r.status === 'read').map(r => r.id)
+    let readings: ReadingRow[] = []
+    if (readIds.length > 0) {
+      const res = await supabase.from('bill_review_readings')
+        .select('id, bill_review_document_id, fuel_type, raw_value, raw_unit, period_start, period_end, delivery_date, source_quote, notes, supersedes, read_at')
+        .in('bill_review_document_id', readIds)
+      if (res.error || !res.data) { console.error('[bill-review] readings could not be read'); return }
+      readings = res.data as ReadingRow[]
+    }
+    const byPath = Object.fromEntries((rows as BillReviewRow[]).map(r => [r.file_path, r]))
+    const now = inventoryRef.current
+    const merged = mergeReadings(now.locations, rows as BillReviewRow[], readings)
+    if (merged.changed) { const next = { ...now, locations: merged.locations }; inventoryRef.current = next; setInventory(next) }
+    const missing = humanDocs.filter(x => !byPath[x.d.file_path] && !x.d.withdrawn)
+    const failed: Record<string, true> = {}
+    if (retry && missing.length > 0) {
+      const { data: { session } } = await supabase.auth.getSession()
+      for (const x of missing) if (!session || !(await submitBill(session.access_token, invId, x.l, x.d))) failed[x.d.id] = true
+      setBillReview({ rows: byPath, submitFailed: failed })
+      if (Object.keys(failed).length < missing.length) return refreshBillReview(invId, false)
+      return
+    }
+    setBillReview(prev => ({ rows: byPath, submitFailed: retry ? failed : prev.submitFailed }))
+  }
+  // Through a ref, so the two effects below run on the inventory id alone and always call the current function.
+  const refreshBillReviewRef = useRef(refreshBillReview)
+  refreshBillReviewRef.current = refreshBillReview
+  useEffect(() => { if (inventoryId) refreshBillReviewRef.current(inventoryId) }, [inventoryId])
+  useEffect(() => {
+    if (!inventoryId) return
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshBillReviewRef.current(inventoryId) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [inventoryId])
+
   const handleFileUpload = async (files: FileList, locIdx: number, docType: string) => {
     if (!files.length) return
     setUploading(true)
@@ -1353,6 +1424,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     }
     // As the database last said; null (unknown) sends nothing to the AI.
     const reading = billReviewReadingRef.current
+    // BR4: bills of a human-read inventory, sent to the team and saved together after the loop.
+    const humanDocs: SourceDoc[] = []
     for (const file of Array.from(files)) {
       const path = buildUploadPath(session.user.id, invId, inventory.reporting_year, inventory.locations[locIdx].name, Date.now(), file.name)
       // T15 (rule R6): the file's SHA-256, for duplicate detection only (client-supplied, not an integrity
@@ -1379,6 +1452,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           // The route refuses both too (409, 503); this keeps the page from asking.
           doc.read_outcome = 'not_read'
           doc.read_note = reading === 'human' ? HUMAN_READ_NOTE : READING_UNKNOWN_NOTE
+          if (reading === 'human') doc.bill_review = { reading: 'human' }
         } else if (CONCIERGE_DEV && !CONCIERGE_READABLE_MEDIA.has(file.type)) {
           // (a) A file the reader cannot open — a spreadsheet or CSV. Keeping it is the point: it is
           // still the evidence behind whatever figure gets typed in. Say so rather than attempting a
@@ -1465,6 +1539,8 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           }
         }
 
+        // BR4: a human-read bill is appended with the others after the loop, then sent and saved.
+        if (doc.bill_review?.reading === 'human') { humanDocs.push(doc); continue }
         // Store the doc (with any proposals) in one functional update — avoids stale-closure append bug on multi-file upload.
         setInventory(inv => {
           const locs = [...inv.locations]
@@ -1472,6 +1548,22 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
           return { ...inv, locations: locs }
         })
       }
+    }
+    if (humanDocs.length > 0) {
+      // BR4 (ruling 3): A HUMAN-READ UPLOAD IS SAVED AT ONCE, so the bill is on the saved inventory the team reads it
+      // against (BR8) and the read-back finds it. The next inventory is built here and put in the ref first, so the
+      // save writes these documents (handleSave reads inventoryRef.current).
+      const cur = inventoryRef.current
+      const locs = [...cur.locations]
+      locs[locIdx] = { ...locs[locIdx], source_docs: [...locs[locIdx].source_docs, ...humanDocs] }
+      const next = { ...cur, locations: locs }
+      inventoryRef.current = next
+      setInventory(next)
+      const failed: Record<string, true> = {}
+      for (const d of humanDocs) if (!(await submitBill(session.access_token, invId, locs[locIdx], d))) failed[d.id] = true
+      setBillReview(prev => ({ ...prev, submitFailed: { ...prev.submitFailed, ...failed } }))
+      await handleSave()
+      await refreshBillReview(invId, false)
     }
     setUploading(false)
   }
@@ -2781,7 +2873,7 @@ workings: saved.workings,
                     ))}
                   </div>
                   <Field label={`Total natural gas: ${yl.heading} (${unitLabel(loc.natural_gas_unit)})`} hint={`Sum of the bills covering ${windowWords.period}`}>
-                    <FigureInput loc={loc} field="natural_gas_amount" onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
+                    <FigureInput loc={loc} field="natural_gas_amount" withTeam={withTeamFor(loc, 'natural_gas_amount', billReview.rows)} onChange={v => updateLocation(activeLocation, 'natural_gas_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'natural_gas_amount', r)} onUseBills={() => switchToBills(activeLocation, 'natural_gas_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'natural_gas_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'natural_gas_amount')} />
                     {validateNaturalGas(loc.natural_gas_amount, loc.natural_gas_unit) && (
@@ -2814,7 +2906,7 @@ workings: saved.workings,
                     ))}
                   </div>
                   <Field label={`Total propane purchased: ${yl.heading} (${unitLabel(loc.propane_unit)})`}>
-                    <FigureInput loc={loc} field="propane_amount" onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
+                    <FigureInput loc={loc} field="propane_amount" withTeam={withTeamFor(loc, 'propane_amount', billReview.rows)} onChange={v => updateLocation(activeLocation, 'propane_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'propane_amount', r)} onUseBills={() => switchToBills(activeLocation, 'propane_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'propane_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'propane_amount')} />
                   </Field>
@@ -2831,7 +2923,7 @@ workings: saved.workings,
                     ))}
                   </div>
                   <Field label={`Total diesel in stationary equipment: ${yl.heading}`}>
-                    <FigureInput loc={loc} field="diesel_stationary_amount" onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
+                    <FigureInput loc={loc} field="diesel_stationary_amount" withTeam={withTeamFor(loc, 'diesel_stationary_amount', billReview.rows)} onChange={v => updateLocation(activeLocation, 'diesel_stationary_amount', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'diesel_stationary_amount', r)} onUseBills={() => switchToBills(activeLocation, 'diesel_stationary_amount')} style={inputStyle} />
                     <UnpricedNote line={unpricedFor(loc.id, 'diesel_stationary_amount')} />
                     <UnitChangeNote change={convertedUnitChange(loc, 'diesel_stationary_amount')} />
                   </Field>
@@ -2905,7 +2997,7 @@ workings: saved.workings,
                       const held = String((loc as unknown as Record<string, unknown>)[unit] ?? 'gallons')
                       return (<>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <FigureInput loc={loc} field={amount} onChange={v => updateLocation(activeLocation, amount, v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, amount, r)} onUseBills={() => switchToBills(activeLocation, amount)} style={{ ...inputStyle, flex: 1 }} />
+                          <FigureInput loc={loc} field={amount} withTeam={withTeamFor(loc, amount, billReview.rows)} onChange={v => updateLocation(activeLocation, amount, v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, amount, r)} onUseBills={() => switchToBills(activeLocation, amount)} style={{ ...inputStyle, flex: 1 }} />
                           <select value={held} disabled={locked} onChange={e => changeFieldUnit(activeLocation, unit as UnitFieldName, e.target.value)} style={{ ...inputStyle, width: 130 }}>
                             {unitOptionsShowing(liquidUnitOptions(loc.country), held, locked).map(([val, label]) => (
                               <option key={val} value={val}>{label}</option>
@@ -2946,7 +3038,7 @@ workings: saved.workings,
               <p style={qHint}>Check your electricity utility bills: kWh is always shown.</p>
               <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 14 }}>
                 <Field label={`Total electricity: ${yl.heading} (kWh)`} hint={`Sum of the bills covering ${windowWords.period}`}>
-                  <FigureInput loc={loc} field="electricity_kwh" onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
+                  <FigureInput loc={loc} field="electricity_kwh" withTeam={withTeamFor(loc, 'electricity_kwh', billReview.rows)} onChange={v => updateLocation(activeLocation, 'electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(activeLocation, 'electricity_kwh', r)} onUseBills={() => switchToBills(activeLocation, 'electricity_kwh')} style={inputStyle} />
                 </Field>
                 {validateElectricity(loc.electricity_kwh) && (
                   <div style={{ background: "#FEF3E2", border: "0.5px solid #fde68a", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e", marginTop: 6 }}>
@@ -3223,7 +3315,7 @@ workings: saved.workings,
               {derivedLocations.map((loc, i) => (
                 <div key={loc.id} style={{ marginBottom: 14 }}>
                   <Field label={`${loc.name}: Renewable electricity (kWh)`} hint="Enter kWh covered by PPAs, RECs, or green tariffs. Leave 0 if none.">
-                    <FigureInput loc={loc} field="renewable_electricity_kwh" onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(i, 'renewable_electricity_kwh', r)} onUseBills={() => switchToBills(i, 'renewable_electricity_kwh')} style={inputStyle} />
+                    <FigureInput loc={loc} field="renewable_electricity_kwh" withTeam={withTeamFor(loc, 'renewable_electricity_kwh', billReview.rows)} onChange={v => updateLocation(i, 'renewable_electricity_kwh', v)} by={currentUser} onOverride={r => overrideFigure(i, 'renewable_electricity_kwh', r)} onUseBills={() => switchToBills(i, 'renewable_electricity_kwh')} style={inputStyle} />
                   </Field>
                   {isPaid ? <DocUpload uploadsOff={ghgAccess === 'active' ? undefined : UPLOADS_OFF_EXPIRED} label={`Upload RECs / PPAs: ${loc.name}`} locIdx={i} location={inventory.locations[i]} docType="renewable_cert" docs={loc.source_docs.filter(d => d.document_type === 'renewable_cert')} onUpload={handleFileUpload} onDocumentAction={documentAction} removingDocIds={removing} onUpdateProposal={updateProposal} onAddCoverageResolution={addCoverageResolution} onRemoveCoverageResolution={removeCoverageResolution} onLabelMeter={labelMeter} onEnterManually={enterManually} currentUser={currentUser} uploading={uploading} reportingYear={inventory.reporting_year} fiscalYearEndMonth={inventory.fiscal_year_end_month} locId={loc.id} coverageResolutions={inventory.coverage_resolutions ?? []}  uploadError={uploadErrors[`${i}:renewable_cert`]} /> : <LockedDocUpload label={`Upload RECs / PPAs: ${loc.name}`} />}
                 </div>
@@ -4054,6 +4146,7 @@ workings: saved.workings,
   if (wall) return <GhgEntryWall access={wall} />
 
   return (
+    <BillReviewContext.Provider value={billReview}>
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', background: '#f8f7f5', minHeight: '100vh' }}>
       {/* ⚠️ IT WRAPS, IT DOES NOT CLIP (free-calc-cta, Oct 2026). This bar was one fixed 56px row with 2rem side
           padding, and at phone width the framework chip, "View trends" and Save did not fit: measured at 375px
@@ -4262,6 +4355,7 @@ workings: saved.workings,
       </div>
       <GHGBot currentStep={step} aiNotice={billReviewReading === 'human'} />
     </div>
+    </BillReviewContext.Provider>
   )
 }
 
@@ -4315,6 +4409,7 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onDocum
   const [unitEditing, setUnitEditing] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const hasConcierge = useHasConcierge()   // concierge tier held → auto-extraction; else manual entry
+  const billReview = useContext(BillReviewContext)   // BR4: the team's records, from the page
   // Reads the SAME set the upload handler skips on, so the drop zone can never promise a reading
   // that will not happen. Three states, not two: no concierge; concierge on a type it reads;
   // concierge on a type it does not.
@@ -4409,10 +4504,12 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onDocum
               declining to guess is the system working, and colouring it as a fault would push a
               customer to re-upload a file that will rightly abstain again. */}
           {/* T10 ruling: an upload with nothing read from it is evidence when its fuel already has a figure. */}
-          {(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id) && (
+          {/* BR4: a bill with the Bill Review team says so, with its expected date, and any held correction. */}
+          <BillReviewDocNotes doc={doc} />
+          {(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id) && !billReviewLine(doc, billReview) && (
             <div style={{ marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5, color: '#555553' }}>Uploaded as evidence. No figure was read from it.</div>
           )}
-          {doc.read_note && (
+          {doc.read_note && !billReviewLine(doc, billReview) && (
             <div style={{
               marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5,
               color: doc.read_outcome === 'failed' ? 'var(--color-state-warn)' : '#555553',

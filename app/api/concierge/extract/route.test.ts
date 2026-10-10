@@ -11,8 +11,14 @@ const INV = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const INV2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
 const h = vi.hoisted(() => ({
-  inventories: {} as Record<string, { id: string; bill_review_reading: unknown }>,
+  inventories: {} as Record<string, { id: string; bill_review_reading: unknown; bill_review_reading_set_at?: string | null }>,
   invError: null as { message: string } | null,
+  // BR4: submission records by file_path, and each stored object's creation time.
+  submitted: new Set<string>(),
+  subError: null as { message: string } | null,
+  created: {} as Record<string, string | undefined>,
+  listError: null as { message: string } | null,
+  lists: 0,
   download: vi.fn(async () => ({ data: new Blob([new Uint8Array([37, 80, 68, 70])], { type: 'application/pdf' }), error: null })),
 }))
 
@@ -40,9 +46,29 @@ vi.mock('../../../../lib/supabaseAuthed', () => {
             }
             return c
           }
+          if (table === 'bill_review_documents') {
+            let fp = ''
+            const c = {
+              select: () => c,
+              eq: (_k: string, v: string) => { fp = v; return c },
+              limit: async () => ({ data: h.subError ? null : (h.submitted.has(fp) ? [{ id: 'sub-1' }] : []), error: h.subError }),
+            }
+            return c
+          }
           throw new Error(`unexpected table ${table}`)
         },
-        storage: { from: (bucket: string) => { if (bucket !== 'source-documents') throw new Error(bucket); return { download: h.download } } },
+        storage: { from: (bucket: string) => {
+          if (bucket !== 'source-documents') throw new Error(bucket)
+          return {
+            download: h.download,
+            list: async (dir: string, opts: { search: string }) => {
+              h.lists++
+              if (h.listError) return { data: null, error: h.listError }
+              const full = `${dir}/${opts.search}`
+              return { data: h.created[full] === undefined ? [] : [{ name: opts.search, created_at: h.created[full] }], error: null }
+            },
+          }
+        } },
       },
     }),
   }
@@ -67,6 +93,7 @@ const nothingSent = () => { expect(h.download).not.toHaveBeenCalled(); expect(mo
 beforeEach(() => {
   h.inventories = { [INV]: { id: INV, bill_review_reading: 'ai' }, [INV2]: { id: INV2, bill_review_reading: 'ai' } }
   h.invError = null
+  h.submitted = new Set(); h.subError = null; h.created = {}; h.listError = null; h.lists = 0
   h.download.mockClear()
   model.mockClear()
   vi.stubGlobal('fetch', model)
@@ -163,18 +190,74 @@ describe('BR2: a parse failure logs and returns metadata only', () => {
   })
 })
 
-// THE PROPERTY. For every (reading at upload, reading asked for now), mirror what the database allows (the trigger in
-// 20261011_bill_review_reading.sql refuses human to ai, so the inventory stays human), then ask the route. A bill
-// uploaded while the inventory was human-read is never extracted. lib/ghg/br1Sql.test.ts pins the trigger rule this mirrors.
-const stored = (atUpload: 'ai' | 'human', now: 'ai' | 'human') => (atUpload === 'human' && now === 'ai' ? 'human' : now)
-describe('BR2 property: a bill uploaded under human reading is never extracted', () => {
-  for (const atUpload of ['ai', 'human'] as const) for (const now of ['ai', 'human'] as const) {
-    it(`uploaded ${atUpload}, now ${now}`, async () => {
-      h.inventories[INV].bill_review_reading = stored(atUpload, now)
+describe('BR4: a bill sent to the team never reaches the AI, even after a switch to AI', () => {
+  const SWITCHED = '2026-10-20T12:00:00Z'
+  it('(a) a bill with a submission record: 409, nothing fetched, the model not called', async () => {
+    h.submitted.add(path())
+    const res = await call({ filePath: path(), inventoryId: INV })
+    expect(res.status).toBe(409)
+    expect((await res.json()).reason).toBe('submitted_for_human_reading')
+    nothingSent()
+  })
+  it('(a) after a switch to AI, a submitted bill is still refused', async () => {
+    h.inventories[INV].bill_review_reading_set_at = SWITCHED
+    h.created[path()] = '2026-10-21T09:00:00Z'   // even one stored after the switch
+    h.submitted.add(path())
+    expect((await call({ filePath: path(), inventoryId: INV })).status).toBe(409)
+    nothingSent()
+  })
+  it('(b) a bill stored before the switch, with no submission record: 409', async () => {
+    h.inventories[INV].bill_review_reading_set_at = SWITCHED
+    h.created[path()] = '2026-10-19T09:00:00Z'
+    const res = await call({ filePath: path(), inventoryId: INV })
+    expect(res.status).toBe(409)
+    expect((await res.json()).reason).toBe('uploaded_before_switch')
+    nothingSent()
+  })
+  it('(b) a bill stored after the switch proceeds', async () => {
+    h.inventories[INV].bill_review_reading_set_at = SWITCHED
+    h.created[path()] = '2026-10-21T09:00:00Z'
+    expect((await call({ filePath: path(), inventoryId: INV })).status).toBe(200)
+    expect(model).toHaveBeenCalledTimes(1)
+  })
+  it('(b) the creation time cannot be read: 503, fails closed, nothing fetched, the model not called', async () => {
+    h.inventories[INV].bill_review_reading_set_at = SWITCHED
+    h.listError = { message: 'storage down' }
+    const res = await call({ filePath: path(), inventoryId: INV })
+    expect(res.status).toBe(503)
+    expect((await res.json()).reason).toBe('upload_time_unknown')
+    nothingSent()
+    h.listError = null   // and an object storage does not list
+    expect((await call({ filePath: path(), inventoryId: INV })).status).toBe(503)
+    nothingSent()
+  })
+  it('(b) is not consulted for an inventory whose reading never changed', async () => {
+    await call({ filePath: path(), inventoryId: INV })
+    expect(h.lists).toBe(0)
+  })
+  it('the submission record cannot be read: 503, fails closed', async () => {
+    h.subError = { message: 'boom' }
+    expect((await call({ filePath: path(), inventoryId: INV })).status).toBe(503)
+    nothingSent()
+  })
+})
+
+// THE PROPERTY, as BR4 leaves it. For every (reading at upload, reading now), and whether the submission landed: a bill
+// uploaded while the inventory was human-read is recorded (the page submits it) and stored before any later switch;
+// the route refuses it either way. A change of reading after the upload stamps bill_review_reading_set_at after it.
+describe('BR4 property: a bill uploaded under human reading is never extracted, whatever the reading now', () => {
+  const UPLOADED = '2026-10-19T09:00:00Z', CHANGED = '2026-10-20T12:00:00Z'
+  for (const atUpload of ['ai', 'human'] as const) for (const now of ['ai', 'human'] as const) for (const landed of [true, false]) {
+    if (atUpload === 'ai' && !landed) continue   // an AI-read upload is never submitted
+    it(`uploaded ${atUpload}, now ${now}${atUpload === 'human' ? (landed ? ', submission recorded' : ', submission lost') : ''}`, async () => {
+      h.inventories[INV].bill_review_reading = now
+      h.inventories[INV].bill_review_reading_set_at = now !== atUpload ? CHANGED : null
+      h.created[path()] = UPLOADED
+      if (atUpload === 'human' && landed) h.submitted.add(path())
       const res = await call({ filePath: path(), inventoryId: INV })
       const extracted = res.status === 200
       if (atUpload === 'human') { expect(extracted).toBe(false); nothingSent() }
-      expect(extracted).toBe(stored(atUpload, now) === 'ai')
+      expect(extracted).toBe(atUpload === 'ai' && now === 'ai')
     })
   }
 })

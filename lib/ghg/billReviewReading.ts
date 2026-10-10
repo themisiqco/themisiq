@@ -15,8 +15,13 @@ export const HUMAN_READ_REFUSAL = 'This inventory’s bills are read by a Themis
 /** The extract route's refusal for a path stored before BR2, with no inventory in it (400). */
 export const OLD_PATH_REFUSAL = 'Save the inventory, then upload the bill again.'
 
-/** The note on a bill uploaded to a human-read inventory. Nothing reads it yet (BR4 and BR8 build the queue). */
-export const HUMAN_READ_NOTE = 'Kept for a ThemisIQ specialist to read. It is not sent to the AI. Until it is read, type the figure into the box above.'
+/**
+ * The note stored on a bill uploaded to a human-read inventory. Since BR4 the page shows the team's own line in its
+ * place ("With our team, expected by ...", lib/billReview/waitingWords.ts) once the record is read; this is what the
+ * bill says until then. A figure waiting on the bill offers "Enter the figure myself instead" (Q12), so this note no
+ * longer tells the customer to type it.
+ */
+export const HUMAN_READ_NOTE = 'Kept for a ThemisIQ specialist to read. It is not sent to the AI.'
 /** The note on a bill whose inventory's reading could not be confirmed: not sent, and said so. */
 export const READING_UNKNOWN_NOTE = 'We couldn’t confirm how this inventory’s bills are read, so this one was not read. Type the figure into the box above.'
 

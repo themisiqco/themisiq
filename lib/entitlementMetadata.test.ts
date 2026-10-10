@@ -214,7 +214,9 @@ describe('Concierge route guards', () => {
 // ── Batch 3: the columns, the guard, and the two term checks ─────────────────
 const MIGRATION = 'supabase/migrations/20260928_concierge_source_model.sql'
 const HOOKS = 'lib/useEntitlement.ts'
-const EXTRACT = 'app/api/concierge/extract/route.ts'
+// BR4 (10 Oct 2026): the server's read moved from the extract route into lib/ghg/billReviewGuard.ts
+// (billReviewEntitlement), shared by the extract and submit routes. M33 holds both routes to it.
+const EXTRACT = 'lib/ghg/billReviewGuard.ts'
 
 /**
  * The tier keys the live ghg_tier CHECK permits, read from whichever migration last defines it.
@@ -338,6 +340,14 @@ describe('Concierge access checks respect the term', () => {
       const src = read(rel)
       expect(src, `${rel} must read the shared list`).toContain('CONCIERGE_ENTITLEMENT_KEYS')
       expect(src, `${rel} must not inline the old keys`).not.toContain("'concierge-basic', 'concierge-standard'")
+    }
+  })
+
+  it('M33 both Bill Review routes read the plan through the shared check, and neither queries entitlements itself', () => {
+    for (const rel of ['app/api/concierge/extract/route.ts', 'app/api/bill-review/submit/route.ts']) {
+      const src = read(rel)
+      expect(src, rel).toContain('await billReviewEntitlement(supabase)')
+      expect(src, rel).not.toContain(".from('entitlements')")
     }
   })
 

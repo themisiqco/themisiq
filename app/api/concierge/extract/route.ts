@@ -21,8 +21,10 @@
 //        or its reading is anything but 'ai';
 //   503  the reading could not be read. Fails closed: no read, no extraction.
 // Every refusal is logged with metadata only (the status, the reason, the inventory id), never the path or the file.
-// A switch from human to AI is refused by the database until BR4 (20261011_bill_review_reading.sql), so "human now"
-// covers every bill uploaded while the inventory was human-read.
+// BR4: the checks above live in lib/ghg/billReviewGuard.ts, shared with /api/bill-review/submit. Since BR4 a switch
+// from human to AI is allowed (20261014_bill_review_reading_switch.sql), so two more refusals (409), also before the
+// fetch and the model: (a) a bill with a submission record; (b) a bill stored before the inventory's last reading
+// change. If either cannot be checked, 503 (fails closed).
 // ⚠️ THE BROWSER CHOOSES THE INVENTORY SEGMENT of the path (lib/ghg/uploadPath.ts). This route proves the caller owns
 // the path and the inventory; it cannot prove which of the caller's inventories a bill belongs to. Accepted (BR2
 // ruling), register BR-01.
@@ -40,9 +42,18 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 // From the shared lib, NOT declared here: the wizard needs the same list, and it cannot import from
 // this module without pulling `next/server` into the client bundle. See lib/ghg/conciergeDocTypes.ts.
 import { SUPPORTED_FUELS, type FuelType } from '../../../../lib/ghg/conciergeDocTypes'
-import { CONCIERGE_ENTITLEMENT_KEYS } from '../../../../lib/pricing'
-import { parseUploadPath } from '../../../../lib/ghg/uploadPath'
-import { HUMAN_READ_REFUSAL, OLD_PATH_REFUSAL } from '../../../../lib/ghg/billReviewReading'
+import { HUMAN_READ_REFUSAL } from '../../../../lib/ghg/billReviewReading'
+import { billReviewEntitlement, checkStoredBill } from '../../../../lib/ghg/billReviewGuard'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/** BR4 (b): when the stored object was created, from storage itself (never the file name's timestamp). Null if unreadable. */
+async function storedAt(supabase: SupabaseClient, filePath: string): Promise<string | null> {
+  const i = filePath.lastIndexOf('/')
+  const { data, error } = await supabase.storage.from('source-documents').list(filePath.slice(0, i), { search: filePath.slice(i + 1), limit: 100 })
+  if (error || !Array.isArray(data)) return null
+  const hit = data.find(o => o.name === filePath.slice(i + 1))
+  return hit && typeof hit.created_at === 'string' && !Number.isNaN(Date.parse(hit.created_at)) ? hit.created_at : null
+}
 
 /** BR2: a refusal, logged with metadata only. */
 function refuse(status: number, reason: string, error: string, inventoryId: string | null): NextResponse {
@@ -123,28 +134,20 @@ export async function POST(req: NextRequest) {
     //
     // No user_id filter: RLS scopes the read to the caller's own rows, exactly as the client's
     // useHasConcierge() does. FAILS CLOSED — a fault here must not hand out extraction.
-    const { data: conciergeRows, error: entErr } = await supabase
-      .from('entitlements')
-      .select('module_key')
-      .in('module_key', CONCIERGE_ENTITLEMENT_KEYS)
-      // ⚠️ TERM-AWARE SINCE 28 Sep 2026, AND IT WAS NOT BEFORE. This returned true for an
-      // EXPIRED Concierge row, so a customer whose term had ended kept bill extraction
-      // indefinitely: no error, no symptom, just access that outlived the payment. The GHG check
-      // has always compared term_end. This one simply never did.
-      // Same comparison enforce_ghg_location_allowance() makes in Postgres, and the same one the
-      // server route makes in app/api/concierge/extract/route.ts.
-      // ⚠️ NOT THE SAME QUESTION AS isFirstConciergePurchase, which is deliberately NOT term-aware:
-      // an expired customer has no access, but has still been billed for onboarding once.
-      .gt('term_end', new Date().toISOString())
-      .limit(1)
-    if (entErr) {
-      console.error('[concierge/extract] entitlement read failed (denying):', entErr.message)
+    //
+    // ⚠️ TERM-AWARE SINCE 28 Sep 2026, AND IT WAS NOT BEFORE. This returned true for an EXPIRED Concierge row, so a
+    // customer whose term had ended kept bill extraction indefinitely. ⚠️ NOT THE SAME QUESTION AS
+    // isFirstConciergePurchase, which is deliberately NOT term-aware.
+    // BR4: the read is billReviewEntitlement (lib/ghg/billReviewGuard.ts), shared with /api/bill-review/submit.
+    const entitlement = await billReviewEntitlement(supabase)
+    if (entitlement === 'error') {
+      console.error('[concierge/extract] entitlement read failed (denying)')
       return NextResponse.json(
         { error: 'We couldn’t confirm your plan just now. Please try again in a moment.' },
         { status: 503 },
       )
     }
-    if (!conciergeRows || conciergeRows.length === 0) {
+    if (entitlement === 'none') {
       return NextResponse.json(
         { error: 'Reading figures off a document is part of Bill Review. Your upload is still kept as evidence: type the figure into the box above.' },
         { status: 403 },
@@ -169,27 +172,33 @@ export async function POST(req: NextRequest) {
     // ── BR2: the guarantee, before the file is fetched or the model is called ──
     // The base64 fallback is gone: a document in the body would skip every check below.
     if (body.document !== undefined) return refuse(400, 'document_in_body', 'Documents are read from storage only.', inventoryId)
-    if (!filePath) return refuse(400, 'no_file_path', 'filePath is required.', inventoryId)
-    if (!inventoryId) return refuse(400, 'no_inventory_id', 'inventoryId is required.', null)
-    const named = parseUploadPath(filePath)
-    if (!named) return refuse(400, 'old_format_path', OLD_PATH_REFUSAL, inventoryId)
-    if (named.userId !== userId) return refuse(403, 'path_other_user', 'That document is not yours.', inventoryId)
-    if (named.inventoryId !== inventoryId) return refuse(403, 'path_other_inventory', 'That document belongs to another inventory.', inventoryId)
-    // Through the caller's own client: RLS returns only their own rows, so another user's inventory reads as none.
-    const { data: inv, error: invErr } = await supabase
-      .from('ghg_inventories')
-      .select('id, bill_review_reading')
-      .eq('id', inventoryId)
-      .maybeSingle()
-    if (invErr) return refuse(503, 'reading_unknown', 'We couldn\u2019t confirm how this inventory\u2019s bills are read, so this one was not read.', inventoryId)
-    if (!inv) return refuse(403, 'inventory_not_found', 'That inventory is not yours.', inventoryId)
-    if (inv.bill_review_reading !== 'ai') return refuse(409, 'human_read', HUMAN_READ_REFUSAL, inventoryId)
+    // The path, the caller, the inventory and its reading: the one copy, shared with /api/bill-review/submit.
+    const guard = await checkStoredBill(supabase, userId, { filePath, inventoryId }, 'ai')
+    if (!guard.ok) return refuse(guard.status, guard.reason, guard.error, inventoryId)
+    const storedPath = filePath as string   // checkStoredBill refused an absent path
+
+    // BR4 (a): a bill with a submission record went to the Bill Review team, so it never goes to the AI, whatever the
+    // inventory's reading is now (a switch applies to later uploads only). Read through the caller's own client.
+    const { data: submitted, error: subErr } = await supabase
+      .from('bill_review_documents').select('id').eq('file_path', storedPath).limit(1)
+    if (subErr) return refuse(503, 'submission_unknown', 'We couldn\u2019t confirm whether this bill was sent to our team, so it was not read.', inventoryId)
+    if (submitted && submitted.length > 0) return refuse(409, 'submitted_for_human_reading', HUMAN_READ_REFUSAL, inventoryId)
+
+    // BR4 (b): after a switch, a bill stored before it was stored under the reading before it. The inventory is AI-read
+    // now, so a change recorded at readingSetAt was a switch from human, and a bill stored earlier was uploaded while
+    // human-read: refused, even if its submission never landed. The time is the storage object's own, set by the
+    // server. If it cannot be read, the route refuses (fails closed). Never consulted for an inventory never switched.
+    if (guard.inventory.readingSetAt) {
+      const stored = await storedAt(supabase, storedPath)
+      if (!stored) return refuse(503, 'upload_time_unknown', 'We couldn\u2019t confirm when this bill was uploaded, so it was not read.', inventoryId)
+      if (Date.parse(stored) < Date.parse(guard.inventory.readingSetAt)) return refuse(409, 'uploaded_before_switch', HUMAN_READ_REFUSAL, inventoryId)
+    }
 
     // Fetch the file from Supabase Storage server-side, so large phone photos never travel through the JSON request
     // body (avoids HTTP 413).
     let document: string | undefined
     {
-      const { data: blob, error: dlErr } = await supabase.storage.from('source-documents').download(filePath)
+      const { data: blob, error: dlErr } = await supabase.storage.from('source-documents').download(storedPath)
       if (dlErr || !blob) {
         return NextResponse.json({ error: `Could not read uploaded file from storage: ${dlErr?.message ?? 'not found'}` }, { status: 404 })
       }

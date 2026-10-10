@@ -1880,6 +1880,10 @@ interface ExtractedProposal {
   // type is chosen, which moves it.
   fleetType?: FleetType
   fleetTypeLog?: { from: FleetType | null; to: FleetType; at: string; by: { userId: string; email: string } }[]
+  // BR4: read by a ThemisIQ specialist rather than the AI: the reading (bill_review_readings.id) and when it was read.
+  // No staff user id: how the specialist is named on verifier pages and PDFs is Q10, open for BR9. Absent on an AI
+  // reading. Kept in locations_data; not copied into workings contributions until BR9.
+  readBy?: { method: 'human'; readingId: string; at: string }
 }
 
 /** T18: the figure a unit change cleared from a reading: the typed figure and its unit, and the unit to enter it in. */
@@ -1949,6 +1953,14 @@ interface SourceDoc {
   // T18: withdrawn by the customer. The file and its readings stay as evidence; every reading is set to rejected,
   // with its status before kept in its statusLog, and contributes with reason `withdrawn`. Cleared on restore.
   withdrawn?: { at: string; by: { userId: string; email: string }; reason: string }
+  // BR4: uploaded while the inventory was human-read, so it goes to the Bill Review team and never to the AI. Set at
+  // upload. Its waiting state and expected date are the team's record (public.bill_review_documents), read by the page;
+  // correctionsPending holds a specialist's correction that arrived after the customer confirmed or rejected the
+  // reading it corrects (not merged; the page shows a notice).
+  bill_review?: {
+    reading: 'human'
+    correctionsPending?: { readingId: string; supersedes: string; fuelType: string; rawValue: number; rawUnit: string; at: string }[]
+  }
 }
 
 /**
