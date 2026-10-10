@@ -4,7 +4,11 @@
 -- is run by hand for one customer's request, and holds no personal data until the placeholders are filled in.
 --
 -- Set one inventory's reading, on the customer's request (Q1, ruled 10 Oct 2026: specialist reading is by request
--- only; ThemisIQ quotes and invoices by hand, then sets the inventory to human reading). Until BR8's staff action.
+-- only; ThemisIQ quotes and invoices by hand, then sets the inventory to human reading).
+--
+-- THE FALLBACK (BR8, ruled 10 Oct 2026). The usual way is the staff page: /staff/bill-review, "Change an inventory's
+-- reading" (a lead only; logged as set_reading; staff_set_bill_review_reading, 20261017). Use this script only when the
+-- page cannot be used. It does the same thing by hand and stamps you as set_by the same way.
 --
 -- BEFORE RUNNING, replace the three placeholders below, and do not save the file with them filled in:
 --   <your sign-in email>   the email you sign in to ThemisIQ with (you must hold an active bill_review_lead role)

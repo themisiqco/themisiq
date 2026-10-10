@@ -86,7 +86,8 @@ describe('BR7: the export block for a bill with the team', () => {
   })
   it('the coverage strip shows both, with Enter the figure manually for the unreadable one only', () => {
     const strip = readFileSync(join(process.cwd(), 'app/dashboard/ghg/_components/CoverageStrip.tsx'), 'utf8')
-    expect(strip).toContain("(i.status === 'awaiting_reading' || i.status === 'reading_unreadable') && i.message")
+    // BR8b widened the filter to the spot-check difference too; the two BR7 issues are still in it.
+    expect(strip).toContain("(i.status === 'awaiting_reading' || i.status === 'reading_unreadable' || i.status === 'spot_check_difference') && i.message")
     expect(strip).toContain("{i.status === 'reading_unreadable' && (")
   })
 })

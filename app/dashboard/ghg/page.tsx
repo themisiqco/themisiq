@@ -50,6 +50,7 @@ import { grantVersionLine } from '../../../lib/ghg/versionWords'
 import { buildUploadPath } from '../../../lib/ghg/uploadPath'
 import { readingOf, HUMAN_READ_NOTE, READING_UNKNOWN_NOTE, ASSISTANT_AI_NOTICE, UPLOAD_NEEDS_SAVED_INVENTORY } from '../../../lib/ghg/billReviewReading'
 import { mergeReadings, type ReadingRow } from '../../../lib/billReview/mergeReadings'
+import { mergeSpotChecks, type SpotCheckRow } from '../../../lib/billReview/spotCheckMerge'
 import { withTeamFor, type BillReviewRow } from '../../../lib/billReview/billState'
 import { BillReviewContext, BillReviewDocNotes, billReviewLine, type BillReviewState } from './_components/BillReviewNote'
 import { BillReviewReadingLine } from './_components/BillReviewReadingLine'
@@ -68,7 +69,7 @@ import {
   combustionSourcesFor, gridSourcesFor, sourceAttributionsFor, sourceAttributionsForLocations, factorDerivationsFor,
   calcGas, calcLocation, calcInventory, buildWorkings, emptyLocation,
   notCountedLines,
-  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, fleetTypeProblem, fleetTypeOfField, withFleetTypeTicked, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords,
+  deriveLocations, deriveStoredLocations, documentsBacking, activeOverride, findUnresolvedCoverage, acceptanceProblem, valueProblem, fleetTypeProblem, fleetTypeOfField, withFleetTypeTicked, findUndeclaredStreams, findUnpriceableLocations, unpricedLines, UNPRICED_STATUSES, STREAM_META, deliveryDateOf, proposalNeedsAttention, isoDateInWords, spotCheckOpen,
   streamState, DECLARABLE_STREAMS,
   countryRefusal, refusalIsFixable, unitsForCountryChange, publishersForLocation,
   findSteamFactorGaps, steamFactorFor, STEAM_ESTIMATE_SHORT,
@@ -1394,8 +1395,21 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     setBillReview(prev => ({ rows: byPath, submitFailed: retry ? failed : prev.submitFailed }))
   }
   // Through a ref, so the two effects below run on the inventory id alone and always call the current function.
-  const refreshBillReviewRef = useRef(refreshBillReview)
-  refreshBillReviewRef.current = refreshBillReview
+  // BR8b: a spot-check difference on any of this inventory's AI readings (an AI-read inventory too), read with the
+  // customer's own client (RLS: own rows; checked_by is not a column a customer can read), merged onto the reading it is
+  // about. The engine then blocks export until the customer confirms that reading again or corrects it. The figure is
+  // never changed.
+  const refreshSpotChecks = async (invId: string) => {
+    const { data, error } = await supabase.from('bill_review_spot_checks')
+      .select('id, source_doc_id, fuel_type, proposal_index, result, note, checked_at').eq('inventory_id', invId).eq('result', 'disagrees')
+    if (error || !data) { console.error('[spot-checks] could not be read'); return }
+    const now = inventoryRef.current
+    const merged = mergeSpotChecks(now.locations, data as SpotCheckRow[])
+    if (merged.changed) { const next = { ...now, locations: merged.locations }; inventoryRef.current = next; setInventory(next) }
+  }
+  const refreshAll = async (invId: string) => { await refreshBillReview(invId); await refreshSpotChecks(invId) }
+  const refreshBillReviewRef = useRef(refreshAll)
+  refreshBillReviewRef.current = refreshAll
   useEffect(() => { if (inventoryId) refreshBillReviewRef.current(inventoryId) }, [inventoryId])
   useEffect(() => {
     if (!inventoryId) return
@@ -4581,7 +4595,12 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onDocum
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       {p.status === 'confirmed' ? (
-                        proposalNeedsAttention(p) ? null : <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
+                        // BR8b: a spot-check found a difference (the strip above says what). Confirming again records who
+                        // and when, as any confirmation does; the figure is never changed for the customer.
+                        spotCheckOpen(p) ? (
+                          <button disabled={!currentUser} onClick={() => currentUser && onUpdateProposal(locIdx, doc.id, pi, confirmProposal(p, { by: currentUser, at: new Date().toISOString() }))}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: '#0F6E56', color: '#fff', border: 'none', cursor: 'pointer', opacity: currentUser ? 1 : 0.5 }}>Confirm again</button>
+                        ) : proposalNeedsAttention(p) ? null : <span style={{ fontSize: 11, fontWeight: 600, color: '#0F6E56' }}>✓ Confirmed</span>
                       ) : periodEditing?.key === `${doc.id}:${pi}` && periodEditing.confirm ? null : (
                         // T10c: hidden while the month-only date confirmation is open; that step has its own button.
                         // T10a: a proposal with no figure cannot be confirmed; the message below says what to do.

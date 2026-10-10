@@ -23,6 +23,8 @@ import { createServerClient } from '../supabase'
 
 export type StaffRole = 'bill_reader' | 'bill_review_lead'
 export type StaffAction = 'view_queue' | 'view_document' | 'save_reading' | 'view_ai_reading' | 'record_spot_check' | 'view_access_log'
+  // BR8 (20261017_staff_actions_and_reading_switch.sql)
+  | 'mark_unreadable' | 'set_reading' | 'view_reading_switch' | 'view_spot_checks'
 
 export const STAFF_ONLY = 'This page is for ThemisIQ staff with access to Bill Review.'
 /** Q6 (10 Oct 2026): a staff signed URL lives 5 minutes. */

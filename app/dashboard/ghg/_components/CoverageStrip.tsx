@@ -153,7 +153,8 @@ export function CoverageStrip(p: CoverageStripProps) {
   const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
   // BR7: a bill with the Bill Review team blocks export with the engine's message and no action (its figure waits on the
   // team, or a Q12 override); one the team could not read offers to enter the figure (or the bill's own Delete).
-  const withTeam = issues.filter(i => (i.status === 'awaiting_reading' || i.status === 'reading_unreadable') && i.message
+  // BR8b: and a spot-check difference on a confirmed reading: the message here, "Confirm again" on the reading itself.
+  const withTeam = issues.filter(i => (i.status === 'awaiting_reading' || i.status === 'reading_unreadable' || i.status === 'spot_check_difference') && i.message
     && (i.docIds ?? []).some(id => docIdsHere.has(id)))
   // T15: exact duplicates with a document on this upload, answered or not. The message is the engine's issue.
   const duplicates = findExactDuplicates(location, p.resolutions).filter(x => x.docIds.some(id => docIdsHere.has(id)))

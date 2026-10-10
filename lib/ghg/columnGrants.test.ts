@@ -14,7 +14,7 @@ const DIR = join(process.cwd(), 'supabase/migrations')
 const code = (sql: string) => sql.split('\n').filter(l => !l.trim().startsWith('--')).join('\n')
 
 // BR7: the outbox tables are covered too; their grants are table-level today, so any column grant added later is read here.
-const TABLES = ['ghg_inventories', 'bill_review_documents', 'bill_review_readings', 'bill_review_notices', 'bill_review_notice_documents']
+const TABLES = ['ghg_inventories', 'bill_review_documents', 'bill_review_readings', 'bill_review_notices', 'bill_review_notice_documents', 'bill_review_spot_checks']
 
 /** The privilege list of each GRANT ... ON one of TABLES that names any column, split at top-level commas. */
 function columnGrantsOnInventories(sql: string): string[][] {
@@ -42,7 +42,7 @@ describe('column grants on ghg_inventories and the Bill Review tables are scoped
 
   it('the migrations that grant columns on ghg_inventories are found (not vacuous)', () => {
     for (const f of ['20260813_ghg_factor_editions_column.sql', '20261008_ghg_factor_selection.sql', '20261008_ghg_factor_edition_comparison.sql',
-      '20261009_ghg_location_log.sql', '20261011_bill_review_reading.sql', '20261013_bill_review_queue.sql']) expect(granting, f).toContain(f)
+      '20261009_ghg_location_log.sql', '20261011_bill_review_reading.sql', '20261013_bill_review_queue.sql', '20261018_bill_review_spot_checks.sql']) expect(granting, f).toContain(f)
   })
   for (const f of granting) {
     it(f, () => {

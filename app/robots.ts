@@ -18,6 +18,8 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: [
         '/dashboard',
+        // BR8: the Bill Review specialist page. Not access control (its data is behind requireStaffRole); a courtesy.
+        '/staff',
         '/login',
         '/signup',
         '/checkout',

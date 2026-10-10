@@ -1884,6 +1884,10 @@ interface ExtractedProposal {
   // No staff user id: how the specialist is named on verifier pages and PDFs is Q10, open for BR9. Absent on an AI
   // reading. Kept in locations_data; not copied into workings contributions until BR9.
   readBy?: { method: 'human'; readingId: string; at: string }
+  // BR8b (Q4): a ThemisIQ specialist checked this AI reading after the customer confirmed it, and found a difference.
+  // The figure is never changed for them. Open (export blocked, spot_check_difference) until the customer confirms this
+  // reading again or corrects it after checkedAt, or withdraws or deletes the bill. No staff id (Q10).
+  spotCheck?: { checkId: string; note: string; checkedAt: string }
 }
 
 /** T18: the figure a unit change cleared from a reading: the typed figure and its unit, and the unit to enter it in. */
@@ -4637,6 +4641,9 @@ export const COVERAGE_MESSAGE = {
   // field it backs has a Q12 override; one the team could not read blocks until the field has a figure, or it is deleted.
   awaiting_reading: (file: string, expectedBy: string | null | undefined) =>
     `${file} is with our team${expectedBy ? `, expected by ${isoDateInWords(expectedBy)}` : ''}. Export is blocked until it is read and you confirm it.`,
+  // BR8b (ruled 10 Oct 2026): a spot-check found a difference in a confirmed AI reading.
+  spot_check_difference: (note: string) =>
+    `Our team checked this reading and found a difference: ${note.trim().replace(/[.\s]+$/, '')}. Review it, then confirm the figure again or correct it.`,
   reading_unreadable: (file: string, note: string | null | undefined) =>
     `Our team could not read a figure from ${file}${note ? `: ${note.trim().replace(/[.\s]+$/, '')}` : ''}. Enter the figure from the bill yourself, or delete the bill if it was uploaded by mistake.`,
   // T10b: a delivery-based fuel is checked for completeness, not monthly coverage. Until the customer confirms
@@ -4759,6 +4766,18 @@ export interface BillContribution {
   withdrawal?: SourceDoc['withdrawn']
   /** T10b: the delivery date, when this reading is a delivery (counted in full if inside the year). */
   deliveryDate?: string
+}
+
+/**
+ * BR8b: a spot-check difference is open until the customer confirms this reading again, or corrects it, after the
+ * check (a confirmation or correction recorded later than checkedAt, with who and when, as T18 records them).
+ */
+export function spotCheckOpen(p: Pick<ExtractedProposal, 'spotCheck' | 'confirmations' | 'corrections'>): boolean {
+  if (!p.spotCheck) return false
+  // Instants, not strings: Postgres writes +00:00 and microseconds, the page writes Z and milliseconds.
+  const checked = Date.parse(p.spotCheck.checkedAt)
+  const after = (at: string | undefined) => !!at && Date.parse(at) > checked
+  return !(p.confirmations ?? []).some(c => after(c.at)) && !(p.corrections ?? []).some(c => after(c.at))
 }
 
 /**
@@ -5861,6 +5880,7 @@ export interface CoverageIssue {
   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
   // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a),
   // awaiting_reading | reading_unreadable (BR7: a bill with the Bill Review team, or one it could not read),
+  // spot_check_difference (BR8b: a specialist found a difference in a confirmed AI reading),
   // exact_duplicate (T15, rule R6), factor_missing | refrigerant_unknown | province_missing (FI1).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
@@ -6002,6 +6022,15 @@ export function findUnresolvedCoverage(
       if (fields.length === 0 || fields.some(hasFigure)) return
       out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id],
         fields: fields.map(String), message: COVERAGE_MESSAGE.unread(d.file_name, listInWords(fields.map(f => FIELD_NAME[String(f)] ?? String(f))), site) })
+    })
+
+    // BR8b: a confirmed AI reading a specialist found a difference in, until the customer confirms it again or corrects
+    // it (spotCheckOpen). A withdrawn bill's readings are not counted, so it raises nothing; a deleted one is gone.
+    loc.source_docs.forEach(d => {
+      if (d.withdrawn) return
+      ;(d.extracted ?? []).forEach(p => {
+        if (spotCheckOpen(p)) out.push({ locId: loc.id, fuelType: p.fuelType, status: 'spot_check_difference', docIds: [d.id], message: COVERAGE_MESSAGE.spot_check_difference(p.spotCheck!.note) })
+      })
     })
 
     // Not-counted bills the customer must be told about.
