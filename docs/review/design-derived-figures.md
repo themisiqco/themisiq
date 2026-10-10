@@ -535,6 +535,9 @@ The tests are grouped by task in section 11. They include all of these:
 | BR: provenance (3 Oct 2026) | Every reading shows, in review, workings, verifier page and PDF, "Read by AI on {date}" or "Read by {specialist name} (ThemisIQ) on {date}", then "Confirmed by {customer} on {date}". Ties into T18. (BR9) |
 | BR: staff access (3 Oct 2026) | Role-based (a staff role table), least privilege, all views logged, designed so a hired data analyst can be added without code changes. (BR3) |
 | BR: privacy and About (3 Oct 2026) | The privacy policy and About page name the AI provider as a subprocessor, state that human-read inventories are never sent to it, and replace "opt out via hello@themisiq.co" with the in-product choice. (BR10) |
+| BR: tables (Q3, 10 Oct 2026) | BR4 uses new `bill_review_*` tables. The unused `concierge_jobs`, `concierge_job_documents` and `concierge_proposals` are dropped in the Bill Review rename, not now. (BR4, BR10) |
+| BR: business days (Q5, 10 Oct 2026) | The 2-business-day promise skips weekends, the Ontario public holidays (Employment Standards Act, 2000, s. 1(1)), Easter Monday and the Civic Holiday (first Monday of August). A holiday on a Saturday or Sunday is also taken on the next weekday that is not already a holiday, listed as its own entry: Mon 28 Dec 2026 (Boxing Day); Mon 27 and Tue 28 Dec 2027 (Christmas Day, Boxing Day); Mon 3 Jan 2028 (New Year's Day); Mon 3 Jul 2028 (Canada Day). A bill submitted at or after 15:00:00 Toronto time (daylight saving included), or on a weekend or holiday, counts from the next business day, which is then day 0. A year with no holiday list is refused, never guessed. (BR5; lib/billReview/holidays.ts, lib/billReview/businessDays.ts) |
+| BR: staff signed URLs (Q6, 10 Oct 2026) | A signed URL for a staff document view lives 5 minutes, and is issued only after the view's access-log row is written. (BR3, BR8; lib/staff/access.ts) |
 | Launch (2 Oct 2026) | The commercial launch has moved from 1 November 2026 to a date to be set once the GHG module is complete. Order and estimate for the remaining work: section 12. |
 | Sequencing (2 Oct 2026) | The `factor-integrity` branch (FI1 to FI10) is created from main after derived-figures merges. `factor-years` (T3b, T3c, T3d) is created from main after `factor-integrity` merges. |
 | T3b: optional election and allowlist | Optional-election banner confirmed, for a window ending after 1 February 2026: "If you choose to file this year as your first SB 253 report, Scope 3 isn't required in it." The EU deadline string "FY2024 (large EU companies)" stays on the source-guard allowlist. |
@@ -2675,6 +2678,7 @@ Concierge to Bill Review. BR9 also needs T11 and T17, which render provenance on
 2. **Q2, rounding:** withdrawn. The +20% ruling was replaced by fixed prices per tier (section 10, "BR: price").
 3. **Q3, tables:** reuse the existing, unused `concierge_jobs`, `concierge_job_documents` and `concierge_proposals`
    tables (widened), or create `bill_review_*` tables and drop the unused ones in the rename?
+   **Answered 10 Oct 2026:** new `bill_review_*` tables; the unused ones are dropped in the rename (section 10, "BR: tables").
 4. **Q4, spot-checks:**
    - Sample size and rule.
    - Whether a disagreement is shown to the customer.
@@ -2682,7 +2686,10 @@ Concierge to Bill Review. BR9 also needs T11 and T17, which render provenance on
      beyond BR10.
 5. **Q5, holidays and cut-off:** which Ontario holidays; whether a bill submitted after a cut-off time (e.g. 17:00
    Toronto) counts from the next business day.
+   **Answered 10 Oct 2026:** Ontario public holidays, Easter Monday, the Civic Holiday and weekend substitutes; a 15:00
+   Toronto cut-off (section 10, "BR: business days").
 6. **Q6, signed URLs:** their lifetime for staff document views (5 minutes proposed).
+   **Answered 10 Oct 2026:** 5 minutes (section 10, "BR: staff signed URLs").
 7. **Q7, overdue:** the wording for an overdue bill, and whether the customer is emailed when a date is missed.
 8. **Q8, emails:** one per batch (when the last waiting bill is read), or one per bill, or a daily digest?
 9. **Q9, older readings:** a reading saved before BR9 shows "Read by AI (date not recorded)". Acceptable, or

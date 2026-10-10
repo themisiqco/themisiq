@@ -35,5 +35,7 @@ export const CLEARED_ENV = [
  * Read in app/ or lib/ and deliberately NOT cleared:
  *   NODE_ENV                 Vitest sets it to 'test'; lib/scope3/categoryMethods.test.ts changes and restores it itself.
  *   SCOPE3_SNAPSHOT_UPDATE   a switch a developer sets by hand to rewrite lib/scope3's snapshot; read only by that test.
+ *   TZ                       the process time zone. lib/billReview/businessDays.test.ts sets it and restores it, to prove
+ *                            the expected date is Toronto's whatever the server's zone; no app code reads it.
  */
-export const KEPT_ENV = ['NODE_ENV', 'SCOPE3_SNAPSHOT_UPDATE'] as const
+export const KEPT_ENV = ['NODE_ENV', 'SCOPE3_SNAPSHOT_UPDATE', 'TZ'] as const

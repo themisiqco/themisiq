@@ -7,6 +7,11 @@ import { defineConfig } from 'vitest/config'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
+  // BR3: 'server-only' is aliased by Next itself (next/dist/build/create-compiler-aliases.js) and is not an installed
+  // package, so tests resolve it to Next's own empty module, as the server build does.
+  resolve: { alias: {
+    '@': fileURLToPath(new URL('.', import.meta.url)),
+    'server-only': fileURLToPath(new URL('./node_modules/next/dist/compiled/server-only/empty.js', import.meta.url)),
+  } },
   test: { setupFiles: ['./vitest.setup.ts'] },
 })

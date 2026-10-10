@@ -57,6 +57,10 @@ const EXCLUDED_FILES = new Set([
   // partial and would read worse. THE DATES IN THAT FILE MUST BE CHECKED BY HAND when the AI Act
   // timetable next changes — nothing here will catch them.
   'app/methodology/page.tsx',
+  // BR5 (10 Oct 2026): NOT AN AI ACT DATE. The Bill Review holiday list carries the Civic Holiday 2027, the first Monday
+  // of August, which falls on 2 August 2027, the same day as the high-risk deadline. lib/billReview/holidays.test.ts
+  // recomputes every date in that file from its rule, so it cannot carry a stray AI Act date either.
+  'lib/billReview/holidays.ts',
 ])
 
 
