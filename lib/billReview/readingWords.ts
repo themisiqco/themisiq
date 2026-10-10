@@ -17,7 +17,13 @@ export function readingLine(reading: BillReviewReading): string {
     : 'Your bills are read by AI, and you confirm each one.'
 }
 
-export const ASK_SPECIALIST = 'Ask for a ThemisIQ specialist to read them'
+/**
+ * The AI-read line's request (copy change, Lisa, 10 Oct 2026): "Prefer a ThemisIQ specialist to read them instead? Ask
+ * us to switch. We'll send you a quote before anything changes." ASK_SPECIALIST is the link's text.
+ */
+export const ASK_SPECIALIST_LEAD = 'Prefer a ThemisIQ specialist to read them instead?'
+export const ASK_SPECIALIST = 'Ask us to switch'
+export const ASK_SPECIALIST_AFTER = 'We\u2019ll send you a quote before anything changes.'
 
 /** The request email: the subject names the company and the reporting year, worded by reportingYearLabel (yearText). */
 export function specialistMailto(companyName: string | null | undefined, yearText: string): string {

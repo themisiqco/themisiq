@@ -10,6 +10,8 @@ import { join, relative } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { readingLine, sinceLine, specialistMailto, ASK_SPECIALIST, BILL_REVIEW_CONTACT_EMAIL } from './readingWords'
+
+const textOf = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&#x27;|&#39;/g, "'")
 import { BillReviewReadingLine } from '../../app/dashboard/ghg/_components/BillReviewReadingLine'
 import { BILL_REVIEW_HUMAN_READING_SELLABLE } from '../pricing'
 
@@ -104,11 +106,15 @@ describe('BR6: what the customer reads', () => {
   })
   it('the line renders with no control that changes the reading', () => {
     const ai = renderToStaticMarkup(createElement(BillReviewReadingLine, { reading: 'ai', since: null, companyName: 'Acme Ltd', yearText: 'reporting year 2026' }))
-    expect(ai).toContain(ASK_SPECIALIST)
+    expect(textOf(ai)).toBe('Your bills are read by AI, and you confirm each one. Prefer a ThemisIQ specialist to read them instead? Ask us to switch. We\u2019ll send you a quote before anything changes.')
+    expect(ai).toContain('style="color:var(--color-brand);text-decoration:underline">Ask us to switch</a>')
+    expect(ASK_SPECIALIST).toBe('Ask us to switch')
     expect(ai).toContain('href="mailto:hello@themisiq.co?subject=Specialist%20reading%20for%20Acme%20Ltd%2C%20reporting%20year%202026"')
+    expect(ai).not.toContain(String.fromCharCode(0x2014))
     expect(ai).not.toMatch(/<(input|select|button)/)
     const human = renderToStaticMarkup(createElement(BillReviewReadingLine, { reading: 'human', since: '2026-10-15T16:00:00Z', companyName: 'Acme Ltd', yearText: 'reporting year 2026' }))
     expect(human).not.toContain(ASK_SPECIALIST)
+    expect(human).not.toContain('quote')
     expect(human).toContain('Since 15 October 2026')
   })
   it('shown on the Energy & fuel data step to a Bill Review holder, with the year from the helper', () => {

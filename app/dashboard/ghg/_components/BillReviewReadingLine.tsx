@@ -5,7 +5,7 @@
 // the customer: plain language, no em dash.
 
 import type { BillReviewReading } from '../../../../lib/pricing'
-import { readingLine, sinceLine, specialistMailto, ASK_SPECIALIST } from '../../../../lib/billReview/readingWords'
+import { readingLine, sinceLine, specialistMailto, ASK_SPECIALIST_LEAD, ASK_SPECIALIST, ASK_SPECIALIST_AFTER } from '../../../../lib/billReview/readingWords'
 
 export function BillReviewReadingLine({ reading, since, companyName, yearText }: {
   reading: BillReviewReading; since: string | null; companyName: string; yearText: string
@@ -16,7 +16,7 @@ export function BillReviewReadingLine({ reading, since, companyName, yearText }:
       <div>
         {readingLine(reading)}
         {reading === 'ai' && (
-          <> <a href={specialistMailto(companyName, yearText)} style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>{ASK_SPECIALIST}</a></>
+          <> {ASK_SPECIALIST_LEAD} <a href={specialistMailto(companyName, yearText)} style={{ color: 'var(--color-brand)', textDecoration: 'underline' }}>{ASK_SPECIALIST}</a>. {ASK_SPECIALIST_AFTER}</>
         )}
       </div>
       {changed && <div style={{ marginTop: 4 }}>{changed}</div>}
