@@ -11,6 +11,22 @@
 // the document-fetch can be repointed to storage with no change to the prompt
 // or response shape.
 //
+// BR2 (10 Oct 2026): THE GUARANTEE. A human-read inventory's bills never reach the AI, enforced here, server side,
+// before the file is fetched or the model is called:
+//   400  no stored path, a document posted in the body, or a path in the old format (no inventory in it): the old
+//        base64 `document` fallback is removed, so every document this route reads is one it found in storage;
+//   403  a path naming another user, or an inventory other than the one the request names, or an inventory the
+//        caller cannot read (RLS: own rows only);
+//   409  the inventory's bills are read by a ThemisIQ specialist (ghg_inventories.bill_review_reading = 'human'),
+//        or its reading is anything but 'ai';
+//   503  the reading could not be read. Fails closed: no read, no extraction.
+// Every refusal is logged with metadata only (the status, the reason, the inventory id), never the path or the file.
+// A switch from human to AI is refused by the database until BR4 (20261011_bill_review_reading.sql), so "human now"
+// covers every bill uploaded while the inventory was human-read.
+// ⚠️ THE BROWSER CHOOSES THE INVENTORY SEGMENT of the path (lib/ghg/uploadPath.ts). This route proves the caller owns
+// the path and the inventory; it cannot prove which of the caller's inventories a bill belongs to. Accepted (BR2
+// ruling), register BR-01.
+//
 // COMPLIANCE NOTE: the prompt instructs the model to return value:null /
 // confidence:"low" when it is not certain, rather than guessing. For a
 // compliance product a flagged blank is safer than a confident wrong number;
@@ -25,6 +41,14 @@ import { getAuthedClient, bearerFrom, AuthError } from '../../../../lib/supabase
 // this module without pulling `next/server` into the client bundle. See lib/ghg/conciergeDocTypes.ts.
 import { SUPPORTED_FUELS, type FuelType } from '../../../../lib/ghg/conciergeDocTypes'
 import { CONCIERGE_ENTITLEMENT_KEYS } from '../../../../lib/pricing'
+import { parseUploadPath } from '../../../../lib/ghg/uploadPath'
+import { HUMAN_READ_REFUSAL, OLD_PATH_REFUSAL } from '../../../../lib/ghg/billReviewReading'
+
+/** BR2: a refusal, logged with metadata only. */
+function refuse(status: number, reason: string, error: string, inventoryId: string | null): NextResponse {
+  console.warn('[concierge/extract] refused', { status, reason, inventoryId })
+  return NextResponse.json({ error, reason }, { status })
+}
 
 const FUEL_GUIDANCE: Record<FuelType, string> = {
   electricity:
@@ -84,7 +108,7 @@ export async function POST(req: NextRequest) {
   try {
     // ── Authenticate as the user (same pattern as /api/materiality) ──
     const token = bearerFrom(req)
-    const { supabase } = await getAuthedClient(token)
+    const { supabase, userId } = await getAuthedClient(token)
 
     // ── Entitlement: concierge, NOT ghg ──────────────────────────────
     // These are separate purchases. Concierge is an add-on sold in three tiers on top of the GHG
@@ -138,14 +162,33 @@ export async function POST(req: NextRequest) {
     // ── Parse & validate input ───────────────────────────────────────
     const body = await req.json()
 
-    let document: string | undefined = typeof body.document === 'string' ? body.document : undefined
     let mediaType: string | undefined = typeof body.mediaType === 'string' ? body.mediaType : undefined
     const filePath: string | undefined = typeof body.filePath === 'string' ? body.filePath : undefined
+    const inventoryId: string | null = typeof body.inventoryId === 'string' ? body.inventoryId : null
 
-    // Preferred path: fetch the file from Supabase Storage server-side, so large
-    // phone photos never travel through the JSON request body (avoids HTTP 413).
-    // Falls back to base64 `document` in the body if no filePath is supplied.
-    if (filePath) {
+    // ── BR2: the guarantee, before the file is fetched or the model is called ──
+    // The base64 fallback is gone: a document in the body would skip every check below.
+    if (body.document !== undefined) return refuse(400, 'document_in_body', 'Documents are read from storage only.', inventoryId)
+    if (!filePath) return refuse(400, 'no_file_path', 'filePath is required.', inventoryId)
+    if (!inventoryId) return refuse(400, 'no_inventory_id', 'inventoryId is required.', null)
+    const named = parseUploadPath(filePath)
+    if (!named) return refuse(400, 'old_format_path', OLD_PATH_REFUSAL, inventoryId)
+    if (named.userId !== userId) return refuse(403, 'path_other_user', 'That document is not yours.', inventoryId)
+    if (named.inventoryId !== inventoryId) return refuse(403, 'path_other_inventory', 'That document belongs to another inventory.', inventoryId)
+    // Through the caller's own client: RLS returns only their own rows, so another user's inventory reads as none.
+    const { data: inv, error: invErr } = await supabase
+      .from('ghg_inventories')
+      .select('id, bill_review_reading')
+      .eq('id', inventoryId)
+      .maybeSingle()
+    if (invErr) return refuse(503, 'reading_unknown', 'We couldn\u2019t confirm how this inventory\u2019s bills are read, so this one was not read.', inventoryId)
+    if (!inv) return refuse(403, 'inventory_not_found', 'That inventory is not yours.', inventoryId)
+    if (inv.bill_review_reading !== 'ai') return refuse(409, 'human_read', HUMAN_READ_REFUSAL, inventoryId)
+
+    // Fetch the file from Supabase Storage server-side, so large phone photos never travel through the JSON request
+    // body (avoids HTTP 413).
+    let document: string | undefined
+    {
       const { data: blob, error: dlErr } = await supabase.storage.from('source-documents').download(filePath)
       if (dlErr || !blob) {
         return NextResponse.json({ error: `Could not read uploaded file from storage: ${dlErr?.message ?? 'not found'}` }, { status: 404 })
@@ -161,7 +204,7 @@ export async function POST(req: NextRequest) {
       : [...SUPPORTED_FUELS]
 
     if (!document) {
-      return NextResponse.json({ error: 'document (base64) is required' }, { status: 400 })
+      return NextResponse.json({ error: 'The stored document was empty.' }, { status: 400 })
     }
     if (requestedFuels.length === 0) {
       return NextResponse.json({ error: 'No supported fuelTypes requested' }, { status: 400 })
@@ -270,11 +313,12 @@ export async function POST(req: NextRequest) {
       fields = JSON.parse(cleaned)
       if (!Array.isArray(fields)) throw new Error('Expected a JSON array')
     } catch (parseErr) {
-      console.error('Extraction parse error:', parseErr, '\nRaw model text:', rawText)
-      return NextResponse.json(
-        { error: 'Could not parse extraction result', raw: rawText },
-        { status: 502 },
-      )
+      // BR2: METADATA ONLY. The model's text holds figures and quotes read from the bill, so it is neither logged nor
+      // returned: only its length and the parser's message.
+      console.error('[concierge/extract] parse failed', {
+        inventoryId, length: rawText.length, error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+      })
+      return NextResponse.json({ error: 'Could not parse extraction result' }, { status: 502 })
     }
 
     // model + usage are returned for OPERATOR TELEMETRY only — the wizard logs them so the

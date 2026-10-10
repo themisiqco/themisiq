@@ -397,7 +397,7 @@ describe('item 3 (5 Oct 2026): every save from one tab refused by the owner poli
   it('S4: Save with no company name is refused before anything is written', () => {
     const p = read(PAGE)
     expect(p).toContain("const COMPANY_NAME_NEEDED = 'Enter your company name on the first step before saving. Nothing was saved.'")
-    const save = p.slice(p.indexOf('const handleSave = async () => {'))
+    const save = p.slice(p.indexOf('const handleSave = async (): Promise<string | null | undefined> => {'))
     const guard = save.indexOf("if (!(inventory.company_name || '').trim()) {")
     expect(guard).toBeGreaterThan(0)
     expect(guard).toBeLessThan(save.indexOf('let resolvedCompanyId = inventory.company_id || null'))

@@ -32,7 +32,6 @@ const FILES = [
 const ALLOWED = [
   'const key = `${companyId}:${inventory.reporting_year}`',                                        // prior-year lookup key
   'const priorYearKey = inventory.company_id ? `${inventory.company_id}:${inventory.reporting_year}` : null',
-  'const path = `${session.user.id}/${inventory.reporting_year}/',                                   // storage path
   "gwp: 'AR6', deadline: 'FY2024 (large EU companies)',",                                           // EU deadline, not a label
   'query.window ?? { start: `${query.reporting_year}-01-01`, end: `${query.reporting_year}-12-31` }',  // resolver default window
   'priced from the DEFRA/DESNZ ${DEFRA_WASTE_META.year}',                                            // a factor edition's year (T3c), not a reporting year

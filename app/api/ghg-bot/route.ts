@@ -250,7 +250,16 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'bad_request' }, { status: 400 })
   }
-  const { messages: rawMessages, currentStep } = (body ?? {}) as {
+  // BR2 (decision 3, the strict reading): nothing but these two reaches the model. Any other field is refused, not
+  // ignored, so no caller can attach inventory content (figures, quotes, file names) to a request and have it accepted.
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return NextResponse.json({ error: 'bad_request' }, { status: 400 })
+  }
+  const extra = Object.keys(body).filter(k => k !== 'currentStep' && k !== 'messages')
+  if (extra.length > 0) {
+    return NextResponse.json({ error: 'unexpected_field' }, { status: 400 })
+  }
+  const { messages: rawMessages, currentStep } = body as {
     messages?: unknown
     currentStep?: unknown
   }

@@ -31,10 +31,10 @@ vi.mock('../../../lib/rateLimit', () => ({
 import { POST } from './route'
 
 const DAY = 86_400_000
-const req = () => new Request('http://localhost/api/ghg-bot', {
+const req = (extra: Record<string, unknown> = {}) => new Request('http://localhost/api/ghg-bot', {
   method: 'POST',
   headers: { 'content-type': 'application/json', authorization: 'Bearer token' },
-  body: JSON.stringify({ currentStep: 0, messages: [{ role: 'user', content: 'What is Scope 2?' }] }),
+  body: JSON.stringify({ currentStep: 0, messages: [{ role: 'user', content: 'What is Scope 2?' }], ...extra }),
 }) as never
 
 const fetchMock = vi.fn(async () => new Response(JSON.stringify({
@@ -95,6 +95,18 @@ describe('/api/ghg-bot entitlement (ENF2)', () => {
     expect(res.status).toBe(503)
     expect(await res.json()).toEqual({ error: 'entitlement_check_failed' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('BR2: any body field other than currentStep and messages is refused, and the model is not called', async () => {
+    entRow = { module_key: 'ghg', term_end: new Date(Date.now() + 30 * DAY).toISOString() }
+    for (const extra of [{ inventoryId: 'inv-1' }, { locations: [] }, { sourceQuote: 'Total usage 4,210 kWh' }, { system: 'x' }, { model: 'x' }]) {
+      const res = await POST(req(extra))
+      expect(res.status, Object.keys(extra)[0]).toBe(400)
+      expect(await res.json()).toEqual({ error: 'unexpected_field' })
+    }
+    expect(fetchMock).not.toHaveBeenCalled()
+    // The two fields alone still work.
+    expect((await POST(req())).status).toBe(200)
   })
 
   it('B6: the wizard has a plain message for the expired code', async () => {

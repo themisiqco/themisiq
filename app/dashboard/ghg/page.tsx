@@ -47,6 +47,9 @@ import type { YearDataStatus } from '../../../lib/ghg/series'
 import { useEntitlementAccess, useHasConcierge, type EntitlementAccess } from '../../../lib/useEntitlement'
 import { generateAssurancePDF } from '../../../lib/assurancePdf'
 import { grantVersionLine } from '../../../lib/ghg/versionWords'
+import { buildUploadPath } from '../../../lib/ghg/uploadPath'
+import { readingOf, HUMAN_READ_NOTE, READING_UNKNOWN_NOTE, ASSISTANT_AI_NOTICE, UPLOAD_NEEDS_SAVED_INVENTORY } from '../../../lib/ghg/billReviewReading'
+import type { BillReviewReading } from '../../../lib/pricing'
 import { SB253_SCOPE3_FROM, SB253_WINDOW_STATUS_WORDS, SB253_ELECTION_BANNER, sb253FirstReportBanner } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -222,7 +225,8 @@ const BOT_ERRORS: Record<string, string> = {
     'Something went wrong reaching the guide. Try again in a moment.',
 }
 
-function GHGBot({ currentStep }: { currentStep: number }) {
+// BR2 (decision 3): on a human-read inventory the assistant stays, with one line saying what it sends.
+function GHGBot({ currentStep, aiNotice }: { currentStep: number; aiNotice: boolean }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<BotMessage[]>([])
   const [input, setInput] = useState('')
@@ -297,6 +301,7 @@ function GHGBot({ currentStep }: { currentStep: number }) {
           <div style={{ padding: '1rem 1.25rem', borderBottom: '0.5px solid #e8e7e4', background: 'var(--color-brand)', borderRadius: '16px 16px 0 0' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>ThemisIQ Guide</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Step {currentStep + 1}: {stepNames[currentStep]}</div>
+            {aiNotice && <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>{ASSISTANT_AI_NOTICE}</div>}
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {messages.map((msg, i) => (
@@ -712,6 +717,13 @@ const searchParams = useSearchParams()
   const inventoryRef = useRef(inventory)
   useEffect(() => { inventoryRef.current = inventory }, [inventory])
   const [inventoryId, setInventoryId] = useState<string | null>(null)
+  // BR1/BR2: how this inventory's bills are read (ghg_inventories.bill_review_reading), as the database last said.
+  // Null until a saved row says, and null is never 'ai': the upload sends nothing to the AI on null. Kept outside the
+  // inventory state on purpose: it is never written by Save (the payload does not name it), so it is not an unsaved
+  // change. The ref is what the upload reads, because the upload can save first and read it in the same call.
+  const [billReviewReading, setBillReviewReadingState] = useState<BillReviewReading | null>(null)
+  const billReviewReadingRef = useRef<BillReviewReading | null>(null)
+  const setBillReviewReading = (r: BillReviewReading | null) => { billReviewReadingRef.current = r; setBillReviewReadingState(r) }
   const [uploading, setUploading] = useState(false)
   const [showWorkings, setShowWorkings] = useState<Record<string, boolean>>({})
   const [activeExport, setActiveExport] = useState('sb253')
@@ -975,6 +987,7 @@ const searchParams = useSearchParams()
     // setMode('wizard') below (the "button does nothing" bug). This button only renders in list mode,
     // where no ?id is present, so there's no stale ?id to clear — switching mode in state is enough.
     setInventoryId(null)
+    setBillReviewReading(null)
     setEditingFree(false)
     setSaved(false)
     skipSavedReset.current = true // fresh inventory is pristine until the user types: it becomes the baseline
@@ -1128,6 +1141,7 @@ const searchParams = useSearchParams()
       if (data) {
        skipSavedReset.current = true 
         setInventoryId(data.id)
+        setBillReviewReading(readingOf(data.bill_review_reading))
         loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(data.locations_data) }
         loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(data.locations_data), entries: typedEntriesBaseline(data.locations_data) }
         loadedLocationLog.current = { inventoryId: data.id, log: locationLogBaseline(data.location_log) }
@@ -1325,9 +1339,22 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       setUploading(false)
       return
     }
+    // BR2 (decision 2): A BILL IS STORED UNDER A SAVED INVENTORY. With no id yet, the upload saves the inventory first,
+    // through the same handleSave and its checks, and stops if that save is refused (handleSave has said why). A save
+    // takes no snapshot (T16 snapshots only at link issue, share and export).
+    let invId = inventoryId
+    if (!invId) {
+      invId = (await handleSave()) ?? null
+      if (!invId) {
+        setUploadErrors(prev => ({ ...prev, [`${locIdx}:${docType}`]: UPLOAD_NEEDS_SAVED_INVENTORY }))
+        setUploading(false)
+        return
+      }
+    }
+    // As the database last said; null (unknown) sends nothing to the AI.
+    const reading = billReviewReadingRef.current
     for (const file of Array.from(files)) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `${session.user.id}/${inventory.reporting_year}/${inventory.locations[locIdx].name.replace(/\s+/g, '_')}/${Date.now()}_${safeName}`
+      const path = buildUploadPath(session.user.id, invId, inventory.reporting_year, inventory.locations[locIdx].name, Date.now(), file.name)
       // T15 (rule R6): the file's SHA-256, for duplicate detection only (client-supplied, not an integrity
       // guarantee). A failure gives null and the upload goes ahead without one; it never blocks an upload.
       const sha256 = await sha256Hex(file)
@@ -1347,18 +1374,23 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         // ── Concierge step 5: read bill, convert via lib (single source of truth), attach proposals to the doc. No field write yet. ──
         // Skipped entirely for the document types the concierge cannot read a figure from — see
         // CONCIERGE_UNREAD_DOC_TYPES. The upload still happens; only the extraction call is skipped.
-        if (CONCIERGE_DEV && !CONCIERGE_READABLE_MEDIA.has(file.type)) {
+        if (CONCIERGE_DEV && reading !== 'ai') {
+          // BR2: a human-read inventory's bill is never sent to the AI, and neither is one whose reading is unknown.
+          // The route refuses both too (409, 503); this keeps the page from asking.
+          doc.read_outcome = 'not_read'
+          doc.read_note = reading === 'human' ? HUMAN_READ_NOTE : READING_UNKNOWN_NOTE
+        } else if (CONCIERGE_DEV && !CONCIERGE_READABLE_MEDIA.has(file.type)) {
           // (a) A file the reader cannot open — a spreadsheet or CSV. Keeping it is the point: it is
           // still the evidence behind whatever figure gets typed in. Say so rather than attempting a
           // call the route would reject and then discarding its explanation.
           doc.read_outcome = 'not_read'
           doc.read_note = 'Kept as evidence. We read PDFs and photos. Type this figure into the box above.'
-        } else if (CONCIERGE_DEV && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)) {
+        } else if (CONCIERGE_DEV && reading === 'ai' && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)) {
           try {
   const res = await fetch('/api/concierge/extract', {
               method: 'POST',
               headers: { 'content-type': 'application/json', authorization: `Bearer ${session.access_token}` },
-              body: JSON.stringify({ filePath: doc.file_path, mediaType: file.type, locationName: inventory.locations[locIdx].name }),
+              body: JSON.stringify({ filePath: doc.file_path, inventoryId: invId, mediaType: file.type, locationName: inventory.locations[locIdx].name }),
             })
             const json = await res.json()
             if (json?.success && Array.isArray(json.fields)) {
@@ -2067,7 +2099,9 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     window.location.href = '/pricing?modules=ghg'
   }
 
-  const handleSave = async () => {
+  // BR2: returns the saved inventory's id, or nothing when the save was refused or did not run (the upload saves first
+  // and stops on nothing).
+  const handleSave = async (): Promise<string | null | undefined> => {
     // T18 diff 4: the inventory as it is NOW. A caller that changes the inventory and saves in the same tick (location
     // delete, document delete) sets inventoryRef.current first; `inventory` from this render would be the state before
     // the change, and the save would write the location or document back. Every other caller reaches here from a
@@ -2283,7 +2317,7 @@ workings: saved.workings,
       const { data, error } = await supabase.from('ghg_inventories').insert(payload).select().single()
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
       if (data) {
-        savedId = data.id; setInventoryId(data.id)
+        savedId = data.id; setInventoryId(data.id); setBillReviewReading(readingOf(data.bill_review_reading))
         loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(saved.locations_data) }
         loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(saved.locations_data), entries: typedEntriesBaseline(saved.locations_data) }
         loadedLocationLog.current = { inventoryId: data.id, log: locationLogBaseline(inventory.location_log) }
@@ -2347,6 +2381,7 @@ workings: saved.workings,
     })
     setSaved(true)
     setBaseline(savingFingerprint)
+    return savedId
     } finally { setIsSaving(false) }
   }
 
@@ -4225,7 +4260,7 @@ workings: saved.workings,
           {isSaving ? 'Saving…' : saved ? '✓ Saved' : 'Save draft'}
         </button>
       </div>
-      <GHGBot currentStep={step} />
+      <GHGBot currentStep={step} aiNotice={billReviewReading === 'human'} />
     </div>
   )
 }
