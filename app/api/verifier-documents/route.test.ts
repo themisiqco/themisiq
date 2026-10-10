@@ -63,6 +63,7 @@ beforeEach(() => {
   // Live: feb.pdf deleted since, new.pdf uploaded since.
   h.inventory = {
     id: 'inv-1',
+    user_id: 'u',
     locations_data: [{ name: 'Leeds', source_docs: [doc('d1', 'jan.pdf'), doc('d9', 'new.pdf')],
       document_log: [{ kind: 'deleted', docId: 'd2', file: 'feb.pdf', at: '2026-10-05T09:00:00Z', by: { email: 'jo@acme.example' }, reason: 'Wrong site' }] }],
     location_log: [],
@@ -111,6 +112,59 @@ describe('/api/verifier-documents lists the pinned version\'s documents', () => 
     ])
     expect(JSON.stringify(body)).not.toContain('file_path')
     expect(h.reads).toContain('ghg_inventory_versions:snapshot')
+  })
+})
+
+describe('sec1: only a path inside the inventory owner\'s folder is listed as available or signed', () => {
+  const planted = () => {
+    // Another user's object, planted in the pinned snapshot beside the owner's own old-format and new-format paths.
+    const locations_data = [{ name: 'Leeds', source_docs: [
+      { id: 'p1', file_name: 'theirs.pdf', file_path: 'other-user/inv-7/2025/Leeds/1_theirs.pdf', document_type: 'electricity_bill' },
+      { id: 'o1', file_name: 'old.pdf', file_path: 'u/2025/Leeds/2_old.pdf', document_type: 'electricity_bill' },
+      { id: 'n1', file_name: 'new.pdf', file_path: 'u/inv-1/2025/Leeds/3_new.pdf', document_type: 'electricity_bill' },
+    ] }]
+    h.versions[0].snapshot = { locations_data }
+    h.inventory!.locations_data = locations_data
+  }
+  it('the planted path is listed as unavailable, with no path, and the owner\'s own paths as available', async () => {
+    planted()
+    const body = await (await list(req({ token: 'tok' }))).json()
+    expect(body.documents.map((d: { id: string; status: string }) => [d.id, d.status])).toEqual([['p1', 'unavailable'], ['o1', 'available'], ['n1', 'available']])
+    expect(JSON.stringify(body)).not.toContain('other-user')
+  })
+  it('/sign refuses the planted path with 404 and signs nothing; the owner\'s old and new paths are signed', async () => {
+    planted()
+    const res = await sign(req({ token: 'tok', docId: 'p1' }))
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'not_found' })
+    expect(h.signed).toEqual([])
+    expect((await sign(req({ token: 'tok', docId: 'o1' }))).status).toBe(200)
+    expect((await sign(req({ token: 'tok', docId: 'n1' }))).status).toBe(200)
+    expect(h.signed).toEqual(['u/2025/Leeds/2_old.pdf', 'u/inv-1/2025/Leeds/3_new.pdf'])
+  })
+  it('the owner is read from the inventory row: the user_id column is selected, and a row without one serves nothing', async () => {
+    planted()
+    await list(req({ token: 'tok' }))
+    expect(h.reads).toContain('ghg_inventories:user_id, locations_data, location_log')
+    h.inventory!.user_id = null
+    const res = await sign(req({ token: 'tok', docId: 'n1' }))
+    expect(res.status).toBe(404)
+    expect(h.signed).toEqual([])
+  })
+  it('logs metadata only: the inventory and a count or the document id, never a path', async () => {
+    planted()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await list(req({ token: 'tok' }))
+    await sign(req({ token: 'tok', docId: 'p1' }))
+    const logged = JSON.stringify(warn.mock.calls)
+    // The list route and the sign route each load the pinned documents (one warning each), and /sign adds its refusal.
+    expect(warn.mock.calls.map(c => c[0])).toEqual([
+      '[verifier-documents] stored path outside the owner folder, not served',
+      '[verifier-documents] stored path outside the owner folder, not served',
+      '[verifier-documents/sign] stored path outside the owner folder, refused'])
+    expect(logged).not.toContain('other-user')
+    expect(logged).not.toContain('.pdf')
+    warn.mockRestore()
   })
 })
 

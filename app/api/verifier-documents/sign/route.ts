@@ -69,6 +69,11 @@ export async function POST(req: NextRequest) {
     if (matches.length > 1) {
       return NextResponse.json({ error: 'ambiguous_document' }, { status: 409 })
     }
+    // sec1: a path outside the inventory owner's folder is not signed. Refused as not found, metadata logged.
+    if (matches[0].status === 'unavailable') {
+      console.warn('[verifier-documents/sign] stored path outside the owner folder, refused', { inventoryId: grant.inventoryId, docId })
+      return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    }
     if (matches[0].status === 'deleted') {
       return NextResponse.json({ error: 'deleted', message: matches[0].deleted_note }, { status: 410 })
     }

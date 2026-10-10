@@ -1,4 +1,4 @@
--- NOT YET RUN. Written 9 Oct 2026 for T16; Lisa runs it in the Supabase SQL editor and records the run here.
+-- RUN 9 Oct 2026 (evening, Ontario; 10 Oct UTC) in the Supabase SQL editor, in the order in the header; verified.
 -- RUN ORDER: 4 of 4, after 20261010_verifier_access_inventory_version.sql AND AFTER the T16 app change is deployed
 -- and live. Then supabase/verify/20261010_t16_verify.sql.
 --
@@ -42,6 +42,10 @@
 --   select to_regprocedure('public.ghg_verifier_projection(public.ghg_inventories)') as projection;
 -- PROCEED if unpinned is 0 and projection is not null (files 1 to 3 ran). STOP and report otherwise: this file
 -- refuses an unpinned grant, so a link left unpinned would stop working.
+-- RESULT, 9 Oct 2026 (Lisa): run after the T16 deploy was live. This pre-check's own results were not recorded;
+--   file 3's after-run check had recorded 0 unpinned.
+-- VERIFIED, 9 Oct 2026 (Lisa): supabase/verify/20261010_t16_verify.sql, all 20 checks passed, twice (the second time
+--   after location_log was added).
 --
 -- VERIFY, after: supabase/verify/20261010_t16_verify.sql, checks t16_16 to t16_19.
 --

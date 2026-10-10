@@ -162,6 +162,13 @@ describe('T17: the other pages read the stored row', () => {
 describe('T17: nothing internal reaches the package', () => {
   it('no reason key, fuel key, GWP token, factor key or grid region code in any printed text', () => {
     const { all } = run(saved())
+    // hk2: nor an older stored refusal's factor key, stored unit or country code.
+    const old = { location: 'Paris', stream: 'natural_gas', source: 'Natural gas', scope: 1, gwp_basis: 'unpriced', result_tco2e: null, factor_key: 'natural_gas_kwh',
+      note: 'NOT PRICED: No published emission factor for natural gas measured in kwh in FR (factor key "natural_gas_kwh"). This figure cannot be priced.' }
+    const withOld = run(saved({ workings: [...fx.workings, old] })).all
+    expect(withOld).toContain('No published emission factor for natural gas measured in kWh in France. This figure cannot be priced.')
+    for (const k of ['factor key', 'natural_gas_kwh', ' in FR ']) expect(withOld, k).not.toContain(k)
+    expect(withOld).not.toMatch(/\bkwh\b/)
     const keys = ['outside_year', 'same_bill_as', 'exact_duplicate_of', 'manual_override', 'not_confirmed', 'invalid_period', 'mixed_units', 'billing_month',
       'customer_confirmed', 'natural_gas', 'coverage_resolution', 'document_event', 'location_event', 'all_bills_excluded', 'scope3-cat3', 'US_CA', 'utility_bill_gas']
     for (const k of keys) expect(all, k).not.toContain(k)

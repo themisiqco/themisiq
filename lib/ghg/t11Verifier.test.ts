@@ -43,9 +43,12 @@ describe('the verifier page renders stored workings and calculates nothing', () 
 describe('the location_log migration records its run (CLAUDE.md: the header is the record)', () => {
   const sql = read('supabase/migrations/20261009_ghg_location_log.sql')
   it('opens with the run, and records the pre-check and the result', () => {
-    expect(sql.split('\n')[0]).toBe('-- RUN 9 Oct 2026 in the Supabase SQL editor; grants verified.')
+    expect(sql.split('\n')[0]).toBe('-- RUN 9 Oct 2026 (evening, Ontario) in the Supabase SQL editor, then the API schema cache reloaded; grants verified.')
     expect(sql).not.toContain('NOT YET RUN')
     expect(sql).toContain('every role held its privileges on all 34 columns alike, except service_role, which holds')
-    expect(sql).toContain('all 35 columns alike for authenticated (INSERT, SELECT, UPDATE) and')
+    // hk2: the 35-column line was a pre-check misread as the after-run check. The record now names the column.
+    expect(sql).toContain('-- CORRECTION, 9 Oct 2026 (evening, Ontario). This file was NOT run on the morning of 9 Oct.')
+    expect(sql).toContain("with the query above filtered to column_name = 'location_log':")
+    expect(sql).toContain("notify pgrst, 'reload schema'; was run, and saves worked.")
   })
 })

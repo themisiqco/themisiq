@@ -1,6 +1,8 @@
 -- supabase/verify/20261010_t16_verify.sql
 -- T16 (verifier links pinned to a saved version): ONE read-only query, one row per check, with check_name, expected,
 -- actual and pass. Run AFTER all four 20261010 migrations. Every row should read pass = true. It writes nothing.
+-- RUN 9 Oct 2026 (evening, Ontario; 10 Oct UTC) (Lisa): all 20 checks passed, twice (the second time after
+-- location_log was added).
 --
 -- NOTE: TYPE-CHECKED ONLY BY RUNNING IN SUPABASE. pglast parses the grammar, not the types. "char" catalog columns
 -- (prosecdef is boolean; polcmd, tgtype bits are cast) are concatenated only with ::text (the 1 Oct 2026 lesson).

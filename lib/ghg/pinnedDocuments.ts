@@ -8,6 +8,10 @@
 //   - deleted since, with its tombstone in a location's document_log or in the inventory's location_log: listed, with
 //     who deleted it, when and why, and no link, because the file is no longer held;
 //   - gone with no tombstone (a deletion made before T18 kept records): listed, said so, and no link.
+//   - stored under a path outside the inventory owner's folder (sec1, found in the BR1/BR2 audit, 10 Oct 2026): listed
+//     as unavailable, with no link. locations_data is written by the browser, so a path in it is a claim, not a fact;
+//     the routes sign with the service role, which would sign any object in the bucket. Only a path that starts with
+//     the owner's user id and "/" is ever signed. The owner is read from the inventory row, never from the snapshot.
 // Never a broken link and never a silent omission. /api/verifier-documents lists these; /sign signs only an available
 // document of the pinned version, by the path the version names.
 
@@ -26,9 +30,14 @@ export type PinnedDocument = {
   location: string
   /** The storage path the pinned version names. Server side only: the routes never send it to the browser. */
   file_path: string | null
-  status: 'available' | 'deleted'
+  status: 'available' | 'deleted' | 'unavailable'
   /** For a deleted document, what the verifier reads in place of a link. */
   deleted_note?: string
+}
+
+/** sec1: the one test of whether a stored path may be signed for this inventory: inside its owner's folder. */
+export function pathInOwnerFolder(filePath: string | null | undefined, ownerId: string | null | undefined): boolean {
+  return !!filePath && !!ownerId && filePath.startsWith(`${ownerId}/`)
 }
 
 const on = (at?: string) => (at ? isoDateInWords(at.slice(0, 10)) : 'a date not recorded')
@@ -40,7 +49,7 @@ export function deletedDocumentNote(file: string, t: Tombstone | null): string {
   return `${file} was deleted from the inventory by ${t.by?.email || 'someone not recorded'} on ${on(t.at)}, after this version was saved. ${why} The file is no longer held, so it cannot be opened.`
 }
 
-export function pinnedDocuments(pinnedLocations: unknown, liveLocations: unknown, liveLocationLog: unknown): PinnedDocument[] {
+export function pinnedDocuments(pinnedLocations: unknown, liveLocations: unknown, liveLocationLog: unknown, ownerId: string): PinnedDocument[] {
   const liveIds = new Set(flattenSourceDocs(liveLocations).map(d => d.doc.id).filter(Boolean) as string[])
   const tombstones = new Map<string, Tombstone>()
   const addTomb = (t: Tombstone) => { if (t?.docId && (t.kind === 'deleted' || t.kind === 'deleted_unused')) tombstones.set(t.docId, t) }
@@ -51,6 +60,8 @@ export function pinnedDocuments(pinnedLocations: unknown, liveLocations: unknown
   }
   return flattenSourceDocs(pinnedLocations).map(({ doc, location }) => {
     const base = { id: doc.id ?? null, file_name: doc.file_name || 'document', document_type: doc.document_type || 'document', location, file_path: doc.file_path ?? null }
+    // sec1: before anything else. A path outside the owner's folder is never signed, whatever else is true of it.
+    if (!pathInOwnerFolder(base.file_path, ownerId)) return { ...base, status: 'unavailable' as const }
     // A document stored before uploads carried an id cannot be checked; the page already says it cannot be served.
     if (!doc.id || liveIds.has(doc.id)) return { ...base, status: 'available' as const }
     return { ...base, status: 'deleted' as const, deleted_note: deletedDocumentNote(base.file_name, tombstones.get(doc.id) ?? null) }

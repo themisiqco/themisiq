@@ -1,4 +1,4 @@
--- NOT YET RUN. Written 9 Oct 2026 for T16; Lisa runs it in the Supabase SQL editor and records the run here.
+-- RUN 9 Oct 2026 (evening, Ontario; 10 Oct UTC) in the Supabase SQL editor, in the order in the header; verified.
 -- RUN ORDER: 1 of 4. Then 20261010_ghg_inventory_versions.sql and 20261010_verifier_access_inventory_version.sql,
 -- BEFORE the T16 app change is pushed; then, once that deploy is live, 20261010_get_verifier_inventory_pinned.sql, then
 -- supabase/verify/20261010_t16_verify.sql.
@@ -39,6 +39,7 @@
 --   And: select pg_get_functiondef('public.get_verifier_inventory(uuid)'::regprocedure);
 -- PROCEED if the inventory object it builds names exactly the sixteen keys listed below, in that order, and nothing
 -- else (the 20261009 file as written). STOP and report any difference: it means the live RPC was changed by hand.
+-- RESULT, 9 Oct 2026 (Lisa): one get_verifier_inventory.
 --
 -- VERIFY, after: supabase/verify/20261010_t16_verify.sql, checks t16_01 to t16_03.
 --

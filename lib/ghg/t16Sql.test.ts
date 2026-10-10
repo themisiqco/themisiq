@@ -28,7 +28,9 @@ describe('T16 SQL: house format', () => {
     for (const [k, sql] of Object.entries(ALL)) {
       expect([...sql].filter(ch => ch.charCodeAt(0) > 127), k).toEqual([])
       if (k === 'VERIFY') continue
-      expect(sql.split('\n')[0], k).toBe('-- NOT YET RUN. Written 9 Oct 2026 for T16; Lisa runs it in the Supabase SQL editor and records the run here.')
+      expect(sql.split('\n')[0], k).toBe('-- RUN 9 Oct 2026 (evening, Ontario; 10 Oct UTC) in the Supabase SQL editor, in the order in the header; verified.')
+      expect(sql, k).not.toContain('NOT YET RUN')
+      expect(sql, k).toMatch(/-- RESULT, 9 Oct 2026 \(Lisa\): /)
       expect(sql, k).toMatch(/-- RUN ORDER: \d of 4/)
       expect(sql, k).toContain('-- PRE-CHECK, run first:')
       expect(sql, k).toContain('-- VERIFY, after: supabase/verify/20261010_t16_verify.sql')

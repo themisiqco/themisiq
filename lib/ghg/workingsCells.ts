@@ -21,10 +21,27 @@ export const STORED_PHRASES: readonly [RegExp, string][] = [
   [new RegExp(`^Electricity T&D losses \\(NZ\\) ${EM_DASH} Scope 3 Cat 3$`), 'Electricity transmission and distribution losses (New Zealand), Scope 3 Category 3'],
   [new RegExp(`^as-published ${EM_DASH} see factor source$`), 'as published: see factor source'],
 ]
+// hk2: the refusal MissingEmissionFactorError wrote into older stored notes: "No published emission factor for natural
+// gas measured in kwh in FR (factor key "natural_gas_kwh")". Read without the key, the unit as the customer reads it
+// and the country in words.
+const STORED_MISSING_FACTOR = /No published emission factor for (.+?) measured in (\S+) in ([A-Z]{2}) \(factor key "[^"]*"\)/g
+// The factor tables spell two countries their own way: EL is Greece, UK is the United Kingdom.
+const FACTOR_COUNTRY_ISO: Record<string, string> = { EL: 'GR', UK: 'GB' }
+const REGION_NAMES = typeof Intl !== 'undefined' && 'DisplayNames' in Intl ? new Intl.DisplayNames(['en'], { type: 'region' }) : null
+/** A two-letter country code as stored in an engine note, in words; the code itself when it has no name. */
+export function storedCountryWords(code: string): string {
+  if (code === 'EU') return 'the European Union'
+  let name: string | undefined
+  try { name = REGION_NAMES?.of(FACTOR_COUNTRY_ISO[code] ?? code) } catch { name = undefined }
+  return name && name !== code ? name : code
+}
+
 export function displayStoredText(s: string | null | undefined): string {
   if (s == null) return ''
   let out = s
   for (const [re, to] of STORED_PHRASES) out = out.replace(re, to)
+  out = out.replace(STORED_MISSING_FACTOR, (_m, fuel: string, unit: string, country: string) =>
+    `No published emission factor for ${fuel} measured in ${KEY_UNIT_WORDS[unit.toLowerCase()] ?? unitLabel(unit)} in ${storedCountryWords(country)}`)
   if (out.trim() === EM_DASH) return 'Not provided'
   return out.replace(new RegExp(`\\s*${EM_DASH}\\s*`, 'g'), ': ')
 }
@@ -484,6 +501,20 @@ const GWP_BASIS_WORDS: Record<string, string> = {
   // the stored text exactly, so it holds the old dash; built from its code so no dash is written as copy here.
   [`as-published ${EM_DASH} see factor source`]: 'as published: see factor source',   // also in STORED_PHRASES
 }
+/**
+ * hk2: the inventory's GWP basis for the verifier page's heading line. When a priced row's factor is published on its
+ * own GWP basis (stored as "as published", or a GWP set other than the inventory's, such as an Australian NGA factor on
+ * AR5), the line says so; otherwise it is the GWP set alone.
+ */
+export function gwpHeadingWords(gwpVersion: string, rows: readonly { gwp_basis?: string | null; result_tco2e?: number | null }[] | null | undefined): string {
+  const own = (rows ?? []).some(r => {
+    if (r.result_tco2e == null || !r.gwp_basis) return false
+    if (/^AR[456]$/.test(r.gwp_basis)) return r.gwp_basis !== gwpVersion
+    return workingsGwpBasisCell(r).toLowerCase().startsWith('as published')
+  })
+  return own ? `${gwpVersion}, except factors published with their own GWP basis, as shown on each row.` : gwpVersion
+}
+
 /** The GWP basis column, in words. Never an engine token. */
 export const workingsGwpBasisCell = (r: { gwp_basis?: string | null }): string =>
   !r.gwp_basis ? NOT_PROVIDED : GWP_BASIS_WORDS[r.gwp_basis] ?? displayStoredText(r.gwp_basis)

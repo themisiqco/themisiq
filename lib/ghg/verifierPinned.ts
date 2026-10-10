@@ -27,11 +27,18 @@ export async function loadPinnedDocuments(
 
   const { data: live, error: lErr } = await admin
     .from('ghg_inventories')
-    .select('locations_data, location_log')
+    // user_id: the owner, read here from the inventory row and never from the snapshot (sec1).
+    .select('user_id, locations_data, location_log')
     .eq('id', grant.inventoryId)
     .single()
   if (lErr || !live) return { ok: false, reason: 'inventory_not_found' }
 
+  if (typeof live.user_id !== 'string' || !live.user_id) return { ok: false, reason: 'inventory_not_found' }
+
   const snapshot = (version.snapshot ?? {}) as { locations_data?: unknown }
-  return { ok: true, documents: pinnedDocuments(snapshot.locations_data, live.locations_data, live.location_log) }
+  const documents = pinnedDocuments(snapshot.locations_data, live.locations_data, live.location_log, live.user_id)
+  // sec1: metadata only. Never the path, which is the thing that is wrong.
+  const refused = documents.filter(d => d.status === 'unavailable').length
+  if (refused > 0) console.warn('[verifier-documents] stored path outside the owner folder, not served', { inventoryId: grant.inventoryId, documents: refused })
+  return { ok: true, documents }
 }

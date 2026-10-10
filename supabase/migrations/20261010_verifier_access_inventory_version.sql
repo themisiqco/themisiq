@@ -1,4 +1,4 @@
--- NOT YET RUN. Written 9 Oct 2026 for T16; Lisa runs it in the Supabase SQL editor and records the run here.
+-- RUN 9 Oct 2026 (evening, Ontario; 10 Oct UTC) in the Supabase SQL editor, in the order in the header; verified.
 -- RUN ORDER: 3 of 4, after 20261010_ghg_inventory_versions.sql. Files 1 to 3 run BEFORE the T16 app change is pushed.
 --
 -- verifier_access.inventory_version_id: every verifier link is pinned to a saved version (T16)
@@ -47,6 +47,10 @@
 -- nothing. STOP and report if any privilege covers fewer columns: a column-level grant would not reach the new ones.
 --   And: select count(*) from public.verifier_access where inventory_id not in (select id from public.ghg_inventories);
 -- PROCEED if 0 (the foreign key already guarantees it; a non-zero count means the table is not as the repo records).
+-- RESULT, 9 Oct 2026 (Lisa): verifier_access grants table-level, on all 15 columns: authenticated INSERT, SELECT,
+--   UPDATE; service_role INSERT, REFERENCES, SELECT, UPDATE; anon none. 0 orphan links. Also checked: 0 links whose
+--   owner (customer_user_id) differs from the inventory's owner.
+-- AFTER RUNNING, 9 Oct 2026 (Lisa): 13 links pinned to 7 versions; 0 unpinned.
 --
 -- VERIFY, after: supabase/verify/20261010_t16_verify.sql, checks t16_11 to t16_15 and t16_20.
 --

@@ -14,7 +14,8 @@ import { countryRefusalText, countryRefusalLabel } from '../../../lib/ghg/countr
 import { anyPublishedFactorApplied } from '../../../lib/ghg/factorEditions'
 import { workingsActivityCell, workingsVintageCell, workingsEditionLines, workingsScope2MethodCell, workingsResultCell,
   workingsFactorSourceCell, eventRowsOf, workingsGwpBasisCell, workingsConversionFactorLine,
-  workingsNoteCell, workingsEmissionFactorCell, displayStoredText } from '../../../lib/ghg/workingsCells'
+  workingsNoteCell, workingsEmissionFactorCell, displayStoredText, gwpHeadingWords } from '../../../lib/ghg/workingsCells'
+import { jurisdictionWords, familyWords } from '../../../lib/ghg/editionWords'
 import { sourceAttributionsFor } from '../../../lib/ghg/defraPublication'
 import { auditTrailLine } from '../../../lib/auditTrailNotice'
 import SourceAttributions from '../../components/SourceAttributions'
@@ -47,7 +48,7 @@ interface AuditEntry {
 // null for a legacy document uploaded before ids existed — it cannot be signed, so its row says so.
 // T16: the documents are the pinned version's. One deleted since carries status 'deleted' and the note that says who
 // deleted it and when, and gets no link: the file is no longer held.
-interface VerifierDoc { id: string | null; file_name: string; document_type: string; location: string; status?: 'available' | 'deleted'; deleted_note?: string }
+interface VerifierDoc { id: string | null; file_name: string; document_type: string; location: string; status?: 'available' | 'deleted' | 'unavailable'; deleted_note?: string }
 interface WorkingRow {
   location: string; source: string; scope: number
   // NULLABLE, because the engine emits null and always has. These were declared `number`, the RPC
@@ -424,12 +425,13 @@ function SourceDocRow({ doc, token }: { doc: VerifierDoc; token: string }) {
           // T16: in the version shared, deleted since. Listed with who deleted it and when; no button, because there
           // is no file left to open.
           <span style={{ fontSize: 11, color: '#92400e', maxWidth: 420, lineHeight: 1.5 }}>{doc.deleted_note}</span>
-        ) : doc.id ? (
+        ) : doc.id && doc.status !== 'unavailable' ? (
           <button onClick={() => open(doc.id!)} disabled={busy} style={{ fontSize: 12, padding: '6px 16px', borderRadius: 6, border: 'none', background: '#0d0d0d', color: '#fff', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Opening…' : 'View'}
           </button>
         ) : (
-          // A document stored before uploads carried an id. It cannot be resolved to a file, so we
+          // A document stored before uploads carried an id, or (sec1) one stored outside the inventory owner's folder,
+          // which the server will not sign. It cannot be resolved to a file, so we
           // say that rather than offer a button certain to fail. The document is still listed: a
           // verifier needs to know the evidence exists even when this page cannot serve it.
           <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>Not available here — ask the company for a copy</span>
@@ -780,6 +782,8 @@ export default function VerifierPage() {
   }
   // T16: bills in the version shared that have been deleted since. Their quotes still read, with no link.
   const deletedDocIds = new Set(docs.filter(d => d.status === 'deleted' && d.id).map(d => d.id as string))
+  // sec1: documents the server will not sign (stored outside the owner's folder). Their quotes read as plain text.
+  const unavailableDocIds = new Set(docs.filter(d => d.status === 'unavailable' && d.id).map(d => d.id as string))
   const fileOfDoc = (id: string) => docById[id]?.file_name || 'A document no longer on this inventory'
   const quoteOfDoc = (id: string, pi: number | undefined) => (pi == null ? null : docById[id]?.extracted?.[pi]?.sourceQuote?.trim() || null)
   // The reporting year in words, as every other label on this page names it.
@@ -824,7 +828,7 @@ export default function VerifierPage() {
           Reporting year {yearLabel(inv.reporting_year, inv.fiscal_year_end_month).heading} ({periodWords(inv.reporting_year, inv.fiscal_year_end_month).period}) · {frameworks.join(', ') || 'No framework selected'} · {boundaryLabel(inv.boundary_approach)}
           {' · '}
           {inv.gwp_version
-            ? <>GWP basis: {inv.gwp_version}</>
+            ? <>GWP basis: {gwpHeadingWords(inv.gwp_version, inv.workings)}</>
             : <span style={{ color: 'var(--color-state-warn)', fontWeight: 600 }}>GWP basis not stated</span>}
         </p>
 
@@ -1035,8 +1039,8 @@ export default function VerifierPage() {
                         {Object.entries(inv.factor_editions).flatMap(([juris, families]) =>
                           Object.entries(families ?? {}).map(([family, ed]) => (
                             <tr key={`${juris}:${family}`}>
-                              <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 600, whiteSpace: 'nowrap' }}>{juris}</td>
-                              <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{family}</td>
+                              <td style={{ padding: '8px 10px', color: '#0d0d0d', fontWeight: 600, whiteSpace: 'nowrap' }}>{jurisdictionWords(juris)}</td>
+                              <td style={{ padding: '8px 10px', color: '#555553', whiteSpace: 'nowrap' }}>{familyWords(family)}</td>
                               <td style={{ padding: '8px 10px', color: '#555553' }}>{ed?.source}</td>
                               <td style={{ padding: '8px 10px', color: '#0d0d0d', whiteSpace: 'nowrap' }}>{ed?.edition}</td>
                             </tr>
@@ -1053,7 +1057,7 @@ export default function VerifierPage() {
                   <p style={{ fontSize: 11, color: 'var(--color-ink-muted)', lineHeight: 1.6, margin: '12px 0 0' }}>
                     These editions describe the calculation that produced the figures on this page, not the
                     factor tables currently held by the platform. They were recorded at the same time as the
-                    calculation workings above, so the two describe the same calculation.
+                    calculation workings below, so the two describe the same calculation.
                   </p>
                 </>
               )}
@@ -1123,6 +1127,7 @@ export default function VerifierPage() {
                           with its reason), and who did what to it and when. From the stored row only. */}
                       <WorkingsSourceCell w={w as unknown as SourceCellRow} fileOf={fileOfDoc} quoteOf={quoteOfDoc} yearText={yearText}
                         renderQuote={(q, docId) => docId && deletedDocIds.has(docId) ? `"${q}" ${DELETED_FILE_QUOTE_SUFFIX}`
+                          : docId && unavailableDocIds.has(docId) ? `"${q}"`
                           : docId ? <SourceQuoteLink quote={q} docId={docId} token={token} /> : `"${q}"`}
                         legacyDocIdOfPath={p => p ? pathToDocId[p] : undefined} />
                       {/* Written for a verifier, not reused from the operator's wizard. The operator

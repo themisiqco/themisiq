@@ -4845,7 +4845,10 @@ function VerifierInvite({ inventoryId, dirty }: { inventoryId: string | null; di
           product. "Revoke one" rather than "revoke access", because access is the thing that does
           not fully revoke. */}
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '0.75rem' }}>
-        Generate a read-only link for your independent assurance provider. They&apos;ll see this inventory&apos;s summary, methodology, and full audit trail, with no ability to edit. Links expire in 90 days, and you can revoke one at any time.
+        {/* hk2: since T16 a link shows the saved version it was shared with, and the audit trail stops at that version
+            (get_verifier_inventory, 20261010_get_verifier_inventory_pinned.sql). Expiry is the column default on
+            verifier_access.expires_at, now() + 90 days (20260707_verifier_access_baseline_and_consent.sql). */}
+        Generate a read-only link for your independent assurance provider. They&apos;ll see the saved version of this inventory you share, with its figures, workings, methodology and source documents, and the audit trail up to that version, with no ability to edit. After you save changes, use &ldquo;Share the latest saved version&rdquo; to show them the newer one. Links expire 90 days after they are created, and you can revoke one at any time.
       </p>
       <p style={{ fontSize: 13, color: '#555553', fontWeight: 400, lineHeight: 1.7, marginBottom: '1.25rem' }}>
         Revoking closes the link: the page stops loading and no further documents can be opened. It does not reach anything already downloaded. That is normal and expected. An assurance provider is required to keep the evidence behind their opinion in their own working papers.

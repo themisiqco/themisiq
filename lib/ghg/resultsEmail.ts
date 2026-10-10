@@ -32,6 +32,7 @@ import { GHG_TIERS } from '../pricing'
 import { RESULT_DP, workingsActivityCell } from './workingsCells'
 import { COUNTRY_WORDS } from './series'
 import type { FactorEditions } from './factorEditions'
+import { jurisdictionWords, familyWords } from './editionWords'
 import { gridRegionName, residualRegionName } from './gridRegionNames'
 import { emailShell, EMAIL_POSTAL_ADDRESS, EMAIL_FONT_DISPLAY } from '../email/layout'
 import { INK, INK_MUTED, LINE, BRAND } from '../brand'
@@ -122,10 +123,6 @@ export type ResultsEmailModel = {
   nextStep: string | null
 }
 
-const JURISDICTION_WORDS: Record<string, string> = {
-  US: 'United States', CA: 'Canada', UK: 'United Kingdom', EU: 'European Union', AU: 'Australia', NZ: 'New Zealand',
-}
-const FAMILY_WORDS: Record<string, string> = { combustion: 'Fuel combustion', electricity: 'Electricity', steam: 'Steam' }
 
 /** Engine labels as plain text: an em dash becomes a colon. */
 export function plain(s: string): string {
@@ -264,7 +261,7 @@ export function resultsEmailModel(input: { row: SavedInventoryRow; fullName: str
     for (const [f, ed] of Object.entries(families ?? {})) {
       if (ed && typeof ed.source === 'string') {
         const edition = ed.edition && editionAddsSomething(ed.source, String(ed.edition)) ? `, edition ${ed.edition}` : ''
-        editions.push(plain(`${JURISDICTION_WORDS[j] ?? j}, ${FAMILY_WORDS[f] ?? f}: ${ed.source}${edition}`))
+        editions.push(plain(`${jurisdictionWords(j)}, ${familyWords(f)}: ${ed.source}${edition}`))
       }
     }
   }

@@ -390,3 +390,21 @@ SO THE DIVISION IS: this file for intent, the header for execution, the
 DATABASE for truth. When the two documents disagree, neither wins by default.
 Query the database. A migration is not self-recording; nothing marks a file as
 run except a person writing it down, which is exactly why both drift.
+
+TWO RULES FOR EVERY NEW MIGRATION:
+
+- **The verify query names the new column, table or function directly.** For
+  example `select column_name from information_schema.columns where
+  table_name = 'ghg_inventories' and column_name = 'location_log'`, or
+  `to_regclass(...)`, or `to_regprocedure(...)`. A count of columns is never
+  the proof a migration ran: the same count can come from before the run.
+- **A migration that adds or changes a column, table or function the API reads
+  ends with `notify pgrst, 'reload schema';`, and its header says so.** Until
+  the API reloads its schema cache, it can refuse a column that exists.
+
+WHY, WITH THE DATE ON IT. On 9 Oct 2026 the header of
+`20261009_ghg_location_log.sql` recorded a 35-column pre-check result as the
+after-run check, so the file read as run when the column did not exist. Every
+wizard save failed with "Could not find the 'location_log' column of
+'ghg_inventories' in the schema cache" until the column was created and the
+schema cache reloaded. That file's header holds the corrected record.

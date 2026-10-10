@@ -10,7 +10,7 @@ import { WorkingsSourceCell, type SourceCellRow } from './WorkingsSourceCell'
 import { buildWorkings, deriveLocations, emptyLocation, type Location, type ExtractedProposal, type SourceDoc, type CoverageResolution } from '@/lib/ghg/engine'
 import { addOverride } from '@/lib/ghg/overrides'
 import { TEST_PREPARED_ON } from '@/lib/testing/heldSelection'
-import { workingsGwpBasisCell, workingsConversionFactorLine, workingsSourceCell } from '@/lib/ghg/workingsCells'
+import { workingsGwpBasisCell, workingsConversionFactorLine, workingsSourceCell, workingsNoteCell } from '@/lib/ghg/workingsCells'
 
 const BY = { userId: 'u-1', email: 'jo@acme.example' }
 const p = (o: Partial<ExtractedProposal>): ExtractedProposal => ({ fuelType: 'natural_gas', rawValue: 100, rawUnit: 'mcf', value: 100, unit: 'mcf',
@@ -45,6 +45,10 @@ const render = (w: SourceCellRow, docs: Record<string, SourceDoc>) => text(rende
 const KEYS = ['outside_year', 'same_bill_as', 'exact_duplicate_of', 'manual_override', 'not_confirmed', 'invalid_period', 'mixed_units',
   'billing_month', 'customer_confirmed', 'natural_gas', 'coverage_resolution', 'document_event', 'location_event', 'all_bills_excluded', 'scope3-cat3']
 
+// hk2: a row saved with the refusal MissingEmissionFactorError used to write, factor key and stored unit included.
+const OLD_REFUSAL = { location: 'Paris', stream: 'natural_gas', source: 'Natural gas', scope: 1, gwp_basis: 'unpriced', result_tco2e: null, factor_key: 'natural_gas_kwh',
+  note: 'NOT PRICED: No published emission factor for natural gas measured in kwh in FR (factor key "natural_gas_kwh"). This figure cannot be priced.' }
+
 describe('T11: per figure, the bills that counted and those that did not, and why', () => {
   const { rows, docs } = fixture()
   const gas = rows.find(r => r.stream === 'natural_gas')!
@@ -69,9 +73,11 @@ describe('T11: per figure, the bills that counted and those that did not, and wh
     expect(t).toContain('Entered by hand by jo@acme.example on 3 October 2026, instead of from the bills. Reason: Bill covers two tenants; our share is 40%.')
     expect(t).not.toContain('Bill-sourced')
   })
-  it('no internal key reaches the verifier, on any row of the fixture', () => {
-    for (const w of rows) {
-      const t = `${render(w, docs)} ${workingsGwpBasisCell(w as never)} ${workingsSourceCell(w as never)} ${workingsConversionFactorLine(w as never) ?? ''}`
+  it('no internal key reaches the verifier, on any row of the fixture, nor on an older stored refusal', () => {
+    for (const w of [...rows, OLD_REFUSAL as unknown as (typeof rows)[number]]) {
+      const t = `${render(w, docs)} ${workingsGwpBasisCell(w as never)} ${workingsSourceCell(w as never)} ${workingsConversionFactorLine(w as never) ?? ''} ${workingsNoteCell(w as never)}`
+      expect(t).not.toContain('factor key')
+      expect(t).not.toMatch(/\bkwh\b/)
       for (const k of KEYS) expect(t, `${String(w.source)}: ${k}`).not.toContain(k)
       if (w.factor_key) expect(t, String(w.source)).not.toContain(String(w.factor_key))
       expect(t).not.toContain('—')
@@ -102,6 +108,11 @@ describe('T11: the rest of what a row carries', () => {
     const row = (buildWorkings([l], 'AR6', 2025, [], 12, { preparedOn: TEST_PREPARED_ON }) as SourceCellRow[]).find(r => r.ch4_n2o_note)!
     expect(row.ch4_n2o_note).toMatch(/^Methane and nitrous oxide for petrol in light vehicles at Depot are /)
     expect(render(row, {})).toContain(row.ch4_n2o_note as string)
+  })
+  it('hk2: an older stored refusal reads without its factor key, the unit as the customer reads it, the country in words', () => {
+    expect(workingsNoteCell(OLD_REFUSAL)).toBe('NOT PRICED: No published emission factor for natural gas measured in kWh in France. This figure cannot be priced.')
+    expect(workingsNoteCell({ note: 'NOT PRICED: No published emission factor for diesel stationary measured in gallon in EL (factor key "diesel_stationary_gallon").' }))
+      .toBe('NOT PRICED: No published emission factor for diesel stationary measured in US gallons in Greece.')
   })
   it('a coverage row saved with its fuel key reads the fuel in words; a GWP basis token reads in words', () => {
     expect(workingsSourceCell({ source: 'Coverage resolution: natural_gas', gwp_basis: 'coverage_resolution' })).toBe('Coverage resolution: natural gas')

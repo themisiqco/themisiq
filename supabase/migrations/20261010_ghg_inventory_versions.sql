@@ -1,4 +1,4 @@
--- NOT YET RUN. Written 9 Oct 2026 for T16; Lisa runs it in the Supabase SQL editor and records the run here.
+-- RUN 9 Oct 2026 (evening, Ontario; 10 Oct UTC) in the Supabase SQL editor, in the order in the header; verified.
 -- RUN ORDER: 2 of 4, after 20261010_ghg_verifier_projection.sql. Files 1 to 3 run BEFORE the T16 app change is pushed.
 --
 -- public.ghg_inventory_versions: the saved versions a verifier link is pinned to (T16)
@@ -51,6 +51,7 @@
 --          to_regprocedure('public.ghg_verifier_projection(public.ghg_inventories)') as projection;
 -- PROCEED if existing_table is null and projection is not null (file 1 ran, this one has not). If existing_table is
 -- not null, STOP and report: the table exists and its shape must be compared before anything is re-run.
+-- RESULT, 9 Oct 2026 (Lisa): no ghg_inventory_versions table; the projection present.
 --
 -- VERIFY, after: supabase/verify/20261010_t16_verify.sql, checks t16_04 to t16_10.
 --

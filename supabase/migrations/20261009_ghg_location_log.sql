@@ -1,4 +1,5 @@
--- RUN 9 Oct 2026 in the Supabase SQL editor; grants verified.
+-- RUN 9 Oct 2026 (evening, Ontario) in the Supabase SQL editor, then the API schema cache reloaded; grants verified.
+-- NOT run on the morning of 9 Oct 2026, as this line first said: see CORRECTION below.
 --
 -- ghg_inventories.location_log: the record each deleted location leaves (T18 section D)
 -- ---------------------------------------------------------------------------
@@ -53,9 +54,15 @@
 --   UPDATE on free_tier only (the 8 Oct 2026 result).
 -- VERIFY, after: the same query filtered to column_name = 'location_log' should show authenticated with INSERT,
 -- SELECT, UPDATE; service_role with SELECT (and REFERENCES, as on factor_selection); anon with nothing.
--- VERIFIED, 9 Oct 2026 (Lisa), after running: all 35 columns alike for authenticated (INSERT, SELECT, UPDATE) and
---   service_role (REFERENCES, SELECT); service_role UPDATE still on 1 column (free_tier); anon holds nothing on
---   ghg_inventories.
+-- CORRECTION, 9 Oct 2026 (evening, Ontario). This file was NOT run on the morning of 9 Oct. The result first recorded
+--   here as the after-run check ("all 35 columns alike ...") was a pre-check result, misread: a count of columns does
+--   not show which columns they are. The column was created on 9 Oct 2026 evening (Ontario), after every wizard save
+--   had failed with "Could not find the 'location_log' column of 'ghg_inventories' in the schema cache".
+-- VERIFIED, 9 Oct 2026 evening (Lisa), after running, with the query above filtered to column_name = 'location_log':
+--   authenticated INSERT, SELECT, UPDATE; service_role REFERENCES, SELECT; anon nothing. Then
+--   notify pgrst, 'reload schema'; was run, and saves worked.
+-- The reload is not in this file's SQL, which is left as it ran. New migrations end with it (CLAUDE.md, the two rules
+--   for every new migration).
 --
 -- Idempotent: ADD COLUMN IF NOT EXISTS; the comment is restated and the grants re-issued (a no-op) on every run.
 -- ASCII only, so it pastes whole into the SQL editor (lib/ghg/verifierWhitelist.test.ts W-6).
