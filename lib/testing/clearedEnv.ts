@@ -29,6 +29,8 @@ export const CLEARED_ENV = [
   'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
   // Admin, the guide's model key, invoice text
   'ADMIN_EMAIL', 'ANTHROPIC_API_KEY', 'INVOICE_WIRE_FOOTER',
+  // BR7: the daily Bill Review email job's bearer secret (Vercel Cron)
+  'CRON_SECRET',
 ] as const
 
 /**

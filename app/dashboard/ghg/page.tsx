@@ -52,6 +52,7 @@ import { readingOf, HUMAN_READ_NOTE, READING_UNKNOWN_NOTE, ASSISTANT_AI_NOTICE, 
 import { mergeReadings, type ReadingRow } from '../../../lib/billReview/mergeReadings'
 import { withTeamFor, type BillReviewRow } from '../../../lib/billReview/billState'
 import { BillReviewContext, BillReviewDocNotes, billReviewLine, type BillReviewState } from './_components/BillReviewNote'
+import { BillReviewReadingLine } from './_components/BillReviewReadingLine'
 import type { BillReviewReading } from '../../../lib/pricing'
 import { SB253_SCOPE3_FROM, SB253_WINDOW_STATUS_WORDS, SB253_ELECTION_BANNER, sb253FirstReportBanner } from '../../../lib/sb253'
 import { EPA_EGRID_POWER_PROFILER_URL } from '../../../lib/sources'
@@ -727,6 +728,8 @@ const searchParams = useSearchParams()
   const [billReviewReading, setBillReviewReadingState] = useState<BillReviewReading | null>(null)
   const billReviewReadingRef = useRef<BillReviewReading | null>(null)
   const setBillReviewReading = (r: BillReviewReading | null) => { billReviewReadingRef.current = r; setBillReviewReadingState(r) }
+  // BR6: when ThemisIQ last changed the reading (bill_review_reading_set_at), for the "Since {date}" line. Read-only.
+  const [billReviewReadingSince, setBillReviewReadingSince] = useState<string | null>(null)
   // BR4: the Bill Review team's records for this inventory's bills (by stored path), read on load and when the page
   // becomes visible again, and the bills whose submission did not land (by document id), sent again on the next load.
   const [billReview, setBillReview] = useState<BillReviewState>({ rows: {}, submitFailed: {} })
@@ -994,6 +997,7 @@ const searchParams = useSearchParams()
     // where no ?id is present, so there's no stale ?id to clear — switching mode in state is enough.
     setInventoryId(null)
     setBillReviewReading(null)
+    setBillReviewReadingSince(null)
     setEditingFree(false)
     setSaved(false)
     skipSavedReset.current = true // fresh inventory is pristine until the user types: it becomes the baseline
@@ -1148,6 +1152,7 @@ const searchParams = useSearchParams()
        skipSavedReset.current = true 
         setInventoryId(data.id)
         setBillReviewReading(readingOf(data.bill_review_reading))
+        setBillReviewReadingSince(typeof data.bill_review_reading_set_at === 'string' ? data.bill_review_reading_set_at : null)
         loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(data.locations_data) }
         loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(data.locations_data), entries: typedEntriesBaseline(data.locations_data) }
         loadedLocationLog.current = { inventoryId: data.id, log: locationLogBaseline(data.location_log) }
@@ -1335,7 +1340,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
 
   // BR4: send one bill of a human-read inventory to the Bill Review team. The route records it as waiting with its
   // expected date (computed on the server) and never sends it to the AI. False when the request did not land.
-  const submitBill = async (accessToken: string, invId: string, loc: Location, doc: SourceDoc): Promise<boolean> => {
+  const submitBill = async (accessToken: string, invId: string, loc: Location, doc: SourceDoc): Promise<{ ok: boolean; expectedBy: string | null }> => {
     try {
       const res = await fetch('/api/bill-review/submit', {
         method: 'POST',
@@ -1343,11 +1348,12 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
         body: JSON.stringify({ filePath: doc.file_path, inventoryId: invId, sourceDocId: doc.id, fileName: doc.file_name,
           documentType: doc.document_type, locationId: loc.id, locationName: loc.name }),
       })
-      if (!res.ok) console.error('[bill-review] submit refused', { status: res.status })
-      return res.ok
+      if (!res.ok) { console.error('[bill-review] submit refused', { status: res.status }); return { ok: false, expectedBy: null } }
+      const body = await res.json().catch(() => null)
+      return { ok: true, expectedBy: typeof body?.expectedBy === 'string' ? body.expectedBy : null }
     } catch {
       console.error('[bill-review] submit did not complete')
-      return false
+      return { ok: false, expectedBy: null }
     }
   }
 
@@ -1380,7 +1386,7 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
     const failed: Record<string, true> = {}
     if (retry && missing.length > 0) {
       const { data: { session } } = await supabase.auth.getSession()
-      for (const x of missing) if (!session || !(await submitBill(session.access_token, invId, x.l, x.d))) failed[x.d.id] = true
+      for (const x of missing) if (!session || !(await submitBill(session.access_token, invId, x.l, x.d)).ok) failed[x.d.id] = true
       setBillReview({ rows: byPath, submitFailed: failed })
       if (Object.keys(failed).length < missing.length) return refreshBillReview(invId, false)
       return
@@ -1553,15 +1559,21 @@ if (field === 'province') locs[idx].grid_region = value // Canadian provinces ma
       // BR4 (ruling 3): A HUMAN-READ UPLOAD IS SAVED AT ONCE, so the bill is on the saved inventory the team reads it
       // against (BR8) and the read-back finds it. The next inventory is built here and put in the ref first, so the
       // save writes these documents (handleSave reads inventoryRef.current).
+      // BR7: each bill is sent first, and the date the team expects it by is written onto the bill, so the export block
+      // can name it once saved.
+      const failed: Record<string, true> = {}
+      for (const d of humanDocs) {
+        const sent = await submitBill(session.access_token, invId, inventoryRef.current.locations[locIdx], d)
+        if (!sent.ok) failed[d.id] = true
+        else d.bill_review = { reading: 'human', expectedBy: sent.expectedBy }
+      }
+      setBillReview(prev => ({ ...prev, submitFailed: { ...prev.submitFailed, ...failed } }))
       const cur = inventoryRef.current
       const locs = [...cur.locations]
       locs[locIdx] = { ...locs[locIdx], source_docs: [...locs[locIdx].source_docs, ...humanDocs] }
       const next = { ...cur, locations: locs }
       inventoryRef.current = next
       setInventory(next)
-      const failed: Record<string, true> = {}
-      for (const d of humanDocs) if (!(await submitBill(session.access_token, invId, locs[locIdx], d))) failed[d.id] = true
-      setBillReview(prev => ({ ...prev, submitFailed: { ...prev.submitFailed, ...failed } }))
       await handleSave()
       await refreshBillReview(invId, false)
     }
@@ -2410,6 +2422,7 @@ workings: saved.workings,
       if (error) { lastSaveError.current = error.message; alert(saveFailedText(error)); console.error(error); return }
       if (data) {
         savedId = data.id; setInventoryId(data.id); setBillReviewReading(readingOf(data.bill_review_reading))
+        setBillReviewReadingSince(typeof data.bill_review_reading_set_at === 'string' ? data.bill_review_reading_set_at : null)
         loadedDocumentLog.current = { inventoryId: data.id, log: documentLogBaseline(saved.locations_data) }
         loadedTypedFigures.current = { inventoryId: data.id, typed: typedBaseline(saved.locations_data), entries: typedEntriesBaseline(saved.locations_data) }
         loadedLocationLog.current = { inventoryId: data.id, log: locationLogBaseline(inventory.location_log) }
@@ -2839,6 +2852,10 @@ workings: saved.workings,
       <div>
         <h2 style={sectionHead}>Energy & fuel data</h2>
         <p style={sectionSub}>Enter what appears on your utility bills and fuel records. All calculations happen automatically. You never need to look up emission factors.</p>
+        {/* BR6 (Q1): how this inventory's bills are read, read-only, for a Bill Review holder; a change is asked for. */}
+        {CONCIERGE_DEV && billReviewReading && (
+          <BillReviewReadingLine reading={billReviewReading} since={billReviewReadingSince} companyName={inventory.company_name} yearText={yl.inText} />
+        )}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: '2rem' }}>
           {inventory.locations.map((l, i) => (
             <button key={l.id} onClick={() => setActiveLocation(i)} style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, background: activeLocation === i ? 'var(--color-brand-wash)' : '#f8f7f5', color: activeLocation === i ? 'var(--color-ink)' : '#555553', border: `0.5px solid ${activeLocation === i ? 'var(--color-brand)' : '#e8e7e4'}`, cursor: 'pointer', fontWeight: activeLocation === i ? 500 : 400 }}>
@@ -4416,7 +4433,7 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onDocum
   const conciergeReads = hasConcierge && !CONCIERGE_UNREAD_DOC_TYPES.has(docType)
   // Uploads with nothing read from them that block export (T10 ruling); every other such upload is evidence.
   const unreadBlocking = new Set(findUnresolvedCoverage([location], reportingYear, fiscalYearEndMonth, coverageResolutions)
-    .filter(i => i.status === 'none').flatMap(i => i.docIds ?? []))
+    .filter(i => i.status === 'none' || i.status === 'awaiting_reading' || i.status === 'reading_unreadable').flatMap(i => i.docIds ?? []))
   // T15-fix1, T15-fix2: the line under each confirmed reading that reaches no total, keyed `${docId}:${index}`.
   // Each reading still shows what was read; this says it is not counted, and why. Built by the engine from the
   // same contributions the figure is folded from (notCountedLines).
@@ -4509,7 +4526,8 @@ function DocUpload({ label, uploadsOff, locIdx, docType, docs, onUpload, onDocum
           {(doc.extracted?.length ?? 0) === 0 && !unreadBlocking.has(doc.id) && !billReviewLine(doc, billReview) && (
             <div style={{ marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5, color: '#555553' }}>Uploaded as evidence. No figure was read from it.</div>
           )}
-          {doc.read_note && !billReviewLine(doc, billReview) && (
+          {/* BR7: a bill the team could not read that still blocks says so once, in the coverage strip with its action. */}
+          {doc.read_note && !billReviewLine(doc, billReview) && !(doc.bill_review && doc.read_outcome === 'abstained' && unreadBlocking.has(doc.id)) && (
             <div style={{
               marginTop: 4, marginLeft: 14, fontSize: 11, lineHeight: 1.5,
               color: doc.read_outcome === 'failed' ? 'var(--color-state-warn)' : '#555553',

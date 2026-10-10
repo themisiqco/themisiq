@@ -14,9 +14,14 @@ export type BillReviewRow = {
   unreadable_note: string | null; read_at: string | null
 }
 
-/** Uploaded while human-read, still on the inventory, not withdrawn, nothing read into it, and not yet read by the team. */
+/**
+ * Uploaded while human-read, still on the inventory, not withdrawn, nothing read into it, and not yet read by the team.
+ * BR7: a bill the team could not read (read_outcome 'abstained', written by the merge and saved) is not waiting, even
+ * before the team's records load, so its figure is editable and "Enter the figure from the bill yourself" is true.
+ */
 export function isWaiting(doc: SourceDoc, row: BillReviewRow | undefined): boolean {
-  return doc.bill_review?.reading === 'human' && !doc.withdrawn && (doc.extracted?.length ?? 0) === 0 && (!row || row.status === 'waiting')
+  return doc.bill_review?.reading === 'human' && !doc.withdrawn && (doc.extracted?.length ?? 0) === 0
+    && doc.read_outcome !== 'abstained' && (!row || row.status === 'waiting')
 }
 
 /**

@@ -77,7 +77,7 @@ describe('BR4 merge: a specialist’s reading becomes a proposal of the same sha
     const d = docOf(m.locations)
     expect(d.extracted!.map(p => [p.readBy?.readingId, p.status, p.rawValue])).toEqual([['rd-1', 'confirmed', 4210]])
     expect(d.bill_review?.correctionsPending).toEqual([{ readingId: 'rd-2', supersedes: 'rd-1', fuelType: 'electricity', rawValue: 4120, rawUnit: 'kWh', at: AT }])
-    expect(correctionNotice(d.bill_review!.correctionsPending![0], 'confirmed')).toBe('Our team corrected this reading after you confirmed it: 4120 kWh. Review it.')
+    expect(correctionNotice(d.bill_review!.correctionsPending![0], 'confirmed')).toBe('Our team corrected this reading after you confirmed it: 4,120 kWh. Review it.')
     expect(mergeReadings(m.locations, [row()], [reading(), reading({ id: 'rd-2', raw_value: '4120', supersedes: 'rd-1' })]).changed).toBe(false)
   })
   it('a rejected proposal is not overwritten either', () => {
@@ -91,8 +91,10 @@ describe('BR4 merge: a specialist’s reading becomes a proposal of the same sha
   it('a bill the team could not read says so, in plain words', () => {
     const d = docOf(mergeReadings([loc([doc()])], [row({ status: 'unreadable', unreadable_note: 'The meter section is torn off.' })], []).locations)
     expect(d.read_outcome).toBe('abstained')
-    expect(d.read_note).toBe('Our team could not read a figure from this bill: The meter section is torn off. Type it into the box above.')
-    expect(unreadableNote(null)).toBe('Our team could not read a figure from this bill. Type it into the box above.')
+    // BR7 (ruled 10 Oct 2026): the bill's note is the export block's sentence, and the team's note is kept on the bill.
+    expect(d.read_note).toBe('Our team could not read a figure from d1.pdf: The meter section is torn off. Enter the figure from the bill yourself, or delete the bill if it was uploaded by mistake.')
+    expect(d.bill_review?.unreadableNote).toBe('The meter section is torn off.')
+    expect(unreadableNote('d1.pdf', null)).toBe('Our team could not read a figure from d1.pdf. Enter the figure from the bill yourself, or delete the bill if it was uploaded by mistake.')
   })
 })
 

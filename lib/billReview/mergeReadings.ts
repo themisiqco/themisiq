@@ -68,8 +68,10 @@ function ancestors(r: ReadingRow, byId: Map<string, ReadingRow>): Set<string> {
 function mergeDoc(doc: SourceDoc, row: BillReviewRow, readings: ReadingRow[]): SourceDoc {
   if (row.status === 'unreadable') {
     if ((doc.extracted?.length ?? 0) > 0) return doc
-    const note = unreadableNote(row.unreadable_note)
-    return doc.read_outcome === 'abstained' && doc.read_note === note ? doc : { ...doc, read_outcome: 'abstained', read_note: note }
+    const note = unreadableNote(doc.file_name, row.unreadable_note)
+    if (doc.read_outcome === 'abstained' && doc.read_note === note && doc.bill_review?.unreadableNote === (row.unreadable_note ?? null)) return doc
+    // BR7: the team's note is kept on the bill, so the export block can quote it (COVERAGE_MESSAGE.reading_unreadable).
+    return { ...doc, read_outcome: 'abstained', read_note: note, bill_review: { ...doc.bill_review!, unreadableNote: row.unreadable_note ?? null } }
   }
   if (row.status !== 'read') return doc
   const rs = readings.filter(r => r.bill_review_document_id === row.id)
@@ -91,7 +93,9 @@ function mergeDoc(doc: SourceDoc, row: BillReviewRow, readings: ReadingRow[]): S
     changed = true
   }
   if (!changed) return doc
-  const next: SourceDoc = { ...doc, extracted: proposals, bill_review: { reading: 'human', ...(pending.length ? { correctionsPending: pending } : {}) } }
+  const mark: NonNullable<SourceDoc['bill_review']> = { ...(doc.bill_review ?? { reading: 'human' }) }
+  delete mark.correctionsPending
+  const next: SourceDoc = { ...doc, extracted: proposals, bill_review: { ...mark, reading: 'human', ...(pending.length ? { correctionsPending: pending } : {}) } }
   if (proposals.length > 0) { delete next.read_note; delete next.read_outcome }
   return next
 }

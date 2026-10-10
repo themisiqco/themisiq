@@ -1960,6 +1960,10 @@ interface SourceDoc {
   bill_review?: {
     reading: 'human'
     correctionsPending?: { readingId: string; supersedes: string; fuelType: string; rawValue: number; rawUnit: string; at: string }[]
+    // BR7: the date the team expects to finish (the submit route's, saved with the upload), for the export block's
+    // message; null when no date is set. The team's own note when it could not read the bill.
+    expectedBy?: string | null
+    unreadableNote?: string | null
   }
 }
 
@@ -4629,6 +4633,12 @@ export const COVERAGE_MESSAGE = {
   // T10 ruling: an upload with nothing read from it, when no field its document type supports has a figure.
   unread: (file: string, fuels: string, site: string) =>
     `${file} is uploaded for ${fuels} at ${site}, but no figure has been read from it or entered. Enter the figure from the bill, or confirm this site used no ${fuels}.`,
+  // BR7 (ruled 10 Oct 2026): a bill with the Bill Review team blocks export until it is read and confirmed, or every
+  // field it backs has a Q12 override; one the team could not read blocks until the field has a figure, or it is deleted.
+  awaiting_reading: (file: string, expectedBy: string | null | undefined) =>
+    `${file} is with our team${expectedBy ? `, expected by ${isoDateInWords(expectedBy)}` : ''}. Export is blocked until it is read and you confirm it.`,
+  reading_unreadable: (file: string, note: string | null | undefined) =>
+    `Our team could not read a figure from ${file}${note ? `: ${note.trim().replace(/[.\s]+$/, '')}` : ''}. Enter the figure from the bill yourself, or delete the bill if it was uploaded by mistake.`,
   // T10b: a delivery-based fuel is checked for completeness, not monthly coverage. Until the customer confirms
   // the deliveries listed are all of them, export waits.
   // T10c: no count; the list beside it shows the deliveries.
@@ -5850,6 +5860,7 @@ export interface CoverageIssue {
   fuelType: string
   // gap | overlap (per coverage group), undated | invalid_period | mixed_units | all_rejected (T3 ruling
   // "no silent zero"), stream_off (T6 ruling), none (an unread upload, T10 ruling), no_value (T10a),
+  // awaiting_reading | reading_unreadable (BR7: a bill with the Bill Review team, or one it could not read),
   // exact_duplicate (T15, rule R6), factor_missing | refrigerant_unknown | province_missing (FI1).
   status: string
   message?: string        // plain-language, for the strip (T8); absent for gap and none (copy unchanged)
@@ -5972,6 +5983,22 @@ export function findUnresolvedCoverage(
       if ((d.extracted?.length ?? 0) > 0 || d.withdrawn) return
       // FI9 diff 4: an unread fleet-fuel upload names the ticked vehicle types' fields (all six when none is ticked).
       const fields = d.document_type === 'fleet_fuel' ? unreadFleetFields(loc) : DOC_TYPE_FIELDS[d.document_type] ?? []
+      // BR7: a bill with the Bill Review team takes the place of T10's unread upload, so the customer is not told that no
+      // figure was read and to type one in. Waiting: blocks even with a typed figure, unless every field it backs has a
+      // Q12 override (activeOverride). Unreadable (the team's note is on it): blocks until the field has a figure.
+      // Read: its proposals arrive and this branch no longer applies (an unconfirmed one blocks as any proposal does).
+      if (d.bill_review?.reading === 'human') {
+        if (d.read_outcome === 'abstained') {
+          if (fields.length === 0 || fields.some(f => Number((derivedHere as unknown as Record<string, unknown>)[String(f)] ?? 0) > 0)) return
+          out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'reading_unreadable', docIds: [d.id],
+            fields: fields.map(String), message: COVERAGE_MESSAGE.reading_unreadable(d.file_name, d.bill_review.unreadableNote) })
+          return
+        }
+        if (fields.length > 0 && fields.every(f => activeOverride(loc, f))) return
+        out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'awaiting_reading', docIds: [d.id],
+          fields: fields.map(String), message: COVERAGE_MESSAGE.awaiting_reading(d.file_name, d.bill_review.expectedBy) })
+        return
+      }
       if (fields.length === 0 || fields.some(hasFigure)) return
       out.push({ locId: loc.id, fuelType: fuelTypeForDocType(d.document_type) ?? '', status: 'none', docIds: [d.id],
         fields: fields.map(String), message: COVERAGE_MESSAGE.unread(d.file_name, listInWords(fields.map(f => FIELD_NAME[String(f)] ?? String(f))), site) })

@@ -13,12 +13,13 @@ import { join } from 'node:path'
 const DIR = join(process.cwd(), 'supabase/migrations')
 const code = (sql: string) => sql.split('\n').filter(l => !l.trim().startsWith('--')).join('\n')
 
-const TABLES = ['ghg_inventories', 'bill_review_documents', 'bill_review_readings']
+// BR7: the outbox tables are covered too; their grants are table-level today, so any column grant added later is read here.
+const TABLES = ['ghg_inventories', 'bill_review_documents', 'bill_review_readings', 'bill_review_notices', 'bill_review_notice_documents']
 
 /** The privilege list of each GRANT ... ON one of TABLES that names any column, split at top-level commas. */
 function columnGrantsOnInventories(sql: string): string[][] {
   const out: string[][] = []
-  for (const m of code(sql).matchAll(new RegExp(`\\bgrant\\s+([\\s\\S]*?)\\s+on\\s+(?:table\\s+)?public\\.(?:${TABLES.join('|')})\\b`, 'gi'))) {
+  for (const m of code(sql).matchAll(new RegExp(`\\bgrant\\s+([^;]*?)\\s+on\\s+(?:table\\s+)?public\\.(?:${TABLES.join('|')})\\b`, 'gi'))) {
     const list = m[1]
     if (!list.includes('(')) continue
     const items: string[] = []
@@ -52,6 +53,9 @@ describe('column grants on ghg_inventories and the Bill Review tables are scoped
     const sql = readFileSync(join(DIR, '20261013_bill_review_queue.sql'), 'utf8')
     expect(columnGrantsOnInventories(sql)).toHaveLength(2)
     expect(columnGrantsOnInventories('grant select, insert (a) on public.bill_review_readings to authenticated;')).toHaveLength(1)
+  })
+  it('one statement at a time: a function grant before a table grant is not read as a column grant', () => {
+    expect(columnGrantsOnInventories('grant execute on function public.f(uuid) to service_role;\ngrant select, update on public.bill_review_notices to service_role;')).toEqual([])
   })
   it('the check bites: the shared-list form is refused, the per-privilege form passes', () => {
     expect(perPrivilege(columnGrantsOnInventories('grant select, insert, update (a, b) on public.ghg_inventories to authenticated;')[0])).toBe(false)

@@ -151,12 +151,16 @@ export function CoverageStrip(p: CoverageStripProps) {
 
   // Uploads with nothing read from them and no figure for any field they support (T10 ruling).
   const unread = issues.filter(i => i.status === 'none' && i.message && (i.docIds ?? []).some(id => docIdsHere.has(id)))
+  // BR7: a bill with the Bill Review team blocks export with the engine's message and no action (its figure waits on the
+  // team, or a Q12 override); one the team could not read offers to enter the figure (or the bill's own Delete).
+  const withTeam = issues.filter(i => (i.status === 'awaiting_reading' || i.status === 'reading_unreadable') && i.message
+    && (i.docIds ?? []).some(id => docIdsHere.has(id)))
   // T15: exact duplicates with a document on this upload, answered or not. The message is the engine's issue.
   const duplicates = findExactDuplicates(location, p.resolutions).filter(x => x.docIds.some(id => docIdsHere.has(id)))
     .map(x => ({ x, issue: issues.find(i => i.status === 'exact_duplicate' && i.fuelType === x.fuelType
       && (i.docIds ?? []).length === 2 && x.docIds.every(id => (i.docIds ?? []).includes(id))) }))
 
-  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0
+  if (groups.size === 0 && allRejected.length === 0 && notices.length === 0 && unread.length === 0 && withTeam.length === 0
     && deliveryFuels.length === 0 && refused.length === 0 && duplicates.length === 0) return null
   const yearText = reportingYearLabel(win).inText
   const many = groups.size > 1
@@ -280,6 +284,16 @@ export function CoverageStrip(p: CoverageStripProps) {
                 locId: location.id, fuelType: i.fuelType, field: i.field as string, fuelName: fuelName(i.fuelType), by: p.currentUser, at: now(),
               }))}>Confirm this site used no {fuelName(i.fuelType)}</button>
           </div>
+        </div>
+      ))}
+      {withTeam.map(i => (
+        <div key={`team|${(i.docIds ?? []).join(',')}`} style={{ marginTop: 8, background: '#FEF3E2', borderRadius: 6, padding: '8px 10px', fontSize: 11, color: 'var(--color-state-warn)', fontWeight: 600 }}>
+          <div>⚠ {i.message}</div>
+          {i.status === 'reading_unreadable' && (
+            <div style={row}>
+              <button style={warnButton} onClick={() => p.onEnterManually((i.fields ?? [])[0])}>Enter the figure manually</button>
+            </div>
+          )}
         </div>
       ))}
       {unread.map(i => (
