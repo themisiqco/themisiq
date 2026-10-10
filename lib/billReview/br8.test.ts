@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest'
 import { checkReading, fuelsFor } from './readingCheck'
 import { sortQueue, isOverdue } from './queueOrder'
-import { switchSentence } from './switchWords'
+import { switchSentence, nowLine, ifChangeLine, changeButton } from './switchWords'
+import { blankDraft, draftMissing, canSave } from './readingDraft'
 import { readingToProposal } from './mergeReadings'
 
 const ok = { fuelType: 'electricity', value: 4210, unit: 'kwh', periodStart: '2026-01-01', periodEnd: '2026-01-31', sourceQuote: 'Total usage 4,210 kWh' }
@@ -72,5 +73,37 @@ describe('BR8 switch words (Q1)', () => {
     expect(switchSentence('human', 3)).toBe('From now on, bills uploaded to this inventory will be read by a ThemisIQ specialist and will not be sent to the AI. Bills already uploaded keep their reading: 3 bills were already read by the AI.')
     expect(switchSentence('human', 1)).toContain('1 bill was already read by the AI.')
     expect(switchSentence('ai', 0)).toBe('From now on, bills uploaded to this inventory will be read by the AI, and the customer confirms each one. Bills already read by our team keep their reading, and bills still with our team stay with our team.')
+  })
+})
+
+describe('BR8 follow-up: the switch screen says now, then if you change it', () => {
+  it('the lines', () => {
+    expect(nowLine('human')).toBe('Now: read by a ThemisIQ specialist.')
+    expect(nowLine('ai')).toBe('Now: read by the AI, and the customer confirms each one.')
+    expect(nowLine(null)).toBe('Now: read by the AI, and the customer confirms each one.')
+    expect(ifChangeLine('ai')).toBe('If you change it to AI reading:')
+    expect(ifChangeLine('human')).toBe('If you change it to specialist reading:')
+    expect(changeButton('ai')).toBe('Change to AI reading')
+    expect(changeButton('human')).toBe('Change to specialist reading')
+  })
+})
+
+describe('BR8 follow-up: the reading form', () => {
+  it('dates start empty, never today; an untouched form cannot be saved', () => {
+    const d = blankDraft('electricity')
+    expect([d.periodStart, d.periodEnd, d.deliveryDate]).toEqual(['', '', ''])
+    expect(draftMissing(d)).toEqual(['the figure', 'the period start', 'the period end', 'the quote'])
+    expect(canSave([d])).toBe(false)
+    expect(canSave([])).toBe(false)
+  })
+  it('the dates are required for the mode chosen; complete drafts can be saved, all of them or none', () => {
+    const full = { ...blankDraft('electricity'), value: '4210', sourceQuote: 'Total 4,210 kWh', periodStart: '2026-01-01' }
+    expect(draftMissing(full)).toEqual(['the period end'])
+    const ok = { ...full, periodEnd: '2026-01-31' }
+    expect(canSave([ok])).toBe(true)
+    const delivery = { ...ok, dates: 'delivery' as const }
+    expect(draftMissing(delivery)).toEqual(['the delivery date'])
+    expect(canSave([ok, delivery])).toBe(false)
+    expect(canSave([ok, { ...delivery, deliveryDate: '2026-02-03' }])).toBe(true)
   })
 })

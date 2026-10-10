@@ -36,6 +36,7 @@ export function fakeAdmin(tables: Record<string, Row[]>, opts: { failInsertInto?
       eq: (k: string, v: unknown) => { filters.push(r => r[k] === v); return q },
       neq: (k: string, v: unknown) => { filters.push(r => r[k] !== v); return q },
       lt: (k: string, v: number) => { filters.push(r => Number(r[k]) < v); return q },
+      gt: (k: string, v: string) => { filters.push(r => String(r[k]) > v); return q },
       in: (k: string, v: unknown[]) => { filters.push(r => v.includes(r[k])); return q },
       is: (k: string, v: unknown) => { filters.push(r => (r[k] ?? null) === v); return q },
       order: (col: string, o?: { ascending?: boolean }) => { orderBy = { col, asc: o?.ascending !== false }; return q },

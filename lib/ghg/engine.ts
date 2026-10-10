@@ -4769,15 +4769,17 @@ export interface BillContribution {
 }
 
 /**
- * BR8b: a spot-check difference is open until the customer confirms this reading again, or corrects it, after the
- * check (a confirmation or correction recorded later than checkedAt, with who and when, as T18 records them).
+ * BR8b: a spot-check difference is open until the customer, after the check (a record later than checkedAt, with who
+ * and when, as T18 records them): confirms this reading again; corrects it; or rejects it (BR8 follow-up, 10 Oct 2026),
+ * while it stays rejected (an undo puts the confirmed figure back, and the difference with it).
  */
-export function spotCheckOpen(p: Pick<ExtractedProposal, 'spotCheck' | 'confirmations' | 'corrections'>): boolean {
+export function spotCheckOpen(p: Pick<ExtractedProposal, 'spotCheck' | 'confirmations' | 'corrections' | 'statusLog' | 'status'>): boolean {
   if (!p.spotCheck) return false
   // Instants, not strings: Postgres writes +00:00 and microseconds, the page writes Z and milliseconds.
   const checked = Date.parse(p.spotCheck.checkedAt)
   const after = (at: string | undefined) => !!at && Date.parse(at) > checked
-  return !(p.confirmations ?? []).some(c => after(c.at)) && !(p.corrections ?? []).some(c => after(c.at))
+  const rejectedAfter = p.status === 'rejected' && (p.statusLog ?? []).some(e => e.action === 'rejected' && after(e.at))
+  return !(p.confirmations ?? []).some(c => after(c.at)) && !(p.corrections ?? []).some(c => after(c.at)) && !rejectedAfter
 }
 
 /**

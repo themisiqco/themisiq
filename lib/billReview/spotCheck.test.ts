@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { emptyLocation, deriveLocations, findUnresolvedCoverage, spotCheckOpen, type Location, type SourceDoc, type ExtractedProposal } from '../ghg/engine'
-import { confirmProposal, editFigure } from '../ghg/proposalEdits'
+import { confirmProposal, editFigure, rejectProposal, undoRejection } from '../ghg/proposalEdits'
 import { withdrawDocument, deleteDocument } from '../ghg/documentActions'
 import { spotCheckSample, sampleKey, inSample, type SampleInventory } from './spotCheckSample'
 import { mergeSpotChecks, type SpotCheckRow } from './spotCheckMerge'
@@ -89,6 +89,18 @@ describe('BR8b: the difference on the customer’s bill, and the export block', 
     const l = merged(); const p = l.source_docs[0].extracted![0]
     const corrected = { ...p, ...editFigure(p, { value: 4120, by: BY, at: '2026-10-23T09:00:00.000Z' }) }
     expect(spotCheckOpen(corrected)).toBe(false)
+  })
+  it('clears when the customer rejects the disputed reading after the check; an undo puts it back', () => {
+    const l = merged(); const p = l.source_docs[0].extracted![0]
+    const rejected = { ...p, ...rejectProposal(p, { by: BY, at: '2026-10-23T09:00:00.000Z' }) }
+    expect(spotCheckOpen(rejected)).toBe(false)
+    expect(issues({ ...l, source_docs: [{ ...l.source_docs[0], extracted: [rejected] }] })).toEqual([])
+    const undone = { ...rejected, ...undoRejection(rejected, { by: BY, at: '2026-10-23T10:00:00.000Z' }) }
+    expect(undone.status).toBe('confirmed')
+    expect(spotCheckOpen(undone)).toBe(true)
+    // A rejection from before the check does not clear it.
+    const early = { ...p, status: 'rejected' as const, statusLog: [{ action: 'rejected' as const, at: '2026-10-21T09:00:00.000Z', by: BY, statusBefore: 'confirmed' as const }] }
+    expect(spotCheckOpen(early)).toBe(true)
   })
   it('clears when the customer withdraws or deletes the bill', () => {
     const l = merged()

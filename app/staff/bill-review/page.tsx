@@ -12,13 +12,14 @@ import { supabase } from '../../../lib/supabase'
 import { convertibleUnits, type FuelType } from '../../../lib/unitConversions'
 import { unitLabel } from '../../../lib/ghg/unitLabels'
 import { isoDateInWords } from '../../../lib/ghg/dateWords'
+import { formatActivity } from '../../../lib/ghg/workingsCells'
+import { blankDraft, draftMissing, canSave, type Draft } from '../../../lib/billReview/readingDraft'
 
 type QueueItem = { id: string; inventoryId: string; status: string; submitted_at: string; expected_by: string | null; overdue: boolean
   company: string | null; year: string | null; site: string | null; fileName: string; documentType: string; readable: boolean; stateWords: string | null }
 type Queue = { today: string; waiting: QueueItem[]; done: QueueItem[]; failedEmails: { id: string; kind: string; company: string | null; attempts: number; last_error: string | null; last_attempt_at: string | null }[] }
 type Bill = { id: string; status: string; fileName: string; documentTypeLabel: string; site: string | null; company: string | null; year: string; expected_by: string | null; fuels: FuelType[] }
 type SavedReading = { id: string; fuel_type: string; raw_value: number; raw_unit: string; period_start: string | null; period_end: string | null; delivery_date: string | null; source_quote: string | null; notes: string | null; supersedes: string | null; read_at: string }
-type Draft = { fuelType: string; value: string; unit: string; dates: 'period' | 'delivery'; periodStart: string; periodEnd: string; deliveryDate: string; sourceQuote: string; notes: string; supersedes: string | null }
 
 // The outbox's kinds, in words (BR7, and the staff notifications of 10 Oct 2026).
 const NOTICE_KIND_WORDS: Record<string, string> = { ready: 'Ready to confirm, to the customer', overdue: 'Running late, to the customer',
@@ -41,8 +42,8 @@ async function api(path: string, init?: { method?: string; body?: unknown }) {
   return { status: res.status, body }
 }
 
-const blankDraft = (fuel: string, supersedes: string | null = null): Draft =>
-  ({ fuelType: fuel, value: '', unit: convertibleUnits(fuel as FuelType)[0] ?? '', dates: 'period', periodStart: '', periodEnd: '', deliveryDate: '', sourceQuote: '', notes: '', supersedes })
+// Every figure and count on this page is written through formatActivity: "4,210 kWh", never "4210 kWh".
+const num = (n: number) => formatActivity(n)
 
 export default function StaffBillReviewPage() {
   const [phase, setPhase] = useState<'loading' | 'refused' | 'error' | 'ready'>('loading')
@@ -86,13 +87,13 @@ function QueueView({ queue, reload }: { queue: Queue; reload: () => void }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Emails not sent</div>
           {queue.failedEmails.map(e => (
             <div key={e.id} style={{ fontSize: 12, color: '#555553' }}>
-              {NOTICE_KIND_WORDS[e.kind] ?? e.kind}{e.company ? ` for ${e.company}` : ''}: {e.attempts} attempt{e.attempts === 1 ? '' : 's'}, last on {words(e.last_attempt_at)}. Last error: {e.last_error ?? 'not recorded'}.
+              {NOTICE_KIND_WORDS[e.kind] ?? e.kind}{e.company ? ` for ${e.company}` : ''}: {num(e.attempts)} attempt{e.attempts === 1 ? '' : 's'}, last on {words(e.last_attempt_at)}. Last error: {e.last_error ?? 'not recorded'}.
             </div>
           ))}
         </div>
       )}
       <div style={box}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>With the team ({queue.waiting.length}), overdue first, then oldest first</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>With the team ({num(queue.waiting.length)}), overdue first, then oldest first</div>
         {queue.waiting.length === 0 && <div style={{ fontSize: 12, color: '#555553' }}>No bills are waiting.</div>}
         {queue.waiting.map(b => (
           <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderTop: '0.5px solid #f0efed', fontSize: 12 }}>
@@ -139,7 +140,7 @@ function BillView({ id, back }: { id: string; back: () => void }) {
     const readings = drafts.map(d => ({ fuelType: d.fuelType, value: d.value, unit: d.unit, sourceQuote: d.sourceQuote, notes: d.notes, supersedes: d.supersedes,
       ...(d.dates === 'period' ? { periodStart: d.periodStart, periodEnd: d.periodEnd } : { deliveryDate: d.deliveryDate }) }))
     const r = await api('read', { body: { documentId: id, readings } })
-    if (r.status === 200) { setDone(`Saved ${r.body.saved} reading${r.body.saved === 1 ? '' : 's'}. The customer confirms each one.`); setDrafts([]); openBill() } else setError(r.body?.error ?? `Not saved (HTTP ${r.status}).`)
+    if (r.status === 200) { setDone(`Saved ${num(r.body.saved)} reading${r.body.saved === 1 ? '' : 's'}. The customer confirms each one.`); setDrafts([]); openBill() } else setError(r.body?.error ?? `Not saved (HTTP ${r.status}).`)
   }
   const cantRead = async () => {
     const r = await api('unreadable', { body: { documentId: id, note } })
@@ -165,7 +166,7 @@ function BillView({ id, back }: { id: string; back: () => void }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Readings saved</div>
           {current.map(r => (
             <div key={r.id} style={{ fontSize: 12, padding: '4px 0', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span>{FUEL_WORDS[r.fuel_type] ?? r.fuel_type}: {r.raw_value} {unitLabel(r.raw_unit)}, {r.delivery_date ? `delivered ${words(r.delivery_date)}` : `${words(r.period_start)} to ${words(r.period_end)}`}. &ldquo;{r.source_quote}&rdquo;</span>
+              <span>{FUEL_WORDS[r.fuel_type] ?? r.fuel_type}: {num(r.raw_value)} {unitLabel(r.raw_unit)}, {r.delivery_date ? `delivered ${words(r.delivery_date)}` : `${words(r.period_start)} to ${words(r.period_end)}`}. &ldquo;{r.source_quote}&rdquo;</span>
               <button style={btn} onClick={() => setDrafts(d => [...d, { ...blankDraft(r.fuel_type, r.id), value: String(r.raw_value), unit: r.raw_unit, sourceQuote: r.source_quote ?? '' }])}>Correct this reading</button>
             </div>
           ))}
@@ -195,11 +196,12 @@ function BillView({ id, back }: { id: string; back: () => void }) {
               </div>
               <input aria-label="Quote" style={input} maxLength={300} placeholder="The figure and its unit exactly as printed (required)" value={d.sourceQuote} onChange={e => set(i, { sourceQuote: e.target.value })} />
               <input aria-label="Notes" style={input} placeholder="Notes (optional)" value={d.notes} onChange={e => set(i, { notes: e.target.value })} />
+              {draftMissing(d).length > 0 && <div style={{ color: '#555553' }}>Still needed: {draftMissing(d).join(', ')}.</div>}
             </div>
           ))}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button style={btn} onClick={() => setDrafts(d => [...d, blankDraft(bill.fuels[0] ?? 'electricity')])}>Add another reading</button>
-            {drafts.length > 0 && <button style={primary} onClick={save}>Save {drafts.length === 1 ? 'reading' : `${drafts.length} readings`}</button>}
+            {drafts.length > 0 && <button style={canSave(drafts) ? primary : { ...primary, opacity: 0.5, cursor: 'not-allowed' }} disabled={!canSave(drafts)} onClick={save}>Save {drafts.length === 1 ? 'reading' : `${num(drafts.length)} readings`}</button>}
           </div>
         </div>
       )}
@@ -215,37 +217,67 @@ function BillView({ id, back }: { id: string; back: () => void }) {
   )
 }
 
+type SwitchRow = { inventoryId: string; company: string | null; year: string; ownerEmail: string | null; reading: 'ai' | 'human' | null }
+type SwitchConfirm = { inventoryId: string; company: string | null; year: string; to: 'ai' | 'human'; now: string; ifChange: string; sentence: string; button: string }
+
+// BR8 follow-up (10 Oct 2026): the inventories whose owner holds Bill Review, searchable by company or the owner's
+// email (staff only), each with a Change button; the id box stays below as a fallback.
 function SwitchView() {
+  const [rows, setRows] = useState<SwitchRow[] | null>(null)
+  const [q, setQ] = useState('')
   const [inventoryId, setInventoryId] = useState('')
-  const [view, setView] = useState<{ company: string | null; year: string; reading: string | null; to: 'ai' | 'human'; sentence: string } | null>(null)
+  const [view, setView] = useState<SwitchConfirm | null>(null)
   const [msg, setMsg] = useState('')
-  const show = async () => {
+  const applyList = (r: { status: number; body: { items?: SwitchRow[]; error?: string; message?: string } }) => {
+    if (r.status === 200 && r.body.items) setRows(r.body.items); else setMsg(r.body?.error ?? r.body?.message ?? `HTTP ${r.status}`)
+  }
+  const list = (query: string) => api(`reading-switch/inventories${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''}`).then(applyList)
+  useEffect(() => { api('reading-switch/inventories').then(applyList) }, [])
+  const show = async (id: string) => {
     setMsg(''); setView(null)
-    const r = await api(`reading-switch?inventoryId=${encodeURIComponent(inventoryId.trim())}`)
+    const r = await api(`reading-switch?inventoryId=${encodeURIComponent(id.trim())}`)
     if (r.status === 200) setView(r.body); else setMsg(r.body?.message ?? r.body?.error ?? `HTTP ${r.status}`)
   }
   const change = async () => {
     if (!view) return
-    const r = await api('reading-switch', { body: { inventoryId: inventoryId.trim(), reading: view.to } })
-    if (r.status === 200) { setMsg(`Changed. Since ${words(r.body.setAt)}, this inventory’s bills are read by ${view.to === 'human' ? 'a ThemisIQ specialist' : 'the AI'}. The customer sees this on their Energy and fuel data step.`); setView(null) }
+    const r = await api('reading-switch', { body: { inventoryId: view.inventoryId, reading: view.to } })
+    if (r.status === 200) { setMsg(`Changed. Since ${words(r.body.setAt)}, this inventory’s bills are read by ${view.to === 'human' ? 'a ThemisIQ specialist' : 'the AI'}. The customer sees this on their Energy and fuel data step.`); setView(null); list(q) }
     else setMsg(r.body?.error ?? r.body?.message ?? `HTTP ${r.status}`)
   }
+  const readingWords = (r: SwitchRow['reading']) => (r === 'human' ? 'Specialist reading' : 'AI reading')
+  if (view) return (
+    <div style={box}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{view.company ?? 'Company not named'}, {view.year}</div>
+      <p style={{ fontSize: 12 }}>{view.now}</p>
+      <p style={{ fontSize: 12, fontWeight: 600, marginTop: 8 }}>{view.ifChange}</p>
+      <p style={{ fontSize: 12, margin: '4px 0 10px' }}>{view.sentence}</p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button style={primary} onClick={change}>{view.button}</button>
+        <button style={btn} onClick={() => setView(null)}>Back</button>
+      </div>
+    </div>
+  )
   return (
     <div style={box}>
       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Change an inventory&rsquo;s reading, on the customer&rsquo;s request</div>
       <p style={{ fontSize: 12, color: '#555553', marginBottom: 8 }}>For a lead only. Quote and invoice the customer first. The change applies to bills uploaded from now on.</p>
+      {msg && <p style={{ margin: '0 0 8px', fontSize: 12 }}>{msg}</p>}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        <input aria-label="Search" style={{ ...input, flex: 1 }} placeholder="Search by company name or customer email" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') list(q) }} />
+        <button style={btn} onClick={() => list(q)}>Search</button>
+      </div>
+      {rows && rows.length === 0 && <p style={{ fontSize: 12, color: '#555553' }}>{q.trim() ? 'No Bill Review inventory matches that search.' : 'No customer holds Bill Review.'}</p>}
+      {(rows ?? []).map(r => (
+        <div key={r.inventoryId} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderTop: '0.5px solid #f0efed', fontSize: 12 }}>
+          <span><strong style={{ fontWeight: 600 }}>{r.company ?? 'Company not named'}</strong>, {r.year}. {r.ownerEmail ?? 'Email not found'}. {readingWords(r.reading)}.</span>
+          <button style={btn} onClick={() => show(r.inventoryId)}>Change</button>
+        </div>
+      ))}
+      <div style={{ fontSize: 12, color: '#555553', margin: '14px 0 4px' }}>Not in the list? Enter the inventory id.</div>
       <div style={{ display: 'flex', gap: 6 }}>
         <input aria-label="Inventory id" style={{ ...input, flex: 1 }} placeholder="Inventory id (the id= in the customer's wizard address)" value={inventoryId} onChange={e => setInventoryId(e.target.value)} />
-        <button style={btn} disabled={!inventoryId.trim()} onClick={show}>Show</button>
+        <button style={btn} disabled={!inventoryId.trim()} onClick={() => show(inventoryId)}>Show</button>
       </div>
-      {view && (
-        <div style={{ marginTop: 10, fontSize: 12 }}>
-          <p>{view.company ?? 'Company not named'}, {view.year}. Read now by {view.reading === 'human' ? 'a ThemisIQ specialist' : 'the AI'}.</p>
-          <p style={{ margin: '6px 0' }}>{view.sentence}</p>
-          <button style={primary} onClick={change}>{view.to === 'human' ? 'Change to specialist reading' : 'Change to AI reading'}</button>
-        </div>
-      )}
-      {msg && <p style={{ marginTop: 8, fontSize: 12 }}>{msg}</p>}
     </div>
   )
 }
@@ -283,7 +315,7 @@ function SpotCheckView() {
         <a href={open.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--color-brand)' }}>Open the bill</a>
         <span style={{ fontSize: 11, color: '#555553' }}> The link works for 5 minutes.</span>
         <p style={{ fontSize: 12, margin: '10px 0' }}>
-          The AI read {FUEL_WORDS[open.item.fuelType] ?? open.item.fuelType}: {rd.rawValue ?? 'no figure'} {rd.rawUnit ? unitLabel(rd.rawUnit) : ''}, {rd.deliveryDate ? `delivered ${words(rd.deliveryDate)}` : `${words(rd.periodStart)} to ${words(rd.periodEnd)}`}.
+          The AI read {FUEL_WORDS[open.item.fuelType] ?? open.item.fuelType}: {rd.rawValue == null ? 'no figure' : num(rd.rawValue)} {rd.rawUnit ? unitLabel(rd.rawUnit) : ''}, {rd.deliveryDate ? `delivered ${words(rd.deliveryDate)}` : `${words(rd.periodStart)} to ${words(rd.periodEnd)}`}.
           {rd.sourceQuote ? <> Quote: &ldquo;{rd.sourceQuote}&rdquo;.</> : null} The customer confirmed it.
         </p>
         <textarea aria-label="Note" style={{ ...input, width: '100%', minHeight: 50 }} maxLength={500}

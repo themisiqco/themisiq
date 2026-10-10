@@ -24,6 +24,8 @@ import { POST as open } from '../../app/api/staff/bill-review/open/route'
 import { POST as read } from '../../app/api/staff/bill-review/read/route'
 import { POST as unreadable } from '../../app/api/staff/bill-review/unreadable/route'
 import { GET as switchView, POST as switchSet } from '../../app/api/staff/bill-review/reading-switch/route'
+import { GET as switchList } from '../../app/api/staff/bill-review/reading-switch/inventories/route'
+import { CONCIERGE_KEY } from '../pricing'
 import { STAFF_ONLY } from './access'
 
 const OWNER = 'cust-1'
@@ -181,5 +183,57 @@ describe('BR8: the reading switch (Q1)', () => {
     expect(res.status).toBe(200)
     expect(db.calls).toEqual(['insert:staff_access_log', 'rpc:staff_set_bill_review_reading'])
     expect(args).toEqual({ p_inventory_id: 'inv-1', p_reading: 'ai', p_staff_user_id: 'lead-1' })
+  })
+  it('the confirmation says what is true now, then what a change would do', async () => {
+    const v = await (await switchView(withUrl(req('lead-token', undefined, 'http://x/api?inventoryId=inv-1')))).json()
+    expect(v).toMatchObject({ now: 'Now: read by a ThemisIQ specialist.', ifChange: 'If you change it to AI reading:', button: 'Change to AI reading' })
+  })
+})
+
+describe('BR8 follow-up: the list of inventories a lead may change', () => {
+  const later = '2099-01-01T00:00:00Z'
+  function seedList() {
+    db.tables.ghg_inventories.push(
+      { id: 'inv-2', user_id: 'cust-2', company_name: 'Birch plc', reporting_year: 2025, fiscal_year_end_month: 12, bill_review_reading: 'ai', locations_data: [] },
+      { id: 'inv-3', user_id: 'cust-3', company_name: 'Cedar Ltd', reporting_year: 2025, fiscal_year_end_month: 12, bill_review_reading: 'ai', locations_data: [] },
+      { id: 'inv-4', user_id: 'cust-4', company_name: 'Dune Ltd', reporting_year: 2025, fiscal_year_end_month: 12, bill_review_reading: 'ai', locations_data: [] })
+    db = fakeAdmin({ ...db.tables, entitlements: [
+      { user_id: OWNER, module_key: CONCIERGE_KEY, term_end: later },
+      { user_id: 'cust-2', module_key: CONCIERGE_KEY, term_end: later },
+      { user_id: 'cust-3', module_key: 'ghg', term_end: later },                      // GHG only: not listed
+      { user_id: 'cust-4', module_key: CONCIERGE_KEY, term_end: '2020-01-01T00:00:00Z' }, // lapsed: not listed
+    ] }, { emails: { [OWNER]: 'ops@acme.example', 'cust-2': 'Finance@Birch.example', 'cust-3': 'x@cedar.example', 'cust-4': 'x@dune.example' } })
+    h.db = db
+  }
+  const list = (token: string, q = '') => switchList(withUrl(req(token, undefined, `http://x/api${q ? `?q=${encodeURIComponent(q)}` : ''}`)))
+  it('a lead only: a bill reader and a customer get 403, nothing logged or read', async () => {
+    seedList()
+    expect((await list('reader-token')).status).toBe(403)
+    expect((await list('cust-token')).status).toBe(403)
+    expect(logged()).toEqual([])
+    expect(db.calls.filter(c => !c.includes('staff_roles'))).toEqual([])
+  })
+  it('only owners holding Bill Review now; each row has company, year label, owner email and reading; logged first', async () => {
+    seedList()
+    const res = await list('lead-token')
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([
+      { inventoryId: 'inv-1', company: 'Acme Ltd', year: expect.any(String), ownerEmail: 'ops@acme.example', reading: 'human' },
+      { inventoryId: 'inv-2', company: 'Birch plc', year: expect.any(String), ownerEmail: 'Finance@Birch.example', reading: 'ai' },
+    ])
+    expect(logged()).toEqual(['view_reading_switch'])
+  })
+  it('a failed log write fails the request: 503, no customer or email returned', async () => {
+    seedList()
+    db = fakeAdmin(db.tables, { failInsertInto: new Set(['staff_access_log']), emails: { [OWNER]: 'ops@acme.example' } }); h.db = db
+    const res = await list('lead-token')
+    expect(res.status).toBe(503)
+    expect(JSON.stringify(await res.json())).not.toContain('acme')
+  })
+  it('searchable by company name or owner email, ignoring case', async () => {
+    seedList()
+    expect((await (await list('lead-token', 'birch')).json()).items.map((i: { inventoryId: string }) => i.inventoryId)).toEqual(['inv-2'])
+    expect((await (await list('lead-token', 'OPS@ACME')).json()).items.map((i: { inventoryId: string }) => i.inventoryId)).toEqual(['inv-1'])
+    expect((await (await list('lead-token', 'cedar')).json()).items).toEqual([])
   })
 })

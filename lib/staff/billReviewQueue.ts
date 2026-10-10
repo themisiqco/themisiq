@@ -13,6 +13,8 @@ import 'server-only'
 //   markUnreadable      mark_unreadable       the bill moved to unreadable with the note, then notifyIfBatchComplete
 //   readingSwitchView   view_reading_switch   (lead) the confirmation screen's facts
 //   setReading          set_reading           (lead) staff_set_bill_review_reading: the lead is stamped as set_by
+//   switchInventories   view_reading_switch   (lead) the inventories whose owner holds Bill Review, searchable by company
+//                                             or the owner's email (shown to staff only, never to a customer)
 //
 // SEC-01: a document is signed only by the path its bill_review_documents row holds, only if that path is under the
 // inventory owner's user id and is the path the saved inventory holds for that bill. Never a path from the browser:
@@ -25,7 +27,8 @@ import { logStaffAccess, signStaffDocument, type Staff } from './access'
 import { customerBillState, type CustomerBillState } from '../billReview/billState'
 import { checkReading, fuelsFor, type ReadingInput, type ReadingRowInsert } from '../billReview/readingCheck'
 import { sortQueue, isOverdue } from '../billReview/queueOrder'
-import { switchSentence } from '../billReview/switchWords'
+import { switchSentence, nowLine, ifChangeLine, changeButton } from '../billReview/switchWords'
+import { CONCIERGE_ENTITLEMENT_KEYS } from '../pricing'
 import { notifyIfBatchComplete } from '../billReview/notices'
 import { torontoParts } from '../billReview/businessDays'
 import { yearLabel } from '../ghg/reportingYear'
@@ -175,7 +178,31 @@ export async function readingSwitchView(staff: Staff, inventoryId: unknown) {
   const now = readingOf(r.inv.bill_review_reading)
   const to: BillReviewReading = now === 'human' ? 'ai' : 'human'
   return { ok: true as const, inventoryId: r.inv.id, company: r.inv.company_name, year: yearLabel(r.inv.reporting_year, r.inv.fiscal_year_end_month ?? 12).inText,
-    reading: now, to, readByAi: readByAi(r.inv), sentence: switchSentence(to, readByAi(r.inv)) }
+    reading: now, to, readByAi: readByAi(r.inv), now: nowLine(now), ifChange: ifChangeLine(to), sentence: switchSentence(to, readByAi(r.inv)), button: changeButton(to) }
+}
+
+/**
+ * BR8 follow-up (10 Oct 2026): the inventories a lead may change, those whose owner holds Bill Review now (term-aware),
+ * searchable by company name or the owner's email, read with the service role. The owner's email is staff-only.
+ */
+export async function switchInventories(staff: Staff, query: unknown) {
+  await logStaffAccess(staff, { action: 'view_reading_switch' })
+  const a = staff.admin
+  const { data: ents, error: eErr } = await a.from('entitlements').select('user_id').in('module_key', CONCIERGE_ENTITLEMENT_KEYS).gt('term_end', new Date().toISOString())
+  if (eErr || !ents) return fail(503, 'The Bill Review customers could not be read.')
+  const owners = [...new Set(ents.map(e => e.user_id as string))]
+  if (owners.length === 0) return { ok: true as const, items: [] }
+  const { data: invs, error: iErr } = await a.from('ghg_inventories').select('id, user_id, company_name, reporting_year, fiscal_year_end_month, bill_review_reading').in('user_id', owners)
+  if (iErr || !invs) return fail(503, 'The inventories could not be read.')
+  const emails = new Map<string, string | null>()
+  for (const o of owners) { const { data } = await a.auth.admin.getUserById(o); emails.set(o, data?.user?.email ?? null) }
+  const q = typeof query === 'string' ? query.trim().toLowerCase() : ''
+  const items = (invs as Inv[]).map(i => ({
+    inventoryId: i.id, company: i.company_name, year: yearLabel(i.reporting_year, i.fiscal_year_end_month ?? 12).inText,
+    ownerEmail: emails.get(i.user_id) ?? null, reading: readingOf(i.bill_review_reading),
+  })).filter(i => !q || (i.company ?? '').toLowerCase().includes(q) || (i.ownerEmail ?? '').toLowerCase().includes(q))
+    .sort((x, y) => (x.company ?? '').localeCompare(y.company ?? '') || x.year.localeCompare(y.year))
+  return { ok: true as const, items }
 }
 
 export async function setReading(staff: Staff, inventoryId: unknown, reading: unknown) {
